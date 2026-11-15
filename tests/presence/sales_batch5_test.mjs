@@ -59,7 +59,7 @@ const sales = read('supabase/functions/presence/routes/sales.ts');
 // item 46 (Nov 8) moved the reads into loadMyTasks, shared with the calendar link
 // item 85: six since to-dos can be for a person (their names are read on the site too); the customers'
 // names come from the platform's clients table, by the ids this site's own to-dos carry
-ok('it reads only the signed-in site\'s rows', (sales.match(/export async function loadMyTasks[\s\S]*?\n}\n/) || [''])[0].split('site_id=eq.${siteId}').length - 1 === 6 && /loadMyTasks\(site\.id, principal\.userId \|\| null\)/.test(sales));
+ok('it reads only the signed-in site\'s rows', (sales.match(/export async function loadMyTasks[\s\S]*?\n}\n/) || [''])[0].split('site_id=eq.${siteId}').length - 1 === 6 && /loadMyTasks\(site\.id, principal\.userId \|\| null(, await teamOf\(principal\))?\)/.test(sales));   // item 37: and the caller's team, for Mine
 ok('a failed read says partial, never a false empty list', /if \(!r\.ok\) \{ partial = true; return \[\]; \}/.test(sales) && /items: all\.slice\(0, MY_TASKS_MAX\), total: all\.length, partial/.test(sales));
 const home = read('agency.html');
 ok('Done uses the route that owns each kind', /if\(t\.kind==='next_step'\)return\['PATCH','\/sales\/deals\/'\+encodeURIComponent\(t\.id\),\{next_step:'',next_step_at:''\}\];/.test(home)
@@ -74,7 +74,8 @@ ok('the board ends with Won and Not a fit', /<div class="board with-out">\$\{col
 ok('Not a fit is a drop zone the existing drag wiring serves', /<div class="col-body lost-drop" data-drop="lost">/.test(pipe));
 ok('Won is never a drop target (it is convert-only)', !/data-drop="won"/.test(pipe));
 ok('the Won column reads the summary\'s number once it has loaded', /if\(s\.won_month\)\{WON_MONTH=wm;/.test(pipe));
-ok('an empty board shows the walkthrough, not four empty columns', /if\(!DEALS\.length\)\{if\(window\.ddsStudioLevel&&window\.ddsStudioLevel\(host,\{noun:'Deals',lower:'deals and invoices'\}\)\)return;renderFirstDeal\(host\);return;\}/.test(pipe));
+// item 121: the board reads open deals only, so "empty" means no deal at all (ANY_DEALS), not no open one
+ok('an empty board shows the walkthrough, not four empty columns', /if\(!DEALS\.length&&!\(BOARD_OPEN_ONLY&&ANY_DEALS\)\)\{if\(window\.ddsStudioLevel&&window\.ddsStudioLevel\(host,\{noun:'Deals',lower:'deals and invoices'\}\)\)return;renderFirstDeal\(host\);return;\}/.test(pipe));
 ok('the walkthrough has four steps and step one\'s button', /<h3>Your first deal, in four steps<\/h3>/.test(pipe) && (pipe.match(/<li><b>/g) || []).length >= 4 && /id="fdNew">Add your first deal<\/button>/.test(pipe));
 
 // ── 34 ──
@@ -84,7 +85,7 @@ ok('the feed carries each request\'s priority and assignee', /const cols = 'id,s
 ok('the team list carries each person\'s sign-in id', /presence_agency_members\?agency_id=eq\.\$\{member\.agency_id\}&select=id,email,role,status,user_id,created_at/.test(read('supabase/functions/presence/agency/routes.ts')));
 const inbox = read('inbox.html');
 ok('the assignee picker shows only once a second person has signed in', /if\(team\.people\.length>1\)\{/.test(inbox));
-ok('the row shows High and Urgent only', /\(p==='high'\|\|p==='urgent'\?`<span class="prio \$\{p\}">/.test(inbox));
+ok('the row shows High and Urgent only', /[(=]p==='high'\|\|p==='urgent'\?`<span class="prio \$\{p\}">/.test(inbox));
 ok('both save through the existing triage route', /api\('\/support\/'\+encodeURIComponent\(it\.support_id\),'PATCH',\{\[field\]:value\|\|null\}\)/.test(inbox));
 
 console.log(`\n${pass} passed, ${fail} failed`);

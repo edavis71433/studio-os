@@ -871,7 +871,8 @@ function wire(){
   const ch=$('chartsBtn');if(ch)ch.addEventListener('click',()=>{CHARTS=!CHARTS;try{localStorage.setItem(CHARTS_KEY,CHARTS?'1':'0');}catch(_){/* storage may be denied */}ch.setAttribute('aria-pressed',CHARTS?'true':'false');paintCharts();});
   const pr=$('printBtn');if(pr)pr.addEventListener('click',()=>{printContacts().catch(()=>toast('That couldn’t print just now.'));});
   const dv=$('dropView');if(dv)dv.addEventListener('click',dropView);
-  const cb=$('colsBtn');if(cb&&KIT())cb.addEventListener('click',(e)=>{e.stopPropagation();KIT().columnsMenu(cb,COLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderListZone();});});
+  // shell.js is deferred and can land after this draw, so the kit is looked up on the press (a check here left Columns dead)
+  const cb=$('colsBtn');if(cb)cb.addEventListener('click',(e)=>{const k=KIT();if(!k)return;e.stopPropagation();k.columnsMenu(cb,COLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderListZone();});});
   // Refresh: a rejected load (network hiccup) toasts the page's standard copy —
   // never an unhandled promise; the initial-boot trouble() path is unchanged.
   // These re-renders also restore focus to their control (the sort handlers' pattern).
@@ -924,6 +925,7 @@ function wireList(){
 // item 90: the field filter chips, under the search. A change asks the server for the people it keeps.
 function paintFchips(){
   const host=$('fchips'),k=KIT();if(!host)return;
+  if(!k)document.addEventListener('DOMContentLoaded',paintFchips,{once:true});   // shell.js loads after this script: a draw that beat it gets the chips once it lands
   host.hidden=!k||inClient();   // builder item 83: your own second business keeps the chips
   if(host.hidden){host.innerHTML='';return;}
   k.filterChips(host,{value:FFILT,offer:['quiet','owes','nodeal','added','via'],vias:FOUND_VIA,onChange:(next,key)=>{FFILT=next;PICKED.clear();SRCH=null;reorder(key&&key!=='clear'?'#fchips [data-fchip="'+key+'"]':'#fchips [data-fchip]');}});
@@ -940,9 +942,11 @@ function fillMore(pre,c){
 }
 function readMore(pre){
   const val=(k)=>{const el=$(pre+'-'+k);return el?el.value.trim():'';};
-  const tb=tagBox(pre);
+  // a form filled before shell.js landed has no tag box, so it saves without tags and an edit keeps theirs
+  // (making the box here gave an empty one, and the edit wiped every tag the person had)
+  const tb=TAGBOX[pre];
   return {phone:val('phone'),phone2:val('phone2'),job_title:val('title'),company:val('company'),
-    address:{street:val('street'),city:val('city'),state:val('state'),zip:val('zip')},tags:tb?tb.get():[],found_via:val('found')};
+    address:{street:val('street'),city:val('city'),state:val('state'),zip:val('zip')},tags:tb?tb.get():undefined,found_via:val('found')};
 }
 function openNew(){$('c-name').value='';$('c-email').value='';fillMore('c',{});$('newDlg').showModal();setTimeout(()=>$('c-name').focus(),20);}
 $('c-cancel').onclick=()=>$('newDlg').close();
@@ -952,7 +956,7 @@ $('newForm').onsubmit=async(e)=>{
   if(!name&&!email){toast('A contact needs a name or an email.');return;}
   const m=readMore('c');
   const payload={name,email:email||undefined,phone:m.phone||undefined,phone2:m.phone2||undefined,job_title:m.job_title||undefined,company:m.company||undefined,
-    address:Object.values(m.address).some(Boolean)?m.address:undefined,tags:m.tags.length?m.tags:undefined,found_via:m.found_via||undefined};
+    address:Object.values(m.address).some(Boolean)?m.address:undefined,tags:m.tags&&m.tags.length?m.tags:undefined,found_via:m.found_via||undefined};
   // sales item 105: Save & New saves this one and clears the form for the next person
   const again=!!(e.submitter&&e.submitter.id==='c-again');
   const btns=[$('c-again'),$('c-add')];btns.forEach(b=>{if(b)b.disabled=true;});
@@ -1166,6 +1170,8 @@ function importTargets(){
     ['tags','Tags'],['notes','Notes'],['found_via','How they found you']]
     .concat((FIELD_DEFS||[]).map(f=>['custom:'+f.key,f.label||f.key]));
 }
+// one row on its own, carrying its import's id (an older server, or a shell.js from before item 122)
+async function sendOne(it,ctx){const body=Object.assign({},it,ctx&&ctx.importId?{import_id:ctx.importId}:{});const r=await api('/sales/contacts','POST',body);if(!r.ok)return'failed';return r.body&&r.body.updated?'updated':(r.body&&r.body.deduped?'existed':'added');}
 async function openImport(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
   await loadFieldDefs().catch(()=>{});   // your own fields are columns an import can fill
@@ -1188,9 +1194,20 @@ async function openImport(){
       if(Object.keys(custom).length)it.custom=custom;
       return it;},
     label:(it)=>it.name||it.email,
-    // the import is a record of its own, so it can be undone; each row carries its id
+    // item 122: the whole file in one request: the server makes the import (for Undo) and takes every
+    // row. An older server answers without counts, having only made the import: then the rows go one by
+    // one against it, as they used to. start and send stay for a shell.js from before sendAll.
+    sendAll:async(items,ctx)=>{
+      let r;try{r=await api('/sales/contacts/imports','POST',{file_name:ctx.fileName||'',on_existing:ctx.onExisting,rows:items});}catch(_){r={ok:false,status:0,body:{}};}
+      const d=r.ok&&r.body&&r.body.data;
+      if(!d){if(r.body&&r.body.message)toast(r.body.message);return{failed:items.length};}
+      ctx.importId=d.id||null;
+      if(d.counts)return d.counts;
+      const c={added:0,updated:0,existed:0,failed:0};
+      for(let i=0;i<items.length;i+=5)await Promise.all(items.slice(i,i+5).map(async it=>{let k='failed';try{k=await sendOne(it,ctx);}catch(_){}c[k]=(c[k]||0)+1;}));
+      return c;},
     start:async(o)=>{let r;try{r=await api('/sales/contacts/imports','POST',{file_name:o.fileName||'',on_existing:o.onExisting});}catch(_){return null;}return r.ok&&r.body&&r.body.data?r.body.data.id:null;},
-    send:async(it,ctx)=>{const body=Object.assign({},it,ctx&&ctx.importId?{import_id:ctx.importId}:{});const r=await api('/sales/contacts','POST',body);if(!r.ok)return'failed';return r.body&&r.body.updated?'updated':(r.body&&r.body.deduped?'existed':'added');},
+    send:(it,ctx)=>sendOne(it,ctx),
     summary:(c)=>`${c.added} added${c.updated?`, ${c.updated} updated`:''}${c.existed?`, ${c.existed} already here and left as they were`:''}${c.failed?`, ${c.failed} couldn’t be imported`:''}.`,
     done:()=>{load().catch(()=>{});loadImportStrip();},
   });
@@ -1402,6 +1419,7 @@ function paintMerge(){
       ${tags.length?`<div class="fl">Tags</div><div class="full">Both sets of tags are kept: ${esc(tags.join(', '))}</div>`:''}</div>
     <p class="mmoves">Everything moves to the one you keep: ${esc(parts.join(', '))}.</p>
     <p class="note">The other record is set aside for 30 days. Undo, in the message after, brings it back.</p>
+    ${d.notes_cut>0?`<p class="note" id="mgCut" style="color:var(--warn-ink,#7a5417)">Their notes together are longer than one record holds, so the last ${esc(d.notes_cut)} characters won’t fit. The line with the old email address stays at the top, and Undo brings back both records with every note in full.</p>`:''}
     ${d.partial?'<p class="note" style="color:var(--bad)">We couldn’t count everything attached just now; the merge still moves all of it.</p>':''}
     <div class="row2"><button type="button" class="btn ghost" id="merge-cancel">Cancel</button><button type="button" class="btn" id="mergeGo" data-needs="delete">Merge into one</button></div>`;
   $('merge-cancel').onclick=()=>{$('mergeDlg').close();};
@@ -1420,7 +1438,8 @@ async function doMerge(){
   }
   const away=(r.body.data&&r.body.data.merged_away)||{id:MERGE.other,name:''};
   $('mergeDlg').close();MERGE=null;
-  const msg=`Merged into one${away.name?` — ${away.name}’s record was set aside`:''}.`;
+  const cut=Number(r.body.data&&r.body.data.notes_cut)||0;   // item 121: a cut is said, never found out later
+  const msg=`Merged into one${away.name?` — ${away.name}’s record was set aside`:''}.${cut?` Their notes were cut by ${cut} characters to fit; Undo brings them back in full.`:''}`;
   if(window.ddsToast)ddsToast(msg,'ok',{label:'Undo',onClick:async()=>{
     let u;try{u=await api('/sales/contacts/'+encodeURIComponent(away.id)+'/unmerge','POST',{});}catch(_){u={ok:false,body:{}};}
     toast(u.ok?'The merge is undone — both records are back.':((u.body&&u.body.message)||'We couldn’t undo that merge just now.'));

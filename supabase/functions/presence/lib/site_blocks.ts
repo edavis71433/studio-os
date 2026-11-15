@@ -38,6 +38,7 @@ import { parseWindow, isVisibleNow } from './content_window.ts';
 import { normHex, darken, contrastRatio } from './brand_kit.ts';
 import { UUID_RE } from './uuid.ts';
 import { bookingScript, signupForm } from './site_send.ts';
+import { isAnchor, anchorOf, siteLink } from './section_links.ts';
 
 /** The block types this engine realizes (⊆ the site_components catalog keys). */
 export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
@@ -161,6 +162,8 @@ export interface SectionMapEntry { sid: string; key: string; src_index: number }
 // Enumerated ONLY — any unknown value is dropped (→ the template default), never
 // stored. Returns undefined when nothing non-default was chosen, so a default block
 // keeps NO `look` key and renders byte-identically (goldens only drift by CSS).
+/** Item 225: the shapes a section's bottom edge can take (BLOCK_CSS .block--edge-*). */
+export const SECTION_EDGES = ['wave', 'slant', 'curve', 'peak', 'zigzag'] as const;
 function parseLook(raw: unknown): BlockLook | undefined {
   const l = (raw && typeof raw === 'object') ? (raw as any).look : undefined;
   if (!l || typeof l !== 'object') return undefined;
@@ -170,6 +173,7 @@ function parseLook(raw: unknown): BlockLook | undefined {
   if (l.spacing === 'tight' || l.spacing === 'roomy') out.spacing = l.spacing;
   if (l.align === 'center') out.align = 'center';
   if (l.hideOn === 'mobile' || l.hideOn === 'desktop') out.hideOn = l.hideOn;
+  if ((SECTION_EDGES as readonly unknown[]).includes(l.edge)) out.edge = l.edge;   // item 225: a shaped bottom edge
   return Object.keys(out).length ? out : undefined;
 }
 
@@ -297,7 +301,7 @@ interface StoredDownload { type: 'download'; title?: string; file_id?: string; l
 // it ALSO carries the optional auto-expiring window (show_from / show_until).
 // Wave-1 G4: and the optional, enumerated style `variant` (BLOCK_VARIANTS above).
 // G27: and the optional per-element `style` override object (BlockStyle above).
-type WithLook<T> = T extends unknown ? T & { look?: BlockLook; style?: BlockStyle; show_from?: string; show_until?: string; variant?: string } : never;
+type WithLook<T> = T extends unknown ? T & { look?: BlockLook; style?: BlockStyle; show_from?: string; show_until?: string; variant?: string; anchor?: string } : never;
 export type StoredBlock = WithLook<
   | SiteBlockFeatures | SiteBlockStats | StoredTeam | SiteBlockProcess | SiteBlockPricing
   | SiteBlockCertifications | SiteBlockServiceAreas | SiteBlockCtaBanner
@@ -816,6 +820,9 @@ function validateBlocksTracked(raw: unknown): { blocks: StoredBlock[]; src: numb
       // stores NO variant key, so a default block stays byte-identical in storage).
       const variant = parseVariant(type, b);
       if (variant) (block as any).variant = variant;
+      // Item 225: the owner's link name for the section, tidy or nothing (lib/section_links.ts)
+      const anchor = anchorOf((b as { anchor?: unknown }).anchor);
+      if (anchor && typeof (b as { anchor?: unknown }).anchor === 'string') (block as any).anchor = anchor;
       // Phase EXP: attach the normalized auto-expiring window (or nothing). Parsing
       // is clockless — WHEN it shows is decided at render against snapshot.created_at.
       const win = parseWindow(b);
@@ -850,6 +857,7 @@ const lk = (b: StoredBlock) => ({
   ...((b as any).show_from ? { show_from: (b as any).show_from } : {}),
   ...((b as any).show_until ? { show_until: (b as any).show_until } : {}),
   ...(b.variant ? { variant: b.variant } : {}),   // Wave-1 G4: the style variant rides the rebuild too
+  ...(isAnchor(b.anchor) ? { anchor: b.anchor } : {}),   // item 225: so does the section's link name
 });
 export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => MediaRef | null, extras?: BlockResolveExtras): SiteBlock[] {
   const out: SiteBlock[] = [];
@@ -1280,6 +1288,28 @@ function effHeading(b: SiteBlock): string | null {
 function slugifyAnchor(t: string): string {
   return t.toLowerCase().replace(/&[a-z]+;/g, ' ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'section';
 }
+/** The id each section on a page gets (null for one drawn as no <section>, passed as null).
+ *  Item 225: a section's own link name comes first and is never renamed; a second section
+ *  with the same name keeps its heading's id instead. Every other section takes its heading's
+ *  slug, numbered past any id already used, exactly as before for a page with no link names.
+ *  Pure: the render's second pass and the publish check (lib/manifest_validate.ts) share it. */
+export function sectionIdsFor(blocks: ReadonlyArray<SiteBlock | null>): Array<string | null> {
+  const used = new Set<string>();
+  const own = blocks.map((b) => {
+    const a = b && (b as { anchor?: unknown }).anchor;
+    if (!isAnchor(a) || used.has(a)) return null;
+    used.add(a); return a;
+  });
+  return blocks.map((b, i) => {
+    if (!b) return null;
+    if (own[i]) return own[i];
+    const base = slugifyAnchor(effHeading(b) || b.type);
+    let id = base, n = 2;
+    while (used.has(id)) id = `${base}-${n++}`;
+    used.add(id);
+    return id;
+  });
+}
 
 // ── Phase T-STYLE: an owner-chosen `look` → a small set of deterministic CSS
 // classes stamped onto the section's `class="block …"`. Enumerated only (validated
@@ -1299,6 +1329,7 @@ function lookClasses(look?: BlockLook): string {
   if (look.align === 'center') c.push('block--align-center');
   if (look.hideOn === 'mobile') c.push('block--hide-mobile');
   else if (look.hideOn === 'desktop') c.push('block--hide-desktop');
+  if (look.edge) c.push('block--edge', `block--edge-${look.edge}`);   // item 225
   return c.join(' ');
 }
 /** Inject the look classes into a section's `class="block …"` (first occurrence).
@@ -1382,7 +1413,10 @@ const ffPct = (n: number): string => {
  *  contents block + in-page links resolve. Each block meets the site_components
  *  a11y contract (lists, headings, text-first). */
 export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRenderCtx): RenderedBlock[] {
-  const { esc, attr, safeHref } = ctx;
+  const { esc, attr } = ctx;
+  // Item 225: a section's buttons and links may also go to the site's own pages and to a named
+  // part of a page (lib/section_links.ts); everything else is still ctx.safeHref's call.
+  const safeHref = (u: string): string | null => ctx.safeHref(u) ?? siteLink(u);
   // First pass: build each block's HTML/LD (the `toc` block is deferred — it needs
   // every OTHER section's heading + anchor, known only after this pass).
   // G13: `bi` is the block's index in the INPUT list — the final pass stamps
@@ -1945,18 +1979,17 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
 
   // Second pass: stamp a stable, de-duped anchor id onto every rendered <section>,
   // and collect the heading list a Table-of-contents block links to.
-  const usedIds = new Set<string>();
+  // Item 225: a section's own link name is its id, and is kept first, so a heading's id steps
+  // aside for it (sectionIdsFor below gives the same ids before anything is drawn).
+  const ids = sectionIdsFor(built.map((e) => (!e.html || e.b.type === 'toc' || !e.html.includes('<section') ? null : e.b)));
   const tocEntries: Array<{ id: string; text: string }> = [];
-  for (const e of built) {
-    if (!e.html || e.b.type === 'toc' || !e.html.includes('<section')) continue;   // divider = <div>, toc = deferred
+  built.forEach((e, k) => {
+    const id = ids[k];
+    if (!id) return;   // divider = <div>, toc = deferred
     const heading = effHeading(e.b);
-    const base = slugifyAnchor(heading || e.b.type);
-    let id = base, n = 2;
-    while (usedIds.has(id)) id = `${base}-${n++}`;
-    usedIds.add(id);
     e.html = e.html.replace('<section ', `<section id="${attr(id)}" `);   // first section only
     if (heading) tocEntries.push({ id, text: heading });
-  }
+  });
 
   // Third pass: render each toc block now that anchors exist (skipped when the page
   // has no headings to list). A labelled <nav> landmark of real in-page jump links.
@@ -2021,6 +2054,27 @@ const SP = `:where(${SECTION_PROSE_TYPES.map((c) => '.' + c).join(',')}) .prose`
 /** The extra CSS the block sections need — appended once to a template's stylesheet,
  *  and trimmed at render to the rules a site's pages use (sectionStyles below, item 106).
  *  Reuses existing tokens (--accent, --line, --soft…); no external assets. */
+// ── Item 225: a shaped bottom edge. Each shape is a mask over a strip as wide as the section:
+// the section's own background (background:inherit) shows where the shape is, so the edge is
+// always in the section's colour, whatever theme, band or custom colour it has. The strip hangs
+// over the top of the next section, which makes room with a clear top border its own background
+// shows through, so nothing of it is covered. Shorter on phones. Masks are inline SVG (data:),
+// which the published pages' rule allows (lib/render.ts PUBLISHED_CSP).
+const edgeMask = (d: string) => `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='${d}'/%3E%3C/svg%3E")`;
+const ZIGZAG = 'M0 0H100V3' + Array.from({ length: 20 }, (_, i) => `L${100 - 5 * (i + 1)} ${i % 2 ? 3 : 10}`).join('') + 'Z';
+export const EDGE_PATHS: Record<typeof SECTION_EDGES[number], string> = {
+  wave: 'M0 0H100V5C87.5 11 62.5 -1 50 5C37.5 11 12.5 -1 0 5Z',
+  slant: 'M0 0H100L0 10Z',
+  curve: 'M0 0H100Q50 20 0 0Z',
+  peak: 'M0 0H100L50 10Z',
+  zigzag: ZIGZAG,
+};
+const EDGE_CSS = '.block.block--edge{position:relative;border-bottom:0}'
+  + '.block--edge,.block.block--edge+*{--edge-h:clamp(20px,4vw,48px)}'
+  + '.block.block--edge::after{content:"";position:absolute;left:0;right:0;top:calc(100% - 1px);height:calc(var(--edge-h) + 1px);z-index:1;background:inherit;pointer-events:none;-webkit-mask:var(--edge-m) 0 0/100% 100% no-repeat;mask:var(--edge-m) 0 0/100% 100% no-repeat}'
+  + '.block.block--edge+*{border-top:var(--edge-h) solid transparent}'
+  + 'main>.block--edge:last-child{margin-bottom:var(--edge-h)}'
+  + (Object.keys(EDGE_PATHS) as Array<keyof typeof EDGE_PATHS>).map((k) => `.block--edge-${k}{--edge-m:${edgeMask(EDGE_PATHS[k])}}`).join('');
 export const BLOCK_CSS = `.stats{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .card.stat{text-align:center}.stat-v{font-size:2rem;font-weight:800;color:var(--accent-dark,var(--accent))}.stat-l{color:var(--soft);font-size:.95rem;margin-top:4px}
 ol.process{margin:8px 0 0 0;padding:0;list-style:none;counter-reset:step}
@@ -2249,6 +2303,8 @@ ol.toc a{color:var(--accent-dark,var(--accent))}
 .block--align-center{text-align:center}
 .block--align-center .svc-grid,.block--align-center .cards,.block--align-center .card-grid,.block--align-center .cols,.block--align-center .accordion,.block--align-center .prose,.block--align-center ul,.block--align-center ol,.block--align-center table,.block--align-center .it-row{text-align:left}
 .block--align-center .btn-row,.block--align-center .cta-inner{justify-content:center}
+/* item 225: a shaped bottom edge (EDGE_CSS above) */
+${EDGE_CSS}
 .block-titleonly .title-sub{color:var(--soft);font-size:1.05rem;margin-top:6px;max-width:60ch}
 .block-linklist ul.linklist{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:2px}
 .block-linklist ul.linklist li{margin:0}

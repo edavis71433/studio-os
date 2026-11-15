@@ -76,6 +76,13 @@ export async function resolveAgencyMember(jwt: string): Promise<AgencyMember | n
   };
 }
 
+/** Builder item 209 (review file 06, finding 83): is this ONE site an active client of the agency?
+ *  One row by its key, for a request inside a client, instead of every client's id each time. */
+export async function isActiveClient(agencyId: string, siteId: string): Promise<boolean> {
+  const r = await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${agencyId}&status=eq.active&select=site_id&limit=1`);
+  return r.ok && Array.isArray(r.json) && r.json.length > 0;
+}
+
 /** The agency's active site ids — the scope every /agency operation is fenced to. */
 export async function agencySiteIds(agencyId: string, includeArchived = false): Promise<string[]> {
   const st = includeArchived ? '' : '&status=eq.active';

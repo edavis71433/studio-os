@@ -143,6 +143,17 @@ ok('off: a press is refused, Claude is never asked, and the owner is pointed to 
 r = await draft({ kind: 'enquiry', id: ENQ }, designer);
 ok('off: a teammate is told to ask the owner', r.status === 409 && r.body.can_switch === false && /Ask the studio’s owner/.test(r.body.message));
 
+// found live Nov 15: a customer's record opens inside that customer, and the owner was told to ask the owner
+const inClient = (who) => ({ ...who, scope: { site_id: STUDIO, name: 'A customer' } });
+r = await draft({ kind: 'enquiry', id: ENQ }, inClient(owner));
+ok('off, inside a client: the owner is still pointed to their own Settings', r.status === 409 && r.body.can_switch === true && /Switch it on in Settings/.test(r.body.message), JSON.stringify(r.body));
+r = await draft({ kind: 'enquiry', id: ENQ }, inClient(designer));
+ok('off, inside a client: a teammate who isn\'t the owner is still told to ask the owner', r.status === 409 && r.body.can_switch === false && /Ask the studio’s owner/.test(r.body.message));
+r = await goal('PUT', { ai_on: true }, inClient(owner));
+ok('PUT: the switch still can\'t be flipped from inside a client', r.status === 403 && r.body.error === 'owner_only' && stored()?.ai_on !== true);
+r = await goal('GET', undefined, inClient(owner));
+ok('GET: inside a client the switch is not offered there', r.status === 200 && r.body.data.can_switch === false && r.body.data.from_studio === true);
+
 r = await goal('PUT', { ai_on: true });
 ok('PUT: the owner switches it on, and who and when are kept', r.status === 200 && r.body.data.ai_on === true && stored()?.ai_on_by === 'owner@studio.test' && stored()?.goal_cents === 800000);
 
@@ -251,6 +262,7 @@ const settings = read('settings.html'), crm = read('crm.html'), inbox = read('in
 ok('Settings: Goal and AI help, for those who may change settings, with what it costs', settings.includes('id="goal" aria-labelledby="goalHead" hidden data-needs="configure"') && settings.includes('About 1¢ each press.') && settings.includes('Stops at 50 a day') && settings.includes('Never sends anything.') && settings.includes("key: 'goal', href: '#goal'"));
 ok('record: Where things stand tops the rail; Draft it for me is in the Email box', crm.includes('<div id="aicard"></div>') && crm.includes("label:'Draft it for me'") && crm.includes('tools:emAiTools') && crm.includes('<script src="/sales-ai.js" defer></script>'));
 ok('the Email box offers a row for a page\'s own tools', shell.includes('if (o.tools) o.tools(toolsRow(), { body: body, subj: subj, form: form, go: go });'));
+ok('the off note\'s Open Settings leaves a client for the studio\'s own Settings', kit.includes("const SETTINGS = '/settings.html?client=#goal';") && kit.includes('data-noscope="1">Open Settings'));
 ok('the kit never sends: it fills the box, and Undo puts the words back', kit.includes("o.req('/sales/ai/draft', 'POST'") && !/\/sales\/email|messages'|requestSubmit|\.submit\(\)/.test(kit) && kit.includes('data-ai="undo">Undo draft'));
 ok('Home and Pipeline show the goal from the summary they already read', agency.includes('goalCardHtml(summary)') && pipeline.includes('goalStripHtml(s.goal)') && agency.includes('href="/settings.html#goal"') && pipeline.includes('href="/settings.html#goal"'));
 ok('the Inbox drafts go through AI help', !inbox.includes('/writer/rewrite') && inbox.includes("aiDraftInto('leadBody','leadDraft'"));

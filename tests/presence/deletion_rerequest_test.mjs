@@ -116,6 +116,11 @@ globalThis.fetch = (input, init) => {
 };
 
 const { handleCommerce } = await import('../../supabase/functions/presence/routes/commerce.ts');
+// builder item 191: closing the account asks for a fresh code; this owner signed in with their
+// authenticator app's code a moment ago, so it counts (lib/fresh_code.ts)
+const { freshDeps } = await import('../../supabase/functions/presence/lib/fresh_code.ts');
+freshDeps.user = async () => ({ id: 'u1', email: 'owner@example.com', factors: [{ id: 'f1', factor_type: 'totp', status: 'verified' }] });
+freshDeps.claims = () => ({ aal: 'aal2', amr: [{ method: 'totp', timestamp: Math.floor(Date.now() / 1000) }] });
 const PRINCIPAL = { kind: 'client', email: 'owner@example.com', userId: 'u1', jwt: 'jwt-token', tenantId: null, role: null, requestId: 'r1' };
 const call = async (route) => {
   const req = new Request(`https://api.example/presence${route}`, { method: 'POST', headers: { 'x-dds-user-jwt': 'jwt-token', 'content-type': 'application/json' }, body: '{}' });

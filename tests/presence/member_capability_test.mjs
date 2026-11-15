@@ -32,7 +32,7 @@ const { handleInvoicePaymentUndo } = await import(`${P}/routes/invoice_payments.
 const { handleAssetDelete, handleAssetStatus } = await import(`${P}/routes/assets.ts`);
 const { handleRedirectDelete } = await import(`${P}/routes/search.ts`);
 const { handleContentLibraryDelete } = await import(`${P}/routes/content_library.ts`);
-const { handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword } = await import(`${P}/routes/publish.ts`);
+const { handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword, handleComingSoon } = await import(`${P}/routes/publish.ts`);
 const { handleBookingTypeDelete, handleBookingSettingsPut } = await import(`${P}/routes/booking.ts`);
 const { handleKnowledgeDelete } = await import(`${P}/routes/knowledge.ts`);
 const { handleCommentDelete } = await import(`${P}/routes/comments.ts`);
@@ -53,6 +53,7 @@ const { handleEmailLogAddress } = await import(`${P}/routes/email_log.ts`);
 const { handleReviewGoogleLink } = await import(`${P}/routes/reviews.ts`);   // sales review item 115
 const { handleEstimateDelete } = await import(`${P}/routes/estimates.ts`);   // sales review item 47
 const { handleProspect } = await import(`${P}/routes/prospects.ts`);   // sales review item 112
+const { handleFormDelete } = await import(`${P}/routes/commercial.ts`);   // builder list item 203
 const { handleRecurringAction } = await import(`${P}/routes/recurring_invoices.ts`);
 const { handleReportPut, handleReportPreview } = await import(`${P}/ops/monthly_report.ts`);   // builder list item 58
 const { handleContactImportUndo, handleContactMerge, handleContactUnmerge } = await import(`${P}/routes/contacts_more.ts`);   // sales review items 86 + 105
@@ -147,6 +148,7 @@ const DECIDED = {
     'POST /client/retainers/:id/cancel',   // sales item 117: a client stopping their own retainer is the owner's call
     'DELETE /sales/estimates/:id', 'POST /sales/recurring/:id/stop',   // sales review item 47
     'DELETE /sales/prospects/:id',   // sales review item 112: taking a prospect off the list
+    'DELETE /forms/inbox/:id',   // builder list item 203: an enquiry and its files go for good
     // sales review items 86 + 105: undoing an import takes people off; a merge folds a record away (and back)
     'POST /sales/contacts/imports/:id/undo', 'POST /sales/contacts/:id/merge', 'POST /sales/contacts/:id/unmerge',
     'POST /sales/invoices/:id/payment/undo',   // sales review item 77: taking back a recorded payment changes the books, like a void
@@ -157,6 +159,7 @@ const DECIDED = {
     'DELETE /foundations/domain', 'POST /foundations/domain', 'POST /foundations/prepare',
     'POST /foundations/domain/forward', 'DELETE /foundations/domain/forward',   // builder list item 174
     'POST /preview/settings', 'POST /site/offline', 'POST /site/online', 'POST /site/password', 'PUT /bookings/settings',
+    'POST /site/coming-soon',   // builder list item 158: a Coming soon page before the first publish, a setting like taking the site offline
     'PUT /sales/contacts/fields', 'PUT /sales/stages', 'POST /calendar/link', 'DELETE /calendar/link',
     'POST /email/log-address', 'DELETE /email/log-address',
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58
@@ -191,7 +194,7 @@ const DECIDED = {
     'PATCH /assets/:id', 'PATCH /bookings/types/:id', 'PATCH /broadcasts/:id', 'PATCH /projects/:id',
     'PATCH /projects/:id/deliverables/:id2', 'PATCH /projects/:id/milestones/:id2', 'PATCH /projects/:id/tasks/:id2',
     'PATCH /sales/contacts/:id', 'PATCH /sales/deal-tasks/:id', 'PATCH /sales/deals/:id', 'PATCH /support/:id',
-    'POST /visibility/check', 'PUT /visibility/follow', 'PUT /visibility/phrases', 'PUT /visibility/ai/questions', 'POST /approve/send', 'POST /assets/:id/duplicate', 'POST /assets/:id/remove-background', 'POST /assets/:id/cutout',
+    'POST /visibility/check', 'PUT /visibility/follow', 'PUT /visibility/phrases', 'PUT /site/usable', 'PUT /visibility/ai/questions', 'POST /approve/send', 'POST /assets/:id/duplicate', 'POST /assets/:id/remove-background', 'POST /assets/:id/cutout',
     'POST /assets/:id/replace', 'POST /assets/:id/rollback', 'POST /assets/:id/suggest', 'POST /assets/bulk', 'POST /assets/folders/move',
     'POST /bookings/appointments/:id/cancel', 'POST /bookings/appointments/:id/complete',
     'POST /bookings/appointments/:id/confirm', 'POST /bookings/appointments/:id/no_show', 'POST /bookings/types',
@@ -248,6 +251,7 @@ const DECIDED = {
     // only the owner, or their studio asking the owner, can start or stop a transfer (the route refuses anyone else)
     'POST /portal/members/:id/role', 'POST /portal/transfer', 'POST /portal/transfer/cancel',
     'POST /foundations/plans/:id/done',   // builder item 193: studio-only, checked by the route itself
+    'POST /pages/from-saved',   // builder item 216: studio-only, checked by the route itself
   ],
 };
 const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) => ({ name, need })));
@@ -260,6 +264,7 @@ const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) 
   ok('decided: withdrawing an invoice and cancelling a retainer count as delete', has('delete', 'POST /sales/invoices/:id/void', 'POST /sales/deals/:id/retainer/cancel'));
   ok('decided: taking the site offline and back is configure, not publish', has('configure', 'POST /site/offline', 'POST /site/online'));
   ok('decided: a visitor password is configure, like taking the site offline (list item 175)', has('configure', 'POST /site/password'));
+  ok('decided: a Coming soon page is configure, like taking the site offline (builder list item 158)', has('configure', 'POST /site/coming-soon'));
   ok('decided: removing the domain is configure, so a developer keeps it', has('configure', 'DELETE /foundations/domain'));
   ok('decided: the everyday lists stay edit', has('edit', 'PUT /sales/services', 'PUT /service/faq', 'PUT /service/saved-replies', 'POST /bookings/types', 'PATCH /bookings/types/:id', 'POST /redirects'));
   ok('decided: archiving a file is not deleting it', has('edit', 'POST /assets/bulk') && has('approve', 'POST /assets/:id/status'));
@@ -337,6 +342,7 @@ const CHANGED = [
   { name: 'POST /client/retainers/:id/cancel', fx: { rows: { presence_deals: { retainer: { status: 'active' } } } }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/client_retainers.ts')).handleClientRetainerCancel(r, A, p, ROW, cors) },   // sales item 117
   { name: 'DELETE /sales/estimates/:id', run: (r, p) => handleEstimateDelete(A, p, ROW, cors) },     // sales review item 47
   { name: 'DELETE /sales/prospects/:id', run: (r, p) => handleProspect(r, A, p, ROW, cors) },     // sales review item 112
+  { name: 'DELETE /forms/inbox/:id', run: (r, p) => handleFormDelete(A, ROW, cors) },     // builder list item 203
   { name: 'POST /sales/recurring/:id/stop', run: (r, p) => handleRecurringAction(r, A, p, ROW, 'stop', cors) },
   // sales review items 86 + 105
   { name: 'POST /sales/contacts/imports/:id/undo', fx: { rows: { presence_contact_imports: { created_at: new Date().toISOString(), undone_at: null } } }, run: (r, p) => handleContactImportUndo(r, A, p, ROW, cors) },
@@ -363,6 +369,7 @@ const CHANGED = [
   { name: 'POST /report/monthly/preview', fx: { only: ['clients'] }, run: (r, p) => handleReportPreview(A, p, cors) },   // with every read answering a row the address reads as suppressed; the send is the write
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
   { name: 'POST /site/online', fx: { site: { offline_at: '2026-01-01T00:00:00Z' } }, run: (r, p) => handleBackOnline(A, p, cors) },
+  { name: 'POST /site/coming-soon', body: { line: 'Opening soon.' }, fx: { empty: ['presence_publishes'] }, run: (r, p) => handleComingSoon(r, A, p, cors) },   // builder list item 158: never published, so the deploy to Netlify is the outside call that proves the owner reached it
   { name: 'POST /site/password', body: { password: 'letmein' }, run: (r, p) => handleSitePassword(r, A, p, cors) },   // list item 175: Netlify's answer is the outside call that proves the owner reached it
 ];
 {
@@ -452,7 +459,7 @@ const CHANGED = [
 // A new write handler fails here until someone decides what it needs in lib/site_roles.ts
 // and adds it to DECIDED and to this list. At runtime an unlisted write is refused anyway.
 const WRITE_HANDLERS = [
-  'handleVisibilityCheck', 'handleFollowPut', 'handlePhrasesPut', 'handleAiQuestionsPut', 'handleApprovalDecide', 'handleApprovalsCreate', 'handleApproveSend', 'handleAssetDelete', 'handleAssetDuplicate',
+  'handleVisibilityCheck', 'handleFollowPut', 'handlePhrasesPut', 'handleUsablePut', 'handleAiQuestionsPut', 'handleApprovalDecide', 'handleApprovalsCreate', 'handleApproveSend', 'handleAssetDelete', 'handleAssetDuplicate',
   'handleAssetRemoveBackground', 'handleAssetCutout', 'handleAssetReplace', 'handleAssetRollback', 'handleAssetStatus',
   'handleAssetSuggest', 'handleAssetUpdate', 'handleAssetsBulk', 'handleAssetsFolderMove', 'handleBackOnline', 'handleBookingCancel',
   'handleBookingConfirm', 'handleBookingMark', 'handleBookingSettingsPut', 'handleBookingTypeCreate',
@@ -470,13 +477,14 @@ const WRITE_HANDLERS = [
   'handleCrmNoteAdd', 'handleCrmNoteDelete', 'handleCrmNotePin', 'handleDealTaskCreate', 'handleDealTaskUpdate',
   'handleDeliverable', 'handleDeliverableUploadUrl', 'handleDeliverablesCreate', 'handleDevCustomizationPut',
   'handleDomain', 'handleDomainForward', 'handleEditorImprove', 'handleFaqAdmin', 'handleFormReply',
+  'handleFormDelete',   // builder list item 203: DELETE /forms/inbox/:id needs delete
   'handleFormStatus', 'handleFoundationsDecide', 'handleFoundationsPrepare', 'handleKnowledgeDelete',
   'handleKnowledgeImport', 'handleLaunchCancel', 'handleLaunchCreate', 'handleLaunchDecide', 'handleLaunchPromote',
   'handleLaunchRecapture', 'handleLaunchRollback', 'handleLaunchSchedule', 'handleLocation', 'handleMediaDelete',
   'handleMediaUpdate', 'handleMediaUpload', 'handleMemberAdd', 'handleMemberRevoke', 'handleMessages',
   'handleMilestone', 'handleMilestonesCreate', 'handleMomentDismiss', 'handleMonitorConnect',
   'handleMonitorDisconnect', 'handleMonitorVerify', 'handleNotificationsRead',
-  'handlePageDuplicate', 'handleDeletedPageRestore', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',   // item 154: putting a deleted page back is an edit (contentWriteNeeds)
+  'handlePageDuplicate', 'handlePageFromSaved', 'handleDeletedPageRestore', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',   // item 154: putting a deleted page back is an edit (contentWriteNeeds); item 216: adding a page saved to the studio is open on the member list, the route admits the studio alone
   'handlePreviewShareLink', 'handleProject', 'handleProjectChecklist', 'handleProjectStatus', 'handleProjectSurveys',
   'handleProjects', 'handleProjectTemplates', 'handleTodoTemplates', 'handleDealTasksFromTemplate', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
   'handleRedirectDelete', 'handleRestore', 'handleRestoreToDraft', 'handleReviewApprove', 'handleReviewDismiss',
@@ -514,6 +522,7 @@ const WRITE_HANDLERS = [
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
   'handleFoundationsPlanDone',   // builder item 193: open on the member list; the route answers the studio only
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
+  'handleComingSoon',   // builder list item 158: POST /site/coming-soon needs configure
   'handleSampleInvoice',   // builder list item 175: POST /sales/invoices/test is edit, like Send me a test on an update
   'handlePostPublish', 'handlePostUnpublish',   // builder list item 40: POST /posts/:id/(publish|unpublish) need publish
   'handleScheduleCancel', 'handleScheduleCreate', 'handleSettings', 'handleShareSet', 'handleStockImport',

@@ -16,12 +16,14 @@ export const RESERVED_NAMES = {
   broadcastLists: '__broadcast_lists__',  // sales review items 31 + 39
   stageNames: '__stage_names__',          // sales review item 38
   stageChances: '__stage_chances__',      // sales review item 69: the chance each open stage closes
+  stageNotes: '__stage_notes__',          // sales item 124: the studio's "what to do now" note for each deal stage (lib/stage_notes.ts)
   emailLog: '__email_log__',              // sales review item 69: the private "log this email" address
   calendarFeed: '__calendar_feed__',      // sales review item 46: the private calendar link
   navHidden: '__nav_hidden__',            // builder list item 54: the menu areas the studio hides (agency/routes.ts, routes/workspace.ts)
   monthlyReport: '__monthly_report__',    // builder list item 58: the client's monthly report email (on, the studio's line, last month sent) (ops/monthly_report.ts)
   siteNotify: '__site_notify__',          // builder list item 126: what the studio hears about each client site, and how (lib/site_notify.ts)
   versionStars: '__version_stars__',      // builder list item 158: the versions starred in Versions (routes/publish.ts)
+  comingSoon: '__coming_soon__',          // builder list item 158: the Coming soon page's line, its switches and when it went up (lib/coming_soon.ts)
   followedSearches: '__followed_searches__',   // builder list item 181: the searches a client follows on Google, ten at most (lib/search_tools.ts)
   searchPhrases: '__search_phrases__',    // builder list item 160: the two or three phrases the business wants to be found for (lib/search_phrases.ts)
   aiQuestions: '__ai_questions__',        // builder list item 182: the questions a client's monthly AI check asks, ten at most (lib/ai_watch.ts)
@@ -40,6 +42,7 @@ export const RESERVED_NAMES = {
   setupStrip: '__setup_strip__',          // sales item 105: whether the studio hid Home's setup strip (routes/setup_strip.ts)
   salesGoalAi: '__sales_goal_ai__',       // sales item 94: the month's sales goal, and whether AI help is on (routes/sales_ai.ts)
   bookingBusy: '__booking_busy__',        // builder list item 149: the busy times last read from that calendar, and how the last read went (routes/booking.ts)
+  usableCheck: '__usable_check__',        // builder list item 150: the three ticks only a person can judge, and the last check's count and worst line (lib/usable_check.ts)
 } as const;
 
 const rowsOf = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];

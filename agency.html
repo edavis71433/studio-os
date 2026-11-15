@@ -38,7 +38,14 @@
   .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
   .lrow1{display:flex;align-items:center;gap:10px}
   .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lhead h1,.lhead h2{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .hometitle{font-family:var(--serif);font-weight:600;font-size:30px;line-height:1.1;letter-spacing:-.02em;margin:0 0 var(--dds-s4,16px);color:var(--ink)}
+  .hometitle:focus{outline:none}
+  .lhead .allc{font-size:13.5px;font-weight:600;color:var(--p);text-decoration:none;white-space:nowrap}
+  .hchip.start{background:#fff;color:#3d2185;border-color:#fff;font-weight:600;text-decoration:none;cursor:pointer}
+  #needsEmpty .firsts{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+  #needsEmpty .firsts .btn{text-decoration:none;display:inline-flex;align-items:center;min-height:40px}
+  @media (max-width:760px){.hometitle{font-size:24px;margin-bottom:12px}}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
@@ -199,6 +206,19 @@
   .two .rcard{margin-bottom:0}
   /* the Ask box (moved here from today.html, sales review item 23) */
   .ask{margin-top:var(--dds-s7,32px);padding-top:var(--dds-s6,24px);border-top:1px solid var(--line)}
+  /* builder list item 191: the two-step sign-in nudge, drawn in Figma (B4) */
+  .tsnudge{display:flex;gap:20px;align-items:center;margin:var(--dds-s5,20px) 0;padding:22px 24px;border-radius:var(--dds-r-xl,20px);background:#241d38;color:#fff}
+  .tsnudge svg{flex:0 0 auto}
+  .tsn-words{flex:1;min-width:0}
+  .tsn-eye{margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#b79ceb}
+  .tsnudge h2{margin:0;font-family:var(--dds-serif,'Fraunces',Georgia,serif);font-weight:400;font-size:26px;line-height:1.2;color:#fff}
+  .tsn-line{margin:6px 0 0;font-size:14px;line-height:1.5;color:#d9cdeb;max-width:62ch}
+  .tsn-acts{display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 auto}
+  .tsn-on{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 22px;border-radius:999px;background:#fff;color:#241d38;font-size:14px;font-weight:600;text-decoration:none}
+  .tsn-later{min-height:44px;padding:0 12px;border:0;background:none;color:#fff;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+  .tsn-on:focus-visible,.tsn-later:focus-visible{outline:2px solid #b79ceb;outline-offset:2px}
+  .tsn-nw{white-space:nowrap}
+  @media (max-width:640px){.tsnudge{flex-direction:column;align-items:flex-start;gap:12px;padding:20px}.tsnudge svg{width:36px;height:36px}.tsnudge h2{font-size:22px}.tsn-acts{flex-direction:row;width:100%}.tsn-on{flex:1}}
   .ask h2{font-family:var(--sans);font-weight:600;font-size:17px;margin:0 0 var(--dds-s1,4px)}
   .ask p{margin:0 0 var(--dds-s3,12px);color:var(--soft);font-size:14px}
   .askbox{display:flex;gap:10px}
@@ -508,6 +528,8 @@
 <div class="wrap">
   <!-- the top row, Needs you and the studio strip live OUTSIDE #main: the roster
        re-renders #main.innerHTML per keystroke and must never wipe them -->
+  <!-- sales item 91: the page's title sits at the top, like every other page (it headed the table, two screens down) -->
+  <h1 id="pagehead" class="hometitle" tabindex="-1">Home</h1>
   <div id="top"></div>
   <!-- sales item 105: the setup strip, until its steps are done or someone hides it -->
   <section id="setup" class="setup" aria-labelledby="setupHead" hidden data-needs="configure"></section>
@@ -718,14 +740,15 @@ function lheadHtml(shown){
   return `<header class="lhead">
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">🗂</span>
-      <h1 id="pagehead" tabindex="-1">Home</h1>
+      <h2 id="custHead">Customers</h2>
+      <a class="allc" href="/customers.html">All customers →</a>
       <div class="seg" role="group" aria-label="Display as">
         <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
         <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
       </div>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
-    <div class="lmeta">${shown} business${shown===1?'':'es'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+    <div class="lmeta">${shown} customer${shown===1?'':'s'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
   </header>`;
 }
 function chipsHtml(){
@@ -783,7 +806,7 @@ function render(){
   const list=sortedRows();
   let h=lheadHtml(list.length);
   h+=chipsHtml();
-  h+=`<input class="search" id="search" aria-label="Search clients" placeholder="Search clients…" value="${esc(Q)}">`;
+  h+=`<input class="search" id="search" aria-label="Search customers" placeholder="Search customers…" value="${esc(Q)}">`;
   if(CUST_FAILED)h+=`<div class="notice">Some delivery details wouldn’t load just now — client records still open.</div>`;
   if(VIEWNAME==='archived'&&ARCH_STATE!=='ok'){
     h+=`<div class="center"><p class="muted">${ARCH_STATE==='failed'?'Archived clients wouldn’t load just now.':'Loading archived clients…'}</p>${ARCH_STATE==='failed'?'<p style="margin-top:12px"><button type="button" class="btn ghost" id="archRetry">Try again</button></p>':''}</div>`;
@@ -1057,6 +1080,7 @@ async function load(soft){
   if(AR_ITEMS){paintToday();if(NEEDS||NEEDS_FAILED||MYTASKS)paintNeeds();}   // item 70: Today and Waiting on them read the same invoices
   applyOwed();
   LOADED_ONCE=true;LOADED_AT=Date.now();
+  if(!CLIENTS.length&&NEEDS)paintNeeds();   // sales item 91: an empty studio's greeting and Needs you say where to start
   render();
   paintHero();
 }
@@ -1088,9 +1112,26 @@ function renderTop(){
 // Item 70: the greeting says how many things need you and how many are money,
 // each kind is a chip that narrows the list below to it, and "Go through them"
 // opens the list one at a time.
+// Sales item 91: a brand-new studio (no customers yet, nothing needing it) is told where to start,
+// never "All caught up". The setup steps are sales item 105's strip (#setup; it paints after the
+// greeting and says so with 'dds:setup', so the greeting repaints then);
+// while it shows, the chip leads there, and Needs you offers the first two things to make.
+function brandNew(){return LOADED_ONCE&&!CLIENTS.length&&!(ARCHIVED&&ARCHIVED.length)&&!!NEEDS&&!Number(NEEDS.total||0)&&!needAll().length;}
+function setupStrip(){const el=document.getElementById('setup');return el&&!el.hidden&&el.getClientRects().length?el:null;}
+document.addEventListener('dds:setup',()=>{if(brandNew())paintHero();});
 function paintHero(){
   const sub=$('heroSub'),chips=$('heroChips');if(!sub||!chips)return;
   if(!NEEDS){sub.textContent=NEEDS_FAILED?'':'Checking what needs you…';chips.innerHTML='';return;}
+  const hi=document.querySelector('.hero .hi');
+  if(brandNew()){
+    if(hi)hi.textContent='Welcome to Studio OS';
+    sub.textContent='Nothing needs you yet. Here’s where to start.';
+    chips.innerHTML=setupStrip()?'<a class="hchip start" id="startHere" href="#setup">Start here ↓</a>':'<a class="hchip start" id="startHere" href="#add">Start here: add your first customer</a>';
+    const sh=$('startHere');
+    if(sh)sh.addEventListener('click',(e)=>{e.preventDefault();const st=setupStrip();if(st){st.scrollIntoView({behavior:'smooth',block:'start'});const f=st.querySelector('a[href],button');if(f)f.focus({preventScroll:true});}else openAddCustomer();});
+    return;
+  }
+  if(hi&&hi.textContent==='Welcome to Studio OS')hi.textContent=greetWord();
   const total=Number(NEEDS.total||0),all=needAll();
   const money=all.filter(r=>r.kind==='money').length;
   sub.textContent=total?(total+(total===1?' thing needs you':' things need you')+(money&&all.length>=total?'. '+(money===total?(total===1?'It’s money.':'All of them are money.'):money+(money===1?' is':' are')+' money.'):'.')):'Nothing needs you right now.';
@@ -1468,6 +1509,7 @@ async function boot(){
     await studio;
     EARLY.clear();
     mountAsk();      // and the Ask box (sales review item 23)
+    mountTwoStepNudge().catch(()=>{});   // builder item 191
   }catch(_){EARLY.clear();trouble();}
 }
 boot();
@@ -1522,6 +1564,24 @@ async function ask(){
   try{const r=await apiSend('POST','/concierge/ask',{question});paintAnswer(box,r.ok?(r.body&&r.body.data):null,r.ok?'I don’t have anything measured on that yet — I’d rather say so than guess.':'I couldn’t answer just now — nothing’s wrong, please try again in a moment.');}
   catch(_){box.textContent='I couldn’t answer just now — nothing’s wrong, please try again in a moment.';}
   btn.disabled=false;btn.textContent='Ask';
+}
+// ── Builder list item 191: until this person's own sign-in has two-step sign-in on, Home
+// asks for it (Figma B4). "Not now" hides it for 14 days; it goes for good once it's on.
+// Only a studio's own people see this page, never a client. The sign-in kept on this
+// device says whether it's on (a verified factor), with no call.
+const NUDGE_KEY='dds-2step-nudge',NUDGE_DAYS=14;
+async function mountTwoStepNudge(){
+  try{const at=Number(localStorage.getItem(NUDGE_KEY)||0);if(at&&Date.now()-at<NUDGE_DAYS*86400000)return;}catch(_){}
+  const{data}=await sb.auth.getSession();const sess=data&&data.session;if(!sess)return;
+  if(((sess.user&&sess.user.factors)||[]).some(f=>f&&f.status==='verified')||$('tsNudge'))return;
+  const n=CLIENTS.length;
+  const sec=document.createElement('section');sec.className='tsnudge';sec.id='tsNudge';sec.setAttribute('aria-labelledby','tsNudgeHead');
+  sec.innerHTML=`<svg viewBox="0 0 24 24" width="44" height="44" aria-hidden="true" focusable="false"><path d="M12 2.5 4.5 5.5v6c0 4.6 3.1 8.6 7.5 10 4.4-1.4 7.5-5.4 7.5-10v-6L12 2.5Z" fill="none" stroke="#b79ceb" stroke-width="1.6" stroke-linejoin="round"/><rect x="8.6" y="10.6" width="6.8" height="5.4" rx="1.2" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M10 10.6V9.2a2 2 0 0 1 4 0v1.4" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>`+
+    `<div class="tsn-words"><p class="tsn-eye">${esc(n?`Your studio looks after ${n} client${n===1?'':'s'}`:'Sign-in and security')}</p><h2 id="tsNudgeHead">Turn on two-step <span class="tsn-nw">sign-in.</span></h2>`+
+    `<p class="tsn-line">With a code from your phone, a stolen password isn’t enough to get into your studio, your clients’ sites or their money.</p></div>`+
+    `<div class="tsn-acts"><a class="tsn-on" href="/settings.html#security" data-noscope="1">Turn it on</a><button type="button" class="tsn-later">Not now</button></div>`;
+  ($('needs')||$('top')).insertAdjacentElement('afterend',sec);
+  sec.querySelector('.tsn-later').addEventListener('click',()=>{try{localStorage.setItem(NUDGE_KEY,String(Date.now()));}catch(_){}sec.remove();});
 }
 function mountAsk(){
   const sec=$('askSec');if(!sec||sec.dataset.on)return;
@@ -1590,6 +1650,8 @@ function needsPanelHtml(){
   if(!NEEDS)return NEEDS_FAILED?`<div class="qfail">Needs you wouldn’t load just now.<button id="needsRetry" type="button">Try again</button></div>`:'<p class="quiet">Checking what needs you…</p>';
   const rows=NEEDS.rows||[],rest=NEEDS.rest||[],more=Number(NEEDS.more||0);
   const partial=NEEDS.partial?`<p class="pnote">Some of this couldn’t be checked just now — ↻ tries again.</p>`:'';
+  // sales item 91: day one, the first two things to make
+  if(!rows.length&&brandNew())return `<div class="rcard need" id="needsEmpty"><p class="nn">Nothing needs you yet. Your first customer is the place to start.</p><div class="firsts"><button type="button" class="btn" id="firstCust">+ Add a customer</button><a class="btn ghost" href="/sites.html#new">+ New site</a></div>${partial}</div>`;
   if(!rows.length)return `<div class="rcard need" id="needsEmpty"><p class="nn">Nothing needs you.</p><p class="quiet" style="margin:0">${esc(NEEDS.empty_line||'')}</p>${partial}</div>`;
   let shown=NEEDS_EXPANDED?rows.concat(rest):rows;
   if(QKIND)shown=rows.concat(rest).filter(r=>heroKind(r.kind)===QKIND);
@@ -1642,6 +1704,7 @@ function wireQueue(){
   });
   const off=$('qfilterOff');if(off)off.addEventListener('click',()=>{QKIND='';NEEDS_EXPANDED=false;paintNeeds();const t=$('qt-needs');if(t)t.focus();});
   const qr=$('needsRetry');if(qr)qr.addEventListener('click',()=>mountNeeds());
+  const fc=$('firstCust');if(fc)fc.addEventListener('click',openAddCustomer);
   const mb=$('needsMore');if(mb)mb.addEventListener('click',()=>{const n=(NEEDS.rows||[]).length;NEEDS_EXPANDED=true;paintNeeds();const l=$('needsList');if(l){const a=l.querySelector('div.row:nth-of-type('+(n+1)+') a');if(a)a.focus();}});
   const cb=$('needsClearOld');if(cb)cb.addEventListener('click',()=>clearOld(cb));
   host.querySelectorAll('[data-snooze]').forEach(b=>b.addEventListener('click',()=>snoozeRow(b.getAttribute('data-snooze'),b)));

@@ -510,6 +510,7 @@
   .pill-build,.pill-draft{display:inline-flex;align-items:center;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px}
   .pill-build{background:var(--p-soft);color:var(--p)} .pill-draft{background:var(--warn-soft);color:var(--warn)}
   .wsbuild .wsfoot{justify-content:flex-start}
+  .wsbuild .wsbar .tag{margin-bottom:0}
   /* a phone keeps each Needs you row on one line: words left, its button right */
   @media (max-width:560px){.qrow{flex-wrap:nowrap}.qmain{flex:1 1 0}.qact{flex-direction:column;align-items:stretch}}
   .wspic .wsini{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--serif);font-size:42px;color:var(--p)}
@@ -701,6 +702,7 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script src="/fresh-code.js?v=191"></script>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // The simplified Client Portal (A7.2). Consumes ONLY /portal/context + /portal/feed
@@ -714,7 +716,12 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
+// Speed (items 226 and 227, Nov 15): the database is in Oregon, and Supabase runs the server
+// in the region nearest the visitor, so from the east coast each of the dozen small database
+// calls behind one answer crossed the country (about 1 s an answer; 0.4 s beside the
+// database). x-region asks for Oregon; the server's CORS answer allows the header.
+const FN_REGION='us-west-2';
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''),'x-region':FN_REGION});
 // Nov 10 review (G3): no answer at all (no signal, aeroplane mode) used to THROW out
 // of here, so a button switched off before the call stayed grey for good and nothing
 // was said. No answer is now an ordinary failure (status 0, offline, a plain message),
@@ -851,7 +858,7 @@ function wsBuildHtml(state,draft,waiting,studio){
   else if(a.status&&a.status!=='pending'&&a.status!=='approved')lead='You asked for a change. '+esc(studio)+' is working on it, and the new draft will show up here.';
   else lead='It isn’t live yet. '+esc(studio)+' is building it. '+(waiting>0?'Next: the '+(waiting===1?'one thing':waiting+' things')+' under Needs you.':'You’ll get a draft to look at here as soon as it’s ready.');
   const act=draft&&(state==='ready'||state==='approved')?'<button type="button" class="'+(state==='ready'?'approve':'')+' wsreview" data-ws-apr="'+esc(a.id)+'" data-ws-proj="'+esc(draft.pid)+'">'+(state==='ready'?'Review the draft':'See the draft again')+'</button>':'';
-  return '<div class="card wscard wsbuild">'+'<div class="wspic'+(state==='building'?' dim':'')+'" id="wspic"><div class="wsini" aria-hidden="true">✦</div></div><div class="wsin"><span class="tag">Your website</span><div class="wsbar">'+pill+'</div>'
+  return '<div class="card wscard wsbuild">'+'<div class="wspic'+(state==='building'?' dim':'')+'" id="wspic"><div class="wsini" aria-hidden="true">✦</div></div><div class="wsin"><div class="wsbar"><span class="tag">Your website</span>'+pill+'</div>'
     +'<h3>'+head+'</h3><p class="wslead">'+lead+'</p>'+(act?'<div class="wsfoot">'+act+'</div>':'')+'</div></div>';
 }
 function wsSiteInfo(d){const s=(d&&d.site)||{};const url=typeof s.url==='string'&&/^https:\/\//.test(s.url)?s.url:'';return{url,host:url.replace(/^https:\/\//,''),published_at:(typeof s.last_published_at==='string'&&s.last_published_at)||''};}
@@ -942,7 +949,7 @@ function anchorTarget(a){const ex=String(a||'').replace(/^#/,'');return(ex&&docu
 // reachable from every view because it lives OUTSIDE #main (innerHTML rewrites
 // never touch it). Home aggregates ACROSS projects; the other tabs are top-level
 // destinations over the SAME existing /client/* + /portal/* reads — no new backend.
-const PORTAL={ready:false,persona:'',ctx:{},projects:[],projectsFailed:false,feed:{},feedFailed:false,unread:0,notifs:[],notifsFailed:false,billing:null,billingFailed:false,snaps:null,wstatsFetch:null,wsthumbFetch:null};
+const PORTAL={ready:false,persona:'',ctx:{},projects:[],projectsFailed:false,feed:{},feedFailed:false,unread:0,notifs:[],notifsFailed:false,billing:null,billingFetch:null,billingFailed:false,snaps:null,snapsFetch:null,snapsBoot:null,wstatsFetch:null,wsthumbFetch:null};
 let CURRENT_TAB='home';
 // A monotonically increasing VIEW token: every function that owns a fresh paint
 // of #main bumps it (showTab AND every drill-in open — openProject, support
@@ -1036,7 +1043,8 @@ async function ensureBilling(){
   if(PORTAL.billing){PORTAL.billingFailed=false;return PORTAL.billing;}
   if(PORTAL.persona!=='client')return{invoices:[]};
   try{
-    const r=await api('/client/billing');
+    const pre=PORTAL.billingFetch;PORTAL.billingFetch=null;   // item 179: the boot's read, used once
+    const r=(await pre)||await api('/client/billing');
     if(!r.ok){PORTAL.billingFailed=true;return{invoices:[],failed:true};}
     PORTAL.billing=(r.body&&r.body.data)||{invoices:[]};
   }catch(_){PORTAL.billingFailed=true;return{invoices:[],failed:true};}
@@ -1047,8 +1055,16 @@ async function ensureBilling(){
 // voided or PROCESSING invoice is nothing to pay: it leaves the to-pay tile and
 // the Needs-you queue together, by the one formula.
 function unpaidInvoices(b){return ((b&&b.invoices)||[]).filter(i=>{const s=invState(i);return s==='upcoming'||s==='overdue';});}
-// per-project snapshots (the full client bundle, capped) — shared by Home + Files
-async function ensureSnaps(){
+// per-project snapshots (the full client bundle, capped) — shared by Home + Files.
+// Item 179: Home's website card and Needs you ask at the same moment, and the boot
+// may already have started the read; every caller shares the one in flight.
+function ensureSnaps(){
+  // the boot's read answers Home's first ask, finished or not (a failed project is retried on the ask after that, as before)
+  if(PORTAL.snapsBoot){const b=PORTAL.snapsBoot;PORTAL.snapsBoot=null;return b;}
+  if(!PORTAL.snapsFetch){const p=snapsRead().finally(()=>{if(PORTAL.snapsFetch===p)PORTAL.snapsFetch=null;});PORTAL.snapsFetch=p;}
+  return PORTAL.snapsFetch;
+}
+async function snapsRead(){
   const fetchSnap=async(p)=>{
     try{const r=await api('/client/projects/'+p.id);
       if(!r.ok)throw 0;   // an error response is a FAILED read, not an empty project
@@ -1201,8 +1217,9 @@ function renderHome(){
   document.querySelectorAll('[data-ask-connect]').forEach(b=>b.addEventListener('click',()=>askConnect(b.getAttribute('data-ask-connect'),b.getAttribute('data-label'),b)));
   // back from Google (connections-callback.html → #connections): land on the card
   if(location.hash==='#connections'){try{history.replaceState(null,'','/client.html');}catch(_){}const hc=$('home-connect');if(hc)setTimeout(()=>hc.scrollIntoView({block:'start'}),0);}
-  buildNeedsYou();
-  loadWebsiteCard();
+  // item 228: once what needs them and the website card are in, this Home is the one kept for next time
+  const view=VIEW_SEQ;
+  Promise.allSettled([buildNeedsYou(),loadWebsiteCard()]).then(()=>{if(view===VIEW_SEQ)saveHomeCache();});
   loadDomainCard();
 }
 // Fill glances + mini Paths + the aggregated "Needs you" QUEUE — one list-view
@@ -1338,6 +1355,8 @@ function wsCardHtml(d){
 // full load (like billing); a reviewer never fetches (no website of their own).
 // The in-flight promise is cached too, so Home→away→Home never refires a
 // request that's already running (at most one fetch per load).
+function wsStatsStart(){if(PORTAL.wstats===undefined&&!PORTAL.wstatsFetch)PORTAL.wstatsFetch=api('/client/website-stats').then(r=>r.ok?((r.body&&r.body.data)||null):false).catch(()=>false);}
+function wsThumbStart(){if(PORTAL.wsthumb===undefined&&!PORTAL.wsthumbFetch)PORTAL.wsthumbFetch=api('/client/website-thumb').then(r=>(r.ok&&r.body&&r.body.data&&typeof r.body.data.html==='string')?r.body.data.html:null).catch(()=>null);}
 function wsSlotOff(){const host=document.getElementById('home-website');if(host){host.hidden=true;host.innerHTML='';}}
 // Builder item 194 (Nov 12 review, finding 22): the client is often the only person who can sign in
 // where the domain is kept, and the portal never mentioned a domain. While one is connected and not
@@ -1383,7 +1402,7 @@ async function loadWebsiteCard(){
     // Home visit genuinely retries instead of pinning the card hidden all
     // session (the A4 rule). Only a SUCCESSFUL read caches — its data, or null
     // (the route genuinely has nothing to show; the card hides by design).
-    if(!PORTAL.wstatsFetch)PORTAL.wstatsFetch=api('/client/website-stats').then(r=>r.ok?((r.body&&r.body.data)||null):false).catch(()=>false);
+    wsStatsStart();
     PORTAL.wstats=await PORTAL.wstatsFetch;
     PORTAL.wstatsFetch=null;   // settled — a later call may start a fresh read
     if(PORTAL.wstats===false){PORTAL.wstats=undefined;wsSlotOff();return;}
@@ -1426,7 +1445,7 @@ async function loadWebsiteCard(){
 async function loadWebsiteThumb(){
   if(PORTAL.persona!=='client')return;
   if(PORTAL.wsthumb===undefined){
-    if(!PORTAL.wsthumbFetch)PORTAL.wsthumbFetch=api('/client/website-thumb').then(r=>(r.ok&&r.body&&r.body.data&&typeof r.body.data.html==='string')?r.body.data.html:null).catch(()=>null);
+    wsThumbStart();
     PORTAL.wsthumb=await PORTAL.wsthumbFetch;
     PORTAL.wsthumbFetch=null;
   }
@@ -1609,7 +1628,7 @@ async function renderMessages(focusSup,opts){
   else if(focusSup)openSupportThread(focusSup,null);   // an id not in the list (stale link) — the legacy full view degrades gracefully
   else if(opts&&opts.compose)openComposePane();
   // item 179: beside the list there is room, so the newest conversation is already open
-  else if(MC.rows.length&&window.matchMedia&&window.matchMedia('(min-width:720px)').matches)openConv(MC.rows[0].id,true);
+  else if(MC.rows.length&&window.matchMedia&&window.matchMedia('(min-width:720px)').matches)openConv((MC.rows.find(r=>r.status!=='resolved'&&r.status!=='closed')||MC.rows[0]).id,true);   // a finished request only when nothing is still going
   else renderMPane();
 }
 function renderMRows(){
@@ -2599,6 +2618,8 @@ function accountSectionHtml(canMessage){
     `<div class="acctid"><span class="acctav" aria-hidden="true">${esc(av)}</span><div class="acctwho"><strong>${name?esc(name):'Signed in'}</strong>${email?`<span class="muted">${esc(email)}</span>`:''}</div></div>`+
     `<div class="acctrow"><div class="acctlab"><strong>Appearance</strong><span class="muted">Light, dark, or match your device.</span></div><button id="appearance">${esc(themeLabel())}</button></div>`+
     (email?`<div class="acctrow"><div class="acctlab"><strong>Password</strong><span class="muted">We’ll email you a link to set a new one.</span></div><button id="chgpw">Change password</button></div>`:'')+
+    // builder item 191: two-step sign-in, the client's own (the set-up sheet is fresh-code.js, Figma B)
+    `<div class="acctrow" id="acctTwo"><div class="acctlab"><strong>Two-step sign-in</strong><span class="muted" id="acctTwoLine">Checking…</span></div><button id="twoStep" hidden>Turn on</button></div>`+
     `<div class="acctrow"><div class="acctlab"><strong>Session</strong><span class="muted">Signed in on this device.</span></div><button id="signout2">Sign out</button></div>`+
     businessesHtml()+
     (canMessage?`<p class="muted" style="font-size:12.5px;margin-top:10px">Need to change your name or email? Message your studio and they’ll update it.</p>`:'')+
@@ -2623,6 +2644,24 @@ function wireAccountSection(){
   const ap=$('appearance');if(ap)ap.addEventListener('click',()=>{cycleClientTheme();ap.textContent=themeLabel();});
   const cp=$('chgpw');if(cp)cp.addEventListener('click',async()=>{cp.disabled=true;try{await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/set-password.html?next=/portal.html'});toast('Check your email for a link to set a new password.');}catch(_){toast('Couldn’t send that just now.');cp.disabled=false;}});
   const so=$('signout2');if(so)so.addEventListener('click',doSignOut);
+  paintTwoStep().catch(()=>{});
+}
+// Builder item 191: on, a code from an app on their phone is asked after the emailed code,
+// link or password. The studio can't turn it off for them; it checks it's them and asks us.
+async function paintTwoStep(){
+  const b=$('twoStep'),line=$('acctTwoLine');if(!b||!line)return;
+  if(!window.ddsFresh){line.textContent='Couldn’t check just now.';return;}
+  const st=await window.ddsFresh.status(sb);
+  if(!st.read){line.textContent='Whether it’s on couldn’t load just now.';b.hidden=true;return;}
+  const since=st.since?new Date(st.since):null,day=since&&!isNaN(since)?since.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  line.textContent=st.on?`On${day?' since '+day:''}. Signing in on a new device asks for a code from your app.`:'Off. Turned on, signing in also asks for a 6-digit code from an app on your phone.';
+  b.textContent=st.on?'Turn off':'Turn on';b.hidden=false;
+  b.onclick=async()=>{
+    const who=studioBrand();
+    const r=st.on?await window.ddsFresh.turnOff(sb,st.factor,{lost:`Lost your phone? Ask ${who==='Your studio'?'your studio':who}. They check it’s you, then have it turned off.`})
+      :await window.ddsFresh.turnOn(sb,{issuer:who==='Your studio'?'Studio OS':who});
+    if(r.on||r.off){toast(r.on?'Two-step sign-in is on. Next time you sign in, have your phone ready.':'Two-step sign-in is off.');paintTwoStep().catch(()=>{});}
+  };
 }
 // The starter answers: how this portal works, true for every studio. Same markup as
 // the studio's own articles (lib/faq.ts renderFaq), so the search covers them too.
@@ -3535,7 +3574,7 @@ async function openSurvey(sid,pid,ctrl,from){
     if(q.type==='rating')field=`<select id="svq" class="fieldin" data-q="${esc(q.key)}"><option value="" disabled${val?'':' selected'}>Choose a rating (1–5)…</option>${[1,2,3,4,5].map(n=>`<option${String(n)===val?' selected':''}>${n}</option>`).join('')}</select>`;
     else if(q.type==='choice')field=`<select id="svq" class="fieldin" data-q="${esc(q.key)}"><option value="" disabled${val?'':' selected'}>Choose…</option>${(q.choices||[]).map(c=>`<option${String(c)===val?' selected':''}>${esc(c)}</option>`).join('')}</select>`;
     else field=`<textarea id="svq" class="fieldin" rows="4" data-q="${esc(q.key)}" style="margin-top:0">${esc(val)}</textarea>`;
-    $('main').innerHTML=sheetBackHtml(back)+sheetHead(chips,sv.title||'Survey','')+
+    $('main').innerHTML=sheetBackHtml(back)+sheetHead(chips,sv.title||'Survey',questionnaireOf([sv])?`Your answers help ${studioBrand()} write your pages.`:'')+   // item 179: what the answers are for, as drawn
       `<p class="qprog" id="qprog">Question ${i+1} of ${qs.length}</p><div class="qsteps" aria-hidden="true">${qs.map((_,j)=>`<i class="${j<=i?'on':''}"></i>`).join('')}</div>`+
       `<div class="card qcardq"><label for="svq">${esc(q.label||'Your answer')}</label>${field}</div>`+
       `<div class="qnav"><button class="approve" id="${last?'subSurvey':'qnext'}">${last?'Send your answers':'Next'}</button>${i>0?'<button id="qback">Back</button>':''}</div>`+
@@ -3606,13 +3645,50 @@ function rememberedReviewer(){try{return !!(USER&&USER.id)&&localStorage.getItem
 function rememberedClient(){try{return !!(USER&&USER.id)&&localStorage.getItem(personaKey())==='client';}catch(_){return false;}}
 function rememberPersona(c){try{if(!(USER&&USER.id))return;if(PORTAL.persona==='reviewer'&&c.site_role==='client_reviewer')localStorage.setItem(personaKey(),'reviewer');else if(PORTAL.persona==='client')localStorage.setItem(personaKey(),'client');else localStorage.removeItem(personaKey());}catch(_){}}
 let LOADED_ONCE=false;   // the address's #tab and a kept destination are honoured by the first load only (later loads follow an action)
-function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your updates just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
-function ownerNote(){$('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div><h2 style="margin-top:14px">This is the client view.</h2><p class="muted">You have the full workspace.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
+// ── Builder list item 228: the last visit's Home, at once ──
+// A returning client sees the Home they last saw the moment the page opens, while the
+// fresh one loads; nothing on it can be pressed until then (inert). Kept on this device
+// only, for this person only (the key carries their id), for a week, and wiped when they
+// sign out or the page finds nobody signed in. The site's picture and the first-visit
+// tour are left out; the greeting is said again for the hour it is now.
+const HOME_CACHE_PREFIX='dds-portal-home:';
+const HOME_CACHE_DAYS=7;
+let HOME_FROM_CACHE=false;
+function homeCacheKey(){return(USER&&USER.id)?HOME_CACHE_PREFIX+USER.id:'';}
+function saveHomeCache(){
+  try{
+    const k=homeCacheKey(),main=$('main'),nav=$('tabnav');
+    if(!k||CURRENT_TAB!=='home'||!main||!nav||nav.hidden||!main.querySelector('#home-hero')||main.querySelector('#needs-body .skel'))return;
+    const m=main.cloneNode(true);m.querySelectorAll('iframe,#welcome').forEach(e=>e.remove());
+    const n=nav.cloneNode(true);n.querySelectorAll('.navpanel').forEach(e=>{e.innerHTML='';e.setAttribute('hidden','');});
+    localStorage.setItem(k,JSON.stringify({v:1,at:Date.now(),main:m.innerHTML,nav:n.innerHTML,first:clientName(),title:document.title}));
+  }catch(_){}
+}
+function paintHomeCache(){
+  try{
+    const k=homeCacheKey();if(!k)return false;
+    const rec=JSON.parse(localStorage.getItem(k)||'null');
+    if(!rec||rec.v!==1||typeof rec.main!=='string'||typeof rec.nav!=='string'||!(Date.now()-(+rec.at||0)<HOME_CACHE_DAYS*864e5)){if(rec)localStorage.removeItem(k);return false;}
+    const main=$('main'),nav=$('tabnav');if(!main||!nav)return false;
+    nav.innerHTML=rec.nav;nav.hidden=false;main.innerHTML=rec.main;
+    try{document.body.classList.add('homeview');}catch(_){}
+    const h=main.querySelector('#home-hero h1');if(h)h.textContent=portalGreeting(new Date().getHours(),String(rec.first||''));
+    if(typeof rec.title==='string'&&rec.title)document.title=rec.title;
+    for(const el of[main,nav]){el.setAttribute('inert','');el.setAttribute('aria-busy','true');}
+    HOME_FROM_CACHE=true;return true;
+  }catch(_){return false;}
+}
+function dropHomeCacheView(){HOME_FROM_CACHE=false;for(const id of['main','tabnav']){const el=$(id);if(el){el.removeAttribute('inert');el.removeAttribute('aria-busy');}}}
+function clearHomeCaches(){try{Object.keys(localStorage).filter(k=>k.indexOf(HOME_CACHE_PREFIX)===0).forEach(k=>localStorage.removeItem(k));}catch(_){}}
+// the load will land on Home: no link to a project, a request, a payment or a tab, and no destination kept through a sign-in
+function landsOnHome(){try{const q=new URLSearchParams(location.search);if(q.get('support')||q.get('project')||q.get('approval')||q.get('paid')||q.get('connect'))return false;if(String(location.hash||'').length>1)return false;return !localStorage.getItem(RETURN_KEY);}catch(_){return false;}}
+function signedOut(){dropHomeCacheView();clearHomeCaches();$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
+function trouble(){dropHomeCacheView();$('main').innerHTML=`<div class="center"><h2>We couldn’t load your updates just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
+function ownerNote(){dropHomeCacheView();clearHomeCaches();$('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div><h2 style="margin-top:14px">This is the client view.</h2><p class="muted">You have the full workspace.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
 
 async function load(){
   setWide(false);
-  PORTAL.snaps=null;PORTAL.billing=null;PORTAL.billingFailed=false;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;PORTAL.wsthumb=undefined;PORTAL.wsthumbFetch=null;   // fresh per-load caches (a re-load = fresh data)
+  PORTAL.snaps=null;PORTAL.snapsFetch=null;PORTAL.snapsBoot=null;PORTAL.billing=null;PORTAL.billingFetch=null;PORTAL.billingFailed=false;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;PORTAL.wsthumb=undefined;PORTAL.wsthumbFetch=null;   // fresh per-load caches (a re-load = fresh data)
   const first=!LOADED_ONCE;LOADED_ONCE=true;
   const params=new URLSearchParams(location.search);
   // G2: the destination kept through a sign-in; an address that names its own wins
@@ -3640,12 +3716,17 @@ async function load(){
   const skipProj=rememberedReviewer();   // G12: a reviewer's projects read is refused every time
   // item 179: someone known to be a client here gets everything Home needs in the same round
   const early=rememberedClient();
+  // Home's own reads are started early only when this load lands on Home; a link that opens a
+  // project, a request or a tab reads what it needs itself (an early read there would be a second one)
+  const toHome=!dsup&&!deep&&!paidId&&!wantTab;
   const askPath='/connections/ask'+(askTok?'?token='+encodeURIComponent(askTok):'');
   const nP=early?api('/client/notifications').catch(()=>null):null,aP=early?api(askPath).catch(()=>null):null;
-  if(early){PORTAL.wstatsFetch=api('/client/website-stats').then(r=>r.ok?((r.body&&r.body.data)||null):false).catch(()=>false);
-    PORTAL.wsthumbFetch=api('/client/website-thumb').then(r=>(r.ok&&r.body&&r.body.data&&typeof r.body.data.html==='string')?r.body.data.html:null).catch(()=>null);}
-  const [ctx,proj0,feed]=await Promise.all([api('/portal/context'),skipProj?Promise.resolve(null):api('/client/projects').catch(()=>null),api('/portal/feed')]);
-  if(!ctx.ok){hideNav();trouble();return;}
+  if(early&&toHome){wsStatsStart();wsThumbStart();PORTAL.billingFetch=api('/client/billing').catch(()=>null);}
+  const projP=skipProj?Promise.resolve(null):api('/client/projects').catch(()=>null);
+  // …and each project's details go out the moment the list lands, not after the context
+  if(early&&toHome)projP.then(r=>{const d=r&&r.ok&&r.body&&r.body.data;if(Array.isArray(d)&&d.length&&!PORTAL.projects.length){PORTAL.projects=d;PORTAL.snapsBoot=ensureSnaps();}}).catch(()=>{});
+  const [ctx,proj0,feed]=await Promise.all([api('/portal/context'),projP,api('/portal/feed')]);
+  if(!ctx.ok){dropHomeCacheView();hideNav();trouble();return;}
   const c=ctx.body.data||{};
   // …unless the answer says they are more than a reviewer now: then the read happens after all
   const proj=(skipProj&&(c.is_managed_client||c.site_role!=='client_reviewer'))?await api('/client/projects').catch(()=>null):proj0;
@@ -3671,7 +3752,9 @@ async function load(){
   PORTAL.feedFailed=!feed.ok;   // a failed feed read must never masquerade as zero approvals
   // PS3: the boot notifications GET is persona-gated — a reviewer's /client/*
   // 403 is contract (reviewerAllowed); their bell boots calm with ZERO fetches.
-  if(PORTAL.persona!=='client'){PORTAL.wstatsFetch=null;PORTAL.wsthumbFetch=null;}   // an early read for someone no longer a client is dropped
+  if(PORTAL.persona!=='client'){PORTAL.wstatsFetch=null;PORTAL.wsthumbFetch=null;PORTAL.billingFetch=null;PORTAL.snapsFetch=null;PORTAL.snapsBoot=null;PORTAL.snaps=null;}   // an early read for someone no longer a client is dropped
+  // a client's Home reads go out beside the notifications, not after them (item 179: a first visit took four rounds)
+  else if(toHome){wsStatsStart();wsThumbStart();if(!PORTAL.billing&&!PORTAL.billingFetch)PORTAL.billingFetch=api('/client/billing').catch(()=>null);if(!PORTAL.snapsBoot)PORTAL.snapsBoot=ensureSnaps();}
   const [n,a]=PORTAL.persona==='client'?await Promise.all([
     nP||api('/client/notifications').catch(()=>null),
     aP||api(askPath).catch(()=>null),   // the studio's ask to connect Google, never a blocker
@@ -3685,6 +3768,10 @@ async function load(){
   if(a&&a.ok&&a.body&&a.body.data&&Array.isArray(a.body.data.providers)&&a.body.data.providers.length)PORTAL.ask=a.body.data;
   else if(a&&!a.ok&&askTok&&a.body&&a.body.message)PORTAL.askProblem=String(a.body.message);
   PORTAL.ready=true;
+  // item 228: with the last Home on screen, swap only once Home's own reads have answered,
+  // so the fresh Home replaces it whole instead of passing through grey placeholders
+  // (at most 4 s: a slow read gets the fresh Home's own placeholders, not a frozen old one)
+  if(HOME_FROM_CACHE){if(toHome)await Promise.race([Promise.allSettled([PORTAL.snapsBoot,PORTAL.billingFetch,PORTAL.wstatsFetch].filter(Boolean)),new Promise(r=>setTimeout(r,4000))]);dropHomeCacheView();}
   showNav();
   // deep links open the relevant drill-down; the nav stays visible around it.
   // ?support= now opens the Messages tab with that thread in the reading pane.
@@ -3703,7 +3790,7 @@ async function load(){
 // Always-available client sign-out (the shell's profile menu is owner-shaped;
 // a client needs an obvious, in-view way out). Lands back on the client door.
 // Shared so both the footer link and the "You & notifications" card use it.
-async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();try{await sb.auth.signOut();}catch(_){}location.href='/portal.html';}
+async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();clearHomeCaches();try{await sb.auth.signOut();}catch(_){}location.href='/portal.html';}
 (function(){var s=$('signout');if(s)s.addEventListener('click',doSignOut);})();
 (async function(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";USER=(data&&data.session&&data.session.user)||null;
@@ -3720,6 +3807,7 @@ async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();try{await 
       keepReturn(new URLSearchParams(location.search));   // G2: the project or request an email button was opening
       signedOut();return;
     }
+    if(landsOnHome())paintHomeCache();   // item 228
     await load();
   }catch(_){trouble();}
 })();
