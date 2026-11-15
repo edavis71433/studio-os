@@ -15609,22 +15609,23 @@ const INS_THEMES = [
 // The site's colours as the canvas draws them (every template names them alike), or quiet
 // stand-ins before the canvas has drawn.
 function dcSiteColours() {
-  const out = { paper: "#f7f7f5", card: "#ffffff", ink: "#1c2430", soft: "#5b6572", accent: "#23635a", accentDark: "", wash: "#eef1ee" };
+  const out = { paper: "#f7f7f5", card: "#ffffff", ink: "#1c2430", soft: "#5b6572", accent: "#23635a", accentDark: "", band: "", wash: "#eef1ee" };
   try {
     const d = $("designPreview") && $("designPreview").contentDocument;
     const cs = d && d.documentElement && d.defaultView.getComputedStyle(d.documentElement);
-    if (cs) [["paper", "--paper"], ["card", "--card"], ["ink", "--ink"], ["soft", "--soft"], ["accent", "--accent"], ["accentDark", "--accent-dark"], ["wash", "--wash"]].forEach(([k, v]) => {
+    if (cs) [["paper", "--paper"], ["card", "--card"], ["ink", "--ink"], ["soft", "--soft"], ["accent", "--accent"], ["accentDark", "--accent-dark"], ["band", "--accent-band"], ["wash", "--wash"]].forEach(([k, v]) => {
       const x = cs.getPropertyValue(v).trim(); if (x && !/^var\(/.test(x)) out[k] = x;
     });
   } catch (_) {}
   if (!out.accentDark) out.accentDark = out.accent;
+  if (!out.band) out.band = out.accentDark;   // behind an accent section; Slate names a deeper one (.block--bg-accent)
   return out;
 }
 // what a theme looks like: its background, words and button
 function insThemeLook(v, c) {
   if (v === "tinted") return { bg: "color-mix(in srgb," + c.accent + " 8%," + c.paper + ")", ink: c.ink, btn: c.accent };
   if (v === "plain") return { bg: c.paper, ink: c.ink, btn: c.accent };
-  if (v === "accent") return { bg: c.accentDark, ink: "#ffffff", btn: "#ffffff" };
+  if (v === "accent") return { bg: c.band, ink: "#ffffff", btn: "#ffffff" };
   if (v === "dark") return { bg: "#1a1622", ink: "#f2eef8", btn: c.accent };
   return { bg: "linear-gradient(180deg," + c.card + " 0 55%," + c.wash + " 55%)", ink: c.ink, btn: c.accent };
 }
