@@ -1077,7 +1077,8 @@ test.describe('one preview screen', () => {
     await page.evaluate((n) => new Promise<void>((done) => {
       const f = document.getElementById('previewFrame') as HTMLIFrameElement;
       f.addEventListener('load', () => done(), { once: true });
-      f.srcdoc = `<div>Loading your draft…</div><!--dds-proof ${n - 1}-->`;
+      // item 190: Preview's frame has no origin, so a write says which it is by message (frameWriter)
+      f.srcdoc = `<div>Loading your draft…</div><script>parent.postMessage({ ddsProof: ${n - 1} }, "*")<\/script>`;
     }), newest);
     await expect(frame.locator('#main > section').first()).toBeVisible();
     await expect(frame.getByText('Loading your draft…')).toHaveCount(0);
