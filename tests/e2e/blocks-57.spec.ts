@@ -70,6 +70,19 @@ for (const slug of TEMPLATES) {
       expect(Math.abs(small.centre - (col.left + col.width / 2)), 'lined up in the centre').toBeLessThanOrEqual(1.5);
     });
 
+    test('every photo keeps its own shape: the photo, the video’s cover and the map', async ({ page }) => {
+      await openPage(page, slug);
+      const imgs = page.locator('section.block-stack img');
+      expect(await imgs.count()).toBeGreaterThanOrEqual(3);
+      for (const img of await imgs.all()) {
+        await img.scrollIntoViewIfNeeded();   // they load as they come into view
+        await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.complete && e.naturalWidth > 0)).toBe(true);
+        // the picture is 16 by 10 (naturalWidth comes rounded after the srcset's scale, too coarse for so small a picture)
+        const s = await img.evaluate((e: HTMLImageElement) => { const r = e.getBoundingClientRect(); return { w: r.width, h: r.height, cls: (e.closest('[class*="stk-"]') as HTMLElement).className }; });
+        expect(Math.abs(s.h - s.w * 10 / 16), `${s.cls}: drawn ${Math.round(s.w)} by ${Math.round(s.h)}`).toBeLessThanOrEqual(1.5);
+      }
+    });
+
     test('a block hidden on phones shows on bigger screens only', async ({ page }) => {
       await openPage(page, slug);
       const line = page.locator('section.block-stack hr.stk-hr');
