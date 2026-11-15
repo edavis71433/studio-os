@@ -172,7 +172,8 @@ const pipe = read('pipeline.html');
   // pipeline.html mirrors the branch by hand (the existing convention)
   ok('pipeline.html carries the CONTRACT_SIGNED_GUIDANCE mirror', /const CONTRACT_SIGNED_GUIDANCE=\{tip:'They’ve signed — convert them to open their portal and start the project\.'/.test(pipe));
   ok('the client guidanceFor branches on the signed fact', /if\(s==='contract'&&facts&&facts\.signed&&!facts\.converted\)return CONTRACT_SIGNED_GUIDANCE/.test(pipe));
-  ok('the drawer passes the signed fact into the guidance strip', /guidanceFor\(stage,\{signed:signedNow,converted:!!d\.converted_client_id\}\)/.test(pipe));
+  // sales item 124: the stage note took the strip's place; the signed fact rides on top of it
+  ok('the drawer passes the signed fact into the stage note', /const fact=\(\(stage==='contract'&&signedNow\)/.test(pipe) && /stageNoteHtml\(stage,fact\)/.test(pipe));
   ok('…and into the stage to-do presets (both the dropdown and its wiring)', (pipe.match(/guidanceFor\(d\.stage,\{signed:signedNow,converted:!!d\.converted_client_id\}\)/g) || []).length >= 2);
   ok('the signed "Do next" DEEP-LINKS the convert button', /id="guideConvert"/.test(pipe) && /const gc=\$\('guideConvert'\); if\(gc\)gc\.onclick=/.test(pipe));
   // the mirror's todos are real strings the server copy also carries (no hand-mirror drift)
