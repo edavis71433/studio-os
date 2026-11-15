@@ -2074,7 +2074,8 @@ async function saveStageNote(k, text, reset) {
   if (!reset && SNOTES && String(text).trim() === String(SNOTES[k] || '').trim() && !(box && box.getAttribute('aria-invalid') === 'true')) return;   // nothing changed
   while (SNOTE_BUSY[k]) await new Promise((res) => setTimeout(res, 120));   // one save a note at a time
   SNOTE_BUSY[k] = true; saidNothing(fsSlot('sn-' + k));
-  const r = await api('/sales/stages', 'PUT', { note: { stage: k, text } });
+  const note = { stage: k, text };
+  const r = await api('/sales/stages', 'PUT', { note });
   SNOTE_BUSY[k] = false;
   if (!r.ok) {   // said beside the stage's name; the box keeps your words
     const b2 = $('snt-' + k); markBad(b2, true);
