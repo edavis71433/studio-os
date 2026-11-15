@@ -10,7 +10,7 @@ import { runPipeline } from './publish.ts';
 import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import { siteCan } from '../lib/site_roles.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { PUBLISH_BLOCKED_STATES } from '../lib/lifecycle.ts';
+import { PUBLISH_BLOCKED_STATES, publishRefusal } from '../lib/lifecycle.ts';
 import { captureDraftSnapshot, loadStagedSnapshot } from '../lib/staging.ts';
 import { cleanLaunchName, isValidSchedule, canApprove, canSchedule, canPromote, canRollback, canCancel, canRecapture, statusAfterRecapture, launchStatusLabel, type LaunchStatus } from '../lib/launches.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -125,6 +125,8 @@ export async function handleLaunchSchedule(req: Request, site: SiteRow, principa
 
 // ── promote: atomic publish of the staged snapshot (runPipeline) ────────────
 export async function handleLaunchPromote(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
+  const refused = publishRefusal(site.status, principal.kind);   // item 196: it goes live, so Publish's rules
+  if (refused) return json(refused, 409, cors);
   const l = await getLaunch(site, id);
   if (!l) return json({ error: 'not_found', message: 'That launch isn’t here.' }, 404, cors);
   if (!canPromote(l.status)) return json({ error: 'bad_state', message: 'A launch must be approved before it goes live.' }, 409, cors);
@@ -145,6 +147,8 @@ export async function handleLaunchPromote(site: SiteRow, principal: Principal, i
 
 // ── rollback: restore the pre-promote live snapshot (runPipeline restore) ────
 export async function handleLaunchRollback(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
+  const refused = publishRefusal(site.status, principal.kind);   // item 196: it goes live, so Publish's rules
+  if (refused) return json(refused, 409, cors);
   const l = await getLaunch(site, id);
   if (!l) return json({ error: 'not_found', message: 'That launch isn’t here.' }, 404, cors);
   if (!canRollback(l.status)) return json({ error: 'bad_state', message: 'Only a launched release can be rolled back.' }, 409, cors);

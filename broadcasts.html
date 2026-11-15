@@ -307,10 +307,15 @@ const IC={
   car:'<svg class="ic car" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
   tag:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:13px;height:13px"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/></svg>',
 };
+// builder item 202's name for the Inbox: inside a client it is their Messages (the client's name and
+// scope settle once the shell's context lands, so the trail follows it then too)
+const inboxName=()=>(window.ddsScopeInfo&&window.ddsScopeInfo())?'Messages':'Inbox';
+document.addEventListener('dds:context',()=>{const a=document.getElementById('trailInbox');if(a)a.textContent=inboxName();});
 function render(){
-  // builder item 165: the one page header; it opens from the Inbox, so the trail says Inbox.
-  // Write an update is its one filled action: it takes you to the message (Send stays with it).
-  let h=`<header class="dds-ph"><nav class="dds-ph-trail" aria-label="Where this page is"><a href="/inbox.html">Inbox</a><span aria-hidden="true">›</span></nav>
+  // builder item 165: the one page header; it opens from the Inbox, so the trail names it as the menu
+  // does (builder item 202: inside a client that is their Messages). Write an update is its one filled
+  // action: it takes you to the message (Send stays with it).
+  let h=`<header class="dds-ph"><nav class="dds-ph-trail" aria-label="Where this page is"><a href="/inbox.html" id="trailInbox">${inboxName()}</a><span aria-hidden="true">›</span></nav>
     <div class="dds-ph-row"><span class="dds-ph-ic" data-ic="update" aria-hidden="true"></span>
       <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Send an update</h1></div><p class="dds-ph-line">One email to many people. You see it before it goes, each person can unsubscribe, and nothing ever goes out on its own.</p></div>
       <div class="dds-ph-acts"><button type="button" class="primary dds-ph-fill" id="writeJump">Write an update</button></div></div></header>

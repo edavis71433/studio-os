@@ -156,7 +156,7 @@ test.describe('sales item 94 — AI help and the month’s goal', () => {
     await pill.click();
     await expect(band).toHaveClass(/warn/);
     await expect(band).toContainText('AI help is off. Switch it on in Settings, under Goal and AI help.');
-    await expect(band.getByRole('link', { name: 'Open Settings' })).toHaveAttribute('href', '/settings.html#goal');
+    await expect(band.getByRole('link', { name: 'Open Settings' })).toHaveAttribute('href', '/settings.html?client=#goal');
     await expect(page.locator('#emBody')).toHaveValue('Hi Ivy,');
     await pill.click();
     await expect(band).toHaveText('That’s 50 AI helps today (about 50¢). It starts again tomorrow.');
@@ -166,6 +166,23 @@ test.describe('sales item 94 — AI help and the month’s goal', () => {
     await expect(band.getByRole('button', { name: 'Try again' })).toBeVisible();
     await expect(page.locator('#emBody')).toHaveValue('Hi Ivy,');
     await noOverflow(page);
+  });
+
+  test('inside a customer: the owner\u2019s Open Settings goes to the studio\u2019s own Settings, not the customer\u2019s', async ({ page }) => {
+    // found on the live account Nov 15: a customer's record opens inside that customer (?client=)
+    const SITE = '11111111-2222-4333-8444-555555555555';
+    await installApp(page, { api: RECORD_API });
+    await spyAi(page, [], '/sales/ai/draft', [{ status: 409, body: { error: 'ai_off', can_switch: true, message: 'AI help is off. Switch it on in Settings, under Goal and AI help. It costs about 1\u00a2 each time you press Draft or Sum up.' } }]);
+    await page.goto(`/crm.html?deal=${DEAL}&tab=activity&client=${SITE}`);
+    const tab = page.locator('#composer [data-ct="email"]');
+    await expect(tab).toBeVisible();
+    if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
+    await page.getByRole('button', { name: 'Draft it for me' }).click();
+    const link = page.locator('#emBox .ai-band').getByRole('link', { name: 'Open Settings' });
+    await expect(link).toBeVisible();
+    await page.waitForTimeout(400);   // the shell's scope pass runs after a redraw: the link must come through it as it was
+    await expect(link).toHaveAttribute('href', '/settings.html?client=#goal');
+    await expect(link).toHaveAttribute('data-noscope', '1');
   });
 
   test('a person on their own (no rail): Where things stand sits above the tabs', async ({ page }) => {

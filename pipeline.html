@@ -2492,6 +2492,7 @@ function setFilters(next,key){
 }
 function paintFchips(){
   const host=$('fchips'),k=KIT();if(!host)return;
+  if(!k)document.addEventListener('DOMContentLoaded',paintFchips,{once:true});   // shell.js loads after this script: a draw that beat it gets the chips once it lands
   host.hidden=VIEW==='board'||!k||inClient()||!DEALS.length;   // builder item 83: your own second business keeps the chips
   if(host.hidden){host.innerHTML='';return;}
   // each chip says how many of the deals in view it would keep on its own (the search applied)

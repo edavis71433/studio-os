@@ -27,6 +27,8 @@ import type { Principal } from '../../_shared/auth.ts';
 import { lastPublishDetail } from '../lib/actor_kind.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 import { copiedBlockerFor } from '../lib/copied_record.ts';
+import { pageLockBlockers, lockIdsIn } from '../lib/page_access.ts';
+import { pageLocksFound } from './page_locks.ts';
 
 
 interface RoomState {
@@ -34,7 +36,7 @@ interface RoomState {
   liveContent: SnapshotContent | null;
   draftHash: string;               // M9: the M3 version token for optimistic locking
   blockers: number; warnings: number;
-  blockerList: { field: string; message: string }[];   // the same validation, by name, for the publish page
+  blockerList: { field: string; message: string; at?: { page: string; index: number } }[];   // the same validation, by name, for the publish page
   changes: ReturnType<typeof describeChanges>;
   lastLive: { id: string; created_at: string; completed_at: string | null; actor_kind: string } | null;
   lastAny: { status: string } | null;
@@ -67,6 +69,9 @@ async function roomState(site: SiteRow): Promise<RoomState | null> {
   // item 145: words and photos still exactly as Duplicate or a template copied them in
   const copied = await copiedBlockerFor(site.id, snapshot.content, mediaManifest);
   if (copied) { v.blockers.push(copied); v.ok = false; }
+  // item 196: a password page with no password on this site would be left off without a word
+  const found = await pageLocksFound(site.id, lockIdsIn(snapshot.content));
+  if (found) for (const b of pageLockBlockers(snapshot.content, found)) { v.blockers.push(b); v.ok = false; }
   const changes = describeChanges(snapshot.content, liveContent);
   const draftHash = await computeDraftHash(snapshot); // M9: reuse THIS serialize (no extra work)
 

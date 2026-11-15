@@ -670,14 +670,25 @@ function buildSystem(feed,notifs){
   return rows;
 }
 
+// builder item 202: inside a client this page is their Messages, the name their menu and phone bar
+// use, so its heading and the browser tab say so. At studio level, and for an owner, it is the Inbox.
+function pageName(){return (window.ddsScopeInfo&&window.ddsScopeInfo())?'Messages':'Inbox';}
+function paintPageName(){
+  const sc=window.ddsScopeInfo&&window.ddsScopeInfo(),n=pageName();
+  document.title=n+(sc&&sc.name?' — '+sc.name:'')+' — Studio OS';
+  const h=document.getElementById('pagehead');if(h)h.textContent=n;   // builder item 165: the header's title
+  const ic=document.getElementById('phIc');if(ic)ic.setAttribute('data-ic',n==='Messages'?'messages':'inbox');
+}
+document.addEventListener('DOMContentLoaded',paintPageName);   // the shell (deferred) is in by then
+document.addEventListener('dds:context',paintPageName);         // …and the client's name once its context lands
+
 // ── the console shell ─────────────────────────────────────────────────────────
 function renderConsole(){
-  // builder item 165: the one page header. Inside a client (?client=) this page is that
-  // client's Messages, as the menu names it; otherwise it is the Inbox.
-  const inClient=!!QP().get('client');
+  // builder item 165: the one page header, named by builder item 202's pageName(): inside a client this
+  // page is that client's Messages, otherwise the Inbox (its visible h1 is the page's only heading)
   $('main').innerHTML=`
-  <header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" data-ic="${inClient?'messages':'inbox'}" aria-hidden="true"></span>
-    <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">${inClient?'Messages':'Inbox'}</h1><div class="viewdd">
+  <header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" id="phIc" data-ic="${pageName()==='Messages'?'messages':'inbox'}" aria-hidden="true"></span>
+    <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">${esc(pageName())}</h1><div class="viewdd">
         <button id="viewBtn" class="dds-ph-pick" aria-haspopup="listbox" aria-expanded="false">${esc(VIEW_LABEL[VIEW])} <span class="car" aria-hidden="true">▾</span></button>
         <div id="viewMenu" role="listbox" aria-label="Inbox views" hidden></div>
       </div></div>

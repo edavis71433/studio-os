@@ -812,7 +812,8 @@ function wire(){
   document.querySelectorAll('[data-chip]').forEach(b=>b.addEventListener('click',()=>{const v=b.getAttribute('data-chip');VIEWNAME=v;CURVIEW='';PICKED.clear();render();const nb=document.querySelector('[data-chip="'+v+'"]');if(nb)nb.focus();}));
   const sv=$('saveView');if(sv)sv.addEventListener('click',saveView);
   const dv=$('dropView');if(dv)dv.addEventListener('click',dropView);
-  const cb=$('colsBtn');if(cb&&KIT())cb.addEventListener('click',(e)=>{e.stopPropagation();KIT().columnsMenu(cb,COLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderListZone();});});
+  // shell.js is deferred and can land after this draw, so the kit is looked up on the press (a check here left Columns dead)
+  const cb=$('colsBtn');if(cb)cb.addEventListener('click',(e)=>{const k=KIT();if(!k)return;e.stopPropagation();k.columnsMenu(cb,COLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderListZone();});});
   const ic=$('importCsv');if(ic)ic.addEventListener('click',importCustomers);
   // Refresh: a rejected load (network hiccup) toasts the page's standard copy —
   // never an unhandled promise; the initial-boot trouble() path is unchanged.

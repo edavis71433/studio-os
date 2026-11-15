@@ -260,7 +260,7 @@ ok('wiring: GET /client/website-thumb dispatched beside website-stats',
   /route === '\/client\/website-thumb' && method === 'GET'\) return handleClientWebsiteThumb\(req, site, principal, cors\)/.test(idx));
 ok('page: the picture frame is sandboxed with scripts OFF and drawn once per load (in-flight promise cached)',
   page.includes("f.setAttribute('sandbox','allow-same-origin')")
-  && page.includes("if(!PORTAL.wsthumbFetch)PORTAL.wsthumbFetch=api('/client/website-thumb')")
+  && page.includes("function wsThumbStart(){if(PORTAL.wsthumb===undefined&&!PORTAL.wsthumbFetch)PORTAL.wsthumbFetch=api('/client/website-thumb')")   // item 179: started once, from the boot or the card
   && page.includes('PORTAL.wsthumb=undefined;PORTAL.wsthumbFetch=null;'));
 ok('wiring: every pre-existing /client/* dispatch is untouched',
   ['handleClientProjects','handleClientProject','handleClientReport','handleClientMessages','handleClientDeliverableDownload',
@@ -270,7 +270,7 @@ ok('wiring: every pre-existing /client/* dispatch is untouched',
 ok('page: client.html fetches /client/website-stats and hides the slot on any non-OK read',
   page.includes("api('/client/website-stats')") && /id="home-website" hidden/.test(page));
 ok('page: at most ONE in-flight website-stats fetch (the promise itself is cached)',
-  page.includes('if(!PORTAL.wstatsFetch)PORTAL.wstatsFetch=api(\'/client/website-stats\')')
+  page.includes('function wsStatsStart(){if(PORTAL.wstats===undefined&&!PORTAL.wstatsFetch)PORTAL.wstatsFetch=api(\'/client/website-stats\')')   // item 179: started once, from the boot or the card
   && page.includes('PORTAL.wstats=await PORTAL.wstatsFetch;')
   && page.includes('PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;'));
 ok('page: the disclosure button carries aria-expanded + aria-controls and toggles in place',

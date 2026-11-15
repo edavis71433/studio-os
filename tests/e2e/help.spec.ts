@@ -2,10 +2,10 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp } from './helpers/app';
 
-// Help — the approved "ask in your own words" board. The ask box is the
-// EXISTING Concierge (POST /concierge/ask, the same call connections.html and
-// today.html make); the topic cards point at real pages; the popular answers
-// are the plain answers this page always carried, one row each.
+// Help — the approved "ask in your own words" board. The ask box asks the same
+// helper as the ? panel (POST /help/ask; builder item 202: it used to ask the site
+// Concierge, so one question got two answers); the topic cards open the places
+// they name; the popular answers are the plain answers this page always carried.
 test.describe('Help (ask in your own words)', () => {
   test('title · ask box with ONE filled button · suggested questions · seven topic cards · answers · rail', async ({ page }) => {
     await installApp(page);
@@ -21,7 +21,7 @@ test.describe('Help (ask in your own words)', () => {
     await expect(cards).toHaveCount(7);
     await expect(cards.locator('b')).toHaveText(['Getting started', 'Your website', 'Customers and deals', 'Invoices and payments', 'Client sites', 'Files and sharing', 'Connections']);
     await expect(cards.nth(1)).toHaveAttribute('href', '/presence.html');
-    await expect(cards.nth(2)).toHaveAttribute('href', '/crm.html');
+    await expect(cards.nth(2)).toHaveAttribute('href', '/customers.html');   // item 202: Customers, never the empty "Open a client" picker
     await expect(cards.nth(4)).toHaveAttribute('href', '/sites.html');
     await expect(cards.nth(6)).toHaveAttribute('href', '/connections.html');
     // the answers: one row each, folded, with the original copy inside
@@ -38,12 +38,12 @@ test.describe('Help (ask in your own words)', () => {
     await expect(page.getByRole('button', { name: 'Start the tour' })).toBeVisible();
   });
 
-  test('asking sends the question to /concierge/ask and shows the answer; a chip asks its question', async ({ page }) => {
+  test('asking sends the question to /help/ask and shows the answer; a chip asks its question', async ({ page }) => {
     const asked: string[] = [];
     await installApp(page);
-    await page.route('**/functions/v1/presence/concierge/ask', (route) => {
+    await page.route('**/functions/v1/presence/help/ask', (route) => {
       asked.push(route.request().postDataJSON().question);
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { text: 'Publish from the website builder — nothing goes live until you press Publish.' } }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { matched: true, answer: 'Publish from the website builder — nothing goes live until you press Publish.', links: [] } }) });
     });
     await page.goto('/help.html');
     await page.getByLabel('Ask a question').fill('How do I publish?');
@@ -57,9 +57,9 @@ test.describe('Help (ask in your own words)', () => {
     await expect(page.locator('#ans')).toHaveAttribute('aria-live', 'polite');
   });
 
-  test('a Concierge that has nothing says so — it never guesses', async ({ page }) => {
+  test('a helper that can’t answer says so — it never guesses', async ({ page }) => {
     await installApp(page);
-    await page.route('**/functions/v1/presence/concierge/ask', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
+    await page.route('**/functions/v1/presence/help/ask', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) }));
     await page.goto('/help.html');
     await page.getByLabel('Ask a question').fill('Anything?');
     await page.keyboard.press('Enter');
@@ -70,11 +70,11 @@ test.describe('Help (ask in your own words)', () => {
   test('signed out, the ask box points at the answers and support instead of calling anything', async ({ page }) => {
     let calls = 0;
     await installApp(page, { session: null });
-    await page.route('**/functions/v1/presence/concierge/ask', (route) => { calls++; return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }); });
+    await page.route('**/functions/v1/presence/help/ask', (route) => { calls++; return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }); });
     await page.goto('/help.html');
     await page.getByLabel('Ask a question').fill('How do I publish?');
     await page.getByRole('button', { name: 'Ask' }).click();
-    await expect(page.locator('#ans')).toContainText('Sign in to ask about your own studio');
+    await expect(page.locator('#ans')).toContainText('Sign in to ask');
     expect(calls).toBe(0);
   });
 

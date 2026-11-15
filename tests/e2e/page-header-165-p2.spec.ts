@@ -116,6 +116,9 @@ const PAGES: Array<{ name: string; open: Open; want: Want; ready?: string }> = [
     want: { title: 'Messages', icon: 'messages', line: /conversation/, picker: 'Everything', filled: null }, ready: '#rows [role=option]' },
   { name: 'Send an update', open: async (page) => { await installApp(page, { api: BC_API }); await page.goto('/broadcasts.html'); },
     want: { title: 'Send an update', icon: 'update', trail: 'Inbox', line: /^One email to many people\./, filled: 'Write an update' } },
+  // builder item 202's names: inside a client the Inbox is their Messages, so the trail says so
+  { name: 'a client’s Send an update', open: async (page) => { await installApp(page, { api: { ...BC_API, '/portal/context': STUDIO_CTX } }); await page.goto(`/broadcasts.html?client=${CLIENT}`); },
+    want: { title: 'Send an update', icon: 'update', trail: 'Messages', line: /^One email to many people\./, filled: 'Write an update' } },
   { name: 'Analytics', open: async (page) => { await installApp(page, { api: { '/analytics/dashboard': DASH } }); await page.goto('/analytics.html'); },
     want: { title: 'Analytics', icon: 'analytics', line: /^Your business at a glance\. Numbers only where they’re real\.\s*·\s*As of /, filled: null } },
   { name: 'Files', open: async (page) => { await installApp(page, { api: FILES_API }); await page.goto('/files.html'); },
@@ -123,7 +126,7 @@ const PAGES: Array<{ name: string; open: Open; want: Want; ready?: string }> = [
   { name: 'Visual Studio', open: async (page) => { await installApp(page, { api: { '/visual/kinds': KINDS, '/visual/plans': { data: [] } } }); await page.goto('/visual-studio.html'); },
     want: { title: 'Visual Studio', icon: 'spark', trail: 'Files', line: /^Make images for your website/, filled: null } },
   { name: 'Help', open: async (page) => { await installApp(page); await page.goto('/help.html'); },
-    want: { title: 'Help', icon: 'help', line: /^Ask in your own words\./, filled: null } },
+    want: { title: 'Help', icon: 'help', line: /^How can we help\?$/, filled: null } },
   { name: 'Health Center', open: async (page) => { await installApp(page, { api: { '/admin/health-center': HC } }); await page.goto('/admin-health.html'); },
     want: { title: 'Health Center', icon: 'health', line: 'How every site is doing, in one place: online, fast, secure and found on Google.', filled: null }, ready: '#refreshBtn:not([hidden])' },
 ];

@@ -77,18 +77,21 @@ test.describe('Settings: one way to save (builder item 165)', () => {
     await expect(page.locator('#f-email')).toHaveValue('hello at brightline');
   });
 
-  test('a name can’t be left empty: the box says so and nothing is sent', async ({ page }) => {
-    let puts = 0;
-    await installApp(page, { api: API });
-    await page.route((u) => u.pathname.endsWith('/presence/identity'), (route) => { if (route.request().method() === 'PUT') puts++; return route.fallback(); });
-    await page.goto('/settings.html#studio');
-    await expect(page.locator('#f-name')).toHaveValue('Brightline Studio');
-    await page.locator('#f-name').fill('');
-    await page.locator('#f-name').press('Tab');
-    await expect(page.locator('#fs-f-name')).toHaveText('A name is needed');
-    await expect(page.locator('#f-name')).toHaveAttribute('aria-invalid', 'true');
-    expect(puts).toBe(0);
-  });
+  // the box's own message, in builder item 202's words: a business owner's business, a studio's studio
+  for (const [who, ctx, words] of [['a business owner', null, 'Give the business a name.'], ['a studio', AGENCY_CTX, 'Give your studio a name.']] as const) {
+    test(`a name can’t be left empty: the box says so (${who}) and nothing is sent`, async ({ page }) => {
+      let puts = 0;
+      await installApp(page, { api: ctx ? { ...API, '/portal/context': ctx } : API });
+      await page.route((u) => u.pathname.endsWith('/presence/identity'), (route) => { if (route.request().method() === 'PUT') puts++; return route.fallback(); });
+      await page.goto('/settings.html#studio');
+      await expect(page.locator('#f-name')).toHaveValue('Brightline Studio');
+      await page.locator('#f-name').fill('');
+      await page.locator('#f-name').press('Tab');
+      await expect(page.locator('#fs-f-name')).toHaveText(words);
+      await expect(page.locator('#f-name')).toHaveAttribute('aria-invalid', 'true');
+      expect(puts).toBe(0);
+    });
+  }
 
   test('a stalled-after box saves when it’s left, and its row says Saved', async ({ page }) => {
     const sent: unknown[] = [];

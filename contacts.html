@@ -870,7 +870,8 @@ function wire(){
   const ch=$('chartsBtn');if(ch)ch.addEventListener('click',()=>{CHARTS=!CHARTS;try{localStorage.setItem(CHARTS_KEY,CHARTS?'1':'0');}catch(_){/* storage may be denied */}ch.setAttribute('aria-pressed',CHARTS?'true':'false');paintCharts();});
   const pr=$('printBtn');if(pr)pr.addEventListener('click',()=>{printContacts().catch(()=>toast('That couldn’t print just now.'));});
   const dv=$('dropView');if(dv)dv.addEventListener('click',dropView);
-  const cb=$('colsBtn');if(cb&&KIT())cb.addEventListener('click',(e)=>{e.stopPropagation();KIT().columnsMenu(cb,COLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderListZone();});});
+  // shell.js is deferred and can land after this draw, so the kit is looked up on the press (a check here left Columns dead)
+  const cb=$('colsBtn');if(cb)cb.addEventListener('click',(e)=>{const k=KIT();if(!k)return;e.stopPropagation();k.columnsMenu(cb,COLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderListZone();});});
   // Refresh: a rejected load (network hiccup) toasts the page's standard copy —
   // never an unhandled promise; the initial-boot trouble() path is unchanged.
   // These re-renders also restore focus to their control (the sort handlers' pattern).
@@ -923,6 +924,7 @@ function wireList(){
 // item 90: the field filter chips, under the search. A change asks the server for the people it keeps.
 function paintFchips(){
   const host=$('fchips'),k=KIT();if(!host)return;
+  if(!k)document.addEventListener('DOMContentLoaded',paintFchips,{once:true});   // shell.js loads after this script: a draw that beat it gets the chips once it lands
   host.hidden=!k||inClient();   // builder item 83: your own second business keeps the chips
   if(host.hidden){host.innerHTML='';return;}
   k.filterChips(host,{value:FFILT,offer:['quiet','owes','nodeal','added','via'],vias:FOUND_VIA,onChange:(next,key)=>{FFILT=next;PICKED.clear();SRCH=null;reorder(key&&key!=='clear'?'#fchips [data-fchip="'+key+'"]':'#fchips [data-fchip]');}});
@@ -939,9 +941,11 @@ function fillMore(pre,c){
 }
 function readMore(pre){
   const val=(k)=>{const el=$(pre+'-'+k);return el?el.value.trim():'';};
-  const tb=tagBox(pre);
+  // a form filled before shell.js landed has no tag box, so it saves without tags and an edit keeps theirs
+  // (making the box here gave an empty one, and the edit wiped every tag the person had)
+  const tb=TAGBOX[pre];
   return {phone:val('phone'),phone2:val('phone2'),job_title:val('title'),company:val('company'),
-    address:{street:val('street'),city:val('city'),state:val('state'),zip:val('zip')},tags:tb?tb.get():[],found_via:val('found')};
+    address:{street:val('street'),city:val('city'),state:val('state'),zip:val('zip')},tags:tb?tb.get():undefined,found_via:val('found')};
 }
 function openNew(){$('c-name').value='';$('c-email').value='';fillMore('c',{});$('newDlg').showModal();setTimeout(()=>$('c-name').focus(),20);}
 $('c-cancel').onclick=()=>$('newDlg').close();
@@ -951,7 +955,7 @@ $('newForm').onsubmit=async(e)=>{
   if(!name&&!email){toast('A contact needs a name or an email.');return;}
   const m=readMore('c');
   const payload={name,email:email||undefined,phone:m.phone||undefined,phone2:m.phone2||undefined,job_title:m.job_title||undefined,company:m.company||undefined,
-    address:Object.values(m.address).some(Boolean)?m.address:undefined,tags:m.tags.length?m.tags:undefined,found_via:m.found_via||undefined};
+    address:Object.values(m.address).some(Boolean)?m.address:undefined,tags:m.tags&&m.tags.length?m.tags:undefined,found_via:m.found_via||undefined};
   // sales item 105: Save & New saves this one and clears the form for the next person
   const again=!!(e.submitter&&e.submitter.id==='c-again');
   const btns=[$('c-again'),$('c-add')];btns.forEach(b=>{if(b)b.disabled=true;});

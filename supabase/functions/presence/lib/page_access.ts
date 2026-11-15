@@ -82,6 +82,20 @@ export function applyPageChrome(fileMap: FileMap, pages: Array<{ slug: string; n
   return out;
 }
 
+/** Item 196 (review finding 30): a password page whose key this site doesn't hold would be left
+ *  off the live site without a word (liveContent, below). A page copied from another site brings
+ *  its setting but never its password, which is the usual way here. Each is one thing to finish
+ *  before publishing instead. `found`: the lock ids this site holds. Pure. */
+export function pageLockBlockers(c: SnapshotContent | null | undefined, found: ReadonlySet<string>): Array<{ field: string; message: string }> {
+  const out: Array<{ field: string; message: string }> = [];
+  for (const p of c?.settings?.pages || []) {
+    if (!p || p.access !== 'password' || (p.lock && found.has(p.lock))) continue;
+    const title = String(p.title || p.slug || 'A page').replace(/\s+/g, ' ').trim().slice(0, 60);
+    out.push({ field: `page_lock.${p.slug}`, message: `“${title}” asks for a password, but none is set on this site yet. Set one in its page settings, or choose who can see it.` });
+  }
+  return out;
+}
+
 /** The lock ids a draft's password pages name. Pure. */
 export function lockIdsIn(c: SnapshotContent | null | undefined): string[] {
   const ids = new Set<string>();
