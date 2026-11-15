@@ -283,6 +283,7 @@ export function changeSummary(items: ChangeItem[], days: string[], dayOf: (iso: 
   const perSite = new Map<string, number>();
   let total = 0, live = 0;
   for (const it of items) {
+    if (!it.who) continue;   // a line the record keeps no one for (a removal) is no one's change to count
     const n = it.count;
     total += n;
     if (it.publish_id) live += 1;
