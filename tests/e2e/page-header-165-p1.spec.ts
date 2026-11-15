@@ -103,12 +103,12 @@ const PAGES: Array<{ name: string; open: Open; want: Parameters<typeof expectOne
   { name: 'a client’s Overview', open: async (page) => { await installApp(page); await page.goto('/today.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa'); },
     want: { title: 'Overview', icon: 'overview', filled: null } },
   { name: 'Domains', open: async (page) => { await installApp(page, { api: { '/portal/context': STUDIO, '/agency/domains': DOMAINS } }); await page.goto('/domains.html'); },
-    want: { title: 'Domains', icon: 'website', line: '3 domains you look after · 2 expiring or expired · 1 site on a built-in address', filled: null, tabs: ['Sites', 'Domains', 'Templates'] } },
+    want: { title: 'Domains', icon: 'website', line: '3 domains you look after · 2 expiring or expired · 1 site on a built-in address', filled: null, tabs: ['Sites', 'Domains', 'Templates', 'Usage'] } },
   { name: 'Templates', open: async (page) => {
       await installApp(page, { api: { '/portal/context': STUDIO } });
       await page.route(/\/functions\/v1\/presence\/agency\/kits$/, (route) => route.fulfill(json({ data: KITS, can_manage: true })));
       await page.goto('/templates.html'); },
-    want: { title: 'Templates', icon: 'templates', line: '1 template · 1 starter kit · newest first', filled: null, tabs: ['Sites', 'Domains', 'Templates'] } },
+    want: { title: 'Templates', icon: 'templates', line: '1 template · 1 starter kit · newest first', filled: null, tabs: ['Sites', 'Domains', 'Templates', 'Usage'] } },
   { name: 'Plan my week', open: async (page) => { await installApp(page, { api: { '/portal/context': STUDIO, '/agency/week': WEEK } }); await page.goto('/week.html'); },
     want: { title: 'Plan my week', icon: 'week', trail: 'Home', line: /3 things across 2 clients and your own · 1 late$/, filled: null } },
   { name: 'Pipeline', open: async (page) => {

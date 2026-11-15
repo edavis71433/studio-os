@@ -22,7 +22,7 @@ test.describe('One page header (builder item 165)', () => {
   test('Sites: the icon, the title, the counts, the actions with one filled, the tabs', { tag: '@layout' }, async ({ page }) => {
     await installApp(page, { api: SITES_API });
     await page.goto('/sites.html');
-    await expectOneHeader(page, { title: 'Sites', icon: 'sites', line: '3 sites you look after · 1 needs you', filled: '+ New site', tabs: ['Sites', 'Domains', 'Templates'] });
+    await expectOneHeader(page, { title: 'Sites', icon: 'sites', line: '3 sites you look after · 1 needs you', filled: '+ New site', tabs: ['Sites', 'Domains', 'Templates', 'Usage'] });
     const head = page.locator('header.dds-ph');
     if ((page.viewportSize()?.width || 0) < 761) {
       // the others behind ⋯: a sheet from the bottom, the refresh button saying its name there
