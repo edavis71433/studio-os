@@ -575,6 +575,13 @@
     <div class="plabel">Cards on Home</div>
     <div id="portalCardRows"></div>
   </section>
+  <!-- builder list item 230 (Nov 2026): how the studio's clients sign in. The emailed code is
+       always on, so nobody is locked out; Google and a password are the studio's to add. Saved
+       with the portal's other choices (PUT /agency/portal { signin }). Drawn in Figma first. -->
+  <section class="card" id="portalSignIn" aria-labelledby="portalSignInHead" hidden>
+    <div class="card-h"><h2 id="portalSignInHead" tabindex="-1">How clients sign in</h2><span class="hint">A code by email always works. Add more ways if you like.</span></div>
+    <div id="portalSignInRows"></div>
+  </section>
   <!-- builder list item 234 (Nov 2026): pages and quick links the studio makes for its clients, at
        the top of their Help. Each saves on its own (GET /agency/portal/pages, PUT and DELETE
        /agency/portal/pages/:id and /agency/portal/links/:id). Drawn in Figma first. -->
@@ -830,7 +837,7 @@ const CARDS = [
   { key: 'notify', href: '#notify', title: 'Notifications', desc: 'Ring this phone or computer when something needs you. Enquiries, approvals and support requests also land in your Inbox.', words: 'notifications bell digest alerts emails mute quiet push device phone', scoped: true,
     agencyHref: '#notify', agencyDesc: 'One switch for each client’s site, then the bell and email: what you hear about it, and how.', scopedTitle: () => 'Notifications', scopedDesc: 'What you hear about this client’s site: on Home and in the bell, and by email.' },   // item 126
   // builder list items 229 and 233: what clients see in the portal, the welcome note, Home's cards
-  { key: 'portal', href: '#portalParts', title: 'Client portal', desc: 'What your clients see in their portal, a welcome note on their Home, and Home’s cards.', words: 'client portal clients see hide invoices messages files reports welcome note home cards pages quick links guide', studioTeam: true, scoped: true,
+  { key: 'portal', href: '#portalParts', title: 'Client portal', desc: 'What your clients see in their portal, a welcome note on their Home, and Home’s cards.', words: 'client portal clients see hide invoices messages files reports welcome note home cards pages quick links guide sign in google password code', studioTeam: true, scoped: true,
     scopedTitle: (who) => possessive(who) + ' portal', scopedDesc: 'What this client sees in their portal: the same as your studio’s choices unless you change it here.' },
   // the developer tools are the STUDIO's, never a client's — the card stays unscoped and says so while drilled in
   { key: 'dev', href: '/developer.html', title: 'Developer', desc: 'API keys, webhooks, the schema dump. For you, not clients.', words: 'api keys webhooks schema developer code', feature: 'developer', cap: 'use_developer_mode',
@@ -926,7 +933,7 @@ function markCurrent(id) {
 }
 function spySections() {
   if (!('IntersectionObserver' in window)) return;
-  const ids = ['studio', 'security', 'stages', 'goal', 'report', 'reports', 'menu', 'notify', 'portalParts', 'portalHome', 'portalPages', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 160: the studio's Monthly reports; item 126: Notifications; sales item 94: Goal and AI help; items 229 and 233: the client portal
+  const ids = ['studio', 'security', 'stages', 'goal', 'report', 'reports', 'menu', 'notify', 'portalParts', 'portalHome', 'portalSignIn', 'portalPages', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 160: the studio's Monthly reports; item 126: Notifications; sales item 94: Goal and AI help; items 229 and 233: the client portal
   // C16: the band (15–30% down the screen) never reaches the last part when the page ends
   // first, so Plan & billing never lit up; at the very bottom the last part shown is marked
   const atBottom = () => window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
@@ -2006,7 +2013,7 @@ function loadPortalSettings() {
     paintPortalParts(); wirePortal();
     $('portalParts').hidden = false;
     if (SCOPE) loadPortalWho();   // item 232: when they were invited and last in, and their portal
-    if (!SCOPE) { paintPortalHome(); $('portalHome').hidden = false; }   // the note and Home's cards are every client's: kept at studio level
+    if (!SCOPE) { paintPortalHome(); $('portalHome').hidden = false; paintSignIn(); $('portalSignIn').hidden = false; }   // the note, Home's cards and the sign-in ways are every client's: kept at studio level
   }).catch(() => { PORTAL_ASKED = null; });
   return PORTAL_ASKED;
 }
@@ -2151,6 +2158,41 @@ async function savePortalCard(key, show) {
   if (!r.ok || !r.body || !r.body.data) { setOff(wasOff); paintPortalHome(); toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
   if (!PORTAL_BUSY.size) { PORTALSET.home_off = r.body.data.home_off || []; PORTALSET.off = r.body.data.off || []; }
   PORTAL_SAVED = id; paintPortalHome();
+}
+// ── item 230: how clients sign in. The emailed code is always on; Google shows "Continue with
+//    Google" (once Studio OS has Google sign-in switched on: the sign-in service's own public
+//    settings say), a password lets a client use one instead. Each switch saves as you flip it. ──
+let GOOGLE_READY = null;   // whether the sign-in service offers Google at all (null: not asked yet)
+function googleReady() {
+  if (GOOGLE_READY !== null) return Promise.resolve(GOOGLE_READY);
+  return fetch(SUPABASE_URL + '/auth/v1/settings', { headers: { apikey: SUPABASE_KEY } }).then((r) => r.ok ? r.json() : null)
+    .then((j) => { GOOGLE_READY = !!(j && j.external && j.external.google); return GOOGLE_READY; }).catch(() => { GOOGLE_READY = false; return false; });
+}
+function paintSignIn() {
+  const si = PORTALSET.signin || { google: false, password: true }, locked = portalLocked();
+  const row = (k, label, how, on, off, chip) => `<div class="swrow" data-signin="${k}"><button type="button" class="sw" role="switch" id="sw-si-${k}" aria-checked="${on ? 'true' : 'false'}" aria-labelledby="sw-si-${k}-l"${off ? ' aria-disabled="true"' : ''}></button><div class="t"><b id="sw-si-${k}-l">${esc(label)}${chip ? `<span class="pchip">${esc(chip)}</span>` : ''}${PORTAL_SAVED === 'signin:' + k ? '<span class="nsaved" role="status">Saved</span>' : ''}</b><div class="how">${esc(how)}</div></div></div>`;
+  const gReady = GOOGLE_READY !== false;
+  $('portalSignInRows').innerHTML =
+    row('code', 'Emailed code', 'Always on, so nobody is locked out.', true, true, 'Always on') +
+    row('google', 'Google', gReady ? 'Shows “Continue with Google” on your clients’ sign-in page.' : 'Not available yet: Google sign-in needs a one-time set-up for Studio OS first.', si.google && gReady, locked || !gReady || PORTAL_BUSY.has('signin:google')) +
+    row('password', 'Password', 'Lets a client set a password and use it instead.', si.password, locked || PORTAL_BUSY.has('signin:password'));
+  $('portalSignInRows').querySelectorAll('[data-signin="google"] .sw, [data-signin="password"] .sw').forEach((b) => b.addEventListener('click', () => {
+    if (b.getAttribute('aria-disabled') === 'true') return;
+    saveSignIn(b.id.replace('sw-si-', ''), b.getAttribute('aria-checked') !== 'true');
+  }));
+  if (GOOGLE_READY === null) googleReady().then(() => { if (PORTALSET) paintSignIn(); });
+}
+async function saveSignIn(key, on) {
+  const id = 'signin:' + key;
+  if (!PORTALSET || portalLocked() || PORTAL_BUSY.has(id)) return;
+  const before = { ...(PORTALSET.signin || { google: false, password: true }) };
+  PORTALSET.signin = { ...before, [key]: on };
+  PORTAL_BUSY.add(id); PORTAL_SAVED = ''; paintSignIn();
+  const r = await api('/agency/portal', 'PUT', { signin: { key, on } });
+  PORTAL_BUSY.delete(id);
+  if (!r.ok || !r.body || !r.body.data) { PORTALSET.signin = { ...PORTALSET.signin, [key]: before[key] }; paintSignIn(); toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
+  if (!PORTAL_BUSY.size && r.body.data.signin) PORTALSET.signin = r.body.data.signin;
+  PORTAL_SAVED = id; paintSignIn();
 }
 // ── item 234: the pages and quick links the studio makes for its clients (GET /agency/portal/pages;
 //    PUT and DELETE /agency/portal/pages/:id and /agency/portal/links/:id). A page has a title,

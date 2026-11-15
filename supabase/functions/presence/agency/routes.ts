@@ -290,7 +290,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     const ps = normalizePortal(stored);
     const input = await sharedGather(member.agency_id, now);
     const clients = activeClientsOf(input).map((c) => ({ ...c, choices: ps.clients[c.site_id] || {} }));
-    return json({ data: { off: ps.off, welcome: ps.welcome, home_off: ps.home_off, clients,
+    return json({ data: { off: ps.off, welcome: ps.welcome, home_off: ps.home_off, signin: ps.signin, clients,
       parts: PORTAL_PARTS.map((k) => ({ key: k, label: PART_WORDS[k][0], sub: PART_WORDS[k][1] })),
       cards: HOME_CARDS.map((k) => ({ key: k, label: CARD_WORDS[k][0], sub: CARD_WORDS[k][1] })),
       welcome_max: WELCOME_MAX, can_edit: can(member.role, 'manage_clients') } }, 200, cors);
@@ -298,13 +298,13 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   if (route === '/agency/portal' && method === 'PUT') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
     const change = pickStudioChange(await body());
-    if (!Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which part or card to show or hide, or the welcome note.' }, 400, cors);
+    if (!Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which part or card to show or hide, the welcome note, or a way to sign in.' }, 400, cors);
     const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
     if (!own) return json({ error: 'no_studio_site', message: 'Portal choices are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
     const saved = await updateReservedJson(own.id, RESERVED_NAMES.portalSettings, (cur) => applyStudioChange(normalizePortal(cur), change), member.email);
     if (!saved) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
     forgetPortalOff();
-    return json({ data: { off: saved.off, welcome: saved.welcome, home_off: saved.home_off } }, 200, cors);
+    return json({ data: { off: saved.off, welcome: saved.welcome, home_off: saved.home_off, signin: saved.signin } }, 200, cors);
   }
   {
     const pm = route.match(/^\/agency\/portal\/clients\/([^/]+)$/);

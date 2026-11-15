@@ -204,7 +204,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     studioSiteId ? import('./studio_brand.ts').then((m) => m.studioBrandOf(studioSiteId)).catch(() => null) : Promise.resolve(null),
     studioSiteId && site.client_id ? clientGreetingName(studioSiteId, String(site.client_id), site.id).catch(() => '') : Promise.resolve(''),
     // builder list items 229 and 233: what this client's studio shows them (a failed read hides nothing)
-    studioSiteId ? import('../lib/portal_settings.ts').then((m) => m.readPortalSettings(studioSiteId).then((s) => ({ off: m.resolveOff(s, site.id), welcome: s.welcome, home_off: s.home_off }))).catch(() => null) : Promise.resolve(null),
+    studioSiteId ? import('../lib/portal_settings.ts').then((m) => m.readPortalSettings(studioSiteId).then((s) => ({ off: m.resolveOff(s, site.id), welcome: s.welcome, home_off: s.home_off, signin: s.signin }))).catch(() => null) : Promise.resolve(null),
   ]);
 
   // Phase D: resolve the FEATURE edition from the licensed plan (falls back to
@@ -354,7 +354,7 @@ export async function handlePortalPreviewContext(site: SiteRow, scope: { site_id
   return json({ data: {
     site_role: 'business_owner', capabilities: capabilitiesOf('business_owner'),
     studio, client_first_name: clientFirstName || null,
-    portal: { off: resolveOff(ps, site.id), welcome: ps.welcome, home_off: ps.home_off },
+    portal: { off: resolveOff(ps, site.id), welcome: ps.welcome, home_off: ps.home_off, signin: ps.signin },
     edition: site.edition, site_live: site.status === 'live' || !!site.last_published_at,
     is_agency: false, is_operator: false, is_managed_client: true, sees_full_workspace: siteCan('business_owner', 'view_all'), is_client_portal: false,
     landing: '/client.html', scope: null, attention_count: 0, attention_stale: false, studio_requests: [], businesses: [], business: null, nav: [],
