@@ -279,6 +279,10 @@
   .pchip.off{background:var(--warn-soft,#faedd6);color:var(--warn,#7a5414)}
   .swrow.pw-note{display:block}
   .plabel{margin:14px 0 2px;font-size:13px;font-weight:600;color:var(--ink)}
+  /* item 232: a client's card says when they were invited and last in, and opens their portal */
+  .pwho{padding:2px 0 12px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+  .pwho .how{margin:0 0 8px}
+  .pwho .row{display:flex;gap:8px;flex-wrap:wrap}
   /* builder list item 191: two-step sign-in, drawn in Figma (B1 off, B3 on) */
   .tsrow{margin-top:var(--dds-s3,12px)}
   .tshead{display:flex;align-items:center;gap:var(--dds-s2,8px);flex-wrap:wrap} .tshead b{font-size:14px;font-weight:600}
@@ -534,6 +538,10 @@
        you flip it; the note saves when you leave the box. Drawn in Figma first. -->
   <section class="card" id="portalParts" aria-labelledby="portalPartsHead" hidden>
     <div class="card-h"><h2 id="portalPartsHead" tabindex="-1">What your clients see</h2><span class="hint" id="portalPartsHint">Turn a part off to hide it from every client. To change it for one client, open them and choose their portal in Settings.</span></div>
+    <div class="pwho" id="portalWho" hidden>
+      <p class="how" id="portalWhoLine"></p>
+      <div class="row"><a class="btn sm primary" id="portalSee" href="#">See their portal</a><button type="button" class="btn sm" id="portalLink" hidden>Send a sign-in link</button></div>
+    </div>
     <div id="portalPartsRows"></div>
     <div class="row" id="portalResetRow" hidden style="margin-top:10px"><button type="button" class="btn sm" id="portalReset">Back to your studio’s choices</button></div>
     <div class="how" id="portalPartsNote" style="margin-top:10px">Needs you is always on your clients’ Home. A part that’s off is refused by the server too, not only hidden.</div>
@@ -1942,6 +1950,7 @@ function loadPortalSettings() {
     if (SCOPE && !portalClient()) return;   // inside a site the studio doesn't look after: nothing to choose
     paintPortalParts(); wirePortal();
     $('portalParts').hidden = false;
+    if (SCOPE) loadPortalWho();   // item 232: when they were invited and last in, and their portal
     if (!SCOPE) { paintPortalHome(); $('portalHome').hidden = false; }   // the note and Home's cards are every client's: kept at studio level
   }).catch(() => { PORTAL_ASKED = null; });
   return PORTAL_ASKED;
@@ -1995,6 +2004,43 @@ async function savePortalPart(k, show) {
   if (!r.ok || !r.body || !r.body.data) { undo(); paintPortalParts(); toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
   if (!PORTAL_BUSY.size) { if (c) c.choices = r.body.data.choices || {}; else { PORTALSET.off = r.body.data.off || []; PORTALSET.home_off = r.body.data.home_off || []; } }
   PORTAL_SAVED = k; paintPortalParts();
+}
+// ── item 232: the client's card opens their portal as they see it (client.html?preview=, read
+//    only) and sends them a sign-in link: "Send a new invite" once the last one ran out ──
+const dayWords = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''; };
+function agoWords(iso) {
+  const t = Date.parse(iso || ''); if (!Number.isFinite(t)) return '';
+  const days = Math.floor((Date.now() - t) / 86400000);
+  return days <= 0 ? 'today' : days === 1 ? 'yesterday' : days < 30 ? `${days} days ago` : `on ${dayWords(iso)}`;
+}
+function portalWhoWords(p) {
+  const inv = p.invited_at ? `Invited ${dayWords(p.invited_at)}` : '';
+  if (p.state === 'joined') return [inv, `last in ${agoWords(p.seen_at)}`].filter(Boolean).join(' · ').replace(/^last/, 'Last');
+  if (p.state === 'waiting') return [inv, 'hasn’t signed in yet'].filter(Boolean).join(' · ');
+  if (p.state === 'expired') return [inv, 'the invite ran out'].filter(Boolean).join(' · ');
+  return 'Not invited yet. Invite them from their site on Sites.';
+}
+async function loadPortalWho() {
+  const c = portalClient(); if (!c) return;
+  const see = $('portalSee');
+  see.textContent = `See ${possessive(c.name)} portal`;
+  see.href = '/client.html?preview=' + encodeURIComponent(c.site_id) + '&back=' + encodeURIComponent(location.pathname + location.search + '#portalParts');
+  const r = await api('/agency/portal/people/' + encodeURIComponent(c.site_id), 'GET');
+  const p = r.ok && r.body && r.body.data;
+  $('portalWhoLine').textContent = p ? portalWhoWords(p) : '';
+  const link = $('portalLink');
+  link.hidden = !p || p.state === 'none' || p.can_edit === false;
+  link.textContent = p && p.state === 'expired' ? 'Send a new invite' : 'Send a sign-in link';
+  if (!link.dataset.wired) { link.dataset.wired = '1'; link.addEventListener('click', () => sendPortalLink(c, link)); }
+  $('portalWho').hidden = false;
+}
+async function sendPortalLink(c, btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const r = await api('/agency/portal/clients/' + encodeURIComponent(c.site_id) + '/sign-in-link', 'POST', {});
+  btn.disabled = false;
+  if (!r.ok || !r.body || !r.body.data) { toast(nice(r.body, 'That didn’t send. Try again in a moment.'), true); return; }
+  toast(`Sent a sign-in link to ${r.body.data.email}.`);
 }
 async function resetPortalClient() {
   const c = portalClient(); if (!c || portalLocked()) return;

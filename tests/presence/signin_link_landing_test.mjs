@@ -83,7 +83,8 @@ const quiet = (fn) => async (...a) => { const e = console.error, w = console.war
 
 // ═══ 2. each role lands on a door whose session the next page can read ═══
 {
-  const realmOf = (page) => read(page).match(/storageKey:\s*'(dds-[a-z]+-auth)'/)?.[1];
+  // builder list item 232: the portal reads the studio's own sign-in only for a studio's preview; everyone else's is the second key
+  const realmOf = (page) => read(page).match(/storageKey:\s*(?:PREVIEW\?'dds-[a-z]+-auth':)?'(dds-[a-z]+-auth)'/)?.[1];
   const DOOR = { client_reviewer: 'portal.html', business_staff: 'studio.html', developer: 'studio.html', business_owner: 'studio.html' };
   ok('roles: this covers every role', SITE_ROLES.every((r) => r in DOOR) && Object.keys(DOOR).length === SITE_ROLES.length);
   for (const role of SITE_ROLES) {

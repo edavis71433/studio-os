@@ -63,7 +63,7 @@ const { handleChangeLog, handleWentLive } = lazyRoutes(() => import('./routes/ch
 const { handleWebsiteHealth, handleWebsiteHealthPdf } = lazyRoutes(() => import('./routes/health_page.ts'));
 const { handleBusinessInsights } = lazyRoutes(() => import('./routes/insights_page.ts'));
 const { handleMomentsList, handleMomentDismiss } = lazyRoutes(() => import('./routes/moments.ts'));
-import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleMemberRole, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
+import { handlePortalContext, handlePortalPreviewContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleMemberRole, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
 const { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut, handleBrandKitApply } = lazyRoutes(() => import('./routes/dev.ts'));
 const { handleStockSearch, handleStockImport } = lazyRoutes(() => import('./routes/stock.ts'));
 const { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } = lazyRoutes(() => import('./routes/content_library.ts'));
@@ -491,6 +491,17 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   const isWrite = method === 'PUT' || method === 'POST' || method === 'DELETE' || method === 'PATCH';
   if (isWrite && ent.mode === 'readonly') {
     return json({ error: 'entitlement_paused', message: ent.message }, 403, cors);
+  }
+
+  // 4a. Builder list item 232: a studio previewing a client's portal (client.html?preview=),
+  //     drilled into that client. Reading only: nothing pressed is saved or sent and nothing
+  //     is marked as read, so every write is refused here, before any route runs, and only
+  //     the portal's own reads answer. Its context is the client's, not the studio's.
+  if (req.headers.get('x-dds-preview') === '1') {
+    if (!principal.scope || principal.scope.site_id !== site.id) return json({ error: 'preview_denied', message: 'Only a client’s studio can preview their portal.' }, 403, cors);
+    if (method !== 'GET') return json({ error: 'preview', message: 'This is a preview: nothing is saved or sent.' }, 403, cors);
+    if (route === '/portal/context') return handlePortalPreviewContext(site, principal.scope, principal, cors);
+    if (!(route.startsWith('/client/') || route === '/portal/feed' || route === '/connections/ask')) return json({ error: 'preview', message: 'That isn’t part of a client’s portal.' }, 403, cors);
   }
 
   // 4b. A7.2 reviewer boundary: a client_reviewer (the client portal audience) may
