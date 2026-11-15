@@ -80,7 +80,7 @@ test('Settings: your second business shows the same cards as your first, each ke
   await expect(page.locator('[data-card="connections"]')).toHaveAttribute('href', `/connections.html?client=${B2}`);
   await expect(page.locator('[data-card="dev"]')).toHaveAttribute('href', `/developer.html?client=${B2}`);
   await expect(page.locator('[data-card="dev"]')).not.toHaveAttribute('data-noscope', /./);
-  await expect(page.locator('[data-card="dev"] b')).toHaveText('Developer');
+  await expect(page.locator('[data-card="dev"] b')).toHaveText('Developer tools');   // builder item 165: Developer tools, in plain words
   await expect(page.locator('#billing')).toBeVisible();   // the plan is this business's, read with it in hand
   expect(rec.asked('/commerce/subscription').map((s) => s.scope)).toEqual([B2]);
   expect(rec.asked('/identity').every((s) => s.scope === B2)).toBe(true);
