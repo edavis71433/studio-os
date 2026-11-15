@@ -776,6 +776,31 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 .ins-theme[aria-pressed=true] .ins-theme-pic{border:2.5px solid var(--plum);padding:8.5px 6.5px}
 .ins-theme:focus-visible{outline:2px solid var(--plum);outline-offset:2px;border-radius:12px}
 .ins-says{margin:0;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
+/* item 225: a section's link name, its bottom edge, and Goes to beside a link box */
+.ins-says.bad{color:var(--clay)}
+.ins-anchor-row{display:flex;gap:8px;align-items:center}
+.ins-anchor{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:2px;padding:0 12px;border:1px solid var(--line);border-radius:12px;background:var(--dc-raised,var(--paper))}
+.ins-anchor:focus-within{outline:2px solid var(--plum);outline-offset:1px}
+.ins-anchor-hash{font-weight:700;color:var(--ink-3)}
+.ins-anchor input{flex:1 1 auto;min-width:0;height:42px;border:0;background:transparent;font:inherit;font-size:15px;color:var(--ink);outline:none}
+.ins-anchor-used{margin:0;padding:7px 10px;border-radius:10px;background:var(--sage-soft);color:var(--sage);font-size:12.5px;font-weight:500}
+.ins-edge-tiles .ins-tile{min-width:76px;max-width:33.4%;flex-basis:28%}
+.ins-edge-pic{padding:0;overflow:hidden}
+.ins-edge-pic svg{display:block;width:100%;height:100%}
+.ins-tile.on .ins-edge-pic{padding:0}
+.lp-row{display:flex;gap:6px;align-items:stretch}
+.lp-row>input{flex:1 1 auto;min-width:0}
+.lp-open{flex:none;display:inline-flex;align-items:center;gap:4px;min-height:40px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--sheet);color:var(--plum);font:600 12.5px/1 var(--sans);cursor:pointer;white-space:nowrap}
+.lp-open:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+.lp-says{margin:4px 0 0;font-size:12px;color:var(--ink-2)}
+.lp-says[hidden]{display:none}
+.lp-pop{position:fixed;z-index:420;display:flex;flex-direction:column;min-width:240px;max-width:min(340px,calc(100vw - 16px));max-height:min(420px,70vh);overflow:auto;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--sheet);box-shadow:var(--dds-shadow)}
+.lp-grp{padding:8px 12px 4px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.lp-item{display:flex;align-items:center;gap:10px;min-height:40px}
+.lp-item>span:first-child{flex:1 1 auto}
+.lp-item.on{background:var(--plum-tint);color:var(--plum);font-weight:600}
+.lp-tag{font-size:12px;font-weight:600;color:var(--ink-3)}
+.lp-none{margin:0;padding:6px 12px 8px;font-size:12.5px;color:var(--ink-2)}
 .ins-group{margin:4px 0 0;padding-top:14px;border-top:1px solid var(--hair);font-size:13px;font-weight:600;color:var(--ink)}
 /* the Layout tab: each layout drawn as itself (insPic) */
 .ins-tile-pic:has(.ins-pic){padding:8px;justify-content:stretch;align-items:stretch}
@@ -6977,7 +7002,7 @@ function pgHref(raw) {
   if (/^[^\s/:@]+@[^\s/:@]+\.[^\s/:@]+$/.test(v)) v = "mailto:" + v;
   else if (/^[^\s/:]+\.[^\s:]+$/.test(v)) v = "https://" + v;
   v = v.replace(/^http:\/\//i, "https://");
-  return (v === "/" || /^\/[a-z0-9][a-z0-9-]*\/$/.test(v) || /^https:\/\/[^\s<>"']+$/i.test(v) || /^mailto:[^\s<>"']+$/i.test(v) || /^tel:[+0-9()\-.\s]+$/i.test(v)) ? v.slice(0, 300) : null;
+  return (v === "/" || /^\/[a-z0-9][a-z0-9-]*\/$/.test(v) || /^\/(?:[a-z0-9][a-z0-9-]*\/)?#[a-z0-9][a-z0-9-]*$/.test(v) || /^https:\/\/[^\s<>"']+$/i.test(v) || /^mailto:[^\s<>"']+$/i.test(v) || /^tel:[+0-9()\-.\s]+$/i.test(v)) ? v.slice(0, 300) : null;
 }
 // A link in the menu that isn't one of the site's pages. Adding one asks first; after that it saves as it changes.
 function pgOpenLink(startRef) {
@@ -6991,6 +7016,7 @@ function pgOpenLink(startRef) {
     const lab = pgInput(e ? e.it.label : "", 40, "e.g. Order online"), url = pgInput(e ? e.it.href : "", 300, "yoursite.com, an email or tel:…");
     box.appendChild(pgField("Label in the menu", lab));
     box.appendChild(pgField("Links to", url));
+    linkPick(url);   // item 225: a page, a named part of one, or somewhere else
     const msg = el("div", "hint pg-err"); msg.hidden = true; msg.setAttribute("role", "alert"); box.appendChild(msg);
     const bad = (t) => { msg.textContent = t; msg.hidden = false; };
     const foot = el("div", "pg-foot");
@@ -6999,7 +7025,7 @@ function pgOpenLink(startRef) {
       add.addEventListener("click", () => {
         const label = lab.value.trim().slice(0, 40), href = pgHref(url.value);
         if (!label) return bad("Give it a label for the menu.");
-        if (!href) return bad("That link won’t work. Use a web address, an email address, or tel: and a phone number.");
+        if (!href) return bad("That link won’t work. Pick a page or a part of a page under Goes to, or use a web address, an email address, or tel: and a phone number.");
         pgTurn(async () => {
           if (!(await dcSavePendingEdits())) return;
           const fresh = pgModel();
@@ -7014,7 +7040,7 @@ function pgOpenLink(startRef) {
       lab.addEventListener("change", () => { pgSetLabel(ref, lab.value); });
       url.addEventListener("change", async () => {
         const href = pgHref(url.value);
-        if (!href) return bad("That link won’t work. Use a web address, an email address, or tel: and a phone number.");
+        if (!href) return bad("That link won’t work. Pick a page or a part of a page under Goes to, or use a web address, an email address, or tel: and a phone number.");
         msg.hidden = true;
         await pgTurn(async () => {
           if (!(await dcSavePendingEdits())) return;
@@ -13011,7 +13037,7 @@ function mountBlocksCard() {
 // Phase T-STYLE: a section's "look" (background / width / spacing / alignment) is
 // orthogonal to its content. The per-type editors below rebuild their block object
 // from their own fields, so carry the chosen look across every rebuild.
-function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.style) o.style = p.style; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p._clEdit) o._clEdit = p._clEdit; return o; }
+function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.style) o.style = p.style; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p.anchor) o.anchor = p.anchor; if (p && p._clEdit) o._clEdit = p._clEdit; return o; }
 // Wave-1 G4: per-block STYLE VARIANTS — 2–3 curated looks per section type, rendered
 // by the shared block engine (mirrors site_blocks.ts BLOCK_VARIANTS; the server
 // re-validates, unknown values fall back to the default). The default is stored as
@@ -13045,6 +13071,8 @@ function blockLookRow(idx, blk, sub) {
     insTiles(panes.layout, "Width", [["Normal", ""], ["Full width", "full"]], (o) => (cur.width || "") === o[1], (o) => lookSet(idx, "width", o[1]), (o) => "width:" + (o[1] || "normal"));
     pillRow(panes.layout, "Spacing", [["Tight", "tight"], ["Normal", ""], ["Roomy", "roomy"]], (o) => (cur.spacing || "") === o[1], (o) => lookSet(idx, "spacing", o[1]));
     pillRow(panes.layout, "Text", [["Default", ""], ["Centered", "center"]], (o) => (cur.align || "") === o[1], (o) => lookSet(idx, "align", o[1]));
+    insLinkName(panes.layout, idx, blk);   // item 225
+    insEdgeRow(panes.layout, idx, cur);    // item 225
     pillRow(panes.when, "Show on", [["All screens", ""], ["Desktop only", "mobile"], ["Phones only", "desktop"]], (o) => (cur.hideOn || "") === o[1], (o) => lookSet(idx, "hideOn", o[1]));
     return;
   }
@@ -13438,6 +13466,7 @@ function renderBlocksCard() {
       const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "cta", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }); };
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
       sub.append(t, aiField(t, { field: "banner text" }), bt, u);
+      linkPick(u);   // item 225
     } else if (def.reviewsSimple) {
       const rt = el("input"), ct = el("input"), sc = el("input");
       rt.type = "number"; rt.min = "1"; rt.max = "5"; rt.step = "0.1"; rt.placeholder = "Your rating (e.g. 4.9)"; rt.value = blk.rating || "";
@@ -13466,6 +13495,7 @@ function renderBlocksCard() {
       const commit = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "appointment", title: ti.value.trim(), text: t.value.trim(), button: bt.value.trim(), url: u.value.trim() }); };
       [t, bt, u].forEach((inp) => inp.addEventListener("change", commit));
       sub.append(t, aiField(t, { field: "banner text" }), bt, u);
+      linkPick(u);   // item 225
       sub.appendChild(el("div", "hint", "Visitors tap the button and land on your booking page — nothing external loads on your site."));
     } else if (def.bookingSimple) {
       const t = el("input"); t.type = "text"; t.style.cssText = inputCss;
@@ -13533,7 +13563,7 @@ function renderBlocksCard() {
       dec.addEventListener("change", commit);
       alt.disabled = dec.checked; alt.style.opacity = dec.checked ? ".5" : "1";
       pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].image_id = id || undefined; renderBlocksCard(); }); });
-      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(cap, aiField(cap, { field: "caption" }), alt, decWrap, lk);
+      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(cap, aiField(cap, { field: "caption" }), alt, decWrap, lk); linkPick(lk);
       sub.appendChild(el("div", "hint", "Alt text helps screen readers and search — describe what's in the photo. Tick “decorative” only for backgrounds/flourishes that add no information."));
     } else if (def.imageTextSimple) {
       const picRow = el("div"); picRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:8px";
@@ -13555,7 +13585,7 @@ function renderBlocksCard() {
       // item 224: in the inspector the photo's side is an arrangement on the Layout tab; the
       // select stays behind the scenes so a Content edit keeps the side that was picked there
       const inPane = sub.classList && sub.classList.contains("ins-pane");
-      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(ta, aiField(ta, {}), ...(inPane ? [] : [sideWrap]), bl, bu);
+      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(ta, aiField(ta, {}), ...(inPane ? [] : [sideWrap]), bl, bu); linkPick(bu);
       sub.appendChild(el("div", "hint", inPane ? "Which side the photo sits on is under Layout. On phones the image and text stack automatically." : "On phones the image and text stack automatically."));
     } else if (def.dividerSimple) {
       const styWrap = el("label", "hint", "Style "); const sty = el("select");
@@ -13597,6 +13627,7 @@ function renderBlocksCard() {
       const commit = () => { const o = { type: "spotlight", title: ti.value.trim() }; const E = ey.value.trim(); if (E) o.eyebrow = E; const B = ta.value.trim(); if (B) o.body = B; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; BLOCKS_WORK[idx] = wLook(idx, o); };
       [ey, ta, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
       sub.append(ey, ta, aiField(ta, {}), bl, bu);
+      linkPick(bu);   // item 225
       sub.appendChild(el("div", "hint", "A prominent highlight band. The heading goes in the title field above."));
     } else if (def.tableSimple) {
       const ta = el("textarea");
@@ -14189,6 +14220,7 @@ function renderButtonsBlockBody(blk, idx, sub, ti) {
     const commit = () => { cur().buttons[k] = { label: lb.value.trim(), url: ur.value.trim(), style: st.value === "outline" ? "outline" : "primary" }; };
     [lb, ur, st].forEach((inp) => inp.addEventListener("change", commit));
     row.append(lb, aiField(lb, { field: "button label" }), ur, stWrap);
+    linkPick(ur);   // item 225
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
     rm.addEventListener("click", () => { commitTitle(); cur().buttons.splice(k, 1); renderBlocksCard(); });
     row.appendChild(rm); sub.appendChild(row);
@@ -14232,6 +14264,7 @@ function renderColumnsBlockBody(blk, idx, sub, ti) {
     [bd, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
     wsel.addEventListener("change", () => { commit(); renderBlocksCard(); });
     row.append(bd, aiField(bd, {}), bl, bu, wrap);
+    linkPick(bu);   // item 225
     // #184: OR drop a component into this column (a video, a feature list, stats, a
     // table…). Picking one shows its own mini-editor; a column renders its component
     // when set, otherwise the text/image/button above.
@@ -14336,6 +14369,7 @@ function renderCardsBlockBody(blk, idx, sub, ti) {
     const commit = () => { cur().cards[k] = { heading: hd.value.trim(), text: tx.value.trim() || undefined, image_id: cur().cards[k]?.image_id || undefined, link: lk.value.trim() || undefined }; };
     [hd, tx, lk].forEach((inp) => inp.addEventListener("change", commit));
     row.append(hd, tx, aiField(tx, { field: "caption" }), lk);
+    linkPick(lk);   // item 225
     const rm = el("button", null, "Remove card"); rm.type = "button"; rm.style.cssText = miniBtn;
     rm.addEventListener("click", () => { commitTitle(); cur().cards.splice(k, 1); renderBlocksCard(); });
     row.appendChild(rm); sub.appendChild(row);
@@ -15484,6 +15518,162 @@ function lookSet(idx, key, value) {
   BLOCKS_WORK[idx] = b;
   renderBlocksCard();   // saves soon, as every change to the list does
   dcLiveFromPanel();
+}
+// ── Item 225: a link name per section, and a shaped bottom edge ──
+// A section's link name is its id on the page, so a menu item or a button can jump straight to it
+// ("/#hours", "/menu/#specials"). anchorTidy is lib/section_links.ts anchorOf, the same rule;
+// tests/presence/section_links_225_test.mjs runs both on the same words. The bottom edge
+// (look.edge) hangs the section's own colour over the top of the next one in a shape
+// (lib/site_blocks.ts EDGE_CSS; EDGE_PATHS are the same shapes, pinned by the same test).
+const ANCHOR_RESERVED = ["main", "top", "content", "open-now", "hours-data", "signatures", "dlpdf"];
+function anchorTidy(raw) {
+  const s = String(raw == null ? "" : raw).normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .replace(/^#+/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+/, "").slice(0, 40).replace(/-+$/, "");
+  if (!s || ANCHOR_RESERVED.includes(s) || /^(?:f|form|lb|nl|ps|pfb|ns|dds|presence|search|tab|tabs|consent)-/.test(s)) return null;
+  return s;
+}
+const EDGE_OPTS = [["Straight", ""], ["Wave", "wave"], ["Slant", "slant"], ["Curve", "curve"], ["Peak", "peak"], ["Zigzag", "zigzag"]];
+const EDGE_PATHS = { wave: "M0 0H100V5C87.5 11 62.5 -1 50 5C37.5 11 12.5 -1 0 5Z", slant: "M0 0H100L0 10Z", curve: "M0 0H100Q50 20 0 0Z", peak: "M0 0H100L50 10Z",
+  zigzag: "M0 0H100V3" + Array.from({ length: 20 }, (_, i) => "L" + (100 - 5 * (i + 1)) + " " + (i % 2 ? 3 : 10)).join("") + "Z" };
+const jumpHref = (slug, anchor) => (slug ? "/" + slug + "/" : "/") + "#" + anchor;
+// every page's sections, the page open now from its working copy, the rest as saved
+function dcEveryPageList() {
+  const out = [["", "Home", DC_PAGE ? (S.settings && S.settings.blocks) || [] : BLOCKS_WORK || []]];
+  dcPagesArr().forEach((p) => out.push([p.slug, p.title || p.slug, p.slug === DC_PAGE ? BLOCKS_WORK || [] : p.blocks || []]));
+  return out;
+}
+function dcNamedSections() {
+  const out = [];
+  dcEveryPageList().forEach(([slug, page, list]) => list.forEach((b, i) => {
+    if (!b || !b.anchor) return;
+    const def = BLOCK_DEFS.find((d) => d.type === b.type);
+    out.push({ slug, page, idx: i, anchor: b.anchor, name: String(b.title || "").trim() || (def && def.name) || "A section" });
+  }));
+  return out;
+}
+// what jumps to a section now: menu items by name, buttons and links counted
+function dcLinksTo(slug, anchor) {
+  const href = jumpHref(slug, anchor), items = [];
+  ((S.settings && Array.isArray(S.settings.nav)) ? S.settings.nav : []).forEach((it) => [it, ...(it.children || [])].forEach((x) => { if (x && x.href === href) items.push("the menu item “" + x.label + "”"); }));
+  let buttons = 0;
+  dcEveryPageList().forEach(([page, , list]) => JSON.stringify(list).replace(/"(?:url|link|href)":"([^"]*)"/g, (m, u) => { if (u === href || (page === slug && u === "#" + anchor)) buttons++; return m; }));
+  if (buttons) items.push(buttons === 1 ? "1 button" : buttons + " buttons");
+  return items;
+}
+function insLinkName(host, idx, blk) {
+  const wrap = el("div", "ins-field ins-link"), id = "insAnchor-" + idx;
+  const lbl = el("label", "ins-lbl", "Link name"); lbl.htmlFor = id;
+  const row = el("div", "ins-anchor-row"), box = el("div", "ins-anchor");
+  const inp = el("input"); inp.type = "text"; inp.id = id; inp.maxLength = 40; inp.value = blk.anchor || ""; inp.autocomplete = "off"; inp.spellcheck = false;
+  inp.placeholder = anchorTidy(blk.title) || "hours";
+  box.append(el("span", "ins-anchor-hash", "#"), inp);
+  const copy = el("button", "dc-actbtn", "Copy link"); copy.type = "button";
+  row.append(box, copy);
+  const says = el("p", "ins-says", "A menu item or a button can jump straight here. Short words, small letters and dashes.");
+  says.id = id + "-says"; inp.setAttribute("aria-describedby", says.id);
+  const used = el("p", "ins-anchor-used");
+  const paintUsed = (v) => { const by = v ? dcLinksTo(DC_PAGE || "", v) : []; used.hidden = !v; used.textContent = by.length ? "Linked from " + by.join(" and ") + "." : "Nothing jumps here yet. Pick it in a menu item’s or a button’s Goes to list."; };
+  paintUsed(blk.anchor || "");
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } });   // Enter keeps the name, as leaving the field does
+  inp.addEventListener("change", () => {
+    if (LIVE_PROBE) return;   // the card's typing probe: a name is tidied and saved when the field is left
+    const typed = inp.value.trim(), v = typed ? anchorTidy(typed) : "";
+    says.classList.remove("bad");
+    if (v === null) { says.textContent = "Your site already uses “" + typed + "” for one of its own parts. Pick another name."; says.classList.add("bad"); return; }
+    if (v && dcNamedSections().some((x) => x.slug === (DC_PAGE || "") && x.anchor === v && x.idx !== idx)) { says.textContent = "Another section on this page is already called #" + v + ". Pick another name."; says.classList.add("bad"); return; }
+    says.textContent = "A menu item or a button can jump straight here. Short words, small letters and dashes.";
+    const b = { ...BLOCKS_WORK[idx] }; if (v) b.anchor = v; else delete b.anchor;
+    BLOCKS_WORK[idx] = b; inp.value = v; paintUsed(v);   // the card's own change listener saves it
+  });
+  copy.addEventListener("click", async () => {
+    const v = anchorTidy(inp.value) || (BLOCKS_WORK[idx] && BLOCKS_WORK[idx].anchor);
+    if (!v) { inp.focus(); toast("Give the section a link name first."); return; }
+    const href = jumpHref(DC_PAGE || "", v);
+    try { await navigator.clipboard.writeText(href); toast("Copied " + href + ". Paste it into any button or menu item."); } catch (_) { toast("The link is " + href); }
+  });
+  wrap.append(lbl, row, says, used); host.appendChild(wrap);
+}
+// The edge tiles draw this section's colour over the next one's, as the canvas has them.
+function dcEdgeColours(idx) {
+  let doc = null; try { doc = dcFrameDoc(); } catch (_) {}
+  const win = doc && doc.defaultView, sec = doc && doc.querySelector('main [data-dds-src="' + idx + '"]');
+  const bg = (n) => { const c = n && win ? win.getComputedStyle(n).backgroundColor : ""; return c && !/^rgba\(\d+, \d+, \d+, 0\)$|^transparent$/.test(c) ? c : ""; };
+  const page = bg(doc && doc.body) || dcSiteColours().paper;
+  let next = sec && sec.nextElementSibling;
+  while (next && win && win.getComputedStyle(next).display === "none") next = next.nextElementSibling;
+  const own = bg(sec);
+  return { own: own || dcSiteColours().accent, next: bg(next) || page, plain: !own };
+}
+function insEdgeRow(host, idx, cur) {
+  const col = dcEdgeColours(idx), on = String(cur.edge || "");
+  const wrap = el("div", "ins-field ins-edges");
+  wrap.append(el("div", "ins-lbl", "Bottom edge"), el("p", "ins-says", col.plain
+    ? "This section has no colour of its own yet, so an edge won’t show. Pick a colour theme on the Style tab first."
+    : "The shape where this section meets the next one, in this section’s colour."));
+  const grid = el("div", "ins-tiles ins-edge-tiles"); grid.setAttribute("role", "group"); grid.setAttribute("aria-label", "Bottom edge");
+  EDGE_OPTS.forEach(([name, k]) => {
+    const b = el("button", "ins-tile" + (on === k ? " on" : "")); b.type = "button"; b.setAttribute("aria-pressed", String(on === k));
+    const pic = el("div", "ins-tile-pic ins-edge-pic"); pic.setAttribute("aria-hidden", "true");
+    pic.innerHTML = '<svg viewBox="0 0 100 40" preserveAspectRatio="none"><rect width="100" height="40" fill="' + col.next + '"/><rect width="100" height="20" fill="' + col.own + '"/>'
+      + (k ? '<path transform="translate(0 19.5) scale(1 1.6)" d="' + EDGE_PATHS[k] + '" fill="' + col.own + '"/>' : "") + "</svg>";
+    b.append(pic, el("span", "ins-tile-l", name));
+    b.addEventListener("click", () => lookSet(idx, "edge", k));
+    grid.appendChild(b);
+  });
+  wrap.appendChild(grid); host.appendChild(wrap);
+}
+// ── Item 225: Goes to, beside a menu item's or a button's link: the site's pages, the named parts
+// of them, or somewhere else (typed in the box). Picking one writes the link into the box and
+// tells the box it changed, so the field's own save runs.
+function linkPick(input, opts = {}) {
+  if (!input || !input.parentNode || input.dataset.lp) return;
+  input.dataset.lp = "1";
+  const row = el("div", "lp-row"); input.replaceWith(row);
+  const btn = el("button", "lp-open", "Goes to"); btn.type = "button"; btn.setAttribute("aria-haspopup", "true"); btn.setAttribute("aria-expanded", "false");
+  btn.insertAdjacentHTML("beforeend", uiIcon("chevron", 12));
+  const says = el("p", "lp-says");
+  row.append(input, btn);
+  row.insertAdjacentElement("afterend", says);
+  const name = (href) => {
+    const pages = dcEveryPageList(), page = (slug) => (pages.find((p) => p[0] === slug) || [])[1];
+    const m = /^(?:\/(?:([a-z0-9][a-z0-9-]*)\/)?)?#([a-z0-9-]+)$/.exec(href || "");
+    if (m) { const slug = href.startsWith("/") ? (m[1] || "") : (DC_PAGE || ""); const sec = dcNamedSections().find((x) => x.slug === slug && x.anchor === m[2]);
+      return page(slug) == null ? "" : "Jumps to " + (sec ? sec.name : "#" + m[2]) + " on " + (slug ? "the " + page(slug) + " page" : "Home") + (sec ? "" : ", which no section there is called yet"); }
+    const p = /^\/(?:([a-z0-9][a-z0-9-]*)\/)?$/.exec(href || "");
+    return p && page(p[1] || "") != null ? "Opens " + (p[1] ? "the " + page(p[1]) + " page" : "Home") : "";
+  };
+  const paint = () => { says.textContent = name(input.value.trim()); says.hidden = !says.textContent; };
+  input.addEventListener("change", paint); paint();
+  const set = (href) => { input.value = href; input.dispatchEvent(new Event("input", { bubbles: true })); input.dispatchEvent(new Event("change", { bubbles: true })); };
+  btn.addEventListener("click", () => {
+    const old = document.querySelector(".lp-pop"); if (old) { old.remove(); if (old.dataset.for === input.id) return; }
+    if (!input.id) input.id = "lp-" + Math.random().toString(36).slice(2, 8);
+    const m = el("div", "pp-pop lp-pop"); m.dataset.for = input.id; m.setAttribute("role", "menu"); m.setAttribute("aria-label", "Where it goes");
+    const close = () => { m.remove(); btn.setAttribute("aria-expanded", "false"); document.removeEventListener("mousedown", off, true); window.removeEventListener("keydown", esc, true); };
+    const off = (e) => { if (!m.contains(e.target) && e.target !== btn) close(); };
+    const esc = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); btn.focus(); } };
+    const grp = (t) => m.appendChild(el("div", "lp-grp", t));
+    const item = (label, tag, href, onPick) => {
+      const b = el("button", "pp-pop-item lp-item" + (href && input.value.trim() === href ? " on" : "")); b.type = "button"; b.setAttribute("role", "menuitem");
+      b.append(el("span", null, label)); if (tag) b.append(el("span", "lp-tag", tag));
+      b.addEventListener("click", () => { close(); if (onPick) onPick(); else { set(href); btn.focus(); } });
+      m.appendChild(b);
+    };
+    grp("Pages"); dcEveryPageList().forEach(([slug, title]) => item(title, "", slug ? "/" + slug + "/" : "/"));
+    const named = dcNamedSections();
+    grp("Parts of a page");
+    if (named.length) named.forEach((x) => item(x.page + " › " + x.name, "#" + x.anchor, jumpHref(x.slug, x.anchor)));
+    else m.appendChild(el("p", "lp-none", "None yet. Give a section a link name on its Layout tab."));
+    if (!opts.pagesOnly) { grp("Somewhere else"); item("Another website, an email or a phone…", "", "", () => { input.focus(); input.select(); }); }
+    (btn.closest(".dc-modal-scrim") || document.body).appendChild(m);   // inside a dialog's own layer, so it sits above the dialog
+    const r = btn.getBoundingClientRect(), mh = m.offsetHeight, mw = m.offsetWidth;
+    m.style.setProperty("top", Math.round(r.bottom + 4 + mh > window.innerHeight - 8 ? Math.max(8, r.top - 4 - mh) : r.bottom + 4) + "px");
+    m.style.setProperty("left", Math.round(Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8))) + "px");
+    btn.setAttribute("aria-expanded", "true");
+    // Escape on the window, ahead of the panel's own (a document listener that closes the card)
+    setTimeout(() => { document.addEventListener("mousedown", off, true); window.addEventListener("keydown", esc, true); }, 0);
+    const first = m.querySelector(".lp-item.on") || m.querySelector(".lp-item"); if (first) first.focus();
+  });
 }
 // the footer under every tab: who can see this section, and the quiet tools
 // Item 155: a locked section's card says so at its top. The studio gets the switch for the

@@ -57,7 +57,8 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
  *  another website, an email address or a phone number belongs to the old
  *  business, so it stays behind (and a dropdown keeps only its own pages). Pure. */
 export function menuForCopy(nav: unknown): unknown[] {
-  const own = (href: unknown) => { const v = String(href ?? '').trim(); return v === '/' || /^\/[a-z0-9][a-z0-9-]*\/$/.test(v); };
+  // item 225: a jump to a named part of one of its own pages travels too
+  const own = (href: unknown) => { const v = String(href ?? '').trim(); return v === '/' || /^\/[a-z0-9][a-z0-9-]*\/$/.test(v) || /^\/(?:[a-z0-9][a-z0-9-]*\/)?#[a-z0-9][a-z0-9-]*$/.test(v); };
   const out: unknown[] = [];
   for (const it of Array.isArray(nav) ? nav : []) {
     if (!isObj(it) || !own(it.href)) continue;
