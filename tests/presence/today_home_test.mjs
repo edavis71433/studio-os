@@ -439,7 +439,7 @@ ok('portal: explicit CTAs whose accessible names keep the row title (item 179: o
   && portal.includes('aria-label="Pay — ') && portal.includes('aria-label="Start — ')
   && !portal.includes('data-qapr') && !portal.includes('Open to-dos'));
 ok('portal (item 179): the greeting uses the name on the studio\'s record before the sign-in\'s',
-  portal.includes("function clientName(){const n=PORTAL.ctx&&PORTAL.ctx.client_first_name;return (typeof n==='string'&&n.trim())?n.trim():firstName(USER);}"));
+  portal.includes("function clientName(){const n=PORTAL.ctx&&PORTAL.ctx.client_first_name;return (typeof n==='string'&&n.trim())?n.trim():PREVIEW?'':firstName(USER);}"));   // item 232: a preview never says the studio member's name
 // PS3 (D1a): the queue renders FROM needsYouItems — the same array whose
 // length the heading shows; the bell panel labels the badge's own number in words.
 ok('portal (D1a): queue rows come from needsYouItems',
@@ -457,7 +457,7 @@ ok('portal: the boot notifications GET is persona-gated (reviewer boots with zer
   // item 179: the same reads may leave a round earlier, but only for someone already known to be a client here
   && portal.includes("const early=rememberedClient();")
   && portal.includes("const nP=early?api('/client/notifications').catch(()=>null):null,aP=early?api(askPath).catch(()=>null):null;")
-  && /function rememberedClient\(\)\{try\{return !!\(USER&&USER\.id\)&&localStorage\.getItem\(personaKey\(\)\)==='client';/.test(portal));
+  && /function rememberedClient\(\)\{if\(PREVIEW\)return false;try\{return !!\(USER&&USER\.id\)&&localStorage\.getItem\(personaKey\(\)\)==='client';/.test(portal));
 ok('portal: the mark-seen POST is persona-gated too — after the failed-read skip, before the POST',
   /if\(PORTAL\.notifsFailed\)return;[\s\S]{0,300}?if\(PORTAL\.persona!=='client'\)return;[\s\S]*?api\('\/client\/notifications\/read','POST'/.test(portal));
 // PS3: Recent-updates rows share the queue-row anatomy (icon from moment_type,

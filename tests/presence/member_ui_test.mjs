@@ -165,6 +165,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     'api("DELETE", "/agency/pages/" + it.id)',
     // builder list item 221: removing one of the studio's own update templates, the same (agency/update_templates.ts)
     `api('/agency/update-templates/'+encodeURIComponent(t.id),'DELETE')`,
+    // builder list item 234: removing a portal page or quick link answers to the studio's roles too (manage_clients, agency/routes.ts)
+    "api(`/agency/portal/${kind}/` + encodeURIComponent(ed.id), 'DELETE')",
   ];
   // both spellings the pages use: api("DELETE", route) and api(route, 'DELETE')
   const deletes = /\bapi\(\s*"DELETE"\s*,[^)\n]*\)|\b(?:api|apiAg)\(['`][^;\n]*?,\s*'DELETE'\)/g;

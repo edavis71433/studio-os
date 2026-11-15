@@ -16,9 +16,9 @@ const S1 = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', S2 = 'bbbbbbbb-2222-4222-8222
 const EMPTY = P.normalizePortal(null);
 
 // ── the setting ──
-ok('with nothing stored, every part and card shows and there is no note', same(EMPTY, { off: [], clients: {}, welcome: '', home_off: [] }));
+ok('with nothing stored, every part and card shows and there is no note', same(EMPTY, { off: [], clients: {}, welcome: '', home_off: [], parts_at: null, previewed_at: null, signin: { google: false, password: true } }));
 ok('an unreadable setting shows everything', same(P.normalizePortal('nonsense'), EMPTY) && same(P.normalizePortal({ off: 'invoices', home_off: 7, clients: [] }), EMPTY));
-ok('only known parts and cards are kept, each once, in Settings’ order', same(P.normalizePortal({ off: ['reports', 'nope', 'invoices', 'reports'], home_off: ['projects', 'website', 'x'] }), { off: ['invoices', 'reports'], clients: {}, welcome: '', home_off: ['website', 'projects'] }));
+ok('only known parts and cards are kept, each once, in Settings’ order', same(P.normalizePortal({ off: ['reports', 'nope', 'invoices', 'reports'], home_off: ['projects', 'website', 'x'] }), { off: ['invoices', 'reports'], clients: {}, welcome: '', home_off: ['website', 'projects'], parts_at: null, previewed_at: null, signin: { google: false, password: true } }));
 ok('only real client site ids are kept, lower-case, and a client with no choice is dropped', (() => {
   const s = P.normalizePortal({ clients: { [S1.toUpperCase()]: { invoices: false, nope: true, files: 'no' }, 'not-a-site': { invoices: false }, [S2]: {} } });
   return same(Object.keys(s.clients), [S1]) && same(s.clients[S1], { invoices: false });
@@ -95,13 +95,13 @@ ok('every /client/ request is checked before its route runs', /if \(route\.start
 const delivery = read('supabase/functions/presence/routes/client_delivery.ts');
 ok('Documents leaves out proposals and estimates, or agreements, that are off', /off\.includes\('proposals'\) && \(d\.kind === 'proposal' \|\| d\.kind === 'estimate'\)/.test(delivery) && /off\.includes\('agreements'\) && d\.kind === 'contract'/.test(delivery) && /documents: shown/.test(delivery));
 const ws = read('supabase/functions/presence/routes/workspace.ts');
-ok('the portal’s context carries what’s off, the note and Home’s cards, read beside the brand', /readPortalSettings\(studioSiteId\)\.then\(\(s\) => \(\{ off: m\.resolveOff\(s, site\.id\), welcome: s\.welcome, home_off: s\.home_off \}\)\)\)\.catch\(\(\) => null\)/.test(ws) && /portal: portalSettings,/.test(ws));
+ok('the portal’s context carries what’s off, the note and Home’s cards, read beside the brand', /readPortalSettings\(studioSiteId\)\.then\(\(s\) => \(\{ off: m\.resolveOff\(s, site\.id\), welcome: s\.welcome, home_off: s\.home_off(, signin: s\.signin)? \}\)\)\)\.catch\(\(\) => null\)/.test(ws) && /portal: portalSettings,/.test(ws));
 
 const settings = read('settings.html');
 ok('Settings has both cards, for a studio only, hidden until their read answers', /id="portalParts" aria-labelledby="portalPartsHead" hidden/.test(settings) && /id="portalHome" aria-labelledby="portalHomeHead" hidden/.test(settings) && /function loadPortalSettings\(\) \{\s*if \(!\(CTX && CTX\.is_agency\)\) return Promise\.resolve\(\);/.test(settings));
 ok('a flip sends one change, and a failed save puts the switch back', /api\('\/agency\/portal', 'PUT', \{ part: k, shown: show \}\)/.test(settings) && /api\('\/agency\/portal\/clients\/' \+ encodeURIComponent\(c\.site_id\), 'PUT', \{ part: k, shown: show \}\)/.test(settings) && /undo\(\); paintPortalParts\(\); toast\(/.test(settings));
 ok('inside a client the card is that client’s, with a way back to the studio’s choices', /possessive\(who\) \+ ' portal'/.test(settings) && /'PUT', \{ reset: true \}\)/.test(settings) && /Same as studio/.test(settings));
-ok('the note and Home’s cards stay at studio level', /if \(!SCOPE\) \{ paintPortalHome\(\); \$\('portalHome'\)\.hidden = false; \}/.test(settings) && /maxlength="500"/.test(settings));
+ok('the note and Home’s cards stay at studio level', /if \(!SCOPE\) \{ paintPortalHome\(\); \$\('portalHome'\)\.hidden = false;[^}]*\}/.test(settings) && /maxlength="500"/.test(settings));
 ok('Settings starts the read beside Notifications, and search finds it', /loadNotify\(\);[^\n]*\n\s*loadPortalSettings\(\);/.test(settings) && /key: 'portal', href: '#portalParts'/.test(settings));
 
 const client = read('client.html');
