@@ -31,17 +31,21 @@ const TEXT = ['Hi Dana,', '', 'To finish connecting brightbakery.com to your new
 const VIEW = { to: 'owner@brightbakery.com', to_name: 'Bright Bakery', studio: 'Davis Digital Studio', subject: 'Give Davis Digital Studio access to brightbakery.com’s records', text: TEXT, steps: STEPS, company: 'Namecheap', called: 'Share Access', exact: true, caveat: '', studio_note: 'Needs a Namecheap account at this address, and the invitation must be accepted within 7 days.', asks: 'email', sign_in: 'https://ap.www.namecheap.com/domains/list/', invite_ok: true };
 const ASKED = { domain: 'brightbakery.com', status: 'asked', company: 'Namecheap', invite: 'hello@davisdigital.studio', to: 'owner@brightbakery.com', asked_at: '2026-11-15T10:00:00Z', last_asked_at: '2026-11-15T10:00:00Z', asks: 1, asked_by: 'eric@studio.example', arrived_at: null, arrived_by: null };
 
-async function openDomains(page: Page, opts: { preview?: (body: any) => { status: number; body: unknown }; detailOver?: Record<string, unknown> } = {}) {
+// a server from before item 222 sends no access fields at all
+const before222 = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([k]) => !k.startsWith('access')));
+
+async function openDomains(page: Page, opts: { preview?: (body: any) => { status: number; body: unknown }; detailOver?: Record<string, unknown>; oldServer?: boolean } = {}) {
   const writes: Array<{ method: string; path: string; body: any }> = [];
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await installApp(page, { api: { '/portal/context': studioContext, '/agency/domains': DOMAINS } });
+  const list = opts.oldServer ? { ...DOMAINS, data: { ...DOMAINS.data, domains: DOMAINS.data.domains.map(before222) } } : DOMAINS;
+  await installApp(page, { api: { '/portal/context': studioContext, '/agency/domains': list } });
   await page.route(/\/functions\/v1\/presence\/agency\/domains\/[^/]+(\/(notes|check|access))?$/, async (route: Route) => {
     const path = new URL(route.request().url()).pathname.replace(/^.*\/presence/, '');
     const method = route.request().method();
     const site = path.split('/')[3];
     const d = [BAKERY, HARBOR, JUNIPER, OWN].find((x) => x.site_id === site) || BAKERY;
-    if (method === 'GET') return route.fulfill(json(detail(d, opts.detailOver)));
+    if (method === 'GET') { const det = detail(d, opts.detailOver); return route.fulfill(json(opts.oldServer ? { data: before222(det.data) } : det)); }
     const body = route.request().postDataJSON();
     writes.push({ method, path, body });
     if (path.endsWith('/access') && method === 'POST' && body?.preview) {
@@ -172,6 +176,17 @@ test.describe('Domains: Ask for access (item 222)', () => {
     await openDomains(page);
     await openPanel(page, 'mystudio.example');
     await expect(page.locator('#dpanel .dp-acc')).toHaveCount(0);
+  });
+
+  test('before the server update goes live: no card, no pill and no chip, so nothing offers a button that can’t work yet', async ({ page }) => {
+    const { writes, errors } = await openDomains(page, { oldServer: true });
+    await expect(page.locator('table[aria-label="Domains"] .acc')).toHaveCount(0);
+    await expect(page.locator('[data-filter="access"]')).toHaveCount(0);
+    await openPanel(page, 'brightbakery.com');
+    await expect(page.locator('#dpanel #dpCheck')).toBeVisible();   // the detail has painted
+    await expect(page.locator('#dpanel .dp-acc')).toHaveCount(0);
+    expect(writes).toHaveLength(0);
+    expect(errors).toEqual([]);
   });
 
   test('a phone: the sheet comes up from the bottom, the message folds away, and the buttons are easy to press', async ({ page }, info) => {

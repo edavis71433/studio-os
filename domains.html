@@ -448,7 +448,8 @@ async function helpSend(goal){
 //    POST …/access with preview), then sends it. It arrived, Undo and Not needed tick it. ──
 const accFound=(d)=>(d.where&&d.where.records_at&&d.where.records_at.company)||'';
 function accessHtml(d){
-  if(d.own)return'';
+  // a server without item 222 (before its update goes live) sends no access at all: no card, so no button that can't work yet
+  if(d.own||!('access' in d))return'';
   const a=d.access,who=d.name||'the client';
   const co=a&&a.company&&a.company!=='Another company'?a.company:accFound(d);
   if(a&&a.status==='arrived'){
