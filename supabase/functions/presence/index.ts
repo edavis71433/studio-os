@@ -1071,6 +1071,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     const part = partForClientRoute(route, method);
     if (part && (await portalOffFor(site)).includes(part)) return json({ error: 'hidden', message: 'Your studio has turned this part of your portal off.' }, 403, cors);
   }
+  // builder list item 234: the pages and quick links the client's studio made for them, and a page's file
+  if (route === '/client/portal-pages' && method === 'GET') return (await import('./routes/client_pages.ts')).handleClientPortalPages(site, cors);
+  {
+    const pf = route.match(/^\/client\/portal-pages\/files\/([^/]+)$/);
+    if (pf && method === 'GET') return (await import('./routes/client_pages.ts')).handleClientPortalPageFile(req, site, decodeURIComponent(pf[1]), cors);
+  }
   if (route === '/client/projects' && method === 'GET') return handleClientProjects(req, site, principal, cors);
   if (route === '/client/billing' && method === 'GET') return handleClientBilling(req, site, principal, cors);
   { // sales item 117: the client cancels their own retainer (an owner's call: 'delete' in lib/site_roles.ts)

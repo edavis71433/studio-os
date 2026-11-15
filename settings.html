@@ -283,6 +283,29 @@
   .pwho{padding:2px 0 12px;margin-bottom:6px;border-bottom:1px solid var(--line)}
   .pwho .how{margin:0 0 8px}
   .pwho .row{display:flex;gap:8px;flex-wrap:wrap}
+  /* item 234: pages and quick links, and their two editors */
+  .pgacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .pgrow{align-items:center}
+  .pgdlg{border:1px solid var(--line);border-radius:var(--dds-r-lg,12px);padding:20px;width:min(560px,calc(100vw - 32px));max-height:min(88vh,780px);overflow:auto;background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+  .pgdlg::backdrop{background:rgba(27,21,37,.35)}
+  .pgdlg h2{font-size:18px;margin:0 0 4px}
+  .pgdlg .fl{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}
+  .pgdlg input[type=text],.pgdlg input:not([type]),.pgdlg input[type=url],.pgdlg textarea,.pgdlg select{width:100%;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px}
+  .pgdlg textarea{resize:vertical}
+  .pgitems{list-style:none;padding:0;margin:10px 0 0}
+  .pgitems li{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+  .pgitems li:first-child{border-top:none}
+  .pgitems .pgl{flex:1;min-width:0;overflow-wrap:anywhere}
+  .pgadd,.pgfiles{margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--bg)}
+  #pgFileList{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto}
+  #pgFileList button{text-align:left;justify-content:flex-start}
+  .pgwho{border:none;padding:0;margin:14px 0 0}
+  .pgwho legend{font-size:13px;font-weight:600;margin-bottom:4px}
+  .pgwho .chan{display:flex;align-items:center;gap:8px;min-height:32px}
+  #pgWhoList{margin:4px 0 0 24px}
+  .pgerr{color:var(--dds-danger,#b3261e);min-height:1em}
+  .pgfoot{justify-content:flex-start;margin-top:14px}
+  @media (max-width:767px){.pgdlg .btn.sm{height:40px}}
   /* builder list item 191: two-step sign-in, drawn in Figma (B1 off, B3 on) */
   .tsrow{margin-top:var(--dds-s3,12px)}
   .tshead{display:flex;align-items:center;gap:var(--dds-s2,8px);flex-wrap:wrap} .tshead b{font-size:14px;font-weight:600}
@@ -556,6 +579,57 @@
     <div class="plabel">Cards on Home</div>
     <div id="portalCardRows"></div>
   </section>
+  <!-- builder list item 230 (Nov 2026): how the studio's clients sign in. The emailed code is
+       always on, so nobody is locked out; Google and a password are the studio's to add. Saved
+       with the portal's other choices (PUT /agency/portal { signin }). Drawn in Figma first. -->
+  <section class="card" id="portalSignIn" aria-labelledby="portalSignInHead" hidden>
+    <div class="card-h"><h2 id="portalSignInHead" tabindex="-1">How clients sign in</h2><span class="hint">A code by email always works. Add more ways if you like.</span></div>
+    <div id="portalSignInRows"></div>
+  </section>
+  <!-- builder list item 234 (Nov 2026): pages and quick links the studio makes for its clients, at
+       the top of their Help. Each saves on its own (GET /agency/portal/pages, PUT and DELETE
+       /agency/portal/pages/:id and /agency/portal/links/:id). Drawn in Figma first. -->
+  <section class="card" id="portalPages" aria-labelledby="portalPagesHead" hidden>
+    <div class="card-h"><h2 id="portalPagesHead" tabindex="-1">Pages for your clients</h2><span class="hint">Each page shows at the top of your clients’ Help.</span></div>
+    <div id="portalPageRows"></div>
+    <div class="row pgacts"><button type="button" class="btn sm primary" id="portalNewPage">New page</button></div>
+    <div class="plabel">Quick links · up to 6</div>
+    <div id="portalLinkRows"></div>
+    <div class="row pgacts"><button type="button" class="btn sm" id="portalNewLink">Add a link</button></div>
+  </section>
+  <dialog class="pgdlg" id="pageDlg" aria-labelledby="pageDlgHead">
+    <form id="pageForm" novalidate>
+      <h2 id="pageDlgHead">New page</h2>
+      <label class="fl" for="pgTitle">Title</label><input id="pgTitle" maxlength="80" autocomplete="off">
+      <label class="fl" for="pgWords">Words</label><textarea id="pgWords" rows="6" maxlength="5000"></textarea>
+      <ul class="pgitems" id="pgItems" aria-label="Links, videos and files on this page"></ul>
+      <div class="row pgacts"><button type="button" class="btn sm" data-add="link">Add a link</button><button type="button" class="btn sm" data-add="video">Add a video</button><button type="button" class="btn sm" data-add="file">Add a file</button></div>
+      <div class="pgadd" id="pgAdd" hidden>
+        <label class="fl" for="pgAddLabel">Name</label><input id="pgAddLabel" maxlength="80" autocomplete="off">
+        <label class="fl" for="pgAddUrl" id="pgAddUrlL">Address</label><input id="pgAddUrl" type="url" placeholder="https://" autocomplete="off">
+        <div class="row pgacts"><button type="button" class="btn sm primary" id="pgAddOk">Add</button><button type="button" class="btn sm" id="pgAddNo">Cancel</button></div>
+      </div>
+      <div class="pgfiles" id="pgFiles" hidden><p class="how">Pick a file from your Files.</p><div id="pgFileList"></div></div>
+      <fieldset class="pgwho"><legend>Who sees it</legend>
+        <label class="chan"><input type="radio" name="pgWho" value="all" checked> All clients</label>
+        <label class="chan"><input type="radio" name="pgWho" value="some"> Chosen clients</label>
+        <div id="pgWhoList" hidden></div>
+      </fieldset>
+      <p class="how pgerr" id="pgErr" role="alert"></p>
+      <div class="row pgacts pgfoot"><button type="submit" class="btn sm primary" id="pgSave">Save</button><button type="button" class="btn sm" id="pgSee">See it as a client</button><button type="button" class="btn sm" id="pgCancel">Cancel</button><button type="button" class="btn sm danger" id="pgDelete" hidden>Delete page</button></div>
+    </form>
+  </dialog>
+  <dialog class="pgdlg" id="linkDlg" aria-labelledby="linkDlgHead">
+    <form id="linkForm" novalidate>
+      <h2 id="linkDlgHead">Add a link</h2>
+      <label class="fl" for="lkLabel">Name</label><input id="lkLabel" maxlength="80" autocomplete="off">
+      <label class="fl" for="lkTo">Where it goes</label>
+      <select id="lkTo"><option value="url">A web address</option><option value="book">Book a call</option><option value="messages">Messages</option><option value="documents">Documents</option></select>
+      <div id="lkUrlRow"><label class="fl" for="lkUrl">Address</label><input id="lkUrl" type="url" placeholder="https://" autocomplete="off"></div>
+      <p class="how pgerr" id="lkErr" role="alert"></p>
+      <div class="row pgacts pgfoot"><button type="submit" class="btn sm primary" id="lkSave">Save</button><button type="button" class="btn sm" id="lkCancel">Cancel</button><button type="button" class="btn sm danger" id="lkDelete" hidden>Delete link</button></div>
+    </form>
+  </dialog>
   <section class="card" id="automations" aria-labelledby="autoHead" hidden data-needs="configure">
     <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint" id="autoHint">Ready-made recipes, and the switches behind them. Each saves as you flip it.</span></div>
     <!-- sales item 87: Wix-style recipes, each one tap; it switches on the rows below -->
@@ -768,7 +842,7 @@ const CARDS = [
   { key: 'notify', href: '#notify', title: 'Notifications', desc: 'Ring this phone or computer when something needs you. Enquiries, approvals and support requests also land in your Inbox.', words: 'notifications bell digest alerts emails mute quiet push device phone', scoped: true,
     agencyHref: '#notify', agencyDesc: 'One switch for each client’s site, then the bell and email: what you hear about it, and how.', scopedTitle: () => 'Notifications', scopedDesc: 'What you hear about this client’s site: on Home and in the bell, and by email.' },   // item 126
   // builder list items 229 and 233: what clients see in the portal, the welcome note, Home's cards
-  { key: 'portal', href: '#portalParts', title: 'Client portal', desc: 'What your clients see in their portal, a welcome note on their Home, and Home’s cards.', words: 'client portal clients see hide invoices messages files reports welcome note home cards', studioTeam: true, scoped: true,
+  { key: 'portal', href: '#portalParts', title: 'Client portal', desc: 'What your clients see in their portal, a welcome note on their Home, and Home’s cards.', words: 'client portal clients see hide invoices messages files reports welcome note home cards pages quick links guide sign in google password code', studioTeam: true, scoped: true,
     scopedTitle: (who) => possessive(who) + ' portal', scopedDesc: 'What this client sees in their portal: the same as your studio’s choices unless you change it here.' },
   // the developer tools are the STUDIO's, never a client's — the card stays unscoped and says so while drilled in
   { key: 'dev', href: '/developer.html', title: 'Developer', desc: 'API keys, webhooks, the schema dump. For you, not clients.', words: 'api keys webhooks schema developer code', feature: 'developer', cap: 'use_developer_mode',
@@ -864,7 +938,7 @@ function markCurrent(id) {
 }
 function spySections() {
   if (!('IntersectionObserver' in window)) return;
-  const ids = ['studio', 'security', 'stages', 'goal', 'report', 'reports', 'menu', 'notify', 'portalParts', 'portalHome', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 160: the studio's Monthly reports; item 126: Notifications; sales item 94: Goal and AI help; items 229 and 233: the client portal
+  const ids = ['studio', 'security', 'stages', 'goal', 'report', 'reports', 'menu', 'notify', 'portalParts', 'portalHome', 'portalSignIn', 'portalPages', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 160: the studio's Monthly reports; item 126: Notifications; sales item 94: Goal and AI help; items 229 and 233: the client portal
   // C16: the band (15–30% down the screen) never reaches the last part when the page ends
   // first, so Plan & billing never lit up; at the very bottom the last part shown is marked
   const atBottom = () => window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
@@ -1951,7 +2025,7 @@ function loadPortalSettings() {
     paintPortalParts(); wirePortal();
     $('portalParts').hidden = false;
     if (SCOPE) loadPortalWho();   // item 232: when they were invited and last in, and their portal
-    if (!SCOPE) { paintPortalHome(); $('portalHome').hidden = false; }   // the note and Home's cards are every client's: kept at studio level
+    if (!SCOPE) { paintPortalHome(); $('portalHome').hidden = false; paintSignIn(); $('portalSignIn').hidden = false; }   // the note, Home's cards and the sign-in ways are every client's: kept at studio level
   }).catch(() => { PORTAL_ASKED = null; });
   return PORTAL_ASKED;
 }
@@ -2096,6 +2170,209 @@ async function savePortalCard(key, show) {
   if (!r.ok || !r.body || !r.body.data) { setOff(wasOff); paintPortalHome(); toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
   if (!PORTAL_BUSY.size) { PORTALSET.home_off = r.body.data.home_off || []; PORTALSET.off = r.body.data.off || []; }
   PORTAL_SAVED = id; paintPortalHome();
+}
+// ── item 230: how clients sign in. The emailed code is always on; Google shows "Continue with
+//    Google" (once Studio OS has Google sign-in switched on: the sign-in service's own public
+//    settings say), a password lets a client use one instead. Each switch saves as you flip it. ──
+let GOOGLE_READY = null;   // whether the sign-in service offers Google at all (null: not asked yet)
+function googleReady() {
+  if (GOOGLE_READY !== null) return Promise.resolve(GOOGLE_READY);
+  return fetch(SUPABASE_URL + '/auth/v1/settings', { headers: { apikey: SUPABASE_KEY } }).then((r) => r.ok ? r.json() : null)
+    .then((j) => { GOOGLE_READY = !!(j && j.external && j.external.google); return GOOGLE_READY; }).catch(() => { GOOGLE_READY = false; return false; });
+}
+function paintSignIn() {
+  const si = PORTALSET.signin || { google: false, password: true }, locked = portalLocked();
+  const row = (k, label, how, on, off, chip) => `<div class="swrow" data-signin="${k}"><button type="button" class="sw" role="switch" id="sw-si-${k}" aria-checked="${on ? 'true' : 'false'}" aria-labelledby="sw-si-${k}-l"${off ? ' aria-disabled="true"' : ''}></button><div class="t"><b id="sw-si-${k}-l">${esc(label)}${chip ? `<span class="pchip">${esc(chip)}</span>` : ''}${PORTAL_SAVED === 'signin:' + k ? '<span class="nsaved" role="status">Saved</span>' : ''}</b><div class="how">${esc(how)}</div></div></div>`;
+  const gReady = GOOGLE_READY !== false;
+  $('portalSignInRows').innerHTML =
+    row('code', 'Emailed code', 'Always on, so nobody is locked out.', true, true, 'Always on') +
+    row('google', 'Google', gReady ? 'Shows “Continue with Google” on your clients’ sign-in page.' : 'Not available yet: Google sign-in needs a one-time set-up for Studio OS first.', si.google && gReady, locked || !gReady || PORTAL_BUSY.has('signin:google')) +
+    row('password', 'Password', 'Lets a client set a password and use it instead.', si.password, locked || PORTAL_BUSY.has('signin:password'));
+  $('portalSignInRows').querySelectorAll('[data-signin="google"] .sw, [data-signin="password"] .sw').forEach((b) => b.addEventListener('click', () => {
+    if (b.getAttribute('aria-disabled') === 'true') return;
+    saveSignIn(b.id.replace('sw-si-', ''), b.getAttribute('aria-checked') !== 'true');
+  }));
+  if (GOOGLE_READY === null) googleReady().then(() => { if (PORTALSET) paintSignIn(); });
+}
+async function saveSignIn(key, on) {
+  const id = 'signin:' + key;
+  if (!PORTALSET || portalLocked() || PORTAL_BUSY.has(id)) return;
+  const before = { ...(PORTALSET.signin || { google: false, password: true }) };
+  PORTALSET.signin = { ...before, [key]: on };
+  PORTAL_BUSY.add(id); PORTAL_SAVED = ''; paintSignIn();
+  const r = await api('/agency/portal', 'PUT', { signin: { key, on } });
+  PORTAL_BUSY.delete(id);
+  if (!r.ok || !r.body || !r.body.data) { PORTALSET.signin = { ...PORTALSET.signin, [key]: before[key] }; paintSignIn(); toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
+  if (!PORTAL_BUSY.size && r.body.data.signin) PORTALSET.signin = r.body.data.signin;
+  PORTAL_SAVED = id; paintSignIn();
+}
+// ── item 234: the pages and quick links the studio makes for its clients (GET /agency/portal/pages;
+//    PUT and DELETE /agency/portal/pages/:id and /agency/portal/links/:id). A page has a title,
+//    words, links, videos and files, and who sees it; a quick link goes to a web address or a
+//    place in the portal. Each saves on its own. Studio level only. ──
+let PAGESET = null, PAGES_ASKED = null, PG_EDIT = null, LK_EDIT = null, PG_FILES = null, PG_ADD_KIND = '';
+const newId = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16)));
+const openDlg = (d) => { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); };
+const closeDlg = (d) => { if (d.close) d.close(); else d.removeAttribute('open'); };
+const pagesLocked = () => !!(PAGESET && PAGESET.can_edit === false);
+function loadPortalPages() {
+  if (!(CTX && CTX.is_agency) || SCOPE) return Promise.resolve();
+  if (PAGES_ASKED) return PAGES_ASKED;
+  PAGES_ASKED = api('/agency/portal/pages', 'GET').then((r) => {
+    if (!r.ok || !r.body || !r.body.data) { PAGES_ASKED = null; return; }
+    PAGESET = r.body.data; paintPortalPages(); wirePagesCard();
+    $('portalPages').hidden = false;
+  }).catch(() => { PAGES_ASKED = null; });
+  return PAGES_ASKED;
+}
+function whoWords(p) {
+  if (p.who === 'all') return 'All clients';
+  const names = (p.who || []).map((id) => ((PAGESET.clients || []).find((c) => c.site_id === id) || {}).name).filter(Boolean);
+  if (!names.length) return 'No clients chosen';
+  return names.length <= 2 ? names.join(' and ') : `${names[0]}, ${names[1]} and ${names.length - 2} more`;
+}
+const placeWords = (to) => to === 'book' ? 'Your booking page' : to === 'messages' ? 'Messages, in the portal' : to === 'documents' ? 'Documents, in the portal' : String(to || '').replace(/^https:\/\//, '').replace(/\/$/, '');
+function paintPortalPages() {
+  const locked = pagesLocked(), lim = PAGESET.limits || {};
+  const day = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''; };
+  $('portalPageRows').innerHTML = (PAGESET.pages || []).map((p) => `<div class="swrow pgrow" data-page-row="${esc(p.id)}"><div class="t"><b>${esc(p.title)}</b><div class="how">${esc(whoWords(p))}${p.updated_at ? ' · changed ' + esc(day(p.updated_at)) : ''}</div></div><button type="button" class="btn sm" data-edit-page="${esc(p.id)}" aria-label="${locked ? 'Open' : 'Edit'} ${esc(p.title)}">${locked ? 'Open' : 'Edit'}</button></div>`).join('')
+    || '<p class="how">No pages yet. A welcome guide is a good first one.</p>';
+  $('portalLinkRows').innerHTML = (PAGESET.links || []).map((l) => `<div class="swrow pgrow" data-link-row="${esc(l.id)}"><div class="t"><b>${esc(l.label)}</b><div class="how">${esc(placeWords(l.to))}</div></div>${locked ? '' : `<button type="button" class="btn sm" data-edit-link="${esc(l.id)}" aria-label="Edit ${esc(l.label)}">Edit</button>`}</div>`).join('')
+    || '<p class="how">No quick links yet.</p>';
+  $('portalNewPage').hidden = locked || (PAGESET.pages || []).length >= (lim.pages || 20);
+  $('portalNewLink').hidden = locked || (PAGESET.links || []).length >= (lim.links || 6);
+  $('portalPageRows').querySelectorAll('[data-edit-page]').forEach((b) => b.addEventListener('click', () => openPageEditor(b.getAttribute('data-edit-page'))));
+  $('portalLinkRows').querySelectorAll('[data-edit-link]').forEach((b) => b.addEventListener('click', () => openLinkEditor(b.getAttribute('data-edit-link'))));
+}
+function wirePagesCard() {
+  if ($('portalPages').dataset.wired) return; $('portalPages').dataset.wired = '1';
+  $('portalNewPage').addEventListener('click', () => openPageEditor(''));
+  $('portalNewLink').addEventListener('click', () => openLinkEditor(''));
+  $('pageForm').addEventListener('submit', (e) => { e.preventDefault(); savePage(); });
+  $('pgCancel').addEventListener('click', () => closeDlg($('pageDlg')));
+  $('pgDelete').addEventListener('click', () => removeThing('pages'));
+  $('pgSee').addEventListener('click', seePage);
+  document.querySelectorAll('input[name="pgWho"]').forEach((r) => r.addEventListener('change', () => { $('pgWhoList').hidden = !document.querySelector('input[name="pgWho"][value="some"]').checked; }));
+  $('pageForm').querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', () => startAdd(b.getAttribute('data-add'))));
+  $('pgAddOk').addEventListener('click', finishAdd);
+  $('pgAddNo').addEventListener('click', () => { $('pgAdd').hidden = true; });
+  $('linkForm').addEventListener('submit', (e) => { e.preventDefault(); saveLink(); });
+  $('lkCancel').addEventListener('click', () => closeDlg($('linkDlg')));
+  $('lkDelete').addEventListener('click', () => removeThing('links'));
+  $('lkTo').addEventListener('change', () => { $('lkUrlRow').hidden = $('lkTo').value !== 'url'; });
+}
+function openPageEditor(id) {
+  const p = id ? (PAGESET.pages || []).find((x) => x.id === id) : null;
+  const locked = pagesLocked();
+  PG_EDIT = { id: p ? p.id : newId(), saved: !!p, items: p ? p.items.map((i) => ({ ...i })) : [], sure: false };
+  $('pageDlgHead').textContent = p ? p.title : 'New page';
+  $('pgTitle').value = p ? p.title : ''; $('pgWords').value = p ? p.words : '';
+  const some = !!p && p.who !== 'all';
+  document.querySelectorAll('input[name="pgWho"]').forEach((r) => { r.checked = r.value === (some ? 'some' : 'all'); });
+  $('pgWhoList').innerHTML = (PAGESET.clients || []).map((c) => `<label class="chan"><input type="checkbox" value="${esc(c.site_id)}"${some && p.who.includes(c.site_id) ? ' checked' : ''}> ${esc(c.name)}</label>`).join('') || '<p class="how">No clients yet.</p>';
+  $('pgWhoList').hidden = !some;
+  paintPgItems();
+  $('pgAdd').hidden = true; $('pgFiles').hidden = true; $('pgErr').textContent = '';
+  $('pgDelete').hidden = !p || locked; $('pgDelete').textContent = 'Delete page';
+  $('pageForm').querySelectorAll('input, textarea, [data-add]').forEach((el) => { el.disabled = locked; });
+  $('pgSave').hidden = locked;
+  openDlg($('pageDlg'));
+  $('pgTitle').focus();
+}
+function paintPgItems() {
+  const mark = { link: '↗', video: '▶', file: '⬇' }, locked = pagesLocked();
+  $('pgItems').innerHTML = PG_EDIT.items.map((i, k) => `<li><span aria-hidden="true">${mark[i.kind] || '•'}</span><span class="pgl">${esc(i.label)}</span>${locked ? '' : `<button type="button" class="btn sm" data-rm="${k}" aria-label="Remove ${esc(i.label)}">Remove</button>`}</li>`).join('');
+  $('pgItems').querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => { PG_EDIT.items.splice(+b.getAttribute('data-rm'), 1); paintPgItems(); }));
+}
+async function startAdd(kind) {
+  if (PG_EDIT.items.length >= ((PAGESET.limits || {}).items || 12)) { $('pgErr').textContent = 'That’s as many links, videos and files as a page holds.'; return; }
+  PG_ADD_KIND = kind; $('pgErr').textContent = '';
+  if (kind !== 'file') {
+    $('pgFiles').hidden = true; $('pgAdd').hidden = false;
+    $('pgAddLabel').value = ''; $('pgAddUrl').value = '';
+    $('pgAddUrlL').textContent = kind === 'video' ? 'The video’s address (YouTube, Vimeo, Loom…)' : 'Address';
+    $('pgAddLabel').focus();
+    return;
+  }
+  $('pgAdd').hidden = true; $('pgFiles').hidden = false;
+  const list = $('pgFileList');
+  if (!PG_FILES) {
+    list.innerHTML = '<p class="how">Loading your Files…</p>';
+    const r = await api('/assets?limit=60', 'GET');
+    const all = (r.ok && r.body && r.body.data && r.body.data.assets) || null;
+    if (!all) { list.innerHTML = '<p class="how">Your Files couldn’t load just now.</p>'; return; }
+    PG_FILES = all.filter((a) => a && a.id && a.client_private !== true);   // a file private to one client never goes on a page
+  }
+  list.innerHTML = PG_FILES.length ? PG_FILES.map((a) => `<button type="button" class="btn sm" data-file="${esc(a.id)}">${esc(a.name || 'A file')}</button>`).join('') : '<p class="how">No files yet. Upload them in Files first.</p>';
+  list.querySelectorAll('[data-file]').forEach((b) => b.addEventListener('click', () => {
+    const a = PG_FILES.find((x) => x.id === b.getAttribute('data-file')); if (!a) return;
+    PG_EDIT.items.push({ kind: 'file', label: String(a.name || 'A file').slice(0, 80), media_id: a.id });
+    $('pgFiles').hidden = true; paintPgItems();
+  }));
+}
+function finishAdd() {
+  const url = $('pgAddUrl').value.trim(), label = $('pgAddLabel').value.trim();
+  if (!/^https:\/\/[^\s/?#]+\.[^\s]+$/i.test(url)) { $('pgErr').textContent = 'The address needs to start with https://.'; $('pgAddUrl').focus(); return; }
+  PG_EDIT.items.push({ kind: PG_ADD_KIND === 'video' ? 'video' : 'link', label: label || (PG_ADD_KIND === 'video' ? 'Watch the video' : url.replace(/^https:\/\//, '').replace(/\/$/, '')), url });
+  $('pgAdd').hidden = true; $('pgErr').textContent = ''; paintPgItems();
+}
+async function savePage() {
+  if (pagesLocked() || !PG_EDIT) return false;
+  const title = $('pgTitle').value.trim();
+  if (!title) { $('pgErr').textContent = 'Give the page a title.'; $('pgTitle').focus(); return false; }
+  const some = document.querySelector('input[name="pgWho"][value="some"]').checked;
+  const who = some ? [...$('pgWhoList').querySelectorAll('input:checked')].map((c) => c.value) : 'all';
+  if (some && !who.length) { $('pgErr').textContent = 'Choose at least one client, or show it to all clients.'; return false; }
+  const btn = $('pgSave'); btn.disabled = true;
+  const r = await api('/agency/portal/pages/' + encodeURIComponent(PG_EDIT.id), 'PUT', { title, words: $('pgWords').value, items: PG_EDIT.items, who });
+  btn.disabled = false;
+  if (!r.ok || !r.body || !r.body.data) { $('pgErr').textContent = nice(r.body, 'That didn’t save. Try again in a moment.'); return false; }
+  PAGESET.pages = r.body.data.pages; PAGESET.links = r.body.data.links; PG_EDIT.saved = true;
+  paintPortalPages(); closeDlg($('pageDlg')); toast('Saved. It’s at the top of their Help.');
+  return true;
+}
+async function seePage() {
+  const some = document.querySelector('input[name="pgWho"][value="some"]').checked;
+  const chosen = some ? [...$('pgWhoList').querySelectorAll('input:checked')].map((c) => c.value) : [];
+  const as = chosen[0] || ((PAGESET.clients || [])[0] || {}).site_id;
+  if (!as) { $('pgErr').textContent = 'Add a client first: a page is seen through a client’s portal.'; return; }
+  if (!pagesLocked() && !(await savePage())) return;
+  location.href = '/client.html?preview=' + encodeURIComponent(as) + '&back=' + encodeURIComponent('/settings.html#portalPages') + '#help';
+}
+function openLinkEditor(id) {
+  const l = id ? (PAGESET.links || []).find((x) => x.id === id) : null;
+  LK_EDIT = { id: l ? l.id : newId(), sure: false };
+  $('linkDlgHead').textContent = l ? l.label : 'Add a link';
+  $('lkLabel').value = l ? l.label : '';
+  const place = l && ['book', 'messages', 'documents'].includes(l.to) ? l.to : 'url';
+  $('lkTo').value = place; $('lkUrl').value = l && place === 'url' ? l.to : ''; $('lkUrlRow').hidden = place !== 'url';
+  $('lkErr').textContent = ''; $('lkDelete').hidden = !l; $('lkDelete').textContent = 'Delete link';
+  openDlg($('linkDlg'));
+  $('lkLabel').focus();
+}
+async function saveLink() {
+  if (pagesLocked() || !LK_EDIT) return;
+  const label = $('lkLabel').value.trim(), place = $('lkTo').value, url = $('lkUrl').value.trim();
+  if (!label) { $('lkErr').textContent = 'Give the link a name.'; $('lkLabel').focus(); return; }
+  if (place === 'url' && !/^https:\/\/[^\s/?#]+\.[^\s]+$/i.test(url)) { $('lkErr').textContent = 'The address needs to start with https://.'; $('lkUrl').focus(); return; }
+  const btn = $('lkSave'); btn.disabled = true;
+  const r = await api('/agency/portal/links/' + encodeURIComponent(LK_EDIT.id), 'PUT', { label, to: place === 'url' ? url : place });
+  btn.disabled = false;
+  if (!r.ok || !r.body || !r.body.data) { $('lkErr').textContent = nice(r.body, 'That didn’t save. Try again in a moment.'); return; }
+  PAGESET.pages = r.body.data.pages; PAGESET.links = r.body.data.links;
+  paintPortalPages(); closeDlg($('linkDlg')); toast('Saved.');
+}
+// Delete asks twice on the same button: the first press says what the second will do
+async function removeThing(kind) {
+  const ed = kind === 'pages' ? PG_EDIT : LK_EDIT, btn = $(kind === 'pages' ? 'pgDelete' : 'lkDelete');
+  if (!ed || pagesLocked()) return;
+  if (!ed.sure) { ed.sure = true; btn.textContent = kind === 'pages' ? 'Press again to delete the page' : 'Press again to delete the link'; return; }
+  btn.disabled = true;
+  const r = await api(`/agency/portal/${kind}/` + encodeURIComponent(ed.id), 'DELETE');
+  btn.disabled = false;
+  if (!r.ok || !r.body || !r.body.data) { toast(nice(r.body, 'That didn’t delete. Try again in a moment.'), true); return; }
+  PAGESET.pages = r.body.data.pages; PAGESET.links = r.body.data.links;
+  paintPortalPages(); closeDlg($(kind === 'pages' ? 'pageDlg' : 'linkDlg')); toast('Deleted.');
 }
 // I3 (bug hunt, Nov 10): answers can come back in any order. Each field counts the saves it
 // has on their way, and a repaint leaves a field alone while one is out; an answer older than
@@ -2356,6 +2633,7 @@ const SHELL_READY = document.readyState === 'loading' ? new Promise((r) => docum
     if (!inClient()) loadGoalAi();   // sales item 94: Goal and AI help, the studio's own like Deal stages
     loadNotify();   // item 126: a studio's notifications per client site (agency members only)
     loadPortalSettings();   // items 229 and 233: what clients see in the portal (agency members only)
+    loadPortalPages();   // item 234: the pages and quick links at the top of clients' Help
     wireDeletion();
     if (!inClient()) { wireSecurity(); loadSecurity().catch(() => {}); }   // item 191: your own sign-in, in your own business too
     { const dl = $('dlData'); if (dl) dl.addEventListener('click', downloadMyData); }   // item 69: Download my data
@@ -2369,6 +2647,7 @@ const SHELL_READY = document.readyState === 'loading' ? new Promise((r) => docum
     if (location.hash === '#stages' && !inClient()) holdAnchor($('stages'));   // item 83: a second business is not a client
     if (location.hash === '#goal' && !inClient()) holdAnchor($('goal'));   // sales item 94: Home's goal card and AI help's Open Settings land here
     if (location.hash === '#security' && !inClient()) holdAnchor($('security'));   // item 191: the studio home's nudge lands here
+    if (location.hash === '#portalPages') loadPortalPages().then(() => { if (!$('portalPages').hidden) holdAnchor($('portalPages')); });   // item 234
     if (location.hash === '#portalParts' || location.hash === '#portalHome') { const id = location.hash.slice(1); loadPortalSettings().then(() => { if (!$(id).hidden) holdAnchor($(id)); }); }   // items 229 and 233
     if (location.hash === '#notify') {
       if (CTX && CTX.is_agency) loadNotify().then(() => { if (!$('notify').hidden) holdAnchor($('notify')); });

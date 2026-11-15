@@ -72,6 +72,10 @@ const signedIn = (lit) => /x-dds-user-jwt/.test(lit);
 // our key without a sign-in must ask, so a new one gets a decision.
 const LEFT = [
   ['shell.js', "{ 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY }"],   // GET /push/key: an env value
+  // builder list item 230: does the sign-in service offer Google? GET /auth/v1/settings is the sign-in
+  // service's own fixed answer, not one of our functions, so it never carries the header
+  ['portal.html', '{ apikey: SUPABASE_KEY }'],
+  ['settings.html', '{ apikey: SUPABASE_KEY }'],
 ];
 
 // ── 1. every signed-in call asks for Oregon; the others where they read enough ─

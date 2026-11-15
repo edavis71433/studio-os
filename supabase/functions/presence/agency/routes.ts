@@ -291,7 +291,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     const ps = normalizePortal(stored);
     const input = await sharedGather(member.agency_id, now);
     const clients = activeClientsOf(input).map((c) => ({ ...c, choices: ps.clients[c.site_id] || {} }));
-    return json({ data: { off: ps.off, welcome: ps.welcome, home_off: ps.home_off, clients,
+    return json({ data: { off: ps.off, welcome: ps.welcome, home_off: ps.home_off, signin: ps.signin, clients,
       parts: PORTAL_PARTS.map((k) => ({ key: k, label: PART_WORDS[k][0], sub: PART_WORDS[k][1] })),
       cards: HOME_CARDS.map((k) => ({ key: k, label: CARD_WORDS[k][0], sub: CARD_WORDS[k][1] })),
       welcome_max: WELCOME_MAX, can_edit: can(member.role, 'manage_clients') } }, 200, cors);
@@ -299,13 +299,13 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   if (route === '/agency/portal' && method === 'PUT') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
     const change = pickStudioChange(await body());
-    if (!Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which part or card to show or hide, or the welcome note.' }, 400, cors);
+    if (!Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which part or card to show or hide, the welcome note, or a way to sign in.' }, 400, cors);
     const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
     if (!own) return json({ error: 'no_studio_site', message: 'Portal choices are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
     const saved = await updateReservedJson(own.id, RESERVED_NAMES.portalSettings, (cur) => applyStudioChange(normalizePortal(cur), change), member.email);
     if (!saved) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
     forgetPortalOff();
-    return json({ data: { off: saved.off, welcome: saved.welcome, home_off: saved.home_off } }, 200, cors);
+    return json({ data: { off: saved.off, welcome: saved.welcome, home_off: saved.home_off, signin: saved.signin } }, 200, cors);
   }
   {
     const pm = route.match(/^\/agency\/portal\/clients\/([^/]+)$/);
@@ -383,6 +383,52 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       SIGN_IN_LINK_SENT.set(siteId, Date.parse(now));
       if (SIGN_IN_LINK_SENT.size > 2000) SIGN_IN_LINK_SENT.clear();
       return json({ data: { site_id: siteId, sent: true, email: p.email } }, 200, cors);
+    }
+  }
+
+  // ── builder list item 234: the pages and quick links the studio makes for its clients
+  //    (Settings › Client portal). One page or one link at a time, applied to what's stored. ──
+  if (route === '/agency/portal/pages' && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+    if (!own) return json({ error: 'no_studio_site', message: 'Portal pages are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+    const { normalizePages, MAX_PAGES, MAX_LINKS, MAX_ITEMS, TITLE_MAX, WORDS_MAX } = await import('../lib/portal_pages.ts');
+    let stored: unknown;
+    try { stored = await readReservedJsonOrThrow(own.id, RESERVED_NAMES.portalPages); }
+    catch { return json({ error: 'read_failed', message: 'Your portal pages couldn’t load just now.' }, 502, cors); }
+    const input = await sharedGather(member.agency_id, now);
+    return json({ data: { ...normalizePages(stored), clients: activeClientsOf(input),
+      limits: { pages: MAX_PAGES, links: MAX_LINKS, items: MAX_ITEMS, title: TITLE_MAX, words: WORDS_MAX },
+      can_edit: can(member.role, 'manage_clients') } }, 200, cors);
+  }
+  {
+    const pm = route.match(/^\/agency\/portal\/(pages|links)\/([^/]+)$/);
+    if (pm && (method === 'PUT' || method === 'DELETE')) {
+      if (!can(member.role, 'manage_clients')) return forbid(cors);
+      const P = await import('../lib/portal_pages.ts');
+      const id = decodeURIComponent(pm[2]).toLowerCase();
+      if (!P.isId(id)) return json({ error: 'bad_request', message: 'Say which one.' }, 400, cors);
+      const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+      if (!own) return json({ error: 'no_studio_site', message: 'Portal pages are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+      let next: ReturnType<typeof P.normalizePages> | null = null;
+      if (method === 'PUT') {
+        const b = await body();
+        const thing = pm[1] === 'pages' ? P.cleanPage(b, id, now) : P.cleanLink(b, id);
+        if (!thing) return json({ error: 'bad_request', message: pm[1] === 'pages' ? 'A page needs a title.' : 'A quick link needs a name and where it goes (an https address, or a place in the portal).' }, 400, cors);
+        let full = false;
+        const saved = await updateReservedJson(own.id, RESERVED_NAMES.portalPages, (cur) => {
+          const was = P.normalizePages(cur);
+          const put = pm[1] === 'pages' ? P.putPage(was, thing as ReturnType<typeof P.cleanPage> & object) : P.putLink(was, thing as ReturnType<typeof P.cleanLink> & object);
+          if (!put) { full = true; return was; }
+          return put;
+        }, member.email);
+        if (full) return json({ error: 'full', message: pm[1] === 'pages' ? `That’s ${P.MAX_PAGES} pages, the most a portal holds.` : `That’s ${P.MAX_LINKS} quick links, the most a portal holds.` }, 409, cors);
+        next = saved;
+      } else {
+        next = await updateReservedJson(own.id, RESERVED_NAMES.portalPages, (cur) => pm[1] === 'pages' ? P.dropPage(P.normalizePages(cur), id) : P.dropLink(P.normalizePages(cur), id), member.email);
+      }
+      if (!next) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+      return json({ data: { pages: next.pages, links: next.links } }, 200, cors);
     }
   }
 
