@@ -35,7 +35,7 @@ test.describe('Files: small bugs (item 172, D9 to D12)', () => {
     await expect(page.locator('#panel .ptitle')).toHaveText('Team photo');
     await page.locator('#panel .acts').getByRole('button', { name: 'Delete' }).click();
     const ask = page.locator('dialog[open]');
-    await expect(ask).toContainText('Delete this file permanently?');
+    await expect(ask).toContainText('Move “Team photo” to the Trash?');   // item 218: Delete moves a file to the Trash
     await page.keyboard.press('Escape');
     await expect(page.locator('dialog')).toHaveCount(0);
     await panelOpen(page);

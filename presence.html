@@ -6064,10 +6064,11 @@ function mediaCell(grid, m, manage, onPick) {
     });
     row.appendChild(fp);
     cell.appendChild(row);
-    const del = icoBtn("x", "Remove photograph: " + (m.alt_text || ""), "del", 14); del.dataset.needs = "delete"; del.title = "Remove this photograph";
+    const del = icoBtn("x", "Remove photograph: " + (m.alt_text || ""), "del", 14); del.dataset.needs = "delete"; del.title = "Move this photograph to the Trash";
     del.addEventListener("click", async () => {
-      if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Remove for good?"; setTimeout(() => { delete del.dataset.armed; del.innerHTML = uiIcon("x", 14); }, 3200); return; }
-      try { await api("DELETE", `/media/${m.id}`); S.media = S.media.filter((x) => x.id !== m.id); renderMediaGrid(grid, true); toast("Removed"); }
+      // item 218: Remove moves the photo to Files' Trash for 30 days; Files puts it back
+      if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Move to the Trash?"; setTimeout(() => { delete del.dataset.armed; del.innerHTML = uiIcon("x", 14); }, 3200); return; }
+      try { await api("DELETE", `/media/${m.id}`); S.media = S.media.filter((x) => x.id !== m.id); renderMediaGrid(grid, true); toast("Moved to the Trash. Put it back from Files within 30 days."); }
       catch (err) { toast(nice(err), true); }
     });
     cell.appendChild(del);
