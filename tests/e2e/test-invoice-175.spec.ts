@@ -35,7 +35,7 @@ test.describe('Invoices: send a test to myself (builder list item 175)', () => {
     let release: () => void = () => {};
     const hold = new Promise<void>((r) => { release = r; });
     const sent = await openInvoices(page, { status: 200, body: { data: { sent_to: 'owner@studio.example', stripe: true } } }, hold);
-    await expect(page.locator('.head .tools button')).toHaveText(['Send a test to myself', 'Download CSV', 'Send an invoice']);
+    await expect(page.locator('.head .tools button')).toHaveText(['Send a test to myself', 'Download CSV', 'For your bookkeeper', 'Send an invoice']);   // sales item 105 added the bookkeeper's export
     const btn = page.getByRole('button', { name: 'Send a test to myself' });
     await btn.click();
     await expect(page.locator('#testInvBtn')).toHaveText('Sending…');

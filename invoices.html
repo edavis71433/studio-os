@@ -41,8 +41,8 @@
   .pill:hover{background:var(--p-soft)}
   .pill.go{background:var(--dds-grad-btn,var(--p));border-color:transparent;color:var(--dds-on-p,#fff)}
   .pill[aria-disabled="true"]{opacity:.65;cursor:progress}
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pill.go,:root:not([data-theme="light"]) .chip[aria-pressed="true"]{color:#171320}}
-  :root[data-theme="dark"] .pill.go,:root[data-theme="dark"] .chip[aria-pressed="true"]{color:#171320}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pill.go,:root:not([data-theme="light"]) .chip[aria-pressed="true"],:root:not([data-theme="light"]) .echip[aria-pressed="true"]{color:#171320}}
+  :root[data-theme="dark"] .pill.go,:root[data-theme="dark"] .chip[aria-pressed="true"],:root[data-theme="dark"] .echip[aria-pressed="true"]{color:#171320}
   /* the four totals */
   .totals{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0}
   .tot{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px 18px}
@@ -52,10 +52,10 @@
   .tot .s{font-size:13px;color:var(--faint)}
   /* chips, search, month */
   .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
-  .chip{font:inherit;font-size:14px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 14px;min-height:38px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;box-shadow:var(--shadow)}
+  .chip,.echip{font:inherit;font-size:14px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 14px;min-height:38px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;box-shadow:var(--shadow)}
   .chip b{font-weight:700;font-variant-numeric:tabular-nums}
   .chip.over{background:var(--bad-soft);border-color:transparent;color:var(--bad)}
-  .chip[aria-pressed="true"]{background:var(--dds-grad-btn,var(--p));border-color:transparent;color:var(--dds-on-p,#fff)}
+  .chip[aria-pressed="true"],.echip[aria-pressed="true"]{background:var(--dds-grad-btn,var(--p));border-color:transparent;color:var(--dds-on-p,#fff)}
   .bar .grow{flex:1}
   .find,.month{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--dds-line-strong,#d6d4e2);border-radius:999px;padding:8px 14px;min-height:40px}
   .find{width:240px}
@@ -100,6 +100,17 @@
   .dbody input,.dbody select{width:100%;font:inherit;font-size:15px;padding:9px 12px;border:1px solid var(--dds-line-strong,#d6d4e2);border-radius:10px;background:var(--card);color:var(--ink);min-height:44px}
   .row2{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;flex-wrap:wrap}
   .err{color:var(--bad);font-size:13.5px;margin-top:10px}
+  /* sales item 105: the export for a bookkeeper */
+  #expDlg{width:min(560px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto}
+  .eper{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 4px}
+  .eper .echip{min-height:40px}   /* its own class: the page's filters are the only .chip (item 85's test counts them) */
+  .edays{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .edays[hidden]{display:none}
+  .efiles{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
+  .efiles li{border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13.5px;color:var(--soft)}
+  .efiles b{display:block;color:var(--ink);font-size:14px}
+  .efiles .how{display:block;color:var(--p);font-size:12.5px;margin-top:2px}
+  .empty .pill{margin-top:14px}
   @media (max-width:900px){.totals{grid-template-columns:repeat(2,1fr)}}
   @media (max-width:767px){
     .wrap{padding:16px 16px 100px}
@@ -108,7 +119,7 @@
     .totals{gap:10px;margin:14px 0}.tot{padding:12px 14px}.tot .v{font-size:22px}.tot .s{display:none}
     .bar .chips{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px 8px;width:calc(100% + 32px)}
     .bar .chips::-webkit-scrollbar{display:none}
-    .chip{flex:0 0 auto;min-height:44px}
+    .chip,.eper .echip{flex:0 0 auto;min-height:44px}
     .bar .grow{display:none}
     .find{flex:1 1 58%;width:auto;min-width:0;min-height:44px}.month{flex:1 1 34%;min-width:0;min-height:44px}
     table{display:none}
@@ -141,6 +152,23 @@
     <label for="payPrivate">Private note, only you see it (optional)</label><input id="payPrivate" maxlength="300" placeholder="Paid late, waived the fee">
     <p class="err" id="payErr" role="alert" hidden></p>
     <div class="row2"><button type="button" class="pill" id="payCancel">Cancel</button><button type="submit" class="pill go" id="payGo">Record payment</button></div>
+  </form>
+</dialog>
+<dialog id="expDlg" aria-labelledby="expH">
+  <form class="dbody" method="dialog" id="expForm">
+    <h2 id="expH">Export for your bookkeeper</h2>
+    <p class="muted">One zip with two spreadsheets. QuickBooks Online, Xero, Google Sheets and Excel all read them.</p>
+    <div class="eper" role="group" aria-label="Which days">
+      <button type="button" class="echip" data-per="year" aria-pressed="true">This year</button><button type="button" class="echip" data-per="lastyear" aria-pressed="false">Last year</button><button type="button" class="echip" data-per="month" aria-pressed="false">This month</button><button type="button" class="echip" data-per="lastmonth" aria-pressed="false">Last month</button><button type="button" class="echip" data-per="pick" aria-pressed="false">Pick dates</button>
+    </div>
+    <div class="edays" id="expDays" hidden><div><label for="expFrom">From</label><input id="expFrom" type="date"></div><div><label for="expTo">To</label><input id="expTo" type="date"></div></div>
+    <ul class="efiles">
+      <li><b>invoices.csv</b>Every invoice sent in those days, one row per line: number, customer, dates and amounts.<span class="how">QuickBooks Online: Settings, Import data, Invoices</span></li>
+      <li><b>payments.csv</b>Every payment that came in: the day, who paid, which invoice, how, and the amount. Retainer payments included.<span class="how">For matching what came into the bank</span></li>
+    </ul>
+    <p class="muted" style="margin-top:12px;font-size:13px">Nothing is sent anywhere. Only this download.</p>
+    <p class="err" id="expErr" role="alert" hidden></p>
+    <div class="row2"><button type="button" class="pill" id="expCancel">Cancel</button><button type="submit" class="pill go" id="expGo">Download the zip</button></div>
   </form>
 </dialog>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
@@ -213,7 +241,7 @@ function render(focusSel){
   const n=(k)=>k==='all'?all.length:k==='overdue'?all.filter(i=>kindOf(i)==='unpaid'&&!(i.processing||i.state==='processing')&&i.due_date&&dayDiff(i.due_date.slice(0,10),today)<0).length:all.filter(i=>kindOf(i)===k).length;
   const months=[...new Set(all.map(i=>localDay(i.issued_at).slice(0,7)).filter(Boolean))].sort().reverse();
   let h=`<div class="head"><div class="grow"><h1>Invoices</h1><p class="lede">Every invoice you’ve sent, newest first. Record a payment, download the PDF or open the deal from any row.</p></div>
-    <div class="tools"><button type="button" class="pill" id="testInvBtn">Send a test to myself</button><button type="button" class="pill" id="csvBtn">Download CSV</button><button type="button" class="pill go" id="sendBtn">Send an invoice</button></div></div>
+    <div class="tools"><button type="button" class="pill" id="testInvBtn">Send a test to myself</button><button type="button" class="pill" id="csvBtn">Download CSV</button><button type="button" class="pill" id="expBtn">For your bookkeeper</button><button type="button" class="pill go" id="sendBtn">Send an invoice</button></div></div>
     <div class="totals">
       <div class="tot"><div class="l">Owed to you</div><div class="v">${money(t.owed)}</div><div class="s">${t.owedN} unpaid${t.proc?' · '+money(t.proc)+' of it on its way':''}</div></div>
       <div class="tot bad"><div class="l">Overdue</div><div class="v">${money(t.late)}</div><div class="s">${t.lateN?plural(t.lateN,'invoice')+' · the oldest '+plural(t.oldest,'day')+' late':'Nothing late'}</div></div>
@@ -235,7 +263,7 @@ function listHtml(){
   const list=filtered(today),shown=list.slice(0,LIMIT),parts=DATA.items.filter(isPart);
   let h='';
   if(!list.length){
-    h+=all.length?`<div class="empty"><p>No invoice matches that.</p></div>`:`<div class="empty"><h2>No invoices yet</h2><p>Send your first from a deal, or with Send an invoice above.</p></div>`;
+    h+=all.length?`<div class="empty"><p>No invoice matches that.</p></div>`:`<div class="empty"><h2>No invoices yet</h2><p>Bill a client for a deal, a deposit or any work.</p><button type="button" class="pill go" data-send>Send an invoice</button></div>`;
   }else{
     const rowMenu=(i)=>`<div class="menu"><button type="button" class="dots" data-menu="${esc(i.id)}" aria-haspopup="true" aria-expanded="false" aria-label="More for invoice ${esc(i.number_label||i.title)}">⋯</button></div>`;
     h+=`<table aria-label="Invoices"><thead><tr><th scope="col">Number</th><th scope="col">Customer</th><th scope="col">What for</th><th scope="col" class="num">Amount</th><th scope="col">Issued</th><th scope="col">Due</th><th scope="col">Status</th><th scope="col"><span class="sr-only">More</span></th></tr></thead><tbody>`
@@ -260,6 +288,7 @@ function wire(){
   const cb=$('csvBtn');if(cb)cb.addEventListener('click',downloadCsv);
   const tb=$('testInvBtn');if(tb)tb.addEventListener('click',()=>sendTestInvoice(tb));
   const sb2=$('sendBtn');if(sb2)sb2.addEventListener('click',()=>{if(!(window.ddsOpenCreate&&window.ddsOpenCreate('invoice',sb2)))location.href='/pipeline.html';});
+  const eb=$('expBtn');if(eb)eb.addEventListener('click',()=>openExport(eb));
   wireList();
 }
 function wireList(){
@@ -333,6 +362,49 @@ function downloadCsv(){
   const lines=[['Number','Customer','Person','What for','Amount','Issued','Due','Status'].join(',')].concat(list.map(i=>[i.number_label,i.business,i.person,i.title,((Number(i.amount_cents)||0)/100).toFixed(2),localDay(i.issued_at),String(i.due_date||'').slice(0,10),word(i)].map(q).join(',')));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')+'\n'],{type:'text/csv'}));a.download='invoices-'+today+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
 }
+// sales item 105: the export for a bookkeeper. The days are the studio's own (its time zone goes
+// along), and a failed read downloads nothing and says so in the dialog.
+let EXP_PER='year',EXP_BACK=null;
+function expRange(){
+  const t=new Date(),y=t.getFullYear(),m=t.getMonth(),d=(yy,mm,dd)=>ymd(new Date(yy,mm,dd).getTime());
+  if(EXP_PER==='lastyear')return{from:d(y-1,0,1),to:d(y-1,11,31)};
+  if(EXP_PER==='month')return{from:d(y,m,1),to:ymd()};
+  if(EXP_PER==='lastmonth')return{from:d(y,m-1,1),to:d(y,m,0)};
+  if(EXP_PER==='pick')return{from:$('expFrom').value,to:$('expTo').value};
+  return{from:d(y,0,1),to:ymd()};
+}
+function openExport(btn){
+  EXP_BACK=btn;$('expErr').hidden=true;
+  if(!$('expFrom').value){const r=expRange();$('expFrom').value=r.from;$('expTo').value=r.to;}
+  $('expDlg').showModal();
+  const on=document.querySelector('#expDlg [data-per][aria-pressed="true"]');if(on)on.focus();
+}
+document.querySelectorAll('#expDlg [data-per]').forEach(b=>b.addEventListener('click',()=>{
+  EXP_PER=b.getAttribute('data-per');
+  document.querySelectorAll('#expDlg [data-per]').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+  $('expDays').hidden=EXP_PER!=='pick';if(EXP_PER==='pick')$('expFrom').focus();
+}));
+$('expCancel').addEventListener('click',()=>$('expDlg').close());
+// the empty list's one button does what Send an invoice does (sales item 105)
+document.addEventListener('click',(e)=>{const b=e.target&&e.target.closest?e.target.closest('[data-send]'):null;if(!b)return;if(!(window.ddsOpenCreate&&window.ddsOpenCreate('invoice',b)))location.href='/pipeline.html';});
+$('expDlg').addEventListener('close',()=>{if(EXP_BACK&&EXP_BACK.isConnected)EXP_BACK.focus();EXP_BACK=null;});
+$('expForm').addEventListener('submit',async(e)=>{
+  e.preventDefault();
+  const go=$('expGo'),err=(m)=>{$('expErr').textContent=m;$('expErr').hidden=false;};
+  const r=expRange();
+  if(!r.from||!r.to)return err('Pick the first and last day to include.');
+  go.disabled=true;go.textContent='Getting it ready…';$('expErr').hidden=true;
+  try{
+    const q='from='+encodeURIComponent(r.from)+'&to='+encodeURIComponent(r.to)+'&tzo='+new Date().getTimezoneOffset()+'&today='+ymd();
+    const res=await fetch(FN+'/sales/export/accounting?'+q,{headers:H()});
+    if(!res.ok||!/zip/.test(res.headers.get('Content-Type')||'')){const b=await res.json().catch(()=>({}));throw new Error((b&&b.message)||(res.status===404?'This export arrives with the next update. Try again after it.':'The export didn’t download. Try again.'));}
+    const blob=await res.blob();
+    const name=(/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition')||'')||[])[1]||('for-your-bookkeeper-'+r.from+'-to-'+r.to+'.zip');
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
+    $('expDlg').close();toast('Downloaded '+name+'. Hand it to your bookkeeper.');
+  }catch(x){err(x&&x.message?x.message:'The export didn’t download. Try again.');}
+  finally{go.disabled=false;go.textContent='Download the zip';}
+});
 async function load(){
   if(await inClientNow()){$('main').innerHTML=`<div class="center"><h2>Invoices live at the studio level.</h2><p class="muted">You’re looking at one client. Their invoices are on their record’s Billing tab.</p><p style="margin-top:16px"><a class="link" data-noscope href="/invoices.html">Leave this client and open Invoices →</a></p></div>`;return;}
   const r=await api('/sales/invoices?today='+ymd());

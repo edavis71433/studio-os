@@ -750,7 +750,7 @@ function peopleHtml(){
   const s=pSrchNow();   // item 66: past the loaded pages, the server's matches answer the search
   if(!s&&!pWhole()&&PLOADED!==PFILTER)return'<div class="spin" role="status" aria-label="Loading people"></div>';   // item 110: that chip's people are on their way
   const list=(s?s.rows:PEOPLE).filter(c=>(PFILTER==='all'||(PFILTER==='customers')===!!c.client_id)&&(!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q)));
-  if(!list.length)return`<p class="muted" style="padding:20px 0">${q?(!pHaveAll()&&!s?(PSRCH_ERR===Q.trim()?'We couldn’t search everyone just now. These are the people loaded so far.':'Looking through everyone…'):'No one matches “'+esc(Q)+'”.'):PEOPLE.length?'No one here — try “All”.':'No people yet — a website enquiry, a deal or an added customer puts someone here.'}</p>`+pMoreHtml();
+  if(!list.length)return`<p class="muted" style="padding:20px 0">${q?(!pHaveAll()&&!s?(PSRCH_ERR===Q.trim()?'We couldn’t search everyone just now. These are the people loaded so far.':'Looking through everyone…'):'No one matches “'+esc(Q)+'”.'):PEOPLE.length?'No one here — try “All”.':'No people yet — a website enquiry, a deal or an added customer puts someone here.'}</p>${!q&&!PEOPLE.length?'<p><a class="btn" href="/contacts.html?add=1">+ Add a person</a></p>':''}`+pMoreHtml();
   const byClient={}; for(const c of CUSTOMERS)byClient[String(c.client_id)]=c;
   const trs=list.map(c=>{
     const cust=c.client_id?byClient[String(c.client_id)]:null;
