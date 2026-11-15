@@ -280,6 +280,8 @@ https://app.davisdigitalstudio.com/report.html           https://tools.davisdigi
 /templates                   /templates.html       200
 /usage.html                   /usage               301!
 /usage                       /usage.html           200
+/changes.html                 /changes             301!
+/changes                     /changes.html         200
 /snapshot-history.html        /snapshot-history    301!
 /snapshot-history            /snapshot-history.html   200
 /timeline.html                /timeline            301!
