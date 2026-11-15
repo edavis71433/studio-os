@@ -2288,10 +2288,10 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
 .bs-addline{display:inline-block;margin:2px 0 4px;min-height:36px}
 @media (max-width:760px){.bl-head{justify-content:stretch}.bl-head .pillbtn{flex:1}.bl-lists{margin-left:0}.bl-grid{grid-template-columns:1fr}.bl-row{flex-wrap:wrap}}
 /* builder item 220: where a Designer's work waits, in Publish's place (shell.css shows it to a role lacking publish) */
-.pillbtn.waitpub{background:#fff1d6;border-color:#f3dcae;color:#7a4f0d;font-weight:600}
+.pillbtn.waitpub{background:var(--amber-soft);border-color:color-mix(in srgb,var(--amber) 28%,transparent);color:var(--amber-text);font-weight:600}
 .pillbtn.waitpub::before{content:"";width:14px;height:14px;flex:0 0 auto;border-radius:50%;border:1.6px solid currentColor;box-sizing:border-box;background:linear-gradient(currentColor,currentColor) 6px 3px/1.6px 5px no-repeat,linear-gradient(currentColor,currentColor) 6px 6.6px/4px 1.6px no-repeat}
-.pillbtn.waitpub:hover{background:#ffe8bf;color:#6a440b}
-.dock #dockWait{color:#7a4f0d}
+.pillbtn.waitpub:hover{background:color-mix(in srgb,var(--amber) 12%,var(--amber-soft));color:var(--amber-text)}
+.dock #dockWait{color:var(--amber-text)}
 .waitnote{position:fixed;top:72px;right:16px;z-index:9000;width:min(380px,calc(100% - 32px));box-sizing:border-box;background:var(--card,#fff);color:var(--ink);border:1px solid var(--hair);border-radius:16px;box-shadow:0 12px 40px rgba(26,13,64,.18);padding:16px 18px}
 .waitnote[hidden]{display:none}
 .waitnote h2{font-size:15px;font-weight:600;margin:0 0 6px;font-family:var(--sans)}
