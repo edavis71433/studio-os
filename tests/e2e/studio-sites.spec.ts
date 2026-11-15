@@ -619,6 +619,7 @@ test.describe('Sites: the pages travel (item 145)', () => {
     await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Duplicate site' }).click();
     const dlg = page.locator('#dupDlg');
     await expect(dlg).toContainText('this one’s pages and sections, with their words and photos, the menu and the look');
+    await expect(dlg.locator('#dup-biz')).toBeFocused();   // as above: wait for the dialog's own move to its first box
     await dlg.locator('#dup-biz').fill('Bistro Twelve');
     await dlg.locator('#dup-email').fill('sam@bistrotwelve.example');
     await dlg.locator('#dup-submit').click();
@@ -757,6 +758,7 @@ test.describe('Sites: the bug hunt fixes (A1, A10)', () => {
     await page.locator('.scard[data-site="s1"] [data-menu]').click();
     await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Duplicate site' }).click();
     const dlg = page.locator('#dupDlg');
+    await expect(dlg.locator('#dup-biz')).toBeFocused();   // the dialog moves you to its first box a beat after it opens; typing before then can land in the wrong box
     await dlg.locator('#dup-biz').fill('Bistro Twelve');
     await dlg.locator('#dup-email').fill('sam@bistrotwelve.example');
     await dlg.locator('#dup-submit').click();
