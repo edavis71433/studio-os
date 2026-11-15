@@ -774,7 +774,11 @@ const SVG={
 const svg=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${SVG[k]||''}</svg>`;
 // ── Bold redesign, part B: the rail's summary cards — the money, the project
 // and the deal at a glance, each a door to its own tab (the contact card follows)
-const SC_SOURCE={manual:'Added by you',enquiry:'An enquiry',form:'Your website',import:'Imported',referral:'A referral'};
+// sales item 121: every source a deal is written with has its words (the Inbox writes website_form,
+// Prospects prospecting, a free-tool lead free_tools); an unknown code shows no row rather than itself.
+// It is where the DEAL came from, so the row reads "Came from" ("How they found you" is the
+// contact's found_via). Same keys as pipeline.html's SOURCE_WORDS (tests/presence/pipeline_fixes_121_test.mjs).
+const SC_SOURCE={manual:'Added by you',enquiry:'Your website',form:'Your website',website_form:'Your website',import:'An import',referral:'A referral',prospecting:'Prospects',free_tools:'A free tool',example:'Example data'};
 const SC_STATUS={active:'In progress',on_hold:'On hold',complete:'Complete',archived:'Archived',planning:'Planning'};
 function renderSummaryCards(){
   const host=$('sumcards'); if(!host)return;
@@ -802,7 +806,7 @@ function renderSummaryCards(){
   }
   if(d&&d.id){
     const ch=STAGE_CHANCE[d.stage];
-    const rows=[['Value',fmtC(d.expected_value_cents)],['Stage',stageLabel(d.stage)],(ch!=null&&d.stage!=='won'&&d.stage!=='lost')?['Chance',ch+'%']:null,d.expected_close?['Closes',dueLabel(d.expected_close)]:null,d.source?['How they found you',SC_SOURCE[d.source]||String(d.source)]:null].filter(Boolean);
+    const rows=[['Value',fmtC(d.expected_value_cents)],['Stage',stageLabel(d.stage)],(ch!=null&&d.stage!=='won'&&d.stage!=='lost')?['Chance',ch+'%']:null,d.expected_close?['Closes',dueLabel(d.expected_close)]:null,SC_SOURCE[String(d.source||'').toLowerCase()]?['Came from',SC_SOURCE[String(d.source||'').toLowerCase()]]:null].filter(Boolean);
     out.push(`<section class="card sc" aria-labelledby="sc-deal"><div class="sc-h"><h2 id="sc-deal">${esc(d.title||'The deal')}</h2></div><dl class="sc-dl">${rows.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl><button type="button" class="sc-link" data-sc="deal">Open the deal →</button></section>`);
   }
   host.innerHTML=out.join('');

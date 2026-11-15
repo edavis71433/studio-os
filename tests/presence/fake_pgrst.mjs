@@ -14,7 +14,9 @@
 // come back); order (every key, in turn), offset and limit apply. POST honours on_conflict + Prefer resolution=ignore|merge-
 // duplicates, and the `unique` keys (with an optional row predicate, for a
 // partial unique index, or a key function, for an expression index) answer 409 like the database. PATCH and DELETE apply
-// to every matching row. A user JWT (anything but the service key) sees only
+// to every matching row. Filters are read the way PostgREST reads them (checked on the real server, Nov 12
+// 2026, sales item 121): a part with no "=" (`&title.ilike.*x*`) is quietly IGNORED, so a search written that
+// way filters nothing; a filter with "=" that doesn't parse (`&title=nonsense`) answers 400 PGRST100. A user JWT (anything but the service key) sees only
 // `ownSite[token]` in presence_sites — row-level security, roughly.
 export function installFakePostgrest(opts = {}) {
   const SERVICE = opts.service || 'svc-key';
@@ -83,7 +85,11 @@ export function installFakePostgrest(opts = {}) {
     // a database before migration 0194: the visit-count functions aren't there, as PostgREST says it
     if (table === 'rpc/presence_visit_stats' || table === 'rpc/presence_sites_visitors') return reply({ code: 'PGRST202', message: `Could not find the function public.${table.slice(4)}` }, 404);
     if (db.fail.has(table) || db.failMethod.get(table) === method) return reply({ message: 'boom' }, 500);
-    const params = [...u.searchParams.entries()];
+    const valueless = new Set(u.search.replace(/^\?/, '').split('&').filter((p) => p && !p.includes('=')).map((p) => decodeURIComponent(p)));
+    const params = [...u.searchParams.entries()].filter(([k, v]) => !(v === '' && valueless.has(k)));
+    const OPS = /^(not\.)?(eq|neq|is|isdistinct|in|like|ilike|match|imatch|gte|lte|gt|lt|cs|cd|ov|sl|sr|nxl|nxr|adj|fts|plfts|phfts|wfts)\./;
+    const unparsable = params.find(([k, v]) => !META.has(k) && !['columns', 'or', 'and', 'not.or', 'not.and'].includes(k) && !OPS.test(v));
+    if (unparsable) return reply({ code: 'PGRST100', message: `"failed to parse filter (${unparsable[1]})"` }, 400);
     if (token !== SERVICE) {
       if (table === 'presence_sites' && method === 'GET') return reply(ownSite[token] ? (db.tables.presence_sites || []).filter((s) => s.id === ownSite[token]) : []);
       return reply([]);

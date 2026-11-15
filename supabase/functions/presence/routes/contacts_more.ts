@@ -142,7 +142,7 @@ export async function handleContactMerge(req: Request, site: SiteRow, principal:
   // the dry run: what each record holds and what would move, written nothing
   const pick: Partial<Record<MergePick, 'keep' | 'other'>> = {};
   for (const k of MERGE_PICKS) if (b.pick && (b.pick[k] === 'other' || b.pick[k] === 'keep')) pick[k] = b.pick[k];
-  const { values, conflict } = mergeValues(keep, other, pick);
+  const { values, conflict, notesCut } = mergeValues(keep, other, pick);
   if (conflict === 'different_customers') return json({ error: 'different_customers', message: 'These two records belong to two different customers, so they can’t be merged.' }, 409, cors);
   const [dealsR, apptR, revR] = await Promise.all([
     svc(`presence_deals?site_id=eq.${site.id}&contact_id=eq.${otherId}&deleted_at=is.null&select=id&limit=500`),
@@ -152,7 +152,8 @@ export async function handleContactMerge(req: Request, site: SiteRow, principal:
   const moved = { deals: rows(dealsR).map((x: any) => x.id), appointments: rows(apptR).map((x: any) => x.id), reviews: rows(revR).map((x: any) => x.id) };
   if (b.confirm !== true) {
     return json({ data: { dry_run: true, keep: { id: keep.id, ...mergeShow(keep), tags: keep.tags || [] }, other: { id: other.id, ...mergeShow(other), tags: other.tags || [] },
-      result: { ...mergeShow(values), tags: values.tags }, moves: { deals: moved.deals.length, bookings: moved.appointments.length, reviews: moved.reviews.length }, partial: !dealsR.ok || !apptR.ok || !revR.ok } }, 200, cors);
+      result: { ...mergeShow(values), tags: values.tags }, moves: { deals: moved.deals.length, bookings: moved.appointments.length, reviews: moved.reviews.length }, partial: !dealsR.ok || !apptR.ok || !revR.ok,
+      notes_cut: notesCut } }, 200, cors);   // item 121: said before the merge, not found out after
   }
   if (!dealsR.ok) return json({ error: 'read_failed', message: 'We couldn’t check their deals just now, so nothing was merged.' }, 502, cors);
   // 1) the record merged away keeps what it takes to undo this, and steps aside (its email frees up)
@@ -173,7 +174,7 @@ export async function handleContactMerge(req: Request, site: SiteRow, principal:
     await unmergeRecord(site.id, otherId, record).catch(() => null);
     return json({ error: 'write_failed', message: 'Nothing was merged — part of it didn’t save, so everything was put back. Please try again.' }, 502, cors);
   }
-  return json({ data: { merged: true, keep: rows(up)[0], merged_away: { id: otherId, name: String(other.name || other.email || 'Contact') }, moved: { deals: moved.deals.length, bookings: moved.appointments.length, reviews: moved.reviews.length } } }, 200, cors);
+  return json({ data: { merged: true, keep: rows(up)[0], merged_away: { id: otherId, name: String(other.name || other.email || 'Contact') }, moved: { deals: moved.deals.length, bookings: moved.appointments.length, reviews: moved.reviews.length }, notes_cut: notesCut } }, 200, cors);
 }
 
 /** Undo a merge from its record: the kept record's fields go back where nobody changed

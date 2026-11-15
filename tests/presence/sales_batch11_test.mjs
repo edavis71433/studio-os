@@ -111,7 +111,8 @@ ok('Home shows what\'s next, counts it, and moves the next step up on Done', /co
 // ── items 54–56 ──
 ok('Inbox: the badge reads the name alone', /who:l\.name\|\|l\.email\|\|'Someone'/.test(read('inbox.html')) && !/initialsOf\(it\.name\)/.test(read('inbox.html')));
 const pipe = read('pipeline.html');
-ok('Pipeline: a won or not-a-fit deal never "closes"', /d\.expected_close&&d\.stage!=='won'&&d\.stage!=='lost'\?' · closes '/.test(pipe) && /d\.expected_close&&d\.stage!=='won'&&d\.stage!=='lost'\?`<span class="fact">Closes/.test(pipe));
+// item 121: the list card joins its words with " · " (an unknown source says nothing, so no stray dot)
+ok('Pipeline: a won or not-a-fit deal never "closes"', /d\.expected_close&&d\.stage!=='won'&&d\.stage!=='lost'\?'closes '\+niceDay\(d\.expected_close\):''\]\.filter\(Boolean\)\.join\(' · '\)/.test(pipe) && /d\.expected_close&&d\.stage!=='won'&&d\.stage!=='lost'\?`<span class="fact">Closes/.test(pipe));
 ok('Send an update: a "Your customers" list', B.SEGMENTS[0].key === 'customers' && B.isSegmentKey('customers') && B.isAudienceKey('customers'));
 const bl = read('supabase/functions/presence/lib/broadcast.ts');
 ok('…its people are this studio\'s active customers', /presence_service_links\?agency_site_id=eq\.\$\{siteId\}&status=eq\.active&select=customer_client_id/.test(bl));

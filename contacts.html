@@ -1402,6 +1402,7 @@ function paintMerge(){
       ${tags.length?`<div class="fl">Tags</div><div class="full">Both sets of tags are kept: ${esc(tags.join(', '))}</div>`:''}</div>
     <p class="mmoves">Everything moves to the one you keep: ${esc(parts.join(', '))}.</p>
     <p class="note">The other record is set aside for 30 days. Undo, in the message after, brings it back.</p>
+    ${d.notes_cut>0?`<p class="note" id="mgCut" style="color:var(--warn-ink,#7a5417)">Their notes together are longer than one record holds, so the last ${esc(d.notes_cut)} characters won’t fit. The line with the old email address stays at the top, and Undo brings back both records with every note in full.</p>`:''}
     ${d.partial?'<p class="note" style="color:var(--bad)">We couldn’t count everything attached just now; the merge still moves all of it.</p>':''}
     <div class="row2"><button type="button" class="btn ghost" id="merge-cancel">Cancel</button><button type="button" class="btn" id="mergeGo" data-needs="delete">Merge into one</button></div>`;
   $('merge-cancel').onclick=()=>{$('mergeDlg').close();};
@@ -1420,7 +1421,8 @@ async function doMerge(){
   }
   const away=(r.body.data&&r.body.data.merged_away)||{id:MERGE.other,name:''};
   $('mergeDlg').close();MERGE=null;
-  const msg=`Merged into one${away.name?` — ${away.name}’s record was set aside`:''}.`;
+  const cut=Number(r.body.data&&r.body.data.notes_cut)||0;   // item 121: a cut is said, never found out later
+  const msg=`Merged into one${away.name?` — ${away.name}’s record was set aside`:''}.${cut?` Their notes were cut by ${cut} characters to fit; Undo brings them back in full.`:''}`;
   if(window.ddsToast)ddsToast(msg,'ok',{label:'Undo',onClick:async()=>{
     let u;try{u=await api('/sales/contacts/'+encodeURIComponent(away.id)+'/unmerge','POST',{});}catch(_){u={ok:false,body:{}};}
     toast(u.ok?'The merge is undone — both records are back.':((u.body&&u.body.message)||'We couldn’t undo that merge just now.'));

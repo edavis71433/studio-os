@@ -500,9 +500,17 @@ test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
       { id: '66666666-6666-4666-8666-666666666666', title: 'Delta site', stage: 'lost', source: 'manual', expected_value_cents: 100000, expected_close: null, contact_id: 'ct-2', converted_client_id: null, updated_at: past(5), next_step: null, next_step_at: null, last_contacted_at: past(20), agreement_signed: false },
     ] };
     await pinBoard(page);
-    await installApp(page, { api: { ...API, '/sales/deals': mixed } });
+    // item 121: the board asks for the open deals only (open=1) and takes the won and not-a-fit counts from the summary
+    const summary = { data: { ...API['/sales/summary'].data, total: 4, win_rate: { pct: 50, won: 1, lost: 1 } } };
+    await installApp(page, { api: { ...API, '/sales/deals': mixed, '/sales/summary': summary } });
+    const asked: string[] = [];
+    await page.route('**/functions/v1/presence/sales/deals?**', (route) => {
+      const q = new URL(route.request().url()).searchParams; asked.push(q.toString());
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(q.get('open') === '1' ? { data: mixed.data.filter((d) => d.stage !== 'won' && d.stage !== 'lost') } : mixed) });
+    });
     await page.goto('/pipeline.html');
     await expect(page.locator('#board .bcard')).toHaveCount(2);
+    expect(asked.some((q) => /(^|&)open=1(&|$)/.test(q))).toBe(true);
     // the meta reflects what the board shows: 2 open cards, $5,000 + $2,500
     await expect(page.locator('.lhead .lmeta')).toContainText('2 open deals · $7,500 open');
     await expect(page.locator('.lhead .lmeta')).not.toContainText('total');

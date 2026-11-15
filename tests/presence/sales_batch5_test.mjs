@@ -74,7 +74,8 @@ ok('the board ends with Won and Not a fit', /<div class="board with-out">\$\{col
 ok('Not a fit is a drop zone the existing drag wiring serves', /<div class="col-body lost-drop" data-drop="lost">/.test(pipe));
 ok('Won is never a drop target (it is convert-only)', !/data-drop="won"/.test(pipe));
 ok('the Won column reads the summary\'s number once it has loaded', /if\(s\.won_month\)\{WON_MONTH=wm;/.test(pipe));
-ok('an empty board shows the walkthrough, not four empty columns', /if\(!DEALS\.length\)\{if\(window\.ddsStudioLevel&&window\.ddsStudioLevel\(host,\{noun:'Deals',lower:'deals and invoices'\}\)\)return;renderFirstDeal\(host\);return;\}/.test(pipe));
+// item 121: the board reads open deals only, so "empty" means no deal at all (ANY_DEALS), not no open one
+ok('an empty board shows the walkthrough, not four empty columns', /if\(!DEALS\.length&&!\(BOARD_OPEN_ONLY&&ANY_DEALS\)\)\{if\(window\.ddsStudioLevel&&window\.ddsStudioLevel\(host,\{noun:'Deals',lower:'deals and invoices'\}\)\)return;renderFirstDeal\(host\);return;\}/.test(pipe));
 ok('the walkthrough has four steps and step one\'s button', /<h3>Your first deal, in four steps<\/h3>/.test(pipe) && (pipe.match(/<li><b>/g) || []).length >= 4 && /id="fdNew">Add your first deal<\/button>/.test(pipe));
 
 // ── 34 ──
