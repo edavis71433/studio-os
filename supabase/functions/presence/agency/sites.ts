@@ -592,12 +592,15 @@ async function domainAccessRoute(req: Request, method: string, siteId: string, o
   const guide = accessGuide(typeof b?.company === 'string' && b.company ? b.company : (where.records_at?.company || site.domain_registrar));
   if (!guide.shareable) return json({ error: 'cannot_share', message: guide.studio_note, company: guide.company }, 422, cors);
   const invite = cleanInvite(b?.invite, guide.asks);
-  if (!invite) return json({ error: 'bad_invite', message: guide.asks === 'username' ? `Type your studio’s ${guide.company} username.` : 'Type the email address to invite.' }, 400, cors);
+  const inviteMessage = guide.asks === 'username' ? `Type your studio’s ${guide.company} username.` : 'Type the email address to invite.';
   const facts = await ownerFacts(siteId).catch(() => null);
   const to = ownerEmailsOf(facts)[0] || '';
-  const mail = accessEmail({ domain, company: guide.company, invite, studio, firstName: firstWord(facts?.contact?.name), note: typeof b?.note === 'string' ? b.note : '', connected: site.domain_serving === 'latest' });
-  const view = { to, to_name: String(facts?.client?.name || ''), subject: mail.subject, text: mail.text, steps: mail.steps, company: guide.company, called: guide.called, exact: guide.exact, caveat: guide.caveat, studio_note: guide.studio_note, asks: guide.asks, sign_in: guide.sign_in };
+  // a preview before an address is typed shows where it goes in the steps
+  const shown = invite || (guide.asks === 'username' ? `[your ${guide.company} username]` : '[the email you invite]');
+  const mail = accessEmail({ domain, company: guide.company, invite: shown, studio, firstName: firstWord(facts?.contact?.name), note: typeof b?.note === 'string' ? b.note : '', connected: site.domain_serving === 'latest' });
+  const view = { to, to_name: String(facts?.client?.name || ''), studio, subject: mail.subject, text: mail.text, steps: mail.steps, company: guide.company, called: guide.called, exact: guide.exact, caveat: guide.caveat, studio_note: guide.studio_note, asks: guide.asks, sign_in: guide.sign_in, invite_ok: !!invite, ...(invite ? {} : { invite_message: inviteMessage }) };
   if (b?.preview === true) return json({ data: view }, 200, { ...cors, 'Cache-Control': 'no-store' });
+  if (!invite) return json({ error: 'bad_invite', message: inviteMessage }, 400, cors);
   if (!to) return json({ error: 'no_email', message: 'This client has no email on their record yet. Add one there, or copy the message and send it yourself.' }, 409, cors);
   // from the studio, on its brand; a reply lands in the studio's Inbox (a known client: the siteId rule)
   const sent = await sendEmail(to, mail.subject.slice(0, 180), mail.html, own ? await loadEmailBrand(own.id) : undefined, { critical: true, asBusiness: true, ...(own ? { siteId: own.id } : {}) });
@@ -781,12 +784,13 @@ export async function handleAgencySites(req: Request, route: string, method: str
         if (since < CHECK_NOW_GAP_MS) return json({ error: 'too_soon', message: 'Checked a moment ago. Give it a minute before checking again.' }, 429, cors);
         await (await import('../commerce/lifecycle.ts')).checkOneDomain({ ...sq, custom_domain: sq.custom_domain }, now);
         const detail = await domainDetail(siteId, now);
-        return detail ? json({ data: detail }, 200, cors) : notYours(cors);
+        return detail ? json({ data: { ...detail, access_invite: detail.own ? '' : member.email || '' } }, 200, cors) : notYours(cors);   // item 222: as the panel's read
       }
       if (what === 'access') return domainAccessRoute(req, method, siteId, own, member, principal, now, cors);   // item 222
       if (what === '' && method === 'GET') {
         const detail = await domainDetail(siteId, now);
-        return detail ? json({ data: detail }, 200, { ...cors, 'Cache-Control': 'no-store' }) : notYours(cors);
+        // item 222: the address Ask for access invites, unless the studio types another
+        return detail ? json({ data: { ...detail, access_invite: detail.own ? '' : member.email || '' } }, 200, { ...cors, 'Cache-Control': 'no-store' }) : notYours(cors);
       }
       return null;
     }

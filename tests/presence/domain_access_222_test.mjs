@@ -135,9 +135,12 @@ const ASK = { company: 'Namecheap', invite: 'hello@davisdigital.studio', note: '
   reset();
   const p = await call(asMember(), 'POST', `/agency/domains/${S1}/access`, { ...ASK, preview: true });
   ok('preview: the email the client would get, to whom, and nothing written or sent', p.status === 200 && p.body.data.to === 'owner@brightbakery.com' && p.body.data.to_name === 'Bright Bakery' && p.body.data.subject === 'Give Davis Digital Studio access to brightbakery.com’s records' && p.body.data.text.startsWith('Hi Dana,') && writes.length === 0 && mails.length === 0, JSON.stringify(p.body).slice(0, 200));
-  ok('preview: the company\'s facts for the sheet', p.body.data.company === 'Namecheap' && p.body.data.exact === true && /7 days/.test(p.body.data.studio_note) && p.body.data.asks === 'email');
+  ok('preview: the company\'s facts for the sheet', p.body.data.company === 'Namecheap' && p.body.data.exact === true && /7 days/.test(p.body.data.studio_note) && p.body.data.asks === 'email' && p.body.data.studio === 'Davis Digital Studio' && p.body.data.invite_ok === true);
+  const blank = await call(asMember(), 'POST', `/agency/domains/${S1}/access`, { company: 'Porkbun', invite: '', preview: true });
+  ok('preview: before an address is typed, the steps show where it goes, and Send waits', blank.status === 200 && blank.body.data.invite_ok === false && /username/.test(blank.body.data.invite_message) && blank.body.data.steps.some((s) => s.includes('[your Porkbun username]')) && writes.length === 0 && mails.length === 0);
   const d = await call(asMember(), 'GET', `/agency/domains/${S1}`);
   ok('panel: nothing asked yet, and the sheet\'s companies start with the one that keeps its records', d.status === 200 && d.body.data.access === null && d.body.data.access_companies[0] === 'Namecheap', JSON.stringify(d.body.data?.access_companies));
+  ok('panel: the sheet invites the studio member\'s own address unless they type another', d.body.data.access_invite === 'eric@studio.example');
   const s = await call(asMember(), 'POST', `/agency/domains/${S1}/access`, ASK);
   ok('ask: sent, once, to the client', s.status === 200 && mails.length === 1 && mails[0].to === 'owner@brightbakery.com' && mails[0].subject === 'Give Davis Digital Studio access to brightbakery.com’s records', JSON.stringify(s.body).slice(0, 200));
   ok('ask: from the studio by name, with the steps and the password promise', /Davis Digital Studio/.test(String(mails[0].from)) && mails[0].html.includes('tick only “Manage Host Records”') && mails[0].html.includes('You keep your password'));
