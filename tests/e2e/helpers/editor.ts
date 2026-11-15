@@ -93,10 +93,7 @@ export async function mountCanvas(page: Page, opts: { html?: string; settings?: 
   await page.route('**/functions/v1/presence/preview**', (route: Route) =>
     route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: opts.html ?? PAGE_HTML(SECTIONS) }));
   if (opts.beforeGoto) await opts.beforeGoto(page);
-  // the editor's tip comes up 0.4 s after opening, and on a phone it can sit over the section a
-  // test has just hovered: seen, it stays away (list item 108)
-  await page.addInitScript(() => { try { const s = JSON.parse(localStorage.getItem('dds-hints') || '{}'); localStorage.setItem('dds-hints', JSON.stringify({ ...s, 'edit-tap': 1, 'edit-doubleclick': 1 })); } catch { /* storage may be denied */ } });
-  await page.goto('/presence.html#design');
+  await page.goto('/presence.html#design');   // installApp marks the editor's tip seen (list item 108)
   // visual refresh: the builder sits under the site's top row with the sub-view
   // tab strip marking Design — the canvas itself is unchanged
   await expect(page.locator('html')).toHaveClass(/dc-edit/);   // the Design view is the full-screen Edit mode

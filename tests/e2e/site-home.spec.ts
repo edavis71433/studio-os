@@ -1,5 +1,5 @@
 import { test, expect, devices, Page, Route } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, showTips } from './helpers/app';
 
 // The Website page, Squarespace style (Nov 2026): the Overview is the site itself, with
 // one bar and one to-do line, and the menu lives in the sidebar, grouped by job.
@@ -344,6 +344,7 @@ const touchChecks = () => {
     await expect(frame.locator('#dds-dc-bar')).not.toHaveClass(/\bon\b/);   // the toolbar steps aside while you type
   });
   test('the editor’s tip says to tap, not double-click', async ({ page }) => {
+    await showTips(page);
     await touchCanvas(page);
     await expect(page.locator('.dds-hint.dds-live')).toContainText('Tap a section to select it, then tap its words');
   });
@@ -376,6 +377,7 @@ test.describe('editing with a mouse is unchanged', () => {
     await expect(bar).not.toHaveClass(/\bon\b/);
   });
   test('the editor’s tip still says double-click', async ({ page }) => {
+    await showTips(page);
     await touchCanvas(page);
     await expect(page.locator('.dds-hint.dds-live')).toContainText('Double-click the words in a section');
   });

@@ -1,5 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, showTips } from './helpers/app';
 
 // Website builder, Phase 1 (Nov 2026): the editor as one tool. Full-screen Edit mode,
 // one editor per section, one save rule, undo everywhere, one set of tabs.
@@ -499,6 +499,7 @@ test.describe('what a real site showed', () => {
   });
 
   test('double-clicking a core section says where its words live, and stays in Edit mode', async ({ page }) => {
+    await showTips(page);   // the message has to sit clear of the tip a first visit brings
     await mount(page, '/presence.html#design');
     const frame = page.frameLocator('#designPreview');
     await frame.locator('[data-dds-sid="richtext"]').waitFor();

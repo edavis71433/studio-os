@@ -1,4 +1,4 @@
-import { Page, Route } from '@playwright/test';
+import { expect, Page, Route } from '@playwright/test';
 
 // ── The hermetic app harness ─────────────────────────────────────────────────
 // Every signed-in page does two network things: (1) loads supabase-js from a CDN
@@ -10,7 +10,13 @@ import { Page, Route } from '@playwright/test';
 //
 // `session` null → signed-out. `api` overrides/extends the default fixtures,
 // keyed by the path AFTER `/presence` (e.g. '/portal/context'). Longest-prefix
-// match, so '/forms/inbox/<id>' is served by the '/forms/inbox' entry.
+// match, so a read of '/forms/inbox/<id>' is served by the '/forms/inbox' entry.
+//
+// Saves are answered only when a test planned them (builder item 212). A key with a
+// method ('POST /threads/read') answers that method there and below; a plain key
+// answers a save only to exactly its own path. Any other save is refused with a 501
+// and fails the test, naming it: until Nov 2026 every save got "ok", so a page could
+// send the wrong one and still pass.
 
 /** A tiny stand-in for the supabase-js global — getSession returns whatever the
  *  test seeded on window.__E2E_SESSION, so we never touch real auth or storage. */
@@ -183,12 +189,30 @@ function defaults(): Record<string, Json> {
     // fallback would throw mid-render and strand the "Needs you" skeleton.
     '/client/projects': { data: [] },
     '/crm/profile': { data: { profile: { business_name: 'Marlow’s Kitchen', health: 'healthy', live: true }, summary: 'Marlow’s Kitchen’s website is live.', is_studio_view: true, last_activity_at: '2026-07-07T00:00:00Z' } },
+    // the saves a page makes by itself when something is opened, answered as the server
+    // answers them (routes/project_comms.ts, routes/client_delivery.ts)
+    'POST /threads/read': { data: { ok: true } },
+    'POST /notifications/read': { data: { ok: true } },
+    'POST /client/notifications/read': { data: { ok: true } },
   };
+}
+
+const SAVES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const pathOf = (key: string) => key.slice(key.indexOf('/'));
+const under = (path: string, key: string) => path === key || path.startsWith(key + '/');
+
+/** The fixture that answers this call, if any: a key naming its method, or a plain key
+ *  (any read at or under it; a save only to exactly it). The longest path wins, and a
+ *  plain key wins a tie, since a test wrote it for that very path. */
+export function fixtureFor(keys: string[], method: string, path: string): string | undefined {
+  const plain = keys.filter((k) => k.startsWith('/') && (SAVES.has(method) ? path === k : under(path, k)));
+  const named = keys.filter((k) => k.startsWith(method + ' /') && under(path, pathOf(k)));
+  return [...plain, ...named].sort((a, b) => pathOf(b).length - pathOf(a).length)[0];
 }
 
 export interface AppOptions {
   session?: unknown | null;         // undefined → OWNER_SESSION; null → signed-out
-  api?: Record<string, Json>;       // overrides/extends fixtures by path-after-/presence
+  api?: Record<string, Json>;       // overrides/extends fixtures by path-after-/presence ('/path' or 'POST /path')
 }
 
 /** Stub Supabase, seed the session, and mock the presence API. Call BEFORE goto. */
@@ -207,6 +231,7 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
 
   // seed the session before any page script runs
   await page.addInitScript((s) => { (window as unknown as { __E2E_SESSION: unknown }).__E2E_SESSION = s; }, session);
+  await watchQuiet(page);
 
   // the shell's first-login tour auto-opens (aria-modal, intercepts clicks —
   // reliably so at phone widths) whenever 'dds-toured:<role>' is absent. No spec
@@ -216,6 +241,16 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
     for (const role of ['business_owner', 'business_staff', 'developer', 'client_reviewer', 'member']) {
       try { localStorage.setItem('dds-toured:' + role, '1'); } catch { /* storage may be denied */ }
     }
+  });
+  // The editor's one-time tip comes up 0.4 s after the editor opens and sits over the canvas,
+  // so every test starts with it seen (builder item 108). A test of the tip itself clears it
+  // with showTips(page) before it opens the page.
+  await page.addInitScript(() => {
+    try {
+      if (sessionStorage.getItem('e2e-tips')) return;
+      const seen = JSON.parse(localStorage.getItem('dds-hints') || '{}');
+      localStorage.setItem('dds-hints', JSON.stringify({ ...seen, 'edit-tap': 1, 'edit-doubleclick': 1 }));
+    } catch { /* storage may be denied */ }
   });
 
   // serve the supabase-js request with our stub (fully offline) — matches both
@@ -227,14 +262,84 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
   await page.route('**/functions/v1/presence/**', (route: Route) => {
     const url = new URL(route.request().url());
     const path = url.pathname.replace(/^.*\/functions\/v1\/presence/, '') || '/';
-    // longest-prefix match so '/forms/inbox/<id>' → '/forms/inbox'
-    const key = Object.keys(fixtures).filter((k) => path === k || path.startsWith(k + '/') || path.startsWith(k + '?'))
-      .sort((a, b) => b.length - a.length)[0];
+    const method = route.request().method();
+    const key = fixtureFor(Object.keys(fixtures), method, path);
     if (key) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixtures[key]) });
-    // a write we don't specifically fixture (mark-read, dismiss, decide) → generic OK
-    if (route.request().method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true } }) });
+    if (SAVES.has(method)) {
+      const save = `${method} ${path}`;
+      try {
+        expect.soft(save, `the pretend server was sent a save this test didn't plan for. Answer '${save}' on purpose (a fixture in installApp's api, or a page.route) and check it where it matters`).toBe('a save the test planned');
+      } catch { /* the test has already ended */ }
+      return route.fulfill({ status: 501, contentType: 'application/json', body: JSON.stringify({ error: 'unplanned_write', message: `The test didn't plan for ${save}.` }) });
+    }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {} }) });
   });
+}
+
+/** Lets a test see the editor's one-time tips: call before installApp's page opens. */
+export const showTips = (page: Page) => page.addInitScript(() => {
+  try { if (!sessionStorage.getItem('e2e-tips')) { sessionStorage.setItem('e2e-tips', '1'); localStorage.removeItem('dds-hints'); } } catch { /* storage may be denied */ }
+});
+
+// ── "Nothing left to happen" (builder item 108) ──────────────────────────────
+// A test that proves something did NOT happen used to sleep past the page's own wait (a
+// save's 1.2 s, a redraw's 350 ms) and then look. Under load the timer could land after
+// the sleep, and on a quiet machine the sleep was time thrown away. Instead, every page
+// installApp opens counts the timers it has set up to 2 seconds ahead (a toast's 2.2 s
+// and longer are left out, as are repeating timers), and the requests it has sent and
+// not finished reading. settled(page) waits until there are none for 150 ms in a row.
+// { requests: false } waits on the timers alone, for a test holding a request on purpose.
+export async function watchQuiet(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    type Quiet = { (requests?: boolean): boolean; pending: () => { timers: number[]; requests: number } };
+    const w = window as unknown as Record<string, unknown> & { __e2eQuiet?: Quiet };
+    if (w.__e2eQuiet) return;
+    const later = window.setTimeout.bind(window), stop = window.clearTimeout.bind(window), send = window.fetch.bind(window);
+    const timers = new Map<number, number>();
+    let requests = 0;
+    const doneSoon = () => { later(() => { requests--; }, 0); };   // after the caller's own .then has run
+    window.setTimeout = ((fn: TimerHandler, ms?: number, ...args: unknown[]) => {
+      const delay = Number(ms) || 0;
+      if (typeof fn !== 'function' || delay > 2000) return later(fn, ms, ...args);
+      const id: number = later((...a: unknown[]) => { timers.delete(id); (fn as (...x: unknown[]) => void)(...a); }, ms, ...args);
+      timers.set(id, delay);
+      return id;
+    }) as typeof window.setTimeout;
+    window.clearTimeout = ((id?: number) => { if (id !== undefined) timers.delete(id); stop(id); }) as typeof window.clearTimeout;
+    window.fetch = ((...a: Parameters<typeof fetch>) => {
+      requests++;
+      return send(...a).then((res) => {
+        for (const m of ['json', 'text', 'blob', 'arrayBuffer', 'formData'] as const) {
+          const own = (res[m] as () => Promise<unknown>).bind(res);
+          (res as unknown as Record<string, unknown>)[m] = () => { requests++; return own().finally(doneSoon); };
+        }
+        doneSoon();
+        return res;
+      }, (e) => { doneSoon(); throw e; });
+    }) as typeof fetch;
+    const quiet = ((withRequests = true) => timers.size === 0 && (!withRequests || requests === 0)) as Quiet;
+    quiet.pending = () => ({ timers: [...timers.values()], requests });
+    w.__e2eQuiet = quiet;
+  });
+}
+
+export async function settled(page: Page, { requests = true, timeout = 10_000 } = {}): Promise<void> {
+  const look = () => page.evaluate((r) => {
+    const q = (window as unknown as { __e2eQuiet?: ((r: boolean) => boolean) & { pending: () => unknown } }).__e2eQuiet;
+    return q ? { quiet: q(r), pending: q.pending() } : null;
+  }, requests).catch(() => ({ quiet: false, pending: 'the page was changing' }));
+  const end = Date.now() + timeout;
+  let calmSince = 0, last: unknown = null;
+  for (;;) {
+    const now = await look();
+    if (now === null) throw new Error('settled() needs the page opened after installApp or watchQuiet');
+    last = now.pending;
+    if (!now.quiet) calmSince = 0;
+    else if (!calmSince) calmSince = Date.now();
+    else if (Date.now() - calmSince >= 150) return;
+    if (Date.now() > end) throw new Error(`the page still had work pending after ${timeout} ms: ${JSON.stringify(last)}`);
+    await new Promise((r) => setTimeout(r, 25));
+  }
 }
 
 // ── request-body spy for binary uploads ──────────────────────────────────────

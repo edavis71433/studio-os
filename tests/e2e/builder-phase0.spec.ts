@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { test, expect, Page } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, showTips } from './helpers/app';
 
 // Website builder, Phase 0 (Nov 2026): what a client hit in production.
 const API = {
@@ -109,6 +109,7 @@ test.describe('a watch plan', () => {
   }));
 
   test('Design says the plan doesn’t include it, with no building tools and no dead buttons', async ({ page }) => {
+    await showTips(page);   // the editor's tip is what must stay away here
     await installApp(page, { api: WATCH }); await refuse(page);
     await page.goto('/presence.html#design');
     await expect(page.locator('#dpEmptyTitle')).toHaveText('Editing isn’t part of this plan.');
