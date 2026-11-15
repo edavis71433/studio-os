@@ -32,6 +32,7 @@ const { buildNav, landingFor } = await import(`${P}/lib/navigation.ts`);
 const { visibleTo } = await import(`${P}/lib/visibility.ts`);
 const { designAllowed, devModeAllowed, handleDevCustomizationPut } = await import(`${P}/routes/dev.ts`);
 const { STUDIO_ROLE_WORDS, can } = await import(`${P}/agency/auth.ts`);
+const { handleWebsiteTimeline, WEBSITE_CHANGE_TYPES } = await import(`${P}/routes/timeline.ts`);
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
@@ -283,6 +284,40 @@ globalThis.fetch = async (url, init = {}) => {
   ok('menu: a Designer\'s holds no business place, not even as a search entry', !JSON.stringify(nav(['view_site', 'edit', 'comment', 'design', 'publish'])).match(/today|inbox|customers|pipeline|invoices|projects|analytics|settings|domain|contacts/i));
   ok('menu: a Designer who is also on a studio\'s team still gets the Designer\'s menu', JSON.stringify(buildNav({ role: 'designer', edition: 'presence', capabilities: ['view_site', 'edit'], isAgency: true, isOperator: false }).map((s) => s.key)) === JSON.stringify(['website', 'files', 'help']));
   ok('menu: landing is the website for a Designer, whatever else they are', landingFor({ role: 'designer', edition: 'presence', capabilities: [], isAgency: true, isOperator: false }) === '/presence.html');
+}
+
+// ═══ 6b. the editor's Activity card: the website's story, never the business ═══
+// The editor reads /website-timeline for everyone, and a Designer may read it. For an owner
+// it carries enquiries (a customer's name, email and message), the business notes and the
+// studio's project messages; a Designer gets the website's part only.
+{
+  const AGENCY = uuid('e'), PROJECT = uuid('d');
+  const seed = () => reset({
+    presence_form_submissions: [   // the stub ignores order and limit: the first row is the "first enquiry" milestone
+      { id: uuid('0'), site_id: SITE, spam: false, form_kind: 'contact', name: 'Ann Earlier', email: 'ann@customer.example', message: 'Are you open Sundays?', created_at: '2026-10-01T10:00:00Z' },
+      { id: uuid('7'), site_id: SITE, spam: false, form_kind: 'contact', name: 'Jo Customer', email: 'jo@customer.example', message: 'Can you quote my kitchen?', created_at: '2026-11-10T10:00:00Z' },
+    ],
+    presence_moments: [{ id: uuid('8'), site_id: SITE, status: 'active', moment_key: 'busy', headline: 'Three enquiries this week', summary: 'Busier than usual', created_at: '2026-11-10T09:00:00Z' }],
+    presence_change_events: [
+      { id: uuid('b'), site_id: SITE, entity_type: 'identity', action: 'update', summary: 'Updated the opening hours', actor_kind: 'client', created_at: '2026-11-09T10:00:00Z' },
+      { id: uuid('c'), site_id: SITE, entity_type: 'contact', action: 'create', summary: 'Asked jo@customer.example to connect with you', actor_kind: 'client', created_at: '2026-11-09T11:00:00Z' },
+    ],
+    presence_service_links: [{ customer_client_id: CLIENT, status: 'active', project_id: PROJECT, agency_site_id: AGENCY }],
+    presence_project_events: [{ id: uuid('f'), site_id: AGENCY, project_id: PROJECT, client_visible: true, kind: 'message', actor_kind: 'staff', detail: { title: 'Your invoice for October is attached' }, created_at: '2026-11-11T10:00:00Z' }],
+  });
+  const BUSINESS_WORDS = ['Jo Customer', 'jo@customer.example', 'kitchen', 'Three enquiries', 'invoice for October', 'Your first website enquiry'];
+  const story = async (opts) => { seed(); const res = await quiet(() => handleWebsiteTimeline(SITE_ROW, cors, opts))(); return { status: res.status, text: JSON.stringify(await res.json()) }; };
+  const owner = await story(undefined);
+  const ownerSaw = BUSINESS_WORDS.filter((w) => owner.text.includes(w));
+  ok('timeline: an owner\'s carries the enquiry, the note, the studio\'s message and the contact line (so the checks below can fail)', owner.status === 200 && ['Jo Customer', 'jo@customer.example', 'Three enquiries', 'invoice for October', 'Asked jo@customer.example'].every((w) => owner.text.includes(w)), ownerSaw.join(', '));
+  const lee = await story({ websiteOnly: true });
+  const leaked = [...BUSINESS_WORDS, 'Asked jo@customer.example'].filter((w) => lee.text.includes(w));
+  ok('timeline: a Designer\'s holds no customer, message, note or contact line', lee.status === 200 && leaked.length === 0, leaked.join(', '));
+  ok('timeline: a Designer\'s still tells the website\'s story', lee.text.includes('Updated the opening hours'));
+  const asked = ['presence_form_submissions', 'presence_moments', 'presence_service_links', 'presence_project_events'].filter((t) => reads.includes(t));
+  ok('timeline: for a Designer the enquiries, notes and the studio\'s project are never read', asked.length === 0, asked.join(', '));
+  ok('timeline: the change lines a Designer gets are website work only', !WEBSITE_CHANGE_TYPES.some((t) => ['contact', 'deal', 'client', 'internal_note'].includes(t)) && ['identity', 'post', 'media', 'site', 'domain'].every((t) => WEBSITE_CHANGE_TYPES.includes(t)));
+  ok('index: the route answers a Designer with the website\'s part, from the seat the boundary read', idx.includes("if (route === '/website-timeline' && method === 'GET') return handleWebsiteTimeline(site, cors, { websiteOnly: siteRole === 'designer' });"));
 }
 
 // ═══ 7. invites and role changes carry the switch; the email says the role ═══

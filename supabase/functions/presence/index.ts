@@ -497,15 +497,16 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //     reach ONLY the shared feed + the approvals put to them. Everything else in
   //     the client gate is refused — the simplified portal is a real boundary, not
   //     a UI facade. Fast-path: sites with no extra members skip this entirely.
-  {
-    const siteRole = await resolveSiteRoleCached(principal, jwt, site.id);
-    if (siteRole === 'client_reviewer' && !reviewerAllowed(route, method)) {
-      return json({ error: 'forbidden', message: 'That lives in your studio’s full workspace — your client view shows what they’ve chosen to share.' }, 403, cors);
-    }
-    // builder item 220: a Designer reaches the website and nothing else, reads included
-    if (siteRole === 'designer' && !designerAllowed(route, method)) {
-      return json({ error: 'forbidden', role: 'designer', message: 'That isn’t part of a Designer’s role. Designers work on the website; customers, messages and money stay with the owner and the studio.' }, 403, cors);
-    }
+  //     siteRole stays in reach below: a route a Designer may read can still hold
+  //     some of the business (the website timeline's enquiries), and answers them
+  //     with the website's part only.
+  const siteRole = await resolveSiteRoleCached(principal, jwt, site.id);
+  if (siteRole === 'client_reviewer' && !reviewerAllowed(route, method)) {
+    return json({ error: 'forbidden', message: 'That lives in your studio’s full workspace — your client view shows what they’ve chosen to share.' }, 403, cors);
+  }
+  // builder item 220: a Designer reaches the website and nothing else, reads included
+  if (siteRole === 'designer' && !designerAllowed(route, method)) {
+    return json({ error: 'forbidden', role: 'designer', message: 'That isn’t part of a Designer’s role. Designers work on the website; customers, messages and money stay with the owner and the studio.' }, 403, cors);
   }
 
   // 4c. A member's write gets what lib/site_roles.ts gives their role, on every route.
@@ -730,7 +731,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/health' && method === 'GET') return handleHealth(site, cors);
   if (route === '/changes' && method === 'GET') return handleChanges(site, cors);
   if (route === '/content-tree' && method === 'GET') return handleContentTree(site, cors);
-  if (route === '/website-timeline' && method === 'GET') return handleWebsiteTimeline(site, cors);
+  if (route === '/website-timeline' && method === 'GET') return handleWebsiteTimeline(site, cors, { websiteOnly: siteRole === 'designer' });   // builder item 220
   if (route === '/website-health' && method === 'GET') return handleWebsiteHealth(site, cors);
   if (route === '/website-health/pdf' && method === 'GET') return handleWebsiteHealthPdf(site, cors);   // item 183
   if (route === '/business-insights' && method === 'GET') return handleBusinessInsights(site, cors);
