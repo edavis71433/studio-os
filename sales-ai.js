@@ -16,7 +16,9 @@
   const SPARK = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="currentColor"><path d="M12 2.5l1.9 5.3 5.3 1.9-5.3 1.9L12 16.9l-1.9-5.3-5.3-1.9 5.3-1.9z"/><path d="M19 14.5l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z"/></svg>';
   const CLOCK = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>';
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const SETTINGS = '/settings.html#goal';
+  // the studio's own Settings, even from a page inside a client: an empty client= and data-noscope
+  // keep the shell from carrying the client onto it (a client's Settings has no Goal and AI help)
+  const SETTINGS = '/settings.html?client=#goal';
   let styled = false;
   function style() {
     if (styled) return; styled = true;
@@ -49,7 +51,7 @@
   // what the server said, as a band: off (with Open Settings for the owner), the day's limit, couldn't
   function refusal(r, retry) {
     const b = (r && r.body) || {}, msg = b.message || (r && r.status === 0 ? 'You look offline. Try again when you’re back online.' : 'Couldn’t do that just now. Try again in a moment.');
-    if (b.error === 'ai_off') return { cls: 'warn', icon: SPARK, say: msg, acts: b.can_switch ? `<a href="${SETTINGS}">Open Settings</a>` : '' };
+    if (b.error === 'ai_off') return { cls: 'warn', icon: SPARK, say: msg, acts: b.can_switch ? `<a href="${SETTINGS}" data-noscope="1">Open Settings</a>` : '' };
     if (b.error === 'day_limit' || b.error === 'resting' || b.error === 'not_ready') return { cls: 'warn', icon: SPARK, say: msg, acts: '' };
     return { cls: 'bad', icon: '', say: msg, acts: retry ? '<button type="button" data-ai="retry">Try again</button>' : '' };
   }
