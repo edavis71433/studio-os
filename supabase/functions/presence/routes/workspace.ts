@@ -17,7 +17,8 @@ import { capabilitiesOf, contentWriteNeeds, memberWriteNeeds, siteCan, seatCan, 
 import { leadIdOfNoticePeriod } from '../lib/commercial.ts';
 import type { SiteRole } from '../lib/site_roles.ts';
 import { buildNav, landingFor, normalizeHidden } from '../lib/navigation.ts';
-import { readReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { runAfterResponse } from '../lib/after_response.ts';
 import { editionFromPlan, editionFromSite, featuresOf, editionFlags, featureDelta, EDITION_DEFS, type EditionKey } from '../commerce/editions.ts';
 import { nextPlanUp } from '../commerce/catalog.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
@@ -203,6 +204,8 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   const isManagedClient = !!(customerLinks && customerLinks.length > 0);
   // builder list item 59: a managed client's pages carry their studio's name and logo (routes/studio_brand.ts)
   const studioSiteId = isManagedClient ? String(customerLinks![0]?.agency_site_id || '') : '';
+  // builder list item 236: the client opened their portal (at most once an hour, after the answer)
+  if (isManagedClient && site.client_id) runAfterResponse(import('../lib/portal_people.ts').then((m) => m.stampPortalSeen(String(site.client_id))));
   // builder list item 179: and the client's own first name, from the studio's record
   // of them, so Home greets the person and not their sign-in. Read beside the brand.
   const [studio, clientFirstName, portalSettings] = await Promise.all([
@@ -339,6 +342,36 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   } }, 200, cors);
 }
 
+// ── Builder list item 232 (Nov 2026): a client's portal as they see it, for their studio
+//    (client.html?preview=, drilled into the client with x-dds-preview). Only what the portal
+//    reads, built as the client's own context would be; nothing about the studio member, no
+//    bell, and nothing stamped as seen. The first preview ticks item 236's set-up list. ──
+export async function handlePortalPreviewContext(site: SiteRow, scope: { site_id: string; name: string }, principal: Principal, cors: Record<string, string>) {
+  const rows = (q: { ok?: boolean; json?: unknown }) => (q && q.ok !== false && Array.isArray(q.json) ? q.json as any[] : []);
+  const [links, who] = site.client_id ? await Promise.all([
+    svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`).then(rows).catch(() => []),
+    svc(`clients?id=eq.${site.client_id}&select=email,contact_email&limit=1`).then(rows).catch(() => []),
+  ]) : [[], []];
+  const studioSiteId = String(links[0]?.agency_site_id || '');
+  if (!studioSiteId) return json({ error: 'not_a_client', message: 'This site has no client portal: it isn’t a studio’s client.' }, 409, cors);
+  const { readPortalSettings, resolveOff, markPreviewed, normalizePortal } = await import('../lib/portal_settings.ts');
+  const [studio, clientFirstName, ps] = await Promise.all([
+    import('./studio_brand.ts').then((m) => m.studioBrandOf(studioSiteId)).catch(() => null),
+    clientGreetingName(studioSiteId, String(site.client_id), site.id).catch(() => ''),
+    readPortalSettings(studioSiteId),
+  ]);
+  if (!ps.previewed_at) runAfterResponse(updateReservedJson(studioSiteId, RESERVED_NAMES.portalSettings, (cur) => markPreviewed(normalizePortal(cur)), principal.email || 'studio').catch(() => null));
+  return json({ data: {
+    site_role: 'business_owner', capabilities: capabilitiesOf('business_owner'),
+    studio, client_first_name: clientFirstName || null,
+    portal: { off: resolveOff(ps, site.id), welcome: ps.welcome, home_off: ps.home_off },
+    edition: site.edition, site_live: site.status === 'live' || !!site.last_published_at,
+    is_agency: false, is_operator: false, is_managed_client: true, sees_full_workspace: siteCan('business_owner', 'view_all'), is_client_portal: false,
+    landing: '/client.html', scope: null, attention_count: 0, attention_stale: false, studio_requests: [], businesses: [], business: null, nav: [],
+    preview: { site_id: site.id, name: scope.name, email: String(who[0]?.email || who[0]?.contact_email || '') },
+  } }, 200, cors);
+}
+
 // Phase FLOW: where each notice kind sends the owner when tapped in the bell —
 // straight to the page that resolves it, not a generic landing (one fewer hop).
 const NOTICE_HREF: Record<string, string> = {
@@ -404,6 +437,11 @@ export const noticeHrefFor = (n: { kind: string; period?: string | null }): stri
   if (billing && ((n.kind === 'deal_signed' && billing[1] === 'estimate') || (n.kind === 'deal_followup' && (billing[1] === 'estdeclined' || billing[1] === 'recurpause')) || (n.kind === 'invoice_upcoming' && billing[1] === 'recurnext'))) {
     return `/pipeline.html?deal=${billing[2]}&dtab=billing`;
   }
+  // sales item 128: a retainer's lines (approved, payment didn't go through, ended,
+  // approved twice, cancelled by the client) all start retainer:<deal id>:, so they
+  // open that deal's Billing, where the retainer and its charges are
+  const retainer = (n.kind === 'invoice_paid' || n.kind === 'retainer_status') ? /^retainer:([0-9a-f-]{36}):/i.exec(String(n.period || '')) : null;
+  if (retainer) return `/pipeline.html?deal=${retainer[1]}&dtab=billing`;
   return base;
 };
 

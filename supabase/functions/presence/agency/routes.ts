@@ -30,7 +30,7 @@ import { handleUsage } from './usage.ts';
 import { handleAgencyChangeLog } from '../routes/change_log.ts';
 import { handleDoNext } from './do_next.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
-import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJson, readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { readNotify, normalizeNotify, prefFor, quietSites, applyNotifyChange, pickFlags, isSiteId, foldNews } from '../lib/site_notify.ts';
 import { normalizePortal, pickStudioChange, applyStudioChange, pickClientChange, applyClientChange, resolveOff, forgetPortalOff, isSiteId as isPortalSiteId, PORTAL_PARTS, PART_WORDS, HOME_CARDS, CARD_WORDS, WELCOME_MAX } from '../lib/portal_settings.ts';
 import { sendInviteLink } from '../lib/workspace.ts';
@@ -191,6 +191,14 @@ export function forgetAgencyReads(agencyId: string): void {
   for (const k of [...needsRuns.keys()]) if (k.startsWith(agencyId + ':')) needsRuns.delete(k);
 }
 
+// builder list items 236 and 232: the portal's address (the one the invite email carries), the
+// clients a studio looks after in name order, and when each last got a sign-in link (two minutes apart)
+const portalAddress = (studioSiteId: string) => `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/portal.html?studio=${studioSiteId}`;
+const activeClientsOf = (input: { links: Array<{ site_id: string; status: string }>; clientNames: Record<string, string> }) => input.links.filter((l) => l.status === 'active')
+  .map((l) => ({ site_id: l.site_id, name: input.clientNames[l.site_id] || 'A client' }))
+  .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
+const SIGN_IN_LINK_SENT = new Map<string, number>();
+
 export async function handleAgency(req: Request, route: string, method: string, member: AgencyMember, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (method !== 'GET') forgetAgencyReads(member.agency_id);
   try {
@@ -282,9 +290,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     catch { return json({ error: 'read_failed', message: 'Your portal choices couldn’t load just now.' }, 502, cors); }   // never switches that lie
     const ps = normalizePortal(stored);
     const input = await sharedGather(member.agency_id, now);
-    const clients = input.links.filter((l) => l.status === 'active')
-      .map((l) => ({ site_id: l.site_id, name: input.clientNames[l.site_id] || 'A client', choices: ps.clients[l.site_id] || {} }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
+    const clients = activeClientsOf(input).map((c) => ({ ...c, choices: ps.clients[c.site_id] || {} }));
     return json({ data: { off: ps.off, welcome: ps.welcome, home_off: ps.home_off, clients,
       parts: PORTAL_PARTS.map((k) => ({ key: k, label: PART_WORDS[k][0], sub: PART_WORDS[k][1] })),
       cards: HOME_CARDS.map((k) => ({ key: k, label: CARD_WORDS[k][0], sub: CARD_WORDS[k][1] })),
@@ -316,6 +322,67 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       if (!saved) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
       forgetPortalOff();
       return json({ data: { site_id: siteId, choices: saved.clients[siteId] || {}, off: resolveOff(saved, siteId) } }, 200, cors);
+    }
+  }
+
+  // ── builder list items 236 and 232: the studio's Client portal page (the portal's
+  //    address, where its clients stand, the set-up list) and one client's portal card
+  //    (when they were invited and last in, Send a sign-in link). ──
+  if (route === '/agency/portal/overview' && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+    if (!own) return json({ error: 'no_studio_site', message: 'The portal is kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+    const [input, stored, brand] = await Promise.all([
+      sharedGather(member.agency_id, now),
+      readReservedJson(own.id, RESERVED_NAMES.portalSettings).catch(() => null),
+      import('../routes/studio_brand.ts').then((m) => m.studioBrandOf(own.id)).catch(() => null),
+    ]);
+    const { portalPeople, portalCounts, setupList } = await import('../lib/portal_people.ts');
+    const nowMs = Date.parse(now);
+    const people = await portalPeople(activeClientsOf(input), nowMs);
+    const ps = normalizePortal(stored);
+    return json({ data: {
+      address: portalAddress(own.id),
+      counts: portalCounts(people, nowMs),
+      clients: people.map((p) => ({ site_id: p.site_id, name: p.name, state: p.state, invited_at: p.invited_at, seen_at: p.seen_at })),
+      setup: setupList({ hasLogo: !!(brand && !brand.is_default && brand.logo_url), partsAt: ps.parts_at, welcome: ps.welcome, previewedAt: ps.previewed_at, invitedAny: people.some((p) => p.state !== 'none') }),
+      can_edit: can(member.role, 'manage_clients'),
+    } }, 200, cors);
+  }
+  {
+    const pp = route.match(/^\/agency\/portal\/people\/([^/]+)$/);
+    if (pp && method === 'GET') {
+      if (!can(member.role, 'read')) return forbid(cors);
+      const siteId = decodeURIComponent(pp[1]).toLowerCase();
+      if (!isPortalSiteId(siteId)) return json({ error: 'bad_request', message: 'Say which client.' }, 400, cors);
+      const input = await sharedGather(member.agency_id, now);
+      const mine = activeClientsOf(input).find((c) => c.site_id === siteId);
+      if (!mine) return json({ error: 'not_found', message: 'That isn’t one of your clients.' }, 404, cors);
+      const { portalPeople } = await import('../lib/portal_people.ts');
+      const [p] = await portalPeople([mine], Date.parse(now));
+      return json({ data: { ...p, can_edit: can(member.role, 'manage_clients') } }, 200, cors);
+    }
+    const sm = route.match(/^\/agency\/portal\/clients\/([^/]+)\/sign-in-link$/);
+    if (sm && method === 'POST') {
+      if (!can(member.role, 'manage_clients')) return forbid(cors);
+      const siteId = decodeURIComponent(sm[1]).toLowerCase();
+      if (!isPortalSiteId(siteId)) return json({ error: 'bad_request', message: 'Say which client.' }, 400, cors);
+      const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+      if (!own) return json({ error: 'no_studio_site', message: 'Sign-in links go out from your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+      const input = await sharedGather(member.agency_id, now);
+      const mine = activeClientsOf(input).find((c) => c.site_id === siteId);
+      if (!mine) return json({ error: 'not_found', message: 'That isn’t one of your clients.' }, 404, cors);
+      const last = SIGN_IN_LINK_SENT.get(siteId);
+      if (last && Date.parse(now) - last < 2 * 60_000) return json({ error: 'too_soon', message: 'A sign-in link went to them a moment ago. Give it a couple of minutes.' }, 429, cors);
+      const { portalPeople } = await import('../lib/portal_people.ts');
+      const [p] = await portalPeople([mine], Date.parse(now));
+      if (!p || p.state === 'none' || !p.email) return json({ error: 'no_login', message: 'They don’t have a sign-in yet. Invite them from their site on Sites first.' }, 409, cors);
+      const { sendCustomerInvite } = await import('../routes/sales.ts');
+      const sent = await sendCustomerInvite(own.id, p.email, false).catch(() => false);
+      if (!sent) return json({ error: 'send_failed', message: 'The email didn’t go out. Try again in a moment.' }, 502, cors);
+      SIGN_IN_LINK_SENT.set(siteId, Date.parse(now));
+      if (SIGN_IN_LINK_SENT.size > 2000) SIGN_IN_LINK_SENT.clear();
+      return json({ data: { site_id: siteId, sent: true, email: p.email } }, 200, cors);
     }
   }
 

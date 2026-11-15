@@ -250,6 +250,12 @@ export function buildNav(c: NavContext): NavSection[] {
     sections.push({ key: 'customers', label: 'Customers', items: customers });
   }
 
+  // Builder list item 236 (Nov 2026): the client portal's own page, right under Customers: its
+  // address to share, who has joined, and a short list to set it up. Studio level only.
+  if (studioLevel && f.hasRelationship && f.hasClientPortal) sections.push({ key: 'client_portal', label: 'Client portal', items: [
+    { key: 'client_portal', label: 'Client portal', href: '/client-portal.html', desc: 'Your clients’ portal: its address to share, who has joined, what they see, and a short list to set it up.' },
+  ] });
+
   // Pipeline — the sales deals, as its own top-level outcome (Phase 1 overhaul:
   // it was a sub-item under Customers, which hid where the money lived).
   if (f.hasRelationship) sections.push({ key: 'pipeline', label: 'Pipeline', items: [

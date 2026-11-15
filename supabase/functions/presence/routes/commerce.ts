@@ -608,7 +608,10 @@ async function handleBillingSync(req: Request, cors: Record<string, string>): Pr
     // no-op otherwise, so a SaaS renewal invoice can never touch entitlement.
     if (isServiceRetainerMeta(obj.metadata) || type.startsWith('invoice.')) {
       const r = await applyRetainerSync(type, obj);
-      return json({ data: { rail: 'service_retainer', ...r } }, 200, cors);
+      // sales item 128: a retainer or a charge that didn't save answers 502, so the
+      // webhook answers Stripe 500 and Stripe sends the event again. It used to be a
+      // 200 whatever happened, and the change was simply lost.
+      return json({ data: { rail: 'service_retainer', ...r } }, r.retry ? 502 : 200, cors);
     }
 
     // First payment landed → provision the workspace.

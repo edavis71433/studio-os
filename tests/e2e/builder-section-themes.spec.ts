@@ -67,7 +67,7 @@ test.describe('a section’s colours and layouts (builder items 49 and 118)', ()
     expect(await bg(theme(page, 'Dark').locator('.ins-theme-pic'))).toBe('rgb(26, 22, 34)');
     expect(await bg(theme(page, 'Accent').locator('.ins-theme-pic'))).toBe('rgb(110, 70, 48)');   // the site's --accent-dark
     expect(await bg(theme(page, 'Plain').locator('.ins-theme-pic'))).toBe('rgb(251, 250, 247)');  // its --paper
-    expect(await theme(page, 'Dark').locator('.ins-theme-pic b').evaluate((n) => getComputedStyle(n).backgroundColor)).toBe('rgb(138, 90, 60)');   // buttons in its accent
+    expect(await theme(page, 'Dark').locator('.ins-theme-pic b').evaluate((n) => getComputedStyle(n).backgroundColor)).toBe('rgb(110, 70, 48)');   // buttons in its darker accent, as a dark section fills them
     expect(await page.locator('#settingsPanel .ins-group').allTextContents()).toEqual(['Colours · from your site', 'Type']);
     // a pick moves the theme and saves with the section
     await theme(page, 'Tinted').click();
@@ -81,6 +81,7 @@ test.describe('a section’s colours and layouts (builder items 49 and 118)', ()
     await mount(page, BLOCKS, {}, HTML.replace('--accent-dark:#6e4630;', '--accent-dark:#6e4630;--accent-band:#115e59;'));
     await openSection(page, 1, 'style');
     expect(await bg(theme(page, 'Accent').locator('.ins-theme-pic'))).toBe('rgb(17, 94, 89)');   // --accent-band, as the section draws
+    expect(await theme(page, 'Dark').locator('.ins-theme-pic b').evaluate((n) => getComputedStyle(n).backgroundColor)).toBe('rgb(17, 94, 89)');   // and a dark section's buttons
   });
 
   test('a section with a background colour of its own shows no theme picked and says how to use one', async ({ page }) => {

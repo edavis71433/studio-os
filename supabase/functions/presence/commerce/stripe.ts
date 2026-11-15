@@ -8,6 +8,11 @@
 // When STRIPE_SECRET is absent the caller gets a clear "billing not configured"
 // signal (never a crash, never a fake success) — the route turns that into a
 // calm 503 so a mis-provisioned environment is obvious, not silently broken.
+//
+// Every call names the Stripe version this code reads (sales item 128): without
+// it a call gets the account's default of the day, and one press of "Upgrade" in
+// Stripe's Workbench would change the shape of every answer with nobody told.
+import { STRIPE_API_VERSION } from './stripe_shape.ts';
 
 const STRIPE_SECRET = Deno.env.get('STRIPE_SECRET') || '';
 const SITE_URL = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
@@ -16,7 +21,7 @@ export function stripeConfigured(): boolean { return !!STRIPE_SECRET; }
 export function siteUrl(): string { return SITE_URL; }
 
 async function stripeReq(path: string, params: Record<string, string>, idem?: string, method: 'POST' | 'GET' | 'DELETE' = 'POST'): Promise<any> {
-  const h: Record<string, string> = { Authorization: `Bearer ${STRIPE_SECRET}`, 'Content-Type': 'application/x-www-form-urlencoded' };
+  const h: Record<string, string> = { Authorization: `Bearer ${STRIPE_SECRET}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Stripe-Version': STRIPE_API_VERSION };
   if (idem) h['Idempotency-Key'] = idem;
   const qs = (method === 'GET' || method === 'DELETE') && Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
   const url = `https://api.stripe.com/v1/${path}${qs}`;
