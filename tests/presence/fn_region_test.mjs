@@ -9,11 +9,11 @@
 //   • every signed-in call asks: the server checks who is asking against the database
 //     before anything else (shared/auth.ts resolvePrincipal), so it always gains;
 //   • a call with no sign-in asks only where its answer reads the database several times
-//     (an approval, a signature, the sign-up, the studio's name on the sign-in page). A
-//     fixed answer (the plans, the push key) or a single read (welcome's checks) doesn't:
-//     measured Nov 15 from the east coast, the plans took 0.08–0.10 s as they were and
-//     0.15 s asking. Those calls send our key, so they ask the browser's permission first
-//     (a preflight) either way, and the header never adds that round trip;
+//     (an approval, a signature, the studio's name on the sign-in page). A fixed answer
+//     like the push key doesn't: measured Nov 15 from the east coast, the sign-up plans
+//     (also read from code) took 0.08–0.10 s as they were and 0.15 s asking. Those calls
+//     send our key, so they ask the browser's permission first (a preflight) either way,
+//     and the header never adds that round trip;
 //   • one value everywhere, and production only where a page can point at staging
 //     (staging's server doesn't allow the header);
 //   • the header, never the address setting (?forceFunctionRegion=): the browser specs'
@@ -37,6 +37,9 @@ const src = Object.fromEntries(files.map((f) => [f, read(f)]));
 // The old marketing pages' lead forms send our key to clever-api, one write each, from the
 // public website rather than the studio; three are retired behind 301s (_redirects).
 const MARKETING = new Set(['contact.html', 'project-survey.html', 'local-visibility.html', 'pricing-estimator.html', 'roi-calculator.html']);
+// Self sign-up is closed (builder item 199 takes these two pages away), so they're left as
+// they were and not scanned, whether or not they're still here.
+const CLOSING = new Set(['signup.html', 'welcome.html']);
 // Public link pages whose calls send no key, so the browser sends them without asking first.
 // The header would add that round trip for every visitor, and their visitors are mostly the
 // businesses' own customers on the west coast. (The booking page's own routes, and a client
@@ -65,19 +68,17 @@ function keyedLiterals(s) {
 const asks = (lit) => /(['"])x-region\1\s*:/.test(lit) || lit.includes('...REGION_HEADER');
 const signedIn = (lit) => /x-dds-user-jwt/.test(lit);
 
-// The calls with no sign-in that don't ask, each a fixed answer or a single read. Any other
-// call that sends our key without a sign-in must ask, so a new one gets a decision.
+// The calls with no sign-in that don't ask, each a fixed answer. Any other call that sends
+// our key without a sign-in must ask, so a new one gets a decision.
 const LEFT = [
-  ['shell.js', "{ 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY }"],                              // GET /push/key: an env value
-  ['signup.html', '{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon }'],                                       // GET /commerce/plans: from code
-  ['welcome.html', "{ apikey: ENV.anon, Authorization: \"Bearer \" + ENV.anon, 'Content-Type':'application/json' }"], // verify + checkout-status: one read each
+  ['shell.js', "{ 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY }"],   // GET /push/key: an env value
 ];
 
 // ── 1. every signed-in call asks for Oregon; the others where they read enough ─
 {
   let checked = 0; const missing = [], left = [];
   for (const f of files) {
-    if (MARKETING.has(f)) continue;
+    if (MARKETING.has(f) || CLOSING.has(f)) continue;
     for (const lit of keyedLiterals(src[f])) {
       checked++;
       if (asks(lit)) continue;
@@ -87,19 +88,17 @@ const LEFT = [
   ok('the scan finds the studio\'s calls (the shell, the pages, the sign-in doors)', checked >= 50, String(checked));
   ok('every signed-in call asks for Oregon (x-region)', missing.length === 0, missing.map((m) => m.slice(0, 160)).join('\n      '));
   const want = LEFT.map(([f, lit]) => `${f}: ${lit}`);
-  ok('the calls with no sign-in that don\'t ask are exactly the fixed answers and single reads',
+  ok('the only call with no sign-in that doesn\'t ask is the fixed answer (the push key)',
     left.length === want.length && want.every((w) => left.includes(w)), left.filter((l) => !want.includes(l)).map((l) => l.slice(0, 160)).join('\n      '));
   for (const f of ['shell.js', 'today.html', 'sites.html', 'pipeline.html', 'crm.html', 'presence.html', 'client.html', 'studio.html', 'portal.html', 'set-password.html']) {
     const signed = keyedLiterals(src[f]).filter(signedIn);
     ok(`${f} asks on each of its signed-in calls`, signed.length > 0 && signed.every(asks));
   }
-  ok('with no sign-in: an approval, a signature, the sign-up and the sign-in page\'s studio name ask',
+  ok('with no sign-in: an approval, a signature and the sign-in page\'s studio name ask',
     keyedLiterals(src['approve.html']).every(asks) && keyedLiterals(src['sign.html']).every(asks)
-    && /fetch\(FN \+ "\/commerce\/signup", \{ method:'POST', headers:\{[^}]*\.\.\.REGION_HEADER \}/.test(src['signup.html'])
     && src['portal.html'].includes("fetch(FN + '/presence/public/studio/' + id + '/brand', { headers: { apikey: SUPABASE_KEY, 'x-region': FN_REGION } })"));
-  ok('the push key and the plans are asked for as before', src['shell.js'].includes("fetch(FN + '/push/key', { headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY } })")
-    && src['signup.html'].includes('fetch(FN + "/commerce/plans", { headers:{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon } })') && !src['welcome.html'].includes('x-region'));
-  ok('the marketing lead forms are left as they were', [...MARKETING].every((f) => !src[f] || !src[f].includes('x-region')));
+  ok('the push key is asked for as before', src['shell.js'].includes("fetch(FN + '/push/key', { headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY } })"));
+  ok('the marketing lead forms and the closing sign-up pages are left as they were', [...MARKETING, ...CLOSING].every((f) => !src[f] || !src[f].includes('x-region')));
 }
 
 // ── 2. one value, and production only where a page can point at staging ──────
@@ -108,7 +107,7 @@ const LEFT = [
   ok('every page names the same region: us-west-2, the database\'s', defs.length >= 35 && defs.every((d) => d.endsWith('=us-west-2')), defs.filter((d) => !d.endsWith('=us-west-2')).join(', '));
   const values = files.flatMap((f) => [...src[f].matchAll(/(['"])x-region\1\s*:\s*([^,}\s]+)/g)].map((m) => `${f}: ${m[2]}`));
   ok('every header takes its value from that one constant', values.length > 0 && values.every((v) => /: (FN_REGION|CONFIG\.FN_REGION|"us-west-2")$/.test(v)), values.filter((v) => !/: (FN_REGION|CONFIG\.FN_REGION|"us-west-2")$/.test(v)).join(', '));
-  ok('the pages that can point at staging are known', ['presence.html', 'signup.html', 'welcome.html', 'booking.html', 'draft.html', 'join.html', 'review.html', 'spam.html', 'unsubscribe.html'].every((f) => ENV_SWITCH.includes(f)), ENV_SWITCH.join(', '));
+  ok('the pages that can point at staging are known', ['presence.html', 'booking.html', 'draft.html', 'join.html', 'review.html', 'spam.html', 'unsubscribe.html'].every((f) => ENV_SWITCH.includes(f)), ENV_SWITCH.join(', '));
   for (const f of ENV_SWITCH.filter((f) => src[f].includes('x-region'))) {
     const s = src[f];
     ok(`${f}: only production's calls carry it (staging's server doesn't allow it)`,
