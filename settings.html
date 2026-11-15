@@ -2044,7 +2044,11 @@ function paintStageNotes(d) {
         : `<span class="sn-prev">${esc(text.split('\n')[0] || '')}</span><button type="button" class="linkbtn" data-sn-edit="${k}" aria-label="Edit the note for ${esc(label)}">Edit</button></div>`)
       + '</div>';
   }).join('');
-  list.querySelectorAll('[data-sn-edit]').forEach((b) => b.addEventListener('click', () => { SNOTE_OPEN = b.getAttribute('data-sn-edit'); SNOTE_SKIP = ''; paintStageNotes(); const t = $('snt-' + SNOTE_OPEN); if (t) t.focus(); }));
+  list.querySelectorAll('[data-sn-edit]').forEach((b) => b.addEventListener('click', () => {
+    const was = SNOTE_OPEN && $('snt-' + SNOTE_OPEN);
+    if (was && was.getAttribute('aria-invalid') === 'true') { was.focus(); return; }   // a note that didn't save stays open, words and Try again kept, until it saves or Escape puts it away
+    SNOTE_OPEN = b.getAttribute('data-sn-edit'); SNOTE_SKIP = ''; paintStageNotes(); const t = $('snt-' + SNOTE_OPEN); if (t) t.focus();
+  }));
   list.querySelectorAll('textarea[id^="snt-"]').forEach((t) => {
     const k = t.id.slice(4);
     t.addEventListener('change', () => saveStageNote(k, t.value));
