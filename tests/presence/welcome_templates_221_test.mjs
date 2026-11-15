@@ -136,6 +136,9 @@ const seedStudio = () => db.reset({
   ok('…stored for the studio, words and fill-ins as written, no photo', row.agency_id === AG && row.body === 'Hi {{first_name}},\n\nThe patio is open.' && row.created_by === 'sam@bright.example');
   const fromOwn = await studio('POST', '/agency/update-templates', { site_id: STUDIO_SITE, name: 'Holiday hours', subject: 'Our holiday hours', body: 'We’re closed on the 25th.' });
   ok('the studio’s own site can keep one too', fromOwn.status === 201 && fromOwn.body.data.from_name === 'Bright Studio');
+  const unnamed = await studio('POST', '/agency/update-templates', { name: 'Opening hours', subject: 'Our hours', body: 'Open late on Fridays.' });
+  ok('…and a page that names no site keeps it from the studio’s own', unnamed.status === 201 && unnamed.body.data.from_site === STUDIO_SITE);
+  db.tables.presence_update_templates = db.tables.presence_update_templates.filter((t) => t.id !== unnamed.body.data.id);
   const theirs = await studio('POST', '/agency/update-templates', { site_id: OTHER_SITE, name: 'Not ours', subject: 'x', body: 'y' });
   ok('another studio’s client is not one of yours (404), and nothing is kept', theirs.status === 404 && db.tables.presence_update_templates.length === 2);
   ok('no name, no subject, or only a photo: refused, each in words', (await studio('POST', '/agency/update-templates', { site_id: CLIENT_SITE, name: ' ', subject: 's', body: 'b' })).body.error === 'bad_name'

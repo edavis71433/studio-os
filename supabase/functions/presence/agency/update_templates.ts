@@ -48,7 +48,8 @@ export async function handleUpdateTemplates(req: Request, route: string, method:
   if (route === '/agency/update-templates' && method === 'POST') {
     if (!canManage) return forbid(cors);
     const b = await body();
-    const siteId = String(b.site_id || '').toLowerCase();
+    // the page names the site it is on; with none, the studio's own (a site with no business details yet)
+    const siteId = String(b.site_id || '').toLowerCase() || String((await deps.ownSite().catch(() => null))?.id || '').toLowerCase();
     const name = cleanTemplateName(b.name);
     const kept = templateFromUpdate({ subject: b.subject, body: b.body });
     if (!UUID_RE.test(siteId)) return json({ error: 'bad_request', message: 'Say which client’s update this is.' }, 400, cors);

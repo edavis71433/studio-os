@@ -96,6 +96,9 @@ const CONTROLS = [
   ['PUT /report/monthly', 'settings.html', `api('/report/monthly', 'PUT', patch)`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],   // builder list item 58
   ['POST /report/monthly/preview', 'settings.html', `api('/report/monthly/preview', 'POST', {})`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],
   ['DELETE /broadcasts/lists/:id', 'broadcasts.html', `api('/broadcasts/lists/'+encodeURIComponent(SEL.slice(5)),'DELETE')`, ['id="dropList" data-needs="delete"']],
+  // builder list item 221: the welcome email card on Send an update, its save and its test (the card and its "couldn't load" stand-in both carry the mark)
+  ['PUT /broadcasts/welcome', 'broadcasts.html', `api('/broadcasts/welcome','PUT',patch)`, ['class="card wel${on?\'\':\' off\'}" id="welcome" aria-labelledby="welH" data-needs="configure"', 'class="card" id="welcome" aria-labelledby="welH" data-needs="configure"']],
+  ['POST /broadcasts/welcome/test', 'broadcasts.html', `api('/broadcasts/welcome/test','POST',words)`, ['class="card wel${on?\'\':\' off\'}" id="welcome" aria-labelledby="welH" data-needs="configure"']],
   ['POST /calendar/link', 'connections.html', `make(mk, 'POST', 'Your calendar link is ready.')`, ['id="calMake" data-needs="configure"']],   // sales review item 46
   ['POST /calendar/link', 'connections.html', `make(nw, 'POST', 'Your new calendar link is ready.')`, ['id="calNew" data-needs="configure"']],
   ['DELETE /calendar/link', 'connections.html', `make(off, 'DELETE', 'Your calendar link is off.')`, ['id="calOff" data-needs="configure"']],
@@ -107,9 +110,6 @@ const CONTROLS = [
 // nothing in a page calls these: they answer scripts and the operator's tools
 const NO_CONTROL = {
   'DELETE /projects/:id/deliverables/:id2': /\/deliverables\/[^\n]*DELETE|DELETE[^\n]*\/deliverables\//,
-  // builder list item 221: the welcome card on Send an update is drawn and waits for a yes; until it is built no page calls these
-  'PUT /broadcasts/welcome': /\/broadcasts\/welcome'/,
-  'POST /broadcasts/welcome/test': /\/broadcasts\/welcome\/test/,
 };
 // Sales item 117: the client portal has no shell and no data-needs marks. Its one owner-only
 // control, Cancel retainer, sits on the Documents shelf, which draws nothing of billing for anyone
@@ -162,6 +162,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     'api("DELETE", "/monitor/connection")', `api('/crm/notes/'+b.getAttribute('data-delnote'),'DELETE')`,
     // builder list item 216: removing one of the studio's own saved pages answers to the studio's roles (agency/saved_pages.ts), not a seat
     'api("DELETE", "/agency/pages/" + it.id)',
+    // builder list item 221: removing one of the studio's own update templates, the same (agency/update_templates.ts)
+    `api('/agency/update-templates/'+encodeURIComponent(t.id),'DELETE')`,
   ];
   // both spellings the pages use: api("DELETE", route) and api(route, 'DELETE')
   const deletes = /\bapi\(\s*"DELETE"\s*,[^)\n]*\)|\b(?:api|apiAg)\(['`][^;\n]*?,\s*'DELETE'\)/g;
