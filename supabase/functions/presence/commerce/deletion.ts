@@ -3,12 +3,16 @@
 // starts a cancelable cooling-off; a scheduled executor then, per tenant and
 // idempotently, revokes access, cancels Stripe billing, takes the hosted site
 // down, anonymizes PII, and RETAINS required financial/audit evidence. Staged +
-// safe: it soft-takes-down rather than hard-cascading, so an operator can still
-// recover during a mistake window; the deep purge stays an explicit operator step.
+// safe: it soft-takes-down rather than hard-cascading the site row itself.
+// Builder item 205 (Nov 12 review, finding 97): it also clears each site of the
+// business's customers' details and uploaded files (commerce/erase.ts), and a
+// deletion is completed only when every step saved: a step that didn't stops the run
+// with its name, and the request goes back to pending for the next run.
 import { svc } from '../lib/db.ts';
 import { sendEmail } from './account.ts';
 import { cancelSubscription } from './stripe.ts';
 import { deleteSite } from '../lib/netlify.ts';
+import { eraseSiteData } from './erase.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const nowIso = () => new Date().toISOString();
@@ -56,11 +60,16 @@ async function executeOne(d: any): Promise<{ ok: boolean; error?: string }> {
     const ent = rows(await svc(`presence_entitlements?client_id=eq.${enc(clientId)}&product=eq.presence&select=stripe_subscription_id&limit=1`))[0] || {};
     if (ent.stripe_subscription_id) { const c = await cancelSubscription(ent.stripe_subscription_id); if (!c.ok) return { ok: false, error: `stripe_cancel: ${c.error}` }; }
     // 2) revoke access (the entitlement STATUS gate denies everything but export/legal)
-    await svc(`presence_entitlements?client_id=eq.${enc(clientId)}&product=eq.presence`, { method: 'PATCH', body: JSON.stringify({ status: 'deleted' }) });
-    // 3) take the hosted site(s) down + soft-delete the workspace row(s) (staged, recoverable)
-    const sites = rows(await svc(`clients?id=eq.${enc(clientId)}&select=id`)).length
-      ? rows(await svc(`presence_sites?client_id=eq.${enc(clientId)}&select=id,netlify_site_id,status`))
-      : [];
+    const ent2 = await svc(`presence_entitlements?client_id=eq.${enc(clientId)}&product=eq.presence`, { method: 'PATCH', body: JSON.stringify({ status: 'deleted' }) });
+    if (!ent2.ok) return { ok: false, error: 'entitlement: access not revoked' };
+    // 3) take the hosted site(s) down + mark the workspace row(s) deleting, then (item 205)
+    //    clear each of the business's customers' details and files. A read that fails is a
+    //    failed step, never "no sites".
+    const cq = await svc(`clients?id=eq.${enc(clientId)}&select=id`);
+    if (!cq.ok) return { ok: false, error: 'sites: the account could not be read' };
+    const sq = rows(cq).length ? await svc(`presence_sites?client_id=eq.${enc(clientId)}&select=id,netlify_site_id,status`) : null;
+    if (sq && !sq.ok) return { ok: false, error: 'sites: the sites could not be read' };
+    const sites = sq ? rows(sq) : [];
     for (const s of sites) {
       // Takedown must SUCCEED before we erase the pointer — a failed delete with
       // the id nulled leaves the "deleted" customer's site live on Netlify
@@ -69,7 +78,10 @@ async function executeOne(d: any): Promise<{ ok: boolean; error?: string }> {
         const del = await deleteSite(s.netlify_site_id).catch(() => ({ ok: false }));
         if (!(del as { ok?: boolean }).ok) return { ok: false, error: `netlify_takedown: site ${s.id}` };
       }
-      await svc(`presence_sites?id=eq.${s.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'deleting', netlify_site_id: null, custom_domain: null }) }).catch(() => {});
+      const marked = await svc(`presence_sites?id=eq.${s.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'deleting', netlify_site_id: null, custom_domain: null }) });
+      if (!marked.ok) return { ok: false, error: `site ${s.id}: not marked deleting` };
+      const erased = await eraseSiteData(String(s.id));
+      if (!erased.ok) return { ok: false, error: `customer data on site ${s.id}: ${erased.step}` };
     }
     // 4) DELETE THE AUTH USER — without this the login (and its email/last-IP
     //    metadata) survived "deletion". Runs BEFORE anonymization: a failure here
@@ -90,19 +102,27 @@ async function executeOne(d: any): Promise<{ ok: boolean; error?: string }> {
       } catch (e) { return { ok: false, error: `auth_delete: ${String((e as Error)?.message || e)}` }; }
     }
     // 5) anonymize the customer PII (retain the row so entitlement/payment FKs survive for tax/audit)
-    await svc(`clients?id=eq.${enc(clientId)}`, { method: 'PATCH', body: JSON.stringify({ name: 'Deleted account', email: `deleted-${clientId}@deleted.invalid`, contact_email: null, status: 'deleted' }) }).catch(() => {});
+    const anon = await svc(`clients?id=eq.${enc(clientId)}`, { method: 'PATCH', body: JSON.stringify({ name: 'Deleted account', email: `deleted-${clientId}@deleted.invalid`, contact_email: null, status: 'deleted' }) });
+    if (!anon.ok) return { ok: false, error: 'account: not anonymised' };
     // 6) anonymize the CRM traces that carry the person's PII outside the client
     //    row (contacts + signups keyed by email) — retention there has no
     //    business basis once the account is deleted.
     for (const em of [before.email, before.contact_email].filter(Boolean).map((e: string) => e.trim().toLowerCase())) {
       if (em.endsWith('@deleted.invalid')) continue;
-      await svc(`contacts?email=eq.${enc(em)}`, { method: 'PATCH', body: JSON.stringify({ name: 'Deleted account', email: `deleted-${clientId}@deleted.invalid`, phone: null, owner_notes: '' }) }).catch(() => {});
-      await svc(`presence_signups?email=eq.${enc(em)}`, { method: 'PATCH', body: JSON.stringify({ email: `deleted-${clientId}@deleted.invalid`, business_name: 'Deleted account' }) }).catch(() => {});
       // push subscriptions carry email/endpoint/user-agent — hard-delete (they're
       // device tokens, not business records); free-tool submissions by the same
       // person are anonymized too ("your personal details are anonymized").
-      await svc(`presence_push_subscriptions?email=eq.${enc(em)}`, { method: 'DELETE' }).catch(() => {});
-      await svc(`audit_leads?client_email=eq.${enc(em)}`, { method: 'PATCH', body: JSON.stringify({ client_email: `deleted-${clientId}@deleted.invalid`, business_name: 'Deleted account' }) }).catch(() => {});
+      // Item 205: each must save, or the run stops here and the next one repeats it.
+      const steps: Array<[string, string, RequestInit]> = [
+        ['contacts', `contacts?email=eq.${enc(em)}`, { method: 'PATCH', body: JSON.stringify({ name: 'Deleted account', email: `deleted-${clientId}@deleted.invalid`, phone: null, owner_notes: '' }) }],
+        ['signups', `presence_signups?email=eq.${enc(em)}`, { method: 'PATCH', body: JSON.stringify({ email: `deleted-${clientId}@deleted.invalid`, business_name: 'Deleted account' }) }],
+        ['devices', `presence_push_subscriptions?email=eq.${enc(em)}`, { method: 'DELETE' }],
+        ['free-tool leads', `audit_leads?client_email=eq.${enc(em)}`, { method: 'PATCH', body: JSON.stringify({ client_email: `deleted-${clientId}@deleted.invalid`, business_name: 'Deleted account' }) }],
+      ];
+      for (const [name, path, init] of steps) {
+        const r = await svc(path, init);
+        if (!r.ok) return { ok: false, error: `${name}: not anonymised` };
+      }
     }
     return { ok: true };
   } catch (e) {
@@ -120,18 +140,19 @@ export async function runDeletionSweep(limit = 25): Promise<{ due: number; compl
     const claim = await svc(`presence_account_deletions?id=eq.${d.id}&status=eq.pending&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'executing', attempts: (d.attempts || 0) + 1 }) });
     if (!rows(claim)[0]) continue;
     const res = await executeOne(d);
-    if (res.ok) {
-      await svc(`presence_account_deletions?id=eq.${d.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'completed', executed_at: nowIso(), error: '' }) });
+    // item 205: completed only when that, too, saved; otherwise it goes back for the next run
+    const done = res.ok ? await svc(`presence_account_deletions?id=eq.${d.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'completed', executed_at: nowIso(), error: '' }) }) : null;
+    if (res.ok && done?.ok) {
       completed++;
       // OPERATIONAL, to the platform operator: an executed deletion is
-      // irreversible and the follow-on deep purge is a MANUAL step, so this is
-      // the one notice that must never be lost to a marketing opt-out
-      // (critical:true; a bounce/complaint still suppresses it).
+      // irreversible, so this is the one notice that must never be lost to a
+      // marketing opt-out (critical:true; a bounce/complaint still suppresses it).
       const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
-      if (ops) sendEmail(ops, `[Studio OS ops] Account deletion completed: ${d.client_id}`, `<p>Deletion executed for client ${d.client_id}. Financial records retained for tax/audit. Deep purge (if required) is a manual operator step.</p>`, undefined, { critical: true }).catch(() => {});
+      if (ops) sendEmail(ops, `[Studio OS ops] Account deletion completed: ${d.client_id}`, `<p>Deletion executed for client ${d.client_id}: access, hosting, the sign-in, and the business's customers' details and files are gone. Financial records retained for tax/audit.</p>`, undefined, { critical: true }).catch(() => {});
     } else {
       // failed → back to pending for retry, record the reason (operator-visible)
-      await svc(`presence_account_deletions?id=eq.${d.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'pending', error: res.error || 'unknown' }) });
+      const failure = res.ok ? 'completed, but the record didn’t save' : (res.error || 'unknown');
+      await svc(`presence_account_deletions?id=eq.${d.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'pending', error: failure }) });
       console.error(`[deletion] execute failed client=${d.client_id}: ${res.error}`);
       failed++;
     }
