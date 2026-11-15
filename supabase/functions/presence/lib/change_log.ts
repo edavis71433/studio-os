@@ -39,6 +39,7 @@ export interface ChangeItem {
   who_note: string;     // "the owner", "staff", "from your studio"; '' when nothing is added
   side: WhoSide;
   text: string;         // "changed the opening hours"; a whole sentence when `who` is ''
+  detail: string;       // what a kept sentence said after its dash: "Visitors see a simple “temporarily offline” page"
   where: string;        // "Website › Hours and location"
   go: string | null;    // the page and place it opens, on the site's own pages
   count: number;        // saves folded into this line
@@ -48,10 +49,19 @@ export interface ChangeItem {
 
 const lower = (s: unknown) => String(s ?? '').trim().toLowerCase();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// a kept sentence, its first half lower-cased to follow a name; what it said after a dash
+// ("Took the website offline — visitors see …") is its own line
+const tidy = (s: string) => String(s || '').replace(/\s*→\s*/g, ' to ').replace(/\s+/g, ' ').trim().replace(/\.$/, '');
 const plainSummary = (s: string) => {
-  const t = String(s || '').replace(/\s*→\s*/g, ' to ').replace(/\s+—\s+/g, ': ').replace(/\s+/g, ' ').trim().replace(/\.$/, '');
+  const t = tidy(String(s || '').split(/\s+—\s+/)[0]);
   return t ? t.charAt(0).toLowerCase() + t.slice(1) : '';
 };
+/** What a kept sentence says after its dash, as its own line. Pure. */
+export function summaryDetail(s: string): string {
+  const parts = String(s || '').split(/\s+—\s+/);
+  const t = parts.length > 1 ? tidy(parts.slice(1).join(' — ')) : '';
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+}
 /** "Mia Chen" from mia.chen@studio.example; '' when the address has nothing to go on. Pure. */
 export function nameFromEmail(email: string): string {
   const local = lower(email).split('@')[0] || '';
@@ -255,7 +265,7 @@ export function changeItems(rows: RawChange[], i: { viewer: string | null; viewe
       prev.text = w.many(prev.count);
       continue;
     }
-    out.push({ id: `${r.source}:${r.id}`, at: r.at, from: null, site_id: r.site_id, area: w.area, who: who.who, who_note: who.who_note, side: who.side, text: w.text, where: w.where, go: w.go, count: 1, key, ...(r.source === 'publish' && r.status === 'live' && !r.unchanged ? { publish_id: r.id } : {}) });
+    out.push({ id: `${r.source}:${r.id}`, at: r.at, from: null, site_id: r.site_id, area: w.area, who: who.who, who_note: who.who_note, side: who.side, text: w.text, detail: r.source === 'event' ? summaryDetail(r.summary || '') : '', where: w.where, go: w.go, count: 1, key, ...(r.source === 'publish' && r.status === 'live' && !r.unchanged ? { publish_id: r.id } : {}) });
   }
   return out;
 }

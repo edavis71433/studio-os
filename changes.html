@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Changes — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/fonts/brand.css">
+<style>
+  /* the page skin = the shell's --dds-* tokens, aliased the way usage.html does */
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);--raised:var(--dds-raised,#f7f6fb);
+    --p:var(--dds-p,#5b3fa0);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);--bad-soft:var(--dds-bad-soft,#fdeaea);
+    --info:var(--dds-info,#245fa0);--info-soft:var(--dds-info-soft,#e6effa);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  [hidden]{display:none!important}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
+  .lrow1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;min-height:36px}
+  .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
+  .trail{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--soft);margin:0 0 8px}
+  .trail a{color:var(--p);font-weight:600;text-decoration:none}.trail a:hover{text-decoration:underline}
+  .tabs{display:flex;gap:var(--dds-s1,4px);margin-top:10px;border-top:1px solid var(--line);padding-top:var(--dds-s2,8px);flex-wrap:wrap}
+  .tabs a{font-size:13.5px;font-weight:600;color:var(--soft);text-decoration:none;padding:6px var(--dds-s3,12px);border-radius:var(--dds-r,8px)}
+  .tabs a:hover{color:var(--p);background:var(--p-soft)}
+  .tabs a[aria-current="page"]{color:var(--p);background:var(--p-soft)}
+  .sbtn{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:6px var(--dds-s3,12px);text-decoration:none;min-height:36px;display:inline-flex;align-items:center;cursor:pointer}
+  .sbtn:hover{border-color:var(--p);color:var(--p)}
+  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--p);color:#fff;cursor:pointer;min-height:36px;text-decoration:none;display:inline-flex;align-items:center}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn{color:#171320}}
+  :root[data-theme="dark"] .btn{color:#171320}
+
+  /* ── builder list item 215: the band (the Usage band's colours) ── */
+  .cband{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:var(--dds-s4,16px);background:var(--dds-grad,linear-gradient(135deg,#4a2c8c,#6436c4 55%,#7d3fb8));color:#fff;border-radius:var(--dds-r-xl,20px);padding:24px 26px;margin-bottom:var(--dds-s5,20px);box-shadow:0 22px 44px -24px rgba(74,44,140,.7);overflow:hidden}
+  .cband .eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.8)}
+  .cband .big{font-weight:700;font-size:clamp(36px,5vw,54px);line-height:1.04;letter-spacing:-.03em;margin-top:6px;font-variant-numeric:tabular-nums}
+  .cband .sub{font-size:19px;font-weight:500;color:rgba(255,255,255,.92);margin-top:2px}
+  .chart{margin-top:18px}
+  .chart .ct{font-size:12px;font-weight:600;color:rgba(255,255,255,.88);margin-bottom:6px}
+  .bars{display:flex;align-items:flex-end;gap:12px;height:96px;border-bottom:1px solid rgba(255,255,255,.35)}
+  .bar{flex:1;display:flex;flex-direction:column-reverse;min-width:6px;height:100%;position:relative}
+  .bar i{display:block;width:100%}
+  .bar i.s{background:#fff}.bar i.c{background:#9fe8d1}.bar i.a{background:rgba(255,255,255,.38)}
+  .bar i:last-child{border-radius:4px 4px 0 0}
+  .bar b{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:11.5px;font-weight:600;padding-bottom:3px}
+  .axis{display:flex;gap:12px;margin-top:4px}
+  .axis span{flex:1;text-align:center;font-size:11px;color:rgba(255,255,255,.8);white-space:nowrap}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:13px;font-weight:600}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .facts{display:grid;grid-template-columns:1fr 1fr;gap:var(--dds-s3,12px);align-content:start}
+  .fact{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:var(--dds-r-lg,14px);padding:14px 16px;min-width:0}
+  .fact .fv{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.15;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+  .fact .fn{font-size:12.5px;color:rgba(255,255,255,.86);margin-top:3px}
+  .who{display:flex;flex-direction:column;gap:12px}
+  .who .wh{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.85)}
+  .wrow{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(60px,1.2fr) auto;gap:12px;align-items:center}
+  .wrow .nm b{display:block;font-size:14px}.wrow .nm span{font-size:12px;color:rgba(255,255,255,.78)}
+  .wrow .tr{height:8px;border-radius:99px;background:rgba(255,255,255,.2);overflow:hidden}.wrow .tr i{display:block;height:100%;background:#fff;border-radius:99px;min-width:5px}
+  .wrow .n{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+  .cband :focus-visible{outline:2px solid #fff;outline-offset:2px}
+  @media (max-width:1000px){.cband{grid-template-columns:1fr}}
+  @media (max-width:640px){.cband{padding:18px 16px}.bars{gap:6px;height:80px}.axis{gap:6px}.facts .fv{font-size:19px}}
+
+  /* who sees this page (one site) */
+  .roles{margin-bottom:var(--dds-s5,20px)}
+  .roles h2{font-size:15px;font-weight:600;display:inline}
+  .roles .rs{font-size:13px;color:var(--soft);margin-left:8px}
+  .rgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:10px}
+  .role{border-radius:12px;padding:12px 14px;background:var(--raised)}
+  .role b{display:block;font-size:13.5px}.role span{display:block;font-size:12.5px;color:var(--soft);margin-top:2px}
+  .role.yes{background:var(--good-soft)}.role.some{background:var(--info-soft)}.role.studio{background:var(--p-soft)}
+  .role b::before{margin-right:6px;font-weight:700}
+  .role.yes b::before,.role.studio b::before{content:"✓";color:var(--good)}.role.studio b::before{color:var(--p)}
+  .role.some b::before{content:"◐";color:var(--info)}.role.no b::before{content:"×";color:var(--soft)}
+  @media (max-width:1000px){.rgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (max-width:520px){.rgrid{grid-template-columns:1fr}}
+
+  /* the list */
+  .lhd{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--dds-s3,12px);flex-wrap:wrap;margin-bottom:10px}
+  .lhd h2{font-size:16px;font-weight:600}
+  .lhd .sub{font-size:13px;color:var(--soft);margin-top:2px}
+  .seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px;gap:2px;max-width:100%;overflow-x:auto;scrollbar-width:none}
+  .seg::-webkit-scrollbar{display:none}
+  .seg button{font:inherit;font-size:13px;font-weight:600;border:none;border-radius:999px;background:transparent;color:var(--soft);padding:6px 14px;cursor:pointer;min-height:36px;white-space:nowrap}
+  .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
+  .feed{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);box-shadow:var(--shadow);overflow:hidden}
+  .fbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--line)}
+  .fbar select{font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;min-height:36px;max-width:100%}
+  .fbar .sep{width:1px;height:22px;background:var(--line)}
+  .pill{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);padding:6px 13px;min-height:36px;cursor:pointer;white-space:nowrap}
+  .pill[aria-pressed="true"]{background:var(--p-soft);border-color:var(--p);color:var(--p)}
+  .fbar .count{margin-left:auto;font-size:12.5px;color:var(--faint)}
+  .day{padding:14px 18px 8px;background:var(--raised);font-size:11.5px;font-weight:700;letter-spacing:.08em;color:var(--faint);text-transform:uppercase}
+  ol.rows{list-style:none;padding:0}
+  .ch{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;grid-template-areas:"av say chip go";gap:14px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .ch>.av{grid-area:av}.ch>.say{grid-area:say}.ch>.chip{grid-area:chip}.ch>.go{grid-area:go}
+  .ch.live{background:var(--p-soft)}
+  .av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff;background:linear-gradient(135deg,#6d3fd4,#a63f86);flex:0 0 auto}
+  .av.owner{background:#127369}.av.seat{background:#a85c0d}.av.support{background:#245fa0}.av.unknown{background:#69667d}
+  .av.mark{background:var(--raised);color:var(--soft)}.av.mark.people{background:var(--info-soft);color:var(--info)}.av.mark.settings{background:var(--warn-soft);color:var(--warn)}
+  .av svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .say{min-width:0}
+  .say .t{font-size:14.5px;overflow-wrap:anywhere}.say .t b{font-weight:600}
+  .say .s{font-size:12.5px;color:var(--soft);margin-top:2px}
+  .chip{font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 9px;white-space:nowrap}
+  .chip.website{background:var(--p-soft);color:var(--p)}.chip.photos,.chip.people{background:var(--info-soft);color:var(--info)}
+  .chip.live{background:var(--good-soft);color:var(--good)}.chip.settings{background:var(--warn-soft);color:var(--warn)}.chip.auto{background:var(--raised);color:var(--soft)}
+  .go{font:inherit;font-size:13.5px;font-weight:600;color:var(--p);text-decoration:none;background:none;border:1px solid transparent;border-radius:999px;padding:6px 10px;min-height:36px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap}
+  .go:hover{border-color:var(--p)}
+  .went{margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .went .wl{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--faint)}
+  .went ul{margin:6px 0 0;padding-left:18px;font-size:13.5px}
+  .went p{font-size:13px;color:var(--soft);margin-top:4px}
+  .went a{font-size:13px;font-weight:600;color:var(--p);text-decoration:none;display:inline-block;margin-top:6px}
+  .more{display:flex;justify-content:center;padding:14px 16px 16px}
+  .more button{font:inherit;font-size:13.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);padding:10px 22px;min-height:44px;cursor:pointer}
+  .empty{padding:36px 18px;text-align:center;color:var(--soft);font-size:14px}
+  .foot{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--soft);margin-top:var(--dds-s3,12px)}
+  .foot svg{flex:0 0 auto;width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;margin-top:2px}
+  .partial{font-size:12.5px;color:var(--warn);margin:-8px 0 var(--dds-s3,12px)}
+  /* phones: each change is a card, the chip and Open under the sentence */
+  @media (max-width:640px){
+    .ch{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"av say say" ". chip go";row-gap:6px;column-gap:12px;margin:10px 12px;border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--card)}
+    .ch.live{background:var(--p-soft)}
+    .ch>.chip{justify-self:start}
+    ol.rows{padding-bottom:4px}
+    .day{background:transparent;padding:14px 16px 0}
+    .feed{background:transparent;border:none;box-shadow:none}
+    .fbar{background:var(--card);border:1px solid var(--line);border-radius:14px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+    .fbar::-webkit-scrollbar{display:none}
+    .fbar .count{display:none}
+    .lrow1 .sbtn,.lrow1 .btn{display:none}
+    .pill,.seg button,.sbtn,.lbtn,.go,.fbar select{min-height:44px}
+  }
+  .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-weight:600;font-size:20px;margin:0 0 var(--dds-s2,8px)}
+  .muted{color:var(--soft);font-size:14px}
+  a.link{color:var(--p);text-decoration:none;font-weight:500}a.link:hover{text-decoration:underline}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script>
+// ── Changes (builder list item 215, Nov 2026 review, file 03 finding 4) ────────────
+// Netlify keeps an audit log in sentences; Studio OS recorded every save, publish, invite
+// and checkpoint but showed none of it, so "who changed my hours?" had no answer here.
+// Two ways in, as drawn in Figma (page 410:2) and approved:
+//   • at the studio's level, a tab beside Usage: every client's changes, the week by who
+//     made them (your studio, clients, Studio OS by itself), then each change, newest first;
+//   • inside a client (?client=) or on an owner's own site: that site's changes, this
+//     month by who made them, and who may see this page.
+// GET /agency/change-log or GET /change-log (routes/change_log.ts); a publish that went
+// live opens what went live (…/went-live). The sentences come from what is already kept.
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+let TOKEN="";
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
+// ?client= opens one site: a studio inside a client, or a second business of one's own; the server tells them apart
+const scope=()=>new URLSearchParams(location.search).get('client')||'';
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope(),'x-region':FN_REGION});
+async function api(path){
+  try{const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+  catch(_){return{ok:false,status:0,body:{}};}
+}
+const TZ=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';}catch(_){return'UTC';}})();
+const n1=(n)=>Number(n||0).toLocaleString('en-US');
+const plural=(n,w,ws)=>n1(n)+' '+(n===1?w:(ws||w+'s'));
+const ICON={
+  auto:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  people:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/></svg>',
+  info:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
+};
+const AREAS=[['','Everything'],['website','Website'],['photos','Photos'],['live','Going live'],['people','People'],['settings','Settings']];
+const AREA_WORD={website:'Website',photos:'Photos',live:'Going live',people:'People',settings:'Settings'};
+let MODE='studio',SITES=[],META={},D=null,ITEMS=[],NEXT=null,BUSY=false,WENT={};
+const F={who:'',area:'',site:''};
+
+// "4:32 PM"; a day heading: "Today · Saturday, Nov 15"
+const timeOf=(iso)=>new Date(iso).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+function dayKey(iso){const d=new Date(iso);return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();}
+function dayHead(iso){
+  const d=new Date(iso),now=new Date(),y=new Date(now);y.setDate(now.getDate()-1);
+  const same=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
+  const words=d.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',...(d.getFullYear()!==now.getFullYear()?{year:'numeric'}:{})});
+  return same(d,now)?'Today · '+words:same(d,y)?'Yesterday · '+words:words;
+}
+const initials=(who)=>{const w=String(who||'').trim().split(/\s+/).filter(Boolean);return w.length?(w[0][0]+(w.length>1?w[w.length-1][0]:'')).toUpperCase():'?';};
+// a link to the place a change opens, on that site: the studio carries ?client=
+function hrefFor(it){
+  if(!it.go)return'';
+  const site=MODE==='studio'?it.site_id:scope();
+  if(!site)return it.go;
+  const [p,h]=it.go.split('#');
+  return p+(p.includes('?')?'&':'?')+'client='+encodeURIComponent(site)+(h?'#'+h:'');
+}
+// "Eric changed the opening hours on Bluebird Bakery." — the site named in the sentence when it says "the site"
+function sentence(it){
+  let t=esc(it.text);
+  const site=MODE==='studio'&&it.site?`<b>${esc(it.site)}</b>`:'';
+  if(site){const swapped=t.replace(/\bthe (website|site)\b/,site);t=swapped!==t?swapped:t+' on '+site;}
+  if(!it.who)return t.charAt(0).toUpperCase()+t.slice(1)+'.';
+  return `<b>${esc(it.who)}</b>${it.who_note?', '+esc(it.who_note)+',':''} ${t}.`;
+}
+function lead(it){
+  if(it.side==='auto')return`<span class="av mark" aria-hidden="true">${ICON.auto}</span>`;
+  if(!it.who)return`<span class="av mark ${it.area==='people'?'people':'settings'}" aria-hidden="true">${ICON.people}</span>`;
+  return`<span class="av ${esc(it.side==='you'?'':it.side)}" aria-hidden="true">${esc(initials(it.who==='You'?'You':it.who))}</span>`;
+}
+function rowHtml(it){
+  const when=it.from&&dayKey(it.from)===dayKey(it.at)?`${timeOf(it.from)} to ${timeOf(it.at)}`:timeOf(it.at);
+  const sub=[it.detail,it.where,when].filter(Boolean).map(esc).join(' · ');
+  const chip=it.side==='auto'?'<span class="chip auto">Automatic</span>':`<span class="chip ${esc(it.area)}">${esc(AREA_WORD[it.area]||'')}</span>`;
+  const href=hrefFor(it);
+  const go=it.publish_id?`<button type="button" class="go" data-went="${esc(it.id)}" aria-expanded="${WENT[it.id]?'true':'false'}">${WENT[it.id]?'Hide':'What went live'} <span aria-hidden="true">${WENT[it.id]?'‹':'›'}</span></button>`
+    :href?`<a class="go" href="${esc(href)}">Open <span aria-hidden="true">›</span><span class="sr-only">: ${esc(it.where||'')}</span></a>`:'';
+  return`<li class="ch${it.publish_id?' live':''}" data-id="${esc(it.id)}">${lead(it)}<div class="say"><p class="t">${sentence(it)}</p><p class="s">${sub}</p>${wentHtml(it)}</div>${chip}${go}</li>`;
+}
+function wentHtml(it){
+  const w=WENT[it.id];if(!w)return'';
+  if(w==='loading')return`<div class="went" role="status">Reading what went live…</div>`;
+  if(w==='failed')return`<div class="went"><p>We couldn’t read it just now.</p></div>`;
+  const open=hrefFor({...it,go:'/presence.html#history'});
+  if(!w.kept)return`<div class="went"><p>Versions keeps the last twenty publishes, so this one no longer has its words.</p><a href="${esc(open)}">Open Versions ›</a></div>`;
+  const list=w.sentences.length?`<ul>${w.sentences.map(s=>`<li>${esc(s)}</li>`).join('')}</ul>`:'<p>Nothing the site shows had changed.</p>';
+  return`<div class="went"><span class="wl">WHAT WENT LIVE</span>${list}<a href="${esc(open)}">Open this version in Versions ›</a></div>`;
+}
+function feedHtml(){
+  const items=ITEMS;
+  if(!items.length)return`<div class="empty">${F.area||F.who||F.site?'No changes like that yet. Try Everything.':'No changes yet. Each save, publish and invite shows here.'}</div>`;
+  let h='',last='';
+  for(const it of items){
+    const k=dayKey(it.at);
+    if(k!==last){if(last)h+='</ol>';h+=`<h3 class="day">${esc(dayHead(it.at))}</h3><ol class="rows">`;last=k;}
+    h+=rowHtml(it);
+  }
+  return h+'</ol>'+(NEXT?`<div class="more"><button type="button" id="older">Show older changes</button></div>`:'');
+}
+
+// ── the band ──
+function studioBand(w){
+  const days=w.days||[],max=Math.max(1,...days.map(d=>d.studio+d.client+d.auto));
+  const peak=days.reduce((a,d)=>(d.studio+d.client+d.auto)>(a?a.studio+a.client+a.auto:0)?d:a,null);
+  const label=(ymd)=>new Date(ymd+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',day:'numeric'});
+  const first=days[0]?new Date(days[0].day+'T12:00:00'):null,lastD=days.length?new Date(days[days.length-1].day+'T12:00:00'):null;
+  const range=first&&lastD?`${first.toLocaleDateString('en-US',{month:'short',day:'numeric'})} to ${first.getMonth()===lastD.getMonth()?lastD.getDate():lastD.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`:'';
+  const bars=days.map(d=>{const t=d.studio+d.client+d.auto,pct=(n)=>Math.round(n/max*100);
+    const top=peak&&d.day===peak.day&&t;
+    return`<div class="bar">${d.studio?`<i class="s" style="height:${pct(d.studio)}%"></i>`:''}${d.client?`<i class="c" style="height:${pct(d.client)}%"></i>`:''}${d.auto?`<i class="a" style="height:${pct(d.auto)}%"></i>`:''}${top?`<b style="bottom:${pct(t)}%">${esc(t)} on ${esc(label(d.day))}</b>`:''}</div>`;}).join('');
+  const people=(w.people||[]);
+  const studioPeople=people.filter(p=>p.side==='studio'||p.side==='support').slice(0,2).map(p=>`${p.who} ${p.count}`).join(' · ');
+  const owners=people.filter(p=>p.side==='owner').length,seats=people.filter(p=>p.side==='seat').length;
+  const clientWords=[owners?plural(owners,'owner'):'',seats?plural(seats,'staff member','staff members'):''].filter(Boolean).join(' and ')||'nobody on the clients’ side';
+  const most=(w.sites||[])[0];
+  const named=people.filter(p=>p.side!=='auto').length;
+  const chartWords=`Changes each day: ${days.map(d=>`${label(d.day)} ${d.studio+d.client+d.auto}`).join(', ')}.`;
+  return`<section class="cband" aria-label="This week in changes">
+    <div>
+      <div class="eyebrow">This week · ${esc(range)}</div>
+      <div class="big">${esc(plural(w.total,'change'))}</div>
+      <div class="sub">on ${esc(plural(w.site_count||0,'site'))}, by ${esc(plural(named,'person','people'))} · ${esc(n1(w.went_live))} went live</div>
+      <div class="chart" role="img" aria-label="${esc(chartWords)}"><div class="ct" aria-hidden="true">Changes each day, by who made them</div><div class="bars" aria-hidden="true">${bars}</div><div class="axis" aria-hidden="true">${days.map(d=>`<span>${esc(label(d.day))}</span>`).join('')}</div></div>
+      <div class="legend" aria-hidden="true"><span><i style="background:#fff"></i>Your studio · ${esc(n1(w.by_side.studio))}</span><span><i style="background:#9fe8d1"></i>Clients · ${esc(n1(w.by_side.client))}</span><span><i style="background:rgba(255,255,255,.38)"></i>Automatic · ${esc(n1(w.by_side.auto))}</span></div>
+    </div>
+    <div class="facts">
+      <div class="fact"><div class="fv">${esc(n1(w.by_side.studio))} by your studio</div><div class="fn">${esc(studioPeople||'no one at the studio yet')}</div></div>
+      <div class="fact"><div class="fv">${esc(n1(w.by_side.client))} by clients</div><div class="fn">${esc(clientWords)}</div></div>
+      <div class="fact"><div class="fv">${esc(n1(w.went_live))} went live</div><div class="fn">published or put back this week</div></div>
+      <div class="fact"><div class="fv">${esc(most?most.name||'A client':'None yet')}</div><div class="fn">${most?`changed most: ${esc(plural(most.count,'time'))}`:'no changes this week'}</div></div>
+    </div>
+  </section>`;
+}
+function siteBand(m){
+  const people=m.people||[],max=Math.max(1,...people.map(p=>p.count));
+  const named=people.filter(p=>p.side!=='auto'),auto=people.find(p=>p.side==='auto');
+  const by=`by ${plural(named.length,'person','people')}${auto?' and Studio OS':''}`;
+  const rows=people.map(p=>`<div class="wrow">${p.side==='auto'?`<span class="av mark" aria-hidden="true">${ICON.auto}</span>`:`<span class="av ${esc(p.side==='you'?'':p.side)}" aria-hidden="true">${esc(initials(p.who))}</span>`}<div class="nm"><b>${esc(p.who)}</b><span>${esc(p.side==='auto'?'by itself, as scheduled':p.who_note||(p.side==='studio'?'your studio':p.side==='you'?'you':''))}</span></div><span class="tr" aria-hidden="true"><i style="width:${Math.round(p.count/max*100)}%"></i></span><span class="n">${esc(n1(p.count))}</span></div>`).join('');
+  return`<section class="cband" aria-label="${esc(m.label)} in changes">
+    <div><div class="eyebrow">${esc(m.label)} so far${D.site_name?' · '+esc(D.site_name):''}</div><div class="big">${esc(plural(m.total,'change'))}</div><div class="sub">${esc(by)} · ${esc(n1(m.went_live))} went live</div></div>
+    <div class="who"><span class="wh">Who changed it</span>${rows||'<span class="nm">No changes yet this month.</span>'}</div>
+  </section>`;
+}
+function rolesHtml(){
+  return`<section class="roles" aria-label="Who sees this page"><h2>Who sees this page</h2><span class="rs">Each role sees only what it may</span>
+    <div class="rgrid">
+      <div class="role yes"><b>Owner and co-owners</b><span>Every change here</span></div>
+      <div class="role yes"><b>Staff</b><span>Every change except who was invited or removed</span></div>
+      <div class="role some"><b>Designer</b><span>Website and photo changes only</span></div>
+      <div class="role no"><b>Reviewer</b><span>Doesn’t see this page</span></div>
+      <div class="role studio"><b>Your studio</b><span>Every change, on every client</span></div>
+    </div></section>`;
+}
+function headHtml(){
+  if(MODE==='studio'){
+    const n=SITES.length;
+    return`<header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🌐</span><h1 id="pagehead" tabindex="-1">Sites</h1>
+      <a class="sbtn" href="/week.html">Plan my week</a>
+      <button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+      ${META.can_create?'<a class="btn" href="/sites.html#new">+ New site</a>':''}</div>
+      <div class="lmeta">${esc(plural(n,'site'))} · Who changed what on every client’s site, newest first · Updated just now</div>
+      <nav class="tabs" aria-label="Sites, domains, templates, usage and changes"><a href="/sites.html">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html">Templates</a><a href="/usage.html">Usage</a><a href="/changes.html" aria-current="page">Changes</a></nav></header>`;
+  }
+  const web=scope()?'/presence.html?client='+encodeURIComponent(scope()):'/presence.html';
+  return`<nav class="trail" aria-label="Where you are"><a href="${esc(web)}">Website</a><span aria-hidden="true">›</span><span>Changes</span></nav>
+    <header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🕘</span><h1 id="pagehead" tabindex="-1">Changes</h1>
+      <a class="sbtn" href="${esc(web+'#history')}">Versions</a>
+      <button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
+      <div class="lmeta">${D.site_name?esc(D.site_name)+' · ':''}Who changed the website, and when · Updated just now</div></header>`;
+}
+function listHead(){
+  const client=D&&D.viewer_side==='client';
+  const opts=[['','Everyone'],['studio','Your studio'],['client',MODE==='studio'?'Clients':client?'You and your team':'The client'],['auto','Automatic']];
+  const h=MODE==='studio'?'Every change, newest first':'Every change on this site, newest first';
+  const s=MODE==='studio'?`Your studio, your clients and Studio OS itself, on ${plural(SITES.length,'site')}`:`${plural((D.month&&D.month.total)||0,'change')} this month · ${client?'you, your studio':'the studio, the client'} and Studio OS itself`;
+  return`<div class="lhd"><div><h2>${esc(h)}</h2><div class="sub">${esc(s)}</div></div>
+    <div class="seg" role="group" aria-label="Who made them">${opts.map(([k,w])=>`<button type="button" data-who="${k}" aria-pressed="${F.who===k}">${esc(w)}</button>`).join('')}</div></div>`;
+}
+function barHtml(){
+  const can=D&&D.can_people;
+  const sites=MODE==='studio'?`<label class="sr-only" for="siteSel">Which site</label><select id="siteSel"><option value="">All ${esc(plural(SITES.length,'site'))}</option>${SITES.map(s=>`<option value="${esc(s.site_id)}"${F.site===s.site_id?' selected':''}>${esc(s.name||'(unnamed)')}</option>`).join('')}</select><span class="sep" aria-hidden="true"></span>`:'';
+  return`<div class="fbar" role="group" aria-label="Which changes">${sites}${AREAS.filter(([k])=>k!=='people'||can).map(([k,w])=>`<button type="button" class="pill" data-area="${k}" aria-pressed="${F.area===k}">${esc(w)}</button>`).join('')}<span class="count">${esc(plural(ITEMS.length,'change'))} shown</span></div>`;
+}
+function render(focus){
+  let h=headHtml();
+  if(MODE==='studio'&&D.week)h+=studioBand(D.week);
+  if(MODE==='site'&&D.month)h+=siteBand(D.month);
+  if(MODE==='site'&&D.viewer_side==='studio')h+=rolesHtml();
+  h+=listHead();
+  h+=`<div class="feed" id="feed">${barHtml()}${feedHtml()}</div>`;
+  h+=`<p class="foot">${ICON.info}<span>Built from what Studio OS already keeps: every save, publish, restore, invite and checkpoint. A name shows for whoever was signed in; what Studio OS did by itself says Studio OS. Each person sees only the sites and kinds of change their role allows.</span></p>`;
+  $('main').innerHTML=h;
+  wire();
+  if(focus){const n=document.querySelector(focus);if(n)n.focus();}
+}
+function wire(){
+  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',async()=>{if(await load())render('#refreshBtn');});
+  document.querySelectorAll('[data-who]').forEach(b=>b.addEventListener('click',async()=>{const w=b.getAttribute('data-who');if(w===F.who||BUSY)return;const was=F.who;F.who=w;if(!await load())F.who=was;render(`[data-who="${F.who}"]`);}));
+  document.querySelectorAll('[data-area]').forEach(b=>b.addEventListener('click',async()=>{const a=b.getAttribute('data-area');if(a===F.area||BUSY)return;const was=F.area;F.area=a;if(!await load())F.area=was;render(`[data-area="${F.area}"]`);}));
+  const ss=$('siteSel');if(ss)ss.addEventListener('change',async()=>{const was=F.site;F.site=ss.value;if(!await load())F.site=was;render('#siteSel');});
+  const older=$('older');if(older)older.addEventListener('click',async()=>{const n=ITEMS.length;if(await load(true)){render();const li=document.querySelectorAll('li.ch')[n];const t=li&&li.querySelector('.go,a');if(t)t.focus();else if(li){li.tabIndex=-1;li.focus();}}});
+  document.querySelectorAll('[data-went]').forEach(b=>b.addEventListener('click',()=>toggleWent(b.getAttribute('data-went'))));
+}
+async function toggleWent(id){
+  if(WENT[id]&&WENT[id]!=='loading'){delete WENT[id];render(`[data-went="${id}"]`);return;}
+  const it=ITEMS.find(x=>x.id===id);if(!it)return;
+  WENT[id]='loading';render(`[data-went="${id}"]`);
+  const r=MODE==='studio'?await api(`/agency/change-log/went-live?site=${encodeURIComponent(it.site_id)}&id=${encodeURIComponent(it.publish_id)}`):await api(`/change-log/went-live?id=${encodeURIComponent(it.publish_id)}`);
+  WENT[id]=r.ok&&r.body&&r.body.data?r.body.data:'failed';
+  render(`[data-went="${id}"]`);
+}
+function query(more){
+  const q=new URLSearchParams({tz:TZ});
+  if(F.who)q.set('who',F.who);if(F.area)q.set('area',F.area);if(F.site&&MODE==='studio')q.set('site',F.site);
+  if(more&&NEXT)q.set('before',NEXT);
+  return q.toString();
+}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load the changes just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup. It usually passes.</p><button id="retry" class="btn">Try again</button></div>`;const r=$('retry');if(r)r.addEventListener('click',()=>boot());}
+function noAccess(){$('main').innerHTML=`<div class="center"><h2>This page isn’t part of your view.</h2><p class="muted">Changes shows who changed a website. Your studio shares what you need with you.</p></div>`;}
+// true when read; a failed read keeps what is shown and says so
+async function load(more){
+  if(BUSY)return false;BUSY=true;
+  const path=(MODE==='studio'?'/agency/change-log?':'/change-log?')+query(more);
+  const r=await api(path);
+  BUSY=false;
+  if(!r.ok){
+    if(r.status===401){signedOut();return false;}
+    if(MODE==='studio'&&r.status===403&&!D){MODE='site';return load(more);}   // not a studio: an owner's own site
+    if(r.status===403&&!D){noAccess();return false;}
+    if(D){toast(more?'Couldn’t read older changes just now.':'Couldn’t read the changes just now.',true);return false;}
+    trouble();return false;
+  }
+  const d=r.body.data||{};
+  if(more){ITEMS=ITEMS.concat(d.items||[]);NEXT=d.next_before||null;return true;}
+  D=d;ITEMS=d.items||[];NEXT=d.next_before||null;
+  if(MODE==='studio'){SITES=Object.entries(d.sites||{}).map(([site_id,name])=>({site_id,name})).sort((a,b)=>String(a.name).localeCompare(String(b.name)));}
+  return true;
+}
+async function boot(){
+  try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
+    if(!TOKEN){signedOut();return;}
+    MODE=scope()?'site':'studio';D=null;
+    const [ok,sitesQ]=await Promise.all([load(),MODE==='studio'?api('/agency/sites'):Promise.resolve(null)]);
+    if(sitesQ&&sitesQ.ok)META={can_create:!!sitesQ.body.can_create};
+    if(ok)render();
+  }catch(_){trouble();}
+}
+boot();
+</script>
+</body>
+</html>

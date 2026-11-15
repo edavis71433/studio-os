@@ -47,7 +47,8 @@ const say = (r, names) => { const w = C.describeEvent(r, { item: 'menu item', it
   eq('site: set up, status, offline in its words; a handover is People', [
     say(ev(1, 't', 'site', 'create', { summary: 'Provisioned website hosting' })), say(ev(2, 't', 'site', 'update', { summary: 'Site status: live → archived' })),
     say(ev(3, 't', 'site', 'update', { summary: 'Took the website offline — visitors see a simple “temporarily offline” page. Every version is kept.' })),
-  ], ['set up the website', 'changed the site from live to archived', 'took the website offline: visitors see a simple “temporarily offline” page. Every version is kept']);
+  ], ['set up the website', 'changed the site from live to archived', 'took the website offline']);
+  eq('site: what a kept sentence said after its dash is its own line', C.summaryDetail('Took the website offline — visitors see a simple “temporarily offline” page. Every version is kept.'), 'Visitors see a simple “temporarily offline” page. Every version is kept');
   eq('site: a handover’s area', C.describeEvent(ev(1, 't', 'site', 'update', { summary: 'Started handing the site to new@owner.example' })).area, 'people');
   eq('publish events: the publish’s own record tells it; naming a version stays', [say(ev(1, 't', 'publish', 'publish', { summary: '1 photos change' })), say(ev(2, 't', 'publish', 'update', { summary: 'Named a kept version “Spring”' }))], [null, 'named a kept version “Spring”']);
   eq('restores: one that went live is a publish; into the draft stays', [say(ev(1, 't', 'restore', 'restore', { summary: 'Restored the version from Nov 9' })), say(ev(2, 't', 'restore', 'restore', { summary: 'Brought the version from Nov 9 into the draft' }))], [null, 'brought the version from Nov 9 into the draft']);
@@ -163,7 +164,7 @@ const say = (r, names) => { const w = C.describeEvent(r, { item: 'menu item', it
   const member = { agency_id: AG, role: 'owner', email: 'eric@studio.example' };
   const ra = await (await L.handleAgencyChangeLog(new Request('http://x/agency/change-log?tz=UTC'), '/agency/change-log', 'GET', member, {}, '2026-11-15T18:00:00Z')).json();
   eq('studio: every client’s lines, each with its site', ra.data.items.slice(0, 2).map((i) => [i.who, i.text, i.site]), [['Eric', 'published the site. 3 changes went live', 'Bluebird Bakery'], ['Eric', 'changed the opening hours', 'Bluebird Bakery']]);
-  eq('studio: the week by day and by who', [ra.data.week.total, ra.data.week.by_side, ra.data.week.days.length, ra.data.week.sites[0].name, ra.data.can_people], [5, { studio: 3, client: 2, auto: 0 }, 7, 'Bluebird Bakery', true]);
+  eq('studio: the week by day and by who', [ra.data.week.total, ra.data.week.by_side, ra.data.week.days.length, ra.data.week.sites[0].name, ra.data.week.site_count, ra.data.can_people], [5, { studio: 3, client: 2, auto: 0 }, 7, 'Bluebird Bakery', 1, true]);
   const viewOnly = await (await L.handleAgencyChangeLog(new Request('http://x/agency/change-log?tz=UTC'), '/agency/change-log', 'GET', { ...member, role: 'designer' }, {}, '2026-11-15T18:00:00Z')).json();
   ok('studio: a role that can’t open a client reads its people unnamed, and no People lines', viewOnly.data.can_people === false && viewOnly.data.items.every((i) => i.area !== 'people') && viewOnly.data.items.some((i) => i.who === 'Someone on their side'));
   eq('studio: a route that isn’t this one is passed on', await L.handleAgencyChangeLog(new Request('http://x/agency/sites'), '/agency/sites', 'GET', member, {}), null);

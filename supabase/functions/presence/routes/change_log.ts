@@ -269,7 +269,7 @@ export async function handleAgencyChangeLog(req: Request, route: string, method:
   const days = daysBack(nowIso, 7, tz);
   const since = new Date(Date.parse(`${days[0]}T00:00:00Z`) - 14 * 3_600_000).toISOString();   // early enough for any zone; the band keeps the zone's seven days
   const b = await build(sites, { before: beforeOf(url.searchParams.get('before'), nowIso), nowIso, summarySince: since, summaryDays: days, inBand: (iso) => days.includes(dayIn(iso, tz)), tz, viewer: null, viewerSide: 'studio', agencyIds: [member.agency_id], canPeople, maskClient: !can(member.role, 'bulk_publish') });
-  const week = { days: b.summary.days, total: b.summary.total, went_live: b.summary.went_live, by_side: b.summary.by_side, people: b.summary.people.slice(0, 6), sites: b.summary.sites.slice(0, 3).map((x) => ({ ...x, name: b.names.get(x.site_id) || '' })) };
+  const week = { days: b.summary.days, total: b.summary.total, went_live: b.summary.went_live, by_side: b.summary.by_side, people: b.summary.people.slice(0, 6), site_count: b.summary.sites.length, sites: b.summary.sites.slice(0, 3).map((x) => ({ ...x, name: b.names.get(x.site_id) || '' })) };
   return json({ data: {
     items: filterItems(b.items, url.searchParams.get('area'), url.searchParams.get('who'), 'studio').map((it) => ({ ...it, site: b.names.get(it.site_id) || '' })),
     next_before: b.next, sites: Object.fromEntries(ids.map((x) => [x, b.names.get(x) || ''])), week, can_people: canPeople,
