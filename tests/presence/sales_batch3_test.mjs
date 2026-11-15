@@ -55,6 +55,14 @@ const appPages = [...new Set([...nav.matchAll(/'\/([a-z0-9-]+)\.html/g)].map((m)
 ok(`the menu names app pages (${appPages.length})`, appPages.length >= 10);
 for (const p of appPages) ok(`${p} revalidates on every load`, /no-cache/.test(ruleFor(p) || ''));
 for (const p of ['/shell.js', '/shell.css']) ok(`${p} revalidates on every load`, /no-cache/.test(ruleFor(p) || ''));
+// A script an app page loads has to keep up the same way: its own no-cache rule like shell.js,
+// a ?v= the page bumps when the file changes, or a versioned file under /vendor/. sales-ai.js
+// (item 94) shipped with none of the three, so a fix to it reached a browser a day late.
+const shellPages = [...Deno.readDirSync(ROOT)].map((e) => e.name).filter((n) => n.endsWith('.html') && read(n).includes('src="/shell.js"'));
+ok(`app pages found by the shell they load (${shellPages.length})`, shellPages.length >= 10);
+const unversioned = [...new Set(shellPages.flatMap((n) => [...read(n).matchAll(/<script[^>]*\ssrc="(\/[^"?]+\.js)"/g)].map((m) => m[1])))].filter((s) => !s.startsWith('/vendor/'));
+ok('the scan sees shell.js, loaded with no ?v=', unversioned.includes('/shell.js'));
+for (const s of unversioned) ok(`${s}, loaded by an app page with no ?v=, revalidates on every load`, /no-cache/.test(ruleFor(s) || ''));
 for (const p of ['/studio', '/sign', '/set-password', '/portal']) ok(`${p} keeps its no-store policy at the clean URL`, /no-store/.test(ruleFor(p) || ''));
 
 console.log(`\n${pass} passed, ${fail} failed`);

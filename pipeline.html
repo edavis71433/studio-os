@@ -674,6 +674,7 @@ html.dds-embed #detailWrap{padding-top:0}
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
+const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -696,7 +697,7 @@ const listUrl=()=>{const p=new URLSearchParams();if(scope())p.set('client',scope
 // forwarded to the parent record so they switch tabs instead of navigating the iframe.
 const EMBED=new URLSearchParams(location.search).get('embed')==='1';
 if(EMBED)document.addEventListener('click',(e)=>{const a=e.target&&e.target.closest&&e.target.closest('a[href]');if(!a)return;const href=a.getAttribute('href')||'';if(/^\/projects\.html/.test(href)){e.preventDefault();try{window.parent.postMessage({type:'dds-open-delivery'},location.origin);}catch(_){}}});
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope(),'x-region':FN_REGION});
 // final pass, batch C: on a phone the four numbers share one row (item 58); a long one
 // ("$12,450.50") shrinks to fit its quarter rather than being cut off
 function fitTiles(host){

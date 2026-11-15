@@ -346,6 +346,7 @@
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
+const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 // builder item 165: on a phone the header's other actions sit in a sheet behind ⋯; picking one puts the sheet away
@@ -365,7 +366,7 @@ sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_tok
 // ?view=website: the builder's Analytics tab. The website band on its own, since a
 // site tab isn't where someone comes for the studio's pipeline.
 const WEBSITE_VIEW=new URLSearchParams(location.search).get('view')==='website';
-async function api(path){const r=await fetch(FN+path,{headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()}});return r.ok?{ok:true,body:await r.json().catch(()=>({}))}:{ok:false,status:r.status};}
+async function api(path){const r=await fetch(FN+path,{headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope(),'x-region':FN_REGION}});return r.ok?{ok:true,body:await r.json().catch(()=>({}))}:{ok:false,status:r.status};}
 function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 
 // ── formatting (all money is cents; everything tabular-nums) ──
