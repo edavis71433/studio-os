@@ -25,6 +25,19 @@ export function emailMatch(email: unknown, column = 'email'): string {
   return `${column}=ilike.${encodeURIComponent(e.replace(/[\\%_]/g, (c) => '\\' + c))}`;
 }
 
+/** One PostgREST filter matching any of these addresses, whatever their capitals
+ *  (sales item 122: an import reads who is already here a hundred emails at a
+ *  time). Each is an ilike with its pattern characters escaped, inside quotes
+ *  so the dots and @ of an address read as text; an address holding a `*`
+ *  matches exactly, as emailMatch does. */
+export function emailsMatch(emails: unknown[], column = 'email'): string {
+  const q = (s: string) => '"' + s.replace(/[\\"]/g, (c) => '\\' + c) + '"';
+  const terms = [...new Set(emails.map(normEmail).filter(Boolean))].map((e) => e.includes('*')
+    ? `${column}.eq.${q(e)}`
+    : `${column}.ilike.${q(e.replace(/[\\%_]/g, (c) => '\\' + c))}`);
+  return `or=(${encodeURIComponent(terms.join(','))})`;
+}
+
 /** Did the database refuse a write because the row already exists? (Postgres
  *  unique_violation.) Two adds of one new person at once — two rows of one
  *  import file, two tabs — both pass the "is there one?" check before either

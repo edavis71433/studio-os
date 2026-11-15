@@ -24,7 +24,8 @@ ok('executor: anonymizes customer PII', /name: 'Deleted account', email: `delete
 // carrying email/endpoint/UA — not business records). No OTHER table row is
 // ever hard-deleted (financial evidence retained).
 ok('executor: RETAINS financial evidence (only auth-user + push-subscription DELETEs; no other table)', (del.match(/method: 'DELETE'/g) || []).length === 2 && /auth\/v1\/admin\/users\/\$\{u\.id\}`, \{ method: 'DELETE'/.test(del) && /presence_push_subscriptions\?email=eq\.\$\{enc\(em\)\}`, \{ method: 'DELETE'/.test(del) && /status: 'deleted'/.test(del) && /status: 'deleting'/.test(del));
-ok('executor: a failed run is retryable (status back to pending + error recorded)', /status: 'pending', error: res\.error/.test(del));
+// builder item 205: a run that completed but whose record didn't save goes back too
+ok('executor: a failed run is retryable (status back to pending + error recorded)', /const failure = res\.ok \? [^\n]+ : \(res\.error \|\| 'unknown'\);\s+await svc\(`presence_account_deletions\?id=eq\.\$\{d\.id\}`, \{ method: 'PATCH', body: JSON\.stringify\(\{ status: 'pending', error: failure \}\) \}\);/.test(del));
 ok('executor: cross-tenant safe (every op scoped to the row’s client_id)', (del.match(/client_id=eq\.\$\{enc\(clientId\)\}/g) || []).length >= 3);
 
 // request + cancel lifecycle

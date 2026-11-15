@@ -21,6 +21,7 @@ const RECORD = { data: {
 } };
 const RECORD_API = {
   '/crm/record': RECORD,
+  '/sales/stages': { data: { labels: { lead: 'New lead', qualified: 'Qualified', proposal: 'Proposal sent', contract: 'Agreement out', won: 'Won', lost: 'Not a fit' }, custom: {}, chances: {}, notes: { won: 'Send the welcome and the kickoff details.' }, notes_custom: {} } },   // item 124
   '/crm/activity': { data: { items: [], upcoming: [] } },
   '/crm/profile': { data: { profile: { business_name: 'Sam Rivera', edition: 'monitor', status: 'draft', live: false, last_published_at: null, members: 0, connected: 0, connected_needing_attention: 0, active_moments: 0, pending_approvals: 0, health: 'healthy' }, summary: 'Sam Rivera’s website is hosted elsewhere.', context: {} } },
   [`/sales/deals/${DEAL}`]: { data: { deal: { id: DEAL, title: 'Harbor Lane Bakery', stage: 'won', expected_value_cents: 320000, next_step: 'Sign Contract', next_step_at: '2026-08-06', converted_client_id: 'cl-1' }, proposals: [], contracts: [], invoices: [] } },
@@ -36,7 +37,7 @@ test.describe('the record after a win (items 49–52)', () => {
     const tile = page.locator('#hlpanel .hl').filter({ hasText: 'Next step' });
     await expect(tile).toContainText('Open their project to see what’s left');
     await expect(tile).not.toContainText('Sign Contract');
-    await expect(page.locator('.path-guide')).toContainText('Their project is 70% along.');
+    await expect(page.locator('.stage-note .sn-fact')).toContainText('Their project is 70% along.');   // item 124: the fact rides above the studio's note
     await expect(page.locator('#dcard')).toContainText('Website: hosted elsewhere');
     await expect(page.locator('#dcard')).not.toContainText('not yet');
     // the record's Upcoming & overdue band shows what the server sends, never the won deal's old step

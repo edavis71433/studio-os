@@ -123,9 +123,10 @@ test.describe('one page’s settings (builder items 48 and 120)', () => {
     await expect(pw).toBeFocused();
     await expect(pw).toHaveAttribute('type', 'password');
     expect(pagesWrites(writes)).toHaveLength(0);                          // picking it alone changes nothing
-    await pw.fill('abc');
+    await expect(panel.locator('[data-group="access"]')).toContainText('It keeps casual visitors out, not secrets');   // item 204
+    await pw.fill('letmein');
     await panel.getByRole('button', { name: 'Save password' }).click();
-    await expect(panel.locator('[data-group="access"] .pg-err')).toHaveText('Use at least 4 letters or numbers.');
+    await expect(panel.locator('[data-group="access"] .pg-err')).toHaveText('Use at least 8 letters or numbers.');   // item 204: seven is too few
     expect(writes.filter((w) => w.path === '/page-locks')).toHaveLength(0);
     await panel.getByRole('button', { name: 'Show' }).click();
     await expect(panel.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'text');
