@@ -1,6 +1,7 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import { installApp } from './helpers/app';
 import { installIosFocusSemantics } from './helpers/ios-focus';
+import { settled } from './helpers/app';
 
 // Nov 10 bug hunt, Pipeline (B7 · B8 · B13 · B14 · B19 · B20 and the small ones):
 //   B20 "5k" is $5,000 (it was saved as $5)
@@ -133,7 +134,7 @@ test.describe('board moves (B13, B21)', () => {
     await expect.poll(() => moved.length).toBeGreaterThan(0);
     land();
     await expect(toastWith(page, 'Moved to Proposal sent')).toBeVisible();
-    await page.waitForTimeout(700);
+    await settled(page);
     expect(moved).toEqual([{ id: D2, to: 'proposal' }]);
     await expect(toastWith(page, 'already moved')).toHaveCount(0);
   });

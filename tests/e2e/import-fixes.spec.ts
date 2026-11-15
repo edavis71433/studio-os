@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { settled } from './helpers/app';
 
 // List item 97 (Nov 10 bug hunt, B2 · B5 · B6 and two small ones): the CSV importers.
 // Contacts, Customers and Pipeline share one importer now (shell.js importPanel —
@@ -131,7 +132,7 @@ test.describe('item 97 — Close stops a running import (B6)', () => {
     await expect(page.locator('#csvZone input[type=file]')).toHaveCount(0);
     open();                                                                                      // the five on their way land
     await expect(toastWith(page, 'Stopped after 5 of 40 — 5 already yours')).toBeVisible();
-    await page.waitForTimeout(600);                                                              // a running import would have sent its next five by now
+    await settled(page);                                                              // a running import would have sent its next five by now
     expect(sent.length).toBe(5);
   });
 });

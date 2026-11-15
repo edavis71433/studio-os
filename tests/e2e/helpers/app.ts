@@ -146,6 +146,10 @@ export const CLIENT_NAV = [
 export const ALL_FEATURES = ['website', 'developer', 'forms', 'business_moments', 'connected', 'ai', 'relationship', 'reports', 'client_portal'];
 
 type Json = Record<string, unknown>;
+/** A stand-in's answer: fixed, or worked out from what a save sent, as a route that returns
+ *  the saved row answers (`(sent) => ({ data: { ...row, ...sent } })`). */
+// deno-lint-ignore no-explicit-any
+export type Answer = Json | ((sent: any) => Json);
 
 /** Default fixtures — a studio_os owner with two things needing them. */
 function defaults(): Record<string, Json> {
@@ -212,13 +216,13 @@ export function fixtureFor(keys: string[], method: string, path: string): string
 
 export interface AppOptions {
   session?: unknown | null;         // undefined → OWNER_SESSION; null → signed-out
-  api?: Record<string, Json>;       // overrides/extends fixtures by path-after-/presence ('/path' or 'POST /path')
+  api?: Record<string, Answer>;     // overrides/extends fixtures by path-after-/presence ('/path' or 'POST /path')
 }
 
 /** Stub Supabase, seed the session, and mock the presence API. Call BEFORE goto. */
 export async function installApp(page: Page, opts: AppOptions = {}): Promise<void> {
   const session = opts.session === undefined ? OWNER_SESSION : opts.session;
-  const fixtures = { ...defaults(), ...(opts.api || {}) };
+  const fixtures: Record<string, Answer> = { ...defaults(), ...(opts.api || {}) };
 
   // the shell keeps the who-am-I answer for the visit (sessionStorage 'dds-ctx:…').
   // A second installApp on a page that has already loaded stands for a different
@@ -264,7 +268,11 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
     const path = url.pathname.replace(/^.*\/functions\/v1\/presence/, '') || '/';
     const method = route.request().method();
     const key = fixtureFor(Object.keys(fixtures), method, path);
-    if (key) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixtures[key]) });
+    if (key) {
+      const answer = fixtures[key];
+      const sent = () => { try { return route.request().postDataJSON(); } catch { return null; } };
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(typeof answer === 'function' ? answer(sent()) : answer) });
+    }
     if (SAVES.has(method)) {
       const save = `${method} ${path}`;
       try {

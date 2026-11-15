@@ -33,6 +33,10 @@ const API = (over: Record<string, unknown> = {}) => ({
   '/forms/inbox': { data: { submissions: [queueRow()], unread: 1 } },
   '/notifications': { data: [], unread_count: 0 },
   '/crm/activity': { data: { upcoming: [], items: [{ id: 'i1', kind: 'message', type: 'message', title: 'The client sent a message', body: 'How is it going?', at: '2026-07-15T00:00:00Z', meta: null }], reply_to: `/projects/${PID}/messages`, reply_support_to: null } },
+  // the replies these tests send, answered as the server answers them (builder item 212)
+  'POST /forms/inbox/l-9/reply': { data: { sent: true, at: '2026-07-15T01:00:00Z', status: 'replied' } },
+  [`POST /projects/${PID}/messages`]: { data: { id: 'pm-new', project_id: PID, audience: 'client', body: 'Thanks!', author_kind: 'client', created_at: '2026-07-15T01:00:00Z' } },
+  'POST /support/s-1/messages': { data: { id: 'sm-new', request_id: 's-1', body: 'Done.', author_kind: 'client', created_at: '2026-07-15T01:00:00Z' } },
   '/support/s-1': { data: { request: { id: 's-1', subject: 'Logo tweak', status: 'open', body: 'Please tweak the logo', created_at: '2026-07-14T00:00:00Z' }, messages: [{ id: 'sm1', body: 'Can we make it bigger?', author_kind: 'client', created_at: '2026-07-14T01:00:00Z' }], is_studio_view: true } },
   ...over,
 });

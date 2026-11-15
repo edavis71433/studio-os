@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { settled } from './helpers/app';
 
 // SS2 (standards sweep) — the Agency roster wears the redesign anatomy: shared
 // .lhead with ↻ refresh under REQ_SEQ, fixed-view chips, sortable typed columns
@@ -275,7 +276,7 @@ test.describe('Agency portfolio', () => {
     await page.locator('#refreshBtn').click();   // read #2 departs — the server answers SLOWLY
     await page.locator('#refreshBtn').click();   // read #3 — answers fast
     await expect(page.locator('#main')).toContainText('FreshCo');
-    await page.waitForTimeout(1400);             // read #2 resolves late — it must be DROPPED
+    await settled(page);             // read #2 resolves late — it must be DROPPED
     await expect(page.locator('#main')).toContainText('FreshCo');
     await expect(page.locator('#main')).not.toContainText('StaleCo');
   });

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp, ALL_FEATURES, STUDIO_NAV } from './helpers/app';
+import { settled } from './helpers/app';
 
 // Rosters as Salesforce list views (redesign slice 3): customers.html and
 // contacts.html get a list-view header (object icon + fixed-view dropdown +
@@ -301,7 +302,7 @@ test.describe('Customers — SS6 quick wins', () => {
     await page.locator('#refreshBtn').click();
     await page.locator('#refreshBtn').click();
     await expect(page.locator('tbody tr')).toContainText(['Fresh Customer']);
-    await page.waitForTimeout(900);
+    await settled(page);
     await expect(page.locator('tbody tr')).toContainText(['Fresh Customer']);
     await expect(page.locator('#main')).not.toContainText('Stale Customer');
   });
@@ -374,7 +375,7 @@ test.describe('Contacts — SS6 quick wins', () => {
     await page.locator('#refreshBtn').click();
     await page.locator('#refreshBtn').click();
     await expect(page.locator('tbody tr')).toContainText(['Fresh Contact']);
-    await page.waitForTimeout(900);   // the stale response lands — and must be ignored
+    await settled(page);   // the stale response lands — and must be ignored
     await expect(page.locator('tbody tr')).toContainText(['Fresh Contact']);
     await expect(page.locator('#main')).not.toContainText('Stale Contact');
   });

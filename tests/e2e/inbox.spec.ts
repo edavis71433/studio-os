@@ -45,6 +45,12 @@ const API = {
     messages: [{ id: 'sm1', body: 'Can we make it bigger?', author_kind: 'client', created_at: '2026-07-14T01:00:00Z' }],
     is_studio_view: true,
   } },
+  // the saves these tests make, answered as the server answers them (builder item 212)
+  'POST /projects/aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa/messages': { data: { id: 'pm-new', project_id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', audience: 'client', body: 'On it — draft coming today.', author_kind: 'client', created_at: '2026-07-15T01:00:00Z' } },
+  'POST /support/s-1/messages': { data: { id: 'sm-new', request_id: 's-1', body: 'Done — take a look.', author_kind: 'client', created_at: '2026-07-15T01:00:00Z' } },
+  'PATCH /support/s-1': { data: { id: 's-1', subject: 'Logo tweak', status: 'resolved', resolved_at: '2026-07-15T01:00:00Z' } },
+  'POST /foundations/plans/p1/decide': { data: { id: 'p1', status: 'approved' } },
+  'POST /forms/inbox/l-9': { data: { ok: true } },
 };
 
 test.describe('Inbox — split-view console', () => {

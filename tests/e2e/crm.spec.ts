@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { settled } from './helpers/app';
 
 // CRM surfaces: website enquiries (the Inbox's Enquiries view) and the
 // relationship view (crm.html).
@@ -267,7 +268,7 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
     await page.locator('#refreshBtn').click();
     await page.locator('#refreshBtn').click();
     await expect(queue(page)).toContainText(['Fresh Lead']);
-    await page.waitForTimeout(900);   // let the stale response land
+    await settled(page);   // let the stale response land
     await expect(queue(page)).toContainText(['Fresh Lead']);
     await expect(page.locator('#rows')).not.toContainText('Stale Lead');
   });
@@ -753,7 +754,7 @@ test.describe('Relationship view', () => {
     await page.locator('[data-updone="t1"]').click();       // → activity call 2 (slow)
     await page.locator('[data-updone="t2"]').click();       // → activity call 3 (fast)
     await expect(page.locator('#timeline')).toContainText('Fresh item');
-    await page.waitForTimeout(900);                          // the stale response lands
+    await settled(page);                          // the stale response lands
     await expect(page.locator('#timeline')).toContainText('Fresh item');
     await expect(page.locator('#acard')).not.toContainText('Stale item');
   });

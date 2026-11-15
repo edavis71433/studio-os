@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { settled } from './helpers/app';
 
 // ── Business details: where each field shows, a short description, a second location (builder list item 127, Nov 2026) ──
 // Four cards; under each field one sentence says where it shows on the live site (two differ
@@ -116,7 +117,7 @@ test.describe('Business details: a second location', () => {
     await page.locator('#f2-label').fill('Glendale');
     await page.locator('#f2-address_line1').fill('410 Brand Blvd');
     await expect(page.locator('#p2Wait')).toBeVisible();
-    await page.waitForTimeout(900);
+    await settled(page);
     expect(placePuts(calls)).toHaveLength(0);   // not a place yet
     await page.locator('#f2-city').fill('Glendale');
     await page.locator('#f2-phone').fill('(555) 010-0199');

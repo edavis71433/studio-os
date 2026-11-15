@@ -2,6 +2,7 @@ import { test, expect, Page, Route } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { settled } from './helpers/app';
 
 // Builder list item 225 (Nov 2026): a link name per section, so a menu item or a button can jump
 // to it, and a shaped bottom edge between sections. First a client's published page as the
@@ -126,7 +127,7 @@ test.describe('Layout › Link name (builder item 225)', () => {
     await name.fill('main');
     await name.press('Enter');   // Enter keeps the name, as leaving the field does
     await expect(page.locator('.ins-link .ins-says')).toHaveText('Your site already uses “main” for one of its own parts. Pick another name.');
-    await page.waitForTimeout(900);   // past the save's own wait
+    await settled(page);   // the save's own wait is over
     expect(m.writes.filter((w) => w.path === '/settings' && JSON.stringify(w.body || {}).includes('"anchor":"main"'))).toHaveLength(0);
   });
 });

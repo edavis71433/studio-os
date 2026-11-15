@@ -167,7 +167,9 @@ test.describe('Sharing & access', () => {
   });
 
   test('a role changes from its own list; Remove asks for a second press; Send it again resends', async ({ page }) => {
-    await installApp(page, { api: { '/portal/members': people({ data: [DANA, JO] }), '/portal/shares': SHARES_NONE } });
+    await installApp(page, { api: { '/portal/members': people({ data: [DANA, JO] }), '/portal/shares': SHARES_NONE,
+      'POST /portal/members/m-1/role': { data: { ok: true, member: { id: 'm-1', email: 'dana@example.com', role: 'client_reviewer', status: 'active' }, message: 'dana@example.com is now Reviewer.' } },
+      'POST /portal/members/m-2/revoke': { data: { ok: true, message: 'Access removed.' } } } });
     await page.goto('/sharing.html');
     const card = peopleCard(page);
     const role = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/members/m-1/role'));
@@ -304,7 +306,7 @@ function spyScope(page: import('@playwright/test').Page): Array<[string, string]
 
 test.describe('Sharing & access — client scope', () => {
   test('opened with ?client=, every members/shares request carries x-dds-scope-site, the heading names the client, the breadcrumb keeps the client', async ({ page }) => {
-    await installApp(page, { api: { '/portal/context': SCOPED_CTX, '/portal/members': people({ data: [REVIEWER], owner: { name: 'Marlow Chen', email: 'marlow@example.com', signed_in: true, me: false }, studio: { name: 'Bright Studio', role: 'Website manager', people: [{ email: 'owner@example.com', role: 'Studio owner', me: true }] }, can_transfer: 'studio' }), '/portal/shares': SHARES_NONE } });
+    await installApp(page, { api: { 'POST /portal/members/m-1/revoke': { data: { ok: true, message: 'Access removed.' } }, '/portal/context': SCOPED_CTX, '/portal/members': people({ data: [REVIEWER], owner: { name: 'Marlow Chen', email: 'marlow@example.com', signed_in: true, me: false }, studio: { name: 'Bright Studio', role: 'Website manager', people: [{ email: 'owner@example.com', role: 'Studio owner', me: true }] }, can_transfer: 'studio' }), '/portal/shares': SHARES_NONE } });
     const seen = spyScope(page);
     await page.goto(`/sharing.html?client=${CLIENT}`);
     // the page says whose site it is, and the way back stays in scope

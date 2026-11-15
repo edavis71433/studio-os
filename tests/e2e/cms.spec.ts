@@ -52,6 +52,12 @@ test.describe('CMS workspace', () => {
   const BOARD_API = {
     ...PRESENCE_API,
     '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'restaurant-classic', template_version: 1, custom_domain: 'marlows.example' }, identity: { business_name: 'Marlow’s Kitchen' }, location: {} } },
+    // the saves these tests make, answered as the server answers them (builder item 212): the
+    // identity row as saved, and the phrases view (routes/search_tab.ts phrasesView, lib/search_tools.ts phraseTasks)
+    'PUT /identity': (sent: Record<string, unknown>) => ({ data: { site_id: 's1', business_name: 'Marlow’s Kitchen', ...sent } }),
+    'PUT /visibility/phrases': (sent: { phrases?: string[] }) => ({ data: { max: 3, ideas: [], pages: [],
+      list: (sent?.phrases || []).map((phrase) => ({ phrase, found: null })),
+      tasks: (sent?.phrases || []).map((p) => ({ key: `phrase:${p}`, priority: 'high', done: false, title: `Put “${p}” in a page’s search headline`, sub: 'Google reads the headline first. Pick the page that is about it.', go: 'phrases' })) } }),
     '/health': { data: { state: 'healthy', sentence: 'Your website is live and up to date.', detail: '', first_run: false, facts: {
       website: { state: 'live', label: 'Live', detail: 'marlows.example' },
       draft: { state: 'changes', label: '2 changes', detail: 'ready to publish' },

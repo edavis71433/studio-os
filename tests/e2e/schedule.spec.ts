@@ -84,7 +84,7 @@ test.describe('Scheduling — one place, inside Publish', () => {
   });
 
   test('what is already scheduled is listed with its own Cancel', async ({ page }) => {
-    await installApp(page, { api: { ...PRESENCE, '/schedule': ONE } });
+    await installApp(page, { api: { ...PRESENCE, '/schedule': ONE, 'POST /schedule/sc-1/cancel': { data: { ok: true, message: 'Canceled.' } } } });
     await page.goto('/presence.html#publish');
     const rit = page.locator('#ritualWrap');
     await expect(rit.getByText('Holiday hours')).toBeVisible();

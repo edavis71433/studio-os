@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp } from './helpers/app';
+import { settled } from './helpers/app';
 
 // Projects as a Lightning surface (redesign slice 9): the roster is a list view
 // on the shared .lhead anatomy (📁 icon + #pagehead + refresh + meta) with the
@@ -290,7 +291,7 @@ test.describe('Projects list view', () => {
     await page.locator('[data-open="p2"]').click();           // open a DIFFERENT record
     await expect(page.locator('#dtitle')).toContainText('Beta brand refresh');
     await expect(page.locator('#msgList')).toContainText('No messages yet');
-    await page.waitForTimeout(1100);                          // p1's stale response lands
+    await settled(page);                          // p1's stale response lands
     await expect(page.locator('#detailInner')).not.toContainText('STALE P1 MESSAGE');
     await expect(page.locator('#dtitle')).toContainText('Beta brand refresh');
   });

@@ -1,6 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
-import { touchScreen } from './helpers/app';
+import { touchScreen, settled } from './helpers/app';
 
 // Builder item 195 (Nov 12 review, file 06, findings 27 to 29): the editor answers the Tab key;
 // Clear the page and a starter layout stop at a section the studio locked, and a save the server
@@ -117,7 +117,7 @@ test.describe('a locked section on the page (item 195, finding 28)', () => {
     await page.evaluate(() => { (0, eval)('dcClearPage("")'); });   // not waited on: the old page asked first, and that question would hold the test
     await expect(page.getByText('Your studio locked a section on this page so it can’t be cleared. Ask them if it needs to change.')).toBeVisible();
     await expect(page.locator('dialog[open]')).toHaveCount(0);   // never asked: there's nothing to say yes to
-    await page.waitForTimeout(900);
+    await settled(page);
     expect(puts).toEqual([]);
     expect(await working(page)).toEqual(['Fresh bread', 'Our story']);
   });
@@ -126,7 +126,7 @@ test.describe('a locked section on the page (item 195, finding 28)', () => {
     const { puts } = await mount(page, { who: 'client', lock: LOCK });
     await page.evaluate(() => { (0, eval)('applyStarterLayout({ name: "Bakery", blocks: [{ type: "title", title: "A new start" }] })'); });
     await expect(page.getByText('Your studio locked a section on this page so a layout can’t replace its sections. Ask them if it needs to change.')).toBeVisible();
-    await page.waitForTimeout(900);
+    await settled(page);
     expect(puts).toEqual([]);
     expect(await working(page)).toEqual(['Fresh bread', 'Our story']);
   });
