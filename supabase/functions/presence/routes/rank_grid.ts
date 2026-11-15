@@ -19,7 +19,7 @@ import { updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { actsForClient } from '../lib/actor_kind.ts';
 import {
   COORDS_KEEP_DAYS, GRID_FINDS_PER_DAY, GRID_NAME_ASKS_PER_DAY, GRID_NOW_PER_DAY, PLACE_ID_RE, PRICES,
-  applyGridChange, checkPlaceId, costWords, findPlaces, mapsPlaceUrl, nextScanDay, normalizeGridSetting,
+  applyGridChange, checkPlaceId, costWords, findPlaces, gridDueNow, mapsPlaceUrl, nextScanDay, normalizeGridSetting,
   placeIdFromReviewUri, placeNames, scanCost, type GridSetting, type PlaceSource,
 } from '../lib/rank_grid.ts';
 import { SCAN_COLS, readGridSetting, scanAndKeep } from '../ops/rank_grid_scans.ts';
@@ -58,7 +58,7 @@ const todayStartMs = (nowMs: number) => Math.floor(nowMs / DAY_MS) * DAY_MS;
 /** The setting as the studio's page reads it. Pure. */
 export function settingView(s: GridSetting, nowIso: string) {
   return {
-    enabled: s.enabled, phrases: s.phrases, size: s.size, spacing: s.spacing, next: nextScanDay(nowIso),
+    enabled: s.enabled, phrases: s.phrases, size: s.size, spacing: s.spacing, next: nextScanDay(nowIso), due: gridDueNow(s, nowIso),
     place: s.place ? { ...s.place, maps: mapsPlaceUrl(s.place.id) } : null,
     last_result: s.last_result,
   };
@@ -140,6 +140,7 @@ export async function handleMapsGet(site: SiteRow, principal: Principal, cors: R
   }
   const data: Record<string, unknown> = {
     ready, studio, enabled: s.enabled, phrases, size: s.size, spacing: s.spacing, next: nextScanDay(nowIso),
+    due: gridDueNow(s, nowIso),   // this month's scan is still to run: a tick does it, usually the next one (one client a tick; none while Google’s daily allowance is used up)
     latest, history: hist.slice(0, 24).map((h) => histView(h, studio)),
   };
   if (studio) {
