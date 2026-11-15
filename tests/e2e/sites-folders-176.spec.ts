@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Builder list item 176 (Nov 2026): folders, tags and saved views on Sites, borrowed from
 // Wix Studio's Sites list. The fixtures match the REAL shapes: GET /agency/sites/organize and
@@ -284,7 +285,7 @@ test.describe('Sites: tags (builder list item 176)', () => {
 
   test('the table: a tick box a row, not a way in; the picked bar moves, tags and untags them; Clear', async ({ page }) => {
     const t = await openSites(page);
-    await page.locator('#dispTable').click();
+    await (await headerAction(page, '#dispTable')).click();   // builder item 165: behind the header's ⋯ on a phone
     const table = page.locator('#tableHost');
     await expect(table.getByRole('checkbox', { name: 'Pick every site shown' })).toBeVisible();
     await expect(table.locator('thead .thb').last()).toHaveText('Folder · Tags');
@@ -339,7 +340,7 @@ test.describe('Sites: saved views (builder list item 176)', () => {
     await expect(vb).toHaveText(/View:\s*Everything/);
     await tiles(page).filter({ hasText: 'Restaurants' }).click();
     await page.locator('#fpills [data-filter="live"]').click();
-    await page.locator('#dispTable').click();
+    await (await headerAction(page, '#dispTable')).click();   // builder item 165: behind the header's ⋯ on a phone
     await page.locator('#saveViewBtn').click();
     const dlg = page.locator('#svDlg');
     await expect(dlg.locator('#svKeeps .keep')).toHaveText(['Folder: Restaurants', 'Live', 'Table']);
@@ -407,7 +408,7 @@ test.describe('Sites: who can change them, and an older server (builder list ite
     await expect(page.locator('#rowMenuHost [role="menuitem"]')).not.toContainText(['Move to folder…']);
     await expect(page.locator('#rowMenuHost [role="menuitem"]')).not.toContainText(['Tags…']);
     await page.keyboard.press('Escape');
-    await page.locator('#dispTable').click();
+    await (await headerAction(page, '#dispTable')).click();   // builder item 165: behind the header's ⋯ on a phone
     await expect(page.locator('#tableHost input[type="checkbox"]')).toHaveCount(0);
     expect(t.writes).toEqual([]);
   });
@@ -423,7 +424,7 @@ test.describe('Sites: who can change them, and an older server (builder list ite
       await page.locator(`.scard[data-site="${ID.bistro}"] [data-menu]`).click();
       await expect(page.locator('#rowMenuHost [role="menuitem"]')).not.toContainText(['Move to folder…']);
       await page.keyboard.press('Escape');
-      await page.locator('#dispTable').click();
+      await (await headerAction(page, '#dispTable')).click();   // builder item 165: behind the header's ⋯ on a phone
       await expect(page.locator('#tableHost thead .thb').last()).toHaveText('Tags');
       await expect(page.locator('#tableHost input[type="checkbox"]')).toHaveCount(0);
       expect(t.writes).toEqual([]);
@@ -446,7 +447,7 @@ test.describe('Sites: folders on every size (builder list item 176)', () => {
     }
     expect(await serious(page, '#main')).toEqual([]);
 
-    await page.locator('#dispTable').click();
+    await (await headerAction(page, '#dispTable')).click();   // builder item 165: behind the header's ⋯ on a phone
     await page.locator('#tableHost').getByRole('checkbox', { name: 'Pick Taco Twelve' }).check();
     await expect(page.getByRole('region', { name: 'Picked sites' })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
