@@ -38,7 +38,7 @@ test.describe('Templates (builder list item 166)', () => {
     await openTemplates(page);
     await expect(page.getByRole('heading', { level: 1, name: 'Templates' })).toBeVisible();
     await expect(page.locator('.lmeta')).toHaveText('1 template · 1 starter kit');   // item 198: the built-in designs join this line when they load
-    await expect(page.locator('.tabs a')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage']);   // item 210: the Usage tab
+    await expect(page.locator('.tabs a')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage', 'Changes']);   // items 210 and 215: the Usage and Changes tabs
     await expect(page.locator('.tabs a[aria-current="page"]')).toHaveText('Templates');
     const rows = page.locator('.krow');
     await expect(rows).toHaveCount(2);

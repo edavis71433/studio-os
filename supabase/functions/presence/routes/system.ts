@@ -21,6 +21,7 @@ import { runMonthlyReports } from '../ops/monthly_report.ts';
 import { runAiChecks } from '../ops/ai_checks.ts';
 import { runRankGridScans } from '../ops/rank_grid_scans.ts';
 import { runSiteTrashPurge } from '../ops/site_trash.ts';
+import { runFileTrashPurge } from '../ops/file_trash.ts';
 import { runDuePosts } from '../ops/scheduled_posts.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runReviewRequests, runProspectNurture, runSupportAging, runAgreementRenewalReminders, runBookingReminders, runBookingFollowups, runEmailAuthNudges, runApexDriftWatch, runApprovalReminders } from '../commerce/lifecycle.ts';
 import { runScheduledBroadcasts } from '../lib/broadcast.ts';
@@ -325,6 +326,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'reconcile') return json({ data: await runReconcileStuckPublishes(limit) }, 200, cors); // M5: finalize stuck publishes
       if (task === 'heartbeat') return json({ data: await runUptimeHeartbeat(limit ?? 25) }, 200, cors); // uptime: probe live hosted sites
       if (task === 'media_gc') return json({ data: await reapMedia(limit ?? 100) }, 200, cors); // M6: reap soft-deleted + orphaned media
+      if (task === 'file_trash') return json({ data: await runFileTrashPurge(limit ?? 100) }, 200, cors); // item 218: empty what's been in a Trash 30 days
       if (task === 'snapshot_gc') return json({ data: await reapSnapshots(limit ?? 200) }, 200, cors); // M7: prune old unreferenced snapshots
       if (task === 'lifecycle') return json({ data: await runLifecycleSweep(limit) }, 200, cors); // Phase RL: trial expiry + lifecycle comms
       if (task === 'deletion') return json({ data: await runDeletionSweep(limit) }, 200, cors);   // P2-E W2: execute eligible account deletions
@@ -399,6 +401,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['monthly_reports', () => runMonthlyReports(20)],   // builder list item 58: last month's report to each switched-on client, in the first days of a month
             ['rank_grids', () => runRankGridScans(1)],   // builder list item 185: one switched-on client's monthly map rank grid at most (a few seconds a search)
             ['site_trash', () => runSiteTrashPurge(10)],   // builder list item 154: a site 90 days in a studio's trash is deleted for good
+            ['file_trash', () => runFileTrashPurge(100)],   // builder list item 218: a file 30 days in a site's Trash is deleted for good, unless the live site still shows it
             ['email_auth', () => runEmailAuthNudges(20)],   // DNS #5: escalate persistent SPF/DMARC/DKIM gaps to one owner nudge
             ['apex_drift', () => runApexDriftWatch(10)],    // DNS: verify the apex still points home; surface drift as a finding
             ['retention', () => runRetentionSweep()],
@@ -462,6 +465,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       await step('monthly_reports', () => runMonthlyReports(20));                  // builder list item 58: last month's report to each switched-on client (last_month dedupes)
       await step('rank_grids', () => runRankGridScans(1));                         // builder list item 185: one switched-on client's monthly map rank grid at most (month claimed first)
       await step('site_trash', () => runSiteTrashPurge(10));                       // builder list item 154: a site 90 days in a studio's trash is deleted for good
+      await step('file_trash', () => runFileTrashPurge(100));                      // builder list item 218: a file 30 days in a site's Trash is deleted for good, unless the live site still shows it
       const emailAuth = await step('email_auth', () => runEmailAuthNudges(20));     // DNS #5: escalate persistent SPF/DMARC/DKIM gaps → one owner nudge
       const apexDrift = await step('apex_drift', () => runApexDriftWatch(10));       // DNS: verify the apex still points home; surface drift as a finding
       const leads = await step('leads', () => runLeadFollowups(20));               // CRM: nudge un-replied leads, once per lead

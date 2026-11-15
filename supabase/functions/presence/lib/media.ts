@@ -11,6 +11,8 @@ import type { MediaManifestEntry } from './serializer.ts';
 import { magicMatchesMime, stripJpegExif, mediaQuota, quotaExceeded } from './media_guard.ts';
 import { fewAtATime } from './few_at_a_time.ts';
 import type { KnownFile } from './netlify.ts';
+import { trashPatch, trashGoesAt } from './media_trash.ts';
+import { missingColumnSignal } from './inbound_email.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -122,8 +124,9 @@ export async function importImage(siteId: string, bytes: Uint8Array, mime: strin
   return { media_id: res.media_id, storage_path: res.storage_path };
 }
 
-/** Delete: refuse while referenced (names the blockers); soft-delete row + remove object. */
-export async function deleteMedia(siteId: string, mediaId: string) {
+/** The places that use a file, named for the owner (empty: nothing does). The checks both
+ *  doors share: deleteMedia's, and the Trash's (item 218). */
+export async function mediaInUse(siteId: string, mediaId: string): Promise<string[]> {
   const [off, posts, deliverables, settingsQ, libraryQ] = await Promise.all([
     svc(`presence_offerings?site_id=eq.${siteId}&media_id=eq.${mediaId}&deleted_at=is.null&select=name`),
     svc(`presence_posts?site_id=eq.${siteId}&hero_media_id=eq.${mediaId}&deleted_at=is.null&select=title`),
@@ -170,6 +173,14 @@ export async function deleteMedia(siteId: string, mediaId: string) {
     ...(Array.isArray(deliverables.json) ? deliverables.json.map((d: any) => `deliverable “${d.title || 'file'}”`) : []),
     ...siteRefs,
   ];
+  return refs;
+}
+
+/** Delete for good: refuse while referenced (names the blockers); soft-delete row + remove
+ *  object. Only for the server's own clean-ups now (a public upload that didn't finish);
+ *  a person's Delete moves the file to the Trash (trashMedia). */
+export async function deleteMedia(siteId: string, mediaId: string) {
+  const refs = await mediaInUse(siteId, mediaId);
   if (refs.length) return { error: 'in_use', message: `That image is used by ${refs.join(' and ')} — remove it there first.` };
 
   const row = await svc(`presence_media?id=eq.${mediaId}&site_id=eq.${siteId}&select=storage_path`, {});
@@ -180,6 +191,23 @@ export async function deleteMedia(siteId: string, mediaId: string) {
     await fetch(`${SB_URL}/storage/v1/object/${BUCKET}/${objectPath}`, { method: 'DELETE', headers: { Authorization: `Bearer ${SB_SERVICE}`, apikey: SB_SERVICE } });
   }
   return { ok: true };
+}
+
+/** Item 218: a person's Delete. Refused while the file is used (the same names as above),
+ *  then the file goes in the Trash: out of every list, the picker and the site's space, the
+ *  stored file kept for FILE_TRASH_DAYS so Put back has something to bring back. */
+export async function trashMedia(siteId: string, mediaId: string, by: string) {
+  const refs = await mediaInUse(siteId, mediaId);
+  if (refs.length) return { error: 'in_use', message: `That image is used by ${refs.join(' and ')} — remove it there first.` };
+  const cur = await svc(`presence_media?id=eq.${mediaId}&site_id=eq.${siteId}&deleted_at=is.null&select=metadata&limit=1`);
+  const row = cur.ok && Array.isArray(cur.json) ? cur.json[0] : null;
+  if (!row) return { error: 'not_found', message: 'That file isn’t in Files any more.' };
+  const now = new Date().toISOString();
+  const r = await svc(`presence_media?id=eq.${mediaId}&site_id=eq.${siteId}&deleted_at=is.null`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(trashPatch(now, by, row.metadata)) });
+  // before migration 0225 there is no Trash to move it to: nothing is deleted
+  if (!r.ok && missingColumnSignal(r.json, r.text, 'trashed_at')) return { error: 'trash_unavailable', message: 'The Trash isn’t switched on yet, so nothing was deleted. Try again after the next update.' };
+  if (!r.ok || !Array.isArray(r.json) || !r.json.length) return { error: 'trash_failed', message: 'That didn’t move to the Trash. Try again.' };
+  return { ok: true as const, trashed_at: now, goes_at: trashGoesAt(now) };
 }
 
 /** How a transform that names only a width must resize — see the transform

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { holdShell } from './helpers/late-shell';
 
 // shell.js loads with defer, so a page's own script can draw and wire its list before the
 // shared list tools (window.ddsListKit) exist. Columns on Customers and Contacts was wired only
@@ -11,13 +12,6 @@ import { installApp } from './helpers/app';
 // so a press made before shell.js lands is sent from script; the ones after it are real taps.
 // Every name is made up.
 
-/** Hold shell.js on the wire. The page draws without it; the function returned lets it through. */
-async function holdShell(page: Page): Promise<() => void> {
-  let letGo = () => {};
-  const gate = new Promise<void>((r) => { letGo = r; });
-  await page.route('**/shell.js', async (route) => { await gate; await route.continue().catch(() => { /* the test ended first */ }); });
-  return letGo;
-}
 const kitThere = (page: Page) => page.evaluate(() => typeof (window as unknown as { ddsListKit?: unknown }).ddsListKit === 'object');
 // the page's own script must not throw while it waits (a press with no tools yet does nothing)
 const errorsOn = (page: Page) => { const errs: string[] = []; page.on('pageerror', (e) => errs.push(e.message)); return errs; };

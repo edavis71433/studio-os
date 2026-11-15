@@ -40,7 +40,9 @@
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
   .seg button{border:none;border-radius:0;padding:6px var(--dds-s3,12px);font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer;min-height:36px}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
-  .tabs{display:flex;gap:var(--dds-s1,4px);margin-top:10px;border-top:1px solid var(--line);padding-top:var(--dds-s2,8px)}
+  .tabs{display:flex;gap:var(--dds-s1,4px);margin-top:10px;border-top:1px solid var(--line);padding-top:var(--dds-s2,8px);overflow-x:auto;scrollbar-width:none}   /* item 215: five tabs slide on a phone, never widen the page */
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs a{white-space:nowrap}
   .tabs a{font-size:13.5px;font-weight:600;color:var(--soft);text-decoration:none;padding:6px var(--dds-s3,12px);border-radius:var(--dds-r,8px)}
   .tabs a:hover{color:var(--p);background:var(--p-soft)}
   .tabs a[aria-current="page"]{color:var(--p);background:var(--p-soft)}
@@ -895,7 +897,7 @@ function headHtml(shown){
       ${META.can_create?'<button type="button" class="btn" id="newSiteBtn" style="margin-left:auto">+ New site</button>':''}
     </div>
     <div class="lmeta" id="lmeta">${lmetaText(shown)}</div>
-    <nav class="tabs" aria-label="Sites, domains, templates and usage"><a href="/sites.html" aria-current="page">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html">Templates</a><a href="/usage.html">Usage</a></nav>
+    <nav class="tabs" aria-label="Sites, domains, templates, usage and changes"><a href="/sites.html" aria-current="page">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html">Templates</a><a href="/usage.html">Usage</a><a href="/changes.html">Changes</a></nav>
   </header>`;
 }
 // the band: the facts the server already knows, across every site; each number filters the cards

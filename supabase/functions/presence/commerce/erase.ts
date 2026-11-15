@@ -21,6 +21,7 @@
 // deletion stays pending, and the next run repeats them all: each is safe to repeat.
 import { svc } from '../lib/db.ts';
 import { BUCKET } from '../lib/media.ts';
+import { missingColumnSignal } from '../lib/inbound_email.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -109,5 +110,9 @@ export async function eraseSiteData(siteId: string, deps: EraseDeps = eraseDeps)
   // 3. the media library's rows: their files are gone
   const m = await svc(`presence_media?site_id=eq.${siteId}&deleted_at=is.null`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ deleted_at: new Date().toISOString() }) });
   if (!m.ok) return { ok: false, step: 'presence_media' };
+  // item 218: files already in the Trash went with the folders above; their rows lose the Trash's
+  // mark, so media_gc clears them like any deleted file instead of the 30-day sweep keeping them
+  const t = await svc(`presence_media?site_id=eq.${siteId}&trashed_at=not.is.null`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ trashed_at: null }) });
+  if (!t.ok && !missingColumnSignal(t.json, t.text, 'trashed_at')) return { ok: false, step: 'presence_media trash' };
   return { ok: true };
 }
