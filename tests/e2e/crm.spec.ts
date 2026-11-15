@@ -140,7 +140,7 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
     await expect(pane.locator('.card .body').first()).toHaveText('Can I get a quote for a patio?');
     // the action row; since the bold redesign the deal and Spam sit in the pane's head
     const acts = pane.locator('.acts');
-    await expect(acts.locator('button')).toHaveText(['Make customer', 'Mark read', 'Not a fit']);   // bold redesign: + Make it a deal and Spam sit in the pane's head
+    await expect(acts.locator('button')).toHaveText(['Make customer', 'Mark read', 'Not a fit', 'Delete']);   // bold redesign: + Make it a deal and Spam sit in the pane's head; builder item 203 adds Delete at the end
     await expect(pane.locator('#paneActs button')).toHaveText(['+ Make it a deal', /Spam/]);
     await expect(pane.locator('#paneActs button.quiet')).toHaveText(/Spam/);   // still the quiet one
     // a read row (Dana) has no dot, its own initials, and no Mark read
@@ -347,7 +347,7 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
     const pane = await pick(page, 'Sam Rivera');
     await expect(pane.getByRole('link', { name: '✓ In pipeline — view deal' })).toHaveAttribute('href', '/crm.html?deal=d-7&tab=deal');
     for (const name of ['+ Make it a deal', 'Reply & make it a deal', 'Make customer', 'Not a fit']) await expect(pane.getByRole('button', { name })).toHaveCount(0);
-    await expect(pane.locator('button.quiet')).toHaveCount(0);
+    await expect(pane.locator('button.quiet')).toHaveText(['Delete']);   // no Spam once it is in the pipeline; builder item 203's Delete stays
   });
 
   test('+ Make it a deal turns the enquiry into a deal and the card flips to “In pipeline”', async ({ page }) => {
