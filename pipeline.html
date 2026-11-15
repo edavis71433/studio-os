@@ -3432,7 +3432,7 @@ async function openDeal(id){
     const draftContract=(data.contracts||[]).find(k=>k.status==='draft'); // saved but not sent
     // Convert = adding YOUR customer (service voice, frozen billing boundary):
     // the studio bills them for the work — they never subscribe to software.
-    // Self-serve platform signups pick a plan at signup.html; never here.
+    // Nobody signs up by themselves (builder item 199), so no plan is picked here.
     const whoName=esc(((c&&c.name)||d.title||'this client'));
     const convExplain=(c&&c.email
       ? `This adds ${whoName} as your customer — it creates their client portal and emails ${esc(c.email)} a link to set their password and sign in. Nothing else needed.`

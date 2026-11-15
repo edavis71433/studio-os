@@ -58,9 +58,9 @@ const pageOf = (href) => {
 // ═══ 2. the shell's fixed navigation targets resolve ═══
 {
   // hard-coded destinations in shell.js / approve.html / help.html (non-buildNav)
-  const shellTargets = ['/help.html', '/portal.html', '/dds-studio-manage-9k2p.html', '/pricing.html', '/today.html', '/agency.html', '/client.html', '/developer.html', '/crm.html'];
+  const shellTargets = ['/help.html', '/portal.html', '/studio.html', '/pricing.html', '/today.html', '/agency.html', '/client.html', '/developer.html', '/crm.html'];
   const missing = shellTargets.filter((t) => !pages.has(t));
-  ok('shell + fixed targets all resolve (help/portal/admin/pricing/…)', missing.length === 0, missing.join(', '));
+  ok('shell + fixed targets all resolve (help/portal/studio/pricing/…)', missing.length === 0, missing.join(', '));
 }
 
 // ═══ 3. the guard itself is meaningful (a known page exists; a fake one doesn't) ═══
