@@ -64,8 +64,8 @@ test.describe('the copied-words item (finding 32)', () => {
     await mount(page, '#publish', { changesData: changes({ blockers: 1, blocker_list: [{ field: 'copied', message: COPIED, at: { page: '', index: 1 } }] }) });
     await expect(ritualRow(page)).toHaveCount(1);
     await expect(ritualRow(page)).toContainText(COPIED + ' Or ask your studio to keep them as they are.');
-    await expect(ritualRow(page).getByRole('button', { name: 'Keep the copied words and photos as they are' })).toHaveCount(0);
-    await ritualRow(page).getByRole('button', { name: /^Fix/ }).click();
+    await expect(ritualRow(page).getByRole('button', { name: 'Keep them as they are' })).toHaveCount(0);
+    await ritualRow(page).getByRole('button', { name: /^Change them/ }).click();
     await expect(page.locator('#ritualWrap')).not.toHaveClass(/\bon\b/);
     await expect(page.locator('#view-business')).toBeHidden();
     await expect(page.locator('#settingsPanel')).toHaveAttribute('data-mode', 'section');
@@ -76,9 +76,10 @@ test.describe('the copied-words item (finding 32)', () => {
     const { posts } = await mount(page, '#publish', { studio: true, changesData: changes({ blockers: 1, blocker_list: [{ field: 'copied', message: COPIED, at: { page: '', index: 1 } }] }) });
     await expect(ritualRow(page)).toHaveText(new RegExp(COPIED.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     await expect(ritualRow(page)).not.toContainText('Or ask your studio');
-    await ritualRow(page).getByRole('button', { name: 'Keep the copied words and photos as they are' }).click();
+    await ritualRow(page).getByRole('button', { name: 'Keep them as they are' }).click();
+    await page.getByRole('button', { name: 'Keep them', exact: true }).click();   // it asks first (item 216)
     await expect.poll(() => posts.find((p) => p.path === '/agency/sites/s1/copied')?.body).toEqual({ keep: true });
-    await expect(page.getByText('Kept as they are. They can go live now.')).toBeVisible();
+    await expect(page.getByText('Kept as they are. They can publish now.')).toBeVisible();
   });
 });
 
