@@ -17635,6 +17635,7 @@ function dcEditorKey(e, inDoc) {
   if (DC_MODE !== "edit" || IPE || IDE || PDRAG || document.querySelector("dialog[open], .scrim.on")) return;
   if ($("stage").classList.contains("on") || $("ritualWrap").classList.contains("on")) return;
   const id = dcKeyAction(e); if (!id) return;
+  if (stkKey(e, id, inDoc || document)) return;   // item 57: with a block picked, the keys work on the block
   const el2 = dcPickedSection(); if (!el2) return;
   // Enter and Delete belong to whatever has the focus; they reach the section only from the page itself
   const home = inDoc || document;
@@ -17681,6 +17682,7 @@ function dcKeysSheet() {
   };
   group("Anywhere in the editor", [["Undo", [DCK.mod, "Z"]], ["Redo", [DCK.shift, DCK.mod, "Z"]], ["Close the open card", ["Esc"]], ["Search Studio OS", [DCK.mod, "K"]], ["This list", ["?"]]]);
   group("The section you picked", [["Edit it", ["Enter"]], ["Duplicate it", [DCK.mod, "D"]], ["Copy, cut, paste below", [DCK.mod, "C", "X", "V"]], ["Move it up or down", [DCK.alt, "↑", "↓"]], ["Delete it (asks first)", [DCK.del]]]);
+  group("A block you picked", [["Copy it", [DCK.mod, "D"]], ["Move it up or down", [DCK.alt, "↑", "↓"]], ["Delete it", [DCK.del]], ["Back to the whole section", ["Esc"]]]);
   dlg.appendChild(el("p", "dck-note", (KEY_MAC ? "On a Windows computer, Ctrl takes the place of ⌘ and Alt of ⌥." : "On a Mac, ⌘ takes the place of Ctrl and ⌥ of Alt.")
     + " Keys never fire while you are typing in a box or in the page’s words."));
   document.body.appendChild(dlg);
@@ -19668,6 +19670,11 @@ function stkInject(doc, main, live) {
         e.preventDefault(); e.stopPropagation();
         const c = eeClassify(sec); if (c.kind === "block") stkEdit(c.bi, Number(node.getAttribute("data-dds-item")), "content");
       });
+      // a right-click opens the whole section's menu (item 158), so the block lets go and the keys follow the menu
+      node.addEventListener("contextmenu", (e) => {
+        if (!STK_PICK || DC_MODE !== "edit" || Date.now() - (doc.__dcTouchAt || 0) < 900 || (IPE && IPE.el && IPE.el.contains(e.target))) return;
+        stkUnpick();
+      });
       node.addEventListener("keydown", (e) => {
         if (DC_MODE !== "edit" || IPE || e.target !== node || node.hasAttribute("data-dds-field")) return;   // a block's words take Enter to type into them
         if (e.key !== "Enter" && e.key !== " ") return;
@@ -19710,6 +19717,23 @@ function stkUnpick() {
   }
   stkPhoneBar(null);
   stkTreeMark(null);
+}
+// The editor's keys (item 158) with a block picked work on the block, as its toolbar does.
+// Copy, cut and paste stay with whole sections: Esc lets go of the block first.
+function stkKey(e, id, home) {
+  const p = STK_PICK, it = p && (stkItems(p.bi) || [])[p.j];
+  const doc = it && dcFrameDoc(), hit = doc && stkFind(doc, p.bi, p.j);
+  if (!hit) return false;
+  if (id === "copy" || id === "cut" || id === "paste") return true;
+  const t = e.target;
+  if ((id === "edit" || id === "del") && t !== hit.el && t !== home.body && t !== home.documentElement && t !== home) return true;   // Enter and Delete belong to whatever has the focus
+  const b = BLOCKS_WORK[p.bi];
+  e.preventDefault(); e.stopPropagation();
+  if (id === "edit") { if (lockedForMe(b) && !(b.lock && b.lock.words)) lockStop(p.bi); else stkEdit(p.bi, p.j, "content"); }
+  else if (id === "dup") stkCopy(p.bi, p.j);
+  else if (id === "up" || id === "down") stkMove(p.bi, p.j, id === "up" ? -1 : 1);
+  else if (id === "del") stkDelete(p.bi, p.j);
+  return true;
 }
 function stkToolbar(doc, node, bi, j) {
   const tb = doc.getElementById("dds-dc-blk"), more = doc.getElementById("dds-dc-blkmore"); if (!tb) return;

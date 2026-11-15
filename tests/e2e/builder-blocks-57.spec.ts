@@ -1,7 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { mountCanvas, PAGE_HTML } from './helpers/editor';
+import { mountCanvas, PAGE_HTML, markCanvas, canvasReplaced } from './helpers/editor';
 
 // Builder list item 57, the editor half: blocks inside a section (Figma node 324:789). The canvas
 // is a Blocks section and a Text section as the real renderer stamps them (tests/presence/
@@ -188,5 +188,55 @@ test.describe('Blocks inside a section, in the editor', { tag: '@touch' }, () =>
     await expect(page.locator('#ritualWrap .jrow')).toContainText('“Our story” on your home page: a button added.');
     await page.locator('#ritualWrap .pubbtn').click();
     await expect.poll(() => published, { timeout: 6000 }).toEqual(['POST']);
+  });
+});
+
+// The editor's keys (builder item 158) with a block picked work on the block; Esc hands them back
+// to the section. This canvas is drawn once, so after each save the test picks from the four
+// blocks it still shows.
+test.describe('keys on a picked block', () => {
+  test.beforeEach(({}, info) => { test.skip(info.project.name !== 'desktop-chromium', 'keys need a keyboard'); });
+
+  test('⌥↓ moves the block, ⌘D copies it and Delete deletes it with Undo; after Esc or a right-click they work on the section', async ({ page }) => {
+    const { frame, puts } = await open(page);
+    const item = (j: number) => frame.locator(`section.block-stack [data-dds-item="${j}"]`);
+    const key = async (k: string, n: number) => {   // a key that saves, and the canvas drawn again after it
+      await markCanvas(frame);
+      await page.keyboard.press(k);
+      await expect.poll(() => puts.length, { timeout: 6000 }).toBe(n);
+      await canvasReplaced(frame);
+    };
+    await item(2).click();
+    await expect(item(2)).toHaveClass(/dc-blk-on/);
+    await key('Alt+ArrowDown', 1);
+    expect(kinds(puts[0])).toBe('heading,text,button,image');
+    await expect(item(3)).toHaveClass(/dc-blk-on/);   // the moved block is still the picked one
+    await key('ControlOrMeta+d', 2);
+    expect(kinds(puts[1])).toBe('heading,text,button,image,image');
+    await item(1).click();
+    await key('Backspace', 3);
+    expect(kinds(puts[2])).toBe('heading,button,image,image');
+    await expect(page.getByText('Text deleted')).toBeVisible();
+    await expect(page.locator('dialog[open]')).toHaveCount(0);   // a block goes at once, with Undo; only a whole section asks first
+    expect((puts[2].blocks as Block[]).map((b) => b.type)).toEqual(['stack', 'richtext']);
+    // a right-click opens the whole section's menu, so a picked block lets go
+    await item(1).click();
+    await expect(item(1)).toHaveClass(/dc-blk-on/);
+    await item(1).click({ button: 'right' });
+    await expect(frame.getByRole('menuitem', { name: 'Edit section' })).toBeVisible();
+    await expect(item(1)).not.toHaveClass(/dc-blk-on/);
+    await page.keyboard.press('Escape');
+    await expect(frame.getByRole('menuitem', { name: 'Edit section' })).toBeHidden();
+    // Esc lets go of the block, and then ⌥↓ moves the whole section
+    await item(1).click();
+    await expect(item(1)).toHaveClass(/dc-blk-on/);
+    await page.keyboard.press('Escape');
+    await expect(item(1)).not.toHaveClass(/dc-blk-on/);
+    await item(0).hover();
+    await expect(frame.locator('#dds-dc-bar')).toHaveClass(/\bon\b/);
+    await key('Alt+ArrowDown', 4);
+    expect((puts[3].blocks as Block[]).map((b) => b.type)).toEqual(['richtext', 'stack']);
+    await page.keyboard.press('?');
+    await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toContainText('A block you picked');
   });
 });
