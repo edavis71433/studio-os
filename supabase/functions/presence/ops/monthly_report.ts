@@ -19,8 +19,8 @@
 // flipped mid-run stays flipped; switching on marks last month as handled, so the
 // first report really is next month's; the visits are read in full pages.
 import { svc, svcCount, svcPages, svcPaged } from '../lib/db.ts';
-import { aggregateVisits } from '../lib/visits.ts';
-import type { VisitRow } from '../lib/visits.ts';
+import { aggregateVisits, reportSpeed, speedWords } from '../lib/visits.ts';
+import type { VisitRow, SpeedRow, ReportSpeed } from '../lib/visits.ts';
 import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
 import type { EmailBrand } from '../lib/email_brand.ts';
 import { sendEmail } from '../commerce/account.ts';
@@ -99,6 +99,8 @@ export interface ReportData {
   ai: { month: string; asked: number; named: number; priorNamed: number | null; engines: string; questions: Array<{ q: string; named: boolean | null }>; newlyNamed: string | null } | null;
   reviews: { rating: number | null; count: number | null; newGoogle: number | null; unreplied: number | null; ownNew: number | null } | null;
   health: { n: number; then: number | null; fixed: number } | null;
+  // builder list item 211: how fast pages showed for the month's visitors (lib/visits.ts speedOf)
+  speed: ReportSpeed | null;
   maps?: ReportMaps | null;      // builder list item 185: the map rank grid, for clients the studio switched it on for
 }
 /** Builder list item 185: the month's map rank grid. The first search with a scan that
@@ -290,7 +292,7 @@ export function foldReport(i: { month: string; label: string; startMs: number; e
   const pubs = i.publishes ? i.publishes.filter((p) => inMonth(p.created_at)) : null;
   const lastPublishedAt = pubs && pubs.length ? pubs.map((p) => p.created_at).sort().slice(-1)[0] : null;
   return { month: i.month, monthLabel: i.label, visitors, pageviews, truncated, enquiries: i.enquiries, topPages, publishes: pubs ? pubs.length : null, lastPublishedAt, address: i.address, ...(i.timeZone ? { timeZone: i.timeZone } : {}),
-    siteName: '', priorLabel: '', priorVisitors: null, search: null, followed: [], ai: null, reviews: null, health: null, maps: null };
+    siteName: '', priorLabel: '', priorVisitors: null, search: null, followed: [], ai: null, reviews: null, health: null, speed: null, maps: null };
 }
 
 /** Builder list item 185: the map rank grid for the report, from the scans in the month and
@@ -415,6 +417,8 @@ export function reportHtml(d: ReportData, o: { studioName: string; note: string;
     const h = d.health;
     parts.push(`<p style="margin:14px 0 6px"><strong>Website health</strong></p><p style="margin:0 0 8px">${h.n === 0 ? 'Nothing to look at' : `${h.n} thing${h.n === 1 ? '' : 's'} to look at`}${h.then !== null ? (h.then === h.n ? ', the same as a month ago' : `, ${Math.abs(h.then - h.n)} ${h.then > h.n ? 'fewer' : 'more'} than a month ago`) : ''}${h.fixed ? `. ${h.fixed} fixed this month` : ''}.</p>`);
   }
+  const fast = speedWords(d.speed);   // builder list item 211: rides the Website health switch
+  if (fast && on('health')) parts.push(`<p style="margin:14px 0 6px"><strong>How fast it loads</strong></p><p style="margin:0 0 8px">${esc(fast)}</p>`);
   if (!on('pages')) { /* left out */ }
   else if (d.topPages.length) {
     parts.push(`<p style="margin:10px 0 6px"><strong>What people read most</strong></p><ol style="margin:0 0 14px;padding-left:20px">${d.topPages.map((p) => `<li>${esc(pageName(p.path))} <span style="color:#6b6478">· ${n1(p.views)} view${p.views === 1 ? '' : 's'}</span></li>`).join('')}</ol>`);
@@ -436,10 +440,12 @@ const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await
 const VISITS_PAGE = 1000, VISITS_PAGES = 50;   // every page or none (lib/db.ts svcPages); 50,000 visits a month at most
 /** The month's reads for one site. Each part is best-effort on its own. */
 export async function loadReportData(site: SiteRow, win: { month: string; startIso: string; endIso: string; label: string }, timeZone?: string): Promise<ReportData> {
-  const [vq, enq, pq] = await Promise.all([
+  const [vq, enq, pq, sq] = await Promise.all([
     safe(svcPages(`presence_visits?site_id=eq.${site.id}&ts=gte.${win.startIso}&ts=lt.${win.endIso}&kind=not.in.(button,leave)&select=ts,kind,path,ref_host,utm_source,device,country,visitor_hash`, 'ts', VISITS_PAGE, VISITS_PAGES)),
     safe(svcCount(`presence_form_submissions?site_id=eq.${site.id}&spam=is.false&created_at=gte.${win.startIso}&created_at=lt.${win.endIso}`)),
     safe(svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&created_at=gte.${win.startIso}&created_at=lt.${win.endIso}&select=created_at&limit=500`)),
+    // builder list item 211: how fast pages showed, from the speed each visitor's browser reported as they left (0160)
+    safe(svcPages(`presence_visits?site_id=eq.${site.id}&ts=gte.${win.startIso}&ts=lt.${win.endIso}&kind=eq.leave&lcp_ms=not.is.null&select=path,device,lcp_ms`, 'ts', VISITS_PAGE, 5)),
   ]);
   const rows = <T,>(q: unknown): T[] | null => (q && (q as { ok?: boolean }).ok && Array.isArray((q as { json?: unknown }).json)) ? (q as { json: T[] }).json : null;
   const visits = vq ? (vq.rows as VisitRow[]) : null;
@@ -473,7 +479,7 @@ export async function loadReportData(site: SiteRow, win: { month: string; startI
   const grid = await safe(readGridSetting(site.id));
   const mq = grid && grid.enabled && grid.phrases.length ? await safe(svc(`presence_rank_grid_scans?site_id=eq.${site.id}&scanned_at=gte.${encodeURIComponent(priorWin.startIso)}&scanned_at=lt.${encodeURIComponent(win.endIso)}&select=phrase,kind,scanned_at,size,spacing_mi,ranks,top3,total&order=scanned_at.desc&limit=60`)) : null;
   const maps = grid && mq ? foldMaps({ phrases: grid.phrases, now: [Date.parse(win.startIso), Date.parse(win.endIso)], prior: [Date.parse(priorWin.startIso), Date.parse(win.startIso)], scans: rows<any>(mq) }) : null;
-  return { ...base, ...extras, maps, siteName, priorLabel: priorWin.label.replace(/ \d{4}$/, '') };
+  return { ...base, ...extras, maps, siteName, priorLabel: priorWin.label.replace(/ \d{4}$/, ''), speed: reportSpeed(sq ? sq.rows as SpeedRow[] : null) };
 }
 
 /** The studio that looks after this client site (the active service link): its brand,
