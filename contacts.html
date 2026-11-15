@@ -1036,7 +1036,9 @@ function openAddCustomer(){
   $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
   const cf=$('cu-full');if(cf){cf.hidden=true;cf.textContent='';}
   const sb2=$('cu-submit');if(sb2){sb2.disabled=false;sb2.textContent='Set up + invite';}
-  $('custDlg').showModal();setTimeout(()=>$('cu-name').focus(),20);
+  // Name is the dialog's first field since the sign-up choice went (item 199), so showModal
+  // already focuses it; the late nudge never pulls focus back from a field someone has moved to
+  $('custDlg').showModal();setTimeout(()=>{const d=$('custDlg'),a=document.activeElement;if(!d.contains(a)||a===d)$('cu-name').focus();},20);
 }
 $('cu-cancel').onclick=()=>$('custDlg').close();
 $('cu-edition').onchange=syncCuSignup;
