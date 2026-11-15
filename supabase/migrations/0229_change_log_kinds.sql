@@ -60,7 +60,8 @@ begin
    where id = new.site_id;
   return new;
 end $$;
-revoke all on function public.presence_note_site_change() from public, anon, authenticated;   -- a trigger's own; nobody calls it
+-- a trigger's own; nobody calls it (create or replace keeps 0206's grants, this says so again)
+revoke all on function public.presence_note_site_change() from public, anon, authenticated;
 
 comment on constraint presence_change_events_entity_type_check on public.presence_change_events is
   'What a change line can be about. 0229 (item 239) added launch, preview and content_library (saved sections); launch and preview lines never move presence_sites.last_change_at.';
