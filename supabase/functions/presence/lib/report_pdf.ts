@@ -58,6 +58,9 @@ export function reportPdf(d: ReportData, o: { studioName: string; accent?: strin
   const prior = d.priorLabel || 'the month before';
   const boxes: Array<[string, string, string]> = [];
   if (d.visitors !== null && on('visits')) boxes.push(['Visits', n1(d.visitors), changeOn(d.visitors, d.priorVisitors, prior)]);
+  // builder list item 219: clicks to contact ride the Enquiries switch, as in the email
+  const c = d.contacts;
+  if (c && on('enquiries') && (c.calls + c.emails || c.prior)) boxes.push(['Clicks to contact', n1(c.calls + c.emails), c.prior === null ? '' : c.calls + c.emails === c.prior ? 'the same' : `${c.calls + c.emails > c.prior ? 'up' : 'down'} ${n1(Math.abs(c.calls + c.emails - c.prior))} on ${prior}`]);
   if (d.enquiries !== null && on('enquiries')) boxes.push(['Enquiries', n1(d.enquiries), '']);
   if (d.search && on('google')) boxes.push(['Google clicks', n1(d.search.clicks), changeOn(d.search.clicks, d.search.priorClicks, prior)]);
   if (d.ai && on('ai')) boxes.push(['AI answers', `${d.ai.named} of ${d.ai.asked}`, d.ai.priorNamed === null ? '' : d.ai.named === d.ai.priorNamed ? 'the same as before' : `${d.ai.named > d.ai.priorNamed ? 'up' : 'down'} ${Math.abs(d.ai.named - d.ai.priorNamed)}`]);
@@ -73,6 +76,8 @@ export function reportPdf(d: ReportData, o: { studioName: string; accent?: strin
     });
     y -= 66;
   }
+  // builder list item 219: why visits fell, under the numbers, when they did
+  if (d.drop && d.drop.short && on('visits')) { para(`Why visits fell: ${d.drop.sentence}`, 9.5, 'R', SOFT); y -= 4; }
   if (d.search && on('google')) {
     head('On Google');
     para(`${n1(d.search.clicks)} clicks to your site and ${n1(d.search.impressions)} times seen${changeOn(d.search.clicks, d.search.priorClicks, prior) ? `; clicks ${changeOn(d.search.clicks, d.search.priorClicks, prior)}` : ''}.`);
