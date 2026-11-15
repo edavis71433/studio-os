@@ -403,6 +403,8 @@
     var IMPORT_MAX = 500;   // one run's worth; the rest of a bigger file is named, never dropped in silence
     // host: an element to fill. o: {title, help, mapHeader(h)→key|null, ready(keys)→'' or a message, toItem(obj)→item|null,
     // label(item)→string, noun, send(item)→Promise<'added'|'existed'|'skipped'|'failed'>, summary(counts)→string, done()}
+    // Sales item 122: a page that can take the whole file at once gives sendAll(items, ctx)→Promise<counts> instead;
+    // then the file goes in ONE request (Contacts), not five rows at a time. send stays for the pages without it.
     function importPanel(host, o) {
       // One run per panel: Import CSV again while rows are going in leaves the running panel as it is
       // (a second run of the same file doubled everyone without an email, who can't be matched)
@@ -475,7 +477,7 @@
           go.addEventListener('click', function () {
             if (run.running || run.stop) return;
             run.running = true; go.disabled = true; file.disabled = true; closer.textContent = 'Stop';   // no second file under a running one
-            var counts = { added: 0, updated: 0, existed: 0, skipped: 0, failed: 0 }, done = 0, i = 0, ctx = { onExisting: how.onExisting || 'skip', importId: null };
+            var counts = { added: 0, updated: 0, existed: 0, skipped: 0, failed: 0 }, done = 0, i = 0, ctx = { onExisting: how.onExisting || 'skip', importId: null, fileName: how.fileName || '' };
             function finish(stopped) {
               run.running = false;
               if (host.__ddsImport === run) { host.__ddsImport = null; host.innerHTML = ''; }
@@ -490,6 +492,17 @@
               var chunk = items.slice(i, i + 5); i += 5;
               Promise.all(chunk.map(function (it) { return Promise.resolve().then(function () { return o.send(it, ctx); }).catch(function () { return 'failed'; }).then(function (k) { counts[k in counts ? k : 'failed']++; done++; }); }))
                 .then(function () { go.textContent = 'Importing ' + Math.min(done, items.length) + '/' + items.length + '…'; live.textContent = 'Imported ' + done + ' of ' + items.length; next(); });
+            }
+            // item 122: the whole file in one request. It can't be stopped halfway, so Close waits for it;
+            // what went in is said when it lands, and Undo takes it back for a day
+            if (o.sendAll) {
+              closer.disabled = true; closer.textContent = 'Close';
+              go.textContent = 'Importing ' + items.length + '…'; live.textContent = 'Importing ' + many(items.length) + ' in one go…';
+              Promise.resolve().then(function () { return o.sendAll(items, ctx); }).catch(function () { return null; }).then(function (got) {
+                if (got && typeof got === 'object') { for (var k in counts) counts[k] = Number(got[k]) || 0; } else counts.failed = items.length;
+                done = items.length; finish(false);
+              });
+              return;
             }
             // item 86: a page that keeps imports starts one first (its id rides on every row, for Undo)
             Promise.resolve(o.start ? o.start({ onExisting: ctx.onExisting, fileName: how.fileName || '' }) : null).then(function (id) { ctx.importId = id || null; }, function () { ctx.importId = null; }).then(next);
