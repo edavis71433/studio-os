@@ -120,6 +120,9 @@
   .rp-in li.off{background:var(--bg);color:var(--faint);border-style:dashed} .rp-in li.off::before{content:""}
   /* builder list items 160 and 176 (Nov 2026, as drawn): who gets it, what it says, what to suggest next */
   .rp-next{font-size:12.5px;font-weight:600;color:var(--p);text-align:right}
+  /* builder list item 200: the report waits until the website is live */
+  .rp-next.wait{color:var(--dds-info,#245fa0);background:var(--dds-info-soft,#e6effa);border-radius:999px;padding:3px 10px}
+  #reportLast.wait{color:var(--dds-info,#245fa0);font-weight:500}
   .rp-h{display:flex;align-items:center;gap:10px;margin:var(--dds-s3,12px) 0 0;padding-top:var(--dds-s3,12px);border-top:1px solid var(--line);font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
   .rp-h+.swrow{border-top:none;padding-top:10px}
   .swrow.rp-block{display:block}
@@ -189,6 +192,7 @@
   .rrow .rpill{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;background:var(--bg);color:var(--soft)}
   .rrow .rpill.sent{background:var(--good-soft,#e6f5ec);color:var(--good)}
   .rrow .rpill.warn{background:var(--warn-soft,#fdf2e2);color:var(--warn)}
+  .rrow .rpill.wait{background:var(--dds-info-soft,#e6effa);color:var(--dds-info,#245fa0)}
   .rrow .rgo{font-weight:600;color:var(--p);text-decoration:none;justify-self:end;font-size:13px}
   .rrow .rgo:hover{text-decoration:underline}
   .rrow .rdim{color:var(--faint)}
@@ -1340,7 +1344,7 @@ async function retryReport(e) {
   if (b && b.isConnected) { b.disabled = false; toast('Still couldn’t load — try again in a moment.', true); }
 }
 const REPORT_PARTS = [['visits', 'Visits'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['maps', 'On Google Maps'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['pages', 'Most read pages'], ['changes', 'What changed']];
-const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce', quiet: 'a quiet month, under your number of visits' };
+const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce', quiet: 'a quiet month, under your number of visits', not_live: 'the website wasn’t live yet' };
 const CC_BLOCK_WORDS = { unsubscribed: 'unsubscribed', bounced: 'emails bounce' };
 const SUGGEST_FROM = { idea: 'From their Do next list: a Growth Coach idea', ai: 'From their Do next list: an AI answer that misses them', search: 'From their Do next list: a Search to-do', health: 'From their Do next list: a website fix', reviews: 'From their Do next list: Google reviews waiting', own: 'Your own words' };
 const EMAIL_RE = /^[^\s@<>()",;]+@[^\s@<>()",;]+\.[^\s@<>()",;]{2,}$/;
@@ -1357,7 +1361,11 @@ function paintReport() {
   if (document.activeElement !== $('report-note')) $('report-note').value = d.note || '';
   $('reportLast').textContent = reportStatusLine(d);
   const n = reportPeople(d);
-  $('reportNext').textContent = d.enabled && d.next_month ? 'Next one: ' + monthAfter(d.next_month) + ' 1 · to ' + n + (n === 1 ? ' person' : ' people') : '';
+  // item 200: before the website is live the report waits, and the card says so instead of a date
+  const waiting = d.live === false;
+  $('reportLast').classList.toggle('wait', waiting);
+  $('reportNext').classList.toggle('wait', waiting && !!d.enabled);
+  $('reportNext').textContent = waiting ? (d.enabled ? 'Waits for the site to go live' : '') : d.enabled && d.next_month ? 'Next one: ' + monthAfter(d.next_month) + ' 1 · to ' + n + (n === 1 ? ' person' : ' people') : '';
   // item 182: the monthly AI check, its cost in words, and how the last one went
   $('sw-ai').setAttribute('aria-checked', d.ai_checks ? 'true' : 'false');
   $('aiCost').textContent = d.ai_cost ? d.ai_cost + '.' : '';
@@ -1463,6 +1471,8 @@ async function setSuggestMode(mode) {
   if (await saveReport({ propose: { mode } })) toast(mode === 'auto' ? 'On. Each report suggests one thing from their Do next list.' : 'Off. The report goes without a suggestion.');
 }
 function reportStatusLine(d) {
+  // item 200: an older server sends no `live`, which reads as live, as before
+  if (d.live === false) return d.enabled ? 'Waiting for their website to go live. The first report goes out on the 1st of the month after it does.' : 'Their website isn’t live yet. Switch this on now if you like: the report waits until it is.';
   const r = d.last_result;
   if (r && r.month) {
     const m = monthWords(r.month);
@@ -1506,7 +1516,7 @@ function wireReport() {
     if (REPORT_BUSY || !REPORT_READ) return;   // greyed: the press does nothing, and shows nothing
     const next = !(REPORT && REPORT.enabled === true);
     $('sw-report').setAttribute('aria-checked', next ? 'true' : 'false');
-    if (await saveReport({ enabled: next })) toast(next ? 'On. The first report goes out in the first days of next month.' : 'Off. No more reports to this client.');
+    if (await saveReport({ enabled: next })) toast(next ? (REPORT && REPORT.live === false ? 'On. The first report goes out the month after their website goes live.' : 'On. The first report goes out in the first days of next month.') : 'Off. No more reports to this client.');
   });
   $('sw-ai').addEventListener('click', async () => {
     if (REPORT_BUSY || !REPORT_READ) return;   // one save at a time, like the report switch (item 101)
@@ -1625,10 +1635,11 @@ function lastWords(row) {
   const l = row.last;
   if (!row.email) return ['Can’t send yet', 'warn'];
   if (row.blocked) return ['Can’t send: ' + (CC_BLOCK_WORDS[row.blocked] || 'can’t be emailed'), 'warn'];
+  if (row.live === false && row.enabled) return ['Waits for the site to go live', 'wait'];   // item 200
   if (!l) return [row.enabled ? 'First one next month' : 'Never sent', ''];
   const m = new Date(Date.UTC(+l.month.slice(0, 4), +l.month.slice(5, 7) - 1, 1)).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
   if (l.status === 'sent') return [m + ' · sent', 'sent'];
-  if (l.status === 'skipped') return [l.reason === 'quiet' ? 'Skipped: a quiet month' : m + ' · not sent', l.reason === 'quiet' ? '' : 'warn'];
+  if (l.status === 'skipped') return [l.reason === 'quiet' ? 'Skipped: a quiet month' : l.reason === 'not_live' ? m + ' · site wasn’t live' : m + ' · not sent', l.reason === 'quiet' || l.reason === 'not_live' ? '' : 'warn'];
   return [m + ' · didn’t go out', 'warn'];
 }
 function paintReports() {
@@ -1673,7 +1684,7 @@ async function flipClientReport(siteId) {
   if (!r.ok) { row.enabled = !next; if (r.body && r.body.blocked) row.blocked = r.body.blocked; paintReports(); toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); return; }
   paintReports();
   const sw = $('reportsRows').querySelector('[data-rsw="' + CSS.escape(siteId) + '"]'); if (sw) sw.focus();
-  toast(next ? 'On. ' + row.name + ' gets a report in the first days of next month.' : 'Off. No more reports to ' + row.name + '.');
+  toast(next ? 'On. ' + row.name + (row.live === false ? ' gets a report the month after their website goes live.' : ' gets a report in the first days of next month.') : 'Off. No more reports to ' + row.name + '.');
 }
 async function switchOnTheRest() {
   if (REPORTS_BUSY || !REPORTS) return;

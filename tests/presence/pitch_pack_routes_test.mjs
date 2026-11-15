@@ -89,6 +89,15 @@ PP.packDeps.ai = { engines: [] };   // the AI check is "not switched on" unless 
   ok('a made-up token is nothing', bad.status === 404);
   const weird = await res(await PP.handlePackPublic('DROP TABLE;--', cors));
   ok('a non-token is nothing', weird.status === 404);
+  // builder list item 200 (review file 06, finding 62): a read that failed is not a dead link,
+  // so pitch.html can say "try again" instead of "ask for a fresh link"
+  const real = globalThis.fetch;
+  for (const [what, answer] of [['answers 500', () => new Response(JSON.stringify({ message: 'boom' }), { status: 500, headers: { 'Content-Type': 'application/json' } })], ['doesn’t answer', () => { throw new TypeError('network'); }]]) {
+    globalThis.fetch = async (url, init = {}) => (new URL(String(url)).pathname.includes('presence_pitch_packs') ? answer() : real(url, init));
+    const down = await res(await PP.handlePackPublic(pk.token, cors));
+    ok(`a pack read that ${what} says try again (503), not that the link is dead`, down.status === 503 && down.body.error === 'unavailable', JSON.stringify(down));
+  }
+  globalThis.fetch = real;
 }
 
 // ═══ a building pack is not public yet ═══

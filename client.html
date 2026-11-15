@@ -2686,8 +2686,28 @@ function kitHtml(kr){
   const site=w.address?`<div class="kfacts"><h3 class="kh">Your website</h3><a href="${esc(w.address)}" target="_blank" rel="noopener">${esc(String(w.address).replace(/^https?:\/\//,''))} ↗</a>${facts?`<p class="muted">${esc(facts.charAt(0).toUpperCase()+facts.slice(1))}</p>`:''}</div>`:'';
   const guides=(k.guides||[]).length?`<h3 class="kh">How to</h3>${k.guides.map(g=>`<details class="faq-item"><summary>${esc(g.title)}</summary><div class="faq-answer"><p>${esc(g.body)}</p></div></details>`).join('')}`:'';
   const videos=(k.videos||[]).length?`<h3 class="kh">Videos</h3><ul class="kl">${k.videos.map(v=>`<li><a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">▶ ${esc(v.title)} ↗</a></li>`).join('')}</ul>`:'';
-  const files=(k.files||[]).length?`<h3 class="kh">Files</h3><ul class="kl">${k.files.map(f=>`<li><a href="${esc(f.url)}" target="_blank" rel="noopener">⬇ ${esc(f.name)}</a></li>`).join('')}</ul>`:'';
+  // item 200: a tap asks for a fresh link (wireKitFiles); the one that came with the list is the fallback
+  const files=(k.files||[]).length?`<h3 class="kh">Files</h3><ul class="kl">${k.files.map(f=>`<li><a href="${esc(f.url||'#')}" target="_blank" rel="noopener"${f.id?` data-kit-file="${esc(f.id)}"`:''}>⬇ ${esc(f.name)}</a></li>`).join('')}</ul>`:'';
   return `<section id="sec-kit" class="kit"><h2>Your website kit · from ${esc(studioBrand())}</h2><div class="card">${who}${site}${guides}${videos}${files}</div></section>`;
+}
+// Builder list item 200 (review file 06, finding 61): a kit file's link lasts ten minutes,
+// so a tap asks GET /client/kit/files/:id for a fresh one, as the portal's other files do,
+// and a file still opens long after Help was opened. The link downloads, so the page stays
+// where it is. Before the server has the route, the link that came with the list is used.
+// No kit on the page (the studio hasn't put one in, or Help answers are off) wires nothing.
+function wireKitFiles(){
+  document.querySelectorAll('[data-kit-file]').forEach(a=>a.addEventListener('click',async(e)=>{
+    e.preventDefault();
+    if(a.getAttribute('aria-busy')==='true')return;   // a second tap while the first is on its way
+    a.setAttribute('aria-busy','true');
+    const r=await api('/client/kit/files/'+encodeURIComponent(a.getAttribute('data-kit-file')));
+    a.removeAttribute('aria-busy');
+    const url=r.ok&&r.body&&r.body.data&&r.body.data.url;
+    if(url&&/^https:\/\//.test(url)){location.assign(url);return;}
+    const old=a.getAttribute('href');
+    if(r.status===404&&!(r.body&&r.body.error==='not_in_kit')&&old&&old!=='#'){location.assign(old);return;}   // a server without the route yet
+    toast((r.body&&r.body.message)||'That file couldn’t open just now. Try again in a moment.');
+  }));
 }
 function starterFaqHtml(){return `<section class="faq">${STARTER_FAQ.map(([q,a])=>`<details class="faq-item"><summary>${esc(q)}</summary><div class="faq-answer"><p>${esc(a)}</p></div></details>`).join('')}</section>`;}
 // Item 128: New in your portal. The portal's bell is already its news, so what changed in
@@ -2738,6 +2758,7 @@ async function renderHelp(){
   html+=accountSectionHtml(true);
   $('main').innerHTML=html;
   wirePackCard();
+  wireKitFiles();   // item 200
   const hm=$('helpMsg');if(hm)hm.addEventListener('click',openMessagesCompose);   // item 179 part three: one door
   wireWhatsNewDoor();   // item 128
   wireAccountSection();

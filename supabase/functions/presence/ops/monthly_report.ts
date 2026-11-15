@@ -200,6 +200,14 @@ export function blockedReason(email: string | null, suppression: string | null):
   return suppression === 'opt_out' ? 'unsubscribed' : 'bounced';
 }
 
+/** Builder list item 200 (review file 06, finding 60): the report waits until the website
+ *  is live. A site counts once it has gone live, as the portal's own card asks
+ *  (routes/client_delivery.ts), and a website the studio watches on the client's own host
+ *  (edition monitor) is live already, so a watch-plan client keeps getting theirs. Pure. */
+export function reportSiteLive(site: { edition?: string | null; status?: string | null; last_published_at?: string | null } | null | undefined): boolean {
+  return !!site && (site.edition === 'monitor' || site.status === 'live' || !!site.last_published_at);
+}
+
 // ── Bug hunt D7 (Nov 10): the month is the site's own, not London's ──
 // The month's edges, the first days a report may go, and the date of the last publish
 // were all worked out on the UTC clock, so a visit or a publish at 6pm Pacific on October
@@ -571,8 +579,10 @@ export function afterFailure(s: ReportSetting, month: string, before: string | n
  *  month under the studio's visits number is skipped the same way ("quiet"); once the
  *  client's report is out, the extra people and the studio's copy get theirs, each on
  *  its own (one that fails doesn't undo the month). Item 176: the suggestion it carried
- *  is logged, so a picked one rests three months. */
-export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOString()): Promise<{ sent: number; skipped: number; unreachable: number; failures: number; quiet?: number; not_due?: boolean }> {
+ *  is logged, so a picked one rests three months. Item 200: a site that isn't live yet
+ *  is skipped once for the month the same way ("not_live", counted as waiting), before
+ *  anything else is read, and its first report goes out the month after it goes live. */
+export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOString()): Promise<{ sent: number; skipped: number; unreachable: number; failures: number; quiet?: number; waiting?: number; not_due?: boolean }> {
   // D7: each site's month turns on its own clock; on a day no clock is in its first days, read nothing
   if (!anyZoneInSendDays(nowIso)) return { sent: 0, skipped: 0, unreachable: 0, failures: 0, not_due: true };
   // Item 209 (review file 06, finding 63): every client with the report on, a page at a
@@ -585,7 +595,7 @@ export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOStr
       yield* page as Array<{ site_id: string; body: string }>;
     }
   })();
-  let sent = 0, skipped = 0, unreachable = 0, failures = 0, quiet = 0;
+  let sent = 0, skipped = 0, unreachable = 0, failures = 0, quiet = 0, waiting = 0;
   for await (const r of rows) {
     if (sent >= limit) break;
     let seen: ReportSetting; try { seen = normalizeReportSetting(JSON.parse(r.body)); } catch { skipped++; continue; }
@@ -595,6 +605,16 @@ export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOStr
     const sq = await svc(`presence_sites?id=eq.${r.site_id}&select=*&limit=1`);
     const site = (Array.isArray(sq.json) ? sq.json[0] : null) as SiteRow | null;
     if (!site) { skipped++; continue; }
+    // item 200: "how your website did" for a site nobody can visit yet reads as bad news, so the
+    // month is marked skipped with its reason (the same claim: only if still due) and nothing is sent
+    if (!reportSiteLive(site)) {
+      const held = await SAVE(site.id, (s) => {
+        if (!reportDueNow(s, nowIso, tz)) throw new NotDue();
+        return { ...s, last_month: win.month, tries: null, last_result: { month: win.month, status: 'skipped', reason: 'not_live', at: nowIso } };
+      }).catch(() => null);
+      if (held) waiting++; else skipped++;
+      continue;
+    }
     const reach = await reachOf(site);
     // claim the month: only if it is still due on the LATEST setting; only the month mark (and, for a client who can't be emailed, the reason) changes
     let before: string | null = null, claimedSetting: ReportSetting | null = null;
@@ -631,7 +651,7 @@ export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOStr
       await SAVE(site.id, (s) => afterFailure(s, win.month, before, nowIso)).catch(() => null);
     }
   }
-  return { sent, skipped, unreachable, failures, ...(quiet ? { quiet } : {}) };
+  return { sent, skipped, unreachable, failures, ...(quiet ? { quiet } : {}), ...(waiting ? { waiting } : {}) };
 }
 
 // ── the site-scoped routes: GET and PUT /report/monthly, POST /report/monthly/preview ──
@@ -655,6 +675,7 @@ async function reportCard(site: SiteRow, s: ReportSetting, principal: { email?: 
     parts: REPORT_PARTS.map((k) => ({ key: k, words: REPORT_PART_WORDS[k] })),
     maps_on: (await readGridSetting(site.id).catch(() => null))?.enabled === true,   // item 185: the map part waits for the grid
     propose_next: pr.next, propose_options: pr.options,
+    live: reportSiteLive(site),   // item 200: false while the report waits for the website to go live
   };
 }
 export async function handleReportGet(site: SiteRow, principal: { email?: string | null }, cors: Record<string, string>) {
