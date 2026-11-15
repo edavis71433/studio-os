@@ -6,7 +6,7 @@
 //            "caller-JWT" pattern (defense in depth): ownership is proven by
 //            the database on every read/write, not re-implemented in code.
 // siteDb() picks between them for site content. See below.
-import { seesFullWorkspace, type SiteRole } from './site_roles.ts';
+import { seesSite, type SiteRole } from './site_roles.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -180,7 +180,8 @@ export function pinViolation(siteId: string, path: string, init: RequestInit = {
  *  to have cleared it, so a write that gate doesn't know about fails closed. */
 export function siteDb(jwt: string, site: { id: string }, principal: { scope?: { site_id: string } | null; member?: { site_id: string; role: string; cleared?: boolean } | null }): SiteDb {
   const scoped = !!principal.scope?.site_id && principal.scope.site_id === site.id;
-  const member = principal.member?.site_id === site.id && seesFullWorkspace(principal.member.role as SiteRole) ? principal.member : null;
+  // builder item 220: a Designer's seat reaches the website's content too (index.ts holds them to its routes)
+  const member = principal.member?.site_id === site.id && seesSite(principal.member.role as SiteRole) ? principal.member : null;
   if (!scoped && !member) return (path, init = {}) => asUser(jwt, path, init);
   return (path, init = {}) => {
     const uncleared = member && !member.cleared && (init.method || 'GET').toUpperCase() !== 'GET';

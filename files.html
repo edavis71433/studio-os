@@ -994,7 +994,7 @@ function lheadHtml(shown){
       <span class="obj-ic" aria-hidden="true">🗂</span>
       <h1 id="pagehead" tabindex="-1">Files</h1>
       <div class="seg" role="group" aria-label="Display as"><button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button><button id="dispGrid" aria-pressed="${DISPLAY==='grid'?'true':'false'}">Grid</button></div>
-      <a class="lmake" id="makeImage" href="/visual-studio.html" title="Make an image with Visual Studio">Make an image</a>
+      <a class="lmake" id="makeImage" href="/visual-studio.html" data-needs="approve" title="Make an image with Visual Studio">Make an image</a>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
       ${S.canEdit&&DISPLAY==='grid'&&S.assets.length?`<button class="btn" id="selbtn">${S.selectMode?'Done':'Select'}</button>`:''}
       ${S.canEdit?`<button class="btn primary" id="add">＋ Add files</button>`:''}
