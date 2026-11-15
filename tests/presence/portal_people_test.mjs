@@ -83,6 +83,7 @@ ok('this device keeps nothing of a preview', ['function rememberStudio(){if(PREV
 ok('never the studio member’s own name or email', client.includes(":PREVIEW?'':firstName(USER);}") && /const email=PREVIEW\?String\(\(PORTAL\.ctx&&PORTAL\.ctx\.preview&&PORTAL\.ctx\.preview\.email\)\|\|''\)/.test(client));
 ok('a paper’s or a payment’s link says it’s a preview instead of opening', /a\.hasAttribute\('data-pay'\)\|\|pays\.includes\(href\)\|\|\/\\\/doc\\\.html\\\?t=\/\.test\(href\)/.test(client));
 ok('the strip names the client and goes back to them', /You’re seeing \$\{esc\(poss\)\} portal as \$\{esc\(name\)\} sees it\. Nothing you press is saved or sent, and nothing is marked as read\./.test(client) && /Back to \$\{esc\(name\)\}/.test(client));
+ok('a preview reads the studio’s own sign-in, never a client’s; signed out, it asks for the studio’s', client.includes("storageKey:PREVIEW?'dds-portal-auth':'dds-client-auth'") && client.indexOf('const PREVIEW=') < client.indexOf('const sb=supabase.createClient') && client.includes('Sign in to your studio to see a client’s portal.'));
 ok('back goes only to a page of this app', /return \/\^\\\/\(\?!\[\\\/\\\\\]\)\[\^\\s\]\*\$\/\.test\(b\)\?b:'';/.test(client));
 
 const settings = read('settings.html');

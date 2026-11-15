@@ -743,7 +743,14 @@
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
-const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-client-auth',persistSession:true,autoRefreshToken:true}});
+// Builder list item 232: a studio sees a client's portal as the client does (?preview=<their
+// site>, opened from the studio). Every read is the client's, drilled into them; nothing
+// pressed is saved, sent or paid, and nothing is marked as read: the server refuses every
+// write too. This device keeps nothing of it (no stored Home, no remembered client).
+const PREVIEW=(()=>{try{const v=String(new URLSearchParams(location.search).get('preview')||'').toLowerCase();return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v)?v:'';}catch(_){return'';}})();
+const PREVIEW_BACK=(()=>{try{const b=String(new URLSearchParams(location.search).get('back')||'');return /^\/(?![\/\\])[^\s]*$/.test(b)?b:'';}catch(_){return'';}})();
+// a preview is the studio's own sign-in (the studio pages' realm), never a client's
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:PREVIEW?'dds-portal-auth':'dds-client-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
@@ -753,12 +760,6 @@ sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_tok
 // calls behind one answer crossed the country (about 1 s an answer; 0.4 s beside the
 // database). x-region asks for Oregon; the server's CORS answer allows the header.
 const FN_REGION='us-west-2';
-// Builder list item 232: a studio sees a client's portal as the client does (?preview=<their
-// site>, opened from the studio). Every read is the client's, drilled into them; nothing
-// pressed is saved, sent or paid, and nothing is marked as read: the server refuses every
-// write too. This device keeps nothing of it (no stored Home, no remembered client).
-const PREVIEW=(()=>{try{const v=String(new URLSearchParams(location.search).get('preview')||'').toLowerCase();return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v)?v:'';}catch(_){return'';}})();
-const PREVIEW_BACK=(()=>{try{const b=String(new URLSearchParams(location.search).get('back')||'');return /^\/(?![\/\\])[^\s]*$/.test(b)?b:'';}catch(_){return'';}})();
 const PREVIEW_MSG='This is a preview: nothing is saved, sent or paid.';
 let PREVIEW_REFUSED=0;
 const H=()=>Object.assign({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':PREVIEW||(new URLSearchParams(location.search).get('client')||''),'x-region':FN_REGION},PREVIEW?{'x-dds-preview':'1'}:{});
@@ -3801,7 +3802,8 @@ function dropHomeCacheView(){HOME_FROM_CACHE=false;for(const id of['main','tabna
 function clearHomeCaches(){try{Object.keys(localStorage).filter(k=>k.indexOf(HOME_CACHE_PREFIX)===0||k.indexOf('dds-portal-papers:')===0).forEach(k=>localStorage.removeItem(k));}catch(_){}}   // item 238's memory goes with it
 // the load will land on Home: no link to a project, a request, a payment or a tab, and no destination kept through a sign-in
 function landsOnHome(){try{const q=new URLSearchParams(location.search);if(q.get('support')||q.get('project')||q.get('approval')||q.get('paid')||q.get('connect'))return false;if(String(location.hash||'').length>1)return false;return !localStorage.getItem(RETURN_KEY);}catch(_){return false;}}
-function signedOut(){dropHomeCacheView();clearHomeCaches();$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
+function signedOut(){if(PREVIEW){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio to see a client’s portal.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;return;}   // item 232: this device's client caches stay as they are
+  dropHomeCacheView();clearHomeCaches();$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
 function trouble(){dropHomeCacheView();$('main').innerHTML=`<div class="center"><h2>We couldn’t load your updates just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
 function ownerNote(){dropHomeCacheView();clearHomeCaches();$('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div><h2 style="margin-top:14px">This is the client view.</h2><p class="muted">You have the full workspace.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
 
