@@ -17,6 +17,8 @@ import { svc } from '../lib/db.ts';
 import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import { resolveAgencyMember, can } from '../agency/auth.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
+import { requireFresh } from '../lib/fresh_code.ts';   // builder item 191
+import { alertOwner } from '../lib/security_alerts.ts';
 import {
   starterSide, startRefusal, START_WORDS, transferSummary, transferStep, ownerWho, ownerFacts, ownerEmailsOf, hasOwnerFacts,
   ownsAnother, openTransfer, createTransfer, moveTransfer, handOver, transferById, transfersWaitingOn, businessName,
@@ -58,7 +60,7 @@ export async function handleTransferStart(req: Request, jwt: string, site: SiteR
   const now = new Date().toISOString();
   const { side, studio } = await sideOf(jwt, site, principal);
   if (!side) return json({ error: 'forbidden', message: 'Only the owner can hand this site to someone else. Their studio can ask them to.' }, 403, cors);
-  let b: { email?: unknown; keep_owner?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+  let b: { email?: unknown; keep_owner?: unknown; fresh_code?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
   const to = lower(b.email).slice(0, 254);
   const keepOld = b.keep_owner !== false;
   const facts = await ownerFacts(site.id);
@@ -69,6 +71,9 @@ export async function handleTransferStart(req: Request, jwt: string, site: SiteR
   let refusal = startRefusal({ toEmail: to, ownerEmails: owners, hasOwner: hasOwnerFacts(facts) && owners.length > 0, open: !!open.row, ownsAnother: false });
   if (!refusal && await ownsAnother(to, null, clientId)) refusal = 'owns_another';
   if (refusal) { const [status, message] = START_WORDS[refusal]; return json({ error: refusal, message }, status, cors); }
+  // item 191: a fresh code first (their app's, or one we email them)
+  const fresh = await requireFresh(principal, b, 'transfer', `${await businessName(site.id)} to ${to}`, cors);
+  if (fresh instanceof Response) return fresh;
   const made = await createTransfer({ siteId: site.id, clientId, fromEmail: owners[0], toEmail: to, keepOld, startedBy: principal.email || '', side }, now);
   if (!made.row) {
     if (made.error === 'already_open') { const [status, message] = START_WORDS.already_open; return json({ error: 'already_open', message }, status, cors); }
@@ -79,6 +84,9 @@ export async function handleTransferStart(req: Request, jwt: string, site: SiteR
   const emailed = await emailNextStep(made.row, { business, studio: studio || await studioNameOf(site.id), ownerName: owner?.name });
   await writeChangeEvent({ siteId: site.id, entityType: 'site', entityId: site.id, action: 'update', summary: side === 'studio' ? `Asked the owner to hand the site to ${to}` : `Started handing the site to ${to}`, principal, provenance: 'human' }).catch(() => {});
   const who = side === 'studio' ? (owner?.name || owners[0]) : to;
+  // item 191: the owner hears it started. When the studio started it, the email asking them
+  // to agree is that news; when the owner did, they get the alert, in case it wasn't them.
+  if (side === 'owner') await alertOwner(site.id, 'transfer_started', { business, who: to, by: principal.email || 'Someone signed in as you', confirmedWith: fresh.way });
   const message = emailed
     ? (side === 'studio' ? `We’ve emailed ${who} to agree. Then ${to} gets an email to accept.` : `We’ve emailed ${to} to accept. Nothing changes until they do.`)
     : `It’s waiting, but the email to ${who} didn’t send. Try Stop and start again in a moment.`;
@@ -141,6 +149,10 @@ export async function handleTransferAnswer(req: Request, id: string, verb: 'agre
   }
 
   if (verb === 'agree') {
+    // item 191: agreeing hands the site away, so it asks for a fresh code first too
+    let ab: { fresh_code?: unknown } = {}; try { ab = await req.json(); } catch { /* none sent */ }
+    const fresh = await requireFresh(principal, ab, 'transfer', `${business} to ${t.to_email}`, cors);
+    if (fresh instanceof Response) return fresh;
     if (!(await moveTransfer(t, 'asked_new', email, now))) return json({ error: 'changed', message: 'It changed a moment ago. Refresh to see where it stands.' }, 409, cors);
     const facts = await ownerFacts(t.site_id);
     const emailed = await emailNextStep({ ...t, status: 'asked_new' }, { business, ownerName: ownerWho(facts?.client, facts?.contact?.name)?.name });
