@@ -102,6 +102,9 @@ const ENVS = {
 const qs = new URLSearchParams(location.search);
 const ENV = qs.get('env') === 'staging' ? ENVS.staging : ENVS.prod;
 const FN = ENV.url + "/functions/v1/presence";
+// run production's server beside its database (Oregon), not nearest the visitor: see shell.js.
+// Staging's server doesn't allow the header, so it goes to production only.
+const REGION_HEADER = ENV === ENVS.prod ? { "x-region": "us-west-2" } : {};
 const envSuffix = qs.get('env') === 'staging' ? '&env=staging' : '';
 const sb = supabase.createClient(ENV.url, ENV.anon, { auth: { storageKey: "dds-portal-auth", persistSession: true, autoRefreshToken: true } });
 
@@ -117,7 +120,7 @@ function showMsg(text, kind){ const m=document.getElementById('msg'); m.textCont
 
 async function loadPlan(){
   try{
-    const r = await fetch(FN + "/commerce/plans", { headers:{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon } });
+    const r = await fetch(FN + "/commerce/plans", { headers:{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon, ...REGION_HEADER } });
     const j = await r.json();
     const plans = (j.data && j.data.plans) || [];
     PLAN = plans.find(p => p.key === PLAN_KEY) || null;
@@ -151,7 +154,7 @@ async function submitForm(e){
   try{
     const payload = { email, password, business_name: business, plan: PLAN_KEY, terms_version: TERMS_VERSION };
     if (TRIAL && PLAN.trial_eligible) payload.trial = true; else payload.term = TERM;
-    const r = await fetch(FN + "/commerce/signup", { method:'POST', headers:{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon, 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
+    const r = await fetch(FN + "/commerce/signup", { method:'POST', headers:{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon, 'Content-Type':'application/json', ...REGION_HEADER }, body: JSON.stringify(payload) });
     const j = await r.json();
     if (!r.ok){
       if (j.error === 'account_exists'){ showMsg('An account with this email already exists. Please sign in instead.', 'err'); }

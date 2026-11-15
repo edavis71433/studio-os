@@ -13,6 +13,11 @@
   var SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
   var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
   var FN = SUPABASE_URL + "/functions/v1/presence";
+  // x-region: run the server beside the database in Oregon, not in the region nearest the
+  // visitor. From the east coast each of the small database calls behind one answer crossed
+  // the country: about 1 s an answer, 0.4 s beside the database (client.html, Nov 15 2026).
+  // Only for our own functions: Storage uploads and other hosts don't allow the header.
+  var FN_REGION = 'us-west-2';
   var TOKEN = "";
 
   // ── Appearance: every app page ships light + dark tokens keyed on
@@ -134,7 +139,7 @@
   }
   function api(path) {
     var s = scopeId();
-    return fetch(FN + path, { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': s } })
+    return fetch(FN + path, { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': s, 'x-region': FN_REGION } })
       .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, status: r.status, body: b }; }).catch(function () { return { ok: r.ok, status: r.status, body: {} }; }); })
       .catch(function () { return { ok: false, status: 0, body: {} }; });
   }
@@ -172,7 +177,7 @@
   // own book, read and written from inside a client, as crm.html's apiAg does)
   window.ddsApi = function (path, opts) {
     opts = opts || {};
-    var init = { method: opts.method || 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': opts.scope !== undefined ? opts.scope : scopeId() } };
+    var init = { method: opts.method || 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': opts.scope !== undefined ? opts.scope : scopeId(), 'x-region': FN_REGION } };
     if (opts.body !== undefined) init.body = typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
     return fetch(FN + path, init)
       .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, status: r.status, body: b }; }).catch(function () { return { ok: r.ok, status: r.status, body: {} }; }); })
@@ -1494,7 +1499,7 @@
     try { if (ctxUid) localStorage.setItem(LAST_KEY, JSON.stringify({ uid: ctxUid, site_id: id })); } catch (_) { /* */ }
     var withId = function (path) { return b['default'] ? path : path + (path.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(id); };
     if (b.role === 'client_reviewer') { location.href = withId('/portal.html'); return; }
-    fetch(FN + '/portal/context', { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': b['default'] ? '' : id } })
+    fetch(FN + '/portal/context', { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': b['default'] ? '' : id, 'x-region': FN_REGION } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {
         var land = j && j.data && j.data.landing;
@@ -1514,7 +1519,7 @@
   function siteRows() {
     if (SWITCH_ROWS) return Promise.resolve(SWITCH_ROWS);
     if (SWITCH_LOADING) return SWITCH_LOADING;
-    SWITCH_LOADING = fetch(FN + '/agency/sites', { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': '' } })
+    SWITCH_LOADING = fetch(FN + '/agency/sites', { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': '', 'x-region': FN_REGION } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (b) { if (!b || !Array.isArray(b.data)) return null; SWITCH_ROWS = b.data; return SWITCH_ROWS; })   // a failed read is said, never "no sites"; the next open tries again
       .catch(function () { return null; })
@@ -2535,11 +2540,11 @@
           var ep = existing.endpoint;
           return existing.unsubscribe().then(function () {
             pushOn = false;
-            return fetch(FN + '/push/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN }, body: JSON.stringify({ endpoint: ep }) }).then(function () { window.ddsToast && window.ddsToast('Notifications turned off'); closeProfile(); });
+            return fetch(FN + '/push/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-region': FN_REGION }, body: JSON.stringify({ endpoint: ep }) }).then(function () { window.ddsToast && window.ddsToast('Notifications turned off'); closeProfile(); });
           });
         }
         // turn ON — fetch the VAPID key, request permission, subscribe, save.
-        return fetch(FN + '/push/key', { headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY } })
+        return fetch(FN + '/push/key', { headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'x-region': FN_REGION } })
           .then(function (r) { return r.json(); })
           .then(function (j) {
             var key = j && j.data && j.data.key;
@@ -2548,7 +2553,7 @@
               if (perm !== 'granted') { window.ddsToast && window.ddsToast('Notifications need permission — allow them in your browser.', 'err'); return; }
               return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(key) }).then(function (sub) {
                 var j2 = sub.toJSON();
-                return fetch(FN + '/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN }, body: JSON.stringify({ endpoint: j2.endpoint, keys: j2.keys }) })
+                return fetch(FN + '/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-region': FN_REGION }, body: JSON.stringify({ endpoint: j2.endpoint, keys: j2.keys }) })
                   .then(function () { pushOn = true; window.ddsToast && window.ddsToast('Notifications on — we’ll ping you when something needs you.'); closeProfile(); });
               });
             });
