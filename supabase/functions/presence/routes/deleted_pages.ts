@@ -14,6 +14,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc, type SiteDb } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
+import { putBackUsed } from '../lib/media_trash.ts';
 import { guardStaleDraft } from '../lib/optimistic_lock.ts';
 import { PAGE_SLUG_RE } from '../lib/page_ops.ts';
 import { deletedPagesList, freeSlug, PAGE_KEEP_DAYS } from '../lib/site_trash.ts';
@@ -59,5 +60,7 @@ export async function handleDeletedPageRestore(req: Request, db: SiteDb, site: S
   await svc(`presence_deleted_pages?id=eq.${id}&site_id=eq.${site.id}`, { method: 'DELETE' }).catch(() => null);
   const title = String(page.title || kept.title || slug);
   await writeChangeEvent({ siteId: site.id, entityType: 'settings', entityId: null, action: 'update', summary: `Put back the page “${title}”${slug !== want ? ` as /${slug}/` : ''}`, principal, provenance: 'human', fields: ['pages'] });
+  // item 218: a photo the page shows that has since gone in the Trash comes back out of it with the page
+  await putBackUsed(site.id, JSON.stringify(page).match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g) || [], principal, 'a page put back from Versions shows it');
   return json({ data: { slug, title, moved: slug !== want, pages: w.json[0].pages ?? [...pages, back] } }, 200, cors);
 }
