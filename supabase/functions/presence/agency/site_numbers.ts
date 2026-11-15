@@ -16,11 +16,16 @@
 //     day nearest a month ago (presence_health_days, written by the evidence engine).
 //     It is for studio pages only (Law 13: a client never sees a score).
 // A number that can't be known says why (`*_why`), never a zero. Reading needs `read`.
+//
+// Builder list item 219: `drops` says why, for each site whose visits fell enough to say
+// (lib/visit_drop.ts): where the visits came from in each month, and for Google the search
+// that lost the most clicks. Read only for the sites that fell, a dozen at most.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { can, agencySiteIds } from './auth.ts';
 import type { AgencyMember } from './auth.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
+import { readVisitDrop, lastWholeMonths, visitDrop, type VisitDrop } from '../lib/visit_drop.ts';
 
 /** The two whole months compared: last month and the one before (UTC), and the first
  *  moment of the earlier one. Pure. */
@@ -143,5 +148,25 @@ export async function handleSiteNumbers(route: string, method: string, member: A
     clicks: rowsOf<ClickMonth>(clickQ), health: rowsOf<HealthRow>(healthQ), healthReady,
   });
   const partial = [setQ, connQ, clickQ].some((q) => (q as { ok?: boolean }).ok === false) || (visitsReady && !(visQ as { ok?: boolean }).ok) || (healthReady && !(healthQ as { ok?: boolean }).ok);
-  return json({ data, ...head, partial }, 200, cors);
+  const drops = await siteDrops(sites, data, nowIso).catch(() => ({}));
+  return json({ data, ...head, partial, drops }, 200, cors);
+}
+
+/** Builder list item 219: why visits fell, for the sites that fell enough to say. */
+export const DROPS_READ_MAX = 12;
+async function siteDrops(sites: SiteFacts[], data: Record<string, SiteNumbers>, nowIso: string): Promise<Record<string, VisitDrop>> {
+  const w = lastWholeMonths(nowIso);
+  const fell = sites.filter((s) => { const v = data[s.id]?.visitors; return !!v && !!visitDrop({ now: v.value, was: v.prior, wasLabel: w.priorLabel, sourcesNow: null, sourcesWas: null }); })
+    .sort((a, b) => (data[a.id].visitors!.value - data[a.id].visitors!.prior) - (data[b.id].visitors!.value - data[b.id].visitors!.prior))
+    .slice(0, DROPS_READ_MAX);
+  if (!fell.length) return {};
+  const names = rowsOf<{ site_id: string; business_name: string }>(await svc(`presence_identity?site_id=in.(${fell.map((s) => s.id).join(',')})&select=site_id,business_name&limit=100`).catch(() => null)) || [];
+  const nameOf = new Map(names.map((r) => [r.site_id, r.business_name]));
+  const out: Record<string, VisitDrop> = {};
+  await Promise.all(fell.map(async (s) => {
+    const v = data[s.id].visitors!;
+    const d = await readVisitDrop(s, { startIso: w.startIso, endIso: w.endIso, priorStartIso: w.priorStartIso, month: w.month, prior: w.prior, wasLabel: w.priorLabel, name: nameOf.get(s.id) || null, now: v.value, was: v.prior }).catch(() => null);
+    if (d) out[s.id] = d;
+  }));
+  return out;
 }
