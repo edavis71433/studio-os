@@ -113,7 +113,7 @@ const dlg = (page: Page) => page.locator('dialog#dds-cr');
 const settled = (page: Page) => dlg(page).evaluate((e) => Promise.all(e.getAnimations().map((a) => a.finished)).then(() => true));
 async function openMenu(page: Page) {
   await page.locator(isPhone(page) ? '#dds-mbar-create' : '#dds-create').click();
-  await expect(dlg(page).locator('.cr-item')).toHaveCount(7);
+  await expect(dlg(page).locator('.cr-item')).toHaveCount(9);
 }
 async function openForm(page: Page, label: string) {
   await openMenu(page);
@@ -146,7 +146,7 @@ test.describe('+ Create', () => {
       expect(b.height).toBeGreaterThanOrEqual(page.viewportSize()!.width < 1024 ? 44 : 40);   // the iPad is a touch screen
     }
     await openMenu(page);
-    await expect(dlg(page).locator('.cr-item b')).toHaveText(['Log a call', 'New deal', 'Send an invoice', 'Send a proposal', 'Add a customer', 'Add a to-do', 'Send an update']);
+    await expect(dlg(page).locator('.cr-item b')).toHaveText(['Log a call', 'New deal', 'Send an invoice', 'Send a proposal', 'Add a customer', 'Add a to-do', 'New project', 'New site', 'Send an update']);
     const opener = page.locator(isPhone(page) ? '#dds-mbar-create' : '#dds-create');
     await expect(opener).toHaveAttribute('aria-expanded', 'true');
     if (isPhone(page)) {
@@ -382,7 +382,7 @@ test.describe('+ Create', () => {
     await page.goto('/agency.html');
     await expect(page.locator('#dds-create')).toBeVisible();
     await page.locator('body').press('c');
-    await expect(dlg(page).locator('.cr-item')).toHaveCount(7);
+    await expect(dlg(page).locator('.cr-item')).toHaveCount(9);
     await expect(dlg(page).locator('.cr-item').first()).toBeFocused();
     await page.keyboard.press('i');                                                        // a letter in the menu picks its job
     await expect(dlg(page).locator('#dds-cr-title')).toHaveText('Send an invoice');
@@ -397,7 +397,7 @@ test.describe('+ Create', () => {
     await page.keyboard.press('Escape');
     // the shortcuts list says so
     await page.locator('body').press('?');
-    await expect(page.locator('.dds-keys')).toContainText('Create — log a call, a deal, an invoice…');
+    await expect(page.locator('.dds-keys')).toContainText('Create — log a call, a deal, an invoice, a project…');
     await page.keyboard.press('Escape');
     // a link from anywhere: #create:invoice
     await page.goto('/agency.html#create:invoice');
@@ -405,7 +405,7 @@ test.describe('+ Create', () => {
     expect(new URL(page.url()).hash).toBe('');
   });
 
-  test('only a studio at studio level: an owner and a studio inside a client get no Create', async ({ page }) => {
+  test('only a studio: an owner gets no Create; inside a client it stays, for that client (sales item 91)', async ({ page }) => {
     await installApp(page);   // a business owner
     await page.goto('/today.html');
     await expect(page.locator('#dds-shell .dds-nav')).toBeAttached();
@@ -417,8 +417,9 @@ test.describe('+ Create', () => {
     await installApp(page, { api: { ...FIXTURES, '/portal/context': { data: { ...STUDIO_CTX.data, nav: CLIENT_NAV, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } } } } });
     await page.goto(`/today.html?client=${CLIENT}`);
     await expect(page.locator('#dds-ctxbar')).toBeVisible();
-    await expect(page.locator('#dds-create')).toHaveCount(0);
-    await expect(page.locator('#dds-mbar-create')).toHaveCount(0);
+    await page.locator(isPhone(page) ? '#dds-mbar-create' : '#dds-create').click();
+    await expect(dlg(page).locator('#dds-cr-title')).toHaveText('Create for Joe’s Plumbing');
+    await expect(dlg(page).locator('.cr-item b')).toHaveText(['Log a call', 'Send an invoice', 'Send a proposal', 'Add a to-do', 'New project', 'New deal']);
   });
 
   test('a phone gets a sheet: tiles to pick from, the form’s button above the home bar, nothing wider than the screen', async ({ page }) => {
@@ -509,7 +510,7 @@ test.describe('+ Create: the bug hunt fixes (A3, A8, A9)', () => {
     await expect(bar.locator('#dds-mbar-create')).toBeVisible();
     expect(await bar.locator('> a, > button').evaluateAll((els) => els.map((e) => e.id || (e.textContent || '').trim()))).toEqual(['Home', 'dds-mbar-create', 'Inbox', 'dds-mbar-menu']);   // this menu has no Sites (item 165 puts it second when it does)
     await bar.locator('#dds-mbar-create').click();
-    await expect(dlg(page).locator('.cr-item')).toHaveCount(7);
+    await expect(dlg(page).locator('.cr-item')).toHaveCount(9);
   });
 
   test('A8 — when people and deals won’t load, the box says so with Try again, and typing never turns it into "Loading…"', async ({ page }) => {

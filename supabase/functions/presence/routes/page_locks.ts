@@ -43,6 +43,15 @@ export async function handlePageLockList(site: SiteRow, cors: Record<string, str
   return json({ data: { ids: rows(r).map((x) => String(x.id)), ready: true } }, 200, cors);
 }
 
+/** Which of these lock ids this site holds, or null when that couldn't be read: the publish
+ *  list then says nothing rather than ask for a password that may well be set (item 196). */
+export async function pageLocksFound(siteId: string, ids: string[]): Promise<Set<string> | null> {
+  const clean = ids.filter((id) => UUID_RE.test(id)).slice(0, 40);
+  if (!clean.length) return new Set();
+  const r = await svc(`presence_page_locks?site_id=eq.${siteId}&id=in.(${clean.join(',')})&select=id`).catch(() => null);
+  return r && r.ok ? new Set(rows(r).map((x) => String(x.id))) : null;
+}
+
 /** The keys a publish seals this site's password pages with, by lock id. A lock that isn't
  *  this site's, or a table that isn't there yet, gives nothing: those pages stay off the
  *  live site rather than going up open. */

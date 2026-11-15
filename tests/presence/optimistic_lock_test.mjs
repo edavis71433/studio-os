@@ -93,7 +93,7 @@ const content = (over = {}) => ({ identity: { business_name: 'Cafe' }, locations
   // Two writes out at once name the same version, and the first to land refuses the other
   const line = new Function('return ' + html.match(/const DRAFT_WRITE = (\/.+\/);/)[1])();
   for (const r of ['/settings', '/identity', '/location', '/offerings', '/offerings/1', '/faqs/1', '/testimonials/1', '/posts/1', '/pages/duplicate']) ok(`line: ${r} is checked against the version, so it waits its turn`, line.test(r));
-  for (const r of ['/media/1', '/media/upload-url', '/redirects', '/redirects/1', '/dev/customization', '/dev/brand-kit', '/dev/brand-kit/apply', '/site/template', '/reviews/1/approve', '/publishes/checkpoints/1/restore', '/restore-to-draft', '/writer/drafts/1/accept']) ok(`line: ${r} moves the version, so it waits its turn`, line.test(r));
+  for (const r of ['/media/1', '/media/upload-url', '/redirects', '/redirects/1', '/dev/customization', '/dev/brand-kit', '/dev/brand-kit/apply', '/site/template', '/reviews/1/approve', '/publishes/checkpoints/1/restore', '/pages/deleted/1/restore', '/restore-to-draft', '/writer/drafts/1/accept']) ok(`line: ${r} moves the version, so it waits its turn`, line.test(r));
   for (const r of ['/publish', '/writer/generate', '/editor/improve', '/concierge/ask', '/reviews/request', '/publishes/checkpoints', '/writer/drafts/1/discard', '/settings-other']) ok(`line: ${r} stays out of it`, !line.test(r));
   ok('wiring: the editor seeds + refreshes its held hash from /changes', /S\.draftHash = c\.data\.draft_hash|c\.data && c\.data\.draft_hash/.test(html));
 
@@ -119,7 +119,7 @@ const content = (over = {}) => ({ identity: { business_name: 'Cafe' }, locations
   // the draft as the stub reads it: `now` before the write, `after` once it lands
   const draftAt = () => { const d = { now: 'V0', calls: 0 }; d.read = async () => { d.calls++; return { hash: d.now }; }; return d; };
 
-  for (const r of ['/settings', '/identity', '/offerings/1', '/media/1', '/redirects', '/dev/brand-kit', '/restore-to-draft']) ok(`moves: ${r}`, movesDraft('PUT', r) && movesDraft('post', r));
+  for (const r of ['/settings', '/identity', '/offerings/1', '/media/1', '/redirects', '/dev/brand-kit', '/restore-to-draft', '/pages/deleted/1/restore']) ok(`moves: ${r}`, movesDraft('PUT', r) && movesDraft('post', r));
   for (const r of ['/publish', '/notes', '/writer/generate', '/publishes/checkpoints', '/reviews/request']) ok(`moves: ${r} doesn't`, !movesDraft('POST', r));
   ok('moves: a read never does', !movesDraft('GET', '/settings'));
 

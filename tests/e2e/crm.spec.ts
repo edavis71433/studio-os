@@ -486,9 +486,9 @@ test.describe('Relationship view', () => {
   test('P1 — the action bar sends an invoice from the record in two clicks (POST /sales/deals/:id/invoice)', async ({ page }) => {
     await installApp(page, { api: { '/crm/record': HUB_RECORD, [`/sales/deals/${DEAL}`]: HUB_DEAL, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } } });
     await page.goto(`/crm.html?client=${CLIENT}`);
-    await expect(page.getByRole('tab', { name: 'Billing' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Invoices' })).toBeVisible();
     await page.locator('#act-invoice').click();                         // 1: the action bar
-    await expect(page.getByRole('tab', { name: 'Billing' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Invoices' })).toHaveAttribute('aria-selected', 'true');
     await page.locator('#bf-amt').fill('1600');
     const posted = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes(`/sales/deals/${DEAL}/invoice`));
     await page.locator('#bf-go').click();                               // 2: Send invoice
@@ -578,7 +578,7 @@ test.describe('Relationship view', () => {
     await installApp(page, { api: bothApi() });
     await page.goto(`/crm.html?client=${CLIENT}`);
     await page.locator('#act-send-both').click();
-    await expect(page.getByRole('tab', { name: 'Billing' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Invoices' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#sendBothBtn')).toBeFocused();
     const posted = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/sales/proposals/p-1/send'));
     await page.locator('#sendMore').click();
@@ -627,7 +627,7 @@ test.describe('Relationship view', () => {
     await expect(page.locator('.uprow').filter({ hasText: 'Unpaid invoice — Invoice' })).not.toHaveClass(/overdue/);
     await expect(page.locator('.uprow').filter({ hasText: 'Photos' })).toHaveCount(0);
     // the Billing tab's chips
-    await page.getByRole('tab', { name: 'Billing' }).click();
+    await page.getByRole('tab', { name: 'Invoices' }).click();
     const row = (t: string) => page.locator('.btable tr.brow').filter({ hasText: t });
     await expect(row('Deposit').locator('.schip.good')).toHaveText('Paid');
     await expect(row('Invoice').locator('.schip')).toHaveText('Upcoming');
@@ -852,7 +852,7 @@ test.describe('Relationship view', () => {
     await installApp(page, { api: { '/crm/record': HUB_RECORD, [`/sales/deals/${DEAL}`]: HUB_DEAL, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } } });
     await page.goto(`/crm.html?client=${CLIENT}`);
     await page.locator('#act-invoice').click();
-    await expect(page.getByRole('tab', { name: 'Billing' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Invoices' })).toHaveAttribute('aria-selected', 'true');
     await page.locator('#bf-amt').fill('1600');
     const reread = page.waitForResponse((r) => r.request().method() === 'GET' && new URL(r.url()).pathname.endsWith(`/sales/deals/${DEAL}`));
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('dds:created', { detail: { kind: 'todo' } })));
