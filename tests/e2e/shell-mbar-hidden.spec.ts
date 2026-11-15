@@ -24,8 +24,8 @@ test.describe('The phone bar follows Your menu (bug hunt C17)', () => {
     await page.goto('/settings.html');
     const mbar = page.locator('#dds-mbar');
     await expect(mbar.locator('a[href^="/agency"]')).toContainText('Home');
-    await expect(mbar.locator('a[href^="/pipeline"]')).toContainText('Pipeline');
     await expect(mbar.locator('#dds-mbar-create')).toBeVisible();
+    await expect(mbar.locator('#dds-mbar-menu')).toContainText('Menu');   // builder item 165: Pipeline and the rest live in Menu
     await expect(mbar.locator('a[href^="/inbox"]')).toHaveCount(0);
     await expect(mbar).not.toContainText('Inbox');
   });

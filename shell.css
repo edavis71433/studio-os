@@ -262,11 +262,12 @@ html.dds-has-shell.dds-has-ctxbar body{padding-top:calc(var(--dds-shell-h) + var
 .dds-palette .res .s{margin-left:auto;font-size:11.5px;color:var(--dds-faint)}
 .dds-palette .none{padding:var(--dds-s6);text-align:center;color:var(--dds-soft);font-size:14px}
 
-/* ── the App Launcher waffle + its panel (slice 7) ────────────────────────────
-   The waffle (CLICK-invoked, §11.5) shows at EVERY width — it replaced the
-   burger. Its panel is the drawer element: ≤760px the same full-screen sheet
-   the burger opened (1:1 capability); ≥761px a popover under the bar listing
-   every destination grouped by section. */
+/* ── Menu: the sidebar's Menu button + its panel (slice 7; builder item 165) ──
+   The button (CLICK-invoked, §11.5) replaced the burger; screen readers and the
+   tour call it Menu (it was "App Launcher"). Its panel is the drawer element:
+   ≥761px a popover beside the sidebar listing every place grouped by section;
+   ≤760px a sheet from the bottom, opened by the bottom bar's Menu (the top bar's
+   button hides there, so a phone has one Menu — see the phone block below). */
 .dds-waffle{flex:0 0 auto}
 /* embedded pages (pipeline/projects ?embed=1) hide nav chrome page-side; the
    waffle is nav chrome too — hide it with them so iframes stay clean */
@@ -283,7 +284,9 @@ html.dds-embed .dds-waffle{display:none!important}
 .dds-drawer.open{display:block}
 .dds-drawer .g{margin-bottom:var(--dds-s4)}
 .dds-drawer .g .t{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--dds-faint);margin:0 0 6px}
-.dds-drawer .g a{display:block;font-size:16px;color:var(--dds-ink);text-decoration:none;padding:var(--dds-s3) var(--dds-s2);border-radius:var(--dds-r)}
+.dds-drawer .g a{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--dds-ink);text-decoration:none;padding:var(--dds-s3) var(--dds-s2);border-radius:var(--dds-r)}
+.dds-drawer .g a .nic{width:17px;height:17px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.dds-drawer .g a .dl{min-width:0}
 .dds-drawer .g a.here{color:var(--dds-p);font-weight:600;background:var(--dds-p-soft)}
 /* section-level active (same split as the bar): the group heading gets the
    emphasis on record pages (/crm.html), where no item earns aria-current */
@@ -297,7 +300,8 @@ html.dds-embed .dds-waffle{display:none!important}
     max-height:calc(100vh - var(--dds-shell-h) - 18px);max-height:calc(100dvh - var(--dds-shell-h) - 18px);
     background:var(--dds-card);border:1px solid var(--dds-line);border-radius:var(--dds-r-xl);box-shadow:var(--dds-shadow);
     padding:var(--dds-s4) var(--dds-s4);z-index:2147483001;overscroll-behavior:contain}
-  .dds-drawer.open{columns:3 190px;column-gap:var(--dds-s5)}
+  .dds-drawer.open .dlist{columns:3 190px;column-gap:var(--dds-s5)}
+  .dds-drawer .dh{display:none}   /* the popover sits under its own button; the phone sheet carries the title */
   .dds-drawer .g{break-inside:avoid;margin-bottom:var(--dds-s4)}
   .dds-drawer .g a{font-size:13.5px;padding:var(--dds-s2) var(--dds-s2)}
 }
@@ -401,9 +405,11 @@ html.dds-embed .dds-waffle{display:none!important}
      With inset-bottom:0 the bar covered the sheet's LAST row: on a long nav
      that row is a real destination, un-tappable (the tap hits #dds-mbar).
      Same 72px + safe-area the body reserves, so the sheet scrolls its final
-     row into clear space instead of under the bar. Raising the drawer's
-     z-index instead is NOT an option — see the note above. */
-  .dds-drawer{inset:var(--dds-shell-h) 0 calc(72px + env(safe-area-inset-bottom,0px)) 0}
+     row into clear space instead of under the bar. Raising the drawer above
+     the bar is NOT an option — see the note above. (Builder item 165: the
+     drawer is the Menu sheet now; its box dims the page down to the bar, at
+     the bar's own level but earlier in the page, so the bar stays on top.) */
+  .dds-drawer{inset:0 0 calc(72px + env(safe-area-inset-bottom,0px)) 0}
   body{padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))}
   /* keep toasts + one-time hints clear of the bar */
   .dds-toast{bottom:calc(84px + env(safe-area-inset-bottom,0px));pointer-events:none}
@@ -745,7 +751,8 @@ html.dds-notyours body > :not([id^="dds-"]):not(.dds-drawer):not(.dds-pop):not(s
 /* phones and tablets: the bars keep their places; the bottom bar gets icons
    over its words and the current one sits on a soft pill */
 @media (max-width:760.98px){
-  #dds-mbar{padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 24px -12px rgba(23,21,34,.18)}
+  #dds-mbar{padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 24px -12px rgba(23,21,34,.18);
+    box-sizing:border-box;min-height:calc(72px + env(safe-area-inset-bottom,0px))}   /* item 165: the height the page and the Menu sheet leave for it */
   #dds-mbar a,#dds-mbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:7px 4px 6px;font-size:11.5px;font-weight:600;color:var(--dds-soft);border-radius:var(--dds-r,12px)}
   #dds-mbar .nic{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
   #dds-mbar a[aria-current="page"]{color:var(--dds-p);background:var(--dds-p-soft)}
@@ -829,17 +836,43 @@ html.dds-app[data-theme="dark"] .seg button[aria-pressed="true"],html.dds-app[da
   html.dds-side .dds-create{height:44px}
   html.dds-side .dds-create kbd,html .dds-search kbd,html.dds-side #dds-search kbd{display:none}
 }
-/* the studio's phone bar: Home · Inbox · + · Pipeline · Customers */
+/* the phone bar (builder item 165, Figma 296:29): a studio's is Home · Sites · + ·
+   Inbox · Menu, an owner's Home · Website · + · Inbox · Menu; .plus marks a bar
+   with the + in it (it was the studio's Home · Inbox · + · Pipeline · Customers) */
 @media (max-width:760.98px){
-  #dds-mbar.sales,#dds-mbar.plus{align-items:center}   /* .plus: Home · Inbox · + · Menu when the sales bar can't be drawn (bug hunt A3) */
-  #dds-mbar.sales > a{min-width:0}
-  #dds-mbar.sales .mlbl{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #dds-mbar.plus{align-items:center}
+  #dds-mbar > a,#dds-mbar > button:not(.mplus){min-width:0}
+  #dds-mbar .mlbl{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* the count sits on the icon's corner, so five places keep their words whole on a 360-wide
+     phone ("Messages 3" was cut short inside a client with the + in the bar) */
+  #dds-mbar > a{position:relative}
+  #dds-mbar .mlbl .mdot{position:absolute;top:2px;left:calc(50% + 5px);margin:0;vertical-align:0}
   #dds-mbar .mplus{flex:0 0 auto;width:54px;height:54px;margin:-20px 6px 0;padding:0;border-radius:50%;display:grid;place-items:center;
     background:var(--dds-grad-btn);color:var(--dds-on-p);box-shadow:0 0 0 4px var(--dds-card),0 12px 24px -10px color-mix(in srgb,var(--dds-p) 80%,transparent)}
   #dds-mbar .mplus .nic{width:26px;height:26px;stroke-width:2.4}
   #dds-mbar .mplus:active{background:var(--dds-grad-btn);filter:brightness(.94)}
   #dds-mbar .mplus:focus-visible{outline:2px solid var(--dds-p);outline-offset:3px}
+  /* one Menu on a phone, the bottom bar's: the top bar's button stays only where
+     there is no bottom bar (the website builder keeps its own dock) */
+  html.dds-app #dds-waffle{display:none}
+  /* the Menu sheet (Figma 296:109): the page dims down to the bar, and the list
+     rises from the bottom under a serif "Menu", a row per place with its icon */
+  .dds-drawer{z-index:2147483000;padding:0;overflow:hidden;background:rgba(15,13,24,.5)}
+  .dds-drawer .dsheet{position:absolute;left:0;right:0;bottom:0;max-height:calc(100% - 48px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;box-sizing:border-box;
+    background:var(--dds-card);border-radius:var(--dds-r-xl,20px) var(--dds-r-xl,20px) 0 0;padding:18px 16px 10px;box-shadow:0 -10px 30px -12px rgba(15,13,24,.4);animation:dds-sheet-up var(--dds-t-base) var(--dds-ease)}
+  .dds-drawer .dh{margin:0 0 4px;padding:0 8px;font-family:var(--dds-serif);font-size:24px;font-weight:600;letter-spacing:-.015em;line-height:1.25;color:var(--dds-ink)}
+  .dds-drawer .g{margin-bottom:var(--dds-s3)}
+  .dds-drawer .g:not(:has(.t)){margin-bottom:0}
+  .dds-drawer .g .t{margin:0;padding:10px 8px 4px}
+  .dds-drawer .g a{gap:12px;min-height:44px;padding:0 8px;font-size:15px;font-weight:500}
+  .dds-drawer .g a .nic{width:20px;height:20px;color:var(--dds-soft)}
+  .dds-drawer .g a.here .nic{color:var(--dds-p)}
+  .dds-drawer .g .t ~ a{padding-left:40px}   /* a titled group's rows line up with the words of the rows with icons */
+  html.dds-menu-on body{overflow:hidden}
+  #dds-mbar #dds-mbar-menu[aria-expanded="true"]{color:var(--dds-p);background:var(--dds-p-soft)}   /* the bar says which of its places is open */
 }
+@keyframes dds-sheet-up{from{transform:translateY(24px)}}
+@media (prefers-reduced-motion:reduce){.dds-drawer .dsheet{animation:none}}
 
 /* the dialog: the menu, then a form */
 .dds-cr{padding:0;border:0;margin:0;max-width:none;max-height:none;background:var(--dds-card);color:var(--dds-ink);font-family:var(--dds-sans);font-size:14px;box-shadow:var(--dds-shadow-pop);overflow:hidden}
