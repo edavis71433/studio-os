@@ -295,14 +295,15 @@
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN = SUPABASE_URL + "/functions/v1/presence";
+const FN_REGION = 'us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN = "";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 
-async function apiGet(path){ const r = await fetch(FN + path, { headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') } }); return r.ok ? r.json() : Promise.reject(r.status); }
-async function apiPost(path, body){ const r = await fetch(FN + path, { method:'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') }, body: JSON.stringify(body||{}) }); return r.ok ? r.json() : Promise.reject(r.status); }
+async function apiGet(path){ const r = await fetch(FN + path, { headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''), 'x-region':FN_REGION } }); return r.ok ? r.json() : Promise.reject(r.status); }
+async function apiPost(path, body){ const r = await fetch(FN + path, { method:'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''), 'x-region':FN_REGION }, body: JSON.stringify(body||{}) }); return r.ok ? r.json() : Promise.reject(r.status); }
 
 function greet(h){h=h==null?new Date().getHours():h;return h<12?'Good morning.':h<18?'Good afternoon.':'Good evening.';}
 
@@ -563,7 +564,7 @@ async function mountSiteDeck(){
 // client's scope (exactly as crm.html reads it) and the project at studio level
 // (no scope header), as the record's Project tab does. Each tile exists only
 // when its read came back; a failed record read leaves the page as it was.
-async function apiPostStudio(path, body){ const r = await fetch(FN + path, { method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':'' }, body: JSON.stringify(body) }); const j = await r.json().catch(() => ({})); return r.ok ? j : Promise.reject(j); }
+async function apiPostStudio(path, body){ const r = await fetch(FN + path, { method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':'', 'x-region':FN_REGION }, body: JSON.stringify(body) }); const j = await r.json().catch(() => ({})); return r.ok ? j : Promise.reject(j); }
 // ── builder list item 184: one Do next list per client (GET /agency/sites/:id/do-next) ──
 // Needs you, the health check, Search, reviews, AI answers and the coach's ideas for this
 // client, in that order. Most items leave on their own when the thing is done; Done puts one
@@ -609,7 +610,7 @@ async function decideDoNext(btn,id){
     if(window.ddsToast)ddsToast(decision==='done'?'Done. It’s off the list for 30 days.':decision==='not_relevant'?'Off the list for good.':'Back on the list.');
   }catch(e){btn.disabled=false;if(window.ddsToast)ddsToast((e&&e.message)||'That didn’t save. Nothing changed; try again.','err');}
 }
-async function apiGetStudio(path){ const r = await fetch(FN + path, { headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':'' } }); return r.ok ? r.json() : Promise.reject(r.status); }
+async function apiGetStudio(path){ const r = await fetch(FN + path, { headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':'', 'x-region':FN_REGION } }); return r.ok ? r.json() : Promise.reject(r.status); }
 function clientFacts(rec,proj,ctx){
   if(!rec||!rec.identity)return null;
   const id=rec.identity; const site=new URLSearchParams(location.search).get('client')||id.customer_site_id||'';
@@ -1051,7 +1052,7 @@ async function dismissNotice(id, btn){
 // field crm.html's inline editor saves) — no new endpoint. The row leaves only
 // AFTER the write succeeds; on failure the button comes back. An emptied list
 // takes its section with it (no empty card).
-async function apiSend(path, method, body){ const r = await fetch(FN + path, { method, headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'') }, body: JSON.stringify(body||{}) }); return r.ok ? r.json() : Promise.reject(r.status); }
+async function apiSend(path, method, body){ const r = await fetch(FN + path, { method, headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''), 'x-region':FN_REGION }, body: JSON.stringify(body||{}) }); return r.ok ? r.json() : Promise.reject(r.status); }
 async function todoDone(id, btn){
   const row = btn.closest('.trow'); btn.disabled = true;
   try{

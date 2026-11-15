@@ -254,6 +254,7 @@ const DECIDED = {
     'POST /portal/members/:id/role', 'POST /portal/transfer', 'POST /portal/transfer/cancel',
     'POST /foundations/plans/:id/done',   // builder item 193: studio-only, checked by the route itself
     'POST /pages/from-saved',   // builder item 216: studio-only, checked by the route itself
+    'PUT /site/publish-lock',   // builder item 214: the studio, platform staff, or the owner of a site no studio looks after, checked by the route itself
   ],
 };
 const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) => ({ name, need })));
@@ -526,6 +527,7 @@ const WRITE_HANDLERS = [
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
   'handleFoundationsPlanDone',   // builder item 193: open on the member list; the route answers the studio only
+  'handlePublishLockPut',   // builder item 214: open on the member list; the route answers the studio, staff, or the owner of a site no studio looks after
   'handleSitePassword',   // builder list item 175: POST /site/password needs configure
   'handleComingSoon',   // builder list item 158: POST /site/coming-soon needs configure
   'handleSampleInvoice',   // builder list item 175: POST /sales/invoices/test is edit, like Send me a test on an update
