@@ -12,6 +12,7 @@ import { mintSignInLink } from '../lib/workspace.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
+import { roomOf, roomFullMessage, studioList, addsToRoom } from '../lib/site_room.ts';
 import { isCustomerOfStudio, claimPortfolioSite, requestConnection } from '../lib/connect_requests.ts';
 import { ensureProjectForDeal, ensureBridge, linksForCustomer, emailOperator, tickChecklistForDeal } from '../lib/service_bridge.ts';
 import { loadEmailBrand, EMAIL_BRAND_DEFAULT, emailBand, emailFacts } from '../lib/email_brand.ts';
@@ -2915,6 +2916,27 @@ export async function handleSalesDocumentLink(site: SiteRow, kind: DocKind, id: 
   return json({ url: docViewerUrl(token), pdf_url: `${fnBase()}/functions/v1/presence/sales/doc/${encodeURIComponent(token)}?format=pdf` }, 200, cors);
 }
 
+// ── Builder item 198: the one site-limit rule at the sales doors (lib/site_room.ts) ──
+// Add a customer and Convert put the customer's site in the studio's list, so a full
+// plan is refused before anything is made, the way + New site refuses. Only a studio
+// (an agency member) has a list, and an email whose site is already in it adds nothing.
+async function fullPlanFor(principal: Principal, email: string): Promise<{ used: number; limit: number | null } | null> {
+  if (!principal.jwt) return null;
+  const am = await resolveAgencyMember(principal.jwt).catch(() => null);
+  if (!am) return null;
+  const list = await studioList(am.agency_id);
+  if (!list) return null;
+  const room = roomOf(list.map((l) => l.status), am.client_limit);
+  if (!room.full) return null;
+  const existing = email ? await findClientByEmail(email).catch(() => null) : null;
+  if (existing) {
+    const q = await svc(`presence_sites?client_id=eq.${existing.id}&select=id&limit=5`).catch(() => null);
+    const theirs = q ? rows(q) : [];
+    if (theirs.some((x) => !addsToRoom(list, String(x.id)))) return null;   // already in the list
+  }
+  return { used: room.used, limit: room.limit };
+}
+
 // ═══ CONVERT TO CUSTOMER (idempotent) ═══
 export async function handleSalesConvert(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
@@ -2954,6 +2976,9 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   const businessName = clean((contact?.company || contact?.name || deal.title), 120) || 'New customer';
   const email = clean(contact?.email, 160).toLowerCase();
   const plan = pickPlan(cb.plan); // selectable edition (default 'presence'); billing formalized in P2-E (active access, unbilled — a deliberate P2-C decision)
+  // item 198: a full plan is said before anything is made
+  const fullAt = await fullPlanFor(principal, email);
+  if (fullAt) { await unclaim(); return json({ error: 'client_limit', message: roomFullMessage(fullAt.limit, 'convert'), room: { ...fullAt, full: true } }, 409, cors); }
 
   // 1+2) resolve/create the customer ACCOUNT (login) and run the ONE idempotent
   //    provisioning path (entitlement + site + hosting + seeds). This is the SHARED
@@ -3379,6 +3404,10 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   }
 
   // ── A) SET THEM UP NOW (existing behavior) ──────────────────────────────────
+  // item 198: a full plan is refused before anything is made (Home, Customers and
+  // Contacts all add here; the same rule as + New site)
+  const fullAt = await fullPlanFor(principal, email);
+  if (fullAt) return json({ error: 'client_limit', message: roomFullMessage(fullAt.limit, 'add'), room: { ...fullAt, full: true } }, 409, cors);
   const plan = pickPlan(b.edition);   // "what they get" (default presence); reuse the convert whitelist
   const existingWebsite = clean(b.website_url, 200);   // their OWN site, when we don't host it
 

@@ -22,6 +22,7 @@ import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
 import { layoutCounts } from '../lib/site_layout.ts';
 import { removeTemplatePhotos } from '../lib/media.ts';
 import { handleAgencySites } from './sites.ts';
+import { roomOf, roomFullMessage, addsToRoom } from '../lib/site_room.ts';
 import { handleSiteFolders } from './site_folders.ts';   // builder list item 176
 import { handleSavedPages } from './saved_pages.ts';   // builder list item 216
 import { handleClientTools } from './client_tools.ts';
@@ -393,9 +394,13 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     if (!can(member.role, 'manage_clients')) return forbid(cors);
     const b = await body();
     if (!UUID_RE.test(String(b?.site_id || ''))) return json({ error: 'bad_request', message: 'A site_id is needed.' }, 400, cors);
-    const existing = await svc(`presence_agency_clients?agency_id=eq.${member.agency_id}&select=site_id&limit=1000`);
-    if ((existing.json ?? []).length >= member.client_limit) {
-      return json({ error: 'client_limit', message: `The plan covers ${member.client_limit} clients — the limit can grow with the plan.` }, 400, cors);
+    const existing = await svc(`presence_agency_clients?agency_id=eq.${member.agency_id}&select=site_id,status&limit=1000`);
+    const listRows = (existing.json ?? []) as Array<{ site_id: string; status: string }>;
+    // item 198: one rule at every door (lib/site_room.ts): the Trash doesn't count, and a
+    // site already in the list adds nothing
+    const room = roomOf(listRows.map((r) => r.status), member.client_limit);
+    if (room.full && addsToRoom(listRows, String(b.site_id))) {
+      return json({ error: 'client_limit', message: roomFullMessage(room.limit, 'new'), room }, 409, cors);
     }
     // Final pass (Nov 8, S1): this added ANY site id to the portfolio, overwriting
     // the agency that managed it — site ids show on published pages and in reply
@@ -663,13 +668,14 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     ]);
     const links = (clients.json ?? []) as Array<{ site_id: string; status: string }>;
     const ids = links.filter((l) => l.status === 'active').map((l) => l.site_id);
+    const room = roomOf(links.map((l) => l.status), member.client_limit);   // item 198: the Trash doesn't count
     const sites = await loadSites(ids);
     const since = new Date(Date.now() - 30 * 86400000).toISOString();
     const pubs = ids.length ? await svc(`presence_publishes?site_id=in.(${ids.join(',')})&status=eq.live&created_at=gt.${since}&select=id&limit=1000`) : { json: [] };
     return json({ data: {
       plan: member.plan,
       seats: { used: (seats.json ?? []).length, limit: member.seat_limit },
-      clients: { used: links.length, active: ids.length, archived: links.length - ids.length, limit: member.client_limit },
+      clients: { used: room.used, active: ids.length, archived: links.filter((l) => l.status === 'archived').length, trashed: links.length - room.used, limit: member.client_limit },
       editions: sites.reduce((acc: Record<string, number>, s) => { acc[s.edition] = (acc[s.edition] || 0) + 1; return acc; }, {}),
       publishes_30d: (pubs.json ?? []).length,
     } }, 200, cors);

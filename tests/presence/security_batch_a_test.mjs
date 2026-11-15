@@ -330,5 +330,28 @@ T.presence_service_links.push({ project_id: '0eeeeeee-0000-4000-8000-00000000000
   ok('scoped: a link from another studio to the same customer is never followed', !log.some((c) => c.url.includes(`site_id=eq.${OTHER_SITE}`)));
 }
 
+// ═══ builder item 198: Add a customer and Convert follow the plan's site limit ═══
+// One rule at every door (lib/site_room.ts): the Trash doesn't count, a full plan is
+// refused before anything is made, and a customer already in the list adds nothing.
+world();
+{
+  T.presence_agencies.find((a) => a.id === AG1).client_limit = 1;
+  T.presence_agency_clients.push({ site_id: MINE_SITE, agency_id: AG1, status: 'active', owner_email: 'lee@maple.test' });
+  const r = await res(await S.handleSalesAddCustomer(req('POST', '/sales/customers', { mode: 'provision', email: 'new@person.test', business_name: 'New Co' }), site(STUDIO_SITE), studio(), cors));
+  ok('item 198: a full plan refuses Add a customer, in plain words, before anything is made', r.status === 409 && r.body?.error === 'client_limit' && /Your plan covers 1 site, and all 1 is in use\. Move one you no longer need to the Trash on Sites, then add them\./.test(r.body?.message || ''), JSON.stringify(r.body));
+  NOT_TAKEN('item 198, a full plan');
+  ok('item 198: …no account was made either', wrote('clients').length === 0 && !log.some((c) => c.method === 'POST' && c.url.startsWith('/auth/v1/admin/users')));
+  const again = await res(await S.handleSalesAddCustomer(req('POST', '/sales/customers', { mode: 'provision', email: 'lee@maple.test', business_name: 'Maple Street Studio' }), site(STUDIO_SITE), studio(), cors));
+  // (past the rule it goes on to set them up; this world has no hosting, so it stops there)
+  ok('item 198: a customer whose site is already in the list adds nothing, so the rule lets it through', again.body?.error !== 'client_limit' && again.status !== 409, JSON.stringify({ status: again.status, body: again.body }).slice(0, 300));
+}
+world();
+{
+  T.presence_agencies.find((a) => a.id === AG1).client_limit = 1;
+  T.presence_agency_clients.push({ site_id: MINE_SITE, agency_id: AG1, status: 'trashed', owner_email: 'lee@maple.test' });
+  const r = await res(await S.handleSalesAddCustomer(req('POST', '/sales/customers', { mode: 'provision', email: 'new@person.test', business_name: 'New Co' }), site(STUDIO_SITE), studio(), cors));
+  ok('item 198: a site in the Trash doesn\'t count, so a plan of 1 with its only site trashed has room', r.body?.error !== 'client_limit' && r.status !== 409, JSON.stringify(r.body).slice(0, 200));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('Failed:\n  ' + failed.join('\n  ')); Deno.exit(1); }
