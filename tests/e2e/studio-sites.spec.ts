@@ -619,7 +619,8 @@ test.describe('Sites: the pages travel (item 145)', () => {
     await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Duplicate site' }).click();
     const dlg = page.locator('#dupDlg');
     await expect(dlg).toContainText('this one’s pages and sections, with their words and photos, the menu and the look');
-    await expect(dlg.locator('#dup-biz')).toBeFocused();   // as above: wait for the dialog's own move to its first box
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));   // as below: let the dialog's own 20ms move to its first box land first
+    await expect(dlg.locator('#dup-biz')).toBeFocused();
     await dlg.locator('#dup-biz').fill('Bistro Twelve');
     await dlg.locator('#dup-email').fill('sam@bistrotwelve.example');
     await dlg.locator('#dup-submit').click();
@@ -758,7 +759,10 @@ test.describe('Sites: the bug hunt fixes (A1, A10)', () => {
     await page.locator('.scard[data-site="s1"] [data-menu]').click();
     await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Duplicate site' }).click();
     const dlg = page.locator('#dupDlg');
-    await expect(dlg.locator('#dup-biz')).toBeFocused();   // the dialog moves you to its first box a beat after it opens; typing before then can land in the wrong box
+    // the dialog moves you to its first box 20ms after it opens (openDuplicate's timer); a page timer set now runs after it,
+    // so the typing below can't be pulled back into the first box halfway through
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));
+    await expect(dlg.locator('#dup-biz')).toBeFocused();
     await dlg.locator('#dup-biz').fill('Bistro Twelve');
     await dlg.locator('#dup-email').fill('sam@bistrotwelve.example');
     await dlg.locator('#dup-submit').click();
