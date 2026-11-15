@@ -52,7 +52,7 @@ ok('Home is headed Home (final pass, batch C: the nav says Home; the Customers p
 ok('the Customers column says Requests (batch C: it counts requests only), its badge counts requests', /\['open_support','Requests',/.test(read('customers.html')) && /att\+\(att===1\?' request':' requests'\)/.test(read('customers.html')));
 ok('the record says Waiting on them', /Waiting on them/.test(read('crm.html')) && !/Waiting on client/.test(read('crm.html')));
 ok('the project page says Waiting on them', !/Waiting on client/.test(read('projects.html')));
-ok('Send an update\'s trail goes back to the Inbox (builder item 165: the one page header\'s trail)', /<nav class="dds-ph-trail" aria-label="Where this page is"><a href="\/inbox\.html">Inbox<\/a>/.test(read('broadcasts.html')));
+ok('Send an update\'s trail goes back to the Inbox, their Messages inside a client (builder item 165: the one page header\'s trail; builder item 202\'s names)', /<nav class="dds-ph-trail" aria-label="Where this page is"><a href="\/inbox\.html" id="trailInbox">\$\{inboxName\(\)\}<\/a>/.test(read('broadcasts.html')) && /const inboxName=\(\)=>\(window\.ddsScopeInfo&&window\.ddsScopeInfo\(\)\)\?'Messages':'Inbox';/.test(read('broadcasts.html')));
 ok('the record\'s tab title is Record', /<title>Record — Studio OS<\/title>/.test(read('crm.html')));
 
 // ── 26 ──
