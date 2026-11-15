@@ -280,6 +280,7 @@ test.describe('Send an update › templates (item 221)', () => {
   });
 
   test('accessibility: the welcome card and the templates sheet pass axe', async ({ page }) => {
+    test.slow();   // two full scans; WebKit on a busy machine needs the room
     await open(page);
     await expect(card(page).getByRole('switch', { name: 'Send the welcome email' })).toBeVisible();
     const a = await new AxeBuilder({ page }).include('#welcome').withTags(['wcag2a', 'wcag2aa']).analyze();
@@ -289,5 +290,7 @@ test.describe('Send an update › templates (item 221)', () => {
     const b = await new AxeBuilder({ page }).include('#tplDlg').withTags(['wcag2a', 'wcag2aa']).analyze();
     expect(b.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious').map((v) => `${v.id} (${v.nodes.length})`)).toEqual([]);
     await noSideScroll(page);
+    await page.getByRole('dialog', { name: 'Start from a template' }).getByRole('button', { name: 'Close' }).click();
+    await expect(page.locator('#tplDlg')).toBeHidden();
   });
 });
