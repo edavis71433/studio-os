@@ -11,14 +11,15 @@ import { aiAssistantOf } from './visits.ts';
 import { searchWords } from './search_phrases.ts';
 
 export type Channel = 'google' | 'search' | 'direct' | 'social' | 'ai' | 'links' | 'sites';
-export const CHANNEL_WORDS: Record<Channel, { name: string; fewer: string }> = {
-  google: { name: 'Google searches', fewer: 'fewer Google searches' },
-  search: { name: 'Other search engines', fewer: 'fewer visits from Bing and other search engines' },
-  direct: { name: 'Straight to the site', fewer: 'fewer visits straight to the site' },
-  social: { name: 'Social media', fewer: 'fewer visits from social media' },
-  ai: { name: 'AI assistants', fewer: 'fewer visits from AI assistants' },
-  links: { name: 'Your own links', fewer: 'fewer visits from your own links (emails, ads, QR codes)' },
-  sites: { name: 'Other websites', fewer: 'fewer visits from other websites' },
+// name: a row's label; from: in a sentence ("came from …"); fewer: the line under a red number
+export const CHANNEL_WORDS: Record<Channel, { name: string; from: string; fewer: string }> = {
+  google: { name: 'Google searches', from: 'Google searches', fewer: 'fewer Google searches' },
+  search: { name: 'Other search engines', from: 'Bing and other search engines', fewer: 'fewer visits from Bing and other search engines' },
+  direct: { name: 'Straight to the site', from: 'people coming straight to the site', fewer: 'fewer visits straight to the site' },
+  social: { name: 'Social media', from: 'social media', fewer: 'fewer visits from social media' },
+  ai: { name: 'AI assistants', from: 'AI assistants', fewer: 'fewer visits from AI assistants' },
+  links: { name: 'Your own links', from: 'your own links (emails, ads, QR codes)', fewer: 'fewer visits from your own links (emails, ads, QR codes)' },
+  sites: { name: 'Other websites', from: 'other websites', fewer: 'fewer visits from other websites' },
 };
 /** A drop is explained once the month before had this many visits and this month fell
  *  by at least this much: below that a few visits either way say nothing. */
@@ -108,10 +109,10 @@ export function visitDrop(i: {
   let short: string, why: string;
   if (-top.change * 2 >= lost) {
     short = `Mostly ${top.channel === 'google' && ownName ? 'fewer Google searches for your name' : CHANNEL_WORDS[top.channel].fewer}`;
-    why = `Most of the drop came from ${top.name.toLowerCase()}: ${plural(-top.change, 'visit')} fewer.`;
+    why = `Most of the drop came from ${CHANNEL_WORDS[top.channel].from}: ${n1(-top.change)} fewer visit${-top.change === 1 ? '' : 's'}.`;
   } else {
     short = 'Fewer visits from several places';
-    why = `The drop was spread out: ${fell.slice(0, 3).map((p) => `${p.name.toLowerCase()} ${n1(-p.change)} fewer`).join(', ')}.`;
+    why = `The drop was spread out: ${fell.slice(0, 3).map((p) => `${n1(-p.change)} fewer from ${CHANNEL_WORDS[p.channel].from}`).join(', ')}.`;
   }
   if (search) why += ownName
     ? ` Fewer people looked you up by name: “${search.term}” brought ${plural(search.now, 'click')} from Google, against ${n1(search.was)}.`

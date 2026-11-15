@@ -1213,6 +1213,43 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .sv-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:var(--dds-s2,8px)}
 .sv-head h3{margin:0}
 .sv-headn{font-size:12.5px;color:var(--ink-2);margin-right:auto}
+/* builder list item 219: why visits fell, and the searches almost on page one */
+.sv-drop{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:var(--dds-s5,20px);margin-top:var(--dds-s4,16px);border:1px solid var(--clay);border-radius:16px;background:var(--clay-soft);padding:18px 22px}
+.sv-drop h3{display:flex;align-items:center;gap:10px;margin:0 0 6px;font-size:19px}
+.sv-drop-dot{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--clay);color:var(--sheet);font-size:12px;flex:0 0 auto}
+.sv-drop p{margin:0 0 6px;font-size:14px;color:var(--ink)}
+.sv-drop .sv-drop-k{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);margin:0}
+.sv-drop ul{list-style:none;margin:6px 0 0;padding:0}
+.sv-drop li{display:grid;grid-template-columns:minmax(110px,1fr) minmax(60px,1.2fr) auto auto;gap:10px;align-items:center;padding:4px 0;font-size:13px}
+.sv-drop li .bar{display:block;width:100%;height:8px}
+.sv-drop li .bar rect.down{fill:var(--clay)} .sv-drop li .bar rect.up{fill:var(--sage)}
+.sv-drop li .c{font-weight:700;text-align:right;min-width:40px} .sv-drop li .c.down{color:var(--clay)} .sv-drop li .c.up{color:var(--sage)}
+.sv-drop li .w{font-size:12px;color:var(--ink-2);white-space:nowrap}
+.sv-near-src{font-size:12.5px;color:var(--ink-2)}
+.sv-near-t{width:100%;border-collapse:collapse;font-size:13.5px}
+.sv-near-t th{text-align:left;font-size:12px;font-weight:600;color:var(--ink-3);padding:8px 10px;border-bottom:1px solid var(--hair);white-space:nowrap}
+.sv-near-t td{padding:12px 10px;border-bottom:1px solid var(--hair);vertical-align:middle}
+.sv-near-t .q{font-weight:600;overflow-wrap:anywhere}
+.sv-near-t .pl{white-space:nowrap} .sv-near-t .pl b{font-size:15px;margin-right:6px}
+.sv-near-t .pg{color:var(--plum);font-weight:500;overflow-wrap:anywhere}
+.sv-near-t .fx{min-width:200px}
+.sv-near-t .act{text-align:right}
+.sv-near-go{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--plum);border-radius:999px;background:none;color:var(--plum);padding:6px 12px;min-height:36px;cursor:pointer;white-space:nowrap}
+.sv-near-go:hover{background:var(--plum-soft,var(--paper))}
+.sv-near-ph{display:none}
+@media (max-width:760px){
+  .sv-drop{grid-template-columns:minmax(0,1fr);padding:16px}
+  .sv-drop li{grid-template-columns:minmax(0,1fr) minmax(50px,1fr) auto}
+  .sv-drop li .w{display:none}
+  .sv-near-t thead{display:none}
+  .sv-near-t tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:12px 0;border-top:1px solid var(--hair)}
+  .sv-near-t td{padding:0;border:0}
+  .sv-near-t td.pl{grid-column:2;grid-row:1;text-align:right}
+  .sv-near-t td.sn,.sv-near-t td.ck{display:none}
+  .sv-near-t td.pg,.sv-near-t td.fx,.sv-near-t td.act{grid-column:1/-1}
+  .sv-near-go{width:100%;min-height:44px}
+  .sv-near-ph{display:inline}
+}
 /* item 160: what people type to find you */
 .sv-phrases{margin:0 0 var(--dds-s4,16px)}
 .sv-phrases h3{font:600 19px/1.25 var(--serif)}
@@ -2459,6 +2496,9 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
         <section class="sv-card sv-phrases" aria-labelledby="svPhrasesH" id="svPhrasesCard" hidden><div class="sv-head"><h3 id="svPhrasesH">What people type to find you</h3><span class="sv-headn" id="svPhrasesN"></span></div><div id="svPhrases"></div></section>
         <div class="sv-tools" id="svTools" role="group" aria-label="Search tools" hidden></div>
         <div class="sv-sum" id="svNums" hidden></div>
+        <!-- item 219: why visits fell, and the searches almost on page one -->
+        <section class="sv-drop" aria-labelledby="svDropH" id="svDropCard" hidden></section>
+        <section class="sv-card sv-wide" aria-labelledby="svNearH" id="svNearCard" hidden><div class="sv-head"><h3 id="svNearH">Almost on page one</h3><span class="sv-headn" id="svNearN"></span><span class="sv-near-src" id="svNearSrc"></span></div><div id="svNear"></div></section>
         <div class="sv-grid sv-top">
           <section class="sv-card" aria-labelledby="svChecklistH"><h3 id="svChecklistH">Your checklist</h3><div id="seoTasks"></div></section>
           <section class="sv-card" aria-labelledby="svMoversH" id="svMoversCard" hidden><h3 id="svMoversH">Pages that moved most in Google</h3><div id="svMovers"></div></section>
@@ -10298,6 +10338,7 @@ async function loadSearch() {
   if (!$("view-search").classList.contains("on")) return;
   renderSvScore(); renderSvFix(); renderSvConsole(); renderSvListing(); renderSvAi(); renderSeoTasks();
   renderSvTools(); renderSvNums(); renderSvMovers();   // item 124
+  renderSvDrop(); renderSvNear();   // item 219
   renderSvPhrases();   // item 160
   if (SV && SV.follow && SV.console && SV.console.status === "connected") loadSvFollow(); else { SV_FOLLOW = null; renderSvFollow(); }   // item 181
   loadSvAiWatch();   // item 182
@@ -10622,6 +10663,43 @@ function renderSvNums() {
   }
   host.hidden = !tiles.length;
   host.innerHTML = tiles.join("");
+}
+// ── item 219: why visits fell, and the searches almost on page one ──
+// GET /visibility brings both (routes/search_tab.ts): `drop` when last month's visits fell enough to
+// say why, from where they came from and the search that lost the most; `near_miss` the searches
+// Google showed the site for at places 8 to 20, each with the page and one thing to fix there.
+function renderSvDrop() {
+  const card = $("svDropCard"); if (!card) return;
+  const d = SV && SV.drop;
+  card.hidden = !d;
+  if (!d) { card.textContent = ""; return; }
+  const parts = (d.parts || []).slice(0, 4), max = Math.max(1, ...parts.map((p) => Math.abs(p.change)));
+  card.innerHTML = `<div><h3 id="svDropH"><span class="sv-drop-dot" aria-hidden="true">▼</span>Visits fell ${esc(d.pct)}% in ${esc(d.month_label)}</h3><p>${esc(d.sentence)}</p>${d.search ? `<button type="button" class="sv-linkbtn" id="svDropSee">See the searches ›</button>` : ""}</div>`
+    + (parts.length ? `<div><p class="sv-drop-k">Where the visits came from, ${esc(d.month_label)} against ${esc(d.prior_label)}</p><ul>${parts.map((p) => `<li><span>${esc(p.name)}</span><svg class="bar" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"><rect class="${p.change < 0 ? "down" : "up"}" width="${Math.max(3, Math.round(Math.abs(p.change) / max * 100))}" height="8" rx="4"/></svg><span class="c ${p.change < 0 ? "down" : "up"}">${p.change > 0 ? "+" : "−"}${svNum(Math.abs(p.change))}</span><span class="w">${svNum(p.now)} (was ${svNum(p.was)})</span></li>`).join("")}</ul></div>` : "");
+  const see = $("svDropSee"); if (see) see.addEventListener("click", () => { const n = $("svConsoleCard"); if (n) { n.hidden = false; n.scrollIntoView({ behavior: "smooth", block: "center" }); } });
+}
+const SV_NEAR_GO = { hidden: "Improve the page", title: "Improve the page", description: "Improve the page", already: "Ask for reviews", check: "Open the page" };
+function renderSvNear() {
+  const card = $("svNearCard"), host = $("svNear"); if (!card || !host) return;
+  const nm = SV && SV.near_miss, list = (nm && nm.list) || [];
+  card.hidden = !list.length;
+  if (!list.length) { host.textContent = ""; return; }
+  $("svNearN").textContent = list.length === 1 ? "1 search" : `${list.length} searches`;
+  $("svNearSrc").textContent = `From Search Console · ${svMonth(nm.period)}`;
+  const live = SV.address && SV.address.url ? SV.address.url.replace(/\/$/, "") : "";
+  host.innerHTML = `<p class="hint">Google shows this site at places ${esc(nm.from)} to ${esc(nm.to)} for these searches: the bottom of page one or the top of page two. One fix on the right page can bring each one up.</p>
+    <table class="sv-near-t"><caption class="sr-only">Searches almost on page one, with the page Google shows and one thing to fix</caption>
+    <thead><tr><th scope="col">Search</th><th scope="col">Place · ${esc(svMonth(nm.period).slice(0, 3))}</th><th scope="col">Seen</th><th scope="col">Clicks</th><th scope="col">The page Google shows</th><th scope="col">One thing to fix</th><th scope="col"><span class="sr-only">Do it</span></th></tr></thead>
+    <tbody>${list.map((x, i) => `<tr><td class="q">${esc(x.term)}</td><td class="pl"><b>#${esc(Math.round(x.place))}</b>${x.prior_place == null ? `<span class="sv-chg">New</span>` : svChg(x.place, x.prior_place, "place")}</td><td class="sn">${svNum(x.seen)}</td><td class="ck">${svNum(x.clicks)}</td><td class="pg"><span class="sv-near-ph">Google shows </span>${esc(x.path)}${x.path === "/" ? " (Home)" : ""}</td><td class="fx">${esc(x.words)}</td><td class="act">${x.fix === "check" && !live ? "" : `<button type="button" class="sv-near-go" data-near="${i}" aria-label="${esc(SV_NEAR_GO[x.fix] || "Open")}: ${esc(x.term)}">${esc(SV_NEAR_GO[x.fix] || "Open")}</button>`}</td></tr>`).join("")}</tbody></table>
+    <p class="hint">Place is Google’s average for the month; page one is places 1 to 10. The fix is checked against the page’s own title and description on Google, never guessed.</p>`;
+  host.querySelectorAll("[data-near]").forEach((b) => b.addEventListener("click", () => svNearGo(list[Number(b.getAttribute("data-near"))], live)));
+}
+function svNearGo(x, live) {
+  if (!x) return;
+  if (x.fix === "already") return go("reviews");
+  if (x.fix === "check" || !x.key) { if (live) window.open(live + x.path, "_blank", "noopener"); return; }
+  if (x.key === "home") { const n = $(x.fix === "description" ? "f-seo_description" : "f-seo_title"); if (n) { n.scrollIntoView({ behavior: "smooth", block: "center" }); n.focus({ preventScroll: true }); } return; }
+  pgOpenSettings({ href: x.path });   // that page's own title and description on Google, and whether Google may show it
 }
 const SV_GO_WORD = { phrases: "Pick a page", publish: "Publish", "tool:hide": "Open", health: "See it", "connect:console": "Connect", domain: "Connect", wording: "Write", pages: "Open Pages", review: "Read it", "connect:listing": "Connect", files: "Open Files", "tool:llms": "Write", follow: "Follow", monitor: "Add it" };
 function svTodoGo(t) {
