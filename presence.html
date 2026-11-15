@@ -465,6 +465,17 @@ html:not(.is-studio) #dcModeSeg [data-dcmode="timewarp"]{display:none}
 .hdate .ver-kind{display:flex;margin-bottom:3px}
 .ver-note{display:flex;gap:10px;margin:var(--dds-s4,16px) 0 0;padding:var(--dds-s3,12px) 14px;border-radius:12px;background:var(--info-soft);color:var(--ink);font-size:12.5px;line-height:1.5}
 .ver-note>span:first-child{color:var(--info);font-weight:600}
+/* item 214: Lock publishing, under Versions' heading */
+.pub-lock{display:flex;flex-direction:column;gap:6px;margin:0 0 var(--dds-s4,16px);padding:12px 16px;border-radius:14px;background:var(--paper)}
+.pub-lock.on{background:var(--amber-soft)}
+.pub-lock .pg-sw{font-weight:600;font-size:13.5px}
+.pub-lock p{margin:0;font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.pub-lock.on p{color:var(--ink)}
+.pub-lock .field{margin:4px 0 0}
+.pub-lock input[type=text]{width:100%;max-width:520px}
+.pillbtn.locked{background:var(--amber-soft);color:var(--amber);border-color:transparent;display:inline-flex;align-items:center;gap:6px}
+.pillbtn.locked svg{flex:none}
+.rit-locked{margin:0 0 12px;font-size:14px;line-height:1.6;color:var(--ink-2)}
 .ver-sheet-note{margin:10px 0 0;font-size:13.5px;line-height:1.6;color:var(--ink)}
 .ver-more>summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink-2);margin-bottom:var(--dds-s4,16px)}
 h5.rune{font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:600;margin:36px 0 var(--dds-s4,16px);display:flex;align-items:center;gap:var(--dds-s4,16px)}
@@ -2780,11 +2791,12 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
       <!-- HISTORY -->
       <section class="view" id="view-history">
         <h1 class="doc" role="heading" aria-level="2">Versions</h1>
-        <p class="docsub">Every version you publish, and every checkpoint you save, newest first. View one, compare it, or bring it back into your draft. Your live site changes only when you publish.</p>
+        <p class="docsub">Every version you publish, and every checkpoint you save, newest first. View one, compare it, publish it again, or bring it back into your draft. Your live site changes only when you publish.</p>
+        <div id="pubLock"></div><!-- item 214: Lock publishing -->
         <!-- item 125: saves and publishes in one list, marked apart -->
         <div class="ver-top"><p class="ver-legend"><span class="ver-kind pub">Published</span><span class="ver-kind save">Saved, never live</span></p><button type="button" class="pillbtn sm" id="btnSaveCheckpoint" title="Save a named copy of your draft before a big edit, to look at or come back to. Your live site isn’t touched." hidden>Save a checkpoint</button></div>
         <div id="pubList"></div>
-        <p class="ver-note" id="verNote"><span aria-hidden="true">ⓘ</span><span>Restoring a version brings back its business details, services, reviews, questions, updates, sections, pages, menu, header and footer, colours and fonts, and leaves your bookings, enquiries, contacts and files as they are now.</span></p>
+        <p class="ver-note" id="verNote"><span aria-hidden="true">ⓘ</span><span>Publish again puts that version back on your live site in one step and leaves your draft as it is. Restoring a version brings back its business details, services, reviews, questions, updates, sections, pages, menu, header and footer, colours and fonts, and leaves your bookings, enquiries, contacts and files as they are now.</span></p>
         <!-- what happened to the site, newest first (was its own page: timeline.html) -->
         <section class="hb-sec" id="activitySec" aria-labelledby="activityH" tabindex="-1" hidden>
           <div class="hb-sec-h"><h2 id="activityH">Recent activity</h2><button type="button" class="quietact" id="activityMore" hidden>See all</button></div>
@@ -2832,6 +2844,19 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
     <div class="foot">
       <button class="quietact" data-close>Cancel</button>
       <button class="pillbtn inked" id="btnRestoreGo">Restore to my draft</button>
+    </div>
+  </div>
+</div>
+
+<!-- item 214: Publish again asks once -->
+<div class="scrim" id="againScrim">
+  <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="againTitle">
+    <h2 id="againTitle">Publish this version again?</h2>
+    <p class="sub" id="againSub"></p>
+    <div class="body"><p class="ver-sheet-note">Your draft stays as it is, so what you’ve changed since is still there for your next publish. Today’s version stays in Versions, so it can come back too.</p></div>
+    <div class="foot">
+      <button class="quietact" data-close>Cancel</button>
+      <button class="pillbtn inked" id="btnAgainGo">Publish this version</button>
     </div>
   </div>
 </div>
@@ -2939,6 +2964,9 @@ const ENVS = {
 };
 const ENV = new URLSearchParams(location.search).get("env") === "staging" ? ENVS.staging : ENVS.prod;
 const FN = ENV.url + "/functions/v1/presence";
+// run production's server beside its database (Oregon), not nearest the visitor: see shell.js.
+// Staging's server doesn't allow the header, so it goes to production only.
+const REGION_HEADER = ENV === ENVS.prod ? { "x-region": "us-west-2" } : {};
 const sb = supabase.createClient(ENV.url, ENV.anon, { auth: { storageKey: "dds-portal-auth", persistSession: true, autoRefreshToken: true } });
 if (ENV === ENVS.prod) window.__ddsSb = sb;   // shell.js reuses it, so this page runs one auth client
 
@@ -3312,7 +3340,7 @@ async function apiSend(method, route, body, undoRec, named) {
   const r = await fetch(FN + route, {
     method,
     headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''),
-      ...(mut && version ? { "If-Match": version } : {}) },
+      ...REGION_HEADER, ...(mut && version ? { "If-Match": version } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   }).finally(() => { if (mut) WRITES_ANSWERED++; });
   const text = await r.text();
@@ -3386,7 +3414,7 @@ function settingsPut(build, landed) {
 async function apiHtml(route) {
   const { data } = await sb.auth.getSession();
   const jwt = data?.session?.access_token;
-  const r = await fetch(FN + route, { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||'') } });
+  const r = await fetch(FN + route, { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''), ...REGION_HEADER } });
   const text = await r.text();
   if (!r.ok) { let j = null; try { j = JSON.parse(text); } catch {} const e = new Error((j && j.message) || "We couldn’t load that page just now."); e.status = r.status; throw e; }
   // A 200 that is not a page (a JSON envelope, an empty body) must never land
@@ -6232,7 +6260,7 @@ const CUTOUT_POLL_MS = 2500, CUTOUT_POLLS = 72;   // three minutes at most
 async function pickerCutout(id) {
   const call = async (path, method) => {
     const { data } = await sb.auth.getSession();
-    return fetch(FN + path, { method, headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||'') } });
+    return fetch(FN + path, { method, headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''), ...REGION_HEADER } });
   };
   const fail = "The cut-out didn’t come through, so nothing changed. Try again in a moment.";
   let r; try { r = await call("/assets/" + id + "/cutout", "POST"); } catch (_) { return { error: "The cut-out couldn’t start. Check your connection and try again." }; }
@@ -7364,7 +7392,7 @@ async function hmPdf(btn) {
   btn.disabled = true;
   try {
     const { data } = await sb.auth.getSession();
-    const r = await fetch(FN + "/website-health/pdf", { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get("client") || "") } });
+    const r = await fetch(FN + "/website-health/pdf", { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get("client") || ""), ...REGION_HEADER } });
     if (!r.ok) throw new Error("bad");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(await r.blob());
@@ -7909,16 +7937,21 @@ function renderRecent() {
 const sectionWord = (s) => ({ offerings: VOCAB.label.toLowerCase(), faqs: "questions", testimonials: "testimonials", updates: "updates", business: "business", media: "files", site: "your site" }[s] || s);
 function renderPublishButton() {
   const c = S.changes;
-  const label = c && c.count > 0 ? `Publish ${c.count} change${c.count === 1 ? "" : "s"}` : "Publish";
+  const locked = !!(S.publishLock && S.publishLock.on);   // item 214: it opens the card that says why
+  const label = locked ? "Locked" : c && c.count > 0 ? `Publish ${c.count} change${c.count === 1 ? "" : "s"}` : "Publish";
   $("btnPublish").textContent = label;
   // nothing to publish → the button steps back to quiet; the filled style is for a real next action
-  $("btnPublish").classList.toggle("inked", !!(c && (c.count > 0 || c.first_publish)));
-  $("dockPublish").textContent = c && c.count > 0 ? `Publish·${c.count}` : "Publish";
+  $("btnPublish").classList.toggle("inked", !locked && !!(c && (c.count > 0 || c.first_publish)));
+  $("btnPublish").classList.toggle("locked", locked);
+  $("btnPublish").title = locked ? "Publishing is locked" : "";
+  $("dockPublish").textContent = locked ? "Locked" : c && c.count > 0 ? `Publish·${c.count}` : "Publish";
   const barPub = $("dcBtnPublish");   // Edit mode's own copy of the same button
   if (barPub) {
     const tight = window.matchMedia && matchMedia("(max-width:760px)").matches && c && c.count > 0;   // a phone's bar is short of room
-    barPub.textContent = tight ? `Publish·${c.count}` : label; barPub.setAttribute("aria-label", label);
+    if (locked) { barPub.innerHTML = uiIcon("lock", 14); barPub.appendChild(document.createTextNode("Locked")); barPub.setAttribute("aria-label", "Publishing is locked"); }
+    else { barPub.textContent = tight ? `Publish·${c.count}` : label; barPub.setAttribute("aria-label", label); }
     barPub.classList.toggle("inked", $("btnPublish").classList.contains("inked"));
+    barPub.classList.toggle("locked", locked);
   }
   dcSyncLiveChip();
 }
@@ -8431,6 +8464,9 @@ async function loadRitual(toSchedule) {
     if (REVIEWED && !S.draftHash && !DRAFT_WRITES_OUT) S.draftHash = REVIEWED;   // as readChanges, when the page holds none
     renderPublishButton();
     renderRitualLive();
+    // Item 214: while publishing is locked, the card says so and why, instead of offering Publish
+    const lock = await readPublishLock();
+    if (lock && lock.on) { renderRitualLocked(c, lock); return; }
     const body = $("ritBody"); body.innerHTML = "";
     const forClient = scopedClientName();
     if (forClient) {
@@ -9460,6 +9496,7 @@ function renderVersionTools() {
   box.appendChild(card);
 }
 async function loadHistory() {
+  readPublishLock();      // item 214: the lock row under the heading, and whether Publish again can go
   renderPreviewPanel();   // FD-T20/T21: Draft → Preview → Live sits at the top
   renderCheckpoints();    // named draft safety points
   renderLaunches();   // FD-T7: staged launches sit above the version journal
@@ -9549,7 +9586,7 @@ function renderVersionList() {
     body.appendChild(el("div", "hmeta",
       p.status === "failed" ? "Your site was unchanged and nothing was lost."
       : p.status === "publishing" ? "Still publishing."
-      : (p.kind === "restore" ? "A restored version · " : "") + (who ? "Published by " + who : "Published")));
+      : (p.kind === "restore" && !/^Published again/.test(p.summary || "") ? "A restored version · " : "") + (who ? "Published by " + who : "Published")));
     row.appendChild(body);
     const acts = el("div", "hacts");
     if (p.status === "live") acts.appendChild(verStar(p));   // item 158
@@ -9586,7 +9623,14 @@ function renderVersionList() {
         if (!out.hidden && !out.dataset.done) { out.dataset.done = "1"; showVersionCompare(out, p.id, "draft"); }
       });
       acts.appendChild(cmp);
-      const res = el("button", "textact", "Restore");
+      if (p.id !== liveId) {   // item 214: an earlier publish goes live again in one step
+        const again = el("button", "textact", "Publish again"); again.dataset.needs = "publish";
+        const locked = !!(S.publishLock && S.publishLock.on);
+        again.disabled = locked; if (locked) again.title = "Publishing is locked";
+        again.addEventListener("click", () => openPublishAgain(p));
+        acts.appendChild(again);
+      }
+      const res = el("button", "quietact", "Restore to draft");
       res.addEventListener("click", () => {
         S.restoreTarget = p;
         $("resSheetSub").textContent = `“${p.summary}”, published ${fmtDate(p.at)}.`;
@@ -9618,7 +9662,7 @@ function versionSavedRow(c) {
   const acts = el("div", "hacts");
   acts.appendChild(verStar(c));   // item 158
   const view = el("button", "quietact", "View"); view.addEventListener("click", () => openLaunchPreview(c.id)); acts.appendChild(view);
-  const res = el("button", "textact", "Restore");
+  const res = el("button", "quietact", "Restore to draft");   // item 214: beside Publish again, it says where it goes
   res.addEventListener("click", () => { S.restoreTarget = c; $("resSheetSub").textContent = `“${c.name}”, saved ${fmtDate(c.at)}.`; openSheet("restoreScrim"); });
   acts.appendChild(res);
   const rm = el("button", "quietact", "Remove"); rm.dataset.needs = "delete";
@@ -9640,6 +9684,102 @@ function workFromRestored() {
   DC_UNDO = []; DC_REDO = [];
   BLOCKS_WORK = currentBlocks(); DC_HIST_LAST = histSnap(); BLOCK_FOCUS = null; updateUndoButtons();
   renderBlocksCard(); renderPagesBar(); refreshDesignPreview();
+}
+// ── Item 214: Publish again, and Lock publishing ─────────────────────────────
+// Publish again puts an earlier publish back on the live site in one step (POST /restore
+// deploys that kept version through the one pipeline); the draft is left as it is. Lock
+// publishing holds the live site as it is, a launch freeze or a client in dispute: while it is
+// on, nothing goes live by any route and the bar's Publish says Locked. The server keeps the
+// lock and checks it on every way of going live (lib/publish_lock.ts); the page reads it on
+// boot, whenever Versions or Publish opens, and after each change.
+const lockDay = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+function openPublishAgain(p) {
+  S.againTarget = p;
+  $("againSub").textContent = "“" + (p.label || p.summary) + "”, published " + lockDay(p.at) + ", goes on your live site again now, all at once, in place of today’s version.";
+  openSheet("againScrim");
+}
+$("btnAgainGo").addEventListener("click", async () => {
+  const p = S.againTarget; if (!p) return;
+  const btn = $("btnAgainGo");
+  btn.disabled = true; btn.textContent = "Publishing…";
+  try {
+    const r = await api("POST", "/restore", { publish_id: p.id });
+    closeSheet("againScrim");
+    toast(r && r.data && r.data.status === "live" ? "That version is live again." : "That version is going live. It usually takes under a minute.");
+    if (S.site) S.site.last_published_at = new Date().toISOString();
+    loadHistory(); scheduleChangesRefresh();
+  } catch (err) { toast(nice(err), true); }
+  btn.disabled = false; btn.textContent = "Publish this version";
+});
+async function readPublishLock() {
+  try { S.publishLock = (await api("GET", "/site/publish-lock")).data || null; }
+  catch (_) { /* a hiccup, or a server from before: no lock is shown, and the server still refuses */ }
+  renderPublishButton(); renderPublishLock();
+  if (S.publishesRead) renderVersionList();
+  return S.publishLock || null;
+}
+async function setPublishLock(on, words) {
+  const body = { on }; if (words !== undefined) body.words = words;
+  S.publishLock = (await api("PUT", "/site/publish-lock", body)).data || null;
+  renderPublishButton(); renderPublishLock();
+  if (S.publishesRead) renderVersionList();
+  return S.publishLock;
+}
+function renderPublishLock() {
+  const box = $("pubLock"); if (!box) return;
+  box.textContent = ""; box.className = "";
+  const l = S.publishLock; if (!l) return;
+  const by = l.by_kind === "client" ? (studioInClient() ? "the client" : "you") : (studioInClient() ? "your team" : "your studio");
+  if (!l.can_change) {
+    if (!l.on) return;   // a client whose studio looks after the site: nothing to say until it's locked
+    box.className = "pub-lock on";
+    box.appendChild(el("p", null, (l.by_kind === "client" ? "Publishing was locked on " + lockDay(l.at) + "." : "Your studio locked publishing on " + lockDay(l.at) + "." + (l.words ? " Their note: “" + l.words + "”" : "")) + " Ask them if something needs to go live."));
+    return;
+  }
+  box.className = "pub-lock" + (l.on ? " on" : "");
+  const row = pgSwitch(l.on ? "Publishing is locked" : "Lock publishing", l.on);
+  const cb = row.querySelector("input"); cb.setAttribute("role", "switch");
+  cb.addEventListener("change", async () => {
+    const on = cb.checked; cb.disabled = true;
+    try {
+      await setPublishLock(on);
+      const nb = $("pubLock").querySelector("input[role=switch]"); if (nb) nb.focus();   // drawn again: the keyboard stays on the switch
+      toast(on ? "Publishing is locked. Nothing goes live until it’s unlocked." : "Unlocked. Publishing works again.");
+    } catch (err) { cb.checked = !on; cb.disabled = false; toast(nice(err), true); }
+  });
+  box.appendChild(row);
+  box.appendChild(el("p", null, l.on ? "Since " + lockDay(l.at) + ", by " + by + ". Nothing goes live until it’s unlocked; edits keep saving to the draft."
+    : "Nothing goes live until it’s unlocked: for a launch freeze, or while something is being sorted out. Edits keep saving to the draft."));
+  if (!l.on) return;
+  const inp = el("input"); inp.type = "text"; inp.maxLength = 140; inp.value = l.words || ""; inp.id = "pubLockWords"; inp.placeholder = "For example: launch freeze until Friday";
+  inp.addEventListener("change", async () => {
+    try { await setPublishLock(true, inp.value); toast("Saved"); } catch (err) { toast(nice(err), true); }
+  });
+  box.appendChild(pgField(studioInClient() ? "What your client sees" : "A note with the lock", inp));
+}
+// The publish card while publishing is locked: why, and the one way on for whoever may unlock.
+function renderRitualLocked(c, l) {
+  const n = c && c.count > 0 ? c.count : 0, body = $("ritBody"), acts = $("ritActions");
+  body.innerHTML = ""; acts.innerHTML = ""; $("ritBlockers").innerHTML = "";
+  $("ritTitle").textContent = "Publishing is locked.";
+  if (l.can_change) {
+    $("ritSub").textContent = "Locked since " + lockDay(l.at) + "." + (l.words ? (studioInClient() ? " Your client reads: “" + l.words + "”" : " Your note: “" + l.words + "”") : "");
+    body.appendChild(el("p", "rit-locked", !n ? "Nothing is waiting in the draft." : n === 1 ? "1 change is waiting in the draft. Unlock to publish it, or leave it locked and it waits." : n + " changes are waiting in the draft. Unlock to publish them, or leave it locked and they wait."));
+    const un = el("button", "pubbtn", "Unlock publishing");
+    un.addEventListener("click", async () => {
+      un.disabled = true;
+      try { await setPublishLock(false); toast("Unlocked. Publishing works again."); loadRitual(); }
+      catch (err) { un.disabled = false; toast(nice(err), true); }
+    });
+    acts.appendChild(un);
+  } else {
+    $("ritSub").textContent = l.by_kind === "client" ? "Publishing was locked on " + lockDay(l.at) + "." : "Your studio locked publishing on " + lockDay(l.at) + "." + (l.words ? " Their note: “" + l.words + "”" : "");
+    body.appendChild(el("p", "rit-locked", (!n ? "Your draft is safe." : n === 1 ? "Your change is safe in your draft and goes live once it’s unlocked." : "Your " + n + " changes are safe in your draft and go live once it’s unlocked.") + " Ask your studio if something needs to go live sooner."));
+    const pub = el("button", "pubbtn", !n ? "Publish" : n === 1 ? "Publish this change" : "Publish these " + n + " changes");
+    pub.disabled = true; pub.title = "Publishing is locked";
+    acts.appendChild(pub);
+  }
+  const back = el("button", "notyet", "Back to your website"); back.addEventListener("click", closeRitual); acts.appendChild(back);
 }
 $("btnRestoreGo").addEventListener("click", async () => {
   const p = S.restoreTarget; if (!p) return;
@@ -9720,6 +9860,7 @@ async function refreshAll() {
   applyEditionGating();
   carryScopeOnLinks();
   applyVocab();
+  readPublishLock();   // item 214: the bar's Publish says Locked while publishing is locked
   fillSingles(); await loadToday(todayFirst);
  
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);

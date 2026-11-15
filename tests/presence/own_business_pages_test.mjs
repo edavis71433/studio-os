@@ -70,7 +70,7 @@ const settings = read('settings.html');
   matrix('settings', (c) => run(c.client, c.ctx, { ...c.win }));
   ok('settings: a ?client= that is no real site id is no client at all, as before', run('', null, { ...SHELL_HELD }) === false && /const SCOPE = \(function \(\) \{ const v = new URLSearchParams\(location\.search\)\.get\('client'\) \|\| ''; return UUID_RE\.test\(v\) \? v : ''; \}\)\(\);/.test(settings));
   matrix('settings (the context as the shell published it)', (c) => run(c.client, null, { ...c.win, __ddsContext: c.ctx || undefined }));
-  ok('settings: the address still goes with every read and every link', /'x-dds-scope-site': SCOPE \}\)/.test(settings) && /const withClient = \(href\) => \{ if \(!SCOPE\) return href;/.test(settings));
+  ok('settings: the address still goes with every read and every link', /'x-dds-scope-site': SCOPE, 'x-region': FN_REGION \}\)/.test(settings) && /const withClient = \(href\) => \{ if \(!SCOPE\) return href;/.test(settings));
   ok('settings: Deal stages, the studio’s Automations and the plan are kept out, and the Monthly report and Enquiry replies shown, only inside a client',
     /const inC = inClient\(\);\n  const show = CARDS\.filter\([^\n]*!\(c\.ownerOnly && inC\) && !\(c\.studioOnly && inC\) && !\(c\.scopedOnly && !inC\)/.test(settings)
     && /async function loadPlan\(\) \{\s*if \(inClient\(\)\) return;/.test(settings)
@@ -127,8 +127,8 @@ const crm = read('crm.html');
   const head = grab(crm, /const scopeParam=\(\)=>[\s\S]*?\nconst H=\(scoped\)=>[^\n]*\n/, 'crm helpers');
   const links = grab(crm, /const agHref=[^\n]*\n[\s\S]*?const pinHref=[^\n]*\n/, 'crm links');
   const rq = grab(crm, /function recordQuery\(\)\{[\s\S]*?\n\}/, 'recordQuery');
-  const run = (c, url) => new Function('QP', 'SUPABASE_KEY', 'TOKEN', 'window', 'localStorage',
-    `${head}${links}${rq}\nreturn { H, agHref, pinHref, recordQuery, studioScoped };`)(() => new URLSearchParams(url), 'K', 'T', { ...c.win }, storage(c.held));
+  const run = (c, url) => new Function('QP', 'SUPABASE_KEY', 'TOKEN', 'window', 'localStorage', 'FN_REGION',
+    `${head}${links}${rq}\nreturn { H, agHref, pinHref, recordQuery, studioScoped };`)(() => new URLSearchParams(url), 'K', 'T', { ...c.win }, storage(c.held), 'us-west-2');
   const studio = run(CASES[1], `?client=${SITE}&deal=${OTHER}`), held = run(CASES[2], `?client=${SITE}&deal=${OTHER}`), none = run(CASES[0], `?deal=${OTHER}`);
   matrix('crm', (c) => run(c, search(c)).studioScoped(), [...SHELL_CASES_OF(CASES), ...EARLY, ODD]);
   ok('crm: inside a client the studio-level reads go unscoped and the links pin it off (as before)',
@@ -139,6 +139,7 @@ const crm = read('crm.html');
     held.H(false)['x-dds-scope-site'] === SITE && held.H(true)['x-dds-scope-site'] === SITE
     && held.agHref('pipeline.html', 'deal=1') === `/pipeline.html?deal=1&client=${SITE}` && held.pinHref('/projects.html?project=1') === `/projects.html?project=1&client=${SITE}`
     && held.recordQuery() === `?deal=${OTHER}`);
+  ok('crm: every read, scoped or not, asks to run beside the database', [studio, held, none].every((r) => r.H(false)['x-region'] === 'us-west-2' && r.H(true)['x-region'] === 'us-west-2'));
   ok('crm: with no business picked nothing changes', !('x-dds-scope-site' in none.H(false)) && none.agHref('pipeline.html', 'deal=1') === '/pipeline.html?deal=1&client=' && none.recordQuery() === `?deal=${OTHER}`);
   ok('crm: the early timeline and the move to the customer’s address are a studio’s only',
     /if\(q0\.get\('client'\)&&studioScoped\(\)&&!q0\.get\('deal'\)/.test(crm) && /if\(canon\.key==='client' && canon\.value && QP\(\)\.get\('client'\)!==canon\.value && !ownBusiness\(\)\)\{/.test(crm));
@@ -161,7 +162,7 @@ for (const page of ['contacts', 'pipeline', 'projects']) {
   const html = read(`${page}.html`);
   const src = grab(html, /const inClient=\(\)=>!!scope\(\)&&\(window\.ddsScopeInfo&&[^\n]*\?!!window\.ddsScopeInfo\(\):true\);/, `${page} inClient`);
   matrix(page, (c) => new Function('scope', 'window', `${src}\nreturn inClient();`)(() => c.client, { ...c.win }), SHELL_CASES);
-  ok(`${page}: the address still goes with every read`, /'x-dds-scope-site':(AG_MODE\?'':)?scope\(\)\}\)/.test(html));
+  ok(`${page}: the address still goes with every read`, /'x-dds-scope-site':(AG_MODE\?'':)?scope\(\),'x-region':FN_REGION\}\)/.test(html));
 }
 const contacts = read('contacts.html'), pipeline = read('pipeline.html'), projects = read('projects.html');
 ok('contacts: Save view, Add and Import are a client’s pipeline’s to hide; a paint before the context is painted again',
@@ -215,7 +216,7 @@ for (const page of ['developer', 'get-started']) {
   const sent = (c) => new Function('location', 'window', `${src}\nreturn ownBusiness();`)({ search: search(c) }, { ...c.win });
   const wrong = [...CASES, ODD].filter((c) => sent(c) !== (c.client && c !== ODD && c.win === SHELL_HELD ? c.client : '')).map((c) => c.n);
   ok(`${page}: sends your own business with every read and save, a client’s never`, wrong.length === 0, wrong.join('; '));
-  ok(`${page}: waits for the context before its first read when ?client= is there`, /'x-dds-scope-site':ownBusiness\(\)\}\);/.test(html) && /await businessKnown\(\);/.test(html)
+  ok(`${page}: waits for the context before its first read when ?client= is there`, /'x-dds-scope-site':ownBusiness\(\),'x-region':FN_REGION\}\);/.test(html) && /await businessKnown\(\);/.test(html)
     && /async function businessKnown\(\)\{if\(!new URLSearchParams\(location\.search\)\.get\('client'\)\)return;[^\n]*await window\.ddsContext\(\)\.catch\(\(\)=>null\);\}/.test(html));
 }
 
@@ -231,7 +232,7 @@ for (const page of ['todos', 'invoices', 'recently-deleted']) {
     return got === c.want ? '' : c.n;
   }));
   ok(`${page}: shows the studio-level notice only for a studio inside a client`, verdicts.every((v) => !v), verdicts.filter(Boolean).join('; '));
-  ok(`${page}: the check comes first in load(), and every read still carries the address`, /async function load\(\)\{\n  if\(await inClientNow\(\)\)\{\$\('main'\)\.innerHTML=/.test(html) && /'x-dds-scope-site':scope\(\)\}\);/.test(html));
+  ok(`${page}: the check comes first in load(), and every read still carries the address`, /async function load\(\)\{\n  if\(await inClientNow\(\)\)\{\$\('main'\)\.innerHTML=/.test(html) && /'x-dds-scope-site':scope\(\),'x-region':FN_REGION\}\);/.test(html));
 }
 ok('contacts and pipeline: the filter chips stay in your own second business',
   /host\.hidden=!k\|\|inClient\(\);/.test(contacts) && /host\.hidden=VIEW==='board'\|\|!k\|\|inClient\(\)\|\|!DEALS\.length;/.test(pipeline));
