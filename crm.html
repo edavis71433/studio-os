@@ -474,6 +474,7 @@
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
+const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -490,7 +491,7 @@ const scopeParam=()=>QP().get('client')||'';
 // (shell.js HELD_KEY), else the address, as before.
 const studioScoped=()=>{const id=scopeParam();if(!id)return false;if(window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return !!window.ddsScopeInfo();try{const held=JSON.parse(localStorage.getItem('dds-held-businesses')||'[]');if(Array.isArray(held)&&held.indexOf(id)>=0)return false;}catch(_){/* storage may be denied */}return true;};
 const ownBusiness=()=>studioScoped()?'':scopeParam();   // the business ?client= picked, when it is no client of a studio
-const H=(scoped)=>{const h={'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN};if(scoped)h['x-dds-scope-site']=scopeParam();else if(ownBusiness())h['x-dds-scope-site']=ownBusiness();return h;};
+const H=(scoped)=>{const h={'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-region':FN_REGION};if(scoped)h['x-dds-scope-site']=scopeParam();else if(ownBusiness())h['x-dds-scope-site']=ownBusiness();return h;};
 // api() = scoped to the record's customer site (/crm/*, the reply routes).
 // apiAg() = UNSCOPED on purpose: deal/contact/project rows live on the operator's
 // own agency site, so /sales/* + /projects/* must resolve against that site (the
