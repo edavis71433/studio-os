@@ -47,6 +47,7 @@ import { checkSoon } from '../lib/check_soon.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 import { copiedBlockerFor } from '../lib/copied_record.ts';
+import { lockStop } from '../lib/publish_lock.ts';
 
 
 export const CALM = 'We hit a snag updating your site and we’re on it — nothing changed on your live site.';
@@ -91,6 +92,9 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // back as "published by your studio" for the first two (lib/actor_kind.ts).
   let actorKind: string = publishActorKind(principal);
   let snapshotId = snapshotArg.snapshotId;
+  // Item 214: while publishing is locked, nothing goes live, by this or any other route
+  const locked = await lockStop(site.id, publishActorKind(principal));
+  if (locked) return json(locked.body, locked.status, cors);
 
   // ── M5: per-stage telemetry via structured logging (reuses the logging floor —
   //    no new monitoring system, no DB migration). `st` holds cumulative ms from
@@ -352,6 +356,8 @@ export async function handlePublish(req: Request | null, site: SiteRow, principa
   // studio paused publishes only via an operator (staff), not the client
   const refused = publishRefusal(site.status, principal.kind);
   if (refused) return json(refused, 409, cors);
+  const locked = await lockStop(site.id, publishActorKind(principal));   // item 214: said before the draft is read
+  if (locked) return json(locked.body, locked.status, cors);
 
   // ── M4: idempotency + cooldown apply to the CLIENT HTTP /publish path ONLY.
   //    Internal callers (admin force-publish, agency bulk) pass req=null and are
@@ -450,17 +456,21 @@ export async function handleRestore(req: Request, site: SiteRow, principal: Prin
   const publishId = body?.publish_id;
   if (!publishId) return json({ error: 'bad_request', message: 'Which version should we restore?' }, 400, cors);
 
-  const rec = await svc(`presence_publishes?id=eq.${encodeURIComponent(publishId)}&site_id=eq.${site.id}&select=snapshot_id,change_summary,created_at`);
+  const rec = await svc(`presence_publishes?id=eq.${encodeURIComponent(publishId)}&site_id=eq.${site.id}&select=snapshot_id,change_summary,version_label,created_at`);
   const row = rec.json?.[0];
   if (!row) return json({ error: 'not_found', message: 'We couldn’t find that version.' }, 404, cors);
   if (!row.snapshot_id) return json({ error: 'not_restorable', message: 'That version is no longer restorable (older versions are kept for a limited time).' }, 410, cors);
+  // Item 214: Publish again on the version that is live already would deploy the same site twice
+  const live = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=snapshot_id&order=created_at.desc&limit=1`);
+  if (live.json?.[0]?.snapshot_id === row.snapshot_id) return json({ error: 'already_live', message: 'That version is the one live now.' }, 409, cors);
 
   const snap = await svc(`presence_snapshots?id=eq.${row.snapshot_id}&site_id=eq.${site.id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization`);
   const s = snap.json?.[0];
   if (!s) return json({ error: 'not_restorable', message: 'That version is no longer restorable.' }, 410, cors);
 
   const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at, dev_customization: s.dev_customization ?? null };
-  const summary = `Restored the version from ${new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  // item 214: Versions keeps it as what it is, by its name when it has one
+  const summary = `Published again: ${row.version_label ? `“${row.version_label}”` : `the version from ${new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}`;
   return runPipeline(site, principal, 'restore', { snapshot, snapshotId: row.snapshot_id, mediaManifest: s.media_manifest || [] }, summary, cors);
 }
 
@@ -691,6 +701,8 @@ export async function handleCheckpointRestore(req: Request, site: SiteRow, princ
 export async function takeSiteOffline(site: SiteRow, principal: Principal): Promise<{ ok: true } | { ok: false; error: string; message: string; status: number }> {
   if (PUBLISH_BLOCKED_STATES.includes(site.status)) return { ok: false, error: 'lifecycle_blocked', message: 'This site is archived and can’t be changed. Contact your studio to reactivate it.', status: 409 };
   if (site.status === 'paused' && principal.kind !== 'staff' && principal.kind !== 'system') return { ok: false, error: 'site_paused', message: 'Your site is currently paused. Contact your studio first.', status: 409 };
+  const locked = await lockStop(site.id, publishActorKind(principal));   // item 214: the live site stays as it is
+  if (locked) return { ok: false, error: String(locked.body.error), message: String(locked.body.message), status: locked.status };
   if (!site.netlify_site_id || !netlifyConfigured()) return { ok: false, error: 'config', message: 'Hosting isn’t connected for this site yet.', status: 409 };
 
   // offline only makes sense for a site that has actually gone live
