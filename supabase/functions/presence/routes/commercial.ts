@@ -791,7 +791,10 @@ export async function handleApprovePost(req: Request, cors: Record<string, strin
   const decision = b?.decision === 'approve' ? 'approve' : b?.decision === 'reject' ? 'abandon' : null;
   if (!decision) return json({ error: 'bad_request', message: 'Choose approve or not yet.' }, 400, cors);
   const p = v.payload;
-  const principal: Principal = { kind: 'system', userId: 'client-one-tap', tenantId: null, role: 'client', email: null, jwt: null, requestId: 'approve-token' };
+  // Item 239: the business decided, by the link emailed to it, with no sign-in. The change log's
+  // actor column is a uuid that refused the old 'client-one-tap' name, so the decision went
+  // unrecorded; now it is the client's hand with no sign-in id ("Someone on the client's side").
+  const principal: Principal = { kind: 'client', userId: null, tenantId: null, role: 'client', email: null, jwt: null, requestId: 'approve-token' };
   // Sales item 92: "Not yet" can say what should change (read before the decision, which ends the pending row)
   const note = decision === 'abandon' ? cleanNote(b?.note) : '';
   const pending = decision === 'abandon' ? await loadPending(p).catch(() => null) : null;

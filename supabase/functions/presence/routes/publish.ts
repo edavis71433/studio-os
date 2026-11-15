@@ -18,14 +18,14 @@ import { deployFileMap, netlifyConfigured, setSitePassword, getSite, digestFiles
 import type { DeployFile, NetlifySiteInfo } from '../lib/netlify.ts';
 import { withForwarding } from '../lib/domain_notify.ts';
 import { mergeSecurityHeaders, mergeAssetCaching } from '../lib/security_headers.ts';
-import { writeChangeEvent } from '../lib/provenance.ts';
+import { writeChangeEvent, draftChangesOnly } from '../lib/provenance.ts';
 import type { Snapshot } from '../lib/render_types.ts';
 import { PUBLISH_BLOCKED_STATES, publishRefusal } from '../lib/lifecycle.ts';
 import { parseIdempotencyKey, cooldownRemainingMs, replayData } from '../lib/publish_guard.ts';
 import { deployCeiling, deployCeilingExceeded, reconcileSitePublishes } from '../lib/deploy_reconcile.ts';
 import { computeDraftHash } from '../lib/draft_hash.ts';
 import { raiseNotice, clearNotice } from '../lib/notice.ts';
-import { publishActorKind, actorKindCheckViolation, legacyActorKind } from '../lib/actor_kind.ts';
+import { publishActorKind, changeActorKind, actorKindCheckViolation, legacyActorKind } from '../lib/actor_kind.ts';
 import { describeChanges } from '../lib/diff.ts';
 import { normalizeSnapshotContent } from '../lib/render_types.ts';
 import { tickChecklistForCustomerSite, emailCustomerSiteLive } from '../lib/service_bridge.ts';
@@ -74,12 +74,13 @@ export function unchangedMessage(kind: 'publish' | 'restore'): string {
 export async function changeSummary(siteId: string): Promise<string> {
   const lastLive = await svc(`presence_publishes?site_id=eq.${siteId}&status=eq.live&select=created_at&order=created_at.desc&limit=1`);
   const since = lastLive.json?.[0]?.created_at;
-  const ev = await svc(`presence_change_events?site_id=eq.${siteId}${since ? `&created_at=gt.${encodeURIComponent(since)}` : ''}&select=entity_type,action&limit=200`);
+  // item 239: a launch's steps and the preview's link are kept in the log but change nothing to publish
+  const ev = await svc(`presence_change_events?site_id=eq.${siteId}${since ? `&created_at=gt.${encodeURIComponent(since)}` : ''}&${draftChangesOnly()}&select=entity_type,action&limit=200`);
   const rows: Array<{ entity_type: string; action: string }> = Array.isArray(ev.json) ? ev.json : [];
   if (!rows.length) return 'Publishing your site';
   const counts: Record<string, number> = {};
   for (const r of rows) counts[r.entity_type] = (counts[r.entity_type] || 0) + 1;
-  const label: Record<string, string> = { identity: 'business details', location: 'hours & location', offering: 'offerings', testimonial: 'testimonials', faq: 'FAQs', post: 'updates', media: 'photos', redirect: 'links', voice: 'voice profile', settings: 'settings' };
+  const label: Record<string, string> = { identity: 'business details', location: 'hours & location', offering: 'offerings', testimonial: 'testimonials', faq: 'FAQs', post: 'updates', media: 'photos', redirect: 'links', voice: 'voice profile', settings: 'settings', content_library: 'saved sections' };
   const parts = Object.entries(counts).map(([k, n]) => `${n} ${label[k] || k} change${n > 1 ? 's' : ''}`);
   const deletions = rows.filter((r) => r.action === 'delete').length;
   return parts.join(', ') + (deletions ? ` (including ${deletions} deletion${deletions > 1 ? 's' : ''})` : '');
@@ -91,8 +92,9 @@ export async function changeSummary(siteId: string): Promise<string> {
 export async function runPipeline(site: SiteRow, principal: Principal, kind: 'publish' | 'restore', snapshotArg: { snapshot: Snapshot; snapshotId?: string; mediaManifest: any[]; draftSettings?: DraftSettings }, summary: string, cors: Record<string, string>, idempotencyKey?: string, opts?: { changeCount?: number }) {
   // Studio audit change 2: 'staff' (platform) · 'operator' (the client's studio,
   // scoped in via ?client=) · 'client' (the owner). The client's room reads this
-  // back as "published by your studio" for the first two (lib/actor_kind.ts).
-  let actorKind: string = publishActorKind(principal);
+  // back as "published by your studio" for the first two (lib/actor_kind.ts). Item 239: a
+  // publish the scheduler fires is 'system', which the column has taken since 0015.
+  let actorKind: string = changeActorKind(principal);
   let snapshotId = snapshotArg.snapshotId;
   // Item 214: while publishing is locked, nothing goes live, by this or any other route
   const locked = await lockStop(site.id, publishActorKind(principal));
@@ -738,7 +740,7 @@ export async function takeSiteOffline(site: SiteRow, principal: Principal): Prom
     console.log(JSON.stringify({ evt: 'offline_mark_failed', site_id: site.id }));
     return { ok: false, error: 'write_failed', message: 'The offline page may be up, but we couldn’t record it. Publish to bring your site back, or try again.', status: 502 };
   }
-  await writeChangeEvent({ siteId: site.id, entityType: 'site', entityId: null, action: 'update', summary: 'Took the website offline — visitors see a simple “temporarily offline” page. Every version is kept.', principal, provenance: 'human', fields: ['offline_at'] });
+  await writeChangeEvent({ siteId: site.id, entityType: 'site', entityId: null, action: 'update', summary: `Took the website offline${principal.kind === 'system' ? ' on schedule' : ''} — visitors see a simple “temporarily offline” page. Every version is kept.`, principal, provenance: 'human', fields: ['offline_at'] });
   console.log(JSON.stringify({ evt: 'site_offline', site_id: site.id, deploy_id: dep.deployId || null }));
   return { ok: true };
 }
