@@ -56,10 +56,11 @@
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
+const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const token=new URLSearchParams(location.search).get('token')||'';
-const H={'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY};
+const H={'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-region':FN_REGION};
 
 // Sales item 92: who is asking comes from the server (the studio's name and logo); it said
 // "Davis Digital Studio" whoever sent it. Drawn in Figma: page "One-tap approval page — sales item 92".

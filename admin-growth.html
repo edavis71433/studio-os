@@ -250,6 +250,7 @@ const CONFIG = {
   SUPABASE_URL: 'https://qksstlqzbhesadrrofgn.supabase.co',
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo',
   FN: 'https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/clever-api',
+  FN_REGION: 'us-west-2',   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 };
 
 // Builder item 213: Growth uses the studio's sign-in. The same storage key as every
@@ -284,7 +285,7 @@ async function api(type, payload = {}) {
   if (!session) { showGate(); throw new Error('no session'); }
   const res = await fetch(CONFIG.FN, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-dds-user-jwt': session.access_token },
+    headers: { 'Content-Type': 'application/json', 'x-dds-user-jwt': session.access_token, 'x-region': CONFIG.FN_REGION },
     body: JSON.stringify({ type, ...payload }),
   });
   let j = {}; try { j = await res.json(); } catch (_) {}
