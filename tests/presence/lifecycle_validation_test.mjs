@@ -11,7 +11,6 @@ const results = [];
 const step = (n, label, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${String(n).padStart(2)}. ${label}${note && !p ? ' — ' + note : ''}`); };
 
 const commerce = read('supabase/functions/presence/routes/commerce.ts');
-const terms = read('supabase/functions/presence/commerce/terms.ts');
 const stripe = read('supabase/functions/presence/commerce/stripe.ts');
 const wh = read('supabase/functions/stripe-webhook/index.ts');
 const sync = read('supabase/functions/presence/commerce/entitlement_sync.ts');
@@ -26,7 +25,7 @@ const subs = read('supabase/functions/presence/commerce/subscriptions.ts');
 // Builder item 199 (Nov 15 2026): self-serve sign-up is closed. Studios add their clients
 // and invite them, so steps 1 to 3 and 6 to 8 now check that the closed door stays closed.
 step(1, 'Sign-up is closed: the route answers one fixed reply and makes no account', /\(route === '\/commerce\/signup' \|\| route === '\/commerce\/verify'\) && method === 'POST'\) return signupClosed\(cors\)/.test(commerce) && !/createAuthUser\(/.test(commerce));
-step(2, 'The reply is the same for every email (no body read, no lookup); the terms recorder stays for later', /return json\(SIGNUP_CLOSED, 410, cors\)/.test(commerce) && !/findClientByEmail\(/.test(commerce) && /export async function recordAcceptance/.test(terms));
+step(2, 'The reply is the same for every email (no body read, no lookup)', /return json\(SIGNUP_CLOSED, 410, cors\)/.test(commerce) && !/findClientByEmail\(/.test(commerce));
 step(3, 'Nothing joins a studio by signing up (the unproved-email join is gone)', !/autoConnectPreListedStudio|bridgeCustomerToStudio/.test(commerce));
 step(4, 'A no-card trial past its end is FORCE-EXPIRED (the revenue bug)', /export function shouldExpireTrial/.test(life) && /shouldExpireTrial\(e, nowIso\)/.test(life));
 step(5, 'Trial-ending nudge fires in the last 3 days', /days > 0 && days <= 3\) out\.push\('trial_ending'\)/.test(life));

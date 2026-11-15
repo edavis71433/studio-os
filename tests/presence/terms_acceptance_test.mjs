@@ -7,22 +7,16 @@ const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
 
-const terms = read('supabase/functions/presence/commerce/terms.ts');
 const commerce = read('supabase/functions/presence/routes/commerce.ts');
 const exporter = read('supabase/functions/presence/platform/exporter.ts');
 const mig = read('supabase/migrations/0084_terms_acceptance.sql');
 
-// ── module ──
-ok('module: server owns authoritative versions (env-overridable)', /TERMS_VERSION = Deno\.env\.get\('TERMS_VERSION'\)/.test(terms) && /PRIVACY_VERSION = Deno\.env\.get\('PRIVACY_VERSION'\)/.test(terms));
-ok('module: records version + when + ip + ua + method + context', /terms_version: termsVersion[\s\S]*?accepted_at:[\s\S]*?ip:[\s\S]*?user_agent:[\s\S]*?method:[\s\S]*?context:/.test(terms));
-ok('module: prefers the PRESENTED version (strongest evidence of what they saw)', /presentedTermsVersion[\s\S]*?\|\| TERMS_VERSION/.test(terms));
-ok('module: best-effort — never throws, logs on failure', /catch \(e\)[\s\S]*?non-fatal/.test(terms));
-
 // ── self-serve sign-up is closed (builder item 199, Nov 15 2026) ──
 // The clickwrap was recorded at sign-up, the only place an account was made without
-// a studio. Sign-up now answers one fixed reply, so no new acceptance is recorded
-// until it opens again; the recorder, the table and the export of past ones stay.
-ok('signup: closed, so nothing records a clickwrap today (the recorder is kept for when it opens)', !/recordAcceptance/.test(commerce) && /return signupClosed\(cors\)/.test(commerce));
+// a studio. Sign-up now answers one fixed reply, so its recorder (commerce/terms.ts)
+// went with it; the table and the export of the acceptances already kept stay.
+ok('signup: closed, so nothing records a clickwrap today', !/recordAcceptance/.test(commerce) && /return signupClosed\(cors\)/.test(commerce));
+ok('module: the sign-up recorder is gone with sign-up (commerce/terms.ts)', (() => { try { read('supabase/functions/presence/commerce/terms.ts'); return false; } catch { return true; } })());
 
 // ── export includes the customer's own consent copy (no IP/UA leak) ──
 ok('export: includes terms_acceptances (portable consent record)', /terms_acceptances: acceptQ\.json/.test(exporter) && /presence_terms_acceptances\?client_id=eq/.test(exporter));
