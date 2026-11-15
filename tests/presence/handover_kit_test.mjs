@@ -10,7 +10,8 @@
 //   · nothing reaches the portal until it's switched on, and then the files
 //     come with download links and the site's facts ride along;
 //   · "Tell them it's ready" needs it shown and an owner; a view-only seat can
-//     look but not change, and another studio's site is not found.
+//     look but not change, and another studio's site is not found;
+//   · item 200: a tapped file gets a fresh link, only for a file the kit lists.
 //   deno run --allow-read --allow-env tests/presence/handover_kit_test.mjs
 Deno.env.set('SUPABASE_URL', 'http://stub.local');
 Deno.env.set('SERVICE_ROLE_KEY', 'service-key');
@@ -18,7 +19,7 @@ Deno.env.set('APP_URL', 'https://app.example');
 Deno.env.set('RESEND_KEY', 're_test');
 const K = await import('../../supabase/functions/presence/lib/handover_kit.ts');
 const { handleClientTools } = await import('../../supabase/functions/presence/agency/client_tools.ts');
-const { handleClientKit } = await import('../../supabase/functions/presence/routes/client_kit.ts');
+const { handleClientKit, handleClientKitFile } = await import('../../supabase/functions/presence/routes/client_kit.ts');
 const results = [];
 const ok = (n, p, note = '') => { results.push(p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
 const NOW = '2026-11-11T10:00:00.000Z';
@@ -46,7 +47,7 @@ const NOW = '2026-11-11T10:00:00.000Z';
 const AG = 'aaaaaaaa-0000-4000-8000-000000000001';
 const SITE = 'c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1', THEIRS = 'd2d2d2d2-d2d2-4d2d-8d2d-d2d2d2d2d2d2', STUDIO = 'e3e3e3e3-e3e3-4e3e-8e3e-e3e3e3e3e3e3', CLIENT = 'f4f4f4f4-f4f4-4f4f-8f4f-f4f4f4f4f4f4';
 const LOGO = '11111111-2222-4333-8444-555555555555', MENU = '11111111-2222-4333-8444-666666666666', ELSEWHERE = '11111111-2222-4333-8444-777777777777';
-let T, mail, clock = 0;
+let T, mail, clock = 0, signDown = false;
 function reset() {
   T = {
     presence_agency_clients: [{ agency_id: AG, site_id: SITE, status: 'active' }],
@@ -89,7 +90,7 @@ globalThis.fetch = async (url, init = {}) => {
   const method = (init.method || 'GET').toUpperCase();
   const reply = (b, status = 200) => new Response(b === null ? null : JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
   if (u.hostname === 'api.resend.com') { mail.push(JSON.parse(init.body)); return reply({ id: 'mail' }); }
-  if (u.pathname.startsWith('/storage/v1/object/sign/')) return reply({ signedURL: u.pathname.replace('/storage/v1', '') + '?token=s' });
+  if (u.pathname.startsWith('/storage/v1/object/sign/')) return signDown ? reply({ message: 'down' }, 500) : reply({ signedURL: u.pathname.replace('/storage/v1', '') + '?token=s&t=' + clock++ });
   const table = u.pathname.replace(/^.*\/rest\/v1\//, '');
   if (table === 'rpc/rate_hit') return reply(true);
   if (method === 'GET') return reply(pick(hits(table, u.searchParams), u.searchParams));
@@ -127,7 +128,23 @@ reset();
   const p = await portal();
   const k = p.body.data;
   ok('portal: once on — who to call, the how-tos and videos', p.status === 200 && k.contact.name === 'Bright Studio' && k.guides.length === 3 && k.videos[0].url === 'https://www.loom.com/share/7d0c');
-  ok('portal: the files in the kit’s order, each with a signed download link, never the stored record', k.files.map((x) => x.name).join() === 'Brand colours and fonts,Logo — full colour' && k.files.every((x) => /^http:\/\/stub\.local\/storage\/v1\/object\/sign\//.test(x.url) && !('storage_path' in x) && !('id' in x)));
+  ok('portal: the files in the kit’s order, each with its id and a signed download link, never where it is stored', k.files.map((x) => x.name).join() === 'Brand colours and fonts,Logo — full colour' && k.files.map((x) => x.id).join() === [MENU, LOGO].join() && k.files.every((x) => /^http:\/\/stub\.local\/storage\/v1\/object\/sign\//.test(x.url) && !('storage_path' in x)));
+  // ── item 200 (review file 06, finding 61): a tapped file gets a fresh link ──
+  const tap = async (id) => { const res = await handleClientKitFile(T.presence_sites[0], id, {}); return { status: res.status, cache: res.headers.get('Cache-Control'), body: await res.json() }; };
+  const t1 = await tap(LOGO), t2 = await tap(LOGO);
+  ok('tap: a file in the kit gets a signed download link, named, never kept', t1.status === 200 && /^http:\/\/stub\.local\/storage\/v1\/object\/sign\/.+download=Logo/.test(t1.body.data.url) && t1.body.data.name === 'Logo — full colour' && t1.cache === 'no-store' && !('storage_path' in t1.body.data));
+  ok('tap: each tap makes a fresh link, so one opened late still works', t2.status === 200 && t1.body.data.url !== t2.body.data.url);
+  ok('tap: a file of another site is not in the kit', (await tap(ELSEWHERE)).body.error === 'not_in_kit');
+  T.presence_media.push({ id: '11111111-2222-4333-8444-888888888888', site_id: SITE, alt_text: 'Private notes', mime: 'application/pdf', storage_path: `presence-media/${SITE}/notes.pdf`, created_at: '2026-10-03T00:00:00Z', deleted_at: null });
+  const notListed = await tap('11111111-2222-4333-8444-888888888888');
+  ok('tap: a file of their own site the studio didn’t put in the kit is not opened (404)', notListed.status === 404 && notListed.body.error === 'not_in_kit' && /isn’t in your kit/.test(notListed.body.message));
+  signDown = true;
+  const down = await tap(MENU);
+  signDown = false;
+  ok('tap: storage that doesn’t answer says to try again, not that the file is gone (502)', down.status === 502 && down.body.error === 'unavailable');
+  T.presence_media.find((m) => m.id === MENU).deleted_at = '2026-11-12T00:00:00Z';
+  ok('tap: a file removed from Files since is not in the kit any more', (await tap(MENU)).body.error === 'not_in_kit');
+  T.presence_media.find((m) => m.id === MENU).deleted_at = null;
   ok('portal: the website’s facts', k.website.address === 'https://harbordental.example' && k.website.live_since === '2026-10-03T09:00:00Z' && k.website.domain_expires_at === '2027-03-14T00:00:00Z');
   const em = await studio('POST', `/agency/sites/${SITE}/kit/email`);
   const m0 = mail[0] || {};
@@ -136,6 +153,9 @@ reset();
   ok('a later save keeps "they were told"', again.body.data.kit.emailed_at === em.body.data.kit.emailed_at && again.body.data.kit.guides.length === 0);
   T.clients[0].email = null;
   ok('tell them: a site with no owner yet is refused, plainly', (await studio('POST', `/agency/sites/${SITE}/kit/email`)).status === 409);
+  await studio('PUT', `/agency/sites/${SITE}/kit`, { ...again.body.data.kit, shown: false });
+  const off = await handleClientKitFile(T.presence_sites[0], LOGO, {});
+  ok('tap: a kit taken out of the portal opens none of its files', off.status === 404);
 }
 
 const passed = results.filter(Boolean).length;

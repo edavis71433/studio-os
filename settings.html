@@ -117,6 +117,9 @@
   .rp-in li.off{background:var(--bg);color:var(--faint);border-style:dashed} .rp-in li.off::before{content:""}
   /* builder list items 160 and 176 (Nov 2026, as drawn): who gets it, what it says, what to suggest next */
   .rp-next{font-size:12.5px;font-weight:600;color:var(--p);text-align:right}
+  /* builder list item 200: the report waits until the website is live */
+  .rp-next.wait{color:var(--dds-info,#245fa0);background:var(--dds-info-soft,#e6effa);border-radius:999px;padding:3px 10px}
+  #reportLast.wait{color:var(--dds-info,#245fa0);font-weight:500}
   .rp-h{display:flex;align-items:center;gap:10px;margin:var(--dds-s3,12px) 0 0;padding-top:var(--dds-s3,12px);border-top:1px solid var(--line);font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
   .rp-h+.swrow{border-top:none;padding-top:10px}
   .swrow.rp-block{display:block}
@@ -186,6 +189,7 @@
   .rrow .rpill{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;background:var(--bg);color:var(--soft)}
   .rrow .rpill.sent{background:var(--good-soft,#e6f5ec);color:var(--good)}
   .rrow .rpill.warn{background:var(--warn-soft,#fdf2e2);color:var(--warn)}
+  .rrow .rpill.wait{background:var(--dds-info-soft,#e6effa);color:var(--dds-info,#245fa0)}
   .rrow .rgo{font-weight:600;color:var(--p);text-decoration:none;justify-self:end;font-size:13px}
   .rrow .rgo:hover{text-decoration:underline}
   .rrow .rdim{color:var(--faint)}
@@ -312,6 +316,12 @@
     .strow > .fs{grid-column:1/-1}   /* the tick drops under its row (an empty one takes no room, and stays a live region) */
     .strow > .fs:not(:empty){margin-top:6px}
   }
+  .nsaved{font-size:12px;font-weight:600;color:var(--good,#11744a);margin-left:6px}
+  /* items 229 and 233: a client's own choice says so beside the part */
+  .pchip{display:inline-block;margin-left:8px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--p-soft,#ece6f8);color:var(--p,#5b3fa0);vertical-align:1px}
+  .pchip.off{background:var(--warn-soft,#faedd6);color:var(--warn,#7a5414)}
+  .swrow.pw-note{display:block}
+  .plabel{margin:14px 0 2px;font-size:13px;font-weight:600;color:var(--ink)}
   /* builder list item 191: two-step sign-in, drawn in Figma (B1 off, B3 on) */
   .tsrow{margin-top:var(--dds-s3,12px)}
   .tshead{display:flex;align-items:center;gap:var(--dds-s2,8px);flex-wrap:wrap} .tshead b{font-size:14px;font-weight:600}
@@ -561,6 +571,26 @@
     <div id="notifyRows"></div>
     <div class="how" id="notifyNote" style="margin-top:10px">Money owed, something broken and messages from your clients always reach you. The emails your clients get never change.</div>
   </section>
+  <!-- builder list items 229 and 233 (Nov 2026): what the studio's clients see in the portal,
+       the welcome note and Home's cards. Kept once per studio (GET/PUT /agency/portal); inside a
+       client, that client's own choices (PUT /agency/portal/clients/:site). Each switch saves as
+       you flip it; the note saves when you leave the box. Drawn in Figma first. -->
+  <section class="card" id="portalParts" aria-labelledby="portalPartsHead" hidden>
+    <div class="card-h"><h2 id="portalPartsHead" tabindex="-1">What your clients see</h2><span class="hint" id="portalPartsHint">Turn a part off to hide it from every client. To change it for one client, open them and choose their portal in Settings.</span></div>
+    <div id="portalPartsRows"></div>
+    <div class="row" id="portalResetRow" hidden style="margin-top:10px"><button type="button" class="btn sm" id="portalReset">Back to your studio’s choices</button></div>
+    <div class="how" id="portalPartsNote" style="margin-top:10px">Needs you is always on your clients’ Home. A part that’s off is refused by the server too, not only hidden.</div>
+  </section>
+  <section class="card" id="portalHome" aria-labelledby="portalHomeHead" hidden>
+    <div class="card-h"><h2 id="portalHomeHead" tabindex="-1">Your clients’ Home</h2><span class="hint" id="portalHomeHint">What every client sees first.</span></div>
+    <div class="swrow pw-note">
+      <div class="t"><b><label for="portalWelcome">Welcome note</label><span id="portalWelcomeSaved"></span></b><div class="how">At the top of every client’s Home, signed with your studio’s name. Leave it empty for none.</div>
+        <textarea id="portalWelcome" maxlength="500" rows="4" placeholder="e.g. Thanks for working with us! Everything for your website is here. Anything you need, write to us in Messages." style="width:100%;margin-top:8px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical"></textarea>
+        <div class="how" id="portalWelcomeCount" aria-live="polite">0 / 500</div></div>
+    </div>
+    <div class="plabel">Cards on Home</div>
+    <div id="portalCardRows"></div>
+  </section>
   <section class="card" id="automations" aria-labelledby="autoHead" hidden data-needs="configure">
     <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint" id="autoHint">Ready-made recipes, and the switches behind them. Changes save as you go.</span></div>
     <!-- sales item 87: Wix-style recipes, each one tap; it switches on the rows below -->
@@ -759,6 +789,7 @@ const IC = {
   goal: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
   stages: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
   calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
+  portal: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><circle cx="12" cy="13.5" r="2"/><path d="M8.5 19a3.5 3.5 0 0 1 7 0"/>',   // items 229 and 233
   security: '<path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z"/><rect x="9" y="11" width="6" height="5" rx="1"/><path d="M10 11V9.5a2 2 0 0 1 4 0V11"/>',
 };
 const CARDS = [
@@ -801,6 +832,9 @@ const CARDS = [
   // builder item 202: the card holds the real switch (this device); it opened the Inbox, where there is none
   { key: 'notify', href: '#notify', title: 'Notifications', desc: 'Ring this phone or computer when something needs you. Enquiries, approvals and support requests also land in your Inbox.', words: 'notifications bell digest alerts emails mute quiet push device phone', scoped: true,
     agencyHref: '#notify', agencyDesc: 'One switch for each client’s site, then the bell and email: what you hear about it, and how.', scopedTitle: () => 'Notifications', scopedDesc: 'What you hear about this client’s site: on Home and in the bell, and by email.' },   // item 126
+  // builder list items 229 and 233: what clients see in the portal, the welcome note, Home's cards
+  { key: 'portal', href: '#portalParts', title: 'Client portal', desc: 'What your clients see in their portal, a welcome note on their Home, and Home’s cards.', words: 'client portal clients see hide invoices messages files reports welcome note home cards', studioTeam: true, scoped: true,
+    scopedTitle: (who) => possessive(who) + ' portal', scopedDesc: 'What this client sees in their portal: the same as your studio’s choices unless you change it here.' },
   // the developer tools are the STUDIO's, never a client's — the card stays unscoped and says so while drilled in
   // builder item 165: named for what the page holds (it promised API keys, webhooks and a schema dump it doesn't have)
   { key: 'dev', href: '/developer.html', title: 'Developer tools', desc: 'Your site’s colors and type, your own styles and a block of your own HTML. For you, not your clients.', words: 'developer code css html theme colors styles tokens', feature: 'developer', cap: 'use_developer_mode',
@@ -843,7 +877,7 @@ const cardMatches = (c, words) => { const hay = [c.title, c.desc, c.agencyTitle,
 function renderCards() {
   const words = findWords();
   const inC = inClient();
-  const show = CARDS.filter((c) => (!c.feature || hasFeature(c.feature)) && (!c.cap || hasCap(c.cap)) && !(c.ownerOnly && inC) && !(c.studioOnly && inC) && !(c.scopedOnly && !inC) && !(c.agencyOnly && !(CTX && CTX.is_agency && !SCOPE)) && !(c.operatorOnly && (SCOPE || !(CTX && CTX.is_operator))))
+  const show = CARDS.filter((c) => (!c.feature || hasFeature(c.feature)) && (!c.cap || hasCap(c.cap)) && !(c.ownerOnly && inC) && !(c.studioOnly && inC) && !(c.scopedOnly && !inC) && !(c.agencyOnly && !(CTX && CTX.is_agency && !SCOPE)) && !(c.studioTeam && !(CTX && CTX.is_agency)) && !(c.operatorOnly && (SCOPE || !(CTX && CTX.is_operator))))
     .filter((c) => (words.length ? cardMatches(c, words) : !c.searchOnly));
   $('cards').innerHTML = show.map((c) => cardHtml(c, STATUSES[c.key])).join('') ||
     `<p class="setnone" role="status">No setting matches “${esc(words.join(' '))}”. Try a word like password, team or invoices.</p>`;
@@ -871,6 +905,14 @@ function renderCards() {
       else toast(NOTIFY ? 'This client’s site isn’t one your studio looks after.' : 'Your notification choices couldn’t load just now. Try again in a moment.', true);   // never an empty part
     });
   });
+  const pc = $('cards').querySelector('[data-card="portal"]');
+  if (pc) pc.addEventListener('click', (e) => {
+    e.preventDefault();
+    loadPortalSettings().then(() => {   // items 229 and 233
+      if (!$('portalParts').hidden) reveal('portalParts', 'portalPartsHead');
+      else toast(PORTALSET ? 'This client isn’t one your studio looks after.' : 'Your portal choices couldn’t load just now. Try again in a moment.', true);   // never an empty part
+    });
+  });
   const gl = $('cards').querySelector('[data-card="goal"]');
   if (gl) gl.addEventListener('click', (e) => { e.preventDefault(); reveal('goal', 'goalHead'); });
   const kc = $('cards').querySelector('[data-card="security"]');
@@ -888,7 +930,7 @@ function markCurrent(id) {
 }
 function spySections() {
   if (!('IntersectionObserver' in window)) return;
-  const ids = ['studio', 'security', 'stages', 'goal', 'report', 'reports', 'menu', 'notify', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 160: the studio's Monthly reports; item 126: Notifications; sales item 94: Goal and AI help
+  const ids = ['studio', 'security', 'stages', 'goal', 'report', 'reports', 'menu', 'notify', 'portalParts', 'portalHome', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 160: the studio's Monthly reports; item 126: Notifications; sales item 94: Goal and AI help; items 229 and 233: the client portal
   // C16: the band (15–30% down the screen) never reaches the last part when the page ends
   // first, so Plan & billing never lit up; at the very bottom the last part shown is marked
   const atBottom = () => window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
@@ -1442,7 +1484,7 @@ async function retryReport(e) {
   if (b && b.isConnected) { b.disabled = false; toast('Still couldn’t load — try again in a moment.', true); }
 }
 const REPORT_PARTS = [['visits', 'Visits'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['maps', 'On Google Maps'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['pages', 'Most read pages'], ['changes', 'What changed']];
-const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce', quiet: 'a quiet month, under your number of visits' };
+const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce', quiet: 'a quiet month, under your number of visits', not_live: 'the website wasn’t live yet' };
 const CC_BLOCK_WORDS = { unsubscribed: 'unsubscribed', bounced: 'emails bounce' };
 const SUGGEST_FROM = { idea: 'From their Do next list: a Growth Coach idea', ai: 'From their Do next list: an AI answer that misses them', search: 'From their Do next list: a Search to-do', health: 'From their Do next list: a website fix', reviews: 'From their Do next list: Google reviews waiting', own: 'Your own words' };
 const EMAIL_RE = /^[^\s@<>()",;]+@[^\s@<>()",;]+\.[^\s@<>()",;]{2,}$/;
@@ -1459,7 +1501,11 @@ function paintReport() {
   if (document.activeElement !== $('report-note') && !REPORT_KEEP.note) $('report-note').value = d.note || '';   // item 165: a line that didn't save keeps your words
   $('reportLast').textContent = reportStatusLine(d);
   const n = reportPeople(d);
-  $('reportNext').textContent = d.enabled && d.next_month ? 'Next one: ' + monthAfter(d.next_month) + ' 1 · to ' + n + (n === 1 ? ' person' : ' people') : '';
+  // item 200: before the website is live the report waits, and the card says so instead of a date
+  const waiting = d.live === false;
+  $('reportLast').classList.toggle('wait', waiting);
+  $('reportNext').classList.toggle('wait', waiting && !!d.enabled);
+  $('reportNext').textContent = waiting ? (d.enabled ? 'Waits for the site to go live' : '') : d.enabled && d.next_month ? 'Next one: ' + monthAfter(d.next_month) + ' 1 · to ' + n + (n === 1 ? ' person' : ' people') : '';
   // item 182: the monthly AI check, its cost in words, and how the last one went
   $('sw-ai').setAttribute('aria-checked', d.ai_checks ? 'true' : 'false');
   $('aiCost').textContent = d.ai_cost ? d.ai_cost + '.' : '';
@@ -1565,6 +1611,8 @@ async function setSuggestMode(mode) {
   if (await saveReport({ propose: { mode } })) toast(mode === 'auto' ? 'On. Each report suggests one thing from their Do next list.' : 'Off. The report goes without a suggestion.');
 }
 function reportStatusLine(d) {
+  // item 200: an older server sends no `live`, which reads as live, as before
+  if (d.live === false) return d.enabled ? 'Waiting for their website to go live. The first report goes out on the 1st of the month after it does.' : 'Their website isn’t live yet. Switch this on now if you like: the report waits until it is.';
   const r = d.last_result;
   if (r && r.month) {
     const m = monthWords(r.month);
@@ -1623,7 +1671,7 @@ function wireReport() {
     if (REPORT_BUSY || !REPORT_READ) return;   // greyed: the press does nothing, and shows nothing
     const next = !(REPORT && REPORT.enabled === true);
     $('sw-report').setAttribute('aria-checked', next ? 'true' : 'false');
-    if (await saveReport({ enabled: next })) toast(next ? 'On. The first report goes out in the first days of next month.' : 'Off. No more reports to this client.');
+    if (await saveReport({ enabled: next })) toast(next ? (REPORT && REPORT.live === false ? 'On. The first report goes out the month after their website goes live.' : 'On. The first report goes out in the first days of next month.') : 'Off. No more reports to this client.');
   });
   $('sw-ai').addEventListener('click', async () => {
     if (REPORT_BUSY || !REPORT_READ) return;   // one save at a time, like the report switch (item 101)
@@ -1748,10 +1796,11 @@ function lastWords(row) {
   const l = row.last;
   if (!row.email) return ['Can’t send yet', 'warn'];
   if (row.blocked) return ['Can’t send: ' + (CC_BLOCK_WORDS[row.blocked] || 'can’t be emailed'), 'warn'];
+  if (row.live === false && row.enabled) return ['Waits for the site to go live', 'wait'];   // item 200
   if (!l) return [row.enabled ? 'First one next month' : 'Never sent', ''];
   const m = new Date(Date.UTC(+l.month.slice(0, 4), +l.month.slice(5, 7) - 1, 1)).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
   if (l.status === 'sent') return [m + ' · sent', 'sent'];
-  if (l.status === 'skipped') return [l.reason === 'quiet' ? 'Skipped: a quiet month' : m + ' · not sent', l.reason === 'quiet' ? '' : 'warn'];
+  if (l.status === 'skipped') return [l.reason === 'quiet' ? 'Skipped: a quiet month' : l.reason === 'not_live' ? m + ' · site wasn’t live' : m + ' · not sent', l.reason === 'quiet' || l.reason === 'not_live' ? '' : 'warn'];
   return [m + ' · didn’t go out', 'warn'];
 }
 function paintReports() {
@@ -1796,7 +1845,7 @@ async function flipClientReport(siteId) {
   if (!r.ok) { row.enabled = !next; if (r.body && r.body.blocked) row.blocked = r.body.blocked; paintReports(); toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); return; }
   paintReports();
   const sw = $('reportsRows').querySelector('[data-rsw="' + CSS.escape(siteId) + '"]'); if (sw) sw.focus();
-  toast(next ? 'On. ' + row.name + ' gets a report in the first days of next month.' : 'Off. No more reports to ' + row.name + '.');
+  toast(next ? 'On. ' + row.name + (row.live === false ? ' gets a report the month after their website goes live.' : ' gets a report in the first days of next month.') : 'Off. No more reports to ' + row.name + '.');
 }
 async function switchOnTheRest() {
   if (REPORTS_BUSY || !REPORTS) return;
@@ -2010,6 +2059,131 @@ async function saveNotify(siteId, patch) {
   NOTIFY.sites[i] = { ...before, on: d.on, dashboard: d.dashboard, email: d.email };
   NOTIFY_SAVED.add(siteId); paintNotify();
   try { if (window.ddsBellRefresh) window.ddsBellRefresh(); } catch (_) { /* the bell asks again on its next look */ }
+}
+// ── items 229 and 233: what clients see in the portal, the welcome note and Home's cards
+//    (GET/PUT /agency/portal, PUT /agency/portal/clients/:site) ──
+// At studio level the switches are every client's; inside a client they are that client's,
+// each saying "Same as studio" or its own choice. Every change saves as it's made and puts
+// back what was there when it doesn't save. A failed read leaves the cards away.
+let PORTALSET = null, PORTAL_ASKED = null, PORTAL_SAVED = '';
+const PORTAL_BUSY = new Set();
+function loadPortalSettings() {
+  if (!(CTX && CTX.is_agency)) return Promise.resolve();
+  if (PORTAL_ASKED) return PORTAL_ASKED;
+  PORTAL_ASKED = api('/agency/portal', 'GET').then((r) => {
+    if (!r.ok || !r.body || !r.body.data) { PORTAL_ASKED = null; return; }
+    PORTALSET = r.body.data;
+    if (SCOPE && !portalClient()) return;   // inside a site the studio doesn't look after: nothing to choose
+    paintPortalParts(); wirePortal();
+    $('portalParts').hidden = false;
+    if (!SCOPE) { paintPortalHome(); $('portalHome').hidden = false; }   // the note and Home's cards are every client's: kept at studio level
+  }).catch(() => { PORTAL_ASKED = null; });
+  return PORTAL_ASKED;
+}
+const portalLocked = () => !!(PORTALSET && PORTALSET.can_edit === false);
+function portalClient() { if (!SCOPE || !PORTALSET) return null; return (PORTALSET.clients || []).find((c) => c.site_id === SCOPE.toLowerCase()) || null; }
+const studioShows = (k) => !((PORTALSET && PORTALSET.off) || []).includes(k);
+// what this client (or every client) sees for a part: the client's own choice, else the studio's
+function portalShows(k, c) { return c && typeof c.choices[k] === 'boolean' ? c.choices[k] : studioShows(k); }
+function paintPortalParts() {
+  const c = portalClient(), locked = portalLocked();
+  const who = c ? String(c.name || 'this client') : '';
+  $('portalPartsHead').textContent = c ? possessive(who) + ' portal' : 'What your clients see';
+  $('portalPartsHint').textContent = c ? `Starts the same as your studio’s choices. A change here is only for ${who}.` : 'Turn a part off to hide it from every client. To change it for one client, open them and choose their portal in Settings.';
+  const had = document.activeElement && document.activeElement.id;
+  $('portalPartsRows').innerHTML = (PORTALSET.parts || []).map((p) => {
+    const k = p.key, own = !!(c && typeof c.choices[k] === 'boolean');
+    const msgOff = k === 'services' && !portalShows('messages', c);   // a request becomes a conversation in Messages
+    const on = portalShows(k, c) && !msgOff;
+    const chip = c ? (own ? `<span class="pchip${on ? '' : ' off'}">${on ? 'On' : 'Off'} for ${esc(who)}</span>` : '<span class="pchip">Same as studio</span>') : '';
+    const off = locked || PORTAL_BUSY.has(k) || msgOff;
+    return `<div class="swrow" data-portal-part="${esc(k)}"><button type="button" class="sw" role="switch" id="sw-pp-${esc(k)}" data-pp="${esc(k)}" aria-checked="${on ? 'true' : 'false'}" aria-labelledby="sw-pp-${esc(k)}-l"${off ? ' aria-disabled="true"' : ''}></button>`
+      + `<div class="t"><b id="sw-pp-${esc(k)}-l">${esc(p.label)}${chip}${PORTAL_SAVED === k ? '<span class="nsaved" role="status">Saved</span>' : ''}</b><div class="how">${esc(msgOff ? 'Off while Messages is off: a request becomes a conversation in Messages.' : p.sub)}</div></div></div>`;
+  }).join('');
+  $('portalPartsRows').querySelectorAll('[data-pp]').forEach((b) => b.addEventListener('click', () => { if (b.getAttribute('aria-disabled') === 'true') return; const k = b.getAttribute('data-pp'); savePortalPart(k, b.getAttribute('aria-checked') !== 'true'); }));
+  $('portalResetRow').hidden = !(c && Object.keys(c.choices || {}).length) || locked;
+  if (had) { const n = $(had); if (n) n.focus(); }   // the redraw keeps your place
+  $('portalPartsNote').textContent = locked ? 'Your role can see these but not change them. Your studio’s owner, an admin or an account manager can.' : 'Needs you is always on your clients’ Home. A part that’s off is refused by the server too, not only hidden.';
+}
+// Each flip sends that one change; the server applies it to what's stored. The server's
+// whole answer is taken once nothing else is saving, so a quick second flip isn't undone.
+async function savePortalPart(k, show) {
+  if (!PORTALSET || portalLocked() || PORTAL_BUSY.has(k)) return;
+  const c = portalClient();
+  PORTAL_BUSY.add(k); PORTAL_SAVED = '';
+  let r, undo;
+  if (c) {
+    const had = Object.prototype.hasOwnProperty.call(c.choices, k), was = c.choices[k];
+    undo = () => { if (had) c.choices[k] = was; else delete c.choices[k]; };
+    if (show === studioShows(k)) delete c.choices[k]; else c.choices[k] = show;   // the same as the studio's is no choice
+    paintPortalParts();
+    r = await api('/agency/portal/clients/' + encodeURIComponent(c.site_id), 'PUT', { part: k, shown: show });
+  } else {
+    const wasOff = PORTALSET.off.includes(k);
+    const setOff = (o) => { PORTALSET.off = o ? PORTALSET.off.filter((x) => x !== k).concat(k) : PORTALSET.off.filter((x) => x !== k); };
+    undo = () => setOff(wasOff);
+    setOff(!show); paintPortalParts();
+    r = await api('/agency/portal', 'PUT', { part: k, shown: show });
+  }
+  PORTAL_BUSY.delete(k);
+  if (!r.ok || !r.body || !r.body.data) { undo(); paintPortalParts(); toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
+  if (!PORTAL_BUSY.size) { if (c) c.choices = r.body.data.choices || {}; else { PORTALSET.off = r.body.data.off || []; PORTALSET.home_off = r.body.data.home_off || []; } }
+  PORTAL_SAVED = k; paintPortalParts();
+}
+async function resetPortalClient() {
+  const c = portalClient(); if (!c || portalLocked()) return;
+  const before = { ...c.choices }; c.choices = {}; paintPortalParts();
+  const r = await api('/agency/portal/clients/' + encodeURIComponent(c.site_id), 'PUT', { reset: true });
+  if (!r.ok) { c.choices = before; paintPortalParts(); toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
+  toast(`Back to your studio’s choices for ${c.name}.`);
+}
+function paintPortalHome() {
+  const locked = portalLocked(), max = PORTALSET.welcome_max || 500;
+  const ta = $('portalWelcome');
+  if (document.activeElement !== ta) ta.value = PORTALSET.welcome || '';
+  ta.disabled = locked; ta.maxLength = max;
+  $('portalWelcomeCount').textContent = `${ta.value.length} / ${max}`;
+  const homeOff = PORTALSET.home_off || [];
+  const had = document.activeElement && document.activeElement.id;
+  const rows = (PORTALSET.cards || []).map((x) => {
+    const on = !homeOff.includes(x.key), off = locked || PORTAL_BUSY.has('card:' + x.key);
+    return `<div class="swrow"><button type="button" class="sw" role="switch" id="sw-pc-${esc(x.key)}" data-pc="${esc(x.key)}" aria-checked="${on ? 'true' : 'false'}" aria-labelledby="sw-pc-${esc(x.key)}-l"${off ? ' aria-disabled="true"' : ''}></button><div class="t"><b id="sw-pc-${esc(x.key)}-l">${esc(x.label)}${PORTAL_SAVED === 'card:' + x.key ? '<span class="nsaved" role="status">Saved</span>' : ''}</b><div class="how">${esc(x.sub)}</div></div></div>`;
+  });
+  // Needs you is always on Home: shown as a switch that's on and can't be moved
+  rows.splice(1, 0, '<div class="swrow"><button type="button" class="sw" role="switch" id="sw-pc-needs" aria-checked="true" aria-disabled="true" aria-labelledby="sw-pc-needs-l"></button><div class="t"><b id="sw-pc-needs-l">Needs you<span class="pchip">Always there</span></b><div class="how">What’s waiting on the client</div></div></div>');
+  $('portalCardRows').innerHTML = rows.join('');
+  $('portalCardRows').querySelectorAll('[data-pc]').forEach((b) => b.addEventListener('click', () => { if (b.getAttribute('aria-disabled') === 'true') return; savePortalCard(b.getAttribute('data-pc'), b.getAttribute('aria-checked') !== 'true'); }));
+  if (had) { const n = $(had); if (n) n.focus(); }
+}
+function wirePortal() {
+  const ta = $('portalWelcome');
+  if (ta.dataset.wired) return; ta.dataset.wired = '1';
+  ta.addEventListener('input', () => { $('portalWelcomeCount').textContent = `${ta.value.length} / ${PORTALSET.welcome_max || 500}`; $('portalWelcomeSaved').innerHTML = ''; });
+  ta.addEventListener('change', savePortalWelcome);   // when you leave the box
+  $('portalReset').addEventListener('click', resetPortalClient);
+}
+async function savePortalWelcome() {
+  const ta = $('portalWelcome'); if (!PORTALSET || portalLocked()) return;
+  const v = ta.value;
+  if (v.trim() === (PORTALSET.welcome || '').trim()) return;
+  const r = await api('/agency/portal', 'PUT', { welcome: v });
+  if (!r.ok || !r.body || !r.body.data) { toast(nice(r.body, 'The note didn’t save. What you wrote is still in the box.'), true); return; }
+  PORTALSET.welcome = r.body.data.welcome || '';
+  if (document.activeElement !== ta) ta.value = PORTALSET.welcome;
+  $('portalWelcomeCount').textContent = `${ta.value.length} / ${PORTALSET.welcome_max || 500}`;
+  $('portalWelcomeSaved').innerHTML = '<span class="nsaved" role="status">Saved</span>';
+}
+async function savePortalCard(key, show) {
+  const id = 'card:' + key;
+  if (!PORTALSET || portalLocked() || PORTAL_BUSY.has(id)) return;
+  const wasOff = (PORTALSET.home_off || []).includes(key);
+  const setOff = (o) => { const l = (PORTALSET.home_off || []).filter((x) => x !== key); PORTALSET.home_off = o ? l.concat(key) : l; };
+  PORTAL_BUSY.add(id); PORTAL_SAVED = ''; setOff(!show); paintPortalHome();
+  const r = await api('/agency/portal', 'PUT', { card: key, shown: show });
+  PORTAL_BUSY.delete(id);
+  if (!r.ok || !r.body || !r.body.data) { setOff(wasOff); paintPortalHome(); toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
+  if (!PORTAL_BUSY.size) { PORTALSET.home_off = r.body.data.home_off || []; PORTALSET.off = r.body.data.off || []; }
+  PORTAL_SAVED = id; paintPortalHome();
 }
 // I3 (bug hunt, Nov 10): answers can come back in any order. Each field counts the saves it
 // has on their way, and a repaint leaves a field alone while one is out; an answer older than
@@ -2345,6 +2519,7 @@ function holdAnchor(sec) {
     else { wireReport(); loadReport(); }
     if (!inClient()) loadGoalAi();   // sales item 94: Goal and AI help, the studio's own like Deal stages
     loadNotify();   // item 126: a studio's notifications per client site (agency members only)
+    loadPortalSettings();   // items 229 and 233: what clients see in the portal (agency members only)
     wireDeletion();
     if (!inClient()) { wireSecurity(); loadSecurity().catch(() => {}); }   // item 191: your own sign-in, in your own business too
     { const dl = $('dlData'); if (dl) dl.addEventListener('click', downloadMyData); }   // item 69: Download my data
@@ -2358,6 +2533,7 @@ function holdAnchor(sec) {
     if (location.hash === '#stages' && !inClient()) holdAnchor($('stages'));   // item 83: a second business is not a client
     if (location.hash === '#goal' && !inClient()) holdAnchor($('goal'));   // sales item 94: Home's goal card and AI help's Open Settings land here
     if (location.hash === '#security' && !inClient()) holdAnchor($('security'));   // item 191: the studio home's nudge lands here
+    if (location.hash === '#portalParts' || location.hash === '#portalHome') { const id = location.hash.slice(1); loadPortalSettings().then(() => { if (!$(id).hidden) holdAnchor($(id)); }); }   // items 229 and 233
     if (location.hash === '#notify') {
       if (CTX && CTX.is_agency) loadNotify().then(() => { if (!$('notify').hidden) holdAnchor($('notify')); });
       else paintPush().then(() => { $('notify').hidden = false; holdAnchor($('notify')); });   // builder item 202

@@ -18,7 +18,7 @@
 import { svc } from '../lib/db.ts';
 import { loadTokens, saveTokens, markStatus } from '../connected/store.ts';
 import { refreshTokens } from '../connected/auth.ts';
-import { propertyCandidates, gscQueryBody, gscMonthWindow, gscBackMonths, noPropertySentence, parseTotals, parseTermRows, signalRowsFor, gscDomainFor, gscTermBody, foldDaysToMonths, type GscTotals } from '../lib/gsc.ts';
+import { propertyCandidates, gscQueryBody, gscMonthWindow, gscBackMonths, noPropertySentence, parseTotals, parseTermRows, signalRowsFor, gscDomainFor, gscTermBody, foldDaysToMonths, parsePairRows, pairRowsToStore, PAIR_ROWS, type GscTotals } from '../lib/gsc.ts';
 import { readReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { normalizeFollowed } from '../lib/search_tools.ts';
 
@@ -113,6 +113,15 @@ export async function syncGscForSite(site: { id: string; client_id: string; cust
     const terms = parseTermRows(res.json, 25).map((t) => ({ client_id: site.client_id, period, dimension: dim, key: t.key, clicks: t.clicks, impressions: t.impressions, position: t.position }));
     if (terms.length) await svc('presence_search_terms?on_conflict=client_id,period,dimension,key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(terms) }).catch(() => {});
     if (dim === 'query') await syncFollowed(site, prop, startDate, endDate, period, new Set(terms.map((t) => t.key)), tokenState).catch(() => {});
+  }
+
+  // builder list item 219: each search with the page Google showed for it, so the Search tab
+  // can name the page to improve for a search just off page one. A write of its own: until
+  // migration 0220 lets the table keep pairs it is refused, and nothing else waits on it.
+  const pairs = await query(site.id, prop, gscQueryBody(startDate, endDate, ['query', 'page'], PAIR_ROWS), tokenState);
+  if (pairs.ok) {
+    const rows = pairRowsToStore(site.client_id, period, parsePairRows(pairs.json));
+    if (rows.length) await svc('presence_search_terms?on_conflict=client_id,period,dimension,key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) }).catch(() => {});
   }
 
   if (opts.backfill) {

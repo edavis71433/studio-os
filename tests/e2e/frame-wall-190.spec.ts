@@ -50,7 +50,9 @@ test('Edit’s canvas runs none of the drawn page’s scripts, and the editor st
   await expect(frame.locator('#dds-dc-bar')).toBeAttached();
   await expect(frame.locator('#a h2')).toHaveText('Fresh bread');
   await page.waitForTimeout(600);   // the broken image has failed by now, and the SVG has loaded
-  await frame.locator('#js').click({ force: true }).catch(() => { /* the editor may keep the click */ });
+  // the click goes to the link itself: on a tablet the editor's dock covers the page's left edge,
+  // so a click at the link's place would press a dock button instead (item 57 added Layers there)
+  await frame.locator('#js').dispatchEvent('click');
   await page.waitForTimeout(300);
   expect(await touched(page)).toEqual([]);
   await expect(frame.locator('body')).not.toHaveAttribute('data-own', 'ran');

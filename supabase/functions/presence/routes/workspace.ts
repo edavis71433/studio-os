@@ -197,9 +197,11 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   const studioSiteId = isManagedClient ? String(customerLinks![0]?.agency_site_id || '') : '';
   // builder list item 179: and the client's own first name, from the studio's record
   // of them, so Home greets the person and not their sign-in. Read beside the brand.
-  const [studio, clientFirstName] = await Promise.all([
+  const [studio, clientFirstName, portalSettings] = await Promise.all([
     studioSiteId ? import('./studio_brand.ts').then((m) => m.studioBrandOf(studioSiteId)).catch(() => null) : Promise.resolve(null),
     studioSiteId && site.client_id ? clientGreetingName(studioSiteId, String(site.client_id), site.id).catch(() => '') : Promise.resolve(''),
+    // builder list items 229 and 233: what this client's studio shows them (a failed read hides nothing)
+    studioSiteId ? import('../lib/portal_settings.ts').then((m) => m.readPortalSettings(studioSiteId).then((s) => ({ off: m.resolveOff(s, site.id), welcome: s.welcome, home_off: s.home_off }))).catch(() => null) : Promise.resolve(null),
   ]);
 
   // Phase D: resolve the FEATURE edition from the licensed plan (falls back to
@@ -302,6 +304,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     capabilities: caps,
     studio,                              // builder list item 59: { name, logo_url, accent } for a managed client, else null
     client_first_name: clientFirstName || null,   // builder list item 179: the name on the studio's record of this client
+    portal: portalSettings,              // builder list items 229 and 233: { off, welcome, home_off } for a managed client, else null
     edition: site.edition,               // 'monitor' | 'presence' (site hosting dimension)
     site_live: !!siteLive,               // sales review item 24: the client Overview's Website tile (hosted elsewhere · live · not live yet)
     edition_key: editionKey,             // Phase D: the FEATURE edition (cms_only … enterprise)

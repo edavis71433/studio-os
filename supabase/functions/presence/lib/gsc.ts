@@ -156,3 +156,52 @@ export function foldDaysToMonths(resp: any): Array<{ period: string; clicks: num
   return [...by.entries()].filter(([, m]) => m.impressions > 0).sort(([a], [b]) => a.localeCompare(b))
     .map(([period, m]) => ({ period, clicks: m.clicks, impressions: m.impressions, position: m.weighted ? Math.round((m.weighted / m.impressions) * 10) / 10 : null }));
 }
+
+// ── Builder list item 219: which page Google showed for each search ──
+// The Search tab lists searches that sit just off Google's first page, each with the
+// page to improve. Search Console gives that pair only when asked for both at once
+// (dimensions query and page), so the sync asks once more a month and keeps the pairs
+// in presence_search_terms as dimension 'query_page' (migration 0220): the search, a
+// tab, the page's address. Pairs past place 30 aren't kept: they are nowhere near.
+export const PAIR_SEP = '\t';
+export const PAIR_ROWS = 250, PAIR_MAX_PLACE = 30;
+const KEY_MAX = 400;   // presence_search_terms keys are kept to 400 characters (parseTermRows)
+
+/** One kept key for a search and its page; '' when the two don't fit whole. Pure. */
+export function pairKey(query: string, page: string): string {
+  const q = String(query || '').replace(/\s+/g, ' ').trim(), p = String(page || '').trim();
+  if (!q || !p || q.includes(PAIR_SEP) || p.includes(PAIR_SEP)) return '';
+  const key = q + PAIR_SEP + p;
+  return key.length <= KEY_MAX ? key : '';
+}
+/** A kept key read back as its search and page, or null. Pure. */
+export function splitPairKey(key: string): { query: string; page: string } | null {
+  const k = String(key || ''), at = k.indexOf(PAIR_SEP);
+  if (at <= 0 || at === k.length - 1) return null;
+  return { query: k.slice(0, at), page: k.slice(at + 1) };
+}
+
+export interface GscPairRow { query: string; page: string; clicks: number; impressions: number; position: number | null }
+/** The rows of a query-and-page breakdown (keys: [search, page]). Pure. */
+export function parsePairRows(resp: any, max = PAIR_ROWS): GscPairRow[] {
+  const rows = (resp && Array.isArray(resp.rows) && resp.rows) || [];
+  return rows.slice(0, max).map((r: any) => ({
+    query: String((r.keys && r.keys[0]) ?? ''), page: String((r.keys && r.keys[1]) ?? ''),
+    clicks: Number(r.clicks) || 0, impressions: Number(r.impressions) || 0,
+    position: typeof r.position === 'number' ? r.position : null,
+  })).filter((r: GscPairRow) => r.query && r.page);
+}
+
+/** The month's pairs as presence_search_terms rows: the ones Google placed within 30, each
+ *  once, any that wouldn't fit whole left out (never cut short). Pure. */
+export function pairRowsToStore(clientId: string, period: string, pairs: GscPairRow[]): Array<Record<string, unknown>> {
+  const seen = new Set<string>(), out: Array<Record<string, unknown>> = [];
+  for (const p of pairs) {
+    if (p.position === null || p.position > PAIR_MAX_PLACE) continue;
+    const key = pairKey(p.query, p.page);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ client_id: clientId, period, dimension: 'query_page', key, clicks: p.clicks, impressions: p.impressions, position: Math.round(p.position * 10) / 10 });
+  }
+  return out;
+}

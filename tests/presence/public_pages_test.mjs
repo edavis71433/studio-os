@@ -29,6 +29,8 @@ globalThis.fetch = (url, init = {}) => {
   if (u.includes('/presence_site_preview?token=eq.')) return reply(u.includes(TOKEN) ? [{ site_id: SITE, snapshot_id: 'snap-1', password_hash: world.hash ?? null }] : []);
   if (u.includes('/rpc/rate_hit')) { const b = JSON.parse(init.body); const k = `${b.p_bucket}|${b.p_window}`; world.rate[k] = (world.rate[k] || 0) + 1; return reply(world.rate[k] <= b.p_max); }
   if (u.includes('/suppressed_emails') && m === 'POST') { world.suppressed.push(JSON.parse(init.body)); return reply([], 201); }
+  // builder list item 200: the review page asks whether its site is still there
+  if (u.includes('/presence_sites?id=eq.')) return world.sitesDown ? reply({ message: 'boom' }, 500) : reply(u.includes(SITE) ? [{ id: SITE, status: 'live' }] : []);
   return reply([]);
 };
 const post = (body) => handlePublicPreviewOpen(new Request(`https://db.example/functions/v1/presence/p/${TOKEN}`, { method: 'POST', body: JSON.stringify(body) }), TOKEN, {});
@@ -76,6 +78,19 @@ const post = (body) => handlePublicPreviewOpen(new Request(`https://db.example/f
   ok('an emailed review link goes on to the viewer', r.status === 302 && r.headers.get('location') === `https://app.example/review.html?site=${SITE}`);
   const src = Deno.readTextFileSync(new URL('../../supabase/functions/presence/routes/reviews.ts', import.meta.url));
   ok('review emails link the viewer; the page’s form still posts to the function', /const reviewPageUrl = \(siteId: string\) => `\$\{appUrl\(\)\}\/review\.html\?site=\$\{siteId\}`/.test(src) && /const endpoint = reviewEndpoint\(siteId\)/.test(src));
+  // builder list item 200 (review file 06, finding 62): the viewer tells a link that will never
+  // work (404) from a moment's trouble (503), so it can say what to do about each
+  const ask = (id) => handleReviewPage(new Request(`https://db.example/functions/v1/presence/reviews/${id}?embed=1`), id, {});
+  const page = await ask(SITE);
+  ok('the viewer’s ask gets the review page', page.status === 200 && (await page.text()).includes('Leave a review'));
+  const gone = await ask('22222222-2222-4222-8222-222222222222');
+  ok('a link to a site that isn’t there is not found, so the viewer says to ask for a fresh one', gone.status === 404);
+  world.sitesDown = true;
+  const down = await ask(SITE);
+  world.sitesDown = false;
+  ok('a read that failed is not a dead link: the viewer says to try again', down.status === 503);
+  const html = (await (await ask(SITE)).text());
+  ok('the page’s form tells the connection from a refusal, and keeps what was typed', html.includes('Check your connection and try again. Your review is still here.') && html.includes('Too many tries in a row') && !html.includes('Something went wrong'));
 }
 
 // ── unsubscribe ──

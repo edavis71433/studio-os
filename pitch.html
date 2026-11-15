@@ -58,6 +58,9 @@
   .foot{margin-top:34px;font-size:12.5px;color:var(--faint);text-align:center}
   .printbtn{position:fixed;right:18px;bottom:18px;font:inherit;font-size:13.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:9px 16px;background:var(--card);color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
   .center{text-align:center;padding:80px 12px}
+  .center .sub{margin:10px auto 0}
+  .again{margin-top:22px;font:inherit;font-size:15px;font-weight:600;border:0;border-radius:999px;padding:11px 22px;min-height:44px;background:var(--p);color:#fff;cursor:pointer}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .again{color:#171320}}
   .spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:80px auto;animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (max-width:640px){.cols,.cols.n2{grid-template-columns:1fr}.col.you{order:-1}}
@@ -91,12 +94,25 @@ function speedCard(d,you){
     ?`<p class="sub">On a phone, the main part of your homepage takes <strong>${esc(secs(s.phone_lcp_ms))} seconds</strong> to show. ${s.phone_lcp_status==='good'?'Google counts that as good.':s.phone_lcp_status==='poor'?'Google counts over 4 seconds as slow.':'Google counts under 2.5 seconds as good.'}</p>`:'';
   return `<section class="card"><h2>How fast it shows on a phone</h2>${theirs}<p class="sub">A page we build weighs about ${esc(ours.typical_kb)} kB, and never more than ${esc(ours.limit_kb)} kB, so it shows quickly on a phone.</p></section>`;
 }
+// Builder list item 200 (review file 06, finding 62): a prospect on a weak signal was told the
+// link was dead. Now no answer, or one that failed on our side, is the connection: the link is
+// still good and Try again asks once more. Only "there's no such report" says to ask for a
+// fresh link.
+function cantLoad(){
+  $('#main').innerHTML='<div class="center" role="alert"><h1>We couldn’t load your report just now</h1><p class="sub">Check your connection, then try again. The link is still good.</p><button class="again" id="again" type="button">Try again</button></div>';
+  $('#again').addEventListener('click',()=>{$('#main').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';load();});
+}
+function deadLink(){
+  $('#main').innerHTML='<div class="center" role="alert"><h1>This link doesn’t work any more</h1><p class="sub">The report may have been rebuilt or taken down. Reply to the email it came with and ask for a fresh link.</p></div>';
+}
 async function load(){
   const t=new URLSearchParams(location.search).get('t')||'';
   let r=null;
   try{r=await fetch(FN+'/sales/pack/'+encodeURIComponent(t));}catch(_){}
-  if(!r||!r.ok){$('#main').innerHTML='<div class="center"><h1>This link isn’t live</h1><p class="sub" style="margin:10px auto 0">The report you were sent may have been rebuilt — ask for a fresh link.</p></div>';return;}
-  const d=(await r.json()).data;
+  if(r&&(r.status===404||r.status===400)){deadLink();return;}
+  let d=null;
+  if(r&&r.ok){try{d=(await r.json()).data;}catch(_){}}
+  if(!d){cantLoad();return;}
   if(d.brand&&d.brand.accent)document.documentElement.style.setProperty('--p',d.brand.accent);
   const you=d.you||{};
   const rivals=(d.rivals||[]).slice(0,2);
