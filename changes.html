@@ -47,7 +47,7 @@
   .cband .big{font-weight:700;font-size:clamp(36px,5vw,54px);line-height:1.04;letter-spacing:-.03em;margin-top:6px;font-variant-numeric:tabular-nums}
   .cband .sub{font-size:19px;font-weight:500;color:rgba(255,255,255,.92);margin-top:2px}
   .chart{margin-top:18px}
-  .chart .ct{font-size:12px;font-weight:600;color:rgba(255,255,255,.88);margin-bottom:6px}
+  .chart .ct{font-size:12px;font-weight:600;color:rgba(255,255,255,.88);margin-bottom:24px}   /* room for the busiest day's label over its bar */
   .bars{display:flex;align-items:flex-end;gap:12px;height:96px;border-bottom:1px solid rgba(255,255,255,.35)}
   .bar{flex:1;display:flex;flex-direction:column-reverse;min-width:6px;height:100%;position:relative}
   .bar i{display:block;width:100%}
@@ -197,7 +197,7 @@ const ICON={
 };
 const AREAS=[['','Everything'],['website','Website'],['photos','Photos'],['live','Going live'],['people','People'],['settings','Settings']];
 const AREA_WORD={website:'Website',photos:'Photos',live:'Going live',people:'People',settings:'Settings'};
-let MODE='studio',SITES=[],META={},D=null,ITEMS=[],NEXT=null,BUSY=false,WENT={};
+let MODE='studio',SITES=[],META={},D=null,ITEMS=[],NEXT=null,BUSY=false,READ=null,WENT={};
 const F={who:'',area:'',site:''};
 
 // "4:32 PM"; a day heading: "Today · Saturday, Nov 15"
@@ -358,9 +358,9 @@ function render(focus){
 }
 function wire(){
   const rf=$('refreshBtn');if(rf)rf.addEventListener('click',async()=>{if(await load())render('#refreshBtn');});
-  document.querySelectorAll('[data-who]').forEach(b=>b.addEventListener('click',async()=>{const w=b.getAttribute('data-who');if(w===F.who||BUSY)return;const was=F.who;F.who=w;if(!await load())F.who=was;render(`[data-who="${F.who}"]`);}));
-  document.querySelectorAll('[data-area]').forEach(b=>b.addEventListener('click',async()=>{const a=b.getAttribute('data-area');if(a===F.area||BUSY)return;const was=F.area;F.area=a;if(!await load())F.area=was;render(`[data-area="${F.area}"]`);}));
-  const ss=$('siteSel');if(ss)ss.addEventListener('change',async()=>{const was=F.site;F.site=ss.value;if(!await load())F.site=was;render('#siteSel');});
+  document.querySelectorAll('[data-who]').forEach(b=>b.addEventListener('click',()=>{const w=b.getAttribute('data-who');if(w===F.who)return;const was={...F};F.who=w;refilter(`[data-who="${w}"]`,was);}));
+  document.querySelectorAll('[data-area]').forEach(b=>b.addEventListener('click',()=>{const a=b.getAttribute('data-area');if(a===F.area)return;const was={...F};F.area=a;refilter(`[data-area="${a}"]`,was);}));
+  const ss=$('siteSel');if(ss)ss.addEventListener('change',()=>{const was={...F};F.site=ss.value;refilter('#siteSel',was);});
   const older=$('older');if(older)older.addEventListener('click',async()=>{const n=ITEMS.length;if(await load(true)){render();const li=document.querySelectorAll('li.ch')[n];const t=li&&li.querySelector('.go,a');if(t)t.focus();else if(li){li.tabIndex=-1;li.focus();}}});
   document.querySelectorAll('[data-went]').forEach(b=>b.addEventListener('click',()=>toggleWent(b.getAttribute('data-went'))));
 }
@@ -381,11 +381,26 @@ function query(more){
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load the changes just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup. It usually passes.</p><button id="retry" class="btn">Try again</button></div>`;const r=$('retry');if(r)r.addEventListener('click',()=>boot());}
 function noAccess(){$('main').innerHTML=`<div class="center"><h2>This page isn’t part of your view.</h2><p class="muted">Changes shows who changed a website. Your studio shares what you need with you.</p></div>`;}
+// The filters: the latest pick wins. A pick made while a read is on its way waits for it, then
+// one more read asks with every pick; a read that fails puts the picks back to what is shown.
+let REFILTER=false,AGAIN=false,FOCUS=null;
+async function refilter(focus,was){
+  FOCUS=focus;
+  if(REFILTER){AGAIN=true;return;}
+  REFILTER=true;
+  while(BUSY)await (READ||Promise.resolve()).catch(()=>{});   // Refresh or older changes, still reading
+  let ok;
+  do{AGAIN=false;ok=await load();}while(ok&&AGAIN);
+  REFILTER=false;AGAIN=false;
+  if(!ok)Object.assign(F,was);
+  if(!ok&&!$('feed'))return;   // signed out meanwhile: that page stays
+  render(FOCUS);
+}
 // true when read; a failed read keeps what is shown and says so
 async function load(more){
   if(BUSY)return false;BUSY=true;
   const path=(MODE==='studio'?'/agency/change-log?':'/change-log?')+query(more);
-  const r=await api(path);
+  READ=api(path);const r=await READ;
   BUSY=false;
   if(!r.ok){
     if(r.status===401){signedOut();return false;}

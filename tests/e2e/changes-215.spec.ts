@@ -58,6 +58,9 @@ test.describe('Changes (builder list item 215)', () => {
     await expect(tabs.getByRole('link', { name: 'Changes' })).toHaveAttribute('aria-current', 'page');
     const band = page.getByRole('region', { name: 'This week in changes' });
     await expect(band.locator('.big')).toHaveText('64 changes');
+    // the busiest day's label sits under the chart's title, never on it
+    const title = await band.locator('.chart .ct').boundingBox(), peak = await band.locator('.bar b').boundingBox();
+    expect(peak!.y).toBeGreaterThanOrEqual(title!.y + title!.height);
     await expect(band.locator('.sub')).toHaveText('on 2 sites, by 4 people · 9 went live');
     await expect(band.locator('.fact .fv')).toHaveText(['41 by your studio', '15 by clients', '9 went live', 'Bluebird Bakery']);
     await expect(band.locator('.fact .fn').first()).toHaveText('Eric 33 · Mia Chen 8');
@@ -100,11 +103,12 @@ test.describe('Changes (builder list item 215)', () => {
     await page.getByRole('group', { name: 'Who made them' }).getByRole('button', { name: 'Clients' }).click();
     await expect(page.getByRole('button', { name: 'Clients' })).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('group', { name: 'Which changes' }).getByRole('button', { name: 'Photos' }).click();
+    // picked while Photos is still reading: the pick stays, and one more read asks with every pick
     await page.getByLabel('Which site').selectOption(S2);
+    await expect.poll(() => asked.some((a) => new RegExp(`who=client&area=photos&site=${S2}`).test(a))).toBe(true);
     await expect(page.getByLabel('Which site')).toHaveValue(S2);
-    expect(asked.some((a) => /who=client/.test(a))).toBe(true);
-    expect(asked.some((a) => /who=client&area=photos/.test(a))).toBe(true);
-    expect(asked.some((a) => new RegExp(`area=photos&site=${S2}`).test(a))).toBe(true);
+    await expect(page.getByRole('button', { name: 'Photos' })).toHaveAttribute('aria-pressed', 'true');
+    expect(asked.some((a) => /who=client&area=photos(&|\|)/.test(a))).toBe(true);
   });
 
   test('inside a client: that site’s changes, this month by who made them, and who sees the page', async ({ page }) => {
