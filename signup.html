@@ -103,7 +103,8 @@ const qs = new URLSearchParams(location.search);
 const ENV = qs.get('env') === 'staging' ? ENVS.staging : ENVS.prod;
 const FN = ENV.url + "/functions/v1/presence";
 // run production's server beside its database (Oregon), not nearest the visitor: see shell.js.
-// Staging's server doesn't allow the header, so it goes to production only.
+// Staging's server doesn't allow the header, so it goes to production only. Only the sign-up
+// asks: the plans are a fixed answer with no database read, where asking would only add a trip.
 const REGION_HEADER = ENV === ENVS.prod ? { "x-region": "us-west-2" } : {};
 const envSuffix = qs.get('env') === 'staging' ? '&env=staging' : '';
 const sb = supabase.createClient(ENV.url, ENV.anon, { auth: { storageKey: "dds-portal-auth", persistSession: true, autoRefreshToken: true } });
@@ -120,7 +121,7 @@ function showMsg(text, kind){ const m=document.getElementById('msg'); m.textCont
 
 async function loadPlan(){
   try{
-    const r = await fetch(FN + "/commerce/plans", { headers:{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon, ...REGION_HEADER } });
+    const r = await fetch(FN + "/commerce/plans", { headers:{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon } });
     const j = await r.json();
     const plans = (j.data && j.data.plans) || [];
     PLAN = plans.find(p => p.key === PLAN_KEY) || null;

@@ -50,11 +50,8 @@ const ENVS = {
 const qs = new URLSearchParams(location.search);
 const ENV = qs.get('env') === 'staging' ? ENVS.staging : ENVS.prod;
 const FN = ENV.url + "/functions/v1/presence";
-// run production's server beside its database (Oregon), not nearest the visitor: see shell.js.
-// Staging's server doesn't allow the header, so it goes to production only.
-const REGION_HEADER = ENV === ENVS.prod ? { "x-region": "us-west-2" } : {};
 const roomHref = "/get-started.html" + (qs.get('env')==='staging'?'?env=staging':'');   // Phase I: new customers land in the guided first-run, never a blank workspace
-const H = { apikey: ENV.anon, Authorization: "Bearer " + ENV.anon, 'Content-Type':'application/json', ...REGION_HEADER };
+const H = { apikey: ENV.anon, Authorization: "Bearer " + ENV.anon, 'Content-Type':'application/json' };
 
 // Email verification (non-blocking) if a token is present.
 (async function verify(){

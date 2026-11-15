@@ -3,9 +3,17 @@
 // nearest the visitor, so from the east coast each of the small database calls behind
 // one answer crossed the country: about 1 s an answer, 0.4 s beside the database. The
 // client portal asked for Oregon first (client.html's FN_REGION, PR 424); every page
-// now does, with the x-region header. This pins:
-//   • every call that sends a sign-in or our key to our functions asks for Oregon. Those
-//     calls ask the browser's permission first anyway (a preflight), so it costs nothing;
+// now does, with the x-region header. Asking adds one trip across the country (from the
+// visitor's nearest server to Oregon) and saves one for every database call, so it pays
+// once an answer reads the database twice. This pins:
+//   • every signed-in call asks: the server checks who is asking against the database
+//     before anything else (shared/auth.ts resolvePrincipal), so it always gains;
+//   • a call with no sign-in asks only where its answer reads the database several times
+//     (an approval, a signature, the sign-up, the studio's name on the sign-in page). A
+//     fixed answer (the plans, the push key) or a single read (welcome's checks) doesn't:
+//     measured Nov 15 from the east coast, the plans took 0.08–0.10 s as they were and
+//     0.15 s asking. Those calls send our key, so they ask the browser's permission first
+//     (a preflight) either way, and the header never adds that round trip;
 //   • one value everywhere, and production only where a page can point at staging
 //     (staging's server doesn't allow the header);
 //   • the header, never the address setting (?forceFunctionRegion=): the browser specs'
@@ -55,20 +63,43 @@ function keyedLiterals(s) {
   return [...seen.values()];
 }
 const asks = (lit) => /(['"])x-region\1\s*:/.test(lit) || lit.includes('...REGION_HEADER');
+const signedIn = (lit) => /x-dds-user-jwt/.test(lit);
 
-// ── 1. every keyed call asks for Oregon ──────────────────────────────────────
+// The calls with no sign-in that don't ask, each a fixed answer or a single read. Any other
+// call that sends our key without a sign-in must ask, so a new one gets a decision.
+const LEFT = [
+  ['shell.js', "{ 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY }"],                              // GET /push/key: an env value
+  ['signup.html', '{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon }'],                                       // GET /commerce/plans: from code
+  ['welcome.html', "{ apikey: ENV.anon, Authorization: \"Bearer \" + ENV.anon, 'Content-Type':'application/json' }"], // verify + checkout-status: one read each
+];
+
+// ── 1. every signed-in call asks for Oregon; the others where they read enough ─
 {
-  let checked = 0; const missing = [];
+  let checked = 0; const missing = [], left = [];
   for (const f of files) {
     if (MARKETING.has(f)) continue;
-    for (const lit of keyedLiterals(src[f])) { checked++; if (!asks(lit)) missing.push(`${f}: ${lit.slice(0, 140)}`); }
+    for (const lit of keyedLiterals(src[f])) {
+      checked++;
+      if (asks(lit)) continue;
+      (signedIn(lit) ? missing : left).push(`${f}: ${lit}`);
+    }
   }
   ok('the scan finds the studio\'s calls (the shell, the pages, the sign-in doors)', checked >= 50, String(checked));
-  ok('every call that sends a sign-in or our key asks for Oregon (x-region)', missing.length === 0, missing.join('\n      '));
+  ok('every signed-in call asks for Oregon (x-region)', missing.length === 0, missing.map((m) => m.slice(0, 160)).join('\n      '));
+  const want = LEFT.map(([f, lit]) => `${f}: ${lit}`);
+  ok('the calls with no sign-in that don\'t ask are exactly the fixed answers and single reads',
+    left.length === want.length && want.every((w) => left.includes(w)), left.filter((l) => !want.includes(l)).map((l) => l.slice(0, 160)).join('\n      '));
   for (const f of ['shell.js', 'today.html', 'sites.html', 'pipeline.html', 'crm.html', 'presence.html', 'client.html', 'studio.html', 'portal.html', 'set-password.html']) {
-    ok(`${f} asks on each of its keyed calls`, keyedLiterals(src[f]).length > 0 && keyedLiterals(src[f]).every(asks));
+    const signed = keyedLiterals(src[f]).filter(signedIn);
+    ok(`${f} asks on each of its signed-in calls`, signed.length > 0 && signed.every(asks));
   }
-  ok('the marketing lead forms are the only keyed calls left as they were', [...MARKETING].every((f) => !src[f] || !src[f].includes('x-region')));
+  ok('with no sign-in: an approval, a signature, the sign-up and the sign-in page\'s studio name ask',
+    keyedLiterals(src['approve.html']).every(asks) && keyedLiterals(src['sign.html']).every(asks)
+    && /fetch\(FN \+ "\/commerce\/signup", \{ method:'POST', headers:\{[^}]*\.\.\.REGION_HEADER \}/.test(src['signup.html'])
+    && src['portal.html'].includes("fetch(FN + '/presence/public/studio/' + id + '/brand', { headers: { apikey: SUPABASE_KEY, 'x-region': FN_REGION } })"));
+  ok('the push key and the plans are asked for as before', src['shell.js'].includes("fetch(FN + '/push/key', { headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY } })")
+    && src['signup.html'].includes('fetch(FN + "/commerce/plans", { headers:{ apikey: ENV.anon, Authorization: "Bearer " + ENV.anon } })') && !src['welcome.html'].includes('x-region'));
+  ok('the marketing lead forms are left as they were', [...MARKETING].every((f) => !src[f] || !src[f].includes('x-region')));
 }
 
 // ── 2. one value, and production only where a page can point at staging ──────

@@ -16,6 +16,8 @@
   // x-region: run the server beside the database in Oregon, not in the region nearest the
   // visitor. From the east coast each of the small database calls behind one answer crossed
   // the country: about 1 s an answer, 0.4 s beside the database (client.html, Nov 15 2026).
+  // A signed-in call always gains: the server checks who is asking against the database
+  // before anything else. The push key reads no database, so asking would only add a trip.
   // Only for our own functions: Storage uploads and other hosts don't allow the header.
   var FN_REGION = 'us-west-2';
   var TOKEN = "";
@@ -2544,7 +2546,7 @@
           });
         }
         // turn ON — fetch the VAPID key, request permission, subscribe, save.
-        return fetch(FN + '/push/key', { headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'x-region': FN_REGION } })
+        return fetch(FN + '/push/key', { headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY } })
           .then(function (r) { return r.json(); })
           .then(function (j) {
             var key = j && j.data && j.data.key;
