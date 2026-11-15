@@ -108,6 +108,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `DELETE /(media|assets|redirects|content-library|publishes/checkpoints|bookings/types|knowledge/docs)/${ID}`,
     `DELETE /sales/(contacts|deals|proposals|contracts|templates|estimates)/${ID}`,
     `DELETE /sales/prospects/${ID}`,   // sales review item 112: taking a prospect off the list
+    `DELETE /forms/inbox/${ID}`,   // builder list item 203: an enquiry and its files go for good
     `DELETE /projects/${ID}/deliverables/${ID}`,
     `DELETE /projects/templates/${ID}`,   // sales item 106: removing a saved project template, like a saved proposal template
     `DELETE /sales/todo-templates/${ID}`,   // sales item 106: removing a saved to-do list, the same
@@ -172,6 +173,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /visibility/check',
     'PUT /visibility/follow',   // builder item 181: the searches the site follows on Google
     'PUT /visibility/phrases',   // builder item 160: the two or three phrases the business wants to be found for
+    'PUT /site/usable',   // builder item 150: the Usable by everyone ticks, and what its last check found
     'PUT /visibility/ai/questions',   // builder item 182: the questions its monthly AI check asks (the switch is configure)
     'POST /preview/(publish|share-link|section)',   // section: draws one unsaved section for the canvas, stores nothing
     'POST /publishes/checkpoints',
@@ -263,6 +265,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /portal/studio-requests/${ID}/(accept|decline)`,
     // builder item 193: only the studio marks an approved plan finished; the route refuses anyone else and says why
     `POST /foundations/plans/${ID}/done`,
+    // builder item 216: only the studio adds one of its saved pages; the route refuses anyone else and says why
+    'POST /pages/from-saved',
     'POST /crm/notes',
     `POST /crm/notes/${ID}/pin`,
     `DELETE /crm/notes/${ID}`,

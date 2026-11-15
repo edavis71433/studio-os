@@ -174,6 +174,15 @@ export function printSections(content: unknown): PrintedSection[] {
   return out;
 }
 
+/** The prints of one page's sections ('' = Home), as printSections makes them: what a
+ *  saved page brought when it landed (builder list item 216). Pure. */
+export function printPageSections(content: unknown, slug: string): string[] {
+  const settings = isObj(content) && isObj(content.settings) ? content.settings : {};
+  const page: unknown = slug === '' ? null : (Array.isArray(settings.pages) ? settings.pages : []).find((p) => isObj(p) && p.slug === slug);
+  const blocks = slug === '' ? settings.blocks : isObj(page) ? page.blocks : undefined;
+  return (Array.isArray(blocks) ? blocks : []).filter((b) => isObj(b) && !NOTHING_OF_THEIRS.has(String(b.type))).map((b) => print53(canon(b)));
+}
+
 /** What is still exactly as it was copied: the sections whose print hasn't
  *  changed, and the copied photos still in use. Nothing once the studio kept
  *  them. Pure. */
