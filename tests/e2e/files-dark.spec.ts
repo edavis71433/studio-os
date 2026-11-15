@@ -1,5 +1,6 @@
 import { test, expect, Page, Locator } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Found Nov 9 while building item 39: in dark mode the shell turns its purple light
 // (--dds-p) and gives the text on it a dark colour (--dds-on-p), but the Files page's
@@ -49,7 +50,7 @@ for (const scheme of ['dark', 'light'] as const) {
       await expect(add).toBeVisible();
       expect(await ownContrast(add), 'Add files').toBeGreaterThanOrEqual(4.5);
 
-      await page.locator('#selbtn').click();
+      await (await headerAction(page, '#selbtn')).click();
       await page.locator(`.tile[data-pick="${id(1)}"]`).click();
       const tick = page.locator('.tile.sel .check');
       await expect(tick).toBeVisible();
@@ -60,7 +61,7 @@ for (const scheme of ['dark', 'light'] as const) {
       await pinGrid(page);
       await installApp(page, { api });
       await page.goto('/files.html');
-      await page.locator('#selbtn').click();
+      await (await headerAction(page, '#selbtn')).click();
       await page.locator(`.tile[data-pick="${id(1)}"]`).click();
       for (const [bulk, label] of [['collection', 'Move'], ['archive', 'Archive'], ['tag', 'Add tag']]) {
         await page.locator(`[data-bulk="${bulk}"]`).click();

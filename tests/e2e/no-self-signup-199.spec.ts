@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Builder item 199 (Nov 15 2026): nobody signs up by themselves. Studios add their
 // clients and invite them, so:
@@ -61,7 +62,7 @@ for (const d of DIALOGS) {
     });
     await installApp(page, { api: d.api });
     await page.goto(d.path);
-    await page.locator(d.open).first().click();
+    await (await headerAction(page, d.open)).first().click();   // behind ⋯ on a phone (builder item 165)
     await expect(page.locator('#cu-name')).toBeFocused();   // the browser's own focus, before the nudge
     await page.locator('#cu-email').focus();
     await page.waitForTimeout(600);   // the stretched nudge has fired by now
@@ -76,7 +77,7 @@ for (const d of DIALOGS) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { mode: 'connect', pending: true, connected: false, email: 'ana@harbor.example', contact_id: 'c1', message: 'Saved' } }) });
     });
     await page.goto(d.path);
-    await page.locator(d.open).first().click();
+    await (await headerAction(page, d.open)).first().click();   // behind ⋯ on a phone (builder item 165)
     await expect(page.locator('#cu-name')).toBeFocused();
     await page.locator('#cu-name').fill('Ana Ruiz');
     await page.locator('#cu-email').fill('ana@harbor.example');

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp, ALL_FEATURES, STUDIO_LEVEL_NAV } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // The first speed fixes (Nov 10 2026 review, list items 167 to 169).
 //  - The sign-in context (/portal/context) is asked once per visit: the shell
@@ -189,6 +190,6 @@ test('Files: a search asks for the list only; Refresh asks for all three (findin
   expect(asked(seen, '/assets/collections')).toBe(0);
   expect(asked(seen, '/assets/health')).toBe(0);
   seen.length = 0;
-  await page.locator('#refreshBtn').click();
+  await (await headerAction(page, '#refreshBtn')).click();   // builder item 165: behind the header’s ⋯ on a phone
   await expect.poll(() => asked(seen, '/assets/collections') + asked(seen, '/assets/health')).toBe(2);
 });

@@ -60,7 +60,7 @@ test.describe('item 126 — one notifications switch per client site', () => {
     await expect(bacchus.getByRole('switch', { name: /Bacchus Kitchen/ })).toHaveAttribute('aria-checked', 'false');
     await expect(bacchus.getByRole('checkbox', { name: 'By email' })).toBeDisabled();
     await expect(bacchus).toContainText('Off. Nothing about this site reaches you');
-    await expect(bacchus.locator('.nsaved')).toHaveText('Saved');
+    await expect(bacchus.locator('.fs.ok')).toHaveText('Saved');   // builder item 165: the shared tick, beside the site's switch
     // one channel off on the other site
     const harbor = part.locator(`[data-notify-site="${S2}"]`);
     await harbor.getByRole('checkbox', { name: 'By email' }).uncheck();
@@ -70,16 +70,20 @@ test.describe('item 126 — one notifications switch per client site', () => {
     await expect(part.locator('#notifyNote')).toContainText('Money owed, something broken and messages from your clients always reach you');
   });
 
-  test('a change that doesn’t save puts the switch back and says so', async ({ page }) => {
+  test('a change that doesn’t save puts the switch back and says so beside it, with Try again', async ({ page }) => {
     await installApp(page, { api: { ...SETTINGS_API, '/portal/context': AGENCY_CTX(), '/agency/notify': NOTIFY() } });
-    await notifyRoutes(page, { fail: true });
+    const puts = await notifyRoutes(page, { fail: true });
     await page.goto('/settings.html#notify');
     const sw = page.locator(`#sw-n-${S1}`);
     await expect(sw).toHaveAttribute('aria-checked', 'true');
     await sw.click();
-    await expect(page.getByText('That didn’t save.')).toBeVisible();
+    const said = page.locator(`#fs-n-${S1}`);
+    await expect(said).toContainText('Couldn’t save');   // builder item 165: said in its place, not in a passing toast
     await expect(sw).toHaveAttribute('aria-checked', 'true');
-    await expect(page.locator(`[data-notify-site="${S1}"] .nsaved`)).toHaveCount(0);
+    await expect(page.locator(`[data-notify-site="${S1}"] .fs.ok`)).toHaveCount(0);
+    await said.getByRole('button', { name: 'Try again' }).click();   // the same change, sent again
+    await expect.poll(() => puts.length).toBe(2);
+    expect(puts[1]).toEqual(puts[0]);
   });
 
   test('inside a client, only that client’s site', async ({ page }) => {

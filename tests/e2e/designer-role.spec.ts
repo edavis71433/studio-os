@@ -189,7 +189,7 @@ test.describe('A Designer\'s own screen', () => {
     await asDesigner(page);
     await page.goto('/files.html');
     await ready(page);
-    await page.locator('#dds-mbar-menu, #dds-waffle').first().click();
+    await page.locator('#dds-mbar-menu:visible, #dds-waffle:visible').first().click();   // builder item 165: a phone's Menu is the bar's; the nine dots stay hidden there
     await expect(page.locator('#dds-drawer .dds-rolecard')).toBeVisible();
     await expect(page.locator('#dds-drawer .dds-rolecard .rc-t')).toHaveText('You’re a Designer on Marlow’s Kitchen');
   });

@@ -68,7 +68,9 @@ test.describe('Settings page', () => {
     await expect(page.locator('[data-card="billing"] .st')).toContainText('Studio · Active');
   });
 
-  test('Save writes PUT /identity and PUT /settings (industry) with what was typed', async ({ page }) => {
+  // Builder item 165 (one way to save): no Save pill. Each box saves when you leave it, with only
+  // its own field, and the kind of business when it's picked; a tick says so beside its label.
+  test('each box saves when you leave it: PUT /identity with that field, PUT /settings for the kind of business', async ({ page }) => {
     const puts: Array<{ path: string; body: unknown }> = [];
     await installApp(page, { api: API });
     await page.route('**/functions/v1/presence/**', async (route) => {
@@ -78,17 +80,24 @@ test.describe('Settings page', () => {
     });
     await page.goto('/settings.html');
     await expect(page.locator('#f-name')).toHaveValue('Davis Digital Studio');
+    await expect(page.locator('#profileSave')).toHaveCount(0);
+    await expect(page.locator('#profileHint')).toHaveText('Changes save as you go.');
     await page.locator('#f-name').fill('DDS');
+    await page.locator('#f-name').press('Tab');
+    await expect(page.locator('#fs-f-name')).toHaveText('Saved');
     await page.locator('#f-phone').fill('555-0100');
+    await page.locator('#f-phone').press('Enter');                  // Enter saves the box you're in
+    await expect(page.locator('#fs-f-phone')).toHaveText('Saved');
     const opts = await page.locator('#f-industry option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value));
     const pick = opts.includes('web_design') ? 'web_design' : opts[1];
     await page.locator('#f-industry').selectOption(pick);
-    await page.locator('#profileSave').click();
-    await expect(page.locator('.dds-toast')).toContainText('Saved');
+    await expect(page.locator('#fs-f-industry')).toHaveText('Saved');
     expect(puts).toEqual([
-      { path: '/identity', body: { business_name: 'DDS', email: 'hello@example.com', phone: '555-0100', service_area: 'Burbank, CA' } },
+      { path: '/identity', body: { business_name: 'DDS' } },
+      { path: '/identity', body: { phone: '555-0100' } },
       { path: '/settings', body: { industry_key: pick } },
     ]);
+    await expect(page.locator('#subline')).toContainText('DDS');
   });
 
   // ── studio audit 2026-10, change 5: the plan lives on Settings ──────────────
@@ -227,15 +236,20 @@ test.describe('Settings page', () => {
     await expect(sec).toContainText('Home and Settings always stay');
     await sec.locator('#sw-menu-pipeline').click();
     await expect(sec.locator('#sw-menu-pipeline')).toHaveAttribute('aria-checked', 'false');
-    await expect(page.locator('.dds-toast').last()).toContainText('Hidden. The menu changes the next time a page opens.');
+    await expect(sec.locator('#fs-menu-pipeline')).toHaveText('Saved');   // builder item 165: the tick beside it…
+    await expect(sec).toContainText('The menu changes the next time a page opens.');   // …and the note says when
     expect(puts).toEqual([{ hidden: ['files', 'pipeline'] }]);
     await sec.locator('#sw-menu-files').click();                                                   // back on
     expect(puts[1]).toEqual({ hidden: ['pipeline'] });
     await expect(sec.locator('#sw-menu-files')).toHaveAttribute('aria-checked', 'true');
     fail = true;
     await sec.locator('#sw-menu-sites').click();
-    await expect(page.locator('.dds-toast').last()).toContainText('That didn’t save.');
+    await expect(sec.locator('#fs-menu-sites')).toContainText('Couldn’t save');
     await expect(sec.locator('#sw-menu-sites')).toHaveAttribute('aria-checked', 'true');       // flipped back
+    fail = false;
+    await sec.locator('#fs-menu-sites').getByRole('button', { name: 'Try again' }).click();   // and Try again flips it again
+    await expect(sec.locator('#sw-menu-sites')).toHaveAttribute('aria-checked', 'false');
+    await expect(sec.locator('#fs-menu-sites')).toHaveText('Saved');
     // inside a client there is no such card; a plain owner has none either
     await installApp(page, { api: { ...API, '/portal/context': SCOPED_CTX } });
     await page.goto(`/settings.html?client=${CLIENT}`);
@@ -299,10 +313,10 @@ test.describe('Settings page', () => {
     await expect(page.locator('.dds-toast').last()).toContainText('On. The first report goes out in the first days of next month.');
     await expect(sec.locator('#reportLast')).toContainText('Nothing sent yet');
     expect(puts).toEqual([{ enabled: true }]);
-    await sec.locator('#report-note').fill('Thanks for a great month.');
-    await sec.locator('#reportSave').click();
-    await expect(sec.locator('#reportMsg')).toHaveText('Saved.');
-    expect(puts[1]).toEqual({ note: 'Thanks for a great month.' });
+    await sec.locator('#report-note').fill('Thanks for a great month!');
+    await sec.locator('#report-note').press('Tab');                 // builder item 165: the line saves when it's left
+    await expect(sec.locator('#fs-report-note')).toHaveText('Saved');
+    expect(puts[1]).toEqual({ note: 'Thanks for a great month!' });
     await sec.locator('#reportPreview').click();
     await expect(sec.locator('#reportMsg')).toContainText('Sent to eric@example.com');
     expect(previews).toBe(1);
@@ -476,7 +490,7 @@ test.describe('Settings — automations', () => {
     await page.locator('#n-rev').fill('5');
     await expect(page.locator('#n-rev-echo')).toHaveText('5');
     release();
-    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Saved.' }).first()).toBeVisible();
+    await expect(page.locator('#fs-row-rev')).toHaveText('Saved');   // builder item 165: the tick under the row's title
     await expect(page.locator('#n-rev')).toHaveValue('5');
     await expect(page.locator('#n-rev-echo')).toHaveText('5');
   });
@@ -495,7 +509,7 @@ test.describe('Settings — automations', () => {
     await expect(page.locator('#st-lead')).toHaveValue('');
     await page.locator('#sw-deal').click();
     await expect(page.locator('#sw-deal')).toHaveAttribute('aria-checked', 'true');
-    await expect(page.locator('.dds-toast')).toContainText('Saved');
+    await expect(page.locator('#fs-row-deal')).toHaveText('Saved');   // builder item 165: beside what changed, not a passing toast
     await page.locator('#sw-inv').click();
     await expect.poll(() => sent.length).toBe(2);
     await page.locator('#n-deal').fill('10');
@@ -513,13 +527,53 @@ test.describe('Settings — automations', () => {
     expect(sent.every((p) => p.path === '/settings')).toBe(true);
   });
 
-  test('a refused save flips the switch back and says so', async ({ page }) => {
+  test('a refused save flips the switch back and says so beside it, with Try again', async ({ page }) => {
+    let fail = true, tries = 0;
     await installApp(page, { api: API });
-    await page.route('**/functions/v1/presence/settings', (route) => route.request().method() === 'PUT' ? route.fulfill({ status: 502, contentType: 'application/json', body: '{"error":"write_failed","message":"That didn’t save — nothing was changed. Please try again."}' }) : route.fallback());
+    await page.route('**/functions/v1/presence/settings', (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      tries++;
+      return fail ? route.fulfill({ status: 502, contentType: 'application/json', body: '{"error":"write_failed","message":"That didn’t save — nothing was changed. Please try again."}' })
+        : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: route.request().postDataJSON() }) });
+    });
     await page.goto('/settings.html#automations');
     await page.locator('#sw-ack').click();
-    await expect(page.locator('.dds-toast')).toContainText('didn’t save');
+    const said = page.locator('#fs-row-ack');
+    await expect(said).toContainText('Couldn’t save');           // builder item 165: said in the row
     await expect(page.locator('#sw-ack')).toHaveAttribute('aria-checked', 'false');
+    fail = false;
+    await said.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.locator('#sw-ack')).toHaveAttribute('aria-checked', 'true');
+    await expect(said).toHaveText('Saved');
+    expect(tries).toBe(2);
+  });
+
+  // builder item 165: the words you type are never thrown away by a save that didn't go
+  test('own words whose save didn’t go stay in the box, marked, with Try again', async ({ page }) => {
+    let fail = true;
+    const sent: unknown[] = [];
+    await installApp(page, { api: API });
+    await page.route('**/functions/v1/presence/settings', (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      sent.push(route.request().postDataJSON());
+      return fail ? route.fulfill({ status: 502, contentType: 'application/json', body: '{"error":"write_failed"}' })
+        : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: route.request().postDataJSON() }) });
+    });
+    await page.goto('/settings.html#automations');
+    const box = page.locator('#w-ack');
+    await box.fill('Thanks — we’ll call you back today.');
+    await box.press('Tab');
+    await expect(page.locator('#fs-w-ack')).toContainText('Couldn’t save');
+    await expect(box).toHaveValue('Thanks — we’ll call you back today.');
+    await expect(box).toHaveAttribute('aria-invalid', 'true');
+    await page.locator('#sw-deal').click();                       // another save repaints the card…
+    await expect(page.locator('#fs-row-deal')).toContainText('Couldn’t save');
+    await expect(box).toHaveValue('Thanks — we’ll call you back today.');   // …and the words stay
+    fail = false;
+    await page.locator('#fs-w-ack').getByRole('button', { name: 'Try again' }).click();
+    await expect(page.locator('#fs-w-ack')).toHaveText('Saved');
+    await expect(box).not.toHaveAttribute('aria-invalid', 'true');
+    expect(sent.filter((b) => (b as Record<string, unknown>).auto_ack_message !== undefined)).toEqual([{ auto_ack_message: 'Thanks — we’ll call you back today.' }, { auto_ack_message: 'Thanks — we’ll call you back today.' }]);
   });
 
   test('drilled into a client the studio’s switches stay out of sight; their website’s two replies show', async ({ page }) => {
@@ -605,7 +659,7 @@ test.describe('Settings — the agency team', () => {
     });
     await page.goto('/settings.html#team');
     await page.locator('select[data-role="m-2"]').selectOption('account_manager');
-    await expect(page.locator('.dds-toast')).toContainText('Role changed.');
+    await expect(page.locator('#fs-m-m-2')).toHaveText('Saved');   // builder item 165: beside the role it changed
     const remove = page.locator('#people .member').nth(1).getByRole('button', { name: /Remove/ });
     await remove.click();                                               // arms
     await expect(remove).toContainText('Press again');
@@ -637,11 +691,11 @@ test.describe('Settings — the agency team', () => {
     const rows = page.locator('#people .member');
     await expect(rows.nth(0)).toContainText('Owner · you');
     await expect(rows.nth(0).locator('select, button')).toHaveCount(0);                 // matched by member_id, no email needed
-    // a refused role change: the toast carries the server's sentence, the select goes back
+    // a refused role change: beside it, the server's sentence (item 165); the select goes back
     const sel = page.locator('select[data-role="m-2"]');
     await expect(sel).toHaveValue('owner');
     await sel.selectOption('designer');
-    await expect(page.locator('.dds-toast')).toContainText('The team needs at least one owner. Make someone else an owner first.');
+    await expect(page.locator('#fs-m-m-2')).toHaveText('Couldn’t save. The team needs at least one owner. Make someone else an owner first.');
     await expect(sel).toHaveValue('owner');
     await expect(sel).toBeEnabled();
     // a refused removal: the row is NOT marked removed and Remove is usable again
@@ -701,26 +755,31 @@ test.describe('Settings — the Connections card status', () => {
 // ── Sales review item 38 (Nov 2026): name the four open deal stages ──────────
 test.describe('Settings — deal stage names', () => {
   const STAGES = { data: { labels: { lead: 'New lead', qualified: 'Qualified', proposal: 'Proposal sent', contract: 'Agreement out', won: 'Won', lost: 'Not a fit' }, custom: {}, defaults: {} } };
-  test('rename two stages: the four boxes save through /sales/stages, and the stalled-deal labels follow', async ({ page }) => {
+  // builder item 165: a name saves when its box is left (no Save stage names button)
+  test('rename two stages: each saves through /sales/stages when it is left, and the boxes beside them follow', async ({ page }) => {
     let sent: unknown = null;
     await installApp(page, { api: { ...API, '/sales/stages': STAGES } });
     await page.route('**/functions/v1/presence/sales/stages', (route) => {
       if (route.request().method() !== 'PUT') return route.fallback();
       sent = route.request().postDataJSON();
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { labels: { ...STAGES.data.labels, lead: 'Enquiry', proposal: 'Quote sent' }, custom: { lead: 'Enquiry', proposal: 'Quote sent' } } }) });
+      // the server keeps the names it was sent (a blank one goes back to its usual name)
+      const names = (sent as { names: Record<string, string> }).names, custom: Record<string, string> = {};
+      for (const [k, v] of Object.entries(names)) if (v) custom[k] = v;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { labels: { ...STAGES.data.labels, ...custom }, custom } }) });
     });
     await page.goto('/settings.html#automations');
-    await expect(page.locator('#stageNames')).toBeVisible();
+    await expect(page.locator('#stageGrid')).toBeVisible();
     await expect(page.getByLabel('Your name for New lead')).toHaveValue('');
-    await expect(page.locator('#stageNames input')).toHaveCount(4);                       // Won and Not a fit keep their names
+    await expect(page.locator('#stageGrid .c-name input')).toHaveCount(4);               // Won and Not a fit keep their names
     await page.getByLabel('Your name for New lead').fill('Enquiry');
+    await page.getByLabel('Your name for New lead').press('Tab');
+    await expect(page.locator('#fs-stage-lead')).toHaveText('Saved');
     await page.getByLabel('Your name for Proposal sent').fill('Quote sent');
-    await page.getByRole('button', { name: 'Save stage names' }).click();
+    await page.getByLabel('Your name for Proposal sent').press('Tab');
+    await expect(page.locator('#fs-stage-proposal')).toHaveText('Saved');
     await expect.poll(() => sent).toEqual({ names: { lead: 'Enquiry', qualified: '', proposal: 'Quote sent', contract: '' } });
-    await expect(page.locator('#snMsg')).toContainText('The Pipeline, records and reports use these names.');
-    // the stalled-deal labels (item 69 added the percents card, which names the stages too)
-    await expect(page.locator('label:has(#st-lead) [data-stage-label="lead"]')).toHaveText('Enquiry');
-    await expect(page.locator('label:has(#st-proposal) [data-stage-label="proposal"]')).toHaveText('Quote sent');
-    await expect(page.locator('#stageChances [data-stage-label="lead"]')).toHaveText('Enquiry');
+    // the chance and stalled boxes in those rows say the new names to a screen reader
+    await expect(page.getByLabel('Chance a deal at Enquiry closes, in percent')).toHaveCount(1);
+    await expect(page.getByLabel('Stale after days — Quote sent')).toHaveCount(1);
   });
 });

@@ -20,17 +20,7 @@
   [hidden]{display:none!important}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
-  .lrow1{display:flex;align-items:center;gap:10px}
-  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
-  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
-  .tabs{display:flex;gap:var(--dds-s1,4px);margin-top:10px;border-top:1px solid var(--line);padding-top:var(--dds-s2,8px);overflow-x:auto;scrollbar-width:none}   /* item 215: five tabs slide on a phone, never widen the page */
-  .tabs::-webkit-scrollbar{display:none}
-  .tabs a{white-space:nowrap}
-  .tabs a{font-size:13.5px;font-weight:600;color:var(--soft);text-decoration:none;padding:6px var(--dds-s3,12px);border-radius:var(--dds-r,8px)}
-  .tabs a:hover{color:var(--p);background:var(--p-soft)}
-  .tabs a[aria-current="page"]{color:var(--p);background:var(--p-soft)}
+  /* builder item 165: the header is the shared one (shell.css .dds-ph) */
   .intro{font-size:13.5px;color:var(--soft);max-width:var(--dds-w-focus,760px);margin:0 0 var(--dds-s4,16px)}
   /* item 166: every template and starter kit, with what it brings, where it came from, Rename and Remove */
   .klist{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);box-shadow:var(--shadow);overflow:hidden;max-width:1100px}
@@ -120,9 +110,11 @@ function rowHtml(k){
 }
 function render(){
   const t=KITS.filter(k=>k.kind==='template').length,s=KITS.length-t;
-  let h=`<header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">◫</span><h1 id="pagehead" tabindex="-1">Templates</h1></div>
-    <div class="lmeta">${KITS.length?esc(n(t,'template')+' · '+n(s,'starter kit')+' · newest first'):'Nothing saved yet'}</div>
-    <nav class="tabs" aria-label="Sites, domains, templates, usage and changes"><a href="/sites.html">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html" aria-current="page">Templates</a><a href="/usage.html">Usage</a><a href="/changes.html">Changes</a></nav></header>
+  // builder item 165: the one page header (shell.css .dds-ph), its line counting what is saved
+  let h=`<header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" data-ic="templates" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Templates</h1></div>
+        <p class="dds-ph-line" id="phLine">${KITS.length?esc(n(t,'template')+' · '+n(s,'starter kit')+' · newest first'):'Nothing saved yet'}</p></div></div>
+    <nav class="dds-ph-tabs" aria-label="Sites, domains, templates, usage and changes"><a href="/sites.html">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html" aria-current="page">Templates</a><a href="/usage.html">Usage</a><a href="/changes.html">Changes</a></nav></header>
     <p class="intro">Start a new site from one of these under “Start from”. A template brings a saved site’s pages, sections, menu, photos and look; a starter kit brings the setup only: services, FAQs, voice and colors.</p>`;
   if(!KITS.length)h+=`<div class="center"><p class="muted">No templates or starter kits yet.</p><p class="muted" style="margin-top:8px;font-size:13px">Save one from a site’s ⋯ menu on <a class="link" href="/sites.html">Sites</a> (Save as a template), or a customer’s ⋯ on <a class="link" href="/agency.html">Home</a> (Save as a starter kit).</p></div>`;
   else h+=`<div class="klist" id="klist">${KITS.map(rowHtml).join('')}</div>`;

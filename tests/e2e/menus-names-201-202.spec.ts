@@ -174,7 +174,8 @@ test.describe('Names (builder 202)', () => {
     await installApp(page, { api: { '/portal/context': inClient() } });
     await page.goto(`/inbox.html?client=${CLIENT}`);
     await expect(page).toHaveTitle('Messages — Joe’s Plumbing — Studio OS');
-    await expect(page.locator('#inboxH1')).toHaveText('Messages');
+    await expect(page.getByRole('heading', { level: 1, name: 'Messages', exact: true })).toBeVisible();   // builder item 165: the header's visible title, the page's only h1
+    await expect(page.locator('h1')).toHaveCount(1);
     await page.locator('#dds-bell').click();
     await expect(page.locator('.dds-bell-pop .foot')).toHaveText('See everything in Messages →');
   });
@@ -183,7 +184,8 @@ test.describe('Names (builder 202)', () => {
     await installApp(page, { api: { '/portal/context': studioCtx() } });
     await page.goto('/inbox.html');
     await expect(page).toHaveTitle('Inbox — Studio OS');
-    await expect(page.locator('#inboxH1')).toHaveText('Inbox');
+    await expect(page.getByRole('heading', { level: 1, name: 'Inbox', exact: true })).toBeVisible();   // builder item 165: the header's visible title, the page's only h1
+    await expect(page.locator('h1')).toHaveCount(1);
   });
 
   test('Settings for a business owner: Business profile, Services and prices, and Notifications holds the switch', async ({ page }) => {

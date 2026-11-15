@@ -10,8 +10,8 @@
   /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;
      light/dark/data-theme all follow it automatically) — the hand-maintained
      four-block copy this page carried is retired. Visual refresh (2026-10): the
-     page follows the approved "Sharing & access" board — breadcrumb · title +
-     explainer with the two-avatar illustration · Invite-a-client card (email ·
+     page follows the approved "Sharing & access" board — the shared page header
+     (builder item 165: Settings › · icon · title · one line) · Invite-a-client card (email ·
      role · Send invite) · "What clients see" rows with a switch + Visible/Hidden. */
   :root{
     --bg:var(--dds-bg,#f7f7f9);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#15141a);--soft:var(--dds-soft,#5c5a66);--faint:var(--dds-faint,#6f6d7a);--line:var(--dds-line,#e6e6ec);--line-strong:var(--dds-line-strong,#d2d2db);
@@ -28,20 +28,8 @@
   *{box-sizing:border-box;margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:var(--dds-w-form,640px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
-  svg.ic{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
 
-  /* ── breadcrumb + page head ── */
-  .crumbs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--faint);margin:0 0 var(--dds-s4,16px);flex-wrap:wrap}
-  .crumbs a{color:var(--faint);text-decoration:none;display:inline-flex;align-items:center;gap:var(--dds-s1,4px);padding:2px 6px 2px 2px;border-radius:var(--dds-r-sm,6px)}
-  .crumbs a:hover{color:var(--p);background:var(--p-soft)}
-  .crumbs .sep{color:var(--line-strong)}
-  .crumbs [aria-current="page"]{color:var(--ink);font-weight:500}
-  header.phead{display:flex;align-items:flex-start;gap:var(--dds-s5,20px)}
-  .ptitle{flex:1;min-width:0}
-  h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.15;letter-spacing:-.01em;margin:0}
-  .sub{color:var(--soft);font-size:14px;margin:6px 0 0;max-width:54ch}
-  .illo{width:112px;height:64px;flex:0 0 auto}
-  @media (max-width:480px){.illo{display:none}}
+  /* builder item 165: the page header is the shared one (shell.css .dds-ph), Settings in its trail */
 
   /* ── cards ── */
   .seclab{font-size:13px;font-weight:500;color:var(--soft);margin:var(--dds-s6,24px) 0 var(--dds-s2,8px)}
@@ -91,7 +79,10 @@
 </head>
 <body>
 <div class="wrap">
-  <nav class="crumbs" aria-label="Breadcrumb"><a class="back" href="/presence.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M15 6l-6 6 6 6"/></svg>Website</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Sharing &amp; access</span></nav>
+  <header class="dds-ph"><nav class="dds-ph-trail" aria-label="Where this page is"><a class="back" href="/settings.html">Settings</a><span aria-hidden="true">›</span></nav>
+    <div class="dds-ph-row"><span class="dds-ph-ic" data-ic="sharing" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Sharing &amp; access</h1></div><p class="dds-ph-line" id="phLine">Who can sign in, each with a role, and what your clients see</p></div></div>
+  </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -147,8 +138,6 @@ const IC={
   lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
 };
 const svg=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" style="stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round">${IC[k]}</svg>`;
-// the two-avatar illustration beside the title (decorative)
-const ILLO=`<svg class="illo" viewBox="0 0 112 64" aria-hidden="true"><circle cx="36" cy="32" r="24" fill="var(--p-soft)"/><circle cx="36" cy="26" r="8" fill="var(--p)" opacity=".55"/><path d="M20 48a16 12 0 0 1 32 0" fill="var(--p)" opacity=".55"/><circle cx="76" cy="32" r="24" fill="var(--p)"/><path d="M70 36a5 5 0 0 0 7 0l4-4a5 5 0 0 0-7-7l-1 1M82 28a5 5 0 0 0-7 0l-4 4a5 5 0 0 0 7 7l1-1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>`;
 let SHARES={};
 let CTX=null; // the /portal/context this page acted on (scoped → describes the client)
 // Scoped, the page says whose site it is: "Sharing & access — <client>", read from
@@ -158,15 +147,16 @@ let CTX=null; // the /portal/context this page acted on (scoped → describes th
 function scopeName(){if(!scopeId())return '';const c=CTX||window.__ddsContext;const sc=c&&c.scope;return (sc&&sc.name)?String(sc.name):'';}
 function paintScope(){const h=$('pagehead');if(!h)return;const who=scopeName();h.textContent='Sharing & access'+(who?' — '+who:'');document.title='Sharing & access'+(who?' — '+who:'')+' — Studio OS';}
 document.addEventListener('dds:context',paintScope);
-// the breadcrumb's way back keeps the client in scope (the shell rewrites app
-// anchors too; this makes the page honest on its own)
-(function(){const s=scopeId();if(!s)return;const a=document.querySelector('.crumbs a.back');if(a)a.setAttribute('href','/presence.html?client='+encodeURIComponent(s));})();
-// item 136: at studio level the picker's way back is Settings, where the page is opened from
-document.addEventListener('dds:context',()=>{const c=window.__ddsContext;if(scopeId()||!(c&&c.is_agency))return;const a=document.querySelector('.crumbs a.back');if(a&&!a.dataset.settings){a.dataset.settings='1';a.setAttribute('href','/settings.html');a.lastChild.textContent='Settings';}});
+// builder item 165: the page lives in Settings (its Team & access card opens it), so the trail
+// says Settings; scoped, the way back keeps the client (the shell rewrites app anchors too;
+// this makes the page honest on its own)
+(function(){const s=scopeId();if(!s)return;const a=document.querySelector('.dds-ph-trail a.back');if(a)a.setAttribute('href','/settings.html?client='+encodeURIComponent(s));})();
+const headLine=(t)=>{const l=$('phLine');if(l)l.textContent=t;};
 
 function render(){
   const who=scopeName();
-  let html=`<header class="phead"><div class="ptitle"><h1 id="pagehead" tabindex="-1">Sharing & access${who?' — '+esc(who):''}</h1><p class="sub">Choose who can get in, each with a role, and exactly what a reviewer sees. Internal notes stay private unless you share them.</p></div>${ILLO}</header>`;
+  paintScope();headLine('Who can sign in, each with a role, and what a reviewer sees');
+  let html='';
   // builder item 53: the owner, the studio, and the people with a role each (people.js)
   html+=`<section class="card pad" id="peopleCard" aria-labelledby="pp-title"><div id="peopleHost"></div></section>`;
   // shares
@@ -200,13 +190,14 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>Couldn’t load 
 // client's sharing is its own page (?client=). A business owner's own site is theirs
 // to share, so nothing changes for them.
 async function pickClient(){
-  {const a=document.querySelector('.crumbs a.back');if(a&&!a.dataset.settings){a.dataset.settings='1';a.setAttribute('href','/settings.html');a.lastChild.textContent='Settings';}}
-  $('main').innerHTML=`<header class="phead"><div class="ptitle"><h1 id="pagehead" tabindex="-1">Sharing &amp; access</h1><p class="sub">Each client has their own reviewers and their own switches for what they see. Choose the client.</p></div></header><div class="card" id="pickList"><div class="spin" role="status" aria-label="Loading"></div></div>`;
+  headLine('Each client has their own people and their own switches for what they see. Choose the client.');
+  $('main').innerHTML=`<div class="card" id="pickList"><div class="spin" role="status" aria-label="Loading"></div></div>`;
   const r=await api('/agency/sites').catch(()=>({ok:false}));
   const rows=r.ok&&r.body?(Array.isArray(r.body.data)?r.body.data:(r.body.data&&Array.isArray(r.body.data.sites)?r.body.data.sites:null)):null;   // GET /agency/sites answers {data:[rows]}
   const list=rows?rows.filter(x=>x&&x.site_id&&!x.own):null;
   const box=$('pickList');if(!box)return;
   if(!list){box.innerHTML=`<p class="muted" style="padding:var(--dds-s4,16px)">Your clients wouldn’t load just now. Refresh to try again.</p>`;return;}
+  if(list.length)headLine(`${list.length} client${list.length===1?'':'s'}, each with their own people and their own switches for what they see. Choose one.`);
   if(!list.length){box.innerHTML=`<p class="muted" style="padding:var(--dds-s4,16px)">No clients yet. Once you add one, their sharing is set here.</p>`;return;}
   box.innerHTML=`<div role="list" aria-label="Clients">${list.map(x=>`<a class="rowitem pick" role="listitem" href="/sharing.html?client=${encodeURIComponent(x.site_id)}"><span class="grow"><span class="t">${esc(x.name||'(unnamed)')}</span><span class="d">${esc(x.domain||x.address||'')}</span></span><span aria-hidden="true">›</span></a>`).join('')}</div>`;
 }

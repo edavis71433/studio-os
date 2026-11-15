@@ -107,11 +107,11 @@ ok('only a studio, with Pipeline in its menu or its search', /if \(!CTX \|\| !CT
 ok('the sidebar button only when it applies', /\(canCreate\(\) \? '<button type="button" class="dds-create" id="dds-create"/.test(shell));
 ok('create.js loads on idle, from the site itself', /sc\.src = '\/create\.js';/.test(shell) && /requestIdleCallback \|\| function \(f\) \{ return setTimeout\(f, 1500\); \}\)\(function \(\) \{ loadCreate\(\)/.test(shell));
 ok('a failed load says so (and the next press retries)', /sc\.onerror = function \(\) \{ createP = null;/.test(shell) && /Create didn’t load — check your connection and try again\./.test(shell));
-const bar = (shell.match(/if \(pipe && custs\) \{[\s\S]*?\n    \}/) || [''])[0];
-const order = ['homeA', 'inboxA', 'dds-mbar-create', 'pipe.href', 'custs.href'].map((k) => bar.indexOf(k));
-ok('the phone bar: Home · Inbox · + · Pipeline · Customers', order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])));
-// bug hunt A3 (Nov 10): a studio that hid Pipeline or Customers still may create, so its bar is Home · Inbox · + · Menu
-ok('…and everyone else keeps Home · Inbox · Menu, with the + when they may create', /bar\.innerHTML = homeA \+ inboxA \+\s*\(plusHere \? '<button type="button" id="dds-mbar-create"[^\n]*: ''\) \+\s*'<button type="button" id="dds-mbar-menu"/.test(shell) && /var plusHere = canCreate\(\);/.test(shell));
+// builder item 165 (Figma 296:29): Home · Sites (an owner's, or a client's, Website) · + · Inbox · Menu
+ok('the phone bar: Home · Sites or Website · + · Inbox · Menu', /bar\.innerHTML = homeA \+ siteA \+ plusB \+ inboxA \+ menuB;/.test(shell));
+ok('…Sites for a studio, the one Website for an owner or inside a client', /var siteItem = isReviewer \? null : studioLevel \? first\('sites'\) : first\('website'\);/.test(shell));
+// bug hunt A3 (Nov 10): a studio that hid Pipeline or Customers still may create, so the + is whoever may create
+ok('…the + whenever they may create, and Menu, the word, always', /var plusHere = canCreate\(\);/.test(shell) && /var plusB = plusHere \? '<button type="button" id="dds-mbar-create"/.test(shell) && /var menuB = '<button type="button" id="dds-mbar-menu"[^\n]*<span class="mlbl">Menu<\/span><\/button>';/.test(shell));
 ok('"c" opens it, never while typing or under a modal', /else if \(e\.key === 'c' && !e\.shiftKey && canCreate\(\)\) \{ if \(modalOpen\(\)\) return;/.test(shell) && /tour \|\| \(window\.ddsCreate && window\.ddsCreate\.isOpen\(\)\)\); \}/.test(shell));
 ok('⌘K lists the five, last, and opens them in place (no hash for a page to trip on)', /if \(canCreate\(\)\) DESTS = DESTS\.concat\(CREATE_DESTS\);/.test(shell) && /closest\('a\.res\[data-create\]'\)/.test(shell) && /sel\.hasAttribute\('data-create'\)\) \{ e\.preventDefault\(\); openCreate\(/.test(shell));
 ok('"#create:<kind>" opens it once and clears itself', /var CREATE_HASH = \/\^#create\(\?::\(call\|deal\|invoice\|proposal\|todo\|project\|site\|customer\|update\)\)\?\$\/;/.test(shell) && /history\.replaceState\(history\.state, '', location\.pathname \+ location\.search\)/.test(shell));

@@ -1,5 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // ── Who owns each site, on the Sites page (builder list item 53) ──────────────
 // Wix's model: the client owns the site and the studio works on it with a role,
@@ -115,6 +116,7 @@ test.describe('Sites: who owns each site (builder item 53)', () => {
 
   test('the table: Owner and People columns, the studio’s role said once, People opens the sheet', async ({ page }) => {
     await openSites(page);
+    await headerAction(page, '#dispTable');   // builder item 165: on a phone the switch waits behind the header's ⋯, which this opens
     await page.getByRole('button', { name: 'Table' }).click();
     const table = page.locator('#tableHost');
     await expect(table.locator('.trole')).toHaveText('You are Website manager on all 3 sites. Each business owns its own site.');

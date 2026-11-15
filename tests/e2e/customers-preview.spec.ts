@@ -71,14 +71,14 @@ test.describe('Customers — chips, rows and the preview (bold redesign, part 2)
     const chips = page.locator('.chips [data-chip]');
     await expect(chips).toHaveText(['All 3', 'Needs you 1', 'Owes you 2', 'Active 1', 'On hold 1', 'Done 1']);
     await expect(chips.first()).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('.lmeta')).toContainText('3 customers · $2,000 owed to you');
+    await expect(page.locator('#lmeta')).toContainText('3 customers · $2,000 owed to you');
     await page.locator('[data-chip="owes"]').click();
     await expect(page.locator('[data-chip="owes"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('[data-chip="owes"]')).toBeFocused();
     await expect(page.locator('#viewBtn')).toContainText('Owes you');
     await expect(page.locator('.cust')).toHaveCount(2);
     await expect(page.locator('#listZone')).not.toContainText('Beta Salon');
-    await expect(page.locator('.lmeta')).toContainText('2 customers · $2,000 owed to you');
+    await expect(page.locator('#lmeta')).toContainText('2 customers · $2,000 owed to you');
     await page.locator('#viewBtn').click();
     await expect(page.locator('#viewMenu [data-view="owes"]')).toHaveAttribute('aria-selected', 'true');
   });
@@ -88,7 +88,7 @@ test.describe('Customers — chips, rows and the preview (bold redesign, part 2)
     await page.goto('/customers.html');
     await expect(page.locator('[data-chip="all"]')).toBeVisible();
     await expect(page.locator('[data-chip="owes"]')).toHaveCount(0);
-    await expect(page.locator('.lmeta')).not.toContainText('owed');
+    await expect(page.locator('#lmeta')).not.toContainText('owed');
   });
 
   test('rows are the default display: an avatar, the person, the project, and only the facts that are true', async ({ page }) => {
@@ -278,7 +278,7 @@ test.describe('People — the second tab (bold redesign, part 2)', () => {
     await installApp(page, { api: API });
     await page.goto('/customers.html?tab=people');
     await expect(page.getByRole('tab', { name: /People/ })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('.lmeta')).toHaveText('3 people · 2 not customers yet');
+    await expect(page.locator('#lmeta')).toHaveText('3 people · 2 not customers yet');
     await expect(page.locator('[data-pchip]')).toHaveText(['All 3', 'Customers 1', 'Not yet 2']);
     await page.locator('[data-pchip="not"]').click();
     await expect(page.locator('tr[data-person]')).toHaveCount(2);

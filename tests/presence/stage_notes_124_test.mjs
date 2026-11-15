@@ -70,7 +70,8 @@ eq('an empty note puts the starter back', N.withStageNote({ lead: 'A', won: 'B' 
     ok(`${name}: the old one-line tip strip is gone`, !/<b>Tip:<\/b>/.test(src));
     ok(`${name}: what the deal itself knows shows even when the notes couldn’t be read, with no Edit note`, /if\(!text&&!fact\)return'';/.test(src) && /const body=!text\?'':NOTE_EDIT/.test(src) && /\$\{NOTE_EDIT\|\|!text\?'':'<button type="button" class="sn-edit"/.test(src));
   }
-  ok('Settings: all six notes, with the same save', /id="stageNotes"/.test(settings) && /api\('\/sales\/stages', 'PUT', \{ note \}\)/.test(settings));
+  // builder item 165: the note saves when its box is left, through the same PUT
+  ok('Settings: all six notes, with the same save', /id="stageNotes"/.test(settings) && /api\('\/sales\/stages', 'PUT', \{ note \}\)/.test(settings) && /t\.addEventListener\('change', \(\) => saveStageNote\(k, t\.value\)\);/.test(settings) && !/data-sn-save/.test(settings));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

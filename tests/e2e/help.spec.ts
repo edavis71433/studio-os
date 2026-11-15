@@ -11,7 +11,7 @@ test.describe('Help (ask in your own words)', () => {
     await installApp(page);
     await page.goto('/help.html');
     await expect(page.locator('#dds-shell')).toBeAttached();   // the shell mounts (phones keep its nav in the drawer)
-    await expect(page.getByRole('heading', { level: 1, name: 'How can we help?' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Help' })).toBeVisible();   // builder item 165: the page is named as the menu names it
     await expect(page.getByLabel('Ask a question')).toBeVisible();
     await expect(page.locator('.btn.primary')).toHaveCount(1);
     await expect(page.locator('.btn.primary')).toHaveText('Ask');
