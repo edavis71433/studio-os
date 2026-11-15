@@ -353,6 +353,12 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 let TOKEN="", PERIOD='this_month', CTX=null, DASH=null;
+// builder item 83: ?client= is also how someone with places in two businesses opens their second one,
+// their own business and not a studio inside a client, so it keeps the reports their first one shows.
+// The context says which, as the shell's ddsScopeInfo reads it: a scope is a studio inside a client, a
+// business on the person's list is their own; else the shell's memory of the person's businesses, else
+// the address, as before.
+const inClient=()=>{const id=scope();if(!id)return false;if(CTX&&CTX.scope&&CTX.scope.site_id)return true;if(CTX&&Array.isArray(CTX.businesses)&&CTX.businesses.some((b)=>b&&b.site_id===id))return false;return window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)?!!window.ddsScopeInfo():true;};
 // C8: the sign-in pass is renewed about every hour; keep the renewed one, as the other
 // pages do, or Refresh after an hour is refused and reads as "Sign in"
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
@@ -455,7 +461,7 @@ const EXPLAIN={
   attention:'Clients with something flagged for a look today. Each one is listed under What stands out.',
   waiting:'Website enquiries, across every client, that nobody has answered yet.',
   live:'Client sites that are published and answering. Hosted elsewhere means the site lives on another platform.',
-  revenue:'Invoices paid this month, by the day they were paid. The chip compares with last month; the line is the last 12 months.',
+  revenue:'Invoices paid and retainer payments this month, by the day they were paid. The chip compares with last month; the line is the last 12 months.',
   winrate:'Of the deals closed in the last 12 months, the share you won. Not a fit counts as not won.',
   days:'The middle number of days from a deal being added to it being won, across your six latest wins. The chip compares with the six before.',
   expected:'Each open deal’s value times its stage’s chance of closing, added up.',
@@ -870,7 +876,7 @@ let REP_STALE=false;
 function quietStudio(v){const n=Number(v)||0;const el=document.getElementById('allQuietStudio');if(!el||!n)return;
   el.innerHTML=`${n===1?'one thing needs you':n+' things need you'} in your own studio — <a href="/agency.html" data-noscope="1">see Home</a>.`;}
 document.addEventListener('dds:attention',e=>quietStudio(e.detail));
-const reportsShell=()=>scope()?'':`<section class="reports" id="reports" aria-labelledby="reportsH"><h2 class="band" id="reportsH">Reports</h2><div id="reportsBody"><p class="muted">Reading your reports…</p></div></section>`;
+const reportsShell=()=>inClient()?'':`<section class="reports" id="reports" aria-labelledby="reportsH"><h2 class="band" id="reportsH">Reports</h2><div id="reportsBody"><p class="muted">Reading your reports…</p></div></section>`;
 async function loadReports(force){
   if(!$('reportsBody'))return;
   if(!REP||force||REP_STALE){let r;try{r=await api('/sales/reports');}catch(_){r={ok:false};}
@@ -970,7 +976,7 @@ function paintGlance(rep){
   const rv=rep.revenue,o=rep.outcomes,pl=rep.pipeline;
   // the revenue chart
   const revBody=(rv&&!rv.unavailable&&Array.isArray(rv.months)&&rv.months.length)
-    ?((rv.total_this_year||rv.total_last_year)?revenueChart(rv,12)+revenueChart(rv,6)+`<p class="chartnote">Paid invoices by the month they were paid · last 12 months ${esc(money(rv.total_this_year))} · the year before ${esc(money(rv.total_last_year))}</p>`:emptyState('No paid invoices yet','Invoices paid over the last two years will chart here, against the year before.'))
+    ?((rv.total_this_year||rv.total_last_year)?revenueChart(rv,12)+revenueChart(rv,6)+`<p class="chartnote">Paid invoices and retainer payments by the month they were paid · last 12 months ${esc(money(rv.total_this_year))}${rv.retainer_this_year?`, ${esc(money(rv.retainer_this_year))} of it from retainers`:''} · the year before ${esc(money(rv.total_last_year))}</p>`:emptyState('No payments yet','Invoices and retainer payments over the last two years will chart here, against the year before.'))
     :'<p class="muted">This chart couldn’t load just now — Refresh tries again.</p>';
   // the pipeline as it stands
   let pipeBody;
@@ -1009,7 +1015,7 @@ function reportBody(key,d){
     const max=Math.max(1,...d.months.map(m=>Math.max(m.this_year,m.last_year)));
     const rows=d.months.slice().reverse().map(m=>{const ch=m.this_year-m.last_year;return `<tr><td>${esc(m.label)}</td><td><span class="rbar" style="width:${Math.round(60*m.this_year/max)}px" aria-hidden="true"></span>${esc(money(m.this_year))}</td><td>${esc(money(m.last_year))}</td><td class="${ch>0?'up':ch<0?'down':''}">${ch===0?'—':(ch>0?'+':'−')+esc(money(Math.abs(ch)))}</td></tr>`;});
     const tch=d.total_this_year-d.total_last_year;
-    return (d.total_this_year||d.total_last_year?'':'<p class="rep-sum">No paid invoices in the last two years yet.</p>')+rTable(['Month','This year','A year before','Change'],rows,`<td>Last 12 months</td><td>${esc(money(d.total_this_year))}</td><td>${esc(money(d.total_last_year))}</td><td class="${tch>0?'up':tch<0?'down':''}">${tch===0?'—':(tch>0?'+':'−')+esc(money(Math.abs(tch)))}</td>`);
+    return (d.total_this_year||d.total_last_year?'':'<p class="rep-sum">No payments in the last two years yet.</p>')+rTable(['Month','This year','A year before','Change'],rows,`<td>Last 12 months</td><td>${esc(money(d.total_this_year))}</td><td>${esc(money(d.total_last_year))}</td><td class="${tch>0?'up':tch<0?'down':''}">${tch===0?'—':(tch>0?'+':'−')+esc(money(Math.abs(tch)))}</td>`);
   }
   if(key==='pipeline'){
     // item 69: each stage's chance and what it is expected to bring in (an older server sends neither)
@@ -1035,7 +1041,7 @@ function reportBody(key,d){
   }
   return '';
 }
-const REPORT_NOTE={revenue:'Paid invoices by the month they were paid, beside the same month a year before.',pipeline:'Open deals in each stage, and how long they have sat there.',outcomes:'Deals closed in the last 12 months. The reason is the one given when a deal was marked not a fit.',enquiries:'Website enquiries by the page they were sent from.',overdue:'Open invoices past their due date — the same list as Who owes you on the Pipeline.'};
+const REPORT_NOTE={revenue:'Paid invoices and retainer payments by the month they were paid, beside the same month a year before.',pipeline:'Open deals in each stage, and how long they have sat there.',outcomes:'Deals closed in the last 12 months. The reason is the one given when a deal was marked not a fit.',enquiries:'Website enquiries by the page they were sent from.',overdue:'Open invoices past their due date — the same list as Who owes you on the Pipeline.'};
 function paintReports(){
   const host=$('reportsBody');if(!host||!REP)return;
   const label=(REPORTS.find(r=>r[0]===REP_ON)||REPORTS[0])[1];

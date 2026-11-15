@@ -80,7 +80,7 @@ await rest(`presence_entitlements?client_id=eq.${cA.id}&product=eq.presence`, { 
 // ── 7. admin bypass: staff jwt bypasses entitlement (no site of their own -> 404 no_site, NOT 403) ──
 // A staff member has no presence site; the gate must let them past entitlement,
 // so they hit no_site (404), proving the bypass (a denied entitlement would be 403).
-const STAFF_EMAIL = "edavis7143@yahoo.com"; // Eric Test client is not staff; use a real staff if present
+const STAFF_EMAIL = Deno.env.get('STAFF_EMAIL') || 'staff@studio-os.test'; // a staff account on the database under test
 { // find any staff membership user
   const mem = (await j(await rest(`memberships?select=user_id&limit=1`)));
   if (Array.isArray(mem) && mem.length) {

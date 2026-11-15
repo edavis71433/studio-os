@@ -106,7 +106,7 @@ Scheduled publishes, the operations cycle, and retries fire only when something 
 - [ ] **`ANTHROPIC_KEY`** (+ visual keys if using Visual Studio) → `ai = true`.
 - [ ] **Cron** hitting `/system/run` on a schedule (e.g., every 10 min).
 - [ ] **PITR** enabled on both Supabase projects + one recorded restore drill (see DR).
-- [ ] **Secret rotation** — rotate the Netlify token / anything shown in chat.
+- [ ] **Secret rotation** — rotate any credential that has ever been handled outside the secrets store.
 - [ ] **The go-live push** — `git push` to publish the frontend (crosses the go-live gate).
 - [ ] **Final verify** — `GET /system/health?secret=…` shows every intended capability `true`.
 

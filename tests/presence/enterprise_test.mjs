@@ -86,7 +86,10 @@ const ORG = { brand: { name: 'Acme', palette: 'navy', logo: 'acme.svg' }, voice:
   const store = src('enterprise/store.ts');
   ok('spine: the enterprise store reuses decidePlan + claimApprovedPlan', /from '\.\.\/lib\/approved_plan\.ts'/.test(store) && /decidePlan/.test(store) && /claimApprovedPlan/.test(store));
   ok('spine: org operations enforce requires_approval as a DB CHECK', /requires_approval boolean not null default true check \(requires_approval = true\)/.test(mig('0043_presence_enterprise.sql')));
-  ok('spine: execute enforces approval before running', /status !== 'approved'/.test(src('routes/enterprise.ts')) && /not_approved/.test(src('routes/enterprise.ts')));
+  // builder item 213: the /enterprise routes (which alone executed an org operation) had no
+  // caller and left; the agency plans and decides org operations through agency/routes.ts.
+  ok('spine: nothing executes an org operation any more, and the /enterprise routes are gone',
+    !/routes\/enterprise\.ts|\/enterprise/.test(src('index.ts')) && !/applyOrgOperation|claimOrgOperation/.test(src('agency/routes.ts')));
 }
 
 // ═══ 8. SECURITY / ISOLATION — locations don't leak into each other ═══
@@ -128,9 +131,9 @@ async function integration({ SB, SR, ANON }) {
   const rest = (p, i = {}) => fetch(`${SB}/rest/v1/${p}`, { ...i, headers: { ...svcH, ...(i.headers || {}) } });
   let orgId = null; const LOC = '00000000-0000-0000-0000-0000000000aa';
   try {
-    // operator surface is deployed + gated
+    // the old operator surface left with builder item 213; a call to it is refused like any unknown route
     const unauth = await fetch(`${FN}/enterprise/00000000-0000-0000-0000-000000000001`, { headers: anonH });
-    iok('operator surface: /enterprise is live and refuses a non-operator', unauth.status === 403 || unauth.status === 401, `status=${unauth.status}`);
+    iok('the old /enterprise surface is gone and refuses a non-operator', [401, 403, 404].includes(unauth.status), `status=${unauth.status}`);
 
     const org = await (await rest('presence_organizations?select=id', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: 'L5.6 Co', tenant_id: '00000000-0000-0000-0000-000000000000' }) })).json();
     orgId = org?.[0]?.id;

@@ -390,10 +390,11 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
     }
   }
 
-  // ── f. approved plans the agency has not applied ──
+  // ── f. approved plans not finished yet. Nov 12 review, finding 13: the row said "Apply" and
+  //    opened a sheet with no such button; the sheet now has "Mark as done" for the studio ──
   for (const p of (i.plans || []).filter((p) => p.status === 'approved' && active.has(p.site_id))) {
     push({ key: `plan:${p.id || p.site_id + ':' + p.title}`, kind: 'plan', site_id: p.site_id, client_id: null, name: nameOf(p.site_id, null),
-      what: `approved “${p.title}” — not applied yet`, when: 'Approved plan', verb: 'Apply', href: `/presence.html${sc(p.site_id)}#foundations` });
+      what: `approved “${p.title}”: mark it done once the work is finished`, when: 'Approved plan', verb: 'Finish', href: `/presence.html${sc(p.site_id)}#foundations` });
   }
 
   // ── g. changes sitting unpublished (never a monitor site) ──

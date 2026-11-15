@@ -11,9 +11,9 @@
 //     pages, the menu, the header and footer choices (lib/draft_settings.ts).
 //   • The client's restore keeps the sections their studio locked (item 155): it is
 //     refused, before anything is written, when it would remove or change one.
-import { svc } from './db.ts';
+import { svc, svcAll } from './db.ts';
 import { publishActorKind } from './actor_kind.ts';
-import { serializeDraft, variantPath } from './serializer.ts';
+import { serializeDraft, variantPath, readMediaByIds } from './serializer.ts';
 import type { DraftRows, MediaManifestEntry } from './serializer.ts';
 import { draftSettingsOf, insertSnapshot, noDraftSettingsColumn, settingsBack, settingsFromContent } from './draft_settings.ts';
 import type { DraftSettings } from './draft_settings.ts';
@@ -92,7 +92,13 @@ export async function applySnapshotToDraft(
   // pages, the menu, the header and footer, the logo, cover and share image, the
   // announcement. As the snapshot kept them; one from before 0169 rebuilds them from its
   // content. Worked out before anything is written, so a refused restore writes nothing.
-  const mediaRows: Array<{ id: string; storage_path: string; alt_text?: string | null }> = (await svc(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&select=id,storage_path,alt_text`)).json ?? [];
+  // Item 208: only the photos the version kept, by id (every photo it showed is in its
+  // manifest), so a site with more than 1,000 files can't have one called gone. A version
+  // with no manifest reads every live file, a page at a time.
+  const keptIds = [...new Set((snapshot.media_manifest || []).map((m) => String(m.media_id || '').toLowerCase()).filter((id) => /^[0-9a-f-]{36}$/.test(id)))];
+  const mediaRows: Array<{ id: string; storage_path: string; alt_text?: string | null }> = keptIds.length
+    ? await readMediaByIds(site.id, keptIds, 'id,storage_path,alt_text')
+    : await svcAll(`presence_media?site_id=eq.${site.id}&deleted_at=is.null&select=id,storage_path,alt_text`, 'id');
   const resolve = mediaResolver(snapshot.media_manifest || [], mediaRows, gone);
   let back: DraftSettings = { category_order: c.settings?.category_order || [] };
   if (opts.settings && snapshot.draft_settings && typeof snapshot.draft_settings === 'object') {

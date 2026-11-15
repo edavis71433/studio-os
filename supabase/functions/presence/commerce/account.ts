@@ -12,6 +12,9 @@ import { brandEmailShell, EMAIL_BRAND_DEFAULT, type EmailBrand } from '../lib/em
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const RESEND_KEY = Deno.env.get('RESEND_KEY') || '';
+// Resend's address, unless a scratch run points it at a stand-in (scripts/isolation-scratch.sh).
+// The free tools read the same name (_shared/tools/email.ts).
+const RESEND_URL = Deno.env.get('RESEND_API_URL') || 'https://api.resend.com/emails';
 const EMAIL_FROM = Deno.env.get('EMAIL_FROM') || 'Davis Digital Studio <eric@davisdigitalstudio.com>';
 
 const authHeaders = { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json' };
@@ -282,7 +285,7 @@ export async function sendEmail(to: string, subject: string, html: string, brand
     // text-only clients — derived from the body HTML (see htmlToPlainText: cell
     // and block boundaries survive the tag strip, so a table still reads).
     const text = htmlToPlainText(html) + (pageUrl ? `\n\nUnsubscribe: ${pageUrl}` : '');
-    const r = await fetch('https://api.resend.com/emails', {
+    const r = await fetch(RESEND_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
       // List-Unsubscribe: RFC 8058 one-click HTTPS endpoint (what Gmail/Yahoo

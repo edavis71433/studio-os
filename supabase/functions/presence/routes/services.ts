@@ -7,11 +7,13 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { readZone } from '../platform/dns.ts';
+import { readZone, bareDomain } from '../platform/dns.ts';
+import { emailFacts } from '../platform/email_providers.ts';
 import { buildExport } from '../platform/exporter.ts';
 import { buildLaunchChecklist } from '../platform/launch.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { guardedFetch } from '../../_shared/tools/url_guard.ts';   // builder item 204
 
 const fence = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
 
@@ -34,7 +36,7 @@ export async function siteLaunchChecklist(site: SiteRow) {
   const now = new Date().toISOString();
   const domain = await siteDomain(site);
   const [zone, conn, runQ, reviewQ] = await Promise.all([
-    domain ? fence(readZone(domain, now)) : Promise.resolve(null),
+    domain ? fence(readZone(bareDomain(domain), now)) : Promise.resolve(null),   // the bare name: email never lives on "www."
     svc(`presence_monitor_connections?site_id=eq.${site.id}&select=status&limit=1`),
     svc(`presence_evidence_runs?site_id=eq.${site.id}&finished_at=not.is.null&error_text=is.null&select=id&order=started_at.desc&limit=1`),
     svc(`presence_ai_reviews?site_id=eq.${site.id}&select=id&limit=1`),
@@ -50,10 +52,12 @@ export async function siteLaunchChecklist(site: SiteRow) {
   }
   const liveUrl = domain ? `https://${domain}` : null;
   const [httpsOk, sitemapOk] = await Promise.all([
-    liveUrl ? fence((async () => (await fetch(liveUrl, { method: 'HEAD', signal: AbortSignal.timeout(6000) })).ok)()) : Promise.resolve(null),
-    liveUrl ? fence((async () => (await fetch(liveUrl + '/sitemap.xml', { method: 'HEAD', signal: AbortSignal.timeout(6000) })).ok)()) : Promise.resolve(null),
+    // builder item 204: the domain is typed, so both checks go through the guarded fetcher
+    liveUrl ? fence((async () => (await guardedFetch(liveUrl, { method: 'HEAD', signal: AbortSignal.timeout(6000) })).ok)()) : Promise.resolve(null),
+    liveUrl ? fence((async () => (await guardedFetch(liveUrl + '/sitemap.xml', { method: 'HEAD', signal: AbortSignal.timeout(6000) })).ok)()) : Promise.resolve(null),
   ]);
   const rec = zone?.records ?? [];
+  const mail = emailFacts(rec, domain ? bareDomain(domain) : '');
   return buildLaunchChecklist({
     edition: site.edition, domain,
     apex_resolves: zone ? rec.some((r) => (r.type === 'A' || r.type === 'AAAA' || r.type === 'CNAME') && r.name === domain) : null,
@@ -63,8 +67,8 @@ export async function siteLaunchChecklist(site: SiteRow) {
     sitemap_present: sitemapOk,
     gbp_connected: hasEvidence && !evTypes.has('local_presence.profile_unconnected'),
     analytics_connected: hasEvidence && !evTypes.has('analytics.not_connected'),
-    email_has_mx: rec.some((r) => r.type === 'MX'),
-    email_authenticated: rec.some((r) => r.type === 'TXT' && r.value.startsWith('v=spf1')) && rec.some((r) => r.name.startsWith('_dmarc')),
+    email_has_mx: mail.hasMail,
+    email_authenticated: mail.hasSpf && mail.hasDmarc,
     accessibility_criticals: a11yCrit,
     review_done: (reviewQ.json ?? []).length > 0,
   });

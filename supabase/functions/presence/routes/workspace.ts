@@ -28,6 +28,7 @@ import { resolveSiteRoleCached, listSiteMembers, addSiteMember, changeSiteMember
 import { loadThreadMarks, newestClientMessageAt, threadUnread } from '../lib/thread_reads.ts';
 import { shapeClientConversations, studioBellCount, noticeDismissible, NOTICE_ACCOUNT_KINDS, freshEnquiries, invoiceReminderIds, renderableNotices, noticeTier, noticePriority } from '../lib/inbox_feed.ts';
 import { clearNotice } from '../lib/notice.ts';
+import { unfinishedSectionsOf } from '../lib/unfinished.ts';
 import { healSupportOwners } from '../lib/service_bridge.ts';
 import { supportActivityAt } from '../lib/support_activity.ts';
 
@@ -57,6 +58,8 @@ async function verifiedNotices(site: SiteRow, rows: any[]): Promise<any[]> {
   return keep;
 }
 import { missingColumnSignal } from '../lib/inbound_email.ts';
+import { requireFresh } from '../lib/fresh_code.ts';   // builder item 191
+import { alertOwner } from '../lib/security_alerts.ts';
 
 /** The ONLY routes a client_reviewer (the client portal audience) may reach.
  *  Everything else in the client gate is 403 for a reviewer — so the simplified
@@ -436,12 +439,11 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
   const filesHidden = role === 'client_reviewer' ? (await isSharedStudioSite(site.id)) !== false : false;
   const noEnq = Promise.resolve({ ok: true, json: [] as any[] });
   const swallow = () => ({ ok: false, json: [] as any[] });   // best-effort slots must never sink the whole feed
-  // FIX 4: kick off the Content Tree read CONCURRENTLY with the feed's own queries
-  // (owner-only, best-effort) so surfacing missing-required content adds no serial
-  // latency to this bell hot path. Dynamic import avoids any top-level import cycle.
-  const treeP: Promise<any> = seesFull
-    ? import('./room.ts').then((m) => m.siteContentTree(site)).catch(() => null)
-    : Promise.resolve(null);
+  // FIX 4: the sections that need filling in before a publish, read CONCURRENTLY with the
+  // feed's own queries (owner-only, best-effort). Item 209: the count kept on the site,
+  // worked out again only after a change (lib/unfinished.ts), instead of the whole draft
+  // rebuilt and compared with the live one on every open.
+  const unfinishedP: Promise<number | null> = seesFull ? unfinishedSectionsOf(site).catch(() => null) : Promise.resolve(null);
   // ONE initial wave: shares + the feed's own queries + every independent
   // owner-only read the sections below consume (bridge links, support requests,
   // message events, agency links). Predicates unchanged — a reviewer never
@@ -557,15 +559,14 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
     });
 
     // FIX 4: a section that BLOCKS publishing (missing required content) should show
-    // in the main Inbox/bell, not only the Attention Center. Reuse the Content Tree's
-    // existing missing_required signal (no new store); the read was started above,
+    // in the main Inbox/bell, not only the Attention Center. The Content Tree's
+    // missing_required count (item 209: kept on the site); the read was started above,
     // concurrently — awaiting it here adds no serial latency. Best-effort.
     try {
-      const tree = await treeP;
-      const missing = tree ? tree.pages.flatMap((p: any) => p.sections.filter((s: any) => s.status === 'missing_required')) : [];
-      if (missing.length > 0) notices.push({
+      const missing = (await unfinishedP) ?? 0;
+      if (missing > 0) notices.push({
         id: 'missing-required', kind: 'missing_required', period: null, dismissible: false, tier: 'needs_you', priority: false,
-        headline: missing.length === 1 ? 'A section needs filling in before you can publish' : `${missing.length} sections need filling in before you can publish`,
+        headline: missing === 1 ? 'A section needs filling in before you can publish' : `${missing} sections need filling in before you can publish`,
         body: 'Add the missing details and your website is ready to go live.',
         href: noticeHref('missing_required'),
       });
@@ -819,7 +820,16 @@ export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, 
     return json({ data: { ok: true, emailed: !!again.emailed, member: again.member, message: again.emailed ? `Sent ${again.member?.email || 'them'} a new sign-in link.` : 'The email didn’t send. Try again in a moment.' } }, again.emailed ? 200 : 502, cors);
   }
   const { ownerFacts, ownerEmailsOf } = await import('../lib/site_transfer.ts');
-  const ownerEmails = ownerEmailsOf(await ownerFacts(site.id).catch(() => null));
+  const facts = await ownerFacts(site.id).catch(() => null);
+  const ownerEmails = ownerEmailsOf(facts);
+  // item 191: a co-owner can do almost everything, so inviting one (or bringing one back) asks for a fresh code first
+  const coOwner = body?.role === 'business_owner', invitee = String(body?.email || '').trim().toLowerCase();
+  let fresh: { way: 'app' | 'email' | 'none' } = { way: 'none' };
+  if (coOwner && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invitee) && !ownerEmails.includes(invitee)) {
+    const f = await requireFresh(principal, body, 'invite_coowner', `${invitee} as Co-owner of ${String(facts?.client?.name || '').trim() || 'this site'}`, cors);
+    if (f instanceof Response) return f;
+    fresh = f;
+  }
   // platform staff alone may still make a Developer seat (lib/workspace.ts DEVELOPER_PAUSED)
   const res = await addSiteMember(site.id, String(body?.email || ''), body?.role, principal.userId || 'owner', { restore: body?.restore === true, ownerEmails, allowDeveloper: principal.kind === 'staff' });
   if (!res.ok) {
@@ -831,6 +841,8 @@ export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, 
     return json({ error: res.error, message }, status, cors);
   }
   const reviewer = body?.role === 'client_reviewer';
+  // item 191: the owner hears a co-owner was added, whoever added them
+  if (coOwner) await alertOwner(site.id, 'coowner_added', { business: String(facts?.client?.name || '').trim(), who: invitee, by: principal.email || 'Someone signed in', confirmedWith: fresh.way });
   const message = res.emailed
     ? (reviewer ? 'Invited — we’ve emailed them a sign-in link. They’ll see only what you choose to share.' : `Invited as ${SEAT_ROLE_WORDS[body.role as SiteRole] || 'a member'} — we’ve emailed them a sign-in link.`)
     : 'Added — but the invite email didn’t send. Send them their sign-in link yourself, or try again.';
@@ -842,12 +854,27 @@ export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, 
 export async function handleMemberRole(req: Request, jwt: string, site: SiteRow, memberId: string, principal: Principal, cors: Record<string, string>) {
   const g = await requireManager(jwt, site, principal, cors); if (g instanceof Response) return g;
   let body: any = {}; try { body = await req.json(); } catch { /* */ }
+  // item 191: making someone a co-owner is inviting a co-owner, so it asks for a fresh code first
+  const coOwner = body?.role === 'business_owner';
+  let fresh: { way: 'app' | 'email' | 'none' } = { way: 'none' }, seatEmail = '';
+  if (coOwner) {
+    const seat = await svc(`presence_site_members?id=eq.${encodeURIComponent(memberId)}&site_id=eq.${site.id}&select=email,role&limit=1`);
+    const row = Array.isArray(seat.json) ? seat.json[0] : null;
+    if (!row) return json({ error: 'not_found', message: 'That person isn’t on this site any more.' }, 404, cors);
+    seatEmail = String(row.email || '');
+    if (row.role !== 'business_owner') {
+      const f = await requireFresh(principal, body, 'invite_coowner', `${seatEmail} as Co-owner`, cors);
+      if (f instanceof Response) return f;
+      fresh = f;
+    }
+  }
   const res = await changeSiteMemberRole(site.id, memberId, body?.role, { allowDeveloper: principal.kind === 'staff' });
   if (!res.ok) {
     if (res.error === 'not_found') return json({ error: 'not_found', message: 'That person isn’t on this site any more.' }, 404, cors);
     const [status, message] = ADD_WORDS[res.error || 'write_failed'] || ADD_WORDS.write_failed;
     return json({ error: res.error, message }, status, cors);
   }
+  if (coOwner && fresh.way !== 'none') await alertOwner(site.id, 'coowner_added', { who: seatEmail || String(res.member?.email || ''), by: principal.email || 'Someone signed in', confirmedWith: fresh.way });
   return json({ data: { ok: true, member: res.member, message: `${res.member?.email || 'Their role'} is now ${SEAT_ROLE_WORDS[body.role as SiteRole] || body.role}.` } }, 200, cors);
 }
 

@@ -136,19 +136,15 @@ export async function verifyApex(domain: string, expected: ApexExpectation, nowI
 }
 
 /* ── templates — goals become exact records (PURE) ── */
-export function templateRecords(goal: 'point_domain' | 'email_auth' | 'verify_ownership', p: { domain: string; target?: string; token?: string; mailNote?: string }): DnsRecord[] {
+// Email protection has no template here: its records depend on who runs the client's email
+// (platform/email_providers.ts), and Google's used to be handed to everyone (Nov 12 review, finding 14).
+export function templateRecords(goal: 'point_domain' | 'verify_ownership', p: { domain: string; target?: string; token?: string; mailNote?: string }): DnsRecord[] {
   if (goal === 'point_domain') return [
     // Apex A record from the ONE authoritative constant. Prefer an ALIAS/ANAME to
     // p.target where the host supports it (see apexGuidance) — this A record is the
     // universal fallback and the single place to update if Netlify's IP ever moves.
     { type: 'A', name: p.domain, value: NETLIFY_APEX_IP, ttl: 3600 },
     { type: 'CNAME', name: `www.${p.domain}`, value: p.target || `${p.domain}.`, ttl: 3600 },
-  ];
-  if (goal === 'email_auth') return [
-    { type: 'TXT', name: p.domain, value: 'v=spf1 include:_spf.google.com ~all', ttl: 3600 },
-    { type: 'TXT', name: `_dmarc.${p.domain}`, value: 'v=DMARC1; p=none; rua=mailto:postmaster@' + p.domain, ttl: 3600 },
-    // DKIM comes from the mail provider — named honestly, never invented:
-    { type: 'TXT', name: `google._domainkey.${p.domain}`, value: 'v=DKIM1; (copy the key from your email provider’s admin panel)', ttl: 3600 },
   ];
   return [{ type: 'TXT', name: `_dds-verify.${p.domain}`, value: p.token || '', ttl: 300 }];
 }
@@ -172,6 +168,32 @@ export async function dkimPresent(host: string): Promise<boolean | null> {
   } catch { return null; }
 }
 
+/** The name email lives on: the domain without "www." (Nov 12 review, finding 15). After
+ *  "Make www. the main name" the site's domain is www.x.com, and mail never lives there. */
+export function bareDomain(domain: string): string {
+  const d = String(domain || '').trim().toLowerCase().replace(/\.$/, '');
+  return d.startsWith('www.') ? d.slice(4) : d;
+}
+
+const TYPE_NUM: Record<RecordType, number> = { A: 1, NS: 2, CNAME: 5, MX: 15, TXT: 16, AAAA: 28, SRV: 33, CAA: 257 };
+
+/** PURE: one lookup's answers as records of the type that was asked for. A name that is a
+ *  pointer (www. forwarding to the bare name) answers every question with the pointer first;
+ *  that used to be filed as the kind asked for, so the www. forward counted as a mail record
+ *  (Nov 12 review, finding 15). Only answers of the asked type are kept. What sits behind a
+ *  pointer still counts, as it does for mail servers and browsers: an address, or a record
+ *  for fakes kept at a reporting company. */
+export function recordsOfType(name: string, type: RecordType, answer: unknown): DnsRecord[] {
+  const out: DnsRecord[] = [];
+  for (const a of (Array.isArray(answer) ? answer : []) as Array<{ type?: number; data?: string; TTL?: number }>) {
+    if (!a || (typeof a.type === 'number' && a.type !== TYPE_NUM[type])) continue;   // a real answer always says its type
+    const value = String(a.data || '').replace(/^"|"$/g, '');
+    if (type === 'MX') { const m = value.match(/^(\d+)\s+(.+)$/); out.push({ type, name, value: m?.[2] ?? value, priority: m ? Number(m[1]) : undefined, ttl: a.TTL }); }
+    else out.push({ type, name, value, ttl: a.TTL });
+  }
+  return out;
+}
+
 export async function readZone(domain: string, nowIso: string): Promise<ZoneSnapshot> {
   const records: DnsRecord[] = [];
   const lookup = async (name: string, type: RecordType) => {
@@ -179,11 +201,7 @@ export async function readZone(domain: string, nowIso: string): Promise<ZoneSnap
       const r = await fetch(`${DOH}?name=${encodeURIComponent(name)}&type=${type}`, { headers: { accept: 'application/dns-json' }, signal: AbortSignal.timeout(4000) });
       if (!r.ok) return;
       const j = await r.json();
-      for (const a of (Array.isArray(j?.Answer) ? j.Answer : [])) {
-        const value = String(a.data || '').replace(/^"|"$/g, '');
-        if (type === 'MX') { const m = value.match(/^(\d+)\s+(.+)$/); records.push({ type, name, value: m?.[2] ?? value, priority: m ? Number(m[1]) : undefined, ttl: a.TTL }); }
-        else records.push({ type, name, value, ttl: a.TTL });
-      }
+      records.push(...recordsOfType(name, type, j?.Answer));
     } catch { /* fenced: an unreachable resolver reads as an empty section */ }
   };
   await Promise.all([

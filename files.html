@@ -208,6 +208,11 @@
   .social .box img{width:100%;height:100%;object-fit:cover;display:block}
   .social figcaption{font-size:10.5px;color:var(--faint);line-height:1.25}
   .social .ogbtn{margin-top:10px;width:100%}
+  /* item 158: the picture in a pretend browser tab, above Use as site icon */
+  .social .tabpv{display:flex;align-items:center;gap:8px;margin-top:12px;padding:7px 12px;border-radius:10px 10px 0 0;background:var(--bg);border:1px solid var(--line);border-bottom:none;font-size:12.5px;max-width:100%}
+  .social .tabpv .tabic{width:16px;height:16px;border-radius:4px;flex:none;background-color:var(--p-soft);background-position:center;background-size:cover;background-repeat:no-repeat}
+  .social .tabpv span:not(.tabic){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .social .icbtn{margin-top:0;border-top-left-radius:0}
   /* G31: branded cards */
   .social .cardgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
   .social .cardgrid figure{margin:0;text-align:center}
@@ -1371,8 +1376,13 @@ async function loadSocial(id){
   }).join('');
   const isOg=r.body.data.is_share_image;const ed=S.canEdit;
   const ogBtn=ed?`<button class="btn ogbtn" onclick="setShareImage('${id}',${isOg?'true':'false'})">${isOg?'✓ This is your share image':'Use as share image'}</button>`:'';
+  // builder list item 158: the site's own small icon, shown the way a browser tab shows it
+  const isIc=!!r.body.data.is_site_icon;
+  // the picture as a background, the original under it: one that can't load leaves no broken glyph
+  const icSrc=[(S.current&&S.current.asset&&S.current.asset.thumb)||'',fb].filter(Boolean).map((u)=>`url('${esc(u)}')`).join(',');
+  const icBtn=ed?`<div class="tabpv" aria-hidden="true"><span class="tabic" style="background-image:${icSrc||'none'}"></span><span>${esc(siteTabName())}</span></div><button class="btn ogbtn icbtn" onclick="setSiteIcon('${id}',${isIc?'true':'false'})">${isIc?'✓ This is your site icon':'Use as site icon'}</button>`:'';
   slot.innerHTML=`<div class="hl">Social sizes</div><div class="row">${cells}</div>
-    <div style="font-size:11.5px;color:var(--faint);margin-top:6px">Cropped from your focus point. Set the focus in the Website editor.</div>${ogBtn}`;
+    <div style="font-size:11.5px;color:var(--faint);margin-top:6px">Cropped from your focus point. Set the focus in the Website editor.</div>${ogBtn}${icBtn}`;
   wirePreviews(slot);
 }
 // ── G31: branded cards — the photo re-laid-out per platform (Instagram / story /
@@ -1535,6 +1545,15 @@ async function saveEdited(a,out){
   if(a.brand)body.brand=true;
   const r=await api('/assets/'+id,'PATCH',body).catch(()=>({ok:false}));
   return{id,patched:!!(r&&r.ok)};
+}
+// item 158: the tab's words: the client's name inside a client, else the business in hand
+function siteTabName(){const c=window.__ddsContext||{};return (c.scope&&c.scope.name)||(c.business&&c.business.name)||'Your website';}
+// item 158: the picture becomes the site's browser-tab icon (published with the site)
+async function setSiteIcon(id,isIc){
+  if(isIc){toast('Already your site icon');return;}
+  const r=await api('/settings','PUT',{icon_media_id:id});
+  if(r.ok){toast('Set as your site icon — publish to apply');const b=document.querySelector('#social-slot .icbtn');if(b)b.textContent='✓ This is your site icon';}
+  else toast((r.body&&r.body.message)||'Could not set the site icon');
 }
 async function setShareImage(id,isOg){
   if(isOg){toast('Already your share image');return;}

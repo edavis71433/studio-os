@@ -138,7 +138,7 @@ ok('degrade: operator → staff (still the studio\'s hand); everything else unto
 
   const conn = read('connections.html');
   ok('connections.html: scoped row copy — "You connect this for <client> with a Google account that has access to their property."', /You connect this for \$\{esc\(CLIENT_NAME \|\| 'this client'\)\} with a Google account that has access to their property\./.test(conn));
-  ok('connections.html: the owner copy "Who owns it: you do" stays for the un-scoped page', /<b>Who owns it:<\/b> you do\. It’s your account and your permission/.test(conn) && /\$\{SCOPE\s*\n?\s*\?/.test(conn));
+  ok('connections.html: the owner copy "Who owns it: you do" stays for the un-scoped page', /<b>Who owns it:<\/b> you do\. It’s your account and your permission/.test(conn) && /\$\{IN_CLIENT\s*\n?\s*\?/.test(conn));
   ok('connections.html: the client name is the shell context\'s scope.name, resolved before the first render', /c\.scope && c\.scope\.name/.test(conn) && /CLIENT_NAME = await resolveClientName\(\);\s*\n\s*await reload\(\);/.test(conn));
 }
 

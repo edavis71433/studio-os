@@ -214,6 +214,13 @@ Deno.listen = () => {
 };
 Deno.serveHttp = () => ({ nextRequest: () => new Promise((res) => { if (queue.length) res(queue.shift()); else wake = res; }), close() {} });
 await import('../../supabase/functions/presence/index.ts');
+// builder item 191: closing the account asks for a fresh code; these people signed in with their
+// authenticator app's code a moment ago, so it counts (lib/fresh_code.ts)
+{
+  const { freshDeps } = await import('../../supabase/functions/presence/lib/fresh_code.ts');
+  freshDeps.user = async (jwt) => (USERS[jwt] ? { id: USERS[jwt].id, email: USERS[jwt].email, factors: [{ id: 'f1', factor_type: 'totp', status: 'verified' }] } : null);
+  freshDeps.claims = () => ({ aal: 'aal2', amr: [{ method: 'totp', timestamp: Math.floor(Date.now() / 1000) }] });
+}
 
 function send(request) {
   return new Promise((resolve) => {
@@ -500,12 +507,12 @@ for (const [method, route, body, status] of [['GET', '/commerce/plans', undefine
 
   const pres = read('presence.html');
   ok('presence: billing and deletion are gone from the builder, Settings owns them', !/mountBillingCard|mountDeletionCard/.test(pres));
-  ok('presence: so are the plan card and the welcome', /if \(!new URLSearchParams\(location\.search\)\.get\("client"\)\) \{\s*renderFirstRun\(\);\s*renderPlanNotice\(\);/.test(pres));
+  ok('presence: so are the plan card and the welcome', /if \(!studioInClient\(\)\) \{\s*renderFirstRun\(\);\s*renderPlanNotice\(\);/.test(pres));
   ok('presence: a payment notice goes to the billing card on Settings', /payment_trouble:\s*\{[^}]*settings\.html#billing/.test(pres) && /account_lapsed:\s*\{[^}]*settings\.html#billing/.test(pres));
   const settings = read('settings.html');
-  ok('settings: the plan card still never loads in a drill-in', /async function loadPlan\(\) \{\s*if \(SCOPE\) return;/.test(settings));
+  ok('settings: the plan card still never loads in a drill-in', /async function loadPlan\(\) \{\s*if \(inClient\(\)\) return;/.test(settings));
   const today = read('today.html');
-  ok('today: example data is still never asked for in a drill-in', /get\('client'\)\?Promise\.resolve\(null\):apiGet\('\/commerce\/example-data'\)/.test(today));
+  ok('today: example data is still never asked for in a drill-in', /inC\?Promise\.resolve\(null\):apiGet\('\/commerce\/example-data'\)/.test(today));
 }
 
 const passed = results.filter((r) => r.p).length;

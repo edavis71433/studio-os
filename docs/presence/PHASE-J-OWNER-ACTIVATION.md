@@ -72,7 +72,7 @@ Each capability's readiness is **verifiable the moment the owner sets its secret
 - **Secret gating:** `/system/health` + `/system/run` require `SCHEDULER_SECRET`; billing-sync requires its secret; one-tap tokens are HMAC-signed with expiry.
 - **Audit trails:** append-only change/connection ledgers; publish ledger; scheduled-run ledger; every one-tap decision writes a change event.
 - **Recovery:** versioned publishes + PITR + the export backstop.
-- **Owner security actions (documented):** rotate the Netlify token / anything shown in chat; run the `svc()` id-scope audit (roadmap Phase S) before scaling.
+- **Owner security actions (documented):** rotate any credential that has ever been handled outside the secrets store; run the `svc()` id-scope audit (roadmap Phase S) before scaling.
 
 ---
 

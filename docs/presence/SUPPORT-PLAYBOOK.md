@@ -19,7 +19,7 @@
 
 ## The top-10 answers (canned, adapt the greeting)
 
-1. **"I can't sign in"** → portal.html → "Forgot password"; if invited-member, resend the invite from Members. Never reset `edavis7143@yahoo.com`.
+1. **"I can't sign in"** → portal.html → "Forgot password"; if invited-member, resend the invite from Members. Never reset the owner's own test sign-in (the Eric Test account).
 2. **"My site isn't updating"** → Did you publish? Changes are drafts until the Publish button. Check History for the last publish; if a publish shows *failed*, escalate (see below).
 3. **"How do I change X?"** → every business fact is in the workspace's Business page; hours/photos/menu-or-services have their own pages. Link help.html's matching section.
 4. **"A payment failed / card declined"** → their site is still up (say so first); billing portal link to update the card; retries are automatic.

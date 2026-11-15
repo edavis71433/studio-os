@@ -47,17 +47,25 @@ export async function handleCoachHealth(site: SiteRow, cors: Record<string, stri
   const nowIso = new Date().toISOString();
   // the three counts are counted by the database (item 144): fetching the ids to count
   // them came back in pages of 1,000 rows, so a busy site's count stopped at 1,000
-  const [infra, writes, conns, leads, lastChange, meta] = await Promise.all([
+  const [infra, writes, conns, leads, meta0] = await Promise.all([
     svcCount(`presence_infra_plans?site_id=eq.${site.id}&status=eq.proposed`),
     svcCount(`presence_connection_writes?site_id=eq.${site.id}&status=eq.proposed`),
     svc(`presence_connections?site_id=eq.${site.id}&select=status,health`),
     svcCount(`presence_form_submissions?site_id=eq.${site.id}&status=eq.new&spam=is.false`),
-    svc(`presence_change_events?site_id=eq.${site.id}&select=created_at&order=created_at.desc&limit=1`),
-    svc(`presence_sites?id=eq.${site.id}&select=domain_expires_at&limit=1`),
+    svc(`presence_sites?id=eq.${site.id}&select=domain_expires_at,last_change_at&limit=1`),   // last_change_at: item 209 (0206)
   ]);
   const arr = (r: { json?: unknown }): any[] => (Array.isArray((r as { json?: unknown[] }).json) ? (r as { json: any[] }).json : []);
   const connAttn = arr(conns).filter((c) => ['error', 'expired', 'revoked'].includes(c.status) || ['attention', 'down'].includes(c.health)).length;
-  const lastChangeAt = arr(lastChange)[0]?.created_at || null;
+  // Item 209: the site's own latest change, which a publish doesn't count as. Before 0206
+  // that read is refused: the newest change in the history, as before.
+  let meta = meta0, lastChangeAt: string | null = arr(meta0)[0]?.last_change_at || null;
+  if (!meta0.ok) {
+    const [m, lastChange] = await Promise.all([
+      svc(`presence_sites?id=eq.${site.id}&select=domain_expires_at&limit=1`),
+      svc(`presence_change_events?site_id=eq.${site.id}&select=created_at&order=created_at.desc&limit=1`),
+    ]);
+    meta = m; lastChangeAt = arr(lastChange)[0]?.created_at || null;
+  }
   const domExp = arr(meta)[0]?.domain_expires_at || null;
   const domainDays = domExp ? Math.floor((Date.parse(domExp) - Date.parse(nowIso)) / 86400_000) : null;
   const read = coachRead({

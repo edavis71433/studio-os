@@ -15,7 +15,6 @@ import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { describeChanges } from '../lib/diff.ts';
 import { computeDraftHash } from '../lib/draft_hash.ts';
 import { deriveHealth } from '../lib/health.ts';
-import { ensureAndListNotes, resolveNote } from '../lib/notes.ts';
 import { applySnapshotToDraft, snapshotForRestore, leftOffSentence } from '../lib/draft_writer.ts';
 import { lockedRestoreMessage } from '../lib/section_lock.ts';
 import { draftAsFound } from '../lib/optimistic_lock.ts';
@@ -202,28 +201,6 @@ export async function handleContentTree(site: SiteRow, cors: Record<string, stri
   const tree = await siteContentTree(site);
   if (!tree) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
   return json({ data: tree }, 200, cors);
-}
-
-export async function handleNotesList(site: SiteRow, cors: Record<string, string>) {
-  const st = await roomState(site);
-  if (!st) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
-  const notes = await ensureAndListNotes(site.id, {
-    hostingProblem: st.hostingProblem,
-    everPublished: !!st.lastLive,
-    lastPublishedAt: st.lastLive?.completed_at || st.lastLive?.created_at || null,
-    lastPublishFailed: st.lastAny?.status === 'failed',
-    draftChanges: st.changes.count,
-    oldestDraftChangeAt: st.oldestDraftChangeAt,
-    nowIso: new Date().toISOString(),
-  });
-  return json({ data: notes }, 200, cors);
-}
-
-export async function handleNoteResolve(site: SiteRow, principal: Principal, noteId: string, outcome: 'accepted' | 'dismissed', cors: Record<string, string>) {
-  if (!UUID_RE.test(noteId)) return json({ error: 'bad_request', message: 'Invalid note reference.' }, 400, cors);
-  const ok = await resolveNote(site.id, noteId, outcome);
-  if (!ok) return json({ error: 'not_found', message: 'That note is gone already.' }, 404, cors);
-  return json({ data: { ok: true } }, 200, cors);
 }
 
 /** POST /restore-to-draft {publish_id} — reconciliation §3. The retained

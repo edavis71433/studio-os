@@ -21,17 +21,19 @@ export interface LaunchInput {
   review_done: boolean;                 // an open/any review report exists
 }
 
+// The step names are keys (lib/website_health.ts looks items up by them), so they stay; the
+// words a person reads are in `how` (Nov 12 review, finding 18).
 export interface LaunchItem { step: string; state: 'done' | 'todo' | 'n/a'; how: string }
 
 export function buildLaunchChecklist(i: LaunchInput): { items: LaunchItem[]; done: number; total: number; launched: boolean; sentence: string } {
   const isMonitor = i.edition === 'monitor';
   const items: LaunchItem[] = [
     { step: 'Domain connected', state: i.domain ? 'done' : 'todo',
-      how: i.domain ? `${i.domain} is the address.` : 'Prepare the connect-domain plan in the technical-side sheet — two records, everything explained.' },
+      how: i.domain ? `${i.domain} is the address.` : 'Connect your domain on the Domain & email sheet. It gives you the records to add.' },
     { step: 'DNS answering', state: i.domain ? (i.apex_resolves === null ? 'todo' : i.apex_resolves ? 'done' : 'todo') : 'n/a',
-      how: i.apex_resolves ? 'The domain resolves.' : 'The connect-domain plan carries the exact records; drift repair is one click after that.' },
+      how: i.apex_resolves ? 'The domain has records.' : 'The Domain & email sheet shows the exact records to add.' },
     { step: 'Security certificate active', state: i.https_ok === null ? (isMonitor ? 'n/a' : 'todo') : i.https_ok ? 'done' : 'todo',
-      how: i.https_ok ? 'HTTPS answers; renewal is automatic.' : 'Certificates provision themselves once DNS answers — nothing to buy, nothing to renew by hand.' },
+      how: i.https_ok ? 'The padlock is on, and it renews itself.' : 'The padlock comes by itself once the domain’s records point here. Nothing to buy.' },
     { step: isMonitor ? 'Website connected & verified' : 'Website published',
       state: isMonitor ? (i.monitor_verified ? 'done' : 'todo') : (i.published ? 'done' : 'todo'),
       how: isMonitor ? (i.monitor_verified ? 'Observation is running.' : 'Connect your site in the room — one read-only proof, nothing changes on it.')
@@ -43,7 +45,7 @@ export function buildLaunchChecklist(i: LaunchInput): { items: LaunchItem[]; don
     { step: 'Analytics connected', state: i.analytics_connected ? 'done' : 'todo',
       how: i.analytics_connected ? 'Measured.' : 'Optional but honest: without it, traffic trends stay invisible. Connect when ready.' },
     { step: 'Email authenticated', state: !i.email_has_mx ? 'n/a' : i.email_authenticated ? 'done' : 'todo',
-      how: !i.email_has_mx ? 'No email runs on this domain.' : i.email_authenticated ? 'SPF and DMARC answer — inboxes can trust you.' : 'The email-protection plan prepares the records; approve it and place them.' },
+      how: !i.email_has_mx ? 'No email runs on this domain.' : i.email_authenticated ? 'Both protection records are there. Inboxes can trust you.' : 'Set up email protection on the Domain & email sheet. It gives you the records to add.' },
     { step: 'Accessibility reviewed', state: i.accessibility_criticals === 0 && i.review_done ? 'done' : 'todo',
       how: i.accessibility_criticals > 0 ? `${i.accessibility_criticals} critical item${i.accessibility_criticals > 1 ? 's' : ''} to fix — the review desk lists them in plain words.` : i.review_done ? 'Reviewed.' : 'Run “Look things over → Review” once — findings arrive as sentences.' },
   ];

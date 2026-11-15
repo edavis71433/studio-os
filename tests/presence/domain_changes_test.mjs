@@ -25,7 +25,7 @@ ok('anyone else is named by their email, or plainly', byWhom({ kind: 'client', e
   const c2 = domainChangeEmail('changed', { domain: 'new.example', old: 'old.example', forwarded: false, by: 'your studio' });
   const r = domainChangeEmail('removed', { domain: 'bistro.example', by: 'owner@bistro.example', builtIn: 'presence-abc.netlify.app' });
   const m = domainChangeEmail('mail_gone', { domain: 'bistro.example', mx: ['10 mx1.mail.example', '20 mx2.mail.example'], recordsAt: 'Cloudflare' });
-  ok('attached: who did it, and when it goes live', a.subject === 'bistro.example was connected to your website' && /by your studio/.test(a.html) && /goes live once its two records are added/.test(a.html));
+  ok('attached: who did it, and when it goes live', a.subject === 'bistro.example was connected to your website' && /by your studio/.test(a.html) && /goes live once its records are added/.test(a.html));   // builder item 194: with the records passed in, the email lists them (domain_sheet_small_test.mjs)
   ok('changed: from, to, and whether the old one keeps working', c.subject === 'Your website’s address is changing to new.example' && /keeps working: from the next publish, visitors who use it are sent on to new\.example/.test(c.html) && /old\.example no longer shows your website/.test(c2.html));
   ok('removed: still online at its built-in address, linked', r.subject === 'bistro.example was removed from your website' && /by owner@bistro\.example/.test(r.html) && /href="https:\/\/presence-abc\.netlify\.app"/.test(r.html));
   ok('email gone: the old values to put back, and where', m.subject === 'Email for bistro.example may have stopped arriving' && /MX 10 mx1\.mail\.example/.test(m.html) && /MX 20 mx2\.mail\.example/.test(m.html) && /Add them back at Cloudflare/.test(m.html));
@@ -107,8 +107,13 @@ const quiet = async (fn) => { const e = console.error, x = console.warn, l = con
 const jsonOf = async (res) => ({ status: res.status, body: await res.json() });
 const SITE = (custom) => ({ id: 'site1', client_id: 'c1', status: 'live', last_published_at: '2026-10-01T00:00:00Z', template_slug: 'business-classic', template_version: '1.0.0', custom_domain: custom, netlify_site_id: 'nf1', edition: 'presence' });
 const req = (method, body) => new Request('http://stub.local/functions/v1/presence/foundations/domain', { method, body: body === undefined ? undefined : JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
-const OWNER = { kind: 'client', userId: 'u1', email: 'owner@bistro.example' };
-const STUDIO = { kind: 'client', userId: 'u2', email: 'eric@studio.example', scope: { site_id: 'site1', name: 'Bistro Nine' } };
+// builder item 191: removing a domain asks for a fresh code; these people signed in with their
+// authenticator app's code a moment ago, so it counts (lib/fresh_code.ts)
+const { freshDeps } = await import(`${P}/lib/fresh_code.ts`);
+freshDeps.user = async (jwt) => ({ id: jwt === 'jwt-studio' ? 'u2' : 'u1', email: 'owner@bistro.example', factors: [{ id: 'f1', factor_type: 'totp', status: 'verified' }] });
+freshDeps.claims = () => ({ aal: 'aal2', amr: [{ method: 'totp', timestamp: Math.floor(Date.now() / 1000) }] });
+const OWNER = { kind: 'client', userId: 'u1', email: 'owner@bistro.example', jwt: 'jwt-owner' };
+const STUDIO = { kind: 'client', userId: 'u2', email: 'eric@studio.example', jwt: 'jwt-studio', scope: { site_id: 'site1', name: 'Bistro Nine' } };
 
 // attach
 world();
@@ -191,7 +196,7 @@ world({ reserved: null });
   const at = (s) => pub.indexOf(s);
   ok('publishing puts the forwarding rules on top of _redirects, from the host’s own list, before the deploy', at('withForwarding(') > 0 && at('getSite(site.netlify_site_id)') > 0 && at('withForwarding(') < at('const dep = await deployFileMap('));
   const page = read('presence.html');
-  ok('the sheet asks for the domain typed back before removing it', /askText\("Remove " \+ dstat\.custom_domain/.test(page) && /api\("DELETE", "\/foundations\/domain", \{ confirm \}\)/.test(page));
+  ok('the sheet asks for the domain typed back before removing it', /askText\("Remove " \+ dstat\.custom_domain/.test(page) && /api\("DELETE", "\/foundations\/domain", \{ confirm(, \.\.\.extra)? \}\)/.test(page));
   ok('the sheet can change the domain, keeping the old one working by default', /function askDomainChange\(old\)/.test(page) && /cb\.checked = true/.test(page) && /keep_old: ans\.keepOld/.test(page));
   ok('the steps protect the email records, and the card shows recent changes', /Leave anything marked MX or Mail alone/.test(page) && /ch\.dataset\.changes = "domain"/.test(page));
   ok('the reserved name for the email picture is listed', /domainMail: '__domain_mail__'/.test(read('supabase/functions/presence/lib/reserved_store.ts')));

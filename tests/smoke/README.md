@@ -33,36 +33,27 @@ Exit code 0 = green. Non-zero = failures listed at the bottom of the output.
 | 1 | deploy sanity | `version` handshake | 200 + `data.build` | ✅ |
 | 2 | auth gate | unknown route type | 403 `unknown_route` (fail-closed) | ✅ |
 | 3 | auth gate | staff route (`admin_query`) w/o JWT | 401 | ✅ |
-| 4 | billing/notify | `invoice_reminder` unauthenticated | 401 (client-emailing types staff-gated) | ✅ |
-| 5 | billing/notify | `approval_needed` unauthenticated | 401 | ✅ |
-| 6 | billing | `invoice_paylink` unauthenticated | 401 (Stripe link creation gated) | ✅ |
-| 7 | CORS | allowlisted origin | ACAO echoes the origin | ✅ |
-| 8 | CORS | foreign origin | ACAO falls back to canonical, never echoes | ✅ |
-| 9 | public/journal | `contract_get` | 200 + published `version ≥ 1` | ✅ |
-| 10 | identity seam | `_resolver_probe` anonymous | 200 + `kind='public'` | ✅ |
-| 11 | Stripe HMAC | `stripe-webhook` unsigned POST | 400 `invalid signature` | ✅ |
-| 12 | deploy sanity | portal + admin pages | HTTP 200 | ✅ |
-| 13 | auth | test-client login (password grant) | token minted | 🔑 auth tier |
-| 14 | journal/project | `client_project` with client JWT | 200 + data | 🔑 |
-| 15 | client/approvals | `client_decisions` with client JWT | 200 + data | 🔑 |
-| 16 | Growth | `gp_workspace` resolves partnership | 200 + `data.partnership` | 🔑 |
-| 17 | messaging | RLS-scoped `messages` read as client | 200 + array (own rows) | 🔑 |
-| 18 | auth boundary | client JWT on staff route | 401 | 🔑 |
+| 4 | auth gate | the kinds builder item 213 removed (the old client-emailing notices, `invoice_paylink`, `client_purge`, `delete_client_cascade`, `contract_get`, `_resolver_probe`) | 403 `unknown_route`, like any unknown kind | ✅ |
+| 5 | CORS | allowlisted origin | ACAO echoes the origin | ✅ |
+| 6 | CORS | foreign origin | ACAO falls back to canonical, never echoes | ✅ |
+| 7 | Stripe HMAC | `stripe-webhook` unsigned POST | 400 `invalid signature` | ✅ |
+| 8 | deploy sanity | portal + admin pages | HTTP 200 | ✅ |
+| 9 | presence | `GET /site` and an unknown route w/o JWT | 401 | ✅ |
+| 10 | auth | test-client login (password grant) | token minted | 🔑 auth tier |
+| 11 | identity | `whoami` with the client JWT | 200 + `isTeam: false` | 🔑 |
+| 12 | messaging | RLS-scoped `messages` read as client | 200 + array (own rows) | 🔑 |
+| 13 | auth boundary | client JWT on staff route | 401 | 🔑 |
 
 🔑 = requires `SR_KEY` (service role). Local/staging-runner only — never in a
 CI secret for anything public-facing.
 
 ## Deliberately NOT smoked (manual / staging-only)
 
-- **Notify relay actual sends** (`client_message`, `bug`, …) — each run would
-  email Eric. Gating is smoked (#4-5); delivery is verified manually.
-- **AI routes** (`ai_project_help`, `ai_critique`, drafting/analysis) — real
-  token cost + latency per run. Staging-only, on demand.
-- **Mutating staff routes** (`admin_write`, invoice creation, client
-  provisioning) — covered by the tenant isolation suite's seeded-fixture
-  approach (`tests/isolation/`), not by smoke.
-- **Growth writes** (`gp_submit_request`, `gp_rec_respond`) — write real rows;
-  exercise on staging when touched.
+- **The two public forms and the help chat** (`lead_intake`, `survey_response`,
+  `concierge`) — each run would write a row, email Eric or spend AI tokens.
+- **The Growth page's writes and AI drafts** (`partnership_upsert`,
+  `rec_generate`, `review_draft`, …) — write real rows or spend tokens;
+  exercise them on a scratch database when touched (`tests/isolation/`).
 
 ## Test identity
 

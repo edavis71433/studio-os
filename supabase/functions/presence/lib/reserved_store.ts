@@ -21,9 +21,11 @@ export const RESERVED_NAMES = {
   navHidden: '__nav_hidden__',            // builder list item 54: the menu areas the studio hides (agency/routes.ts, routes/workspace.ts)
   monthlyReport: '__monthly_report__',    // builder list item 58: the client's monthly report email (on, the studio's line, last month sent) (ops/monthly_report.ts)
   siteNotify: '__site_notify__',          // builder list item 126: what the studio hears about each client site, and how (lib/site_notify.ts)
+  versionStars: '__version_stars__',      // builder list item 158: the versions starred in Versions (routes/publish.ts)
   followedSearches: '__followed_searches__',   // builder list item 181: the searches a client follows on Google, ten at most (lib/search_tools.ts)
   searchPhrases: '__search_phrases__',    // builder list item 160: the two or three phrases the business wants to be found for (lib/search_phrases.ts)
   aiQuestions: '__ai_questions__',        // builder list item 182: the questions a client's monthly AI check asks, ten at most (lib/ai_watch.ts)
+  rankGrid: '__rank_grid__',              // builder list item 185: the map rank grid: on or off, the business on Google, the searches, the grid, the month scanned (lib/rank_grid.ts)
   doNext: '__do_next__',                  // builder list item 184: what the studio marked Done or Not relevant on a client's Do next list (lib/do_next.ts)
   copiedFrom: '__copied_from__',          // builder list item 145: what Duplicate or a template copied onto a new site, until changed or kept (lib/site_layout.ts)
   domainNotes: '__domain_notes__',        // builder list item 162: the studio's notes on a client's domain (whose account, renews by itself, a note) (agency/sites.ts)
@@ -34,6 +36,9 @@ export const RESERVED_NAMES = {
   bookingOptions: '__booking_options__',  // builder list item 149: customers may change or cancel; the owner's own calendar's private address (lib/booking_links.ts)
   projectTemplates: '__project_templates__',   // sales item 106: the studio's own project templates (lib/project_templates.ts)
   todoLists: '__todo_lists__',            // sales item 106: the studio's saved lists of deal to-dos (lib/todo_templates.ts)
+  handoverPack: '__handover_pack__',     // sales item 93: when the hand-over pack email last went to the client, so a second press isn't a second email (routes/handover_pack.ts)
+  setupStrip: '__setup_strip__',          // sales item 105: whether the studio hid Home's setup strip (routes/setup_strip.ts)
+  salesGoalAi: '__sales_goal_ai__',       // sales item 94: the month's sales goal, and whether AI help is on (routes/sales_ai.ts)
   bookingBusy: '__booking_busy__',        // builder list item 149: the busy times last read from that calendar, and how the last read went (routes/booking.ts)
 } as const;
 
