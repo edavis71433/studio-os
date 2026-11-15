@@ -178,6 +178,8 @@ const say = (r, names) => { const w = C.describeEvent(r, { item: 'menu item', it
   ok('wiring: the site routes are read only, after the reviewer boundary', /route === '\/change-log' && method === 'GET'\) return handleChangeLog\(req, site, principal, cors\)/.test(idx) && /route === '\/change-log\/went-live' && method === 'GET'\) return handleWentLive\(req, site, cors\)/.test(idx) && idx.indexOf("route === '/change-log'") > idx.indexOf('reviewerAllowed(route, method)'));
   ok('wiring: a reviewer is never let in', !/change-log/.test(ws));
   ok('wiring: the studio route', /handleAgencyChangeLog\(req, route, method, member, cors, now\)/.test(ag));
+  // item 220: a Designer's list of routes leaves /change-log off, so the editor's link hides for them
+  ok('wiring: the editor’s link to Changes is for those who see the business', /id="activityChanges" href="\/changes\.html" data-needs="business"/.test(read('../../presence.html')));
 }
 
 const failed = results.filter((r) => !r.p).length;
