@@ -135,6 +135,18 @@ test.describe('Client portal while the website is being built (item 179)', () =>
     await expect(page.locator('#mpane')).not.toContainText('Pick a conversation');
   });
 
+  test('…the newest one still going, not a finished request', async ({ page }, info) => {
+    test.skip(info.project.name === 'mobile', 'a phone shows the list first');
+    const DONE = 'd0d0d0d0-0000-4000-8000-000000000001';
+    await start(page, { '/client/support': { data: [{ id: DONE, subject: 'Service request: Custom request', status: 'closed', created_at: '2026-11-11T10:00:00Z', updated_at: '2026-11-11T10:00:00Z', last_activity_at: '2026-11-11T10:00:00Z', last_message: { text: 'Please ignore and close.', from: 'you' } }] },
+      [`/client/support/${DONE}`]: { data: { request: { id: DONE, subject: 'Service request: Custom request', status: 'closed' }, messages: [] } } });
+    await page.goto('/client.html');
+    await page.locator('#tabnav [data-tab="messages"]').click();
+    await expect(page.locator('.mrow').first()).toContainText('Custom request');   // newest in the list…
+    await expect(page.locator('.mrow[aria-selected="true"]')).toContainText('Website build');   // …but the live one is open
+    await expect(page.locator('#mpane')).toContainText('Welcome aboard.');
+  });
+
   test('on a phone each Needs you row keeps its button on the right', async ({ page }, info) => {
     test.skip(info.project.name !== 'mobile', 'the phone’s layout');
     await start(page);
@@ -160,10 +172,41 @@ test.describe('Client portal while the website is being built (item 179)', () =>
     const held = new Promise<void>((r) => { release = r; });
     await page.route('**/functions/v1/presence/portal/context', async (route) => { await held; return route.fallback(); });
     await page.goto('about:blank'); await page.goto('/client.html');
-    await expect.poll(() => ['/client/notifications', '/client/website-stats', '/client/website-thumb', '/client/projects', '/portal/feed'].every((p) => seen.includes(p))).toBe(true);
+    // everything Home needs is out before the context answers: the project's details follow the list at once
+    await expect.poll(() => ['/client/notifications', '/client/website-stats', '/client/website-thumb', '/client/projects', '/portal/feed', '/client/billing', `/client/projects/${PID}`].every((p) => seen.includes(p))).toBe(true);
     release();
     await expect(card(page)).toBeVisible();
-    expect(seen.filter((p) => p === '/client/notifications').length).toBe(1);
-    expect(seen.filter((p) => p === '/client/website-stats').length).toBe(1);
+    await expect(page.locator('#needs-h')).toHaveText('Needs you · 2');
+    for (const p of ['/client/notifications', '/client/website-stats', '/client/billing', `/client/projects/${PID}`]) expect(seen.filter((x) => x === p).length, p).toBe(1);
+  });
+
+  test('a first visit: Home’s reads go out beside the notifications, not after them', async ({ page }) => {
+    await start(page);
+    const seen: string[] = [];
+    page.on('request', (r) => { const m = r.url().match(/\/functions\/v1\/presence(\/[^?]*)/); if (m) seen.push(m[1]); });
+    let release: () => void = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    await page.route('**/functions/v1/presence/client/notifications', async (route) => { await held; return route.fallback(); });
+    await page.goto('/client.html');
+    await expect.poll(() => ['/client/website-stats', '/client/website-thumb', '/client/billing', `/client/projects/${PID}`].every((p) => seen.includes(p))).toBe(true);
+    release();
+    await expect(card(page)).toBeVisible();
+    await expect(page.locator('#needs-h')).toHaveText('Needs you · 2');
+    expect(seen.filter((x) => x === `/client/projects/${PID}`).length).toBe(1);   // the card and Needs you share the one read
+  });
+
+  test('the card says Your website and its state on one line, as drawn', async ({ page }) => {
+    await start(page);
+    await page.goto('/client.html');
+    const top = (sel: string) => card(page).locator(sel).evaluate((e) => Math.round(e.getBoundingClientRect().top));
+    expect(Math.abs(await top('.tag') - await top('.pill-build'))).toBeLessThan(4);
+  });
+
+  test('the questionnaire says what the answers are for', async ({ page }) => {
+    await start(page, { '/client/surveys/sv1': { data: { survey: { title: 'Project questionnaire', questions: [{ key: 'goal', label: 'What does your business do?', type: 'text' }] }, my_response: null } } });
+    await page.goto('/client.html');
+    await page.locator('#needs-body .qrow', { hasText: 'questionnaire' }).getByRole('button', { name: /^Start/ }).click();
+    await expect(page.locator('#main h1')).toHaveText('Project questionnaire');
+    await expect(page.locator('#main .sheet .sub')).toHaveText('Your answers help Marlow & Co write your pages.');
   });
 });
