@@ -1815,6 +1815,7 @@ test.describe('Client portal — Documents shelf: files and documents (slice 12,
 
   test('zero projects: the send button is hidden entirely (uploads are project-scoped)', async ({ page }) => {
     await installApp(page, { api: { ...FILES_API, '/client/projects': { data: [] }, '/client/documents': { data: { documents: [] } }, '/client/billing': { data: { invoices: [] } } } });
+    await page.addInitScript(() => { try { localStorage.setItem('dds-portal-papers:e2e-owner', '1'); } catch { /* storage may be denied */ } });   // item 238: a client who has had a paper keeps the Documents door
     await page.goto('/client.html');
     await openFilesTab(page);
     await expect(page.locator('#fchoose')).toHaveCount(0);
