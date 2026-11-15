@@ -659,6 +659,7 @@
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN = SUPABASE_URL + "/functions/v1/presence";
+const FN_REGION = 'us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -686,7 +687,7 @@ let ctxIn = null;
 const CTX_IN = new Promise((r) => { ctxIn = r; });   // settles once the page has its context, or knows it has none
 let TOKEN = "";
 sb.auth.onAuthStateChange(function (_e, s) { if (s && s.access_token) TOKEN = s.access_token; });
-const H = () => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': SCOPE });
+const H = () => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': SCOPE, 'x-region': FN_REGION });
 // a dropped connection answers like a refusal (status 0) instead of throwing, so a
 // flipped switch flips back and says why (bug hunt C4/C6)
 const NET_MSG = 'That didn’t go through — check your connection and try again.';

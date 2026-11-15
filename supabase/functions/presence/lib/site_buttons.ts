@@ -12,7 +12,8 @@
 // whether it fills with the accent or the darker accent, is worked out from the site's actual
 // colours (the template's own, or the owner's palette over them), so every set reads at 4.5:1
 // on the page, on dark sections and on accent sections. tests/presence/button_sets_test.mjs
-// checks every template under every palette and look the editor offers.
+// checks every template under every palette and look the editor offers, and
+// accent_band_test.mjs every set on the accent sections.
 // This file imports nothing, so a browser spec can draw a page with it.
 type FileMap = Record<string, string | Uint8Array>;
 
@@ -44,8 +45,10 @@ export function mixHex(a: string, b: string, t: number): string {
 }
 const WHITE = '#ffffff', NEAR_BLACK = '#111111';
 
-/** The site's colours as its pages draw them. */
-export interface SiteColours { paper: string; ink: string; accent: string; accentDark: string; card: string; soft: string }
+/** The site's colours as its pages draw them. `band` is behind an accent section's white words
+ *  (BLOCK_CSS .block--bg-accent): the template's --accent-band where it names one, else the
+ *  darker accent. */
+export interface SiteColours { paper: string; ink: string; accent: string; accentDark: string; band: string; card: string; soft: string }
 
 /** Rules outside @media blocks, as {selectors, declarations}. */
 function screenRules(css: string): Array<{ sels: string[]; decl: string }> {
@@ -84,9 +87,10 @@ export function siteColours(css: string, tokens?: Record<string, string> | null)
   const paper = resolve(vars.paper, vars) || resolve(bodyBg, vars) || resolve(vars.bg, vars) || WHITE;
   const ink = resolve(vars.ink, vars) || (contrast(NEAR_BLACK, paper) >= contrast(WHITE, paper) ? '#1c2430' : '#eef1f5');
   const accent = resolve(vars.accent, vars) || ink;
+  const accentDark = resolve(vars['accent-dark'], vars) || accent;
   return {
-    paper, ink, accent,
-    accentDark: resolve(vars['accent-dark'], vars) || accent,
+    paper, ink, accent, accentDark,
+    band: resolve(vars['accent-band'], vars) || accentDark,
     card: resolve(vars.card, vars) || paper,
     soft: resolve(vars.soft, vars) || ink,
   };
