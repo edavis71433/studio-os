@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 import { capabilitiesOf, type SiteRole } from '../../supabase/functions/presence/lib/site_roles';
 
 // An invited member's pages offer only what their role can use (MC-3). The server has
@@ -37,6 +38,7 @@ async function expectControls(page: Page, p: Person, controls: Array<[string, Ne
   for (const [sel, need] of controls) {
     const c = page.locator(sel).first();
     await expect(c, `${sel} was drawn`).toBeAttached();
+    if (await c.evaluate((el) => !!el.closest('.dds-ph-more'))) await headerAction(page, sel);   // builder item 165: a header action waits behind ⋯ on a phone
     if (p.lacks.includes(need)) await expect(c, `${sel} is gone for ${p.who}`).toBeHidden();
     else await expect(c, `${sel} is there for ${p.who}`).toBeVisible();
   }
@@ -75,7 +77,7 @@ test.describe('what a role lacks', () => {
     await installApp(page, { api: CONTACTS_API });
     await page.route('**/functions/v1/presence/portal/context', (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{}' }));
     await page.goto('/contacts.html');
-    await expect(page.locator('#manageFields')).toBeVisible();
+    await expect(await headerAction(page, '#manageFields')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-dds-lacks'))).toBeNull();
   });
 
@@ -83,7 +85,7 @@ test.describe('what a role lacks', () => {
     const { capabilities: _gone, ...rest } = contextOf('business_staff').data;
     await installApp(page, { api: { ...CONTACTS_API, '/portal/context': { data: rest } } });
     await page.goto('/contacts.html');
-    await expect(page.locator('#manageFields')).toBeVisible();
+    await expect(await headerAction(page, '#manageFields')).toBeVisible();
     await page.waitForFunction(() => (window as unknown as { __ddsContext?: unknown }).__ddsContext);
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-dds-lacks'))).toBeNull();
   });
@@ -97,7 +99,7 @@ test.describe('what a role lacks', () => {
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(STAFF.ctx) });
     });
     await page.goto('/contacts.html');
-    await expect(page.locator('#manageFields')).toBeVisible();   // no role yet: an owner must never see a gap here
+    await expect(await headerAction(page, '#manageFields')).toBeVisible();   // no role yet: an owner must never see a gap here
     release();
     await expect(page.locator('#manageFields')).toBeHidden();
   });

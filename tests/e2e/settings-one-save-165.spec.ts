@@ -196,7 +196,7 @@ test.describe('Developer tools, Get started and the Health Center, in plain word
     await page.goto('/developer.html');
     await expect(page.getByRole('heading', { level: 1, name: 'Developer tools' })).toBeVisible();
     await expect(page).toHaveTitle('Developer tools — Studio OS');
-    await expect(page.locator('header .sub')).toHaveText('Your site’s colors and type, your own styles and a block of your own HTML. These are for you, not your clients. Changes save as you go.');
+    await expect(page.locator('header.dds-ph .dds-ph-line')).toHaveText('Your site’s colors and type, your own styles and a block of your own HTML. These are for you, not your clients. Changes save as you go.');
     await expect(page.locator('#main')).not.toContainText('Developer Mode');
     await expect(page.locator('#main')).not.toContainText('@');                  // the empty template read "@"
     await expect(page.getByRole('button', { name: /^Save/ })).toHaveCount(0);

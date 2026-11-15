@@ -82,8 +82,10 @@ ok('Inbox: the phone pane also leaves room for the home-bar inset', !!phoneStack
 ok('Inbox: the split view is also sized to the screen Safari shows (an iPad held sideways hid Send under its toolbar)', /\.console\{display:flex;align-items:stretch;height:calc\(100vh - var\(--dds-shell-h,54px\)\);height:calc\(100dvh - var\(--dds-shell-h,54px\)\)/.test(inbox));
 const wrap = block(inbox, '(max-width:1279px)');
 ok('Inbox: below a wide laptop the pane header and the reply row wrap instead of squeezing', !!wrap && /\.phead\{flex-wrap:wrap/.test(wrap) && /\.crow\{flex-wrap:wrap/.test(wrap) && /\.crow>\.muted\{flex:1 0 100%\}/.test(wrap));
-ok('Inbox: where the list column is 21rem, "Send an update" steps aside (it stays under ⋯)',
-  /@media \(min-width:1024px\) and \(max-width:1100px\)\{a\.lsend\{display:none\}\}/.test(inbox) && /id="ovfSend"/.test(inbox));
+// builder item 165: "Send an update" left the 21rem list column for the one page header above the
+// split view — in its row on a computer, behind its ⋯ on a phone — so it no longer needs to step aside
+ok('Inbox: "Send an update" is one of the page header\'s other actions (behind ⋯ on a phone)',
+  /<div class="dds-ph-more" id="phMore" popover><a class="lsend" id="sendUpdate"/.test(inbox) && !/id="ovfSend"/.test(inbox));
 
 // ═══ crm.html: the record header ═══
 ok('record: no separator between the status chip and the email (it dangled at a line end on phones)',

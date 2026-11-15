@@ -29,11 +29,11 @@ const API = {
   '/settings': { data: { stage_stale_days: {} } },
 };
 const phone = (page: Page) => (page.viewportSize()?.width || 0) <= 600;
-// Charts and Print are toolbar buttons, or items in More on a phone
+// Charts and Print are buttons in the page header; on a phone they wait behind its ⋯ (builder item 165)
 async function tool(page: Page, which: 'charts' | 'print') {
-  if (!phone(page)) { await page.locator(which === 'charts' ? '#chartsBtn' : '#printBtn').click(); return; }
-  await page.locator('#moreBtn').click();
-  await page.locator(`#moreMenu [data-more="${which}"]`).click();
+  if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();
+  await page.locator(which === 'charts' ? '#chartsBtn' : '#printBtn').click();
+  if (await page.locator('#phMore').isVisible() && await page.locator('.dds-ph-dots').isVisible()) await page.keyboard.press('Escape');   // the sheet puts itself away
 }
 const rowsOf = (page: Page, panel: number) => page.locator('#charts .dc-panel').nth(panel).locator('.dc-row');
 // window.print is a dialog the test can't press, so it notes what would print instead
@@ -63,7 +63,7 @@ test.describe('Pipeline: charts on the list (item 105)', () => {
     await expect(page.locator('#charts')).toBeHidden();
     await tool(page, 'charts');
     await expect(page.locator('#charts')).toBeVisible();
-    if (!phone(page)) await expect(page.locator('#chartsBtn')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#chartsBtn')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#charts h3')).toHaveText(['Open deals by stage', 'Where they came from']);
     // label · count · value, in stage order; won deals aren't on the board, so they aren't counted
     await expect(rowsOf(page, 0)).toHaveText([/^New lead\s*3 deals\s*\$6,500$/, /^Qualified\s*1 deal\s*\$3,200$/, /^Proposal sent\s*2 deals\s*\$6,050$/, /^Agreement out\s*1 deal\s*\$1,400$/]);
@@ -205,9 +205,11 @@ test.describe('Pipeline inside a client (item 105)', () => {
     await page.goto('/pipeline.html?client=site-acme');
     await expect(page.locator('#chartsBtn')).toBeHidden();
     await expect(page.locator('#printBtn')).toBeHidden();
-    if (phone(page)) {
-      await page.locator('#moreBtn').click();
-      await expect(page.locator('#moreMenu [data-more="charts"]')).toHaveCount(0);
+    if (await page.locator('.dds-ph-dots').isVisible()) {
+      await page.locator('.dds-ph-dots').click();   // builder item 165: the header's ⋯ sheet holds neither
+      await expect(page.locator('#phMore')).toBeVisible();
+      await expect(page.locator('#chartsBtn')).toBeHidden();
+      await expect(page.locator('#printBtn')).toBeHidden();
     }
   });
 });

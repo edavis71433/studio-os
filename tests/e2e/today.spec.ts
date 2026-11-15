@@ -169,12 +169,13 @@ const PROJECTS_API = {
 };
 
 test.describe('Today — Lightning Home (slice 10)', () => {
-  test('greeting header: time-of-day headline + date and needs count in the sub line', async ({ page }) => {
+  test('greeting header: the title Today, then the greeting, the date and the needs count in its line', async ({ page }) => {
     await installApp(page);
     await page.goto('/today.html');
-    await expect(page.locator('#greeting')).toHaveText(/^Good (morning|afternoon|evening)\.$/);
-    // "Friday, July 18 · 2 things need you" — the date leads, the count follows
-    await expect(page.locator('#sub')).toContainText(/^[A-Z][a-z]+, [A-Z][a-z]+ \d{1,2} · /);
+    // builder item 165: the title is always the page's name; the time-of-day greeting leads the line under it
+    await expect(page.locator('#greeting')).toHaveText('Today');
+    // "Good morning. Friday, July 18 · 2 things need you." — the greeting, the date, then the count
+    await expect(page.locator('#sub')).toContainText(/^Good (morning|afternoon|evening)\. [A-Z][a-z]+, [A-Z][a-z]+ \d{1,2} · /);
     await expect(page.locator('#sub')).toContainText('2 things need you');
   });
 
