@@ -9,7 +9,7 @@
 <style>
   /* the page skin = the shell's --dds-* tokens, aliased the way usage.html does */
   :root{
-    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);--raised:var(--dds-raised,#f7f6fb);
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);--raised:var(--dds-bg,#f7f6fb);
     --p:var(--dds-p,#5b3fa0);--p-soft:var(--dds-p-soft,#efeafa);
     --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);--bad-soft:var(--dds-bad-soft,#fdeaea);
     --info:var(--dds-info,#245fa0);--info-soft:var(--dds-info-soft,#e6effa);
@@ -108,7 +108,7 @@
   .ch>.av{grid-area:av}.ch>.say{grid-area:say}.ch>.chip{grid-area:chip}.ch>.go{grid-area:go}
   .ch.live{background:var(--p-soft)}
   .av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff;background:linear-gradient(135deg,#6d3fd4,#a63f86);flex:0 0 auto}
-  .av.owner{background:#127369}.av.seat{background:#a85c0d}.av.support{background:#245fa0}.av.unknown{background:#69667d}
+  .av.owner{background:#127369}.av.seat{background:#8a4c08}.av.support{background:#245fa0}.av.unknown{background:#69667d}
   .av.mark{background:var(--raised);color:var(--soft)}.av.mark.people{background:var(--info-soft);color:var(--info)}.av.mark.settings{background:var(--warn-soft);color:var(--warn)}
   .av svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
   .say{min-width:0}
@@ -265,7 +265,7 @@ function feedHtml(){
 function studioBand(w){
   const days=w.days||[],max=Math.max(1,...days.map(d=>d.studio+d.client+d.auto));
   const peak=days.reduce((a,d)=>(d.studio+d.client+d.auto)>(a?a.studio+a.client+a.auto:0)?d:a,null);
-  const label=(ymd)=>new Date(ymd+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',day:'numeric'});
+  const label=(ymd)=>{const d=new Date(ymd+'T12:00:00');return d.toLocaleDateString('en-US',{weekday:'short'})+' '+d.getDate();};
   const first=days[0]?new Date(days[0].day+'T12:00:00'):null,lastD=days.length?new Date(days[days.length-1].day+'T12:00:00'):null;
   const range=first&&lastD?`${first.toLocaleDateString('en-US',{month:'short',day:'numeric'})} to ${first.getMonth()===lastD.getMonth()?lastD.getDate():lastD.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`:'';
   const bars=days.map(d=>{const t=d.studio+d.client+d.auto,pct=(n)=>Math.round(n/max*100);
