@@ -287,7 +287,7 @@ const post = (body) => new Request('http://x/visibility/maps/scan', { method: 'P
   ok('get: each search’s newest scan in full, with the change since the one before', latest && latest.ranks.length === 49 && latest.change.top3 === latest.top3 - 6 && g.latest['emergency plumber'].change === null);
   ok('get: the studio’s view has the rivals, the spots’ ids, the centre and the cost', latest.rivals.length === 3 && latest.tops.length === 49 && latest.center && latest.center.lat === CENTER.lat && latest.cost_words === 'half a cent');
   eq('get: today’s Scan now count, and the history newest first', [g.today, g.history.length, g.history[0].phrase], [{ used: 3, cap: 3 }, 3, 'emergency plumber']);
-  eq('get: the month not handled yet reads as due, for the card’s “within 15 minutes”', g.due, true);
+  eq('get: the month not handled yet reads as due, for the card’s “due now”', g.due, true);
   grid = { body: JSON.stringify({ ...G.normalizeGridSetting(JSON.parse(grid.body)), month: new Date().toISOString().slice(0, 7) }), updated_at: 'th' };
   eq('get: once this month is handled it isn’t due', (await call(R.handleMapsGet, site, studio, {})).body.data.due, false);
   const client = (await call(R.handleMapsGet, site, owner, {})).body.data;

@@ -248,11 +248,11 @@ test.describe('The map rank grid (builder list item 185)', () => {
     await expect(dlg.locator('.rg-costbox')).toContainText('2 searches a month: 7½ cents.');
   });
 
-  test('just switched on: the first scan runs within 15 minutes, not on the 1st', async ({ page }) => {
+  test('just switched on: the first scan is due now, not on the 1st', async ({ page }) => {
     await openGrid(page, STUDIO({ due: true, latest: {}, history: [] })); await closeTip(page);
     const card = page.locator('#rgCard');
-    await expect(card.locator('#rgMeta')).toHaveText('next scan within 15 minutes · every month');
-    await expect(card.locator('.rg-empty')).toHaveText('No scan of “plumber” yet. The first scan runs within 15 minutes, then on the 1st of each month.');
+    await expect(card.locator('#rgMeta')).toHaveText('next scan due now · every month');
+    await expect(card.locator('.rg-empty')).toHaveText('No scan of “plumber” yet. The first scan is due now and usually runs within 15 minutes, then on the 1st of each month.');
   });
 
   test('the client sees nothing while it is off', async ({ page }) => {

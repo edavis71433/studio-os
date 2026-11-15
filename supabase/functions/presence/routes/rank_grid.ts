@@ -140,7 +140,7 @@ export async function handleMapsGet(site: SiteRow, principal: Principal, cors: R
   }
   const data: Record<string, unknown> = {
     ready, studio, enabled: s.enabled, phrases, size: s.size, spacing: s.spacing, next: nextScanDay(nowIso),
-    due: gridDueNow(s, nowIso),   // this month's scan is still to run: the next tick does it, within 15 minutes
+    due: gridDueNow(s, nowIso),   // this month's scan is still to run: a tick does it, usually the next one (one client a tick; none while Google’s daily allowance is used up)
     latest, history: hist.slice(0, 24).map((h) => histView(h, studio)),
   };
   if (studio) {
