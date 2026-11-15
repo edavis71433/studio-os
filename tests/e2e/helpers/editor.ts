@@ -3,7 +3,7 @@
 // adds a test touches one small file, not the 2,300-line one every other did.
 // Moved out of g13-editor.spec.ts as it stood; nothing here changed but `export`.
 import { test, expect, Page, Route } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar, settled } from './app';
 
 
 // ── G13 slice 2 — the in-place canvas TEXT editor (docs/design/G13-INPLACE-
@@ -64,6 +64,8 @@ export const API = {
   '/dev/customization': { data: { theme_tokens: {}, custom_css: '', custom_html: '', allowed_tokens: [], can_edit_css: false, updated_at: null, updated_by: null } },
   '/schedule': { data: { scheduled: [] } },
   '/content-library': { data: [] },
+  // deleting a page saves a restore point first (presence.html), answered as routes/publish.ts does
+  'POST /publishes/checkpoints': { data: { id: 'cp-1', name: 'Before deleting', at: '2026-07-07T00:00:00Z', blockers: 0, warnings: 0, message: 'Checkpoint saved — you can look at it or return to it anytime.' } },
   '/portal/context': { data: {
     site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',
     edition_features: ALL_FEATURES, is_agency: false, is_operator: false, sees_full_workspace: true,
@@ -272,7 +274,7 @@ export async function hideOut(page: Page, frame: Frame) {
 export async function editAndWaitOut(page: Page, frame: Frame, text: string) {
   await typeOver(page, aboutField(frame), text);
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(1500);                               // past the edit's 1.2s debounce
+  await settled(page, { requests: false });                      // the edit's 1.2s debounce has fired (its save may be held)
 }
 // A form's save on its way, with the panel shut again so the page is free to use.
 export async function formSaveOut(page: Page, frame: Frame) {
@@ -362,10 +364,10 @@ export const editHome = async (page: Page, frame: Frame, text: string) => {
   await typeOver(page, homeLine(frame), text);
   await page.keyboard.press('Enter');
 };
-// Typing into a Business details field, then waiting past its 0.7s debounce.
+// Typing into a Business details field, then waiting until its 0.7s debounce has fired (its save may be held).
 export const typeDetail = async (page: Page, id: string, text: string) => {
   await page.locator(id).fill(text);
-  await page.waitForTimeout(1000);
+  await settled(page, { requests: false });
 };
 export const openBusiness = (page: Page) => page.evaluate(() => (window as unknown as { go: (v: string) => void }).go('business'));
 export const duplicate = (page: Page) => page.evaluate(() => (window as unknown as { dcDuplicate: (bi: number) => void }).dcDuplicate(0));

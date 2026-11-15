@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
 import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave, openPages, addBlankPage } from './helpers/editor';
+import { settled } from './helpers/app';
 
 // ── G13 in-place canvas text editor — changing page with an edit open or on its way ──
 // Split from g13-editor.spec.ts (builder list item 109, Nov 2026): the fixtures and
@@ -18,7 +19,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     release();
     await expect(onPill(page)).toHaveText('About');
     await expect(frame.locator('#about-us')).toBeAttached();
-    await page.waitForTimeout(1800);                               // past the 1.2s debounce
+    await settled(page);   // the 1.2s debounce, if anything set it, has fired
     expect(puts.length).toBe(1);                                   // and nothing else was written
   });
 
@@ -34,7 +35,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     expect(saved.pages?.[0].blocks[0].subtitle).toBe('About, edited');
     await expect(onPill(page)).toHaveText('Home');
     await expect(frame.locator('#our-story')).toBeAttached();
-    await page.waitForTimeout(1800);
+    await settled(page);
     expect(puts.length).toBe(1);
   });
 
@@ -49,7 +50,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     await expect(onPill(page)).toHaveText('Home');                     // its write isn't in the saved draft yet
     release();
     await expect(onPill(page)).toHaveText('About');
-    await page.waitForTimeout(1800);
+    await settled(page);
     expect(puts.length).toBe(1);
   });
 
@@ -104,7 +105,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     await openPages(page); await pill(page, 'Home').locator('.pp-name').click();          // back to where they are, before the save lands
     release();
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
-    await page.waitForTimeout(600);                                // past the repaint a switch would ask for
+    await settled(page);   // any repaint a switch would ask for is done
     await expect(onPill(page)).toHaveText('Home');
     await expect(frame.locator('#about-us')).toHaveCount(0);
     expect((puts[0] as Paged).blocks?.[0].subtitle).toBe('Changed my mind');
@@ -160,7 +161,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     await canvasReplaced(frame);
     await expect.poll(() => canvasScrollY(frame)).toBeGreaterThan(before - 50);
-    await page.waitForTimeout(800);                                // a second repaint would show here
+    await settled(page);   // a second repaint would show here
     await expect.poll(() => canvasScrollY(frame)).toBeGreaterThan(before - 50);   // once it settles, as below
   });
 
@@ -183,7 +184,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     const before = await canvasScrollY(frame);
     expect(before).toBeGreaterThan(1000);
     releaseRead();
-    await page.waitForTimeout(500);
+    await settled(page);
     await expect(frame.locator('body[data-e2e-old]')).toHaveCount(1);   // held
     await page.keyboard.press('Escape');
     await canvasReplaced(frame);
@@ -197,7 +198,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(frame.locator('#about-us')).toBeAttached();
     await expect(frame.locator('#dds-dc-bar')).toBeAttached();
-    await page.waitForTimeout(600);                                // a restored scroll lands at load
+    await settled(page);   // a restored scroll lands at load
     expect(await canvasScrollY(frame)).toBe(0);
     expect((puts[0] as Paged).blocks?.[0].subtitle).toBe('Far down, then away');
   });
