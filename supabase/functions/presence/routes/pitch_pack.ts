@@ -34,6 +34,7 @@ import { rateAllow } from '../lib/ratelimit.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { tableMissing } from './estimates.ts';
 import { studioBrandOf } from './studio_brand.ts';
+import { PAGE_WEIGHT_LIMIT_KB, TYPICAL_PAGE_KB } from '../lib/page_weight.ts';
 import { townOf } from '../lib/town.ts';
 import { packNotes } from '../lib/pitch_notes.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -64,14 +65,25 @@ function packScore(row: any) {
     top_issues: items.slice(0, 3).map((f: any) => clean(f.title, 120)).filter(Boolean),
     report_id: row.id ? String(row.id) : null,
     checked_at: String(row.created_at || ''),
+    ...phoneSpeedOf(row.psi ?? row.raw_results?.psi),
   };
+}
+
+/** Builder list item 211: how long the homepage's main content took to show on a phone, in
+ *  Google's own check (the Site Review's PageSpeed run, Largest Contentful Paint), and how
+ *  Google rates it. Nothing when the check couldn't run. Pure. */
+export function phoneSpeedOf(psi: any): { phone_lcp_ms?: number; phone_lcp_status?: 'good' | 'needs_work' | 'poor' } {
+  const v = psi && psi.ok !== false && Array.isArray(psi.vitals) ? psi.vitals.find((x: any) => x?.key === 'lcp') : null;
+  const ms = Number(v?.value);
+  if (!v || !Number.isFinite(ms) || ms <= 0) return {};
+  return { phone_lcp_ms: Math.round(ms), ...(['good', 'needs_work', 'poor'].includes(v.status) ? { phone_lcp_status: v.status } : {}) };
 }
 const fresh = (row: any) => !!row && (now() - Date.parse(String(row.created_at || 0))) < FRESH_DAYS * 86_400_000;
 
 async function latestFresh(tool: 'site_review' | 'ai_visibility', domain: string) {
   const filter = reportUrlFilter(domain);
   if (!filter) return null;
-  const got = await select(`tool_reports?tool=eq.${tool}&${filter}&select=id,input,scores,findings,created_at&order=created_at.desc&limit=1`).catch(() => null);
+  const got = await select(`tool_reports?tool=eq.${tool}&${filter}&select=id,input,scores,findings,created_at${tool === 'site_review' ? ',psi:raw_results->psi' : ''}&order=created_at.desc&limit=1`).catch(() => null);   // item 211: the phone speed
   const row = got && got[0];
   return fresh(row) ? row : null;
 }
@@ -265,5 +277,6 @@ export async function handlePackPublic(tokenRaw: string, cors: Record<string, st
     built_at: pack.built_at,
     brand: brand ? { name: brand.name, logo_url: brand.logo_url, accent: brand.accent } : null,
     report_base: TOOLS_BASE_URL,
+    ours: { typical_kb: TYPICAL_PAGE_KB, limit_kb: PAGE_WEIGHT_LIMIT_KB },   // builder list item 211: what a page we build weighs (a test keeps it true)
   } }, 200, cors);
 }
