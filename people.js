@@ -15,14 +15,23 @@
   var day = function (iso) { if (!iso) return ''; var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }); };
   var initials = function (s) { var w = String(s || '?').replace(/@.*$/, '').split(/[\s._-]+/).filter(Boolean); return ((w[0] || '?').charAt(0) + (w[1] ? w[1].charAt(0) : '')).toUpperCase(); };
   var first = function (s) { var n = String(s || '').trim(); return /@/.test(n) ? n : (n.split(/\s+/)[0] || n); };
-  var CAPS = ['Edit pages', 'Publish', 'Settings', 'Delete', 'Invite people'];
-  // what each role can do, in the server's words (lib/site_roles.ts): Settings is configure
+  // Builder item 220: each role leads with one sentence of what it sees and never sees, in the
+  // server's words (lib/site_roles.ts SEAT_WORDS, kept the same by tests/presence/designer_role_test.mjs),
+  // and the chips are what shows on their screens. A Designer is the website alone.
+  var SEES = ['Website', 'Photos', 'Customers', 'Messages', 'Invoices'];
   var ROLES = [
-    { key: 'business_owner', name: 'Co-owner', desc: 'Everything the owner can do, except hand the site to someone else.', can: [1, 1, 1, 1, 1] },
-    { key: 'business_staff', name: 'Staff', desc: 'Edits pages, publishes, answers enquiries and bookings.', can: [1, 1, 0, 0, 0] },
-    { key: 'developer', name: 'Developer', desc: 'What staff can do, plus settings and the code tools.', can: [1, 1, 1, 0, 0] },
-    { key: 'client_reviewer', name: 'Reviewer', desc: 'Sees only what you share with them, approves and leaves notes.', can: [0, 0, 0, 0, 0], also: 'Approve' },
+    { key: 'business_owner', name: 'Co-owner', desc: 'Sees everything the owner sees, customers, messages and money included, and can do anything except hand the site over.', sees: [1, 1, 1, 1, 1] },
+    { key: 'business_staff', name: 'Staff', desc: 'Sees the website, customers, messages and invoices, but can’t delete anything or change settings.', sees: [1, 1, 1, 1, 1] },
+    { key: 'designer', name: 'Designer', desc: 'Sees only the website, its pages, styles and photos, and never customers, contacts, deals, invoices or messages.', sees: [1, 1, 0, 0, 0] },
+    { key: 'developer', name: 'Developer', desc: 'Sees what Staff sees plus settings and the code tools, but can’t delete anything.', sees: [1, 1, 1, 1, 1] },
+    { key: 'client_reviewer', name: 'Reviewer', desc: 'Sees only what you share with them, to approve and leave notes, and nothing else.', sees: [0, 0, 0, 0, 0], also: 'What you share' },
   ];
+  var NEW_UNTIL = '2027-01-15';   // the Designer card says New until then
+  var roleOf = function (k) { return ROLES.filter(function (x) { return x.key === k; })[0] || null; };
+  // "the owner" in the server's words, said as the person (or "you"); a seat's line leads with its role
+  var personal = function (desc, owner) { return owner ? desc.replace('everything the owner sees', 'everything ' + owner + (owner === 'you' ? ' see' : ' sees')) : desc; };
+  var roleLine = function (k, owner) { var r = roleOf(k); if (!r) return ''; var d = personal(r.desc, owner); return (k === 'business_staff' ? 'Staff' : 'A ' + r.name) + ' ' + d.charAt(0).toLowerCase() + d.slice(1); };
+  var seesChips = function (r) { return '<span class="pp-can">' + (r.also ? '<span class="y">✓ ' + esc(r.also) + '</span>' : '') + SEES.map(function (c, i) { return '<span class="' + (r.sees[i] ? 'y' : '') + '">' + (r.sees[i] ? '✓ ' : '✕ ') + esc(c) + '</span>'; }).join('') + '</span>'; };
   var roleName = function (k) { var r = ROLES.filter(function (x) { return x.key === k; })[0]; return r ? r.name : k; };
   // lib/workspace.ts DEVELOPER_PAUSED, mirrored (site_people_transfer_test keeps the two equal).
   // Off since Nov 15 2026, so Developer is offered again. While it is on, Developer is never
@@ -69,11 +78,21 @@
       '.pp-field{width:100%;box-sizing:border-box;font:inherit;font-size:15px;padding:11px 14px;border:1.5px solid var(--dds-line,#e7e6ef);border-radius:12px;background:var(--dds-card,#fff);color:var(--dds-ink,#171522)}.pp-field:focus{outline:none;border-color:var(--dds-p,#6d3fd4);box-shadow:0 0 0 3px var(--dds-p-soft,#efeafa)}',
       '.pp-roles{display:flex;flex-direction:column;gap:8px;border:none;padding:0;margin:0}.pp-roles legend{padding:0;margin-bottom:6px}',
       '.pp-role{display:flex;flex-direction:column;gap:8px;border:1px solid var(--dds-line,#e7e6ef);border-radius:14px;padding:12px 14px;cursor:pointer;position:relative}',
-      '.pp-role:has(input:checked){border:2px solid var(--dds-p,#6d3fd4);background:var(--dds-p-soft,#efeafa);padding:11px 13px}',
+      '.pp-role:has(input[type=radio]:checked){border:2px solid var(--dds-p,#6d3fd4);background:var(--dds-p-soft,#efeafa);padding:11px 13px}',
       '.pp-role:focus-within{outline:2px solid var(--dds-p,#6d3fd4);outline-offset:2px}',
-      '.pp-role .top{display:flex;align-items:flex-start;gap:10px}.pp-role input{width:18px;height:18px;margin:1px 0 0;accent-color:var(--dds-p,#6d3fd4);flex:0 0 auto}',
+      '.pp-role .top{display:flex;align-items:flex-start;gap:10px}.pp-role input[type=radio]{width:18px;height:18px;margin:1px 0 0;accent-color:var(--dds-p,#6d3fd4);flex:0 0 auto}',
       '.pp-role .nm{font-weight:600;font-size:14.5px;flex:0 0 auto}.pp-role .ds{color:var(--dds-soft,#55526a);font-size:13px}',
       '.pp-can{display:flex;flex-wrap:wrap;gap:6px;padding-left:28px}.pp-can span{font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 8px;background:var(--dds-bg,#f4f3f9);color:var(--dds-faint,#69667d)}.pp-can span.y{background:var(--dds-good-soft,#e6f5ec);color:var(--dds-good,#11744a)}',
+      // builder item 220: the sentence leads; a Designer's card carries the publish switch; each seat says its role
+      '.pp-role .pick{display:flex;flex-direction:column;gap:8px;cursor:pointer}.pp-role .words{display:flex;flex-direction:column;gap:3px;min-width:0}',
+      '.pp-role .ds{font-size:13.5px;line-height:1.45}.pp-role:has(input[type=radio]:checked) .ds{color:var(--dds-ink,#171522)}',
+      '.pp-new{display:inline-block;margin-left:8px;font-size:11px;font-weight:600;border-radius:999px;padding:1px 8px;background:#fff1d6;color:#7a4f0d;vertical-align:1px}',
+      '.pp-pub{display:flex;align-items:center;gap:12px;background:var(--dds-card,#fff);border:1px solid #d9d0f3;border-radius:12px;padding:10px 12px;cursor:pointer;min-height:44px;box-sizing:border-box}.pp-pub .t{flex:1;min-width:0}.pp-pub b{display:block;font-size:13.5px}.pp-pub .w{display:block;font-size:12.5px;color:var(--dds-soft,#55526a)}',
+      '.pp-row-pub{margin:0 0 6px 44px}.pp-row-pub .pp-pub{background:var(--dds-bg,#f4f3f9);border-color:transparent}',
+      '.pp-switch{appearance:none;-webkit-appearance:none;flex:0 0 auto;width:36px;height:20px;border-radius:999px;background:#c9c6d6;position:relative;margin:0;cursor:pointer;transition:background .15s}',
+      '.pp-switch::before{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}',
+      '.pp-switch:checked{background:var(--dds-p,#6d3fd4)}.pp-switch:checked::before{transform:translateX(16px)}.pp-switch:focus-visible{outline:2px solid var(--dds-p,#6d3fd4);outline-offset:2px}.pp-switch:disabled{opacity:.55}',
+      '.pp-sent{margin:-4px 0 6px 44px;font-size:12.5px;line-height:1.45;color:var(--dds-soft,#55526a)}',
       '.pp-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}.pp-step{background:var(--dds-bg,#f4f3f9);border-radius:14px;padding:12px;font-size:12px;color:var(--dds-soft,#55526a)}.pp-step b{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--dds-ink,#171522);margin-bottom:4px}',
       '.pp-step .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--dds-card,#fff);font-size:11px}.pp-step.now{background:var(--dds-p-soft,#efeafa);outline:1px solid var(--dds-p,#6d3fd4)}.pp-step.now .n{background:var(--dds-p,#6d3fd4);color:#fff}',
       '.pp-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer}.pp-check input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--dds-p,#6d3fd4);flex:0 0 auto}',
@@ -123,6 +142,16 @@
     return '<div class="pp-head"><div class="tt"><h2 id="pp-title" tabindex="-1">' + esc(t) + '</h2>' + (s ? '<div class="sub">' + esc(s) + '</div>' : '') + '</div>' + (this.o.dialog ? '<button type="button" class="pp-x" data-pp="close" aria-label="Close">✕</button>' : '') + '</div>';
   };
   Sheet.prototype.side = function () { return (this.d && this.d.can_transfer) || null; };
+  // builder item 220: the owner as a person ("you", a first name, or "the owner"), and who puts a Designer's work live
+  Sheet.prototype.ownerWho = function () { var ow = this.d && this.d.owner; return ow ? (ow.me ? 'you' : first(ow.name || ow.email)) : 'the owner'; };
+  Sheet.prototype.pubWords = function (on) {
+    var st = this.d && this.d.studio, mine = !!(st && st.people.some(function (p) { return p.me; })) || this.side() === 'studio';
+    var who = this.ownerWho() + (st ? ' or ' + (mine ? 'your studio' : st.name) : '');
+    return on ? 'On: their changes go live when they press Publish.' : 'Off: their changes wait in the draft until ' + who + (who === 'you' ? ' publish.' : ' publishes.');
+  };
+  Sheet.prototype.pubHtml = function (on, attrs) {
+    return '<label class="pp-pub"><span class="t"><b>Can publish to the live site</b><span class="w">' + esc(this.pubWords(on)) + '</span></span><input type="checkbox" class="pp-switch" role="switch" ' + attrs + (on ? ' checked' : '') + '></label>';
+  };
   Sheet.prototype.ownerLine = function () {
     var d = this.d, ow = d.owner;
     if (!ow) return 'Nobody owns this site yet.';
@@ -135,13 +164,14 @@
     var studioView = me.side() === 'studio' || !!(st && st.people.some(function (p) { return p.me; }));
     var live = seats.filter(function (m) { return m.status !== 'revoked'; }), gone = seats.filter(function (m) { return m.status === 'revoked'; });
     var h = '<div class="pp" aria-labelledby="pp-title">' + me.headHtml();
-    var note = me.ownerLine() + (st ? (studioView ? ' Your studio works on it as ' + st.role + '.' : ' ' + st.name + ' works on it as ' + st.role + '.') : '') + (ow ? ' People on ' + (ow.me ? 'your' : first(ow.name) + '’s') + ' side each get their own sign-in, with a role.' : '');
+    var note = me.ownerLine() + (st ? (studioView ? ' Your studio works on it as ' + st.role + '.' : ' ' + st.name + ' works on it as ' + st.role + '.') : '') + ' Each person below sees only what their role says.';
     h += '<div class="pp-note">' + esc(note) + '</div>';
     h += '<div class="pp-lab">Owner</div>';
     if (ow) {
       var sub = ow.email + (ow.signed_in === false ? ' · Hasn’t signed in yet' : '');
       var canStart = !!me.side() && d.transfer_ready && !d.transfer;
       h += '<div class="pp-row" data-owner><span class="pp-av" style="background:var(--dds-p-soft,#efeafa);color:var(--dds-p,#6d3fd4)" aria-hidden="true">' + esc(initials(ow.name || ow.email)) + '</span><span class="pp-who"><span class="n">' + esc(ow.name || ow.email) + (ow.me ? ' <span class="pp-faint">· you</span>' : '') + ' <span class="pp-chip">Owner</span></span><span class="s">' + esc(sub) + '</span></span>' + (canStart ? '<button type="button" class="pp-btn" data-pp="transfer">Transfer ownership</button>' : '') + '</div>';
+      h += '<p class="pp-sent" data-sent="owner">Sees and decides everything, and is the only one who can hand the site to someone else.</p>';
     } else {
       h += '<p class="pp-faint">Nobody owns this site yet. Invite the owner from the Sites page first.</p>';
     }
@@ -152,6 +182,7 @@
     }
     if (st) {
       h += '<div class="pp-rule"></div><div class="pp-lab">' + esc((studioView ? 'Your studio' : st.name) + ' · ' + st.role) + '</div>';
+      h += '<p class="pp-sent" data-sent="studio" style="margin-left:0">' + esc((studioView ? 'Your studio' : st.name) + ' sees everything on this site and works on it for ' + (ow ? (ow.me ? 'you' : first(ow.name)) : 'the owner') + '.') + '</p>';
       st.people.forEach(function (p) { h += '<div class="pp-row"><span class="pp-av sq" aria-hidden="true">' + esc(initials(p.email)) + '</span><span class="pp-who"><span class="n">' + esc(p.email) + (p.me ? ' <span class="pp-faint">· you</span>' : '') + '</span><span class="s">' + esc(p.role) + '</span></span></div>'; });
       h += '<p class="pp-faint">' + esc(studioView ? 'Your studio’s owners, admins and account managers can open every client. Change them in Settings › Team.' : 'They can open your site to work on it. Ask ' + st.name + ' if that should change.') + '</p>';
     }
@@ -164,6 +195,8 @@
       h += '<div class="pp-row" data-seat="' + esc(m.id) + '"><span class="pp-av" style="background:' + tn[0] + ';color:' + tn[1] + '" aria-hidden="true">' + esc(initials(m.email)) + '</span><span class="pp-who"><span class="n">' + esc(m.email) + '</span><span class="s">' + esc(when) + (m.joined ? '' : ' · <button type="button" class="pp-link" data-pp="resend" data-email="' + esc(m.email) + '">Send it again</button>') + '</span></span>' +
         '<select class="pp-sel" data-pp="role" data-id="' + esc(m.id) + '" aria-label="Role for ' + esc(m.email) + '">' + opts + '</select>' +
         '<button type="button" class="pp-btn bad' + (me.armed === m.id ? ' armed' : '') + '" data-pp="remove" data-id="' + esc(m.id) + '" aria-label="' + esc((me.armed === m.id ? 'Press again to remove ' : 'Remove ') + m.email) + '">' + (me.armed === m.id ? 'Press again' : 'Remove') + '</button></div>';
+      h += '<p class="pp-sent" data-sent="' + esc(m.id) + '">' + esc(roleLine(m.role, me.ownerWho())) + '</p>';
+      if (m.role === 'designer') h += '<div class="pp-row-pub">' + me.pubHtml(m.can_publish === true, 'data-pp="publish" data-id="' + esc(m.id) + '" aria-label="' + esc('Can publish to the live site: ' + m.email) + '"') + '</div>';
     });
     if (gone.length) {
       h += '<details class="pp-faint"><summary>Removed (' + gone.length + ')</summary>' + gone.map(function (m) { return '<div class="pp-row"><span class="pp-who"><span class="n">' + esc(m.email) + '</span><span class="s">Was ' + esc(roleName(m.role)) + '</span></span><button type="button" class="pp-btn" data-pp="restore" data-email="' + esc(m.email) + '" data-role="' + esc(m.role) + '">Bring them back</button></div>'; }).join('') + '</details>';
@@ -176,13 +209,14 @@
     var owner = ow ? (ow.me ? 'you' : first(ow.name)) : 'the owner';
     var h = '<div class="pp">' + me.headHtml();
     h += '<label class="pp-lab" for="pp-email">Email</label><input class="pp-field" id="pp-email" type="email" autocomplete="off" placeholder="name@theirbusiness.com" value="' + esc(me.email || '') + '">';
-    h += '<fieldset class="pp-roles"><legend class="pp-lab">What can they do?</legend>' + OFFERED.map(function (r) {
-      var desc = r.key === 'business_owner' ? 'Everything ' + owner + ' can do, except hand the site to someone else.' : r.desc;
-      return '<label class="pp-role"><span class="top"><input type="radio" name="pp-role" value="' + r.key + '"' + (me.pick === r.key ? ' checked' : '') + '><span class="nm">' + esc(r.name) + '</span><span class="ds">' + esc(desc) + '</span></span><span class="pp-can">' + CAPS.map(function (c, i) { return '<span class="' + (r.can[i] ? 'y' : '') + '">' + (r.can[i] ? '✓ ' : '✕ ') + esc(c) + '</span>'; }).join('') + (r.also ? '<span class="y">✓ ' + esc(r.also) + '</span>' : '') + '</span></label>';
+    h += '<fieldset class="pp-roles"><legend class="pp-lab">What can they see?</legend>' + OFFERED.map(function (r) {
+      var isNew = r.key === 'designer' && new Date().toISOString().slice(0, 10) < NEW_UNTIL;
+      var pub = r.key === 'designer' && me.pick === 'designer' ? me.pubHtml(me.canPub === true, 'id="pp-canpub"') : '';
+      return '<div class="pp-role" data-role-card="' + r.key + '"><label class="pick"><span class="top"><input type="radio" name="pp-role" value="' + r.key + '"' + (me.pick === r.key ? ' checked' : '') + '><span class="words"><span class="nm">' + esc(r.name) + (isNew ? '<span class="pp-new">New</span>' : '') + '</span><span class="ds">' + esc(personal(r.desc, owner)) + '</span></span></span>' + seesChips(r) + '</label>' + pub + '</div>';
     }).join('') + '</fieldset>';
     if (me.err) h += '<div class="pp-err" role="alert"><span class="t">' + esc(me.err.message) + '</span>' + (me.err.action ? '<button type="button" class="pp-btn" data-pp="' + esc(me.err.action) + '">' + esc(me.err.label) + '</button>' : '') + '</div>';
     h += '<div class="pp-foot"><button type="button" class="pp-btn pri" data-pp="send"' + (me.busy ? ' disabled' : '') + '>' + (me.busy ? 'Sending…' : 'Send invite') + '</button><button type="button" class="pp-btn" data-pp="back">Cancel</button></div>';
-    h += '<p class="pp-faint">Settings means things like the domain, bookings set-up and taking the site offline. Only the owner can hand the site to someone else.</p></div>';
+    h += '<p class="pp-faint">The server checks every request against the role, so a Designer can’t reach customers or messages by typing an address either. Developer is paused while custom code gets a stronger safety check. Nobody but ' + esc(owner) + ' can hand the site to someone else.</p></div>';
     me.host.innerHTML = h; me.wire();
     var f = me.host.querySelector('#pp-email'); if (f) f.focus();
   };
@@ -211,6 +245,7 @@
     [].forEach.call(me.host.querySelectorAll('[data-pp]'), function (b) {
       var what = b.getAttribute('data-pp');
       if (what === 'role') { b.addEventListener('change', function () { me.setRole(b.getAttribute('data-id'), b.value, b); }); return; }
+      if (what === 'publish') { b.addEventListener('change', function () { me.setPublish(b.getAttribute('data-id'), b.checked, b); }); return; }
       b.addEventListener('click', function (e) {
         e.preventDefault();
         if (what === 'close') return me.o.close && me.o.close();
@@ -230,18 +265,26 @@
     });
     var f = me.host.querySelector('#pp-email');
     if (f) f.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); me.invite(); } });
-    [].forEach.call(me.host.querySelectorAll('input[name="pp-role"]'), function (r) { r.addEventListener('change', function () { me.pick = r.value; }); });
+    [].forEach.call(me.host.querySelectorAll('input[name="pp-role"]'), function (r) {
+      r.addEventListener('change', function () {
+        if (f) me.email = f.value;
+        me.pick = r.value; me.draw();
+        var again = me.host.querySelector('input[name="pp-role"][value="' + r.value + '"]'); if (again) again.focus();
+      });
+    });
+    var cp = me.host.querySelector('#pp-canpub');
+    if (cp) cp.addEventListener('change', function () { me.canPub = cp.checked; var w = cp.closest('.pp-pub').querySelector('.w'); if (w) w.textContent = me.pubWords(cp.checked); });
   };
   Sheet.prototype.invite = function () {
     var me = this, f = me.host.querySelector('#pp-email');
     me.email = String(f && f.value || '').trim();
     if (!me.email) { me.err = { message: 'Type their email first.' }; return me.draw(); }
     me.busy = true; me.err = null; me.draw();
-    return me.reqFresh('/portal/members', 'POST', { email: me.email, role: me.pick }).then(function (r) {
+    return me.reqFresh('/portal/members', 'POST', me.pick === 'designer' ? { email: me.email, role: me.pick, can_publish: me.canPub === true } : { email: me.email, role: me.pick }).then(function (r) {
       me.busy = false;
       if (r.cancelled) return me.draw();
       var b = r.body || {};
-      if (r.ok) { me.say((b.data && b.data.message) || 'Invited.'); me.email = ''; me.view = 'people'; me.changed(); return me.load(); }
+      if (r.ok) { me.say((b.data && b.data.message) || 'Invited.'); me.email = ''; me.canPub = false; me.view = 'people'; me.changed(); return me.load(); }
       if (b.error === 'already_member') { me.showId = b.member && b.member.id; me.err = { message: b.message, action: 'show', label: 'Show me' }; }
       else if (b.error === 'was_removed') { me.err = { message: (b.member ? b.member.email : 'They') + ' were removed earlier. Bring them back as ' + roleName(me.pick) + '?', action: 'comeback', label: 'Bring them back' }; }
       else me.err = { message: b.message || 'That didn’t send. Try again.' };
@@ -269,8 +312,24 @@
     return me.reqFresh('/portal/members/' + encodeURIComponent(id) + '/role', 'POST', { role: role }).then(function (r) {
       sel.disabled = false;
       if (r.cancelled) { sel.value = was; return; }
-      if (r.ok) { if (seat) { seat.role = role; seat.role_words = roleName(role); } me.say((r.body.data && r.body.data.message) || 'Changed.'); me.changed(); return; }
+      if (r.ok) {
+        if (seat) { seat.role = role; seat.role_words = roleName(role); if (role !== 'designer') seat.can_publish = false; }
+        me.say((r.body.data && r.body.data.message) || 'Changed.'); me.changed();
+        // builder item 220: the row's sentence follows the role, and a Designer's switch comes or goes
+        me.draw(); var again = me.host.querySelector('[data-pp="role"][data-id="' + id + '"]'); if (again) again.focus();
+        return;
+      }
       sel.value = was; me.say((r.body && r.body.message) || 'That didn’t save. Try again.', true);
+    });
+  };
+  // builder item 220: a Designer's publish switch, saved as they turn it (the role route, the same role)
+  Sheet.prototype.setPublish = function (id, on, box) {
+    var me = this, seat = (me.d.data || []).filter(function (m) { return m.id === id; })[0];
+    box.disabled = true;
+    return me.req('/portal/members/' + encodeURIComponent(id) + '/role', 'POST', { role: 'designer', can_publish: on }).then(function (r) {
+      box.disabled = false;
+      if (r.ok) { if (seat) seat.can_publish = on; var w = box.closest('.pp-pub').querySelector('.w'); if (w) w.textContent = me.pubWords(on); me.say((r.body.data && r.body.data.message) || 'Saved.'); me.changed(); return; }
+      box.checked = !on; me.say((r.body && r.body.message) || 'That didn’t save. Try again.', true);
     });
   };
   // the two-press remove: the first press arms it, a second within a few seconds removes

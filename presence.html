@@ -2340,6 +2340,17 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
 .bl-empty{font-size:13px;color:var(--soft);margin:0 0 8px}
 .bs-addline{display:inline-block;margin:2px 0 4px;min-height:36px}
 @media (max-width:760px){.bl-head{justify-content:stretch}.bl-head .pillbtn{flex:1}.bl-lists{margin-left:0}.bl-grid{grid-template-columns:1fr}.bl-row{flex-wrap:wrap}}
+/* builder item 220: where a Designer's work waits, in Publish's place (shell.css shows it to a role lacking publish) */
+.pillbtn.waitpub{background:var(--amber-soft);border-color:color-mix(in srgb,var(--amber) 28%,transparent);color:var(--amber-text);font-weight:600}
+.pillbtn.waitpub::before{content:"";width:14px;height:14px;flex:0 0 auto;border-radius:50%;border:1.6px solid currentColor;box-sizing:border-box;background:linear-gradient(currentColor,currentColor) 6px 3px/1.6px 5px no-repeat,linear-gradient(currentColor,currentColor) 6px 6.6px/4px 1.6px no-repeat}
+.pillbtn.waitpub:hover{background:color-mix(in srgb,var(--amber) 12%,var(--amber-soft));color:var(--amber-text)}
+.dock #dockWait{color:var(--amber-text)}
+.waitnote{position:fixed;top:72px;right:16px;z-index:9000;width:min(380px,calc(100% - 32px));box-sizing:border-box;background:var(--card,#fff);color:var(--ink);border:1px solid var(--hair);border-radius:16px;box-shadow:0 12px 40px rgba(26,13,64,.18);padding:16px 18px}
+.waitnote[hidden]{display:none}
+.waitnote h2{font-size:15px;font-weight:600;margin:0 0 6px;font-family:var(--sans)}
+.waitnote p{font-size:13px;line-height:1.5;color:var(--soft);margin:0 0 12px}
+.waitnote .row{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:760px){.waitnote{top:auto;bottom:calc(84px + env(safe-area-inset-bottom,0px));left:16px;right:16px;width:auto}.waitnote .pillbtn{min-height:44px}}
 /* item 57 · blocks inside a section: Add a block, a block's card, its rows in Layers, the phone's block bar */
 .stk-kind,.stk-li-main{display:flex;align-items:center;gap:12px;width:100%;padding:8px 10px;border:0;border-radius:var(--dds-r,12px);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .stk-kind:hover,.stk-li-main:hover{background:var(--dc-raised)}
@@ -2421,7 +2432,9 @@ textarea.stk-in{line-height:1.55;resize:vertical}
         <button class="pillbtn" id="btnEditSite" type="button">Edit site</button>
         <button class="pillbtn" id="btnPreview" type="button">Preview</button>
         <a class="pillbtn" id="btnLive" href="#" target="_blank" rel="noopener" hidden>See live site</a>
-        <button class="pillbtn inked" id="btnPublish" type="button">Publish</button>
+        <button class="pillbtn inked" id="btnPublish" type="button" data-needs="publish">Publish</button>
+        <!-- builder item 220: a Designer whose seat can't publish sees where their work waits instead -->
+        <button class="pillbtn waitpub" id="btnWaitPub" type="button" hidden data-if-lacks="publish" aria-haspopup="dialog" aria-controls="waitNote">Waiting to be published</button>
       </div>
       <div class="subline" id="factsWrap">
         <span class="whisper" id="topWhisper" aria-live="polite">Everything saved</span>
@@ -2744,7 +2757,8 @@ textarea.stk-in{line-height:1.55;resize:vertical}
           </div>
           <span class="dc-chip good" id="dcLiveChip" title="Your site is live. Changes reach it when you publish." hidden>Live</span>
           <button type="button" class="dc-actbtn" id="dcBtnPreview" title="See this page the way a visitor will">Preview</button>
-          <button type="button" class="pillbtn" id="dcBtnPublish">Publish</button>
+          <button type="button" class="pillbtn" id="dcBtnPublish" data-needs="publish">Publish</button>
+          <button type="button" class="pillbtn waitpub" id="dcBtnWait" hidden data-if-lacks="publish" aria-haspopup="dialog" aria-controls="waitNote">Waiting to be published</button>
         </div>
         <!-- the dock: the editor's tools, one icon and one word each. Notes and Versions are
              the canvas modes (#dcModeSeg: the same dcSetMode machinery as before). On a phone
@@ -2752,7 +2766,7 @@ textarea.stk-in{line-height:1.55;resize:vertical}
         <nav id="dcDock" class="dc-dock" aria-label="Editor tools">
           <button type="button" class="dc-dk" id="dkPages" data-ico="page" aria-haspopup="dialog" aria-controls="pagesCard" aria-expanded="false" title="Your pages"><span class="dc-dk-l">Pages</span></button>
           <button type="button" class="dc-dk" id="btnTrayOpen" data-ico="plus" aria-label="Add section" aria-haspopup="dialog" aria-controls="trayPanel" title="Add a section to this page"><span class="dc-dk-l">Add</span></button>
-          <button type="button" class="dc-dk" id="btnSettingsOpen" data-needs="configure" data-ico="spark" aria-haspopup="dialog" aria-controls="settingsPanel" title="Styles: how the whole site looks"><span class="dc-dk-l">Styles</span></button>
+          <button type="button" class="dc-dk" id="btnSettingsOpen" data-needs="design" data-ico="spark" aria-haspopup="dialog" aria-controls="settingsPanel" title="Styles: how the whole site looks"><span class="dc-dk-l">Styles</span></button>
           <button type="button" class="dc-dk" id="dkPhotos" data-ico="image" aria-haspopup="dialog" aria-controls="trayPanel" title="Your photos and files"><span class="dc-dk-l">Photos</span></button>
           <div class="dc-dock-more" id="dcDockMore">
             <button type="button" class="dc-dk" id="dkLayers" data-ico="layers" aria-haspopup="dialog" aria-controls="trayPanel" title="Layers: every section on this page, and the blocks inside each"><span class="dc-dk-l">Layers</span></button>
@@ -2873,7 +2887,7 @@ textarea.stk-in{line-height:1.55;resize:vertical}
             <div class="dc-panel-scroll">
               <!-- The site's overall look (theme) lives here now — off the Design page,
                    since starting a page/layout happens through "＋ Page". -->
-              <div class="hint" id="stylesAsk" hidden data-if-lacks="configure" style="padding:16px 18px">Ask the account owner to change your template, colors or fonts.</div>
+              <div class="hint" id="stylesAsk" hidden data-if-lacks="design" style="padding:16px 18px">Ask the account owner to change your template, colors or fonts.</div>
               <div id="designGallery" hidden data-needs="owner"></div>
               <div id="designHost"></div>
               <div id="hfCard"></div>
@@ -2921,8 +2935,15 @@ textarea.stk-in{line-height:1.55;resize:vertical}
   <button data-tab="today" class="on" aria-pressed="true">Site</button>
   <button data-tab="sections" aria-pressed="false">Sections</button>
   <button data-tab="preview" aria-pressed="false">Preview</button>
-  <button data-tab="publish" id="dockPublish" aria-pressed="false">Publish</button>
+  <button data-tab="publish" id="dockPublish" aria-pressed="false" data-needs="publish">Publish</button>
+  <button data-tab="waiting" id="dockWait" aria-pressed="false" hidden data-if-lacks="publish" aria-haspopup="dialog" aria-controls="waitNote">Waiting</button>
 </nav>
+<!-- builder item 220: where a Designer's work waits, said once when they press the pill (Figma 407:735) -->
+<div class="waitnote" id="waitNote" role="dialog" aria-modal="false" aria-labelledby="waitNoteT" hidden>
+  <h2 id="waitNoteT">Your changes are saved in the draft</h2>
+  <p id="waitNoteP">The owner or the studio puts them live. Nothing you change shows on the live site until then. Preview shows exactly what they will publish.</p>
+  <div class="row"><button type="button" class="pillbtn" id="waitNotePreview">Preview the draft</button><button type="button" class="pillbtn ghost" id="waitNoteOk">OK</button></div>
+</div>
 
 <!-- publish ritual (full page) -->
 <div class="ritualwrap" id="ritualWrap" role="dialog" aria-modal="true" aria-labelledby="ritTitle">
@@ -3565,6 +3586,8 @@ function syncSiteHome(view) {
   if (acts && bar && acts.parentElement !== bar) bar.appendChild(acts);
 }
 function go(view, early) {
+  // builder item 220: a Designer never opens a business tab, even from its address or a link
+  if (isBusinessTab(view) && window.ddsLacks && window.ddsLacks("business")) view = "today";
   const stays = $("view-" + view) && $("view-" + view).classList.contains("on");
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("on"));
   const target = $("view-" + view); if (!target) return;
@@ -3683,6 +3706,7 @@ $("dock").addEventListener("click", (e) => {
   if (b.dataset.tab === "today") go("today");
   else if (b.dataset.tab === "preview") openPreview("draft");
   else if (b.dataset.tab === "publish") openRitual();
+  else if (b.dataset.tab === "waiting") openWaitNote();   // builder item 220
   else openSheet("sectionsScrim");
 });
 // One set of tabs. The phone's Sections sheet used to list different places from
@@ -3698,6 +3722,23 @@ const SITE_MENU = [
   ["Site settings", [["business", "Business details"], ["domain", "Domain & email"], ["history", "Versions"], ["connections", "Connections"], ["sharing", "Sharing & access"], ["clientview", "See the client’s view"]]],
 ];
 const SITE_TABS = SITE_MENU.flatMap((g) => g[1]);
+// builder item 220: the note a Designer's pill opens: their work is saved, and who puts it live
+let WAIT_FROM = null;
+function openWaitNote() {
+  const n = $("waitNote"); if (!n) return;
+  const role = (S.ctx && S.ctx.my_role && S.ctx.my_role.name) || "";
+  $("waitNoteP").textContent = (role ? "As a " + role + " here, the owner or the studio puts them live. " : "The owner or the studio puts them live. ") + "Nothing you change shows on the live site until then. Preview shows exactly what they will publish.";
+  WAIT_FROM = document.activeElement; n.hidden = false; $("waitNoteOk").focus();
+}
+function closeWaitNote() {
+  const n = $("waitNote"); if (!n || n.hidden) return;
+  n.hidden = true; if (WAIT_FROM && WAIT_FROM.isConnected && WAIT_FROM.focus) WAIT_FROM.focus();
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeWaitNote(); });
+document.addEventListener("click", (e) => { const n = $("waitNote"); if (n && !n.hidden && !n.contains(e.target) && !(e.target.closest && e.target.closest("#btnWaitPub, #dcBtnWait, #dockWait"))) closeWaitNote(); });
+// builder item 220: the tabs about the business, not the website: a Designer never sees them
+// (a function, so go() can ask it however early it runs)
+function isBusinessTab(view) { return ["search", "bookings", "reviews", "analytics", "domain", "connections", "clientview"].includes(view); }
 // Keeps a studio drilled into a client inside that client on the way out of this page.
 function withClient(path) {
   const c = new URLSearchParams(location.search).get("client");
@@ -3728,6 +3769,8 @@ function buildSiteTabs() {
   const cur = document.querySelector(".view.on"); const curView = cur ? cur.id.replace("view-", "") : "today";
   const item = ([view, label]) => {
     const b = el("button", "navitem", label); b.type = "button";
+    // builder item 220: the business's places leave a Designer's menu (shell.js names the lack)
+    if (isBusinessTab(view)) b.dataset.needs = "business";
     if (view === "domain") b.title = "Your domain, DNS records, email and the padlock — connect a custom domain here";
     else if (view === "analytics") { b.dataset.link = "analytics"; b.title = "Visitors, where they come from and your busiest pages"; }
     else if (view === "styles") { b.dataset.link = "styles"; b.title = "Colors, fonts, corners and your template"; }
@@ -8052,6 +8095,11 @@ function renderPublishButton() {
   $("btnPublish").classList.toggle("locked", locked);
   $("btnPublish").title = locked ? "Publishing is locked" : "";
   $("dockPublish").textContent = locked ? "Locked" : c && c.count > 0 ? `Publish·${c.count}` : "Publish";
+  // builder item 220: the pills a Designer sees in Publish's place say how much waits
+  const waiting = c && c.count > 0;
+  if ($("btnWaitPub")) $("btnWaitPub").textContent = waiting ? "Waiting to be published" : "All saved in the draft";
+  if ($("dockWait")) $("dockWait").textContent = waiting ? `Waiting·${c.count}` : "Saved";
+  if ($("dcBtnWait")) $("dcBtnWait").textContent = waiting ? `${c.count} change${c.count === 1 ? "" : "s"} wait to be published` : "All saved in the draft";
   const barPub = $("dcBtnPublish");   // Edit mode's own copy of the same button
   if (barPub) {
     const tight = window.matchMedia && matchMedia("(max-width:760px)").matches && c && c.count > 0;   // a phone's bar is short of room
@@ -8444,6 +8492,8 @@ function studioInClient() {
 // "Marlow’s Kitchen’s" — a name already ending in s takes the bare apostrophe.
 function possessive(name) { return /s$/i.test(name) ? name + "’" : name + "’s"; }
 function openRitual(opts) {
+  if (window.ddsLacks && window.ddsLacks("publish")) { openWaitNote(); return; }   // builder item 220: their seat can't publish
+
   // threaded as a PARAMETER, not module state: a one-shot flag could be consumed
   // by a stale in-flight loadRitual (open → Escape → reopen) or leak armed when
   // the /changes read fails. (#btnPublish passes its click Event — the === true
@@ -9345,10 +9395,11 @@ async function renderLaunches() {
     const acts = el("div"); acts.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
     const mk = (label, fn, primary) => { const b = el("button", null, label); b.type = "button"; b.style.cssText = "font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;border:" + (primary ? "2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470)" : "1px solid var(--line,#ddd);background:transparent"); b.addEventListener("click", fn); acts.appendChild(b); };
     mk("Preview", () => openLaunchPreview(l.id));
-    if (l.status === "draft") mk("Approve", () => act(`/launches/${l.id}/decide`, "Approved", { decision: "approve" }), true);
+    if (l.status === "draft") { mk("Approve", () => act(`/launches/${l.id}/decide`, "Approved", { decision: "approve" }), true); acts.lastChild.dataset.needs = "approve"; }   // builder item 220
     if (l.status === "draft" || l.status === "approved") mk("Update from draft", () => act(`/launches/${l.id}/recapture`, "Refreshed from your current draft"));
     if (l.status === "approved") {
       mk("Launch now", async () => { if (await askYes("Launch “" + l.name + "”? This replaces your live site with the staged version.", { ok: "Launch" })) act(`/launches/${l.id}/promote`, "Launching — this usually takes under a minute"); }, true);
+      acts.lastChild.dataset.needs = "publish";   // builder item 220: a Designer goes live only when their seat says so
       mk("Schedule", () => {
         // W7: a friendly native date+time picker instead of hand-typed ISO text.
         if (row.querySelector(".sched-inline")) { const ex = row.querySelector(".sched-inline input"); if (ex) ex.focus(); return; }
@@ -9364,8 +9415,9 @@ async function renderLaunches() {
         no.addEventListener("click", () => wrap.remove());
         wrap.appendChild(inp); wrap.appendChild(ok); wrap.appendChild(no); row.appendChild(wrap); inp.focus();
       });
+      acts.lastChild.dataset.needs = "publish";
     }
-    if (l.status === "published") mk("Roll back", async () => { if (await askYes("Roll back “" + l.name + "” to the previous version?", { ok: "Roll back" })) act(`/launches/${l.id}/rollback`, "Rolling back…"); });
+    if (l.status === "published") { mk("Roll back", async () => { if (await askYes("Roll back “" + l.name + "” to the previous version?", { ok: "Roll back" })) act(`/launches/${l.id}/rollback`, "Rolling back…"); }); acts.lastChild.dataset.needs = "publish"; }
     if (l.status === "draft" || l.status === "approved" || l.status === "scheduled") mk("Cancel", () => act(`/launches/${l.id}/cancel`, "Canceled"));
     row.appendChild(acts);
     card.appendChild(row);
@@ -9414,6 +9466,7 @@ async function renderPreviewPanel() {
     acts.lastChild.dataset.needs = "configure";
     if (st.live.published) mk("Compare with Live", () => openPreview("live"));
     mk("Publish this preview", async () => { if (await askYes("Publish the preview to your live site? This publishes exactly what’s in the preview.", { ok: "Publish" })) act("/preview/promote", "Publishing. This usually takes under a minute"); }, true);
+    acts.lastChild.dataset.needs = "publish";   // builder item 220
   }
   card.appendChild(acts);
   // ── G10 → slice B (hard move): the take-offline / bring-back ACTION now lives
@@ -11998,6 +12051,7 @@ function renderBrandImageryReport(host, d) {
   host.innerHTML = "";
   const im = (d && d.imagery) || {}; const list = im.recolorable || [];
   if (!list.length && !im.not_recolorable_count) return;
+  if (window.ddsLacks && window.ddsLacks("approve")) return;   // builder item 220: a Designer makes no AI images (keeping one is an approval)
   const box = el("div"); box.style.cssText = "margin-top:10px;border:1px solid var(--plum-line,#e6ddf5);background:var(--plum-tint,#faf7ff);border-radius:10px;padding:10px 12px";
   box.appendChild(Object.assign(el("div", null, "Your images, on-brand"), { style: "font-size:12px;font-weight:600;margin-bottom:4px" }));
   if (list.length) {
@@ -16631,7 +16685,9 @@ const KEY_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.user
   const on = (id, fn) => { const b = $(id); if (b) b.addEventListener("click", fn); };
   on("btnUndo", dcUndo); on("btnRedo", dcRedo);
   on("btnUndoTop", dcUndo); on("btnRedoTop", dcRedo);
-  on("btnEditExit", () => exitEditMode()); on("dcBtnPublish", () => openRitual({ card: true }));   // the floating studio: a card at the right, the page stays in view
+  on("btnEditExit", () => exitEditMode()); on("dcBtnPublish", () => openRitual({ card: true }));
+  on("btnWaitPub", () => openWaitNote()); on("dcBtnWait", () => openWaitNote());   // builder item 220
+  on("waitNoteOk", () => closeWaitNote()); on("waitNotePreview", () => { closeWaitNote(); openPreview("draft"); });   // the floating studio: a card at the right, the page stays in view
   // Ctrl/⌘+Z = undo, Ctrl/⌘+Shift+Z (or Ctrl+Y) = redo — only while editing the design
   document.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;

@@ -65,11 +65,14 @@ const USERS = {
   'jwt-stranger': { id: uuid('e'), email: 'stranger@example.com' },
   'jwt-two-seats': { id: uuid('f'), email: 'two@example.com' },
   'jwt-by-email': { id: '11111111-2222-4333-8444-555555555555', email: 'pending@example.com' },
+  'jwt-designer': { id: '22222222-3333-4444-8555-666666666666', email: 'designer@example.com' },   // builder item 220
 };
 const principalOf = (jwt, extra = {}) => ({ kind: 'client', userId: USERS[jwt].id, tenantId: null, role: 'client', email: USERS[jwt].email, jwt, requestId: 'test', ...extra });
 const seated = (jwt, role) => principalOf(jwt, { member: { site_id: SITE_A, role } });
 const owner = principalOf('jwt-owner');
-const SEATS = [['business_staff', 'jwt-staff'], ['developer', 'jwt-dev'], ['business_owner', 'jwt-coowner']];
+// builder item 220: a Designer's seat reaches the site's content like staff's; index.ts's boundary
+// (tests/presence/designer_role_test.mjs) is what keeps them to the website's own routes
+const SEATS = [['business_staff', 'jwt-staff'], ['developer', 'jwt-dev'], ['business_owner', 'jwt-coowner'], ['designer', 'jwt-designer']];
 
 const blocks = [{ id: 'hero-1', type: 'hero', title: 'Welcome' }];
 function seedFor(site, id, tag) {
@@ -108,7 +111,7 @@ function reset() {
   T.presence_change_events = [];
   const seat = (jwt, site_id, role, status = 'active', created_at = '2026-01-01T00:00:00Z') => ({ id: crypto.randomUUID(), site_id, email: USERS[jwt].email, user_id: USERS[jwt].id, role, status, created_at });
   T.presence_site_members = [
-    seat('jwt-staff', SITE_A, 'business_staff'), seat('jwt-dev', SITE_A, 'developer'), seat('jwt-reviewer', SITE_A, 'client_reviewer'),
+    seat('jwt-staff', SITE_A, 'business_staff'), seat('jwt-dev', SITE_A, 'developer'), seat('jwt-reviewer', SITE_A, 'client_reviewer'), seat('jwt-designer', SITE_A, 'designer'),
     seat('jwt-coowner', SITE_A, 'business_owner'), seat('jwt-both', SITE_A, 'business_staff'), seat('jwt-revoked', SITE_A, 'business_staff', 'revoked'),
     seat('jwt-two-seats', SITE_B, 'business_staff', 'active', '2026-03-01T00:00:00Z'), seat('jwt-two-seats', SITE_A, 'developer', 'active', '2026-02-01T00:00:00Z'),
     { id: crypto.randomUUID(), site_id: SITE_A, email: USERS['jwt-by-email'].email, user_id: null, role: 'business_staff', status: 'active', created_at: '2026-01-01T00:00:00Z' },
@@ -613,7 +616,7 @@ for (const days of [0, 91, -3, 'soon']) {
   walk('supabase/functions/_shared/');
   ok('nothing else assigns a principal\'s seat', JSON.stringify(stamps) === '["supabase/functions/presence/index.ts"]', stamps.join(','));
 
-  ok('roles: the list this suite iterates covers every role', SITE_ROLES.length === 4 && SEATS.length === 3 && SITE_ROLES.every((r) => r === 'client_reviewer' || SEATS.some(([s]) => s === r)));
+  ok('roles: the list this suite iterates covers every role', SITE_ROLES.length === 5 && SEATS.length === 4 && SITE_ROLES.every((r) => r === 'client_reviewer' || SEATS.some(([s]) => s === r)));
 }
 
 const passed = results.filter((r) => r.p).length;

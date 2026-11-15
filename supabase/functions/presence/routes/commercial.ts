@@ -34,6 +34,7 @@ import { judgeSend, issueTicket, TICKET_MIN_AGE_S, markSender, spamLinkToken, re
 import { storeFormFiles, cleanFileName, filesOf, filePath, fileLink, formFileBytes, filePathsOf, removeFormFiles, SPAM_KEEP_DAYS, type StoredFile } from '../lib/form_files.ts';
 import { autoReplyVerdict } from '../lib/auto_reply.ts';   // item 203
 import { JOINED, JOIN_CHECK_EMAIL, joinLinkToken, readJoinLinkToken, joinEmailSubject, joinEmailHtml } from '../lib/join_confirm.ts';
+import { afterResponseOrNow } from '../lib/after_response.ts';   // item 221
 import { approvalDetail, cleanNote } from '../lib/approval_page.ts';   // sales item 92
 import { wordsHtml, quoteBlock, followupPlan } from '../lib/follow_ups.ts';   // sales item 87
 import { readVisitStats } from '../lib/visit_stats.ts';
@@ -308,7 +309,9 @@ async function businessName(siteId: string, fallback: string): Promise<string> {
 // ═══ Item 203 · join.html: "Yes, add me" ═══
 // The link in the email opens join.html on the app's address (a function's own address
 // can't show a page). It shows who and what first, since mail scanners open links on their
-// own; the button adds them. Authorized by the link's signature alone.
+// own; the button adds them. Authorized by the link's signature alone. Item 221: the press
+// that makes them a subscriber, and only that one, sends the site's welcome email
+// (lib/join_welcome.ts), after the answer.
 async function joinTarget(req: Request, token: unknown, cors: Record<string, string>): Promise<{ siteId: string; email: string; page: string } | Response> {
   if (!(await rateAllow(`joinlink:ip:${clientIp(req)}`, 30, 60))) return tooMany(cors);
   const t = await readJoinLinkToken(token);
@@ -333,21 +336,25 @@ export async function handleJoinPost(req: Request, cors: Record<string, string>)
   if (hit instanceof Response) return hit;
   const failed = () => json({ error: 'write_failed', message: 'That didn’t go through. Try again in a moment.' }, 502, cors);
   const now = new Date().toISOString();
+  const joined = () => json({ data: { ok: true, joined: true } }, 200, cors);
+  const welcomed = async () => { await afterResponseOrNow(import('../lib/join_welcome.ts').then((m) => m.sendJoinWelcome(hit.siteId, normEmail(hit.email), now))); return joined(); };
   const patch = { subscribed_at: now, subscribed_note: `Joined on ${hit.page}: “${SIGNUP_CONSENT}” Said yes by email on ${now.slice(0, 10)}.` };
   let row = await onList(hit.siteId, hit.email);
   if (row === false) return failed();
-  if (row && row.subscribed_at) return json({ data: { ok: true, joined: true } }, 200, cors);   // pressed twice
+  if (row && row.subscribed_at) return joined();   // pressed twice
   if (!row) {
     const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: hit.siteId, email: normEmail(hit.email), name: '', ...patch }) });
-    if (ins.ok && ins.json?.[0]) return json({ data: { ok: true, joined: true } }, 200, cors);
+    if (ins.ok && ins.json?.[0]) return await welcomed();
     if (!isUniqueViolation(ins)) return failed();
     // the same person pressed it in another tab a moment before: theirs is the row to mark
     row = await onList(hit.siteId, hit.email);
     if (!row) return failed();
-    if (row.subscribed_at) return json({ data: { ok: true, joined: true } }, 200, cors);
+    if (row.subscribed_at) return joined();
   }
-  const w = await svc(`presence_contacts?id=eq.${row.id}&site_id=eq.${hit.siteId}`, { method: 'PATCH', body: JSON.stringify(patch) });
-  return w.ok ? json({ data: { ok: true, joined: true } }, 200, cors) : failed();
+  // only the press that turns them into a subscriber marks the row, so two at once welcome them once
+  const w = await svc(`presence_contacts?id=eq.${row.id}&site_id=eq.${hit.siteId}&subscribed_at=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+  if (!w.ok) return failed();
+  return Array.isArray(w.json) && w.json.length ? await welcomed() : joined();
 }
 
 /** What the page's sender shows where the contact form was (the thank-you page's words). */

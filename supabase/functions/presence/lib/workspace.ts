@@ -7,7 +7,7 @@
 import { svc } from './db.ts';
 import { authUser } from '../../_shared/auth.ts';
 import type { SiteRole } from './site_roles.ts';
-import { isSiteRole, seesFullWorkspace } from './site_roles.ts';
+import { isSiteRole, seesSite, SEAT_WORDS, publishWords } from './site_roles.ts';
 import { SITE_COLS, type SiteRow } from './site.ts';
 import type { Surface, ShareOverride } from './visibility.ts';
 import type { EmailBrand } from './email_brand.ts';
@@ -41,15 +41,15 @@ export async function resolveSiteRole(jwt: string, siteId: string, principalKind
 /** The site an invited member reaches: their oldest active seat. They own no site,
  *  so RLS can't find it. `member` is that seat as the row states it, and is null for
  *  a role this code doesn't know, which leaves the caller under RLS. */
-export async function resolveMemberSite(principal: { userId: string | null; email: string | null }): Promise<{ site: SiteRow; member: { site_id: string; role: SiteRole } | null } | null> {
+export async function resolveMemberSite(principal: { userId: string | null; email: string | null }): Promise<{ site: SiteRow; member: { site_id: string; role: SiteRole; can_publish: boolean } | null } | null> {
   const or = `or=(user_id.eq.${encodeURIComponent(principal.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((principal.email || '').toLowerCase())})`;
-  const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id,role&order=created_at.asc&limit=1`);
+  const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id,role,can_publish&order=created_at.asc&limit=1`);
   const seat = Array.isArray(m.json) ? (m.json as any[])[0] : null;
   if (!seat?.site_id) return null;
   const s = await svc(`presence_sites?id=eq.${seat.site_id}&select=${SITE_COLS}&limit=1`);
   const site = Array.isArray(s.json) ? (s.json as any[])[0] : null;
   if (!site) return null;
-  return { site: site as SiteRow, member: isSiteRole(seat.role) ? { site_id: site.id, role: seat.role } : null };
+  return { site: site as SiteRow, member: isSiteRole(seat.role) ? { site_id: site.id, role: seat.role, can_publish: seat.can_publish === true } : null };
 }
 
 // ── Builder item 83: a person with places in two businesses picks one ─────────
@@ -58,19 +58,19 @@ export async function resolveMemberSite(principal: { userId: string | null; emai
 // one of the caller's own businesses or nothing: a site they own (RLS proves it), else
 // one where they hold an active seat, which then decides their role there.
 const personOr = (p: { userId: string | null; email: string | null }) => `or=(user_id.eq.${encodeURIComponent(p.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((p.email || '').toLowerCase())})`;
-export async function resolveHeldBusiness(jwt: string, principal: { kind: string; userId: string | null; email: string | null }, siteId: string): Promise<{ site: SiteRow; member: { site_id: string; role: SiteRole } | null } | null> {
+export async function resolveHeldBusiness(jwt: string, principal: { kind: string; userId: string | null; email: string | null }, siteId: string): Promise<{ site: SiteRow; member: { site_id: string; role: SiteRole; can_publish: boolean } | null } | null> {
   if (principal.kind !== 'client' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId)) return null;
   const { asUser } = await import('./db.ts');
   const own = await asUser(jwt, `presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`);
   const mine = own.ok && Array.isArray(own.json) ? (own.json as SiteRow[])[0] : null;
   if (mine) return { site: mine, member: null };
   if (!principal.userId && !principal.email) return null;
-  const m = await svc(`presence_site_members?site_id=eq.${siteId}&status=eq.active&${personOr(principal)}&select=site_id,role&limit=1`);
+  const m = await svc(`presence_site_members?site_id=eq.${siteId}&status=eq.active&${personOr(principal)}&select=site_id,role,can_publish&limit=1`);
   const seat = Array.isArray(m.json) ? (m.json as any[])[0] : null;
   if (!seat || !isSiteRole(seat.role)) return null;
   const s = await svc(`presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`);
   const site = Array.isArray(s.json) ? (s.json as SiteRow[])[0] : null;
-  return site ? { site, member: { site_id: site.id, role: seat.role as SiteRole } } : null;
+  return site ? { site, member: { site_id: site.id, role: seat.role as SiteRole, can_publish: seat.can_publish === true } } : null;
 }
 
 /** Every business this person can open as themself: the sites they own, then their
@@ -119,9 +119,9 @@ export async function resolveSiteRoleCached(principal: { kind: string; member?: 
 
 /** A site's seats, oldest first. `joined` says they have signed in since the invite
  *  (their user id is learned on first sight); the id itself never leaves here. */
-export async function listSiteMembers(siteId: string): Promise<Array<{ id: string; email: string; role: string; status: string; created_at: string; joined: boolean }>> {
-  const r = await svc(`presence_site_members?site_id=eq.${siteId}&select=id,email,role,status,created_at,user_id&order=created_at.asc`);
-  return (r.ok && Array.isArray(r.json)) ? (r.json as any[]).map(({ user_id, ...m }) => ({ ...m, joined: !!user_id })) : [];
+export async function listSiteMembers(siteId: string): Promise<Array<{ id: string; email: string; role: string; status: string; created_at: string; joined: boolean; can_publish: boolean }>> {
+  const r = await svc(`presence_site_members?site_id=eq.${siteId}&select=id,email,role,status,created_at,user_id,can_publish&order=created_at.asc`);
+  return (r.ok && Array.isArray(r.json)) ? (r.json as any[]).map(({ user_id, can_publish, ...m }) => ({ ...m, joined: !!user_id, can_publish: can_publish === true })) : [];
 }
 
 // CP-9: the invite email — a one-tap magic link instead of a hand-typed code.
@@ -161,12 +161,15 @@ export async function mintSignInLink(email: string, next: string, origin?: strin
   return link;
 }
 
-export async function sendInviteLink(email: string, opts: { subject: string; intro: string; brand: EmailBrand; next: string }): Promise<boolean> {
+export async function sendInviteLink(email: string, opts: { subject: string; intro: string; brand: EmailBrand; next: string; role?: { title: string; lines: string[] } }): Promise<boolean> {
   const link = await mintSignInLink(email, opts.next);
   if (!link) return false;
   const { sendEmail } = await import('../commerce/account.ts');
+  // builder item 220: the role in one sentence, in a box under the welcome (the words are ours, not the inviter's)
+  const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  const roleBox = opts.role ? `<div style="background:#efeafc;border-radius:12px;padding:12px 16px;margin:14px 0 4px"><p style="margin:0 0 4px;font-weight:600;color:#40297f">${esc(opts.role.title)}</p>${opts.role.lines.filter(Boolean).map((l, i) => `<p style="margin:${i ? '4px' : '0'} 0 0;color:${i ? '#55526a' : '#40297f'}">${esc(l)}</p>`).join('')}</div>` : '';
   const sent = await sendEmail(email, opts.subject,
-    `<p>${opts.intro}</p><p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${opts.brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type — this link signs you straight in. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`, opts.brand, { critical: true }).catch(() => false);   // an invited member’s ONLY door in = transactional
+    `<p>${opts.intro}</p>${roleBox}<p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${opts.brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type — this link signs you straight in. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`, opts.brand, { critical: true }).catch(() => false);   // an invited member’s ONLY door in = transactional
   return sent !== false;
 }
 
@@ -174,7 +177,7 @@ export async function sendInviteLink(email: string, opts: { subject: string; int
  *  the client door. A seat with the full workspace lands on the studio door, because
  *  the workspace pages read the operator session ('dds-portal-auth'), and a session
  *  from the client door ('dds-client-auth') would leave them signed out there. */
-async function sendSiteInvite(email: string, siteId: string, role: SiteRole): Promise<boolean> {
+async function sendSiteInvite(email: string, siteId: string, role: SiteRole, canPublish = false): Promise<boolean> {
   const { loadEmailBrand } = await import('./email_brand.ts');
   const bn = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`);
   const name = String(bn.json?.[0]?.business_name || 'a business');   // never "Studio OS" — this reaches a client
@@ -182,10 +185,16 @@ async function sendSiteInvite(email: string, siteId: string, role: SiteRole): Pr
   const safe = name.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));   // the name is the owner's own text, and this is HTML
   // Nov 10 review (G10): "help run" is wrong for a reviewer, who can only look and
   // approve, and an invitation that oversells reads as a mistake or a scam.
+  // builder item 220: a Designer is invited to work on the website, not to help run the business
+  const named = SEAT_WORDS[role]?.name || 'a member';
   const words = role === 'client_reviewer'
     ? { subject: `${name} has shared work for you to review`, intro: `<strong>${safe}</strong> has shared work for you to look over and approve.` }
-    : { subject: `You’ve been invited to help run ${name}`, intro: `You’ve been invited to help run <strong>${safe}</strong>.` };
-  return sendInviteLink(email, { ...words, brand, next: seesFullWorkspace(role) ? '/studio.html' : '/portal.html' });
+    : role === 'designer'
+      ? { subject: `You’re invited to work on ${name}’s website`, intro: `You’ve been invited to work on <strong>${safe}</strong>’s website as a Designer.` }
+      : { subject: `You’ve been invited to help run ${name}`, intro: `You’ve been invited to help run <strong>${safe}</strong> as ${named}.` };
+  const box = SEAT_WORDS[role] ? { title: `What ${role === 'client_reviewer' ? 'you' : 'a ' + named} can see`, lines: [SEAT_WORDS[role].you, publishWords({ role, can_publish: canPublish })] } : undefined;
+  // a seat that sees the website (the full workspace, or a Designer's) signs in at the studio door
+  return sendInviteLink(email, { ...words, role: box, brand, next: seesSite(role) ? '/studio.html' : '/portal.html' });
 }
 
 /** Nov 2026 review (client portal finding 5): is this a studio's own site, the one
@@ -209,7 +218,7 @@ async function reviewerRefusal(siteId: string, role: SiteRole): Promise<'check_f
   return shared ? 'shared_site' : null;
 }
 
-type SeatRow = { id: string; email: string; role: string; status: string };
+type SeatRow = { id: string; email: string; role: string; status: string; can_publish?: boolean };
 /** Developer seats were paused for everyone but platform staff from Nov 12 to Nov 15 2026
  *  (PR 350): a developer saves custom HTML (routes/dev.ts), and the cleaner then was a
  *  pattern list. Builder item 190 closed that: lib/dev_html.ts reads the HTML the way a
@@ -224,7 +233,7 @@ export type AddMemberError = 'bad_email' | 'bad_role' | 'role_paused' | 'shared_
  *  someone already here (that is a role change, by its own route), never makes the
  *  owner a seat, and lets a removed person back only when `restore` says so, with the
  *  role named again. Before, the invite was an upsert, so it rewrote any of those. */
-export async function addSiteMember(siteId: string, email: string, role: SiteRole, invitedBy: string, opts: { restore?: boolean; ownerEmails?: string[]; allowDeveloper?: boolean } = {}): Promise<{ ok: boolean; error?: AddMemberError; emailed?: boolean; restored?: boolean; member?: SeatRow }> {
+export async function addSiteMember(siteId: string, email: string, role: SiteRole, invitedBy: string, opts: { restore?: boolean; ownerEmails?: string[]; allowDeveloper?: boolean; canPublish?: boolean } = {}): Promise<{ ok: boolean; error?: AddMemberError; emailed?: boolean; restored?: boolean; member?: SeatRow }> {
   const clean = String(email || '').trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) return { ok: false, error: 'bad_email' };
   if (!isSiteRole(role)) return { ok: false, error: 'bad_role' };
@@ -237,14 +246,16 @@ export async function addSiteMember(siteId: string, email: string, role: SiteRol
   const seat = (ex.json as SeatRow[])[0];
   if (seat && seat.status !== 'revoked') return { ok: false, error: 'already_member', member: seat };
   if (seat && !opts.restore) return { ok: false, error: 'was_removed', member: seat };
+  // builder item 220: only a Designer's seat carries the publish switch; every other seat stores it off
+  const canPublish = role === 'designer' && opts.canPublish === true;
   const r = seat
-    ? await svc(`presence_site_members?id=eq.${seat.id}&site_id=eq.${siteId}&status=eq.revoked&select=id,email,role,status`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ role, status: 'active', invited_by: invitedBy }) })
-    : await svc('presence_site_members', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: siteId, email: clean, role, status: 'active', invited_by: invitedBy }) });
+    ? await svc(`presence_site_members?id=eq.${seat.id}&site_id=eq.${siteId}&status=eq.revoked&select=id,email,role,status,can_publish`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ role, status: 'active', invited_by: invitedBy, can_publish: canPublish }) })
+    : await svc('presence_site_members', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: siteId, email: clean, role, status: 'active', invited_by: invitedBy, can_publish: canPublish }) });
   // a 409 is the same email added meanwhile (unique site_id, email); an empty PATCH, a restore that raced
   if (!r.ok) return { ok: false, error: r.status === 409 ? 'already_member' : 'write_failed' };
   const row = Array.isArray(r.json) ? (r.json as SeatRow[])[0] : undefined;
   if (!row) return { ok: false, error: 'already_member' };
-  const emailed = await sendSiteInvite(clean, siteId, role).catch(() => false);   // CP-9: one-tap invite email — now we report whether it went
+  const emailed = await sendSiteInvite(clean, siteId, role, canPublish).catch(() => false);   // CP-9: one-tap invite email — now we report whether it went
   return { ok: true, emailed, restored: !!seat, member: row };
 }
 
@@ -252,21 +263,22 @@ export async function addSiteMember(siteId: string, email: string, role: SiteRol
  *  here is refused, so "Send it again" is its own step). Only for a seat still here. */
 export async function resendSiteInvite(siteId: string, email: string): Promise<{ ok: boolean; error?: 'not_found' | 'check_failed'; emailed?: boolean; member?: SeatRow }> {
   const clean = String(email || '').trim().toLowerCase();
-  const ex = await svc(`presence_site_members?site_id=eq.${siteId}&email=eq.${encodeURIComponent(clean)}&status=neq.revoked&select=id,email,role,status&limit=1`);
+  const ex = await svc(`presence_site_members?site_id=eq.${siteId}&email=eq.${encodeURIComponent(clean)}&status=neq.revoked&select=id,email,role,status,can_publish&limit=1`);
   if (!ex.ok || !Array.isArray(ex.json)) return { ok: false, error: 'check_failed' };
   const seat = (ex.json as SeatRow[])[0];
   if (!seat || !isSiteRole(seat.role)) return { ok: false, error: 'not_found' };
-  const emailed = await sendSiteInvite(clean, siteId, seat.role as SiteRole).catch(() => false);
+  const emailed = await sendSiteInvite(clean, siteId, seat.role as SiteRole, seat.can_publish === true).catch(() => false);
   return { ok: true, emailed, member: seat };
 }
 
 /** Change a seat's role (builder item 53). Never touches a removed seat. */
-export async function changeSiteMemberRole(siteId: string, memberId: string, role: SiteRole, opts: { allowDeveloper?: boolean } = {}): Promise<{ ok: boolean; error?: 'bad_role' | 'role_paused' | 'shared_site' | 'check_failed' | 'not_found' | 'write_failed'; member?: SeatRow }> {
+export async function changeSiteMemberRole(siteId: string, memberId: string, role: SiteRole, opts: { allowDeveloper?: boolean; canPublish?: boolean } = {}): Promise<{ ok: boolean; error?: 'bad_role' | 'role_paused' | 'shared_site' | 'check_failed' | 'not_found' | 'write_failed'; member?: SeatRow }> {
   if (!isSiteRole(role)) return { ok: false, error: 'bad_role' };
   if (developerRefused(role, opts.allowDeveloper)) return { ok: false, error: 'role_paused' };
   const refused = await reviewerRefusal(siteId, role);
   if (refused) return { ok: false, error: refused };
-  const r = await svc(`presence_site_members?id=eq.${memberId}&site_id=eq.${siteId}&status=neq.revoked&select=id,email,role,status`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ role }) });
+  // builder item 220: the publish switch belongs to a Designer's seat; any other role turns it off
+  const r = await svc(`presence_site_members?id=eq.${memberId}&site_id=eq.${siteId}&status=neq.revoked&select=id,email,role,status,can_publish`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ role, can_publish: role === 'designer' && opts.canPublish === true }) });
   if (!r.ok) return { ok: false, error: 'write_failed' };
   const row = Array.isArray(r.json) ? (r.json as SeatRow[])[0] : undefined;
   return row ? { ok: true, member: row } : { ok: false, error: 'not_found' };

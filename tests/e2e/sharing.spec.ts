@@ -43,7 +43,7 @@ test.describe('Sharing & access', () => {
     // builder item 53: who owns it, and the people with their roles
     const card = peopleCard(page);
     await expect(card.getByRole('heading', { level: 2, name: 'People' })).toBeVisible();
-    await expect(card.locator('.pp-note')).toHaveText('You own this site. People on your side each get their own sign-in, with a role.');
+    await expect(card.locator('.pp-note')).toHaveText('You own this site. Each person below sees only what their role says.');   // builder item 220
     await expect(card.locator('[data-owner]')).toContainText('Sam Reyes');
     await expect(card.locator('[data-owner] .pp-chip')).toHaveText('Owner');
     await expect(card.getByRole('button', { name: 'Transfer ownership' })).toBeVisible();
@@ -107,21 +107,22 @@ test.describe('Sharing & access', () => {
     await expect(drafts.locator('.state')).toHaveText('Visible');
   });
 
-  test('invite by role: four roles said plainly, Staff picked first; an empty email asks for one and posts nothing; the pick is what is sent', async ({ page }) => {
+  test('invite by role: five roles, each said in one sentence of what it sees, Staff picked first; an empty email asks for one and posts nothing; the pick is what is sent', async ({ page }) => {
     await installApp(page, { api: { '/portal/members': MEMBERS_NONE, '/portal/shares': SHARES_NONE } });
     await page.goto('/sharing.html');
     const card = peopleCard(page);
     await card.getByRole('button', { name: '+ Invite someone' }).click();
     await expect(card.getByRole('heading', { name: 'Invite someone' })).toBeVisible();
     const roles = card.getByRole('radio');
-    await expect(roles).toHaveCount(4);   // Developer is back (Nov 15 2026): DEVELOPER_PAUSED is off now builder item 190 is live
-    await expect(card.locator('.pp-role').filter({ hasText: 'Developer' })).toContainText('What staff can do, plus settings and the code tools.');
+    await expect(roles).toHaveCount(5);   // Co-owner, Staff, Designer (builder item 220), Developer (back since Nov 15 2026: DEVELOPER_PAUSED is off), Reviewer
+    await expect(card.locator('.pp-role').filter({ hasText: 'Developer' })).toContainText('Sees what Staff sees plus settings and the code tools, but can’t delete anything.');
     await expect(card.getByRole('radio', { name: /Staff/ })).toBeChecked();
-    await expect(card.locator('.pp-role').filter({ hasText: 'Co-owner' })).toContainText('Everything you can do, except hand the site to someone else.');
-    await expect(card.locator('.pp-role').filter({ hasText: 'Reviewer' }).locator('.pp-can')).toContainText('✓ Approve');
-    const tile = (name: string) => card.locator('.pp-role').filter({ has: page.locator('.nm', { hasText: new RegExp('^' + name + '$') }) });
-    await expect(tile('Staff').locator('.pp-can .y')).toHaveText(['✓ Edit pages', '✓ Publish']);
-    await expect(tile('Co-owner').locator('.pp-can .y')).toHaveCount(5);
+    await expect(card.locator('[data-role-card="business_owner"]')).toContainText('Sees everything you see, customers, messages and money included, and can do anything except hand the site over.');
+    await expect(card.locator('[data-role-card="client_reviewer"] .pp-can')).toContainText('✓ What you share');
+    const tile = (key: string) => card.locator('[data-role-card="' + key + '"]');
+    await expect(tile('business_staff').locator('.pp-can .y')).toHaveText(['✓ Website', '✓ Photos', '✓ Customers', '✓ Messages', '✓ Invoices']);
+    await expect(tile('designer').locator('.pp-can .y')).toHaveText(['✓ Website', '✓ Photos']);
+    await expect(tile('business_owner').locator('.pp-can .y')).toHaveCount(5);
     let posts = 0;
     page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/portal/members')) posts++; });
     await card.getByRole('button', { name: 'Send invite' }).click();
@@ -172,7 +173,7 @@ test.describe('Sharing & access', () => {
     const card = peopleCard(page);
     const role = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/members/m-1/role'));
     const pick = card.getByRole('combobox', { name: 'Role for dana@example.com' });
-    await expect(pick.locator('option')).toHaveText(['Co-owner', 'Staff', 'Developer', 'Reviewer']);   // Developer is a choice again
+    await expect(pick.locator('option')).toHaveText(['Co-owner', 'Staff', 'Designer', 'Developer', 'Reviewer']);   // Developer is a choice again (builder item 220 added Designer)
     await pick.selectOption('client_reviewer');
     expect((await role).postDataJSON()).toEqual({ role: 'client_reviewer' });
     let revokes = 0;
@@ -196,7 +197,7 @@ test.describe('Sharing & access', () => {
     await page.goto('/sharing.html');
     const pick = peopleCard(page).getByRole('combobox', { name: 'Role for dev@example.com' });
     await expect(pick).toHaveValue('developer');
-    await expect(pick.locator('option')).toHaveText(['Co-owner', 'Staff', 'Developer', 'Reviewer']);
+    await expect(pick.locator('option')).toHaveText(['Co-owner', 'Staff', 'Designer', 'Developer', 'Reviewer']);
   });
 
   test('transfer ownership: the owner names the new owner, keeps a Co-owner place by default, and can stop it while it waits', async ({ page }) => {
