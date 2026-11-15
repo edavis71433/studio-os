@@ -65,6 +65,8 @@ export const API = {
   '/schedule': { data: { scheduled: [] } },
   '/content-library': { data: [] },
   // deleting a page saves a restore point first (presence.html), answered as routes/publish.ts does
+  // publishing saves the usability check's ticks (routes/usable.ts)
+  'PUT /site/usable': (sent: { ticks?: Record<string, boolean>; last?: unknown }) => ({ data: { ticks: sent?.ticks || {}, last: sent?.last ?? null } }),
   'POST /publishes/checkpoints': { data: { id: 'cp-1', name: 'Before deleting', at: '2026-07-07T00:00:00Z', blockers: 0, warnings: 0, message: 'Checkpoint saved — you can look at it or return to it anytime.' } },
   '/portal/context': { data: {
     site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS',

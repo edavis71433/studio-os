@@ -162,7 +162,7 @@ test.describe('item 27 — one tip per visit, retired when the page is left', ()
 
 test.describe('item 28 — an enquiry\'s status and a private note', () => {
   test('every enquiry row says where it stands; the note saves alone, without touching the status', async ({ page }) => {
-    await installApp(page, { api: { '/forms/inbox': { data: { submissions: [
+    await installApp(page, { api: { 'POST /forms/inbox/l1': { data: { ok: true } }, '/forms/inbox': { data: { submissions: [
       { id: 'l1', form_kind: 'quote', name: 'Sam Rivera', email: 'sam@example.com', phone: '', message: 'Can I get a quote for a patio?', source_page: '/contact/', status: 'replied', created_at: '2026-07-07T00:00:00Z', replies: [], note: null },
       { id: 'l2', form_kind: 'contact', name: 'Dana Lee', email: 'dana@example.com', phone: '', message: 'Loved the work!', source_page: '/contact/', status: 'read', created_at: '2026-07-02T00:00:00Z', replies: [], note: { body: 'Old customer, send the spring offer', at: '2026-07-03T00:00:00Z' } },
     ], unread: 0 } } } });

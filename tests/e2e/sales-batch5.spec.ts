@@ -30,6 +30,10 @@ const HOME = {
   '/sales/summary': { data: { total: 2, open: { count: 1, value_cents: 90000 }, won_month: { count: 0, value_cents: 0 }, win_rate: { pct: null, won: 0, lost: 0 }, by_stage: [], ar: { outstanding_cents: 0, count: 0, overdue_count: 0 } } },
   '/sales/deals': { data: [{ id: DEAL, title: 'Harbor Lane Bakery', stage: 'proposal', expected_value_cents: 90000, next_step: 'Follow up call', next_step_at: day(-2), updated_at: new Date().toISOString() }] },
   '/sales/receivables': { data: { items: [], total_cents: 0 } },
+  // Done on each kind of task, answered as the route that owns it answers (builder item 212)
+  [`PATCH /projects/${PROJ}/tasks/${PT}`]: (sent: Record<string, unknown>) => ({ data: { id: PT, project_id: PROJ, title: 'A task', priority: 'normal', client_visible: false, ...sent } }),
+  'PATCH /sales/deal-tasks': { data: { ok: true } },
+  [`PATCH /sales/deals/${DEAL}`]: (sent: Record<string, unknown>) => ({ data: { id: DEAL, title: 'A deal', stage: 'proposal', ...sent } }),
 };
 const TASKS = (n = 0) => ({ data: { partial: false, total: 4 + n, items: [
   { kind: 'next_step', id: DEAL, parent_id: DEAL, title: 'Follow up call', due: day(-2), context: 'Harbor Lane Bakery', href: `/pipeline.html?deal=${DEAL}`, blocked: false },

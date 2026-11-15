@@ -30,6 +30,8 @@ const byClientApi = (extra: Record<string, unknown> = {}) => ({
 });
 
 const filesApi = {
+  // an upload is given its file's name, answered as routes/assets.ts answers it (builder item 212)
+  'PATCH /assets': (sent: Record<string, unknown>) => ({ data: { ok: true, asset: { id: 'uploaded', kind: 'image', state: 'approved', ...sent } } }),
   '/assets/collections': { data: [{ name: 'Brand', count: 1 }] },
   '/assets/health': { data: { findings: [] } },
   '/assets': { data: { assets: [LOGO, CONTRACT], total: 3, shown: 2, live_count: 1, policy: 'immediate' } },

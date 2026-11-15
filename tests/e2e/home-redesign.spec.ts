@@ -59,6 +59,11 @@ const HOME = {
     { kind: 'deal_task', id: 'dt2', parent_id: DCON, title: 'Order the photos', due: ymd(9), context: 'Larkspur Kitchen — menus', href: `/pipeline.html?deal=${DCON}`, blocked: false },
   ] } },
   '/agency/needs-you': needsYou(),
+  // Done on each kind of thing, answered as the route that owns it answers (builder item 212)
+  [`POST /forms/inbox/${E1}`]: { data: { ok: true } },
+  [`PATCH /support/${S1}`]: (sent: Record<string, unknown>) => ({ data: { id: S1, subject: 'A request', priority: 'normal', ...sent } }),
+  [`PATCH /sales/deals/${DEAL}`]: (sent: Record<string, unknown>) => ({ data: { id: DEAL, title: 'Juniper Floral', stage: 'proposal', ...sent } }),
+  'POST /commerce/notices/dismiss': { data: { dismissed: true } },
 };
 
 type Sent = { method: string; path: string; body: unknown; scope: string | null };

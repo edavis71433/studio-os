@@ -91,6 +91,7 @@ test.describe('Commerce in a client drill-in', () => {
   test('Today offers Done only where the feed says so, and it reaches the client’s row', async ({ page }) => {
     const feedRow = (id: string, headline: string, dismissible: boolean) => ({ id, kind: 'domain_expiry', period: '2026-11', headline, body: 'Worth a look.', href: '/presence.html#business', dismissible, tier: 'needs_you', priority: false });
     await installApp(page, scoped({
+      'POST /commerce/notices/dismiss': { data: { dismissed: true } },   // answered as routes/commerce_scoped.ts answers it (builder item 212)
       '/moments': { data: [] },
       '/portal/feed': { data: { role: 'business_owner', moments: [], pending_approvals: [], last_published: null, notices: [
         feedRow(NOTICE_ID, 'The domain expires soon', true),
@@ -149,7 +150,9 @@ test.describe('Scope carry — convert redirects + APP_PAGES coverage', () => {
     '/moments': { data: [] } };
 
   test('Inbox enquiry pane: the + Make it a deal redirect keeps ?client=', async ({ page }) => {
-    await installApp(page, { api: { ...scopedApi, '/sales/deals': { data: { id: 'd-9' } } } });
+    await installApp(page, { api: { ...scopedApi, '/sales/deals': { data: { id: 'd-9' } },
+      // the enquiry's person becomes a contact first, answered as routes/sales.ts answers it (builder item 212)
+      'POST /sales/contacts': (sent: Record<string, unknown>) => ({ data: { id: 'ct-9', site_id: CLIENT, notes: '', custom: {}, client_id: null, tags: [], ...sent } }) } });
     await page.goto(`/inbox.html?client=${CLIENT}#enquiries`);
     await page.locator('#rows [role=option]').filter({ hasText: 'Sam Rivera' }).click();
     await page.locator('#rpane').getByRole('button', { name: '+ Make it a deal' }).click();

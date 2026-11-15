@@ -223,7 +223,9 @@ test.describe('Customers › People past 100 (item 110, K4 and K6)', () => {
 test.describe('Customers: Mark as always ends with a message (item 110, K5)', () => {
   test('a list that can’t refresh after marking says so', async ({ page }, info) => {
     test.skip(info.project.name !== 'desktop-chromium', 'picking rows is the table display');
-    await installApp(page, { api: CUST_API });
+    // Mark as, answered as routes/projects.ts answers it (builder item 212)
+    const status = (id: string) => (sent: { status?: string }) => ({ data: { id, name: 'A project', status: sent?.status || 'on_hold' } });
+    await installApp(page, { api: { ...CUST_API, 'POST /projects/p1/status': status('p1'), 'POST /projects/p2/status': status('p2') } });
     let customersReads = 0;
     await page.route('**/functions/v1/presence/studio/customers', (r) => (++customersReads > 1 ? r.abort('internetdisconnected') : r.fallback()));
     await page.goto('/customers.html');
