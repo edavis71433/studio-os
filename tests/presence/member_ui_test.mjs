@@ -48,6 +48,7 @@ const CONTROLS = [
   ['POST /sales/deals/:id/retainer/cancel', 'crm.html', `apiAg('/sales/deals/'+d.id+'/retainer/cancel','POST',{})`, [`data-ret-cancel="1" data-needs="delete"`]],
   ['DELETE /sales/estimates/:id', 'pipeline.html', `api('/sales/estimates/'+b.dataset.delEst,'DELETE')`, ['data-needs="delete" data-del-est=']],   // sales review item 47
   ['DELETE /sales/prospects/:id', 'prospects.html', `api('/sales/prospects/'+b.dataset.remove,'DELETE')`, ['data-needs="delete" data-remove=']],   // sales review item 112
+  ['DELETE /forms/inbox/:id', 'inbox.html', `api('/forms/inbox/'+encodeURIComponent(it.lead_id),'DELETE')`, ['id="leadDel" class="quiet" data-needs="delete"']],   // builder list item 203
   ['POST /sales/recurring/:id/stop', 'pipeline.html', `api('/sales/recurring/'+sid+'/'+act,'POST',{})`, ['data-needs="delete" data-rec-stop=']],
   // sales review items 86 + 105: undoing an import, and merging two records (the dry run, the merge, its undo)
   ['POST /sales/contacts/imports/:id/undo', 'contacts.html', `api('/sales/contacts/imports/'+encodeURIComponent(IMPORT.id)+'/undo','POST',{})`, ['id="undoImport" data-needs="delete"']],
@@ -69,7 +70,7 @@ const CONTROLS = [
   ['DELETE /offerings/:id', 'presence.html', 'api("DELETE", `/${rec.col}/${rec.id}`)', ['window.ddsLacks && window.ddsLacks("delete") ? null : { kind: "create"']],
 
   ['POST /foundations/domain', 'presence.html', `api("POST", "/foundations/domain", { domain })`, ['choose.dataset.needs = "configure"', 'havePanel.dataset.needs = "configure"', 'needPanel.dataset.needs = "configure"', 'btn.dataset.needs = "configure"; btn.textContent = "Connect your domain"']],
-  ['DELETE /foundations/domain', 'presence.html', `api("DELETE", "/foundations/domain", { confirm })`, ['rm.dataset.needs = "configure"']],   // item 163: the name typed back
+  ['DELETE /foundations/domain', 'presence.html', `api("DELETE", "/foundations/domain", { confirm, ...extra })`, ['rm.dataset.needs = "configure"']],   // item 163: the name typed back; item 191: and a fresh code
   ['POST /foundations/domain', 'presence.html', `api("POST", "/foundations/domain", { domain: ans.domain, keep_old: ans.keepOld })`, ['b.dataset.needs = "configure"; b.dataset.change = "domain"']],   // item 163: change to a different domain
   ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal: "email_auth" })`, ['acts.dataset.needs = "configure"', 'after.dataset.needs = "configure"']],
   ['POST /foundations/prepare', 'presence.html', `api("POST", "/foundations/prepare", { goal })`, ['mh.dataset.needs = "configure"']],
@@ -132,7 +133,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 49, String(routes.length));   // builder item 158 added the Coming soon page; sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
+  ok('the decided delete and configure lists were read', routes.length === 50, String(routes.length));   // builder item 158 added the Coming soon page; builder item 203 added the enquiry delete; sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r] && !PORTAL_OWNER_ONLY[r]);
   for (const [route, c] of Object.entries(PORTAL_OWNER_ONLY)) {
@@ -221,7 +222,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   ok('css: a note beats the builder\'s [hidden] rule only for someone lacking it', css.includes('html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:block!important}'));
   ok('builder: a note starts hidden, so nobody else ever sees it', SOURCE['presence.html'].includes('n.hidden = true; n.dataset.ifLacks = "configure"'));
   const marked = PAGES.filter((p) => /data-needs|dataset\.needs|needs: '/.test(SOURCE[p]) && p !== 'shell.js');
-  ok('the eleven pages with marked controls are the ones expected', JSON.stringify(marked.sort()) === JSON.stringify(['agency.html', 'broadcasts.html', 'connections.html', 'contacts.html', 'crm.html', 'files.html', 'pipeline.html', 'presence.html', 'projects.html', 'prospects.html', 'settings.html']), marked.join(', '));   // projects.html: Remove a project template (sales item 106)   // prospects.html: Remove (sales review item 112)   // connections.html: the calendar link (sales review item 46)   // broadcasts.html: Remove this list (sales review items 31 + 39)
+  ok('the twelve pages with marked controls are the ones expected', JSON.stringify(marked.sort()) === JSON.stringify(['agency.html', 'broadcasts.html', 'connections.html', 'contacts.html', 'crm.html', 'files.html', 'inbox.html', 'pipeline.html', 'presence.html', 'projects.html', 'prospects.html', 'settings.html']), marked.join(', '));   // projects.html: Remove a project template (sales item 106)   // prospects.html: Remove (sales review item 112)   // connections.html: the calendar link (sales review item 46)   // broadcasts.html: Remove this list (sales review items 31 + 39)
   for (const p of marked) ok(`${p} loads the shell script and its stylesheet`, SOURCE[p].includes('src="/shell.js"') && SOURCE[p].includes('href="/shell.css"'));
 }
 
