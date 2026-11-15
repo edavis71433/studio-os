@@ -12,7 +12,6 @@ import { json } from '../../_shared/http.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { svc } from '../lib/db.ts';
-import { writeChangeEvent } from '../lib/provenance.ts';
 import { pendingRequestsFor, studioNames, ownerEmails, claimPortfolioSite, releasePortfolioSite } from '../lib/connect_requests.ts';
 import { bridgeCustomerToStudio } from './sales.ts';
 import { UUID_RE } from '../lib/uuid.ts';
@@ -79,7 +78,7 @@ export async function handleStudioRequests(req: Request, route: string, site: Si
   // 3) the studio's contact for this email is now you; the request is answered
   await svc(`presence_contacts?site_id=eq.${studioSiteId}&${emailMatch(r.email)}&deleted_at=is.null`, { method: 'PATCH', body: JSON.stringify({ client_id: site.client_id }) }).catch(() => {});
   await decide('accepted').catch(() => null);
-  // 4) the studio sees it happen
-  await writeChangeEvent({ siteId: studioSiteId, entityType: 'client', entityId: String(site.client_id), action: 'connect', summary: `${label} accepted your request — they’re in Customers now`, principal, provenance: 'human' }).catch(() => {});
+  // the studio sees it in Customers. Item 239: no change-log line for it, since a new customer
+  // is no change to the studio's website (the line was refused there and never showed)
   return json({ data: { accepted: true, studio, managed: !!claimed, project_id: b.projectId } }, 200, cors);
 }

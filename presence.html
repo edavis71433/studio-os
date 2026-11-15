@@ -9747,7 +9747,7 @@ function renderVersionList() {
     body.appendChild(el("div", "hmeta",
       p.status === "failed" ? "Your site was unchanged and nothing was lost."
       : p.status === "publishing" ? "Still publishing."
-      : (p.kind === "restore" && !/^Published again/.test(p.summary || "") ? "A restored version · " : "") + (who ? "Published by " + who : "Published")));
+      : (p.kind === "restore" && !/^Published again/.test(p.summary || "") ? "A restored version · " : "") + (who ? "Published by " + who : p.by_kind === "system" ? "Published on schedule" : "Published")));   // item 239: the scheduler sent it
     row.appendChild(body);
     const acts = el("div", "hacts");
     if (p.status === "live") acts.appendChild(verStar(p));   // item 158

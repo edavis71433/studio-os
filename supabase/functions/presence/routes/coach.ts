@@ -8,6 +8,7 @@
 // Draft Writer, all unchanged. Ignoring an opportunity is always free.
 import { json } from '../../_shared/http.ts';
 import { svc, svcCount, type SiteDb } from '../lib/db.ts';
+import { draftChangesOnly } from '../lib/provenance.ts';
 import { runGrowthCoach, decideOpportunity } from '../coach/engine.ts';
 import { coachRead } from '../lib/health_coach.ts';
 import { buildTimeline } from '../lib/customer_timeline.ts';
@@ -62,7 +63,7 @@ export async function handleCoachHealth(site: SiteRow, cors: Record<string, stri
   if (!meta0.ok) {
     const [m, lastChange] = await Promise.all([
       svc(`presence_sites?id=eq.${site.id}&select=domain_expires_at&limit=1`),
-      svc(`presence_change_events?site_id=eq.${site.id}&select=created_at&order=created_at.desc&limit=1`),
+      svc(`presence_change_events?site_id=eq.${site.id}&${draftChangesOnly()}&select=created_at&order=created_at.desc&limit=1`),
     ]);
     meta = m; lastChangeAt = arr(lastChange)[0]?.created_at || null;
   }

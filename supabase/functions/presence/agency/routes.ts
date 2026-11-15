@@ -6,6 +6,7 @@
 // plans still wait on the client; publishing runs the one frozen pipeline).
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
+import { draftChangesOnly } from '../lib/provenance.ts';
 import { noticeTier } from '../lib/inbox_feed.ts';
 import { can, agencySiteIds, STUDIO_ROLE_WORDS } from './auth.ts';
 import { buildPortfolio, filterPortfolio, buildQueues, buildPatterns } from './portfolio.ts';
@@ -113,7 +114,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
   } else {
     const [old, evtQ] = await Promise.all([
       svc(`presence_sites?id=in.(${ids.join(',')})&select=${SITE_FACTS}&limit=1000`),
-      svc(`presence_change_events?${IN}&select=site_id,created_at&order=created_at.desc&limit=1000`),
+      svc(`presence_change_events?${IN}&${draftChangesOnly()}&select=site_id,created_at&order=created_at.desc&limit=1000`),
     ]);
     sitesQ = old;
     for (const e of (evtQ.json ?? []) as Array<{ site_id: string; created_at: string }>) {

@@ -42,7 +42,7 @@ ok('connectionActorKind: platform staff → operator (unchanged)', connectionAct
 ok('room: staff publish → "published by your studio"', lastPublishDetail('staff') === 'published by your studio');
 ok('room: operator publish → "published by your studio" (was "published by you")', lastPublishDetail('operator') === 'published by your studio');
 ok('room: the owner\'s own publish → "published by you"', lastPublishDetail('client') === 'published by you');
-ok('room: unknown/legacy/system falls to "published by you" (unchanged behaviour)', lastPublishDetail('system') === 'published by you' && lastPublishDetail(undefined) === 'published by you' && lastPublishDetail('') === 'published by you');
+ok('room: a publish the scheduler fired reads "published on schedule" (item 239); unknown/legacy falls to "published by you"', lastPublishDetail('system') === 'published on schedule' && lastPublishDetail(undefined) === 'published by you' && lastPublishDetail('') === 'published by you');
 ok('studioActed: staff + operator only', studioActed('staff') && studioActed('operator') && !studioActed('client') && !studioActed('system') && !studioActed(null));
 
 // ═══ 5. the pre-0133 degrade: only an actor_kind CHECK violation retries ═══
@@ -57,8 +57,8 @@ ok('degrade: operator → staff (still the studio\'s hand); everything else unto
 // ═══ 6. wiring — the helpers are what the routes actually use ═══
 {
   const pub = read('supabase/functions/presence/routes/publish.ts');
-  ok('publish.ts: actor_kind comes from publishActorKind (no inline staff/client ternary left)',
-    /publishActorKind\(principal\)/.test(pub) && !/principal\.kind === 'staff' \? 'staff' : 'client'/.test(pub));
+  ok('publish.ts: actor_kind comes from the helpers (changeActorKind for the record: system for the scheduler, item 239; no inline staff/client ternary left)',
+    /let actorKind: string = changeActorKind\(principal\);/.test(pub) && /publishActorKind\(principal\)/.test(pub) && !/principal\.kind === 'staff' \? 'staff' : 'client'/.test(pub));
   ok('publish.ts: the snapshot and the publish record both carry the same actorKind',
     /created_by_kind: byKind/.test(pub) && /actor_kind: byKind/.test(pub) && /insertSnapshot\(actorKind\)/.test(pub) && /insertRecord\(actorKind\)/.test(pub));
   ok('publish.ts: an operator publish raises the client\'s studio_published notice, one row per publish',
