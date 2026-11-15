@@ -203,9 +203,10 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const builder = SOURCE['presence.html'], settings = SOURCE['settings.html'];
   ok('builder: the industry field is marked', builder.includes('<div class="field" data-needs="configure"><label for="f-industry">'));
   ok('builder: the verification codes are marked', /<details data-needs="configure"[^>]*>\s*<summary[^>]*>Verification codes/.test(builder));
-  ok('settings: the industry field is marked', settings.includes('<div data-needs="configure"><label for="f-industry">'));
+  ok('settings: the industry field is marked', settings.includes('<div data-needs="configure"><div class="flab"><label for="f-industry">'));
   ok('settings: the automations card and its section are marked', settings.includes(`studioOnly: true, needs: 'configure' }`) && settings.includes('id="automations" aria-labelledby="autoHead" hidden data-needs="configure"'));
-  ok('settings: saving the profile sends no industry for a role without configure', /const mayConfigure = !\(window\.ddsLacks && window\.ddsLacks\('configure'\)\);\s*if \(mayConfigure && /.test(settings));
+  // builder item 165: each box saves on its own; the kind of business (and who signs) never for a role without configure
+  ok('settings: saving the profile sends no industry for a role without configure', /\{ id: 'f-industry', to: 'settings', key: 'industry_key', configure: true \}/.test(settings) && /if \(f\.configure && window\.ddsLacks && window\.ddsLacks\('configure'\)\) return;/.test(settings));
 }
 
 // ═══ 5. what asks for the owner by role, not by capability ═══

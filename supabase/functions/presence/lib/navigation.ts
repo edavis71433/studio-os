@@ -326,7 +326,7 @@ export function buildNav(c: NavContext): NavSection[] {
   // sales item 83: ⌘K "deleted", "restore" or "trash" finds the one place deleted deals, contacts and to-dos wait
   if (studioLevel && f.hasRelationship) settings.push(hid('deleted', 'Recently deleted', '/recently-deleted.html', 'Deals, contacts and to-dos deleted in the last 30 days, each with Restore (trash, undo).'));
   if (f.hasClientPortal && has(c, 'invite')) settings.push(hid('sharing', 'Sharing & access', '/sharing.html', 'Who can sign in — your team, what clients can see, reviewer links.'));
-  if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push(hid('developer', 'Developer Mode', '/developer.html'));
+  if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push(hid('developer', 'Developer tools', '/developer.html', 'Your site’s colors and type, your own styles (CSS) and a block of your own HTML.'));   // builder item 165: its plain name
   // Oct 2026 audit change 11: the Health Center's door — a status line on the studio's
   // home for platform staff, and ⌘K "health" finds the page itself (staff only).
   if (c.isOperator) settings.push(hid('health', 'Health Center', '/admin-health.html', 'Platform health — background jobs, domains, billing, email posture and errors, in ten areas.'));

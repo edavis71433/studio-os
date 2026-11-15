@@ -16,7 +16,7 @@ const SCOPED_CTX = { data: {
 } };
 
 test.describe('Who signs agreements for the studio (sales item 88)', () => {
-  test('Studio profile: the name and title save with the profile, and only what changed', async ({ page }) => {
+  test('Studio profile: the name and title each save when they’re left, and only what changed', async ({ page }) => {
     await installApp(page, { api: { '/identity': IDENTITY, '/settings': { data: { industry_key: 'generic', signs_as_name: '', signs_as_title: '' } } } });
     const puts: Array<{ path: string; body: Record<string, unknown> }> = [];
     await page.route('**/functions/v1/presence/**', async (route) => {
@@ -30,9 +30,13 @@ test.describe('Who signs agreements for the studio (sales item 88)', () => {
     await expect(page.locator('#f-signer')).toBeVisible();
     await expect(page.locator('#signerHow')).toContainText('the moment they sign');
     await page.locator('#f-signer').fill('Alex Rivera');
+    await page.locator('#f-signer').press('Tab');                   // builder item 165: each box saves when it's left
+    await expect(page.locator('#fs-f-signer')).toHaveText('Saved');
     await page.locator('#f-signer-title').fill('Owner');
-    await page.locator('#profileSave').click();
-    await expect.poll(() => puts.find((p) => p.path === '/settings')?.body).toEqual({ signs_as_name: 'Alex Rivera', signs_as_title: 'Owner' });
+    await page.locator('#f-signer-title').press('Tab');
+    await expect(page.locator('#fs-f-signer-title')).toHaveText('Saved');
+    expect(puts.filter((p) => p.path === '/settings').map((p) => p.body)).toEqual([{ signs_as_name: 'Alex Rivera' }, { signs_as_title: 'Owner' }]);
+    expect(puts.filter((p) => p.path === '/identity')).toEqual([]);
   });
 
   test('inside a client the studio’s signer stays out of their profile', async ({ page }) => {

@@ -100,7 +100,7 @@ const settings = read('settings.html');
   ok('settings: who signs agreements shows and saves in your own second business, never inside a client, and is decided again once the context is in',
     /const signer = \(\) => document\.querySelectorAll\('\[data-signer\]'\)\.forEach\(\(el\) => \{ el\.hidden = inClient\(\); \}\);/.test(settings)
     && /signer\(\); if \(SCOPE\) CTX_IN\.then\(signer\);/.test(settings)
-    && /if \(mayConfigure && !inClient\(\)\) \{\s*const sn = \$\('f-signer'\)/.test(settings));
+    && /if \(f\.studio && inClient\(\)\) return;/.test(settings));   // builder item 165: each box saves on its own; who signs is skipped only inside a client
 }
 
 // ── today.html: a first answer from the shell, the context's answer once in ──
