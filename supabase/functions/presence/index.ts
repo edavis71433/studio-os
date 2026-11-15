@@ -102,6 +102,7 @@ const { handleSystem } = lazyRoutes(() => import('./routes/system.ts'));
 const { handleVisibility, handleVisibilityCheck } = lazyRoutes(() => import('./routes/visibility.ts'));
 const { handleFollowGet, handleFollowPut, handleLlmsDraft, handlePhrasesGet, handlePhrasesPut } = lazyRoutes(() => import('./routes/search_tab.ts'));
 const { handleAiGet, handleAiQuestionsPut } = lazyRoutes(() => import('./routes/ai_answers.ts'));
+const { handleMapsGet, handleMapsPut, handleMapsPlace, handleMapsFind, handleMapsNames, handleMapsScan } = lazyRoutes(() => import('./routes/rank_grid.ts'));
 const { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } = lazyRoutes(() => import('./routes/connections.ts'));
 const { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceFeatures } = lazyRoutes(() => import('./routes/marketplace.ts'));
 
@@ -566,6 +567,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/visibility/llms-draft' && method === 'GET') return handleLlmsDraft(site, cors);         // item 124
   if (route === '/visibility/ai' && method === 'GET') return handleAiGet(site, cors);                     // item 182
   if (route === '/visibility/ai/questions' && method === 'PUT') return handleAiQuestionsPut(req, site, principal, cors);
+  if (route === '/visibility/maps' && method === 'GET') return handleMapsGet(site, principal, cors);                  // item 185: the map rank grid (the writes are the studio's only)
+  if (route === '/visibility/maps' && method === 'PUT') return handleMapsPut(req, site, principal, cors);
+  if (route === '/visibility/maps/place' && method === 'PUT') return handleMapsPlace(req, site, principal, cors);
+  if (route === '/visibility/maps/find' && method === 'POST') return handleMapsFind(req, site, principal, cors);
+  if (route === '/visibility/maps/names' && method === 'GET') return handleMapsNames(req, site, principal, cors);
+  if (route === '/visibility/maps/scan' && method === 'POST') return handleMapsScan(req, site, principal, cors);
   if (route === '/redirects' && method === 'GET') return handleRedirectsList(site, cors);                 // Phase SD
   if (route === '/redirects' && method === 'POST') return handleRedirectCreate(req, site, principal, cors);
   if (route === '/redirects/suggest' && method === 'GET') return handleRedirectSuggest(req, site, cors);   // item 156: the old site's pages, matched
@@ -794,6 +801,13 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/sales/stages' && (method === 'GET' || method === 'PUT')) return handleSalesStages(req, site, principal, cors);   // sales review item 38: rename the open stages
   if (route === '/email/sending' && method === 'GET') return handleEmailSending(cors);
   if (route === '/sales/export' && method === 'GET') return handleSalesExport(site, principal, cors);   // sales review item 69: one zip of CSVs
+  if ((route === '/handover/pack' && method === 'GET') || (route === '/handover/notify' && method === 'POST')) return (await import('./routes/handover_pack.ts')).handleHandoverPack(req, site, principal, cors);   // sales item 93: the hand-over pack for a client who leaves
+  if (route === '/sales/setup' && (method === 'GET' || method === 'POST')) return (await import('./routes/setup_strip.ts')).handleSetupStrip(req, site, principal, cors);   // sales item 105: Home's setup strip
+  if (route === '/sales/export/accounting' && method === 'GET') return (await import('./routes/accounting_export.ts')).handleAccountingExport(req, site, principal, cors);   // sales item 105: the export for a bookkeeper
+  // sales item 94: the month's goal and the AI help switch, and AI help's two presses (lazy: most requests never use them)
+  if (route === '/sales/goal-ai' && (method === 'GET' || method === 'PUT')) return (await import('./routes/sales_ai.ts')).handleGoalAi(req, jwt, site, principal, cors);
+  if (route === '/sales/ai/draft' && method === 'POST') return (await import('./routes/sales_ai.ts')).handleAiDraft(req, jwt, site, principal, cors);
+  if (route === '/sales/ai/summary' && (method === 'GET' || method === 'POST')) return (await import('./routes/sales_ai.ts')).handleAiSummary(req, jwt, site, principal, cors);
   // ── Prospects — the lead list (Semrush review, sales item 112). Lazy: most days nobody prospects. ──
   if (route.startsWith('/sales/prospects')) {
     const px = await import('./routes/prospects.ts');

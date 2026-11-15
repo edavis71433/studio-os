@@ -28,7 +28,8 @@ import { resolveSite } from '../lib/site.ts';
 import { resolveMemberSite } from '../lib/workspace.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { CONTACT_MORE_COLS, addressLine } from '../lib/contact_fields.ts';
-import { cleanSearch, phoneDigits, phonePattern, phoneHas, snippet, arrangeResults, shortDate, type SearchResult } from '../lib/record_search.ts';
+import { cleanSearch, phoneDigits, phonePattern, phoneHas, snippet, arrangeResults, shortDate, invoiceNumberQuery, type SearchResult } from '../lib/record_search.ts';
+import { invoiceNo } from '../lib/documents.ts';
 import { CONNECT_INTENT_TAG } from './sales.ts';
 
 /** W3: resolve this customer's Pipeline deal + linked project so the studio can
@@ -126,10 +127,14 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
   const q = cleanSearch(u.searchParams.get('q'));
   if (q.length < 2) return json({ data: { results: [] } }, 200, cors);
   const S = site.id, eq = encodeURIComponent(q), like = `ilike.*${eq}*`, ql = q.toLowerCase();
+  const INV_SEL = 'id,title,amount_cents,status,deal_id,number,payment_for';   // number and payment_for: APPLY-0167
   const hit = (s: unknown) => String(s || '').toLowerCase().includes(ql);
+  // sales item 120 (code pass finding 55): an invoice by its number. "#0013", "0013" and
+  // "invoice 13" mean invoice 13 and never an amount; plain "13" may be either
+  const invNo = invoiceNumberQuery(ql);
   // Phase 2 (search across everything): a money word ("invoice", "owed", "unpaid") lists what's open
-  const moneyWord = /^(inv|invoice|invoices|owed|unpaid|outstanding|money|paid)/.test(ql);
-  const cents = /^\$?\d{2,}(\.\d{2})?$/.test(ql) ? Math.round(Number(ql.replace('$', '')) * 100) : 0;
+  const moneyWord = !invNo?.only && /^(inv|invoice|invoices|owed|unpaid|outstanding|money|paid)/.test(ql);
+  const cents = !invNo?.only && /^\$?\d{2,}(\.\d{2})?$/.test(ql) ? Math.round(Number(ql.replace('$', '')) * 100) : 0;
   const phone = phoneDigits(q), pat = phone ? encodeURIComponent(phonePattern(phone)) : '';
   // the words inside notes, messages and enquiries are looked through from three letters on
   const deep = q.length >= 3;
@@ -146,9 +151,11 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
     read(`presence_deals?site_id=eq.${S}&deleted_at=is.null&or=(title.${like}${deep ? `,notes.${like}` : ''})&select=id,title,stage,notes,converted_client_id&order=updated_at.desc&limit=10`),
     read(`presence_projects?site_id=eq.${S}&deleted_at=is.null&name=${like}&select=id,name,status&limit=6`),
     read(`presence_service_links?agency_site_id=eq.${S}&status=eq.active&select=customer_client_id,customer_site_id&limit=200`),
-    moneyWord
-      ? read(`presence_invoices?site_id=eq.${S}&deleted_at=is.null&status=eq.open&select=id,title,amount_cents,status,deal_id&order=created_at.desc&limit=6`)
-      : read(`presence_invoices?site_id=eq.${S}&deleted_at=is.null&or=(title.${like}${cents ? `,amount_cents.eq.${cents}` : ''})&select=id,title,amount_cents,status,deal_id&order=created_at.desc&limit=6`),
+    invNo?.only
+      ? read(`presence_invoices?site_id=eq.${S}&deleted_at=is.null&number=eq.${invNo.number}&select=${INV_SEL}&limit=6`)
+      : moneyWord
+      ? read(`presence_invoices?site_id=eq.${S}&deleted_at=is.null&status=eq.open&select=${INV_SEL}&order=created_at.desc&limit=6`)
+      : read(`presence_invoices?site_id=eq.${S}&deleted_at=is.null&or=(title.${like}${cents ? `,amount_cents.eq.${cents}` : ''}${invNo ? `,number.eq.${invNo.number}` : ''})&select=${INV_SEL}&order=created_at.desc&limit=6`),
     read(`presence_form_submissions?site_id=eq.${S}&spam=eq.false&or=(name.${like},email.${like}${deep ? `,message.${like}` : ''})&select=id,name,email,message,created_at&order=created_at.desc&limit=6`),
     phone ? read(`presence_form_submissions?site_id=eq.${S}&spam=eq.false&phone=ilike.${pat}&select=id,name,email,phone,created_at&order=created_at.desc&limit=10`) : none,
     read(`presence_proposals?site_id=eq.${S}&deleted_at=is.null&title=${like}&select=id,deal_id,title,status,created_at&order=created_at.desc&limit=4`),
@@ -202,7 +209,8 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
   for (const [list, kind, word] of [[proposals, 'proposal', 'Proposal'], [estimates, 'estimate', 'Estimate'], [agreements, 'agreement', 'Agreement']] as Array<[any[], string, string]>) {
     for (const x of list) add({ kind, group: 'deals', label: String(x.title || word), sub: [word, DOC_WORD[kind][String(x.status)] || '', shortDate(x.created_at)].filter(Boolean).join(' · '), href: dealHref(x.deal_id) });
   }
-  for (const v of invoices) add({ kind: 'invoice', group: 'money', label: `${String(v.title || 'Invoice')} — $${Math.round((Number(v.amount_cents) || 0) / 100).toLocaleString('en-US')}`, sub: 'Invoice · ' + (v.status === 'open' ? 'awaiting payment' : String(v.status || '')), href: v.deal_id ? dealHref(v.deal_id, 'billing') : '/pipeline.html' });
+  // the number on every invoice found (sales item 120): what the client reads off their copy
+  for (const v of invoices) add({ kind: 'invoice', group: 'money', label: `${String(v.title || 'Invoice')} — $${Math.round((Number(v.amount_cents) || 0) / 100).toLocaleString('en-US')}`, sub: [v.payment_for ? 'Part payment' : ['Invoice', invoiceNo(v.number)].filter(Boolean).join(' '), v.status === 'open' ? 'awaiting payment' : String(v.status || '')].filter(Boolean).join(' · '), href: v.deal_id ? dealHref(v.deal_id, 'billing') : '/pipeline.html' });
   // item 76 rides along: Pipeline listens for #outstanding — #receivables opened the board and stopped
   if (moneyWord) add({ kind: 'page', group: 'money', label: 'Who owes you', sub: 'Pipeline · outstanding invoices', href: '/pipeline.html#outstanding' });
   for (const p of projects) add({ kind: 'project', group: 'projects', label: String(p.name || 'Project'), sub: 'Project', href: `/crm.html?project=${p.id}&tab=delivery` });

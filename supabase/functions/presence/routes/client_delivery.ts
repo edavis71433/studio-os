@@ -20,7 +20,8 @@ import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
 import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { isStudioSide, studioDenied, loadApprovals, clearApprovalOverdue } from './projects.ts';
-import { signDocToken, type DocKind } from '../lib/documents.ts';
+import { signDocToken, invoiceNo, type DocKind } from '../lib/documents.ts';
+import { nestPartPayments, PAY_METHOD_LABEL, type PayMethod } from '../lib/invoice_billing.ts';
 import { proposalTotals } from '../lib/sales_lifecycle.ts';
 import { linkSecret, docViewerUrl } from './sales.ts';
 import { readGsc, readSearchTerms } from './analytics.ts';
@@ -83,7 +84,10 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   // select first, then the pre-0132 shape, so a function deploy ahead of the
   // migration never blanks the client's money surface.
   const SEL = 'id,title,description,amount_cents,status,due_date,paid_at,stripe_url,created_at,site_id';
-  let r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since&order=created_at.desc&limit=200`);
+  // sales item 120 (code pass finding 56): the invoice's number, and which invoice a part
+  // payment paid toward (APPLY-0167), so the portal reads like the client's own copies
+  let r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since,number,payment_for,paid_method&order=created_at.desc&limit=200`);
+  if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since&order=created_at.desc&limit=200`);
   if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL}&order=created_at.desc&limit=200`);
   // Builder list item 179, part four: each invoice on the client's papers shelf opens
   // as the studio's branded copy (doc.html, the Documents tab's own short-lived signed
@@ -97,10 +101,11 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   // formula against the client's LOCAL day (PS2's rule) and adds the
   // just-came-back-from-Stripe case; `state` on the wire is the server's word.
   const today = nowIso().slice(0, 10);
-  const list = await Promise.all(rows(r).map(async (i) => {
+  // a part payment sits under the invoice it paid toward, never beside it as a second paid invoice
+  const list = await Promise.all(nestPartPayments(rows(r)).map(async (i) => {
     const state = moneyState(i, today);
     return {
-      id: i.id, name: clean(i.title, 200), description: clean(i.description, 1000),
+      id: i.id, name: clean(i.title, 200), description: clean(i.description, 1000), number: invoiceNo(i.number),
       amount: (Number(i.amount_cents) || 0) / 100, status: i.status, state, due_date: i.due_date, paid_at: i.paid_at,
       processing_since: i.processing_since || null,
       // Only an invoice that is still WAITING on payment is payable: never a paid
@@ -111,6 +116,12 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
       pay_url: ((state === 'upcoming' || state === 'overdue') && i.stripe_url) ? i.stripe_url : null,
       view_url: state ? await viewUrl(i) : null,
       created_at: i.created_at,
+      // what was paid toward it already, each with its own receipt; total = what is left (or
+      // was paid last) plus those parts
+      ...(i.parts ? {
+        payments: await Promise.all(i.parts.map(async (p: any) => ({ id: p.id, amount: (Number(p.amount_cents) || 0) / 100, paid_at: p.paid_at, method: PAY_METHOD_LABEL[p.paid_method as PayMethod] || '', view_url: await viewUrl(p) }))),
+        paid_so_far: (i.paid_so_far_cents || 0) / 100, total: (i.total_cents || 0) / 100,
+      } : {}),
     };
   }));
   const b = moneyBuckets(list, today);

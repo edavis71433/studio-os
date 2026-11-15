@@ -20,17 +20,27 @@ const PAGE = 500;
 
 export async function handleSalesInvoicesList(req: Request, site: SiteRow, cors: Record<string, string>): Promise<Response> {
   const today = callerToday(new URL(req.url).searchParams.get('today'), new Date().toISOString());
+  const book = await readInvoiceBook(site, today);
+  if (!book) return json({ error: 'read_failed', message: 'Your invoices couldn’t load just now.' }, 502, cors);
+  return json({ data: { items: book.items, today, partial: book.partial } }, 200, cors);
+}
+
+/** Every invoice row the studio has, newest first, each with who it is for. The Invoices page
+ *  and the export for a bookkeeper (sales item 105) read the same book. `more` adds what only
+ *  the export needs: each invoice's lines and its payment note. null = a page couldn't be read
+ *  (part of the book is not the book). */
+export async function readInvoiceBook(site: SiteRow, today: string, more = false): Promise<{ items: any[]; partial: boolean } | null> {
   const base = 'id,title,amount_cents,purpose,status,due_date,paid_at,created_at,deal_id,customer_client_id,stripe_url';
   // number, how it was paid and part payments land with APPLY-0167; processing_since with 0132
-  const shapes = [`${base},processing_since,number,paid_method,paid_note,payment_for`, `${base},processing_since`, base];
+  const shapes = [`${base},processing_since,number,paid_method,paid_note,payment_for${more ? ',lines' : ''}`, `${base},processing_since`, base];
   const page = (sel: string, off: number) => svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&select=${sel}&order=created_at.desc,id.desc&limit=${PAGE}&offset=${off}`);
   let sel = shapes[0], r = await page(sel, 0);
   for (let i = 1; !r.ok && i < shapes.length; i++) { sel = shapes[i]; r = await page(sel, 0); }
-  if (!r.ok) return json({ error: 'read_failed', message: 'Your invoices couldn’t load just now.' }, 502, cors);
+  if (!r.ok) return null;
   const all = rows(r);
   while (rows(r).length >= PAGE && all.length < INVOICES_MAX) {
     r = await page(sel, all.length);
-    if (!r.ok) return json({ error: 'read_failed', message: 'Your invoices couldn’t load just now.' }, 502, cors);   // part of the book is not the book
+    if (!r.ok) return null;
     all.push(...rows(r));
   }
   // who each is for: the deal's title and person, and the customer it was billed to
@@ -57,7 +67,8 @@ export async function handleSalesInvoicesList(req: Request, site: SiteRow, cors:
       deal_id: i.deal_id || null, deal_title: d ? String(d.title || '') : '',
       business: k ? String(k.name || k.email || '') : (p && p.company ? String(p.company) : ''),
       person: p ? String(p.name || p.email || '') : '',
+      ...(more ? { paid_note: String(i.paid_note || ''), lines: Array.isArray(i.lines) ? i.lines : [] } : {}),
     };
   });
-  return json({ data: { items, today, partial: all.length >= INVOICES_MAX } }, 200, cors);
+  return { items, partial: all.length >= INVOICES_MAX };
 }

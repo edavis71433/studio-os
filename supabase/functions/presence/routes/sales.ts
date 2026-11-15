@@ -5,7 +5,7 @@
 //   sign/convert are idempotent. Convert bridges to the existing, idempotent
 //   provisionForSignup — no second provisioning path, no legacy data.
 import { json } from '../../_shared/http.ts';
-import { svc, svcCount } from '../lib/db.ts';
+import { svc, svcCount, svcPages } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { sendEmail, findClientByEmail, createAuthUser, createContactAndClient, deleteAuthUser, generateSetPasswordLink, validEmail } from '../commerce/account.ts';
 import { mintSignInLink } from '../lib/workspace.ts';
@@ -23,10 +23,11 @@ import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
-import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { readReservedJsonOrThrow, readReservedJson, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { normalizeGoalAi, goalProgress } from '../lib/sales_ai.ts';
 import { normalizeStageNames, stageLabels, loadStageLabels, forgetStageLabels, renameMovedTo, DEFAULT_STAGE_LABEL, normalizeStageChances, stageChances, loadStageChances, forgetStageChances, expectedValue, DEFAULT_STAGE_CHANCE } from '../lib/stage_names.ts';
 import { validateRetainerInput, mergeRetainerState, retainerSubscriptionIds, type RetainerState } from '../commerce/retainers.ts';
-import { leftToBill, reuseDecision, retainerPaid, linesFromProposal } from '../lib/invoice_billing.ts';   // sales items 107, 108, 81
+import { leftToBill, reuseDecision, retainerPaid, retainerPayments, linesFromProposal } from '../lib/invoice_billing.ts';   // sales items 107, 108, 81, 120
 import { editionFor } from '../commerce/catalog.ts';
 import type { PlanKey } from '../commerce/catalog.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
@@ -830,6 +831,7 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   if (req.method !== 'GET') return json({ error: 'method_not_allowed' }, 405, cors);
   const namesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
   const chancesP = loadStageChances(site.id);   // item 69: each open stage's chance (defaults when unreadable)
+  const goalP = readReservedJson(site.id, RESERVED_NAMES.salesGoalAi);   // sales item 94: the month's goal (none when unreadable: the card stays away)
   // A solo studio's whole pipeline is small; scan a generous cap. `truncated`
   // tells the truth if we ever hit it — the totals are then a floor, never a
   // fabricated whole-set sum.
@@ -861,7 +863,9 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   const chances = await chancesP;
   const ex = expectedValue(deals, chances);
   sum.by_stage = sum.by_stage.map((s) => ({ ...s, chance: chances[s.stage] ?? null, expected_cents: ex.by_stage[s.stage] ?? 0 }));
-  return json({ data: { ...sum, ar, expected: { value_cents: ex.value_cents } }, truncated: deals.length >= CAP }, 200, cors);
+  // sales item 94: the month's goal against won this month and what open deals should still bring
+  const goal = goalProgress(normalizeGoalAi(await goalP).goal_cents, sum.won_month.value_cents, ex.value_cents);
+  return json({ data: { ...sum, ar, expected: { value_cents: ex.value_cents }, goal }, truncated: deals.length >= CAP }, 200, cors);
 }
 
 // ═══ RECEIVABLES — the "who owes me money" list behind the AR strip ═══
@@ -986,8 +990,13 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   const read = async (key: string, path: string) => { try { const r = await svc(path); if (!r.ok) { failed.add(key); return []; } return rows(r); } catch { failed.add(key); return []; } };
   const since24 = new Date(Date.now() - 2 * 366 * 86400_000).toISOString();
   const since365 = new Date(Date.now() - 366 * 86400_000).toISOString();
-  const [paid, deals, subs, rcv] = await Promise.all([
-    read('revenue', `presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${encodeURIComponent(since24)}&select=amount_cents,paid_at&limit=5000`),
+  // sales item 120 (code pass finding 54): revenue is every payment, page by page (one read
+  // answers 1,000 rows at most): paid invoices, and retainer charges, which are only ever a
+  // deal event. Either read failing marks revenue unavailable, never a number that is low.
+  const pages = async (key: string, path: string, order: string) => { const r = await svcPages(path, order).catch(() => null); if (!r) { failed.add(key); return []; } return r.rows; };
+  const [paid, retainerEvents, deals, subs, rcv] = await Promise.all([
+    pages('revenue', `presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${encodeURIComponent(since24)}&select=amount_cents,paid_at`, 'paid_at'),
+    pages('revenue', `presence_deal_events?site_id=eq.${site.id}&kind=eq.invoice_paid&detail->>retainer=eq.true&created_at=gte.${encodeURIComponent(since24)}&select=kind,detail,created_at`, 'created_at'),
     // item 69: found_via rides along; before APPLY-0143 the same read without it
     (async () => {
       const cols = 'id,title,stage,source,source_submission_id,expected_value_cents,created_at,updated_at,converted_client_id,converted_at,lost_reason';
@@ -1016,7 +1025,7 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   const dealsOff = failed.has('deals');   // the pipeline and won/lost reports both stand on the deals read
   return json({ data: {
     generated_at: now,
-    revenue: failed.has('revenue') ? { unavailable: true } : revenueByMonth(paid, now),
+    revenue: failed.has('revenue') ? { unavailable: true } : revenueByMonth(paid, now, retainerPayments(retainerEvents)),
     pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now, await labelsP, await chancesP), partial: failed.has('stages') },
     outcomes: dealsOff ? { unavailable: true } : { ...wonAndLost(deals, now, 365, closedAt), partial: failed.has('closes') },
     enquiries: failed.has('enquiries') ? { unavailable: true } : enquiriesBySource(subs, becameDeal, now),

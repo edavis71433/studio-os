@@ -161,6 +161,8 @@ const DECIDED = {
     'POST /email/log-address', 'DELETE /email/log-address',
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58
     'POST /reviews/google-link',   // sales review item 115: where Google review requests send people is a setting
+    'POST /sales/setup',   // sales item 105: hiding Home's setup strip
+    'PUT /sales/goal-ai',   // sales item 94: the month's goal (the AI help switch in it is the owner's alone, said by the route)
   ],
   approve: [
     'POST /approvals/:id/decide', 'POST /assets/:id/status', 'POST /client/approvals/:id/decide',
@@ -214,6 +216,8 @@ const DECIDED = {
     'POST /sales/customers', 'POST /sales/deals', 'POST /sales/deals/:id/activity',
     'POST /sales/tasks', 'POST /sales/people/activity',   // sales items 85 and 106: to-dos and calls for anyone
     'POST /sales/email',   // sales item 80: an email from the record, like the reply to an enquiry
+    'POST /handover/notify',   // sales item 93: the hand-over pack email (only a studio scoped in gets past the route)
+    'POST /sales/ai/draft', 'POST /sales/ai/summary',   // sales item 94: a draft only fills the box; a summary is kept on the record
     'POST /sales/deals/:id/contracts', 'POST /sales/deals/:id/convert', 'POST /sales/deals/:id/invoice',
     'POST /sales/deals/:id/proposals', 'POST /sales/deals/:id/resend-invite', 'POST /sales/deals/:id/retainer',
     'POST /sales/deals/:id/schedule', 'POST /sales/deals/:id/send', 'POST /sales/deals/:id/stage',
@@ -353,6 +357,8 @@ const CHANGED = [
   { name: 'POST /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },     // sales review item 69
   { name: 'DELETE /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },
   { name: 'POST /reviews/google-link', body: { place_id: 'ChIJTestPlace_1234' }, run: (r, p) => handleReviewGoogleLink(r, A, p, cors) },     // sales review item 115
+  { name: 'POST /sales/setup', body: { hidden: true }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/setup_strip.ts')).handleSetupStrip(r, A, p, cors) },     // sales item 105: hiding Home's setup strip
+  { name: 'PUT /sales/goal-ai', body: { goal_cents: 800000 }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/sales_ai.ts')).handleGoalAi(r, p.jwt || '', A, p, cors) },     // sales item 94: the month's goal
   { name: 'PUT /report/monthly', body: { note: 'A line for the client' }, run: (r, p) => handleReportPut(r, A, p, cors) },     // builder list item 58 (a line, not the switch: this stub answers every read with a row, which reads as a do-not-send entry)
   { name: 'POST /report/monthly/preview', fx: { only: ['clients'] }, run: (r, p) => handleReportPreview(A, p, cors) },   // with every read answering a row the address reads as suppressed; the send is the write
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
@@ -500,6 +506,10 @@ const WRITE_HANDLERS = [
   // no member list (an unlisted write refuses every seat — asserted above), and the handlers
   // themselves refuse anyone who isn't platform staff (tool_leads_routes_test.mjs proves it).
   'handleToolLead', 'handleToolLeadConvert',
+  // builder list item 185: the map rank grid spends the platform's Google key, so it is the studio's
+  // alone. Its writes are on no member list (every seat is refused at the gate), and the handlers
+  // refuse anyone who isn't platform staff or a studio scoped in (rank_grid_test.mjs proves it).
+  'handleMapsPut', 'handleMapsPlace', 'handleMapsFind', 'handleMapsScan',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
   'handleFoundationsPlanDone',   // builder item 193: open on the member list; the route answers the studio only
@@ -512,6 +522,9 @@ const WRITE_HANDLERS = [
   'handleVisualEdit', 'handleVisualGenerate', 'handleVisualVary', 'handleWriteDecide',
   'handleWriteExecute', 'handleWritePrepare', 'handleWriteRollback', 'handleWriterAccept', 'handleWriterDiscard',
   'handleWriterGenerate', 'handleWriterRewrite',
+  'handleSetupStrip',   // sales item 105: POST hides Home's setup strip (configure)
+  'handleHandoverPack',   // sales item 93: POST /handover/notify (edit; the route refuses anyone but the studio)
+  'handleGoalAi', 'handleAiDraft', 'handleAiSummary',   // sales item 94: PUT /sales/goal-ai (configure; the switch is the owner's), POST /sales/ai/(draft|summary) (edit)
 ];
 {
   const idx = read('supabase/functions/presence/index.ts');
