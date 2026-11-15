@@ -1369,7 +1369,8 @@ async function load(){
   if(CTX&&CTX.is_agency&&!scope()){await loadPortfolio();return;}
   await loadDash();
 }
-(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}if(document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));/* shell.js is deferred: wait for it rather than ask who-am-I twice */const c=await (window.ddsContext?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));CTX=(c.ok&&c.body.data)||{};await load();}catch(_){trouble();}})();
+const SHELL_READY=document.readyState==='loading'?new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true})):Promise.resolve();   // shell.js (deferred) is in by DOMContentLoaded. Made now, while the page parses: after an await, readyState can already say 'interactive' with shell.js still on its way
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await SHELL_READY;/* shell.js is deferred: wait for it rather than ask who-am-I twice */const c=await (window.ddsContext?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));CTX=(c.ok&&c.body.data)||{};await load();}catch(_){trouble();}})();
 </script>
 </body>
 </html>

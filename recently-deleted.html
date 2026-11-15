@@ -101,7 +101,8 @@ const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // builder item 83: ?client= is also how someone with places in two businesses opens their second one. That is
 // their own business, not a studio inside a client, so its own deleted deals, contacts and to-dos show here. The shell tells the two apart
 // (ddsScopeInfo, once its context is in); without it, the address decides, as before.
-async function inClientNow(){const id=scope();if(!id)return false;if(document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));if(window.ddsContext)await window.ddsContext().catch(()=>null);return window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)?!!window.ddsScopeInfo():true;}
+const SHELL_READY=document.readyState==='loading'?new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true})):Promise.resolve();   // shell.js (deferred) is in by DOMContentLoaded. Made now, while the page parses: after an await, readyState can already say 'interactive' with shell.js still on its way
+async function inClientNow(){const id=scope();if(!id)return false;await SHELL_READY;if(window.ddsContext)await window.ddsContext().catch(()=>null);return window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)?!!window.ddsScopeInfo():true;}
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope()});
 async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,body:{}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 function toast(m,bad,action){if(window.ddsToast)return void ddsToast(m,bad?'err':'ok',action);}

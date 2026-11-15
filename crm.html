@@ -2100,6 +2100,9 @@ function renderComposer(){
   host.querySelectorAll('[data-aud]').forEach(b=>b.addEventListener('click',()=>{NEWAUD=b.getAttribute('data-aud');host.querySelectorAll('[data-aud]').forEach(x=>{const on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on?'true':'false');});const hh=$('notehint');if(hh)hh.textContent=NEWAUD==='shared'?'The client will see this note.':'Internal notes stay with your studio.';}));
   const ng=$('noteGo'); if(ng)ng.addEventListener('click',addNote);
 }
+// shell.js is deferred and runs just before DOMContentLoaded. Made now, while the page parses: after an
+// await, readyState can already say 'interactive' with shell.js still on its way, and the wait was skipped.
+const SHELL_READY=document.readyState==='loading'?new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true})):Promise.resolve();
 // ── sales item 94: AI help on a record. "Where things stand" tops the rail (kept with its date,
 // so a later visit shows it without paying again) and "Draft it for me" sits in the Email box.
 // Both read the record the way this page does (the keys loadActivity sends, in this page's
@@ -2125,7 +2128,7 @@ function renderAiCard(){
   const c=REC&&REC.canonical;
   if(!c||!c.value){host.innerHTML='';AI_SUM=null;return;}
   const go=()=>{if(!host.isConnected||!window.ddsSalesAi)return;AI_SUM=window.ddsSalesAi.summary(host,{req:api,subject:c.key+':'+c.value,query:aiRecordQuery,who:aiWho(),dealToo:!!idParams().deal,newSince:(iso)=>{const t=Date.parse(iso);return Number.isFinite(t)?(ACT.items||[]).filter(i=>i&&Date.parse(i.at)>t).length:0;}});};
-  if(window.ddsSalesAi||document.readyState!=='loading')go();else document.addEventListener('DOMContentLoaded',go,{once:true});
+  if(window.ddsSalesAi)go();else SHELL_READY.then(go);
 }
 function emAiTools(row,k){
   if(!window.ddsSalesAi)return;
@@ -2137,7 +2140,7 @@ function emAiTools(row,k){
 // shell.js loads deferred: on the first draw the kit may still be on its way
 function emailBoxInto(el,o){
   const go=()=>{if(!el.isConnected)return;if(window.ddsEmailBox)window.ddsEmailBox.open(el,o);else el.innerHTML='<p class="muted">Reload the page to email them from here.</p>';};
-  if(window.ddsEmailBox||document.readyState!=='loading')go();else document.addEventListener('DOMContentLoaded',go,{once:true});
+  if(window.ddsEmailBox&&window.ddsSalesAi)go();else SHELL_READY.then(go);   // sales-ai.js (deferred, after shell.js) draws its Draft it for me
 }
 function emailSent(d,first){
   clearDraft('emSubject');clearDraft('emBody');

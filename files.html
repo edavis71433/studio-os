@@ -639,10 +639,13 @@ function askPrompt(title, body, okLabel, placeholder, value){
   });
 }
 
+// shell.js is deferred and runs just before DOMContentLoaded. Made now, while the page parses: after an
+// await, readyState can already say 'interactive' with shell.js still on its way, and the wait was skipped.
+const SHELL_READY=document.readyState==='loading'?new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true})):Promise.resolve();
 async function loadContext(){
   // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
   // shell.js is deferred, so it is not there yet when this runs: wait for it rather than ask twice.
-  if(document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));
+  await SHELL_READY;
   const c=await (window.ddsContext?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));
   if(c.ok&&c.body.data){
     S.caps=c.body.data.capabilities||[];

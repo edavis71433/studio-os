@@ -2073,6 +2073,9 @@ function holdAnchor(sec) {
   ro.observe($('main'));
   setTimeout(stop, 15000);
 }
+// shell.js is deferred and runs just before DOMContentLoaded. Made now, while the page parses: after an
+// await, readyState can already say 'interactive' with shell.js still on its way, and the wait was skipped.
+const SHELL_READY = document.readyState === 'loading' ? new Promise((r) => document.addEventListener('DOMContentLoaded', r, { once: true })) : Promise.resolve();
 (async function init() {
   try {
     const { data } = await sb.auth.getSession();
@@ -2084,7 +2087,7 @@ function holdAnchor(sec) {
     const profile = loadProfile(); profile.catch(() => {});
     // the shell's context is the same read — reuse it, fall back to our own. shell.js is
     // deferred, so it is not there yet when this runs: wait for it rather than ask twice.
-    if (document.readyState === 'loading') await new Promise((r) => document.addEventListener('DOMContentLoaded', r, { once: true }));
+    await SHELL_READY;
     try { CTX = window.ddsContext ? await window.ddsContext() : null; } catch (_) { CTX = null; }
     if (!CTX) { const r = await api('/portal/context'); CTX = (r.ok && r.body && r.body.data) || null; }
     ctxIn();
