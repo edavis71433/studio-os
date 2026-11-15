@@ -511,6 +511,24 @@
   .pill-build{background:var(--p-soft);color:var(--p)} .pill-draft{background:var(--warn-soft);color:var(--warn)}
   .wsbuild .wsfoot{justify-content:flex-start}
   .wsbuild .wsbar .tag{margin-bottom:0}
+  /* item 234: the studio's pages and quick links, at the top of Help */
+  .hsec{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);margin:18px 2px 8px}
+  .plist{padding:4px 0}
+  .plist .prow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--line);padding:12px 16px;font:inherit;color:var(--ink);cursor:pointer;min-height:56px}
+  .plist .prow:first-child{border-top:none}
+  .plist .prow:hover b{color:var(--p)}
+  .plist .pt{flex:1;min-width:0;display:flex;flex-direction:column}
+  .plist .pt .muted{font-size:13px}
+  .plist .car{color:var(--soft);font-size:18px}
+  .qlinks{display:flex;flex-wrap:wrap;gap:8px}
+  .qlinks .qlink{font:inherit;font-size:13.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);padding:8px 14px;text-decoration:none;cursor:pointer;min-height:40px;display:inline-flex;align-items:center}
+  .qlinks .qlink:hover{border-color:var(--p);color:var(--p)}
+  .ppage h1{font-family:var(--serif,inherit);font-weight:500;margin:6px 0 12px}
+  .ppage p{margin:0 0 12px;line-height:1.6;overflow-wrap:anywhere}
+  .ppage .pfile{font:inherit;font-weight:600;background:none;border:none;color:var(--p);cursor:pointer;padding:0;text-align:left;min-height:36px}
+  .ppage ul.kl{list-style:none;padding:0;margin:8px 0 0}.ppage ul.kl li{padding:6px 0}.ppage ul.kl a{color:var(--p);font-weight:600;text-decoration:none;overflow-wrap:anywhere}
+  @media (max-width:719px){.qlinks .qlink,.plist .prow{min-height:48px}}
+
   /* item 232: a studio's preview of a client's portal */
   .pvbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);padding:10px 16px;font-size:13.5px;line-height:1.45;border-bottom:1px solid var(--line)}
   .pvbar p{margin:0;flex:1 1 320px;min-width:0}
@@ -2745,6 +2763,38 @@ function kitHtml(kr){
   const files=(k.files||[]).length?`<h3 class="kh">Files</h3><ul class="kl">${k.files.map(f=>`<li><a href="${esc(f.url)}" target="_blank" rel="noopener">⬇ ${esc(f.name)}</a></li>`).join('')}</ul>`:'';
   return `<section id="sec-kit" class="kit"><h2>Your website kit · from ${esc(studioBrand())}</h2><div class="card">${who}${site}${guides}${videos}${files}</div></section>`;
 }
+// ── Builder list item 234: the pages and quick links the studio made, at the top of Help
+//    (GET /client/portal-pages: only the pages this client may see). A page opens full
+//    screen with a back arrow; a file on it asks for a fresh link when it's pressed. A quick
+//    link to a place the studio turned off for this client isn't drawn. ──
+let PAGES=null;
+function quickLinkShown(l){const t=String(l&&l.to||'');if(/^https:\/\//.test(t))return true;if(t==='book')return partOn('book');if(t==='messages')return partOn('messages');if(t==='documents')return tabShown('documents');return false;}
+function portalPagesHtml(){
+  const pages=(PAGES&&PAGES.pages)||[],links=((PAGES&&PAGES.links)||[]).filter(quickLinkShown);
+  let h='';
+  if(pages.length)h+=`<section id="sec-pages" aria-labelledby="pagesH"><h2 id="pagesH" class="hsec">From ${esc(studioBrand())}</h2><div class="card plist">${pages.map(p=>`<button type="button" class="prow" data-page="${esc(p.id)}"><span class="pt"><b>${esc(p.title)}</b>${p.sub?`<span class="muted">${esc(p.sub)}</span>`:''}</span><span class="car" aria-hidden="true">›</span></button>`).join('')}</div></section>`;
+  if(links.length)h+=`<section id="sec-qlinks" aria-labelledby="qlinksH"><h2 id="qlinksH" class="hsec">Quick links</h2><div class="qlinks">${links.map(l=>/^https:\/\//.test(l.to)?`<a class="qlink" href="${esc(l.to)}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`:`<button type="button" class="qlink" data-ql="${esc(l.to)}">${esc(l.label)}</button>`).join('')}</div></section>`;
+  return h;
+}
+function wirePortalPages(){
+  document.querySelectorAll('#sec-pages [data-page]').forEach(b=>b.addEventListener('click',()=>openPortalPage(b.getAttribute('data-page'))));
+  document.querySelectorAll('#sec-qlinks [data-ql]').forEach(b=>b.addEventListener('click',()=>{const t=b.getAttribute('data-ql');if(t==='book')openBooking();else showTab(t);}));
+}
+function openPortalPage(id){
+  const p=((PAGES&&PAGES.pages)||[]).find(x=>x.id===id);if(!p){showTab('help');return;}
+  ++VIEW_SEQ;CURRENT_TAB='help';setActiveTab('help');setWide(false);
+  const paras=String(p.words||'').split(/\n{2,}/).map(t=>t.trim()).filter(Boolean).map(t=>`<p>${esc(t).replace(/\n/g,'<br>')}</p>`).join('');
+  const items=(p.items||[]).map(i=>i.kind==='file'?`<li><button type="button" class="pfile" data-file="${esc(i.media_id)}">⬇ ${esc(i.label)}</button></li>`:`<li><a href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">${i.kind==='video'?'▶ ':''}${esc(i.label)} ↗</a></li>`).join('');
+  $('main').innerHTML=sheetBackHtml({label:'Help'})+`<article class="ppage"><h1 id="pagehead" tabindex="-1">${esc(p.title)}</h1>${paras}${items?`<ul class="kl">${items}</ul>`:''}</article>`;
+  document.title=`${p.title} — ${studioBrand()}`;
+  $('sheetBack').addEventListener('click',(e)=>{e.preventDefault();showTab('help');});
+  document.querySelectorAll('.ppage [data-file]').forEach(b=>b.addEventListener('click',async()=>{
+    b.disabled=true;const r=await api('/client/portal-pages/files/'+encodeURIComponent(b.getAttribute('data-file'))+'?page='+encodeURIComponent(p.id));b.disabled=false;
+    if(r.ok&&r.body&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener');else toast((r.body&&r.body.message)||'That file couldn’t open just now. Try again in a moment.');
+  }));
+  try{window.scrollTo(0,0);}catch(_){}
+  const h=$('pagehead');if(h)h.focus({preventScroll:true});
+}
 function starterFaqHtml(){return `<section class="faq">${STARTER_FAQ.map(([q,a])=>`<details class="faq-item"><summary>${esc(q)}</summary><div class="faq-answer"><p>${esc(a)}</p></div></details>`).join('')}</section>`;}
 // Item 128: New in your portal. The portal's bell is already its news, so what changed in
 // the portal lives here, at the top of Help: entries written for clients, a picture and a
@@ -2775,15 +2825,19 @@ async function renderHelp(){
   }
   $('main').innerHTML=spinnerHtml();
   const answers=partOn('help');   // item 229: the studio's answers and the hand-over kit can be off
+  const pgP=api('/client/portal-pages').catch(()=>null);   // item 234: the studio's pages and quick links, whatever Help answers are
   let r=null,kr=null;if(answers){try{[r,kr]=await Promise.all([api('/client/faq').catch(()=>null),api('/client/kit').catch(()=>null)]);}catch(_){}}
+  const pg=await pgP;
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
+  PAGES=(pg&&pg.ok&&pg.body&&pg.body.data)||null;
   const faqFailed=!(r&&r.ok);
   const faqHtml=(!faqFailed&&r.body&&r.body.data&&r.body.data.html)||'';
-  let html=portalHeader('Help',answers?'Quick answers from your studio.':'Your account, and what’s new in your portal.')+whatsNewDoorHtml()+(answers?kitHtml(kr):'');
+  let html=portalHeader('Help',answers?'Quick answers from your studio.':'Your account, and what’s new in your portal.')+whatsNewDoorHtml()+portalPagesHtml()+(answers?kitHtml(kr):'');
   // failed ≠ empty: a failed read says so calmly (nothing was cached, so coming
   // back to the tab retries) — only a genuine ok-empty earns the no-articles copy
   if(answers&&faqFailed)html+=`<div class="card"><p class="muted">We couldn’t load help articles just now — please try again in a moment.</p></div>`;
   else if(answers){
+    if(PAGES&&((PAGES.pages||[]).length||(PAGES.links||[]).length))html+=`<h2 class="hsec">Quick answers</h2>`;   // item 234: under the studio's pages and links
     html+=`<div class="card" style="padding:12px 14px"><input id="faqSearch" type="search" placeholder="Search help…" aria-label="Search help" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)"></div>`;
     // Nov 10 walk: no articles used to mean an empty box with a red question mark.
     // Until the studio writes its own, the basics of this portal answer instead.
@@ -2797,6 +2851,7 @@ async function renderHelp(){
   wirePackCard();
   const hm=$('helpMsg');if(hm)hm.addEventListener('click',openMessagesCompose);   // item 179 part three: one door
   wireWhatsNewDoor();   // item 128
+  wirePortalPages();   // item 234
   wireAccountSection();
   const search=$('faqSearch');
   if(search)search.addEventListener('input',()=>{

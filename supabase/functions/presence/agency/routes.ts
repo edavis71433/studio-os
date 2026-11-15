@@ -385,6 +385,52 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     }
   }
 
+  // ── builder list item 234: the pages and quick links the studio makes for its clients
+  //    (Settings › Client portal). One page or one link at a time, applied to what's stored. ──
+  if (route === '/agency/portal/pages' && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+    if (!own) return json({ error: 'no_studio_site', message: 'Portal pages are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+    const { normalizePages, MAX_PAGES, MAX_LINKS, MAX_ITEMS, TITLE_MAX, WORDS_MAX } = await import('../lib/portal_pages.ts');
+    let stored: unknown;
+    try { stored = await readReservedJsonOrThrow(own.id, RESERVED_NAMES.portalPages); }
+    catch { return json({ error: 'read_failed', message: 'Your portal pages couldn’t load just now.' }, 502, cors); }
+    const input = await sharedGather(member.agency_id, now);
+    return json({ data: { ...normalizePages(stored), clients: activeClientsOf(input),
+      limits: { pages: MAX_PAGES, links: MAX_LINKS, items: MAX_ITEMS, title: TITLE_MAX, words: WORDS_MAX },
+      can_edit: can(member.role, 'manage_clients') } }, 200, cors);
+  }
+  {
+    const pm = route.match(/^\/agency\/portal\/(pages|links)\/([^/]+)$/);
+    if (pm && (method === 'PUT' || method === 'DELETE')) {
+      if (!can(member.role, 'manage_clients')) return forbid(cors);
+      const P = await import('../lib/portal_pages.ts');
+      const id = decodeURIComponent(pm[2]).toLowerCase();
+      if (!P.isId(id)) return json({ error: 'bad_request', message: 'Say which one.' }, 400, cors);
+      const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+      if (!own) return json({ error: 'no_studio_site', message: 'Portal pages are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+      let next: ReturnType<typeof P.normalizePages> | null = null;
+      if (method === 'PUT') {
+        const b = await body();
+        const thing = pm[1] === 'pages' ? P.cleanPage(b, id, now) : P.cleanLink(b, id);
+        if (!thing) return json({ error: 'bad_request', message: pm[1] === 'pages' ? 'A page needs a title.' : 'A quick link needs a name and where it goes (an https address, or a place in the portal).' }, 400, cors);
+        let full = false;
+        const saved = await updateReservedJson(own.id, RESERVED_NAMES.portalPages, (cur) => {
+          const was = P.normalizePages(cur);
+          const put = pm[1] === 'pages' ? P.putPage(was, thing as ReturnType<typeof P.cleanPage> & object) : P.putLink(was, thing as ReturnType<typeof P.cleanLink> & object);
+          if (!put) { full = true; return was; }
+          return put;
+        }, member.email);
+        if (full) return json({ error: 'full', message: pm[1] === 'pages' ? `That’s ${P.MAX_PAGES} pages, the most a portal holds.` : `That’s ${P.MAX_LINKS} quick links, the most a portal holds.` }, 409, cors);
+        next = saved;
+      } else {
+        next = await updateReservedJson(own.id, RESERVED_NAMES.portalPages, (cur) => pm[1] === 'pages' ? P.dropPage(P.normalizePages(cur), id) : P.dropLink(P.normalizePages(cur), id), member.email);
+      }
+      if (!next) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+      return json({ data: { pages: next.pages, links: next.links } }, 200, cors);
+    }
+  }
+
   // ── builder list items 129 and 180: each site's visitors, Google clicks and health,
   //    with the change from last month, read after the Sites cards are up ──
   {
