@@ -1,5 +1,7 @@
 # Production baseline — 2026-07-05
 
+> **A dated record.** This is production as it stood on July 5, 2026, not today: the admin console it names was retired on July 11, and the system has moved on a long way since. The README describes it as it is now.
+
 The definitive record of what is live in production after the step-2 safety
 fixes and the step-3 tenancy migrations `0001/0002/0006`. This is the clean
 starting point for the pipeline work (step 3 continued).

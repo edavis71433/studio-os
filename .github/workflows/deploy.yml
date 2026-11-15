@@ -99,6 +99,15 @@ jobs:
             sleep "$poll"
           done
 
+  # Builder item 212: the walls between studios, checked on a scratch database made for
+  # this run, with this commit's migrations and servers and two studios (isolation.yml).
+  # It runs on every deploy, beside the two jobs above, and writes its result, the date and
+  # the commit to the run's summary. It doesn't hold up the deploy yet: it joins
+  # deploy-production's needs once it has passed on several deploys in a row, as the last
+  # step of item 212. Until then a red result here means look before the next deploy.
+  isolation:
+    uses: ./.github/workflows/isolation.yml
+
   deploy-production:
     if: github.event_name == 'workflow_dispatch'
     needs: [test, browser-gate]

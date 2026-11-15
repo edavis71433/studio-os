@@ -28,7 +28,21 @@ export function byWhom(p: { scope?: unknown; kind?: string; email?: string | nul
 
 export type DomainChange = 'attached' | 'changed' | 'removed' | 'mail_gone' | 'live' | 'main' | 'forward_added' | 'forward_stopped';
 /** Pure: the email for one change, plain words, no hosting company's name. */
-export function domainChangeEmail(kind: DomainChange, o: { domain: string; old?: string | null; forwarded?: boolean; by?: string; builtIn?: string | null; mx?: string[]; recordsAt?: string | null }): { subject: string; html: string } {
+/** Pure: what to do next, for the "connected" and "changing" emails (Nov 12 review, finding 22).
+ *  The client is often the only person who can sign in where the domain is kept, and the email
+ *  used to say only that a domain was connected: no records, no company, no link. */
+export function nextStepsHtml(o: { records?: Array<{ type: string; host: string; value: string }>; recordsAt?: string | null; signIn?: string | null; link?: string | null }): string {
+  const recs = (o.records || []).filter((r) => r && r.value);
+  if (!recs.length) return '<p>It goes live once its records are added where the domain’s settings are kept.</p>';
+  const where = o.recordsAt ? `at ${escHtml(o.recordsAt)}` : 'where the domain’s settings are kept (usually the company it was bought from)';
+  const signIn = o.recordsAt && o.signIn && /^https:\/\//.test(o.signIn) ? ` <a href="${escHtml(o.signIn)}">Sign in to ${escHtml(o.recordsAt)}</a>.` : '';
+  return `<p>It goes live once ${recs.length === 1 ? 'this record is' : `these ${recs.length === 2 ? 'two' : recs.length} records are`} added ${where}.${signIn}</p>` +
+    `<table cellpadding="6" style="border-collapse:collapse;font-family:monospace;font-size:14px"><tr><th align="left">Type</th><th align="left">Name</th><th align="left">Value</th></tr>${recs.map((r) => `<tr><td>${escHtml(r.type)}</td><td>${escHtml(r.host)}</td><td>${escHtml(r.value)}</td></tr>`).join('')}</table>` +
+    '<p>Leave anything marked MX or Mail alone: that’s your email.</p>' +
+    (o.link && /^https:\/\//.test(o.link) ? `<p><a href="${escHtml(o.link)}">Check if it’s ready</a>. Usually within an hour of adding the records, sometimes a day or two.</p>` : '<p>Usually within an hour of adding the records, sometimes a day or two.</p>');
+}
+
+export function domainChangeEmail(kind: DomainChange, o: { domain: string; old?: string | null; forwarded?: boolean; by?: string; builtIn?: string | null; mx?: string[]; recordsAt?: string | null; records?: Array<{ type: string; host: string; value: string }>; signIn?: string | null; link?: string | null }): { subject: string; html: string } {
   const d = escHtml(o.domain), by = escHtml(o.by || 'someone on your account');
   const unexpected = '<p>If this wasn’t expected, reply to this email.</p>';
   // item 174: the www. switch, and another domain forwarding here
@@ -52,12 +66,12 @@ export function domainChangeEmail(kind: DomainChange, o: { domain: string; old?:
   }
   if (kind === 'attached') return {
     subject: `${o.domain} was connected to your website`,
-    html: `<p><strong>${d}</strong> was connected to your website by ${by}.</p><p>It goes live once its two records are added where the domain’s settings are kept.</p>${unexpected}`,
+    html: `<p><strong>${d}</strong> was connected to your website by ${by}.</p>${nextStepsHtml(o)}${unexpected}`,
   };
   if (kind === 'changed') return {
     subject: `Your website’s address is changing to ${o.domain}`,
     html: `<p>Your website is moving from <strong>${escHtml(o.old)}</strong> to <strong>${d}</strong>, by ${by}.</p>` +
-      (o.forwarded ? `<p>${escHtml(o.old)} keeps working: from the next publish, visitors who use it are sent on to ${d}, to the same page.</p>` : `<p>${escHtml(o.old)} no longer shows your website.</p>`) + unexpected,
+      (o.forwarded ? `<p>${escHtml(o.old)} keeps working: from the next publish, visitors who use it are sent on to ${d}, to the same page.</p>` : `<p>${escHtml(o.old)} no longer shows your website.</p>`) + (o.records && o.records.length ? nextStepsHtml(o) : '') + unexpected,
   };
   if (kind === 'removed') return {
     subject: `${o.domain} was removed from your website`,

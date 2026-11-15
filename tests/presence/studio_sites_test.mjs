@@ -111,11 +111,11 @@ const inDays = (n) => new Date(Date.parse(NOW) + n * 86400000).toISOString();
 {
   const base = { site_id: 's', name: 'X', edition: 'presence', status: 'live', last_published_at: '2026-10-01T00:00:00Z', custom_domain: 'x.example', uptime_ok: true };
   ok('domain: expired says how long ago', domainStatus({ ...base, domain_expires_at: inDays(-3) }, NOW).words === 'Expired 3 days ago' && domainStatus({ ...base, domain_expires_at: inDays(-3) }, NOW).tone === 'bad');
-  ok('domain: within 30 days is expiring — the line Needs you uses', domainStatus({ ...base, domain_expires_at: inDays(30) }, NOW).key === 'expiring' && domainStatus({ ...base, domain_expires_at: inDays(31) }, NOW).key === 'connected');
+  ok('domain: within 30 days is expiring — the line Needs you uses', domainStatus({ ...base, domain_expires_at: inDays(30) }, NOW).key === 'expiring' && domainStatus({ ...base, domain_serving: 'latest', domain_expires_at: inDays(31) }, NOW).key === 'connected');
   ok('domain: "Expires today" and "in 1 day" read right', domainStatus({ ...base, domain_expires_at: NOW }, NOW).words === 'Expires today' && domainStatus({ ...base, domain_expires_at: inDays(1) }, NOW).words === 'Expires in 1 day');
   ok('domain: a watch plan\'s domain is on their own host', domainStatus({ ...base, edition: 'monitor' }, NOW).key === 'elsewhere');
   ok('domain: a site not live yet, offline, or not answering says so', domainStatus({ ...base, status: 'ready', last_published_at: null }, NOW).key === 'not_live' && domainStatus({ ...base, offline_at: NOW }, NOW).key === 'offline' && domainStatus({ ...base, uptime_fail_streak: 2 }, NOW).words === 'Not answering');
-  ok('domain: answering the probe is "Connected"; never probed is "Not checked yet"', domainStatus(base, NOW).words === 'Connected' && domainStatus({ ...base, uptime_ok: null }, NOW).words === 'Not checked yet');
+  ok('domain: showing our latest site is "Connected"; merely answering is "Not checked yet" (builder item 194)', domainStatus({ ...base, domain_serving: 'latest' }, NOW).words === 'Connected' && domainStatus(base, NOW).words === 'Not checked yet' && domainStatus({ ...base, uptime_ok: null }, NOW).words === 'Not checked yet');
   const d = buildDomains([
     { ...base, site_id: 'a', name: 'Fine', custom_domain: 'fine.example', domain_expires_at: inDays(300), domain_registrar: 'Registrar A' },
     { ...base, site_id: 'b', name: 'Soon', custom_domain: 'soon.example', domain_expires_at: inDays(12) },

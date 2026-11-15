@@ -19,7 +19,7 @@ const ROSTER = [
     possible_duplicate_of: { id: 'ct-jordon', name: 'Jordon Ellis', email: '', phone: '5550102468', reasons: ['same phone number', 'same name'], why: 'same phone number and same name' } },
   { id: 'ct-jordon', name: 'Jordon Ellis', email: '', phone: '5550102468', company: '', updated_at: new Date(Date.now() - 3 * 86400000).toISOString(),
     possible_duplicate_of: { id: 'ct-jordan', name: 'Jordan Ellis', email: 'jordan.ellis@example.com', phone: '(555) 010-2468', reasons: ['same phone number', 'same name'], why: 'same phone number and same name' } },
-  { id: 'ct-eric', name: 'Eric Test', email: 'edavis7143@yahoo.com', phone: '', company: '', updated_at: new Date(Date.now() - 5 * 86400000).toISOString() },
+  { id: 'ct-eric', name: 'Eric Test', email: 'eric.test@example.com', phone: '', company: '', updated_at: new Date(Date.now() - 5 * 86400000).toISOString() },
   { id: 'ct-marigold', name: 'Marigold Smith', email: 'marigold@example.com', phone: '(310) 555-0134', company: 'Smith & Co', updated_at: new Date(Date.now() - 9 * 86400000).toISOString() },
   { id: 'ct-maurice', name: 'Maurice Tobin', email: 'maurice@example.com', phone: '', company: '', updated_at: new Date(Date.now() - 12 * 86400000).toISOString() },
 ];

@@ -35,6 +35,7 @@ export const SECTION_NAME: Record<string, string> = {
   carousel: 'Slideshow', progress: 'Progress bars', buttons: 'Buttons', divider: 'Divider',
   columns: 'Columns', cards: 'Cards', download: 'Download', toc: 'Table of contents',
   title: 'Heading', link_list: 'Links', table: 'Table', spotlight: 'Spotlight', form: 'Form',
+  stack: 'Blocks',   // builder item 57
 };
 
 export const COMMENT_BODY_MAX = 2000;

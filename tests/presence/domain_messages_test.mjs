@@ -71,7 +71,12 @@ const quiet = async (fn) => { const e = console.error, x = console.warn; console
 const jsonOf = async (res) => ({ status: res.status, body: await res.json() });
 const SITE = (custom) => ({ id: 'site1', client_id: 'c1', status: 'live', last_published_at: '2026-10-01T00:00:00Z', template_slug: 'business-classic', template_version: '1.0.0', custom_domain: custom, netlify_site_id: 'nf1', edition: 'presence' });
 const req = (method, body) => new Request('http://stub.local/functions/v1/presence/foundations/domain', { method, body: body === undefined ? undefined : JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
-const OWNER = { kind: 'client', userId: 'u1', email: 'owner@bistro.example' };
+// builder item 191: removing a domain asks for a fresh code; these people signed in with their
+// authenticator app's code a moment ago, so it counts (lib/fresh_code.ts)
+const { freshDeps } = await import(`${P}/lib/fresh_code.ts`);
+freshDeps.user = async (jwt) => ({ id: jwt === 'jwt-studio' ? 'u2' : 'u1', email: 'owner@bistro.example', factors: [{ id: 'f1', factor_type: 'totp', status: 'verified' }] });
+freshDeps.claims = () => ({ aal: 'aal2', amr: [{ method: 'totp', timestamp: Math.floor(Date.now() / 1000) }] });
+const OWNER = { kind: 'client', userId: 'u1', email: 'owner@bistro.example', jwt: 'jwt-owner' };
 
 world();
 ok('live, the first time: the owner and the studio are told, and it is remembered', await quiet(() => announceLiveOnce({ id: 'site1', client_id: 'c1' }, 'bistro.example', NOW)) === true && w.mails.length === 2 && w.mails.every((m) => m.subject === 'Your website is live at bistro.example') && w.live && w.live.domain === 'bistro.example', JSON.stringify(w.mails.map((m) => m.to)));
@@ -113,7 +118,7 @@ world();
 // ═══ the wiring ═══
 {
   const page = read('presence.html');
-  ok('the waiting card shows its steps with times and the honest wait', /function waitSteps\(dstat, dom\)/.test(page) && /domCard\.appendChild\(waitSteps\(dstat, dom\)\)/.test(page) && /Usually live within an hour of adding the records, sometimes a day or two/.test(page));
+  ok('the waiting card shows its steps with times and the honest wait', /function waitSteps\(dstat, dom\)/.test(page) && /domCard\.appendChild\(waitSteps\(dstat, dom\)\)/.test(page) && /const DOMAIN_WAIT = "Usually within an hour of adding the records, sometimes a day or two\."/.test(page) && /stepLine\(String\(dstat\.wait \|\| DOMAIN_WAIT\)\)/.test(page));   // builder item 194: one wait, said one way
   ok('the waiting steps make their own lines (renderFoundations’ stepLine is local to it; without this the whole sheet failed to draw)', /function waitSteps\(dstat, dom\) \{\n[^\n]*\n  const stepLine = /.test(page));
   ok('the main name is said plainly', /"Visitors who type " \+ bareName \+ " or www\." \+ bareName \+ " end up on "/.test(page));
   ok('"I need to get one" checks a name and opens three companies with it filled in', /needPanel\.dataset\.need = "domain"/.test(page) && /registration\/results\/\?domain=/.test(page) && /porkbun\.com\/checkout\/search\?q=/.test(page) && /domainsearch\/find\?domainToCheck=/.test(page) && /Buy it in your own name and email, and turn on auto-renew/.test(page));

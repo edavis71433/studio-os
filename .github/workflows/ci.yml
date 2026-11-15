@@ -4,7 +4,8 @@ name: CI (Deno pure suite + typecheck)
 # render pipeline (Presence CMS Phase 1, M1). Runs the pure test sweep
 # (no network, no live Supabase) and typechecks every edge function. The
 # integration-tier suites that need live Supabase credentials are skipped here;
-# they run against staging separately. The golden render suite is part of the
+# the ones that prove one studio can't read another's data run before every
+# release on a scratch database (isolation.yml). The golden render suite is part of the
 # sweep, so a renderer change that alters output fails CI until the golden
 # baseline is intentionally updated and committed.
 #
@@ -67,3 +68,5 @@ jobs:
         run: deno run --allow-read tests/workflows/ci_scope_test.mjs
       - name: Deploy and rollback workflows (the browser gate, every function, the smoke tests)
         run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/deploy_gate_test.mjs
+      - name: The walls-between-studios workflow (no secrets, production's CLI and migrations, skips fail)
+        run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/isolation_scope_test.mjs

@@ -28,7 +28,7 @@ test.describe('Sign-in pages in the new look (builder list item 188)', () => {
     await installApp(page, { session: null, api: {} });
     await page.goto('/studio.html');
     await expect(page.locator('.side .word')).toHaveText('Studio OS');
-    await expect(page.locator('.side .lede')).toHaveText('Run your studio.');
+    await expect(page.locator('.side .s1 .lede')).toHaveText('Run your studio.');   // .s2 holds the second step's words (item 191)
     await expect(page.getByRole('heading', { level: 1, name: 'Welcome back.' })).toBeVisible();
     await expect(page.locator('h1')).toHaveCount(1);                     // the band's line is not a second heading
     await bandThenSheet(page);

@@ -12,7 +12,7 @@
 //     ticks, three times a month at most.
 // Each check is also saved as an ordinary AI Visibility report (tool_reports), so the
 // Search tab's existing AI card and its report link show the newest one.
-import { svc } from '../lib/db.ts';
+import { svc, svcPaged } from '../lib/db.ts';
 import { insert } from '../../_shared/tools/db.ts';
 import { logUsage, spendCapReached } from '../../_shared/tools/guard.ts';
 import { assertPublicHttpUrl } from '../../_shared/tools/url_guard.ts';
@@ -25,6 +25,8 @@ import { liveAddress, reviewBusinessType } from '../lib/search_visibility.ts';
 import type { SiteRow } from '../lib/site.ts';
 
 export const AI_MAX_TRIES = 3;
+/** Item 209: the clients a run reads at once, and at most how many pages. */
+export const AI_PAGE = 100, AI_PAGES = 50;
 /** Overridable for tests: the scan's network-facing parts. */
 export const aiCheckDeps: Partial<AiScanDeps> = {};
 
@@ -64,9 +66,14 @@ export async function aiInputsFor(site: SiteRow): Promise<{ businessName: string
 /** The job. Returns what it did; `resting` when the spend cap stopped it. */
 export async function runAiChecks(limit = 1, nowIso = new Date().toISOString()): Promise<{ checked: number; failed: number; skipped: number; resting?: boolean; not_ready?: boolean }> {
   const month = nowIso.slice(0, 7);
-  const q = await svc(`presence_sales_templates?kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.monthlyReport)}&deleted_at=is.null&select=site_id,body&limit=500`);
+  // Item 209 (review file 06, finding 63): every client with the report on, a page at a
+  // time in a set order, until this run's checks are done. One read of 500 in no order
+  // used to be all of it, so a client past it was never checked.
+  const settings = (async function* () {
+    for await (const page of svcPaged(`presence_sales_templates?kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.monthlyReport)}&deleted_at=is.null&select=site_id,body`, 'site_id.asc', AI_PAGE, AI_PAGES)) yield* page as Array<{ site_id: string; body: string }>;
+  })();
   let checked = 0, failed = 0, skipped = 0;
-  for (const r of rows(q)) {
+  for await (const r of settings) {
     if (checked + failed >= limit) break;
     let seen: ReportSetting; try { seen = normalizeReportSetting(JSON.parse(r.body)); } catch { skipped++; continue; }
     if (!aiDueNow(seen, nowIso)) { skipped++; continue; }

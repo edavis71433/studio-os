@@ -13,7 +13,8 @@ if (!TARGET || !ANON || !JWT) { console.log('need SB integration creds — set S
 const SITE = Deno.env.get('SALES_E2E_SITE') || '';
 const H = () => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON, 'x-dds-user-jwt': JWT, 'x-dds-scope-site': SITE });
 const results = [];
-const ok = (n, p) => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}`); };
+const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
+const why = (r) => `${r.status} ${JSON.stringify(r.body).slice(0, 200)}`;
 async function call(path, method, body, headers) {
   const r = await fetch(TARGET + path, { method: method || 'GET', headers: headers || H(), body: body ? JSON.stringify(body) : undefined });
   let b = {}; try { b = await r.json(); } catch { /* */ }
@@ -56,20 +57,22 @@ if (conSent.body?.url) {
   const token = decodeURIComponent(String(conSent.body.url).split('?t=')[1] || '');
   const badSign = await call(`/sales/contracts/${conId}/sign`, 'POST', { token, presented_hash: 'deadbeef', signer_name: 'X' }, { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON });
   ok('6c. signing a MISMATCHED version is rejected (integrity)', !badSign.ok && badSign.status === 409);
-  const sign = await call(`/sales/contracts/${conId}/sign`, 'POST', { token, presented_hash: hash, signer_name: 'E2E Buyer' }, { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON });
-  ok('6d. contract signed with the correct version', sign.ok);
+  // sales item 88 (Nov 2026): the signed copy goes to the signer, so their email is required
+  const sign = await call(`/sales/contracts/${conId}/sign`, 'POST', { token, presented_hash: hash, signer_name: 'E2E Buyer', signer_email: `e2e+signer-${Date.now()}@example.com` }, { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON });
+  ok('6d. contract signed with the correct version', sign.ok, why(sign));
 } else { ok('6c/d. sign link (skipped — no signing secret)', true); }
 
-// 7-10. convert once → customer/workspace + onboarding handoff
-const conv = await call(`/sales/deals/${dealId}/convert`, 'POST', {});
-ok('7. deal converted once', conv.ok && conv.body?.data?.converted);
+// 7-10. convert once → customer/workspace + onboarding handoff. business_os_only, as in
+// sales_closing_e2e: it skips the hosting step, which a scratch database doesn't have.
+const conv = await call(`/sales/deals/${dealId}/convert`, 'POST', { plan: 'business_os_only' });
+ok('7. deal converted once', conv.ok && conv.body?.data?.converted, why(conv));
 ok('8. a customer + workspace/site was created', !!conv.body?.data?.client_id && !!conv.body?.data?.site_id);
-ok('9. the customer receives access (invited to set a login)', conv.body?.data?.invited === true || conv.body?.data?.idempotent === true);
+ok('9. the customer receives access (invited to set a login)', conv.body?.data?.invited === true || conv.body?.data?.idempotent === true, why(conv));
 ok('10. lands in the existing onboarding', conv.body?.data?.onboarding === '/get-started.html' || conv.body?.data?.idempotent);
 
 // 11. retry convert → no duplicate
-const conv2 = await call(`/sales/deals/${dealId}/convert`, 'POST', {});
-ok('11. retrying convert is idempotent (same client_id, no dup)', conv2.ok && conv2.body?.data?.idempotent === true && conv2.body?.data?.client_id === conv.body?.data?.client_id);
+const conv2 = await call(`/sales/deals/${dealId}/convert`, 'POST', { plan: 'business_os_only' });
+ok('11. retrying convert is idempotent (same client_id, no dup)', conv2.ok && conv2.body?.data?.idempotent === true && conv2.body?.data?.client_id === conv.body?.data?.client_id, why(conv2));
 
 // 12. cross-tenant isolation (best-effort: a random other site id must not be readable via our scope)
 const cross = await call(`/sales/deals/00000000-0000-4000-8000-000000000000`, 'GET');

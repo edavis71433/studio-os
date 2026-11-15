@@ -291,7 +291,7 @@ test.describe('G12 — no doomed reads for a reviewer, and old approval links re
     await page.addInitScript(() => localStorage.setItem('dds-portal-persona:e2e-owner', 'reviewer'));
     await page.goto('/client.html');
     await expect(page.locator('[data-proj]')).toHaveCount(1);
-    expect(await page.evaluate(() => localStorage.getItem('dds-portal-persona:e2e-owner'))).toBeNull();
+    expect(await page.evaluate(() => localStorage.getItem('dds-portal-persona:e2e-owner'))).toBe('client');   // remembered as a client now, so the next visit asks for everything at once
   });
   test('an old approval link: a client goes to their portal, the studio keeps the Inbox', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
@@ -344,8 +344,8 @@ test.describe('the live walk — what a client sees', () => {
     await expect(todos.locator('.card', { hasText: 'Review the design draft' })).toContainText('Your studio will share the draft here for your OK.');
     await expect(todos.locator('.card', { hasText: 'Review the design draft' }).getByRole('button')).toHaveCount(0);
     // item 179 part two: the content ask opens its own page, with the file box right there
-    await expect(todos.locator('.card', { hasText: 'questionnaire' }).getByRole('button', { name: 'Send it here' })).toBeVisible();
-    await todos.locator('.card', { hasText: 'Send your content and photos' }).getByRole('button', { name: 'Send files' }).click();
+    await expect(todos.locator('.card', { hasText: 'questionnaire' }).getByRole('button', { name: 'Send', exact: true })).toBeVisible();
+    await todos.locator('.card', { hasText: 'Send your content and photos' }).getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.locator('#main h1')).toHaveText('Send your content and photos');
     await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
   });
@@ -363,7 +363,7 @@ test.describe('the live walk — what a client sees', () => {
     const todos = page.locator('#sec-todos');
     await todos.getByRole('button', { name: 'Review it' }).click();
     await expect(page.locator('#sec-approvals [data-adec]')).toBeFocused();
-    await todos.getByRole('button', { name: 'Open the questionnaire' }).click();
+    await todos.getByRole('button', { name: 'Start' }).click();
     await expect(page.locator('#main h1')).toHaveText('Project questionnaire');
   });
 

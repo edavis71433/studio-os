@@ -28,14 +28,18 @@ ok('setup: project created', proj.status === 201 && projectId);
 // ── deliverable: upload URL (reuses media store) → attach → bundle → download ──
 const pdf = new TextEncoder().encode('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF');
 const up = await A(`/projects/${projectId}/deliverables/upload-url`, 'POST', { mime: 'application/pdf', bytes: pdf.length, title: 'Proposal PDF' });
-ok('deliverable: relationship-gated upload URL minted (reuses presence_media)', up.ok && !!up.body?.data?.media_id && !!up.body?.data?.upload_url);
+ok('deliverable: relationship-gated upload URL minted (reuses presence_media)', up.ok && !!up.body?.data?.media_id && !!up.body?.data?.upload_url, `${up.status} ${JSON.stringify(up.body).slice(0, 200)}`);
 const mediaId = up.body?.data?.media_id;
 const storagePath = up.body?.data?.storage_path; // presence-media/{siteId}/{uuid}.pdf
 // Seed the object bytes so signDownload has a real object to sign. Prefer the
 // signed upload URL (the real client path); fall back to a service-role seed.
 const SR = Deno.env.get('SALES_E2E_SR'); const STORAGE = Deno.env.get('SALES_E2E_STORAGE');
 let putOk = false;
-try { const r = await fetch(up.body?.data?.upload_url, { method: 'PUT', headers: { 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: pdf }); putOk = r.ok; } catch { /* */ }
+// The upload link names the project's address as the server sees it. On production that is the
+// target's own address; on a scratch database it is the address inside Docker, which this machine
+// can't reach, so the same path and token are sent to the target's address.
+const atTarget = (u) => (typeof u === 'string' && u ? new URL(TARGET).origin + u.replace(/^https?:\/\/[^/]+/, '') : u);
+try { const r = await fetch(atTarget(up.body?.data?.upload_url), { method: 'PUT', headers: { 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: pdf }); putOk = r.ok; } catch { /* */ }
 if (!putOk && SR && STORAGE && storagePath) {
   try { const r = await fetch(`${STORAGE}/object/${storagePath}`, { method: 'PUT', headers: { Authorization: 'Bearer ' + SR, apikey: SR, 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: pdf }); putOk = r.ok; } catch { /* */ }
 }

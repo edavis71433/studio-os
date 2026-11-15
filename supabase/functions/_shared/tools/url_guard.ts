@@ -98,6 +98,30 @@ export async function assertPublicHttpUrl(raw: string, resolve: Resolver | null 
   return u;
 }
 
+/** Builder list item 204 (Nov 12 review, finding 93): the one way the server fetches an
+ *  address someone typed or a browser handed it (a watched website, a link an owner
+ *  typed, a prospect's site, a custom domain, a push endpoint). The guard runs on the
+ *  first address and on every redirect hop, which are followed here by hand, at most
+ *  `maxHops`, so the server can't be pointed at a private or internal address, the
+ *  cloud's metadata service included. Throws when an address is refused or there are
+ *  too many hops. With `follow: false` the first answer comes back as it is, a redirect
+ *  included (a status check that must see the redirect itself). */
+export type GuardedFetchOpts = { maxHops?: number; follow?: boolean; guard?: (u: string) => Promise<unknown>; fetchImpl?: (input: string, init?: RequestInit) => Promise<Response> };
+export async function guardedFetch(url: string, init: RequestInit = {}, opts: GuardedFetchOpts = {}): Promise<Response> {
+  const guard = opts.guard || ((u: string) => assertPublicHttpUrl(u));
+  const doFetch = opts.fetchImpl || ((input: string, i?: RequestInit) => fetch(input, i));
+  let current = url;
+  for (let hop = 0; hop <= (opts.maxHops ?? 3); hop++) {
+    await guard(current);
+    const r = await doFetch(current, { ...init, redirect: 'manual' });
+    const loc = r.headers.get('location');
+    if (opts.follow === false || !(r.status >= 300 && r.status < 400 && loc)) return r;
+    try { await r.body?.cancel(); } catch { /* the next hop goes ahead either way */ }
+    current = new URL(loc, current).href;
+  }
+  throw new Error('too_many_redirects');
+}
+
 /** Visitor input → a clean absolute URL, or null. Adds https:// when the
  *  scheme is missing, drops the fragment, refuses anything that isn't a
  *  plausible public web address. */

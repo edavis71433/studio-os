@@ -69,6 +69,14 @@
   .qbtn{flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:11px 12px}
   .qbtn:focus-visible{outline:2px solid var(--p);outline-offset:2px}
   .panel{display:none}
+  /* builder list item 191: the second step, drawn in Figma (A2) */
+  .steppill{display:inline-block;max-width:100%;margin:0 0 14px;padding:4px 12px;border-radius:12px;background:#ece6f7;color:#5b3fa0;font-size:10.5px;font-weight:600;letter-spacing:.2px;line-height:1.5;text-transform:uppercase;overflow-wrap:anywhere}
+  @media (prefers-color-scheme:dark){.steppill{background:#2a2338;color:#d9cdeb}}
+  #stepPanel .ddsf-code{max-width:none}
+  #stepPanel .ddsf-boxes span{max-width:none;background:var(--card);border-color:var(--line);color:var(--ink)}
+  #stepPanel .ddsf-code.on .ddsf-boxes span.at{border-color:var(--p)}
+  #stepPanel .muted.stepl{text-align:left}
+  .steplost{color:var(--soft);font-size:13.5px;line-height:1.55;margin:8px 0 0}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:8px auto}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
@@ -150,6 +158,18 @@
     <p class="muted"><button class="linky" id="forgot" type="button">Forgot your password?</button></p>
   </div>
 
+  <!-- SECOND STEP (builder list item 191): two-step sign-in is on for this person -->
+  <div id="stepPanel" class="panel">
+    <p class="steppill" id="stepPill">Step 2 of 2</p>
+    <h1 id="stepHead" tabindex="-1">One more step.</h1>
+    <p class="sub" id="stepHow">Type the 6-digit code from your authenticator app.</p>
+    <div id="stepBox"></div>
+    <button id="stepGo" type="button">Confirm</button>
+    <p class="muted stepl"><button class="linky" id="stepHelp" type="button" aria-expanded="false" aria-controls="stepLost">Can’t get a code?</button></p>
+    <p class="steplost" id="stepLost" hidden></p>
+    <p class="muted stepl"><button class="linky" id="stepOut" type="button">Sign in as someone else</button></p>
+  </div>
+
   <!-- ROUTING -->
   <div id="routing" class="panel" style="text-align:center" aria-live="polite">
     <div class="spin" role="status" aria-label="Signing you in"></div>
@@ -178,6 +198,7 @@
   </main>
 </div>
 
+<script src="/fresh-code.js?v=191"></script>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── The CLIENT door. One job: sign in and land in the right place. ──────────
@@ -196,7 +217,7 @@ var SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 var FN = SUPABASE_URL + "/functions/v1";
 var $ = function(id){ return document.getElementById(id); };
-var PANELS = ['emailPanel','codePanel','pwPanel','routing','noAccess','resetSent'];
+var PANELS = ['emailPanel','codePanel','pwPanel','stepPanel','routing','noAccess','resetSent'];
 function show(id){ PANELS.forEach(function(p){ $(p).style.display = p===id ? 'block' : 'none'; }); }
 function errIn(boxId, m){ var e=$(boxId); e.textContent=m; e.style.display='block'; }
 function clearErr(boxId){ var e=$(boxId); if(e){ e.style.display='none'; } }
@@ -294,6 +315,13 @@ async function route(token){
     if (r.ok && j && j.data && j.data.landing) { location.href = landingFor(j.data, picked); return; }
     // paused/lapsed — show the server's OWN words (what happened + how to fix it)
     if (r.status === 403 && j && j.message) { noAccess(j.message); return; }
+    // Builder item 191: refused as signed out. Two-step sign-in may have been turned on (or
+    // off) on another device; the server knows, so ask it.
+    if (r.status === 401 && window.ddsFresh) {
+      var due = await window.ddsFresh.stepDue(sb, { ask: true });
+      if (due.due) { askStep(due.factor); return; }
+      if (due.gone) { await signedOutHere(); return; }
+    }
   } catch (e) { sawNetworkTrouble = true; }
   // 2) team member → the Studio OS door
   try {
@@ -371,7 +399,7 @@ $('fCode').addEventListener('submit', async function(ev){
       errIn('errCode', 'That code didn’t work — it may have expired. Check the latest email, or send a new code.');
       b.disabled = false; b.textContent = 'Sign in →'; $('code').focus(); return;
     }
-    route(r.data.session.access_token);
+    signedIn(r.data.session);
   } catch (e) {
     $('code').value = '';
     errIn('errCode', 'Something went wrong — give it another try, or send a new code.');
@@ -398,7 +426,7 @@ $('f').addEventListener('submit', async function(ev){
   try {
     var r = await sb.auth.signInWithPassword({ email: em, password: pw });
     if (r.error || !r.data || !r.data.session) { errIn('err', 'That email or password isn’t right. Check your welcome email, or use “Forgot your password?” below.'); b.disabled=false; b.textContent='Sign in →'; return; }
-    route(r.data.session.access_token);
+    signedIn(r.data.session);
   } catch (e) { errIn('err', 'Something went wrong signing in. Give it another try.'); b.disabled=false; b.textContent='Sign in →'; }
 });
 
@@ -418,13 +446,63 @@ $('toEmail').addEventListener('click', function(){ clearErr('errEmail'); show('e
 $('backToLogin').addEventListener('click', function(){ show('emailPanel'); });
 $('retry').addEventListener('click', async function(){
   if (!sb) return;
-  var s = await sb.auth.getSession(); var t = s && s.data && s.data.session && s.data.session.access_token;
-  if (t) route(t); else show('emailPanel');
+  var s = await sb.auth.getSession(); var ss = s && s.data && s.data.session;
+  if (ss && ss.access_token) signedIn(ss); else show('emailPanel');
 });
 // Builder item 192: the sign-in buttons were left greyed out, saying "Signing in…", by the
 // sign-in that led to this panel. Signing out gives them back.
 function freshButtons(){ [['go', 'Sign in →'], ['codeGo', 'Sign in →']].forEach(function(x){ var b = $(x[0]); if (b) { b.disabled = false; b.textContent = x[1]; } }); }
 $('signout1').addEventListener('click', async function(){ if (sb) { try{ await sb.auth.signOut(); }catch(e){} } freshButtons(); show('emailPanel'); });
+
+// ── Builder item 191: the second step. A client who turned two-step sign-in on types the
+// code from their phone after the emailed code, link or password (Figma A2). Until they
+// do, the server treats them as signed out. Supabase checks the code (aal2).
+var STEP = { factor: null, box: null, busy: false };
+async function signedIn(session){
+  var due = window.ddsFresh ? await window.ddsFresh.stepDue(sb) : { due: false };
+  if (due.due) { askStep(due.factor); return; }
+  route(session.access_token);
+}
+function studioWord(){
+  try { var b = JSON.parse(localStorage.getItem('dds-studio-brand') || 'null'); if (b && b.name) return String(b.name).slice(0, 80); } catch (e) {}
+  var w = document.querySelector('#brand .word'); var t = w && w.textContent.trim();
+  return t && t !== 'Studio OS' ? t : 'your studio';
+}
+function askStep(factor){
+  STEP.factor = factor;
+  if (!STEP.box) {
+    STEP.box = window.ddsFresh.boxes({ id: 'stepCode', describedBy: 'stepHow', onFull: stepConfirm, onEnter: stepConfirm });
+    $('stepBox').appendChild(STEP.box.el); $('stepBox').appendChild(STEP.box.err);
+  }
+  STEP.box.clear(); STEP.box.fault('');
+  // the studio can't turn it off itself: it checks it's them and asks us
+  var who = studioWord();
+  $('stepLost').textContent = 'Ask ' + who + '. They check it’s you, then have the second step turned off so you can sign in and set it up again.';
+  show('stepPanel');
+  STEP.box.focus();
+}
+async function stepConfirm(){
+  if (STEP.busy || !STEP.factor) return;
+  var c = STEP.box.value();
+  if (c.length !== 6) { STEP.box.fault('Type all six digits.'); STEP.box.focus(); return; }
+  STEP.busy = true; var b = $('stepGo'); b.disabled = true; b.textContent = 'Checking…'; STEP.box.fault('');
+  var r = await window.ddsFresh.verifyApp(sb, STEP.factor.id, c);
+  STEP.busy = false; b.disabled = false; b.textContent = 'Confirm';
+  if (r.ok) {
+    var s = await sb.auth.getSession(); var ss = s && s.data && s.data.session;
+    if (ss && ss.access_token) { route(ss.access_token); return; }
+    show('emailPanel'); return;
+  }
+  if (r.gone) { try { await sb.auth.refreshSession(); } catch (e) {} var s2 = await sb.auth.getSession(); var s2s = s2 && s2.data && s2.data.session; if (s2s) { signedIn(s2s); return; } }
+  STEP.box.fault(r.message); STEP.box.clear(); STEP.box.focus();
+}
+async function signedOutHere(){
+  if (sb) { try { await sb.auth.signOut(); } catch (e) {} }
+  freshButtons(); show('emailPanel');
+}
+$('stepGo').addEventListener('click', stepConfirm);
+$('stepHelp').addEventListener('click', function(){ var l = $('stepLost'), open = l.hidden; l.hidden = !open; this.setAttribute('aria-expanded', open ? 'true' : 'false'); });
+$('stepOut').addEventListener('click', function(){ signedOutHere().then(function(){ $('em').focus(); }); });
 
 // Already signed in — or arriving from a magic LINK? This page is a door, not a
 // stop. A clicked magic link lands here with the session tokens in the URL hash;
@@ -443,8 +521,8 @@ $('signout1').addEventListener('click', async function(){ if (sb) { try{ await s
   try {
     for (var i = 0; i < (hasTokens ? 20 : 1); i++) {
       var s = await sb.auth.getSession();
-      var t = s && s.data && s.data.session && s.data.session.access_token;
-      if (t) { route(t); return; }
+      var ss = s && s.data && s.data.session;
+      if (ss && ss.access_token) { signedIn(ss); return; }   // item 191: the second step first, when it's on
       if (!hasTokens) break;
       await new Promise(function(res){ setTimeout(res, 150); });
     }

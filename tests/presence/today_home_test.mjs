@@ -430,7 +430,7 @@ ok('portal: ensureSnaps refetches FAILED ids on the next call (never session-pin
 // handle, and leaves wstats undefined so the next Home visit truly retries.
 ok('portal: a failed website-stats read is never cached (false sentinel + cleared handle)',
   portal.includes("r.ok?((r.body&&r.body.data)||null):false")
-  && portal.includes('if(PORTAL.wstats===false){PORTAL.wstats=undefined;return;}')
+  && portal.includes('if(PORTAL.wstats===false){PORTAL.wstats=undefined;wsSlotOff();return;}')   // item 179: the slot closes too, so Home's other column moves up
   && portal.includes('PORTAL.wstatsFetch=null;   // settled'));
 ok('portal: queue rows lead with an aria-hidden type icon (action-feed anatomy)',
   /<span class="qico[^"]*" aria-hidden="true">/.test(portal));
@@ -453,7 +453,11 @@ ok('portal: opening the bell REFETCHES /client/notifications (client persona onl
   /const open=async\(\)=>\{[\s\S]{0,700}?if\(PORTAL\.persona==='client'\)\{[\s\S]{0,400}?await api\('\/client\/notifications'\)/.test(portal));
 // Item 86 (Nov 8 2026): the notifications and the Google ask go out together, still for a client only.
 ok('portal: the boot notifications GET is persona-gated (reviewer boots with zero /client/* reads)',
-  /const \[n,a\]=PORTAL\.persona==='client'\?await Promise\.all\(\[\s*api\('\/client\/notifications'\)\.catch\(\(\)=>null\),\s*api\('\/connections\/ask'[\s\S]{0,160}?\]\):\[null,null\];/.test(portal));
+  /const \[n,a\]=PORTAL\.persona==='client'\?await Promise\.all\(\[\s*nP\|\|api\('\/client\/notifications'\)\.catch\(\(\)=>null\),\s*aP\|\|api\(askPath\)[\s\S]{0,160}?\]\):\[null,null\];/.test(portal)
+  // item 179: the same reads may leave a round earlier, but only for someone already known to be a client here
+  && portal.includes("const early=rememberedClient();")
+  && portal.includes("const nP=early?api('/client/notifications').catch(()=>null):null,aP=early?api(askPath).catch(()=>null):null;")
+  && /function rememberedClient\(\)\{try\{return !!\(USER&&USER\.id\)&&localStorage\.getItem\(personaKey\(\)\)==='client';/.test(portal));
 ok('portal: the mark-seen POST is persona-gated too — after the failed-read skip, before the POST',
   /if\(PORTAL\.notifsFailed\)return;[\s\S]{0,300}?if\(PORTAL\.persona!=='client'\)return;[\s\S]*?api\('\/client\/notifications\/read','POST'/.test(portal));
 // PS3: Recent-updates rows share the queue-row anatomy (icon from moment_type,
@@ -593,7 +597,7 @@ ok('today: Done on a This-week row PATCHes the deal\'s next step through the exi
   /todoDone\(id, btn\)\{[\s\S]*?await apiSend\('\/sales\/deals\/'\+encodeURIComponent\(id\), 'PATCH', \{ next_step: '', next_step_at: '' \}\);[\s\S]*?row\.remove\(\)/.test(today)
   && /catch\(_\)\{ btn\.disabled = false;/.test(today));
 ok('today: the Customers card reads /studio/customers for the studio only — never for a drilled-in operator (D7)',
-  today.includes("get('client')?Promise.resolve(null):apiGet('/studio/customers').catch(()=>null)")
+  today.includes("inC?Promise.resolve(null):apiGet('/studio/customers').catch(()=>null)")
   && /function customersCardHtml\(list\)\{\s*const rows=customerRows\(list\);\s*if\(!rows\.length\)return''/.test(today));
 ok('today: the stat strip\'s tiles keep the .hl-panel / .hl anatomy crm.html draws (icon tile · label · value · sub)',
   today.includes('<section class="hl-panel" id="stat-strip"') && today.includes('<div class="hl-k">') && today.includes('<div class="hl-v">') && today.includes('<div class="hl-s">'));

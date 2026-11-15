@@ -2,8 +2,11 @@
 # ── Pure regression sweep (Presence CMS Phase 1, M1) ─────────────────────────
 # Runs every tests/presence/*_test.mjs that does NOT require live Supabase
 # credentials, and fails if any pure suite fails. Integration-tier suites
-# self-report "need SB, SR_KEY, ANON" (or similar) and are skipped here — they
-# run against staging separately. The golden render suite is included, so a
+# self-report "need SB, SR_KEY, ANON" (or similar) and are skipped here. The ones
+# that prove one studio can't read another's data run before every release on a
+# scratch database instead (scripts/isolation-scratch.sh, from
+# .github/workflows/isolation.yml); tests/isolation/README.md says which, and why
+# the rest still wait. The golden render suite is included, so a
 # renderer change that alters byte output fails until the golden baseline is
 # intentionally regenerated (`deno run --allow-read --allow-write \
 # tests/presence/render_test.mjs --update-golden`) and committed.

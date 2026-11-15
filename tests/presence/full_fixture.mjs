@@ -1,7 +1,8 @@
 // ── Every template's full sample (list item 110) ─────────────────────────────────
 // A template's fixture.json is its sample business with the built-in pages only. The full
 // sample adds what a real site carries: one of every section the builder offers (the
-// picker's own samples, scripts/thumbnails/samples.ts), a form and a free layout, some on
+// picker's own samples, scripts/thumbnails/samples.ts), a form, a free layout and a Blocks
+// section (item 57), some on
 // the home page and the rest on a page of the owner's own, and a menu with a dropdown.
 // The sections go through the serializer's real step (composeBlocks), so they arrive as a
 // publish draws them. render_test.mjs runs its structure checks on it and keeps its golden
@@ -26,6 +27,21 @@ const FREE = { type: 'freeform', id: 'free-layout', title: 'Placed by hand', asp
   { id: 'photo', kind: 'image', x: 58, y: 10, w: 36, h: 80, z: 2, image: { image_id: '00000000-0000-4000-8000-0000000000f1' } },
   { id: 'go', kind: 'button', x: 6, y: 64, w: 26, h: 20, z: 3, button: { label: 'Book a visit', url: 'https://example.com/book', style: 'primary' } }] };
 
+// Builder item 57: a Blocks section with every kind of block. Its picker sample joins
+// scripts/thumbnails/samples.ts with the editor half, which offers the section.
+const STACK = { type: 'stack', items: [
+  { kind: 'heading', text: 'Built from blocks' },
+  { kind: 'text', body: 'A heading, words, a photo and buttons, **stacked** in reading order.' },
+  { kind: 'image', image_id: '00000000-0000-4000-8000-0000000000f2', caption: 'A photo with its caption' },
+  { kind: 'button', buttons: [{ label: 'Book a visit', url: 'https://example.com/book' }, { label: 'Our hours', url: '/contact/#hours', style: 'outline' }] },
+  { kind: 'heading', text: 'A smaller heading', size: 'm' },
+  { kind: 'video', url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ', poster_id: '00000000-0000-4000-8000-0000000000f3', caption: 'A minute in the shop' },
+  { kind: 'spacer', size: 's' },
+  { kind: 'divider', width: 's' },
+  { kind: 'form', form: { ...FORM, id: 'blocks_form' } },
+  { kind: 'map', address: '12 Olive Ave, Burbank', image_id: '00000000-0000-4000-8000-0000000000f4' },
+] };
+
 // Photos as a publish resolves them, three sizes under /img/; the price list as a file.
 const ref = (id) => (id === FILE_ID
   ? { alt: 'Price list', variants: {}, original: '/files/price-list.pdf' }
@@ -38,7 +54,7 @@ const REVIEWS = { reviewsWall: { items: [
 /** The stored sections, as the builder saves them: [home page, the owner's page]. */
 export function storedSections() {
   const all = Object.entries(SAMPLE_BLOCKS);
-  return [all.filter(([t]) => HOME_TYPES.includes(t)).map(([, b]) => b), [...all.filter(([t]) => !HOME_TYPES.includes(t)).map(([, b]) => b), FORM, FREE]];
+  return [all.filter(([t]) => HOME_TYPES.includes(t)).map(([, b]) => b), [...all.filter(([t]) => !HOME_TYPES.includes(t)).map(([, b]) => b), FORM, FREE, STACK]];
 }
 
 /** A template's sample with every section, a page of its own and a dropdown menu. `words`,

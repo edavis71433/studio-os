@@ -1,5 +1,4 @@
 // ═══ A studio asked to work with you (final pass, Nov 8 2026: S1) ═══════════
-//   GET  /portal/studio-requests            — the requests waiting on you
 //   POST /portal/studio-requests/:id/accept — say yes: the studio can open and
 //                                             work on your website, and you see
 //                                             its projects, messages and invoices
@@ -36,9 +35,6 @@ export async function studioRequestsFor(site: SiteRow, principal: Principal): Pr
 }
 
 export async function handleStudioRequests(req: Request, route: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
-  if (req.method === 'GET' && route === '/portal/studio-requests') {
-    return json({ data: { requests: await studioRequestsFor(site, principal) } }, 200, cors);
-  }
   const m = route.match(/^\/portal\/studio-requests\/([0-9a-f-]{36})\/(accept|decline)$/);
   if (!m || req.method !== 'POST') return json({ error: 'not_found' }, 404, cors);
   if (!ownerOnly(principal)) return notOwner(cors);

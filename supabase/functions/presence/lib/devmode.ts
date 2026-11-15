@@ -32,6 +32,7 @@ const TOKEN_RULES: Record<string, RegExp> = {
   font_scale: /^(0?\.\d+|1(\.\d+)?)$/,
   header_scroll: /^(scroll|stay|hide|fade)$/,   // builder items 50 and 123: what the header does on scroll (lib/site_header.ts)
   phone_bar: /^(off|light|dark)$/,              // builder item 122: the phone-only Call, Directions, Hours and Email bar (lib/phone_bar.ts)
+  motion: /^gentle$/,                           // builder item 158: sections fade up as they scroll into view (lib/site_motion.ts)
 };
 export const ALLOWED_TOKENS = Object.keys(TOKEN_RULES);
 
