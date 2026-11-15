@@ -115,7 +115,8 @@ export async function handleLaunchSchedule(req: Request, site: SiteRow, principa
   if (!isValidSchedule(when, new Date().toISOString())) return json({ error: 'bad_time', message: 'Choose a time in the future for the launch.' }, 422, cors);
   const sp = await svc('presence_scheduled_publishes', {
     method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ site_id: site.id, snapshot_id: l.snapshot_id, kind: 'publish', summary: `Launched “${l.name}”`, scheduled_for: when, status: 'pending' }),
+    // item 239: who scheduled it, so the publish the scheduler fires is recorded as theirs
+    body: JSON.stringify({ site_id: site.id, snapshot_id: l.snapshot_id, kind: 'publish', summary: `Launched “${l.name}”`, scheduled_for: when, status: 'pending', created_by: principal.userId || 'owner' }),
   });
   if (!sp.ok || !sp.json?.[0]?.id) return json({ error: 'schedule_failed', message: 'We couldn’t schedule this launch.' }, 502, cors);
   await patchLaunch(l.id, { status: 'scheduled', scheduled_for: when, scheduled_publish_id: sp.json[0].id });

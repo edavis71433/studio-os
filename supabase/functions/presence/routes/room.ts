@@ -7,6 +7,7 @@
 //   GET  /media            — the library, with in-use flags
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
+import { draftChangesOnly } from '../lib/provenance.ts';
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
@@ -79,7 +80,7 @@ async function roomState(site: SiteRow): Promise<RoomState | null> {
   let oldest: string | null = null;
   if (changes.count > 0) {
     const since = lastLive?.created_at ? `&created_at=gt.${encodeURIComponent(lastLive.created_at)}` : '';
-    const ev = await svc(`presence_change_events?site_id=eq.${site.id}${since}&entity_type=not.in.(publish,restore)&select=created_at&order=created_at.asc&limit=1`);
+    const ev = await svc(`presence_change_events?site_id=eq.${site.id}${since}&${draftChangesOnly(['publish', 'restore'])}&select=created_at&order=created_at.asc&limit=1`);
     oldest = ev.json?.[0]?.created_at ?? null;
   }
 

@@ -255,7 +255,9 @@ let MADE;
   ok('invite: the portfolio row names the owner now', T.presence_agency_clients.find((l) => l.site_id === made.site_id).owner_email === 'june@juniper.example');
   const mail = outside.filter((o) => o.to === 'resend');
   ok('invite: exactly one email, to them, with their sign-in link', mail.length === 1 && [].concat(mail[0].body.to).join(',') === 'june@juniper.example' && /magic-link/.test(mail[0].body.html || ''));
-  ok('invite: the studio\'s history says who was invited', (T.presence_change_events || []).some((e) => e.site_id === OWN && /Invited the owner of Juniper Floral Co\./.test(e.summary || '')));
+  // item 239: this line was refused by the real change log (no 'client' kind) and never showed; an
+  // invitation is no change to the studio's website, so it is no longer written
+  ok('invite: no customer line on the studio\'s website change log', !(T.presence_change_events || []).some((e) => e.site_id === OWN && /Invited the owner/.test(e.summary || '')));
   ok('invite: the site itself is untouched (nothing published, nothing changed)', !writes.some((w) => w.table === 'presence_sites' || w.table === 'presence_publishes'));
   const again = await call(asMember(), 'POST', `/agency/sites/${made.site_id}/invite`, { email: 'other@juniper.example' });
   ok('invite: a second invitation is refused — the site has its owner', again.status === 409 && again.body.error === 'has_owner');
