@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // ── Editing and removing a contact ───────────────────────────────────────────
 // Eric: "i should be able to edit or delete these contacts." His roster carried
@@ -110,6 +111,7 @@ test.describe('Contacts — editing a contact from the row', () => {
     await expect(page.locator('#e-phone')).toHaveValue('(310) 555-0134');
     await expect(page.locator('#e-company')).toHaveValue('Smith & Co');
     await expect(page.locator('#e-custom [data-cf="referred_by"]')).toHaveValue('Word of mouth');
+    await expect(page.locator('#e-name')).toBeFocused();   // the form has opened: it puts the cursor in Name 20 ms after it fills in, and typing elsewhere before that went into Name
 
     await page.locator('#e-name').fill('Marigold Smyth');
     await page.locator('#e-company').fill('Smyth & Co');
@@ -139,6 +141,7 @@ test.describe('Contacts — editing a contact from the row', () => {
     await page.goto('/contacts.html');
     await page.locator('[data-edit="ct-jordon"]').click();
     await expect(page.locator('#editDlg')).toBeVisible();
+    await expect(page.locator('#e-name')).toBeFocused();   // the form has opened: it puts the cursor in Name 20 ms after it fills in, and typing elsewhere before that went into Name
     await page.locator('#e-email').fill('jordan.ellis@example.com');
     await page.locator('#e-save').click();
     // the server's own words, not a generic "that didn't save"
@@ -154,6 +157,7 @@ test.describe('Contacts — editing a contact from the row', () => {
     await mockContacts(page, { writes });
     await page.goto('/contacts.html');
     await page.locator('[data-edit="ct-jordon"]').click();
+    await expect(page.locator('#e-name')).toBeFocused();   // the form has opened: it puts the cursor in Name 20 ms after it fills in, and typing elsewhere before that went into Name
     await page.locator('#e-name').fill('');
     await page.locator('#e-email').fill('');
     await page.locator('#e-save').click();
@@ -432,7 +436,7 @@ test.describe('Contacts — Add-a-customer work-type dropdown', () => {
     await installApp(page);
     await mockContacts(page);
     await page.goto('/contacts.html');
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
     // the dialog moves focus to the name field a beat after it opens; wait for
     // that to land, or a fill() racing it can be redirected into the wrong field

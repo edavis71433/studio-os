@@ -2,7 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 import { installApp } from './helpers/app';
 
 // SS2 (standards sweep) — the Agency roster wears the redesign anatomy: shared
-// .lhead with ↻ refresh under REQ_SEQ, fixed-view chips, sortable typed columns
+// the list bar with ↻ refresh under REQ_SEQ, fixed-view chips, sortable typed columns
 // behind a persisted Table ⇄ Cards toggle, caret-preserving search, honest
 // failure states (a failed portfolio read is NEVER "No clients yet"), and
 // ?client= carried on every drill.
@@ -73,7 +73,7 @@ const ok = (body: unknown) => ({ status: 200, contentType: 'application/json', b
 const boom = (status = 500) => ({ status, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) });
 
 test.describe('Agency portfolio', () => {
-  test('boots under the roster anatomy: .lhead, ONE h1, lmeta count — zero console errors', async ({ page }) => {
+  test('boots under the one page header: ONE h1, the list’s count line — zero console errors', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -81,7 +81,7 @@ test.describe('Agency portfolio', () => {
     await page.goto('/agency.html');
     await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();   // final pass, batch C: the nav says Home
     await expect(page.locator('h1')).toHaveCount(1);
-    await expect(page.locator('.lhead .lmeta')).toContainText('3 customers · Updated just now');
+    await expect(page.locator('#lmeta')).toContainText('3 customers · Updated just now');
     await expect(page.locator('#refreshBtn')).toBeVisible();
     await expect(page.locator('.top .brand')).toContainText('Bright Studio');
     expect(errors).toEqual([]);
@@ -575,7 +575,7 @@ test.describe('Agency home — one home, one roster', () => {
     await expect(park).toHaveCount(1);                                                 // on the bridge list only → still a row
     await expect(park.locator('.rowact')).toHaveText(['Open record']);                 // no ⋯: nothing of theirs to edit or save here
     await expect(park.locator('.pill')).toHaveText('Not live yet');
-    await expect(page.locator('.lhead .lmeta')).toContainText('4 customers');
+    await expect(page.locator('#lmeta')).toContainText('4 customers');
     await page.locator('[data-view="needs"]').click();
     await expect(table.locator('tbody tr')).toHaveCount(1);                            // Marlow — the one with a Needs-you row
   });
@@ -846,7 +846,7 @@ test.describe('Agency roster — housekeeping', () => {
     await arch.click();
     await expect(page.locator('.dds-toast').filter({ hasText: 'archived' })).toContainText('Cedar Garage archived');
     await expect(page.locator('tbody tr[data-open]')).toHaveCount(3);
-    await expect(page.locator('.lhead .lmeta')).toContainText('3 customers');
+    await expect(page.locator('#lmeta')).toContainText('3 customers');
     // the Archived view is its own read, made the first time it is asked for
     expect(calls.filter((c) => c.includes('archived=true'))).toHaveLength(0);
     await page.locator('[data-view="archived"]').click();

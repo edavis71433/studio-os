@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp, ALL_FEATURES, STUDIO_NAV } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Rosters as Salesforce list views (redesign slice 3): customers.html and
 // contacts.html get a list-view header (object icon + fixed-view dropdown +
@@ -35,8 +36,8 @@ test.describe('Customers list view', () => {
     await page.goto('/customers.html');
     // header: object icon + view-name dropdown + meta + refresh
     await expect(page.locator('#viewBtn')).toContainText('All customers');
-    await expect(page.locator('.lmeta')).toContainText('3 customers');
-    await expect(page.locator('.lmeta')).toContainText('Updated just now');
+    await expect(page.locator('#lmeta')).toContainText('3 customers');
+    await expect(page.locator('#lmeta')).toContainText('Updated just now');
     await expect(page.locator('#refreshBtn')).toBeVisible();
     // table: th scope=col + default Name-ascending sort (aria-sort)
     await expect(page.locator('th[scope="col"]').first()).toBeVisible();
@@ -57,7 +58,7 @@ test.describe('Customers list view', () => {
     await expect(page.locator('th[aria-sort="descending"]')).toContainText('Name');
     await expect(page.locator('tbody tr td:nth-child(2)').first()).toContainText('Zeta Gym');
     // meta mirrors the sort header
-    await expect(page.locator('.lmeta')).toContainText('Sorted by Name — descending');
+    await expect(page.locator('#lmeta')).toContainText('Sorted by Name — descending');
     // a different column starts ascending
     await page.locator('[data-sort="open_support"]').click();
     await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Requests');   // final pass, batch C: it counts requests
@@ -73,7 +74,7 @@ test.describe('Customers list view', () => {
     await expect(page.locator('#viewBtn')).toContainText('Needs you');   // Home's word for it (bold redesign, part 2)
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect(page.locator('tbody tr').first()).toContainText('Acme Bakery');
-    await expect(page.locator('.lmeta')).toContainText('1 customer');
+    await expect(page.locator('#lmeta')).toContainText('1 customer');
     // Complete / Archived view
     await page.locator('#viewBtn').click();
     await page.locator('#viewMenu [data-view="done"]').click();
@@ -106,10 +107,9 @@ test.describe('Customers list view', () => {
     await expect(page.locator('#viewMenu')).toBeVisible();
     await expect(page.locator('#viewBtn')).toHaveAttribute('aria-expanded', 'true');
     // outside click → the ONE document-level delegated closer (ported from
-    // inbox.html). Click the space beside the title: it sits RIGHT of the
-    // dropdown on the title's line, so the open menu (below the title) never
-    // covers it (at phone widths the menu overlaps .lmeta).
-    await page.locator('.lrow1 .sp').click();
+    // inbox.html). Click the page's title: the picker sits beside it (builder
+    // item 165) and its menu opens below, so the menu never covers the title.
+    await page.locator('header.dds-ph h1').click();
     await expect(page.locator('#viewMenu')).toBeHidden();
     await expect(page.locator('#viewBtn')).toHaveAttribute('aria-expanded', 'false');
     // Escape closes and hands focus back to the trigger
@@ -161,16 +161,18 @@ test.describe('Contacts list view', () => {
     await installApp(page, { api: { '/sales/contacts': CONTACTS } });
     await page.goto('/contacts.html');
     await expect(page.locator('#viewBtn')).toContainText('All contacts');
-    await expect(page.locator('.lmeta')).toContainText('2 contacts');
+    await expect(page.locator('#lmeta')).toContainText('2 contacts');
     // columns: Name · Company · Email · Phone · Updated (sortable, aria-sort)
     await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Name');
     await expect(page.locator('tbody tr').first()).toContainText('Dana Lee');
     await page.locator('[data-sort="name"]').click();
     await expect(page.locator('tbody tr').first()).toContainText('Sam Rivera');
-    // the toolbar survives: + Add a customer · + Contact · Import CSV
-    await expect(page.locator('#addCust')).toBeVisible();
+    // the toolbar survives: + Add a contact is the header's filled action; + Add a customer and
+    // Import CSV are its others, in the row on a computer and behind ⋯ on a phone (builder item 165)
     await expect(page.locator('#new')).toBeVisible();
+    await expect(await headerAction(page, '#addCust')).toBeVisible();
     await expect(page.locator('#importCsv')).toBeVisible();
+    if (await page.locator('header.dds-ph .dds-ph-more').evaluate((m) => m.matches(':popover-open'))) await page.keyboard.press('Escape');
     // a row opens the unified record's Details tab (click the name cell — the
     // row's center can land on the mailto link at narrow widths, which the
     // row-open handler deliberately ignores)
@@ -201,16 +203,16 @@ test.describe('Contacts list view', () => {
     await page.locator('[data-sort="updated_at"]').click();
     await expect(page.locator('th[aria-sort="descending"]')).toContainText('Updated');
     await expect(page.locator('tbody tr').first()).toContainText('Sam Rivera');   // 2 days ago outranks 90
-    await expect(page.locator('.lmeta')).toContainText('Sorted by Updated — descending');
+    await expect(page.locator('#lmeta')).toContainText('Sorted by Updated — descending');
     // the second click flips to oldest-first
     await page.locator('[data-sort="updated_at"]').click();
     await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Updated');
     await expect(page.locator('tbody tr').first()).toContainText('Dana Lee');
     // the same delegated closer guards this page's dropdown too (click the
-    // object icon — left of the dropdown, never covered by the open menu)
+    // header's icon — left of the title and its picker, never covered by the open menu)
     await page.locator('#viewBtn').click();
     await expect(page.locator('#viewMenu')).toBeVisible();
-    await page.locator('.obj-ic').click();
+    await page.locator('header.dds-ph .dds-ph-ic').click();
     await expect(page.locator('#viewMenu')).toBeHidden();
     await expect(page.locator('#viewBtn')).toHaveAttribute('aria-expanded', 'false');
   });
@@ -225,7 +227,7 @@ test.describe('Customers — SS6 quick wins', () => {
       '/sales/customers': { data: { created: true, invited: true, portal_url: 'https://x.example/portal.html' } },
     } });
     await page.goto('/customers.html');
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog focuses Name a beat after opening — a fill() racing it lands in the wrong field
     await page.locator('#cu-name').fill('Jane Doe');
@@ -246,7 +248,7 @@ test.describe('Customers — SS6 quick wins', () => {
       '/sales/customers': { data: { mode: 'connect', pending: true, connected: false } },
     } });
     await page.goto('/customers.html');
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await page.locator('input[name="cumode"][value="connect"]').check();
     // provision-only fields hide; the submit relabels honestly
     await expect(page.locator('#cu-provision-only')).toBeHidden();
@@ -282,7 +284,7 @@ test.describe('Customers — SS6 quick wins', () => {
     await expect(page.locator('tbody tr').first()).toContainText('Acme Bakery');
     expect(await q.evaluate((el) => (el as HTMLElement).dataset.marker)).toBe('kept');
     await expect(q).toBeFocused();
-    await expect(page.locator('.lmeta')).toContainText('1 customer');
+    await expect(page.locator('#lmeta')).toContainText('1 customer');
   });
 
   test('REQ_SEQ — a slow superseded /studio/customers load never paints over the newest one', async ({ page }) => {
@@ -298,8 +300,8 @@ test.describe('Customers — SS6 quick wins', () => {
     });
     await page.goto('/customers.html');
     await expect(page.locator('tbody tr')).toContainText(['Boot Customer']);
-    await page.locator('#refreshBtn').click();
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await expect(page.locator('tbody tr')).toContainText(['Fresh Customer']);
     await page.waitForTimeout(900);
     await expect(page.locator('tbody tr')).toContainText(['Fresh Customer']);
@@ -352,7 +354,7 @@ test.describe('Contacts — SS6 quick wins', () => {
     expect(await q.evaluate((el) => (el as HTMLElement).dataset.marker)).toBe('kept');
     await expect(q).toBeFocused();
     // the meta count follows the filter
-    await expect(page.locator('.lmeta')).toContainText('1 contact');
+    await expect(page.locator('#lmeta')).toContainText('1 contact');
     await q.fill('');
     await expect(page.locator('tbody tr')).toHaveCount(2);
   });
@@ -371,8 +373,8 @@ test.describe('Contacts — SS6 quick wins', () => {
     });
     await page.goto('/contacts.html');
     await expect(page.locator('tbody tr')).toContainText(['Boot Contact']);
-    await page.locator('#refreshBtn').click();
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await expect(page.locator('tbody tr')).toContainText(['Fresh Contact']);
     await page.waitForTimeout(900);   // the stale response lands — and must be ignored
     await expect(page.locator('tbody tr')).toContainText(['Fresh Contact']);
@@ -400,7 +402,7 @@ test.describe('Contacts — Manage fields (A1)', () => {
       '/sales/contacts/fields': { data: [{ key: 'referred_by', label: 'Referred by', type: 'text' }] },
     } });
     await page.goto('/contacts.html');
-    await page.locator('#manageFields').click();
+    await (await headerAction(page, '#manageFields')).click();
     await expect(page.locator('#fieldsDlg')).toBeVisible();
     await expect(page.locator('#fieldsRows .field-row .fr-label')).toHaveValue('Referred by');
     // saving PUTs the definitions to /sales/contacts/fields
@@ -429,7 +431,7 @@ test.describe('Contacts — the Add-a-customer dialog on phones (SS6 pin)', { ta
       '/sales/customers': { data: { created: true, invited: true, portal_url: 'https://x.example/portal.html' } },
     } });
     await page.goto('/contacts.html');
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
     // the open dialog must fit the DEVICE viewport — the broken geometry sized
     // it against the widened layout viewport, pushing Save out of reach
@@ -476,7 +478,7 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
     await failRefresh(page, /\/functions\/v1\/presence\/studio\/customers(\?|$)/);
     await page.goto('/customers.html');
     await expect(page.locator('tbody tr')).toHaveCount(3);
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
     await page.locator('#cu-email').fill('jane@acmebakery.com');
     await page.locator('#cu-submit').click();
@@ -493,7 +495,7 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
     await failRefresh(page, /\/functions\/v1\/presence\/sales\/contacts(\?|$)/);
     await page.goto('/contacts.html');
     await expect(page.locator('tbody tr')).toHaveCount(2);
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
     await page.locator('#cu-email').fill('jane@acmebakery.com');
     await page.locator('#cu-submit').click();
@@ -506,7 +508,7 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
     await pinTable('dds-display:customers')(page);
     await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/sales/customers': PROVISION_NO_EMAIL } });
     await page.goto('/customers.html');
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
     await page.locator('#cu-name').fill('Jane Doe');
     await page.locator('#cu-email').fill('jane@acmebakery.com');
@@ -522,7 +524,7 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
     await pinTable('dds-display:contacts')(page);
     await installApp(page, { api: { '/sales/contacts': CONTACTS, '/sales/customers': PROVISION_NO_EMAIL } });
     await page.goto('/contacts.html');
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
     await page.locator('#cu-name').fill('Jane Doe');
     await page.locator('#cu-email').fill('jane@acmebakery.com');
@@ -561,14 +563,14 @@ test.describe('Customers — the agency member gets the roster (no forward since
     await pinTable('dds-display:customers')(page);
     await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/agency/kits': KITS, '/portal/context': agencyCtx({ site_id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'Acme Bakery' }) } });
     await page.goto('/customers.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#cu-kit-wrap')).toBeVisible();
     await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
     await expect(page.locator('#cu-signup')).toBeHidden();      // provision mode: no pricing box
     // the owner's copy: no agency, no field — even with kits fixtured
     await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/agency/kits': KITS } });
     await page.goto('/customers.html');
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
     await expect(page.locator('#cu-kit-wrap')).toBeHidden();
   });
@@ -576,12 +578,12 @@ test.describe('Customers — the agency member gets the roster (no forward since
     await pinTable('dds-display:contacts')(page);
     await installApp(page, { api: { '/sales/contacts': CONTACTS, '/agency/kits': KITS, '/portal/context': agencyCtx() } });
     await page.goto('/contacts.html');
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#cu-kit-wrap')).toBeVisible();
     await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
     await installApp(page, { api: { '/sales/contacts': CONTACTS, '/agency/kits': KITS } });
     await page.goto('/contacts.html');
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
     await expect(page.locator('#cu-kit-wrap')).toBeHidden();
   });

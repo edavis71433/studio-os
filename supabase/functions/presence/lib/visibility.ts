@@ -42,10 +42,16 @@ export const DEFAULT_POLICY: Record<Surface, 'always' | 'shared' | 'internal' | 
 
 export interface ShareOverride { shared?: boolean } // from presence_item_shares (per item or whole-surface)
 
+// Builder item 220: a Designer sees the website's own surfaces and nothing of the
+// business: no moments, approvals, messages, notes, knowledge or numbers. Shares don't
+// widen it (they are for the client audience).
+const DESIGNER_SURFACES: ReadonlySet<Surface> = new Set<Surface>(['cms_pages', 'published', 'drafts', 'ai_drafts', 'visual_assets', 'media', 'files', 'comments']);
+
 /** Can this role see an item on this surface, given an optional explicit share?
  *  Owner/staff/developer: always yes. Reviewer: by policy, overridable. */
 export function visibleTo(role: SiteRole, surface: Surface, override?: ShareOverride): boolean {
   if (seesFullWorkspace(role)) return true;                 // owner / staff / developer see all
+  if (role === 'designer') return DESIGNER_SURFACES.has(surface);   // builder item 220: the website's own, never the business's
   const policy = DEFAULT_POLICY[surface] ?? 'internal';
   if (typeof override?.shared === 'boolean') return override.shared;  // explicit share/hide wins
   return policy === 'always' || policy === 'shared';        // default exposure for the reviewer

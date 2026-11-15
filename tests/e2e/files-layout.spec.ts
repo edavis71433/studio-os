@@ -94,8 +94,11 @@ test.describe('Files — one row of kinds and a strip of folders and clients (bo
     await pinGrid(page);
     await installApp(page, { api: API });
     await page.goto('/files.html');
-    const head = page.locator('.lhead .lrow1');
-    for (const sel of ['#dispTable', '#dispGrid', '#makeImage', '#refreshBtn', '#selbtn', '#add']) await expect(head.locator(sel)).toBeVisible();
+    const head = page.locator('header.dds-ph');
+    await expect(head.locator('#add')).toBeVisible();   // the one filled action, always in sight
+    // the others: in the row on a computer, behind ⋯ on a phone (builder item 165)
+    if (await head.locator('.dds-ph-dots').isVisible()) await head.locator('.dds-ph-dots').click();
+    for (const sel of ['#dispTable', '#dispGrid', '#makeImage', '#refreshBtn', '#selbtn']) await expect(head.locator(sel)).toBeVisible();
   });
 
   test('a card says where the file is and whose it is', async ({ page }) => {

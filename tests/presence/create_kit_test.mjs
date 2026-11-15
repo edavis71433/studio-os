@@ -13,8 +13,8 @@
 //      the mail service stubbed: method and path reach the handler, signed in only, and
 //      one studio's call never reads or changes another studio's rows
 //   3  the page wiring is browser tests (tests/e2e/create.spec.ts, create-kit-212.spec.ts;
-//      the list is at the end); what stays text here is marked: the phone bar until
-//      PR 416 lands, and three pins whose text is the contract
+//      the list is at the end, with the phone bar's own spec from PR 416); what stays
+//      text here is three pins whose text is the contract
 import { installFakePostgrest } from './fake_pgrst.mjs';
 Deno.env.set('STRIPE_SECRET', 'sk_test_stub');
 Deno.env.set('RESEND_KEY', 'test-resend-key');
@@ -260,12 +260,6 @@ const bRows = () => JSON.stringify(['presence_deals', 'presence_contacts', 'pres
 const shell = read('shell.js');
 const css = read('shell.css');
 const headers = read('_headers');
-// PR 416 (builder item 165) rewrites these; left as text until it lands
-const bar = (shell.match(/if \(pipe && custs\) \{[\s\S]*?\n    \}/) || [''])[0];
-const order = ['homeA', 'inboxA', 'dds-mbar-create', 'pipe.href', 'custs.href'].map((k) => bar.indexOf(k));
-ok('the phone bar: Home · Inbox · + · Pipeline · Customers', order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])));
-// bug hunt A3 (Nov 10): a studio that hid Pipeline or Customers still may create, so its bar is Home · Inbox · + · Menu
-ok('…and everyone else keeps Home · Inbox · Menu, with the + when they may create', /bar\.innerHTML = homeA \+ inboxA \+\s*\(plusHere \? '<button type="button" id="dds-mbar-create"[^\n]*: ''\) \+\s*'<button type="button" id="dds-mbar-menu"/.test(shell) && /var plusHere = canCreate\(\);/.test(shell));
 
 // pin: _headers is the cache contract Netlify serves; without no-cache a deploy leaves browsers on a stale create.js
 ok('/create.js revalidates like shell.js', /\n\/create\.js\n  Cache-Control: no-cache, must-revalidate\n/.test(headers));
@@ -279,6 +273,11 @@ if (fail) { console.log('FAILED:\n  ' + failed.join('\n  ')); Deno.exit(1); }
 Deno.exit(0);   // std serve() keeps its fake listener open
 
 // ── Covered in the browser by (the page halves of the old text checks) ──
+//   the phone bar (PR 416): Home · Sites or Website · + · Inbox · Menu, the + whenever they may create:
+//     phone-bar-menu-165.spec.ts › a studio’s bar: Home · Sites · + · Inbox · Menu, and the top bar has no second Menu
+//     phone-bar-menu-165.spec.ts › inside a client: Overview · Website · Messages · Menu, the + in the middle when Create shows there
+//     phone-bar-menu-165.spec.ts › an owner running their own site: Home · Website · Inbox · Menu
+//     phone-bar-menu-165.spec.ts › a studio that hid Sites in Your menu: no Sites on the bar either
 //   create.js checks the person’s deals before starting one; the check starts as soon as they are picked:
 //     create.spec.ts › + Create › someone past the first 100: typing asks the server, and their own deal is used — none is started
 //     create.spec.ts › + Create › a person with no deal: the call stays on them, and pressing again after a failure logs it once

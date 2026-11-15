@@ -23,6 +23,7 @@ export const RESERVED_NAMES = {
   monthlyReport: '__monthly_report__',    // builder list item 58: the client's monthly report email (on, the studio's line, last month sent) (ops/monthly_report.ts)
   siteNotify: '__site_notify__',          // builder list item 126: what the studio hears about each client site, and how (lib/site_notify.ts)
   portalSettings: '__portal_settings__',  // builder list items 229 and 233: what the studio's clients see in the portal (lib/portal_settings.ts)
+  portalPages: '__portal_pages__',        // builder list item 234: the pages and quick links the studio makes for its clients (lib/portal_pages.ts)
   versionStars: '__version_stars__',      // builder list item 158: the versions starred in Versions (routes/publish.ts)
   comingSoon: '__coming_soon__',          // builder list item 158: the Coming soon page's line, its switches and when it went up (lib/coming_soon.ts)
   followedSearches: '__followed_searches__',   // builder list item 181: the searches a client follows on Google, ten at most (lib/search_tools.ts)
@@ -46,6 +47,7 @@ export const RESERVED_NAMES = {
   bookingBusy: '__booking_busy__',        // builder list item 149: the busy times last read from that calendar, and how the last read went (routes/booking.ts)
   usableCheck: '__usable_check__',        // builder list item 150: the three ticks only a person can judge, and the last check's count and worst line (lib/usable_check.ts)
   publishLock: '__publish_lock__',        // builder list item 214: publishing locked (a launch freeze or a dispute), when, by whom, the client's note (lib/publish_lock.ts)
+  joinWelcome: '__join_welcome__',        // builder list item 221: the welcome email to each new person on the site's list: on or off, its words, how many went (lib/join_welcome.ts)
 } as const;
 
 const rowsOf = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];

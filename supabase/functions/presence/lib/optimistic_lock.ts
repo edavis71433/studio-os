@@ -14,6 +14,7 @@ import { readDraft, draftTablesMoved } from './draft_hash.ts';
 import type { DraftRead } from './draft_hash.ts';
 import { svc, writeMark, writtenSince } from './db.ts';
 import type { WriteMark } from './db.ts';
+import { draftChangesOnly } from './provenance.ts';
 import type { SiteRow } from './site.ts';
 
 /** Read + normalize the `If-Match` precondition. Strips a weak-validator `W/`
@@ -67,7 +68,8 @@ export async function guardStaleDraft(req: Request, site: SiteRow, cors: Record<
     // the 409 is complete without it.
     let last: LastChangeInfo | null = null;
     try {
-      const r = await svc(`presence_change_events?site_id=eq.${site.id}&select=summary,actor_kind,created_at&order=created_at.desc&limit=1`);
+      // item 239: a launch's step or the preview's link is in the log too, but moves no draft
+      const r = await svc(`presence_change_events?site_id=eq.${site.id}&${draftChangesOnly()}&select=summary,actor_kind,created_at&order=created_at.desc&limit=1`);
       const row = Array.isArray(r.json) ? r.json[0] : null;
       if (row) last = { summary: String(row.summary || ''), actor_kind: String(row.actor_kind || ''), at: String(row.created_at || '') };
     } catch { /* best-effort */ }

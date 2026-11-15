@@ -100,7 +100,7 @@ const settings = read('settings.html');
   ok('settings: who signs agreements shows and saves in your own second business, never inside a client, and is decided again once the context is in',
     /const signer = \(\) => document\.querySelectorAll\('\[data-signer\]'\)\.forEach\(\(el\) => \{ el\.hidden = inClient\(\); \}\);/.test(settings)
     && /signer\(\); if \(SCOPE\) CTX_IN\.then\(signer\);/.test(settings)
-    && /if \(mayConfigure && !inClient\(\)\) \{\s*const sn = \$\('f-signer'\)/.test(settings));
+    && /if \(f\.studio && inClient\(\)\) return;/.test(settings));   // builder item 165: each box saves on its own; who signs is skipped only inside a client
 }
 
 // ── today.html: a first answer from the shell, the context's answer once in ──
@@ -166,11 +166,11 @@ for (const page of ['contacts', 'pipeline', 'projects']) {
 }
 const contacts = read('contacts.html'), pipeline = read('pipeline.html'), projects = read('projects.html');
 ok('contacts: Save view, Add and Import are a client’s pipeline’s to hide; a paint before the context is painted again',
-  /if\(VIEWS_ASKED\|\|inClient\(\)\)return;/.test(contacts) && /\$\{inClient\(\)\?'':addButtons\(\)\}/.test(contacts) && /async function loadImportStrip\(\)\{\s*if\(inClient\(\)\)return;/.test(contacts)
+  /if\(VIEWS_ASKED\|\|inClient\(\)\)return;/.test(contacts) && /const studio=!inClient\(\);/.test(contacts) && /\$\{studio\?[^}]*moreButtons\(\)/.test(contacts) && /async function loadImportStrip\(\)\{\s*if\(inClient\(\)\)return;/.test(contacts)
   && /if\(!ALL\.length&&inClient\(\)\)return `<div class="center"><h2>Contacts live at the studio level\./.test(contacts)
   && /function render\(\)\{\s*PAINTED_IN=inClient\(\);/.test(contacts) && /document\.addEventListener\('dds:context',\(\)=>\{if\(PAINTED_IN!==null&&PAINTED_IN!==inClient\(\)\)\{render\(\);loadSavedViews\(\);loadImportStrip\(\);\}\}\);/.test(contacts));
 ok('pipeline: the page starts as a client’s under ?client= and gives your own business its tools back once the shell can tell',
-  /if\(scope\(\)\)\{\['importDeals','pvBtn','chartsBtn','printBtn'\][^\n]*wireMore\(\);ownBusinessTools\(\);\}/.test(pipeline)
+  /if\(scope\(\)\)\{\['importDeals','pvBtn','chartsBtn','printBtn'\][^\n]*ownBusinessTools\(\);\}/.test(pipeline)
   && /const own=!inClient\(\);if\(own===OWN_TOOLS\)return;OWN_TOOLS=own;/.test(pipeline) && /nd\.hidden=!own;nd\.onclick=own\?openNewDeal:null;/.test(pipeline)
   && /if\(own&&!OWN_WIRED\)\{OWN_WIRED=true;wireViews\(\);studioLevelTools\(\);\}/.test(pipeline)
   && /document\.addEventListener\('dds:context',go\);/.test(pipeline) && /if\(VIEWS_ASKED\|\|inClient\(\)\)return;/.test(pipeline));

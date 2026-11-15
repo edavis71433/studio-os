@@ -114,6 +114,7 @@ test.describe('the list tools work when shell.js lands after the page has drawn'
     await expect(dlg.locator('#e-title')).toHaveValue('Office manager');
     expect(await kitThere(page)).toBe(false);
     await expect(dlg.locator('.dds-tags')).toHaveCount(0);   // the tag box is one of the tools
+    await expect(dlg.locator('#e-name')).toBeFocused();   // the form has opened: it puts the cursor in Name 20 ms after it fills in, and typing elsewhere before that went into Name
     await dlg.locator('#e-phone2').fill('(555) 010-9999');
     await dlg.locator('#e-save').dispatchEvent('click');
     await expect.poll(() => seen.patches.length).toBe(1);

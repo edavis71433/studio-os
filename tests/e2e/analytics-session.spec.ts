@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Bug hunt C (Nov 10 2026), Analytics.
 // C8  the sign-in pass is renewed about every hour; the page now keeps the renewed one
@@ -53,7 +54,7 @@ test.describe('Analytics — the renewed sign-in pass (bug hunt C8)', () => {
     // an hour on: the first pass is refused, and the client has renewed it in the background
     state.refuse = 'e2e-token';
     await page.evaluate(() => { for (const cb of (window as unknown as { __authCbs?: Array<(e: string, s: unknown) => void> }).__authCbs || []) cb('TOKEN_REFRESHED', { access_token: 'renewed-token' }); });
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await expect.poll(() => state.jwts.at(-1)).toBe('renewed-token');
     await expect(page.getByRole('heading', { level: 1, name: 'Analytics' })).toBeVisible();
     await expect(page.locator('#main')).not.toContainText('Sign in to see your analytics');
@@ -66,7 +67,7 @@ test.describe('Analytics — a Refresh that fails keeps the last good reports (b
     await page.goto('/analytics.html');
     await expect(page.locator('#rt-revenue')).toBeVisible();
     state.failDash = true; state.failReports = true;
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await expect(page.locator('.dds-toast', { hasText: 'Couldn’t refresh just now.' })).toBeVisible();
     await page.locator('#rt-enquiries').click();
     await expect(page.locator('#rt-enquiries')).toHaveAttribute('aria-selected', 'true');
@@ -79,7 +80,7 @@ test.describe('Analytics — a Refresh that fails keeps the last good reports (b
     await page.goto('/analytics.html');
     await expect(page.locator('#rt-revenue')).toBeVisible();
     state.failReports = true;
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await expect(page.locator('#reportsBody')).not.toContainText('Your reports couldn’t load just now');
     await page.locator('#rt-pipeline').click();
     await expect(page.locator('#repPrint')).toContainText('Deals by stage');
@@ -87,7 +88,7 @@ test.describe('Analytics — a Refresh that fails keeps the last good reports (b
     // and when they can be read again, the next Refresh reads them
     state.failReports = false;
     const again = page.waitForRequest((r) => r.url().endsWith('/sales/reports'));
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await again;
   });
 

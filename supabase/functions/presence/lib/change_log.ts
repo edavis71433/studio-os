@@ -185,8 +185,21 @@ export function describeEvent(r: RawChange, vocab: Vocab = DEFAULT_VOCAB, names:
       // restores that went live are publishes; these are restores into the draft
       if (action === 'restore' && /restored the version from|brought the website back online|rolled back launch|instant restore|published again/i.test(summary)) return null;
       return { text: said || 'brought an earlier version into the draft', area: 'website', where: 'Website › Versions', go: '/presence.html#history', sig: `restore:${said}` };
-    case 'launch':
-      return null;   // checkpoints are read from presence_launches
+    case 'launch': {
+      // item 239: a launch's own steps (staged, approved, sent back, scheduled, canceled). A saved
+      // checkpoint is read from presence_launches, and a launch going live or rolled back from
+      // its publish record, so those say nothing here.
+      if (action === 'publish' || action === 'restore' || /^saved a checkpoint/i.test(summary.trim())) return null;
+      if (/^removed a checkpoint/i.test(summary.trim())) return { text: said, area: 'website', where: 'Website › Versions', go: '/presence.html#history', sig: 'launch:checkpoint-off' };
+      return said ? { text: said, area: 'live', where: 'Website › Versions', go: '/presence.html#history', sig: `launch:${said}` } : null;
+    }
+    case 'preview':
+      // item 239: the private preview's link and password; its promotion is the publish record's
+      if (action === 'publish') return null;
+      return said ? { text: said, area: 'live', where: 'Website › Versions', go: '/presence.html#history', sig: `preview:${said}` } : null;
+    case 'content_library':
+      // item 239: saved sections ("Updated “Hours” — every linked placement will show this")
+      return { text: said || 'changed a saved section', area: 'website', where: 'Website › Saved sections', go: '/presence.html#design', sig: `content_library:${said}` };
     default:
       return said ? { text: said, area: 'settings', where: 'Website', go: null, sig: `${et}:${said}` } : null;
   }
@@ -204,16 +217,26 @@ export function describePublish(r: RawChange): Words | null {
   if (r.unchanged) return null;
   const n = countFromSummary(r.summary || '');
   const label = String(r.label || '').trim();
-  if (r.status === 'failed') return { text: r.kind === 'restore' ? 'tried to restore an earlier version; it didn’t go live' : 'tried to publish; it didn’t go live', area: 'live', where: 'Website › Versions', go: '/presence.html#history', sig: `fail:${r.id}` };
+  // item 239: a publish the scheduler sent for someone (whoOf names them), or one whose summary says it
+  // was scheduled. The old 'system' rows with nobody named (July probes) were never scheduled.
+  const onTime = r.actor_kind === 'system' && (UUID.test(lower(r.actor)) || /^scheduled\b/i.test(String(r.summary || '').trim())) ? ' on schedule' : '';
+  const versions = { area: 'live' as const, where: 'Website › Versions', go: '/presence.html#history' };
+  if (r.status === 'failed') return { text: r.kind === 'restore' ? `tried to restore an earlier version${onTime}; it didn’t go live` : `tried to publish${onTime}; it didn’t go live`, ...versions, sig: `fail:${r.id}` };
   if (r.status !== 'live') return null;   // still on its way; the next read tells it
+  const said = plainSummary(r.summary || '');
   if (r.kind === 'restore') {
-    const said = plainSummary(r.summary || '');
     const again = said.match(/^published again: (.+)$/i);   // item 214's Publish again
-    if (again) return { text: `published ${again[1]} again`, area: 'live', where: 'Website › Versions', go: '/presence.html#history', sig: `restore:${r.id}` };
-    return { text: said && /^restored|^brought|^rolled/i.test(said) ? `${said}, and it went live` : 'put an earlier version back live', area: 'live', where: 'Website › Versions', go: '/presence.html#history', sig: `restore:${r.id}` };
+    if (again) return { text: `published ${again[1]} again`, ...versions, sig: `restore:${r.id}` };
+    return { text: said && /^restored|^brought|^rolled/i.test(said) ? `${said}, and it went live` : `put an earlier version back live${onTime}`, ...versions, sig: `restore:${r.id}` };
   }
+  // item 239: what a launch, the preview, a scheduled post and a timed section keep says it best
+  const launched = said.match(/^launched (“.+”)$/i);
+  if (launched) return { text: `launched ${launched[1]}${onTime}. It went live`, ...versions, sig: `publish:${r.id}` };
+  if (/^promoted the preview to live$/i.test(said)) return { text: 'put the preview live', ...versions, sig: `publish:${r.id}` };
+  if (/^scheduled blog posts? .+ went live$/i.test(said)) return { text: `put the ${said.replace(/ went live$/i, '')} live`, ...versions, sig: `publish:${r.id}` };
+  if (/^a timed section went live or came down$/i.test(said)) return { text: 'republished the site so a timed section showed or hid on time', ...versions, sig: `publish:${r.id}` };
   const what = n ? `${n} change${n === 1 ? '' : 's'} went live` : 'the changes went live';
-  return { text: `published the site${label ? ` as “${label}”` : ''}. ${what.charAt(0).toUpperCase()}${what.slice(1)}`, area: 'live', where: 'Website › Versions', go: '/presence.html#history', sig: `publish:${r.id}` };
+  return { text: `published the site${onTime}${label ? ` as “${label}”` : ''}. ${what.charAt(0).toUpperCase()}${what.slice(1)}`, ...versions, sig: `publish:${r.id}` };
 }
 
 const ROLE_WORDS: Record<string, string> = { business_owner: 'a Co-owner', business_staff: 'Staff', developer: 'a Developer', client_reviewer: 'a Reviewer', designer: 'a Designer' };
@@ -222,7 +245,13 @@ const SEAT_NOTE: Record<string, string> = { business_owner: 'co-owner', business
 /** Who did it, from the kept sign-in id or email, as the viewer reads it. Pure. */
 export function whoOf(r: RawChange, i: { viewer: string | null; viewerSide: 'studio' | 'client'; people: Map<string, Person>; ownerOf?: Map<string, Person> }): { who: string; who_note: string; side: WhoSide; key: string } {
   const a = lower(r.actor);
-  if (!a || r.actor_kind === 'system' || !UUID.test(a) && !a.includes('@') && a !== 'owner') return { who: 'Studio OS', who_note: '', side: 'auto', key: 'auto' };
+  // item 239: a one-tap decision is the client's, made by the link emailed to the business, with no sign-in
+  if (!a && r.actor_kind === 'client') return { who: i.viewerSide === 'studio' ? 'Someone on the client’s side' : 'Someone on your team', who_note: '', side: 'unknown', key: 'k:client:link' };
+  if (!a || !UUID.test(a) && !a.includes('@') && a !== 'owner') return { who: 'Studio OS', who_note: '', side: 'auto', key: 'auto' };
+  // item 239: work the scheduler sent for someone is theirs, by name and on their side, when they're on
+  // the studio's team, a seat or the owner here. A sign-in found only by its email can't say whose side
+  // it is, so that stays Studio OS by itself.
+  if (r.actor_kind === 'system' && !(i.viewer && a === lower(i.viewer)) && (!i.people.has(a) || i.people.get(a)!.side === 'support')) return { who: 'Studio OS', who_note: '', side: 'auto', key: 'auto' };
   if (i.viewer && a === lower(i.viewer)) return { who: 'You', who_note: '', side: 'you', key: `p:${a}` };
   const p = a === 'owner' ? i.ownerOf?.get(r.site_id) : i.people.get(a);
   if (p) {

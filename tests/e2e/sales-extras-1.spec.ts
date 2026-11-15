@@ -15,7 +15,9 @@ const SETTINGS_API = {
 };
 
 test.describe('Settings — the chance each stage closes (item 69)', () => {
-  test('the four percents show the saved values under the studio\'s names, and Save sends only the percents', async ({ page }) => {
+  // builder item 165 (Figma 295:127): a row per stage — its name, its chance, when it stalls —
+  // and a box saves when it's left; there is no Save percents button any more
+  test('the four percents show the saved values beside the studio\'s names, and a percent saves when it is left', async ({ page }) => {
     let sent: unknown = null;
     await installApp(page, { api: SETTINGS_API });
     await page.route('**/functions/v1/presence/sales/stages', (route) => {
@@ -24,16 +26,19 @@ test.describe('Settings — the chance each stage closes (item 69)', () => {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ...SETTINGS_API['/sales/stages'].data, chances: { lead: 10, qualified: 30, proposal: 60, contract: 75, won: 100, lost: 0 } } }) });
     });
     await page.goto('/settings.html#automations');
-    const box = page.locator('#stageChances');
+    const box = page.locator('#stageGrid');
     await expect(box).toBeVisible();
-    await expect(box.locator('input')).toHaveCount(4);
-    await expect(box.locator('[data-stage-label="lead"]')).toHaveText('Enquiry');            // the studio's own stage name
+    await expect(box.locator('.c-chance input')).toHaveCount(4);
+    await expect(page.locator('#sn-lead')).toHaveValue('Enquiry');                            // the studio's own stage name, in its row
+    await expect(page.getByLabel('Chance a deal at Enquiry closes, in percent')).toHaveValue('10');   // …and the boxes beside it say it
     await expect(page.getByLabel('Chance a deal at Qualified closes, in percent')).toHaveValue('30');
-    await expect(page.locator('#stageNames input')).toHaveCount(4);                          // the names card is unchanged
+    await expect(box.locator('.c-name input')).toHaveCount(4);
+    await expect(page.getByRole('button', { name: /^Save/ })).toHaveCount(0);
     await page.getByLabel('Chance a deal at Proposal sent closes, in percent').fill('60');
-    await page.getByRole('button', { name: 'Save percents' }).click();
+    await page.getByLabel('Chance a deal at Proposal sent closes, in percent').press('Tab');
     await expect.poll(() => sent).toEqual({ chances: { lead: 10, qualified: 30, proposal: 60, contract: 75 } });
-    await expect(page.locator('#scMsg')).toContainText('Pipeline’s Expected total uses these.');
+    await expect(page.locator('#fs-stage-proposal')).toHaveText('Saved');
+    await expect(page.locator('#stagesHow')).toContainText('Pipeline’s Expected total is each open deal’s value times its stage’s chance.');
   });
 
   test('a percent outside 0–100 is caught on the page, nothing is sent', async ({ page }) => {
@@ -41,9 +46,12 @@ test.describe('Settings — the chance each stage closes (item 69)', () => {
     await installApp(page, { api: SETTINGS_API });
     await page.route('**/functions/v1/presence/sales/stages', (route) => { if (route.request().method() === 'PUT') puts++; return route.fallback(); });
     await page.goto('/settings.html#automations');
-    await page.getByLabel('Chance a deal at New lead closes, in percent').fill('120');
-    await page.getByRole('button', { name: 'Save percents' }).click();
-    await expect(page.getByText('Each chance is a percent from 0 to 100.')).toBeVisible();
+    await expect(page.locator('#sn-lead')).toHaveValue('Enquiry');
+    await page.getByLabel('Chance a deal at Enquiry closes, in percent').fill('120');
+    await page.getByLabel('Chance a deal at Enquiry closes, in percent').press('Tab');
+    await expect(page.locator('#fs-stage-lead')).toHaveText('Use a percent from 0 to 100');   // said in its row; the box keeps it
+    await expect(page.locator('#sc-lead')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#sc-lead')).toHaveValue('120');
     expect(puts).toBe(0);
   });
 

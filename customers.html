@@ -27,35 +27,24 @@
   .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
-  /* ── list-view header (SLDS list-view anatomy, dds skin) — kept in sync with
-        inbox.html's list-pane header by hand (.lhead/.lrow1/#viewBtn/#viewMenu) ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
-  .lrow1{display:flex;align-items:center;gap:6px}
-  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  .viewdd{position:relative;min-width:0;flex:1}
-  #viewBtn{font:inherit;font-family:var(--sans);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;display:inline-flex;align-items:center;gap:var(--dds-s2,8px);max-width:100%}
-  #viewBtn:hover{background:var(--p-soft)}
+  /* ── builder item 165: the page header is the shared one (shell.css .dds-ph). The view
+        picker (#viewBtn, .dds-ph-pick) sits beside the title; its menu hangs under it ── */
+  .viewdd{position:relative;min-width:0;max-width:100%}
   /* Second walk (Nov 8, item 59): on a phone "All customers" broke onto two centred
      lines beside the icon. The view name stays on one line and trims with … */
   #viewBtn{max-width:100%;min-width:0}
   #viewBtn .vl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  @media (max-width:600px){#viewBtn{font-size:17px;padding-left:6px;padding-right:4px}}
-  #viewBtn .car{font-size:10px;color:var(--faint)}
   #viewMenu{position:absolute;top:calc(100% + 4px);left:0;min-width:230px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:6px;z-index:30}
   #viewMenu [role=option]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) 10px;cursor:pointer}
   #viewMenu [role=option]:hover{background:var(--p-soft)}
   #viewMenu [role=option][aria-selected="true"]{color:var(--p);font-weight:700}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
-  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
   .seg button{border:none;border-radius:0;padding:6px var(--dds-s3,12px);font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
-  /* Phase 2: the Customers | People tab strip under the header */
-  .seg.tabs2{margin:0 0 var(--dds-s3,12px);background:var(--bg)}
-  .seg.tabs2 button{font-size:13.5px;padding:var(--dds-s2,8px) var(--dds-s4,16px)}
-  .seg.tabs2 button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line);font-weight:600}
-  .seg.tabs2 .n{font-size:11.5px;color:var(--faint);font-weight:500;margin-left:var(--dds-s1,4px)}
+  /* Phase 2: Customers | People are the header's tabs (shell.css .dds-ph-tabs); People's count beside it */
+  .dds-ph-tabs .n{font-size:11.5px;color:var(--faint);font-weight:500;margin-left:var(--dds-s1,4px)}
 
   .bar{display:flex;gap:var(--dds-s2,8px);margin-bottom:var(--dds-s4,16px);align-items:center;flex-wrap:wrap}
   /* sales review item 31: saved views in the view menu; the text buttons beside it */
@@ -179,14 +168,6 @@
   /* ══ Bold redesign, part 2 (Nov 2026): Customers and People. The title sits
      on the page, the views are chips with counts, rows carry an avatar, and a
      row opens a preview beside the list (a sheet on phones). ══ */
-  .lhead{background:none;border:0;box-shadow:none;padding:0;margin-bottom:var(--dds-s4,16px)}
-  .lrow1{gap:10px;flex-wrap:wrap}
-  .lrow1 .viewdd{flex:0 1 auto}
-  .lrow1 .sp{flex:1 1 0;align-self:stretch;min-height:36px}
-  .lrow1 .seg.tabs2{margin:0}
-  .ptitle{font-family:var(--serif);font-weight:600;font-size:28px;line-height:1.15;letter-spacing:-.015em;padding:4px 8px}
-  @media (max-width:760px){.ptitle{font-size:19px;line-height:1.2}}
-  .lmeta{margin:2px 0 0 var(--dds-s2,8px);font-size:13px;color:var(--soft)}
   .bar{margin-bottom:var(--dds-s3,12px)}
   .trow{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;margin:0 0 var(--dds-s3,12px)}
   .chips{display:flex;gap:6px;flex-wrap:wrap;flex:1 1 320px;min-width:0}
@@ -235,13 +216,6 @@
     body.cprev-open table[aria-label="Customers"] [data-col="email"],body.cprev-open table[aria-label="Customers"] [data-col="project_count"]{display:none}
     body.cprev-open table{min-width:0}
   }
-  /* a phone: the title and + Add on one line, Customers | People across the next */
-  @media (max-width:760px){
-    .lrow1 .seg.tabs2{order:3;flex:1 1 100%}
-    .lrow1 .seg.tabs2 button{flex:1}
-  }
-  /* "+ Add" up to a tablet's width, so the title line holds; the rest is still read out */
-  @media (max-width:1100px){#addCust .long{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}}
   a.btn{text-decoration:none}
   /* People: names read as names, not underlined links; a phone gets rows */
   table[aria-label="People"] thead th{padding:var(--dds-s3,12px) var(--dds-s4,16px)}
@@ -310,7 +284,7 @@
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
-<div class="wrap"><h1 class="sr-only">Customers</h1><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div></div>
+<div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div></div>
 <!-- C4: contacts.html's Add-a-customer dialog, ported wholesale — kept in sync by hand -->
 <dialog id="custDlg" aria-label="Add a customer">
   <form id="custForm" class="dbody">
@@ -574,22 +548,20 @@ const lmetaText=(list)=>{
   const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
   return `${count} customer${count===1?'':'s'}${owed?` · ${fmtOwed(owed)} owed to you`:''} · ${updatedLabel()}${DISPLAY==='table'?` · Sorted by ${sortCol[1]} — ${SORT.dir>0?'ascending':'descending'}`:''}`;
 };
-// Bold redesign, part 2: the title sits on the page (the view menu IS the
-// title), with Customers | People and the add button beside it.
+// Builder item 165: the one page header (shell.css .dds-ph). The title is always
+// Customers; the view picker sits beside it (on the Customers tab), the line under
+// it counts what is listed, and Customers | People are the header's tabs.
 function headerHtml(list){
   const people=TAB==='people';
-  return `<div class="lhead">
-    <div class="lrow1">
-      ${people?'<p class="ptitle">People</p>':`<div class="viewdd">
-        <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Customers view: ${esc(viewLabel())}"><span class="vl">${esc(viewLabel())}</span> <span class="car" aria-hidden="true">▾</span></button>
+  return `<header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" data-ic="customers" aria-hidden="true"></span>
+    <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Customers</h1>${people?'':`<div class="viewdd">
+        <button id="viewBtn" class="dds-ph-pick" aria-haspopup="listbox" aria-expanded="false" aria-label="Customers view: ${esc(viewLabel())}"><span class="vl">${esc(viewLabel())}</span> <span class="car" aria-hidden="true">▾</span></button>
         <div id="viewMenu" role="listbox" aria-label="Customer views" hidden></div>
-      </div>`}
-      <span class="sp"></span>
-      ${tabsHtml()}
-      ${people?'<a class="btn ghost" href="/contacts.html">Add or edit people</a>':'<button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add<span class="long"> a customer</span></button>'}
-    </div>
-    <div class="lmeta" id="lmeta">${esc(lmetaText(list))}</div>
-  </div>`;
+      </div>`}</div>
+      <p class="dds-ph-line" id="lmeta">${esc(lmetaText(list))}</p></div>
+    <div class="dds-ph-acts">${people?'<a class="btn ghost" href="/contacts.html">Add or edit people</a>':'<button class="btn primary dds-ph-fill" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button>'}</div>
+  </div>
+  ${tabsHtml()}</header>`;
 }
 // the views as chips with their counts — an empty one is noise (the view menu still lists every view)
 function chipsHtml(){
@@ -732,7 +704,7 @@ async function pSearchServer(){
   repaintPeople();
 }
 function tabsHtml(){
-  return `<div class="seg tabs2" role="tablist" aria-label="Customers or people"><button role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}" aria-pressed="${TAB==='customers'?'true':'false'}">Customers</button><button role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}" aria-pressed="${TAB==='people'?'true':'false'}">People${peopleTabCount()}</button></div>`;
+  return `<div class="dds-ph-tabs" role="tablist" aria-label="Customers or people"><button type="button" role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}">Customers</button><button type="button" role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}">People${peopleTabCount()}</button></div>`;
 }
 let PFILTER='all';
 function peopleChipsHtml(){

@@ -42,6 +42,8 @@ const CHANGE_LABEL: Record<string, string> = {
   testimonial: 'Testimonials updated', faq: 'FAQs updated', post: 'An update was posted', media: 'Photos updated',
   redirect: 'Links updated', settings: 'Settings updated', voice: 'Voice profile updated',
   publish: 'Site published', restore: 'A previous version was restored',
+  // item 239: kept in the log since migration 0229 (the summary says which step)
+  launch: 'Launch updated', preview: 'Preview updated', content_library: 'Saved sections updated',
 };
 
 export function mapPublish(r: { id: string; kind?: string; status?: string; change_summary?: string; created_at: string; completed_at?: string }): TimelineItem {

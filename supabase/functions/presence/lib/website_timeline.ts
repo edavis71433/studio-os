@@ -99,7 +99,7 @@ function actorOf(kind?: string): string {
 const SECTION_TAB: Record<string, string> = {
   identity: 'business', location: 'business', settings: 'design', voice: 'business',
   offering: 'offerings', testimonial: 'testimonials', faq: 'faqs', post: 'updates',
-  media: 'media', redirect: 'business',
+  media: 'media', redirect: 'business', content_library: 'design',
 };
 
 interface Internal { at: string; category: TimelineCategory; actor: string; title: string; description?: string; href?: string; related_page?: string; milestone?: boolean; iconOverride?: string }
@@ -174,14 +174,16 @@ export function buildWebsiteTimeline(input: WebsiteTimelineInput): WebsiteTimeli
     if (r.entity_type === 'publish' || r.entity_type === 'restore' || r.entity_type === 'internal_note') continue;
     const m = item(mapChange(r));
     const isSite = r.entity_type === 'domain' || r.entity_type === 'site';
+    // item 239: a launch's steps and the preview's link sit with Versions, where they're made
+    const isRelease = r.entity_type === 'launch' || r.entity_type === 'preview';
     const tab = SECTION_TAB[r.entity_type];
     const isFirstTestimonial = !!ms.firstTestimonialId && r.id === ms.firstTestimonialId;
     if (isFirstTestimonial) matched.testimonial = true;
     events.push({
       ...m,
-      category: isFirstTestimonial ? 'Milestones' : (isSite ? 'Website' : 'Content'),
+      category: isFirstTestimonial ? 'Milestones' : (isRelease ? 'Publishing' : isSite ? 'Website' : 'Content'),
       actor: actorOf(r.actor_kind) || 'You',
-      href: isSite ? '/presence.html#foundations' : (tab ? `/presence.html#${tab}` : '/presence.html'),
+      href: isRelease ? '/presence.html#history' : isSite ? '/presence.html#foundations' : (tab ? `/presence.html#${tab}` : '/presence.html'),
       related_page: 'Your website',
       ...(isFirstTestimonial ? { title: 'Your first testimonial is up', milestone: true, iconOverride: M_STAR } : {}),
     });

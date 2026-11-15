@@ -260,7 +260,9 @@ await S.handleSalesAddCustomer(req('POST', '/sales/customers', { mode: 'connect'
   ok('accept: 200', a.status === 200 && a.body?.data?.accepted === true, JSON.stringify(a.body));
   ok('accept: the studio may now work on the site', T.presence_agency_clients.some((x) => x.site_id === CUST_SITE && x.agency_id === AG1));
   ok('accept: they are the studio\'s customer', T.presence_customer_agency.some((x) => x.customer_client_id === CUST_CLIENT && x.agency_site_id === STUDIO_SITE) && T.presence_service_links.some((l) => l.customer_client_id === CUST_CLIENT && l.agency_site_id === STUDIO_SITE));
-  ok('accept: the request is answered and the studio is told', T.presence_connect_requests[0].status === 'accepted' && T.presence_change_events.some((e) => e.site_id === STUDIO_SITE));
+  // item 239: the studio sees them in Customers (above); the change-log line it used to try was refused
+  // by the real table and never showed, and a new customer is no change to the studio's website
+  ok('accept: the request is answered, with no line on the studio\'s website change log', T.presence_connect_requests[0].status === 'accepted' && !(T.presence_change_events || []).some((e) => e.site_id === STUDIO_SITE));
 }
 world();
 await S.handleSalesAddCustomer(req('POST', '/sales/customers', { mode: 'connect', email: 'dana@willow.test' }), site(STUDIO_SITE), studio(), cors);

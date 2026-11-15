@@ -10,8 +10,21 @@
 // authorised; these helpers only READ that flag, so no route ever re-queries
 // agency membership to attribute an action. Tests: tests/presence/studio_voice_test.mjs.
 import type { Principal } from '../../_shared/auth.ts';
+import { UUID_RE } from './uuid.ts';
 
 type Actor = Pick<Principal, 'kind'> & { scope?: Principal['scope'] };
+
+/** The scheduler's hand (builder item 239): what a scheduled publish, a scheduled blog post
+ *  and the timed-section sweep sign as. Its sign-in id lands in uuid columns
+ *  (presence_publishes.actor, presence_snapshots.created_by,
+ *  presence_change_events.actor_user_id), which refused the old name 'scheduler', so every
+ *  scheduled publish would have failed with record_failed. The id is the person who scheduled
+ *  the work when one is known, so history keeps who set it; otherwise none. The kind stays
+ *  'system': nobody pressed anything at that moment. Pure. */
+export function schedulerPrincipal(requestId: string, scheduledBy?: unknown): Principal {
+  const id = String(scheduledBy ?? '').trim().toLowerCase();
+  return { kind: 'system', userId: UUID_RE.test(id) ? id : null, tenantId: null, role: null, email: null, jwt: null, requestId };
+}
 
 /** True when an agency member is acting inside a client's scope. Platform
  *  staff are staff wherever they stand, so they are NOT "operators" here. */
@@ -29,7 +42,8 @@ export function publishActorKind(p: Actor): PublishActorKind {
 }
 
 /** presence_change_events.actor_kind — the same vocabulary plus 'system' for
- *  cron/scheduler writes (provenance.ts). */
+ *  cron/scheduler writes (provenance.ts). The publish record takes it too (item 239):
+ *  a publish the scheduler fires is 'system', as migration 0133's column note says. */
 export type ChangeActorKind = PublishActorKind | 'system';
 export function changeActorKind(p: Actor): ChangeActorKind {
   if (p.kind === 'system') return 'system';
@@ -51,8 +65,10 @@ export function studioActed(actorKind: string | null | undefined): boolean {
 
 /** The room's last-publish fact (routes/room.ts /health): the client reads
  *  "published by your studio" for a staff OR operator publish, "published by
- *  you" for their own. */
+ *  you" for their own, and "published on schedule" for one the scheduler fired
+ *  (item 239), whoever set it. */
 export function lastPublishDetail(actorKind: string | null | undefined): string {
+  if (actorKind === 'system') return 'published on schedule';
   return studioActed(actorKind) ? 'published by your studio' : 'published by you';
 }
 
