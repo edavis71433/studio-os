@@ -394,6 +394,11 @@ export const noticeHrefFor = (n: { kind: string; period?: string | null }): stri
   if (billing && ((n.kind === 'deal_signed' && billing[1] === 'estimate') || (n.kind === 'deal_followup' && (billing[1] === 'estdeclined' || billing[1] === 'recurpause')) || (n.kind === 'invoice_upcoming' && billing[1] === 'recurnext'))) {
     return `/pipeline.html?deal=${billing[2]}&dtab=billing`;
   }
+  // sales item 128: a retainer's lines (approved, payment didn't go through, ended,
+  // approved twice, cancelled by the client) all start retainer:<deal id>:, so they
+  // open that deal's Billing, where the retainer and its charges are
+  const retainer = (n.kind === 'invoice_paid' || n.kind === 'retainer_status') ? /^retainer:([0-9a-f-]{36}):/i.exec(String(n.period || '')) : null;
+  if (retainer) return `/pipeline.html?deal=${retainer[1]}&dtab=billing`;
   return base;
 };
 
