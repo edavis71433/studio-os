@@ -170,6 +170,8 @@ export function describeEvent(r: RawChange, vocab: Vocab = DEFAULT_VOCAB, names:
       if (/^provisioned/i.test(summary)) return { text: 'set up the website', area: 'settings', where: 'Website', go: null, sig: 'site:setup' };
       const status = summary.match(/^site status: (\w+) → (\w+)$/i);
       if (status) return { text: `changed the site from ${status[1]} to ${status[2]}`, area: 'settings', where: 'Site settings', go: null, sig: `site:${status[2]}` };
+      // item 214: the switch sits under Versions' heading
+      if (/^(locked|unlocked) publishing|publishing lock/i.test(summary)) return { text: said, area: 'live', where: 'Website › Versions', go: '/presence.html#history', sig: `site:${said}` };
       const people = /hand(ing)? the site|owns the site|transfer|co-owner/i.test(summary);
       const notes = /review note|feedback|left a note/i.test(summary);
       return { text: said, area: people ? 'people' : notes ? 'website' : 'settings', where: people ? 'People' : notes ? 'Website › Notes' : 'Site settings', go: people ? '/sharing.html' : notes ? '/presence.html#design' : null, sig: `site:${said}` };
@@ -181,7 +183,7 @@ export function describeEvent(r: RawChange, vocab: Vocab = DEFAULT_VOCAB, names:
       return null;
     case 'restore':
       // restores that went live are publishes; these are restores into the draft
-      if (action === 'restore' && /restored the version from|brought the website back online|rolled back launch|instant restore/i.test(summary)) return null;
+      if (action === 'restore' && /restored the version from|brought the website back online|rolled back launch|instant restore|published again/i.test(summary)) return null;
       return { text: said || 'brought an earlier version into the draft', area: 'website', where: 'Website › Versions', go: '/presence.html#history', sig: `restore:${said}` };
     case 'launch':
       return null;   // checkpoints are read from presence_launches
@@ -206,6 +208,8 @@ export function describePublish(r: RawChange): Words | null {
   if (r.status !== 'live') return null;   // still on its way; the next read tells it
   if (r.kind === 'restore') {
     const said = plainSummary(r.summary || '');
+    const again = said.match(/^published again: (.+)$/i);   // item 214's Publish again
+    if (again) return { text: `published ${again[1]} again`, area: 'live', where: 'Website › Versions', go: '/presence.html#history', sig: `restore:${r.id}` };
     return { text: said && /^restored|^brought|^rolled/i.test(said) ? `${said}, and it went live` : 'put an earlier version back live', area: 'live', where: 'Website › Versions', go: '/presence.html#history', sig: `restore:${r.id}` };
   }
   const what = n ? `${n} change${n === 1 ? '' : 's'} went live` : 'the changes went live';
