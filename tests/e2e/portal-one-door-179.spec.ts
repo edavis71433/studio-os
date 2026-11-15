@@ -65,6 +65,7 @@ const conv = (page: Page, title: string) => page.locator('.mrow', { has: page.lo
 test.describe('Client portal part three — one Messages door (item 179)', () => {
   test('one door in the tab bar; Messages opens on Write, Book a call and Ask for a service, and counts its conversations', async ({ page }) => {
     await start(page);
+    await page.addInitScript(() => { try { localStorage.setItem('dds-portal-papers:e2e-owner', '1'); } catch { /* storage may be denied */ } });   // item 238: a client who has had a paper keeps the Documents door
     await page.goto('/client.html');
     const tabs = page.locator('#tabnav [data-tab]');
     await expect(tabs).toHaveCount(4);   // part four folded Files and Invoices into Documents
