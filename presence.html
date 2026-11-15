@@ -2996,6 +2996,9 @@ const ENVS = {
 };
 const ENV = new URLSearchParams(location.search).get("env") === "staging" ? ENVS.staging : ENVS.prod;
 const FN = ENV.url + "/functions/v1/presence";
+// run production's server beside its database (Oregon), not nearest the visitor: see shell.js.
+// Staging's server doesn't allow the header, so it goes to production only.
+const REGION_HEADER = ENV === ENVS.prod ? { "x-region": "us-west-2" } : {};
 const sb = supabase.createClient(ENV.url, ENV.anon, { auth: { storageKey: "dds-portal-auth", persistSession: true, autoRefreshToken: true } });
 if (ENV === ENVS.prod) window.__ddsSb = sb;   // shell.js reuses it, so this page runs one auth client
 
@@ -3369,7 +3372,7 @@ async function apiSend(method, route, body, undoRec, named) {
   const r = await fetch(FN + route, {
     method,
     headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''),
-      ...(mut && version ? { "If-Match": version } : {}) },
+      ...REGION_HEADER, ...(mut && version ? { "If-Match": version } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   }).finally(() => { if (mut) WRITES_ANSWERED++; });
   const text = await r.text();
@@ -3443,7 +3446,7 @@ function settingsPut(build, landed) {
 async function apiHtml(route) {
   const { data } = await sb.auth.getSession();
   const jwt = data?.session?.access_token;
-  const r = await fetch(FN + route, { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||'') } });
+  const r = await fetch(FN + route, { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''), ...REGION_HEADER } });
   const text = await r.text();
   if (!r.ok) { let j = null; try { j = JSON.parse(text); } catch {} const e = new Error((j && j.message) || "We couldn’t load that page just now."); e.status = r.status; throw e; }
   // A 200 that is not a page (a JSON envelope, an empty body) must never land
@@ -6289,7 +6292,7 @@ const CUTOUT_POLL_MS = 2500, CUTOUT_POLLS = 72;   // three minutes at most
 async function pickerCutout(id) {
   const call = async (path, method) => {
     const { data } = await sb.auth.getSession();
-    return fetch(FN + path, { method, headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||'') } });
+    return fetch(FN + path, { method, headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''), ...REGION_HEADER } });
   };
   const fail = "The cut-out didn’t come through, so nothing changed. Try again in a moment.";
   let r; try { r = await call("/assets/" + id + "/cutout", "POST"); } catch (_) { return { error: "The cut-out couldn’t start. Check your connection and try again." }; }
@@ -7421,7 +7424,7 @@ async function hmPdf(btn) {
   btn.disabled = true;
   try {
     const { data } = await sb.auth.getSession();
-    const r = await fetch(FN + "/website-health/pdf", { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get("client") || "") } });
+    const r = await fetch(FN + "/website-health/pdf", { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get("client") || ""), ...REGION_HEADER } });
     if (!r.ok) throw new Error("bad");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(await r.blob());
