@@ -262,6 +262,9 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
   await page.route(/@supabase\/supabase-js|\/vendor\/supabase-js/, (route: Route) =>
     route.fulfill({ contentType: 'application/javascript', body: SUPABASE_STUB }));
 
+  // builder list item 230: the sign-in service's public settings (does it offer Google?), answered here
+  await page.route('**/auth/v1/settings', (route: Route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ external: { email: true, google: false }, disable_signup: false }) }));
+
   // mock every presence Edge Function call
   await page.route('**/functions/v1/presence/**', (route: Route) => {
     const url = new URL(route.request().url());

@@ -109,7 +109,7 @@ test.describe('Getting in (builder item 192)', () => {
     await installApp(page, { session: null, api: {} });
     await fakeSignIn(page);
     await page.goto('/portal.html');
-    await expect(page.locator('#codeSub')).toContainText('Enter its 6-digit code below');
+    await expect(page.locator('#codeSub')).toContainText('we’ve sent it a 6-digit code. Type it below');   // builder item 230's words
     await page.locator('#toPw').click();
     await page.locator('#empw').fill('pat@example.com');
     await page.locator('#forgot').click();
