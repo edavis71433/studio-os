@@ -8,6 +8,7 @@
 // publish draws them. render_test.mjs runs its structure checks on it and keeps its golden
 // copy for every template; class_clash_test.mjs reads both sides' markup from it.
 import { composeBlocks } from '../../supabase/functions/presence/lib/serializer.ts';
+import { BLOCK_VARIANTS } from '../../supabase/functions/presence/lib/site_blocks.ts';
 import { FORM_PRESETS } from '../../supabase/functions/presence/lib/forms.ts';
 import { vocabFor } from '../../supabase/functions/presence/lib/industry_vocab.ts';
 import { listTemplates } from '../../supabase/functions/presence/lib/render.ts';
@@ -55,6 +56,20 @@ const REVIEWS = { reviewsWall: { items: [
 export function storedSections() {
   const all = Object.entries(SAMPLE_BLOCKS);
   return [all.filter(([t]) => HOME_TYPES.includes(t)).map(([, b]) => b), [...all.filter(([t]) => !HOME_TYPES.includes(t)).map(([, b]) => b), FORM, FREE, STACK]];
+}
+
+/** Pages of every other look a section can take: each style variant (BLOCK_VARIANTS) and a
+ *  gallery whose photos open large, composed as a publish draws them. A section's first
+ *  variant goes on the first page, its second on the next (a reviews wall is one a page). Not
+ *  in the full sample, so its golden copies stay as they are; band_words_test.mjs draws them
+ *  on the bold bands. */
+export function variantPages() {
+  const lists = [[{ ...SAMPLE_BLOCKS.gallery, zoom: true }]];
+  for (const [type, looks] of Object.entries(BLOCK_VARIANTS)) looks.forEach((variant, i) => (lists[i] ||= []).push({ ...SAMPLE_BLOCKS[type], variant }));
+  return lists.map((list, i) => {
+    const { blocks, src } = composeBlocks(structuredClone(list), () => null, ref, REVIEWS);
+    return { slug: `looks-${i + 1}`, title: `Looks ${i + 1}`, blocks, blocks_src: src };
+  });
 }
 
 /** A template's sample with every section, a page of its own and a dropdown menu. `words`,

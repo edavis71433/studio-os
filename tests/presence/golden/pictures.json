@@ -4,8 +4,8 @@
   "picture": "92a481acb14aeeb136527a861b16f82c5395eb62b614258856fd391faa1c289d"
  },
  "pages/before_and_after.jpg": {
-  "page": "3a5758f1822ade6df7db8ca54a1facf29413b997c45db25eb841144f2a1a02ff",
-  "picture": "b78e1eda3abb483fe714319ee6302da66be6b5500081a49d85236c854570d47c"
+  "page": "bdb324992403187976cb0829a48757be576a5c06e5f140311ee7f99ec36394ce",
+  "picture": "4c0776867d29223677146a654ca9f26768dd7dedc243361b01a656df4611adb1"
  },
  "pages/book_a_visit.jpg": {
   "page": "7a2902c0845acbe061f50a9004390cab4bfabdc475c4e640dd006c5a83427cb7",
@@ -108,8 +108,8 @@
   "picture": "683616b814b11b9266ac26fb901d8f183d7ed9067d3fc77d81c893f0c4adcfac"
  },
  "sections/before_after.jpg": {
-  "page": "d529044d98fae164bfa74ba0ef45215700c1bf6a0314d080765398a28274a63b",
-  "picture": "123c6e698e8ef42f19ccc8d5ae6bb86fe827ad6060f59dea450b550106ee7618"
+  "page": "5c917dd9cf39861203ba4ee6fa088217dc3bef02c184846f2b5ea5ebe486f35c",
+  "picture": "32397dfdd4819f59ba822d8209415aa39bf3aa21baeff4d672326abe0e6a2bb3"
  },
  "sections/booking.jpg": {
   "page": "4ad09f5b602ce2b8233c713c434a0bbcf2ea3c0fd733629a8238d2d471cb9f4a",
@@ -276,7 +276,7 @@
   "picture": "b91054e28dcfb8c8363e117de20020c37f21b59232f4bc4519b7fa02a87c571f"
  },
  "templates/slate.jpg": {
-  "page": "42856f5ba0d8f765aaa9413608f515cc4705f6eef604d6927c971552aafe03d1",
+  "page": "83b02b295cfdd2a3a2303e47b6f62d3c9cfda9e3e3cee410f4a951b480d8cfdb",
   "picture": "3a62f0f3d474de94d092a8ecf68290cff37581ba3d3860e96966828591d88c1c"
  }
 }
