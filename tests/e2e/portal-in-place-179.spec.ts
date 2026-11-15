@@ -288,7 +288,7 @@ test.describe('Client portal part two — every to-do opens the thing itself (it
     await expect(page.locator('#main h1')).toHaveText('Your website draft');
     await page.getByRole('link', { name: '‹ Website build' }).click();
     await expect(page.locator('#main h1')).toHaveText('Website build');
-    await page.locator('#sec-todos .card', { hasText: 'Send your content and photos' }).getByRole('button', { name: 'Send files' }).click();
+    await page.locator('#sec-todos .card', { hasText: 'Send your content and photos' }).getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.locator('#main h1')).toHaveText('Send your content and photos');
     await page.getByRole('link', { name: '‹ Website build' }).click();
     await expect(page.locator('#main h1')).toHaveText('Website build');
