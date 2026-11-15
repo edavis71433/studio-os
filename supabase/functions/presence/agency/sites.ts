@@ -52,14 +52,16 @@ import { writeChangeEvent } from '../lib/provenance.ts';
 import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
 import type { KitPayload } from '../lib/kits.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
-import { buildTrash, TRASH_DAYS, goesAt } from '../lib/site_trash.ts';
+import { buildTrash, TRASH_DAYS, goesAt, trashedEmail } from '../lib/site_trash.ts';
 import type { TrashLink } from '../lib/site_trash.ts';
 import { takeSiteOffline } from '../routes/publish.ts';
 import { normalizeCopied } from '../lib/site_layout.ts';
 import { keepCopied } from '../lib/copied_record.ts';
 import { claimPortfolioSite } from '../lib/connect_requests.ts';
-import { attachOwnerLogin, validEmail } from '../commerce/account.ts';
-import { ownerWho, openTransfersFor, transferSummary } from '../lib/site_transfer.ts';
+import { attachOwnerLogin, validEmail, sendEmail } from '../commerce/account.ts';
+import { loadEmailBrand } from '../lib/email_brand.ts';
+import { ownerReplyTo } from '../lib/service_bridge.ts';
+import { ownerWho, openTransfersFor, transferSummary, ownerFacts, hasOwnerFacts, ownerEmailsOf } from '../lib/site_transfer.ts';
 import type { AttachOwnerError } from '../commerce/account.ts';
 import { provisionCustomerAccount, bridgeCustomerToStudio, ensureConnectContact, linkContactToCustomer, sendCustomerInvite } from '../routes/sales.ts';
 
@@ -877,7 +879,9 @@ export async function handleAgencySites(req: Request, route: string, method: str
     }
     const own = await deps.ownSite().catch(() => null);
     if (own) await writeChangeEvent({ siteId: own.id, entityType: 'site', entityId: siteId, action: 'update', summary: `Moved a client site to the trash${wasLive ? ' and took it offline' : ''}`, principal, provenance: 'human' }).catch(() => {});
-    return json({ data: { site_id: siteId, trashed_at: at, goes_at: goesAt(at, TRASH_DAYS), was_live: wasLive, offline } }, 200, cors);
+    // item 204: a site with an owner is theirs, so they hear it from us, and it shows in their history too
+    const owner_told = await tellOwnerTrashed(siteId, studioWord(member), wasLive, at, principal, own?.id || null).catch(() => false);
+    return json({ data: { site_id: siteId, trashed_at: at, goes_at: goesAt(at, TRASH_DAYS), was_live: wasLive, offline, owner_told } }, 200, cors);
   }
 
   // ── Restore from the trash (item 154): back in every list. A site that was
@@ -895,6 +899,25 @@ export async function handleAgencySites(req: Request, route: string, method: str
     return json({ data: { site_id: siteId, restored: true } }, 200, cors);
   }
   return null;
+}
+
+/** The studio as its clients know it. */
+function studioWord(member: AgencyMember): string {
+  return String((member as { branding?: { display_name?: string } }).branding?.display_name || member.agency_name || 'Your studio').trim();
+}
+/** Item 204: the owner of a trashed site with an owner is emailed, on the site's own brand,
+ *  and the move is written on their side. A reply reaches the studio. False when the site has
+ *  no owner, or the email didn't go. */
+async function tellOwnerTrashed(siteId: string, studio: string, wasLive: boolean, at: string, principal: Principal, studioSiteId: string | null): Promise<boolean> {
+  const facts = await ownerFacts(siteId);
+  if (!hasOwnerFacts(facts)) return false;
+  await writeChangeEvent({ siteId, entityType: 'site', entityId: siteId, action: 'update', summary: `${studio} moved this site to their trash${wasLive ? ' and took it offline' : ''}`, principal, provenance: 'human' }).catch(() => {});
+  const to = ownerEmailsOf(facts)[0];
+  if (!to) return false;
+  const [brand, studioEmail] = await Promise.all([loadEmailBrand(siteId), studioSiteId ? ownerReplyTo(studioSiteId).catch(() => '') : Promise.resolve('')]);
+  const mail = trashedEmail({ studio, site: String(facts?.client?.name || '').trim() || 'your website', wasLive, goesAt: goesAt(at, TRASH_DAYS), studioEmail });
+  // to the owner, about their own website: it always arrives (critical), and a reply reaches the studio
+  return await sendEmail(to, mail.subject, mail.html, brand, { critical: true, replyTo: studioEmail || undefined });
 }
 
 const REFUSED: Record<AttachOwnerError, [number, string]> = {

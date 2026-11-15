@@ -37,6 +37,7 @@ import { JOINED, JOIN_CHECK_EMAIL, joinLinkToken, readJoinLinkToken, joinEmailSu
 import { approvalDetail, cleanNote } from '../lib/approval_page.ts';   // sales item 92
 import { wordsHtml, quoteBlock, followupPlan } from '../lib/follow_ups.ts';   // sales item 87
 import { readVisitStats } from '../lib/visit_stats.ts';
+import { guardedFetch } from '../../_shared/tools/url_guard.ts';   // builder item 204
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
@@ -157,7 +158,8 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
   // published before that page existed has none, so it gets its contact page as before.
   const notSent = async (error: string) => {
     try {
-      const r = await fetch(`${siteOrigin}/not-sent/`, { method: 'HEAD', signal: AbortSignal.timeout(1500) });
+      // builder item 204: the site's address may be a typed domain, so the guarded fetcher asks
+      const r = await guardedFetch(`${siteOrigin}/not-sent/`, { method: 'HEAD', signal: AbortSignal.timeout(1500) });
       if (r.ok) return redirectTo(`/not-sent/#ns-${notSentReason(error)}`);
     } catch { /* falls back below */ }
     return redirectTo('/contact/');
