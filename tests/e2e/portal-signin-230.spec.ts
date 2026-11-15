@@ -91,7 +91,8 @@ test.describe('item 230 — signing in with an emailed code', () => {
     await expect(page.locator('#orRule')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Use a password instead' })).toBeHidden();
     await g.click();
-    await expect.poll(() => calls(page)).toEqual([`oauth google http://127.0.0.1:4694/portal.html?studio=${STUDIO_SITE}`]);
+    const origin = new URL(page.url()).origin;   // the test server's own address, wherever it runs
+    await expect.poll(() => calls(page)).toEqual([`oauth google ${origin}/portal.html?studio=${STUDIO_SITE}`]);
 
     await page.goto('about:blank');
     await door(page, { signin: { google: true, password: true }, google: false });
