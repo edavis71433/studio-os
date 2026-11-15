@@ -18,12 +18,14 @@ const NAME = '__monthly_report__';
 
 // ── the world ──
 let row, clientEmail, suppressed, resendOk, sends, onSend, visitsPages, visitsFail;
+let siteOver = {}, clientReads = 0;   // item 200: the client site as stored, and how often the client's record was read
 let zone = null; const visitReads = [];   // D7: the client site's own clock (null: no row, the default), and the visit windows read
 let clock = 0;
 const stamp = () => new Date(Date.UTC(2026, 10, 1, 0, 0, 0, ++clock)).toISOString();
 function reset(setting) {
   row = { id: 'row-1', site_id: CLIENT_SITE, body: JSON.stringify(setting), updated_at: stamp() };
   clientEmail = 'owner@client.example'; suppressed = null; resendOk = true; sends = []; onSend = null; visitsPages = []; visitsFail = false;
+  siteOver = {}; clientReads = 0;
 }
 const stored = () => JSON.parse(row.body);
 const reply = (body, status = 200, headers = {}) => new Response(body === null ? null : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } });
@@ -50,8 +52,8 @@ globalThis.fetch = async (url, init = {}) => {
     }
     return reply([]);
   }
-  if (table === 'presence_sites') return reply([{ id: CLIENT_SITE, client_id: CLIENT_ID, status: 'live', edition: 'presence', custom_domain: 'client.example' }]);
-  if (table === 'clients') return reply([{ email: clientEmail, name: 'A client' }]);
+  if (table === 'presence_sites') return reply([{ id: CLIENT_SITE, client_id: CLIENT_ID, status: 'live', edition: 'presence', custom_domain: 'client.example', ...siteOver }]);
+  if (table === 'clients') { clientReads++; return reply([{ email: clientEmail, name: 'A client' }]); }
   if (table === 'suppressed_emails') return reply(suppressed ? [{ reason: suppressed }] : []);
   if (table === 'presence_service_links') return reply([{ agency_site_id: STUDIO_SITE }]);
   if (table === 'presence_identity') return reply([{ business_name: 'The Studio' }]);
@@ -125,6 +127,34 @@ clientEmail = null;
   ok('…with the reason saved for the card', s.last_result?.status === 'skipped' && s.last_result?.reason === 'no_email' && s.last_month === '2026-11');
   ok('…and a skipped month never reaches the client’s shelf', !(s.sent_months || []).length);
   ok('…and not tried again every tick', (await quiet(() => runMonthlyReports(20, DEC2))).unreachable === 0);
+}
+
+// ── item 200 (review file 06, finding 60): the report waits until the website is live ──
+reset({ enabled: true, note: '', last_month: '2026-10' });
+siteOver = { status: 'ready', last_published_at: null, custom_domain: null }; visitReads.length = 0;
+{
+  const r = await quiet(() => runMonthlyReports(20, DEC2));
+  const s = stored();
+  ok('a site that isn’t live yet gets no report', sends.length === 0 && r.sent === 0 && r.failures === 0 && r.waiting === 1, JSON.stringify(r));
+  ok('…the month is marked skipped with the reason, for the card', s.last_month === '2026-11' && s.last_result?.status === 'skipped' && s.last_result?.reason === 'not_live', JSON.stringify(s.last_result));
+  ok('…nothing else is read for it, not even the client’s record', clientReads === 0 && visitReads.length === 0, `${clientReads} ${visitReads.length}`);
+  ok('…it stays on, so the first report goes the month after it goes live', s.enabled === true && !(s.sent_months || []).length);
+  ok('…and the next run does nothing', JSON.stringify(await quiet(() => runMonthlyReports(20, DEC2))) === JSON.stringify({ sent: 0, skipped: 1, unreachable: 0, failures: 0 }) && sends.length === 0);
+  // live since: the next month's report goes as usual
+  siteOver = { status: 'live', last_published_at: '2026-12-10T18:00:00.000Z' };
+  const jan = await quiet(() => runMonthlyReports(20, '2027-01-02T09:00:00.000Z'));
+  ok('once live, the next month’s report goes out', jan.sent === 1 && sends.length === 1 && stored().last_result?.status === 'sent' && stored().last_month === '2026-12', JSON.stringify(jan));
+}
+for (const [what, over] of [['a site on the client’s own host (watched, never published here)', { edition: 'monitor', status: 'ready', last_published_at: null }], ['a site published before and paused since', { status: 'paused', last_published_at: '2026-06-01T00:00:00.000Z' }]]) {
+  reset({ enabled: true, note: '', last_month: '2026-10' });
+  siteOver = over;
+  const r = await quiet(() => runMonthlyReports(20, DEC2));
+  ok(`${what} counts as live and gets its report`, r.sent === 1 && sends.length === 1 && !r.waiting, JSON.stringify(r));
+}
+{
+  const { reportSiteLive } = await import(`${P}/ops/monthly_report.ts`);
+  ok('live: published, a live status, or on its own host; not: a draft, a ready site, nothing', reportSiteLive({ status: 'live' }) && reportSiteLive({ status: 'ready', last_published_at: '2026-01-01T00:00:00Z' }) && reportSiteLive({ edition: 'monitor', status: 'provisioning' })
+    && !reportSiteLive({ status: 'draft' }) && !reportSiteLive({ status: 'ready', last_published_at: null, edition: 'presence' }) && !reportSiteLive(null));
 }
 
 // unsubscribed, bounced

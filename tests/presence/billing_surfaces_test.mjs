@@ -44,8 +44,9 @@ ok('studio: labels it billing_type saas (the customer software subscription, not
 // shelf's paint must each redden here.
 ok('client app: fetches /client/billing (ensureBilling) and renders it through the shelf’s rows',
   /api\('\/client\/billing'\)/.test(clientHtml) && /function shelfRows\(invoices,docs,snaps,reports,todayYmd,pending,now\)/.test(clientHtml)
-  && /const \[snaps,docsRes,b,repRes\]=await Promise\.all\(\[ensureSnaps\(\),api\('\/client\/documents'\)\.catch\(\(\)=>null\),ensureBilling\(\),api\('\/client\/reports'\)\.catch\(\(\)=>null\)\]\);/.test(clientHtml)
-  && /const rows=shelfRows\(\(d\.b&&d\.b\.invoices\)\|\|\[\],docs,d\.snaps,reports,today,PAID_PENDING,now\);/.test(clientHtml));
+  // items 229 and 238: each read only when its part is on, and item 238's own reads taken when just made
+  && /const \[snaps,docsRes,b,repRes\]=await Promise\.all\(\[ensureSnaps\(\),\(partOn\('proposals'\)\|\|partOn\('agreements'\)\)\?\(fresh\('docsFetch'\)\|\|api\('\/client\/documents'\)\.catch\(\(\)=>null\)\):Promise\.resolve\(none\),ensureBilling\(\),partOn\('reports'\)\?\(fresh\('repsFetch'\)\|\|api\('\/client\/reports'\)\.catch\(\(\)=>null\)\):Promise\.resolve\(none\)\]\);/.test(clientHtml)
+  && /const rows=shelfRows\(\(d\.b&&d\.b\.invoices\)\|\|\[\],docs,d\.snaps,reports,today,PAID_PENDING,now\)\.filter\(r=>partOn\(r\.cat\)\);/.test(clientHtml));
 ok('client app: states the software subscription is billed separately', /billed separately/i.test(clientHtml));
 // the Pay action exists ONLY past the paid, processing and void/canceled guards,
 // opens the server's pay_url in THIS tab (Nov 10 review, G9: a new tab left the
