@@ -24,10 +24,12 @@
     { key: 'client_reviewer', name: 'Reviewer', desc: 'Sees only what you share with them, approves and leaves notes.', can: [0, 0, 0, 0, 0], also: 'Approve' },
   ];
   var roleName = function (k) { var r = ROLES.filter(function (x) { return x.key === k; })[0]; return r ? r.name : k; };
-  // Developer is paused (Nov 12 2026, lib/workspace.ts DEVELOPER_PAUSED): never offered,
-  // but a seat that already holds it still reads Developer in its list.
-  var OFFERED = ROLES.filter(function (r) { return r.key !== 'developer'; });
-  var choicesFor = function (current) { return ROLES.filter(function (r) { return r.key !== 'developer' || r.key === current; }); };
+  // lib/workspace.ts DEVELOPER_PAUSED, mirrored (site_people_transfer_test keeps the two equal).
+  // Off since Nov 15 2026, so Developer is offered again. While it is on, Developer is never
+  // offered, but a seat that already holds it still reads Developer in its list.
+  var DEVELOPER_PAUSED = false;
+  var OFFERED = ROLES.filter(function (r) { return !DEVELOPER_PAUSED || r.key !== 'developer'; });
+  var choicesFor = function (current) { return ROLES.filter(function (r) { return !DEVELOPER_PAUSED || r.key !== 'developer' || r.key === current; }); };
   var TONES = ['#e3f0fb|#285f95', '#fdf0dc|#8a5a10', '#e6f5ec|#1f6b43', '#fbe7ee|#9b2c55', '#efeafa|#5b3fa0'];
   var tone = function (s) { var n = 0; String(s || '').split('').forEach(function (c) { n = (n * 31 + c.charCodeAt(0)) % 997; }); return TONES[n % TONES.length].split('|'); };
 

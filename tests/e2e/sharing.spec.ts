@@ -114,8 +114,8 @@ test.describe('Sharing & access', () => {
     await card.getByRole('button', { name: '+ Invite someone' }).click();
     await expect(card.getByRole('heading', { name: 'Invite someone' })).toBeVisible();
     const roles = card.getByRole('radio');
-    await expect(roles).toHaveCount(3);   // Developer is paused (DEVELOPER_PAUSED) while custom code gets a stronger safety check
-    await expect(card.getByRole('radio', { name: /Developer/ })).toHaveCount(0);
+    await expect(roles).toHaveCount(4);   // Developer is back (Nov 15 2026): DEVELOPER_PAUSED is off now builder item 190 is live
+    await expect(card.locator('.pp-role').filter({ hasText: 'Developer' })).toContainText('What staff can do, plus settings and the code tools.');
     await expect(card.getByRole('radio', { name: /Staff/ })).toBeChecked();
     await expect(card.locator('.pp-role').filter({ hasText: 'Co-owner' })).toContainText('Everything you can do, except hand the site to someone else.');
     await expect(card.locator('.pp-role').filter({ hasText: 'Reviewer' }).locator('.pp-can')).toContainText('✓ Approve');
@@ -172,7 +172,7 @@ test.describe('Sharing & access', () => {
     const card = peopleCard(page);
     const role = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/members/m-1/role'));
     const pick = card.getByRole('combobox', { name: 'Role for dana@example.com' });
-    await expect(pick.locator('option')).toHaveText(['Co-owner', 'Staff', 'Reviewer']);   // Developer is paused: not a choice
+    await expect(pick.locator('option')).toHaveText(['Co-owner', 'Staff', 'Developer', 'Reviewer']);   // Developer is a choice again
     await pick.selectOption('client_reviewer');
     expect((await role).postDataJSON()).toEqual({ role: 'client_reviewer' });
     let revokes = 0;

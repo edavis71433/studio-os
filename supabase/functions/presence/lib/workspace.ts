@@ -210,12 +210,14 @@ async function reviewerRefusal(siteId: string, role: SiteRole): Promise<'check_f
 }
 
 type SeatRow = { id: string; email: string; role: string; status: string };
-/** Developer seats are paused for everyone but platform staff (Nov 12 2026). A developer
- *  saves custom HTML (routes/dev.ts), and lib/devmode.ts's cleaner is a pattern list, not
- *  a parser: its own note says to keep the role narrow until a strict script CSP and a
- *  real parser land. Builder item 53 offered the role to every owner and studio, so new
- *  Developer seats wait for that work. A seat that already holds the role keeps it. */
-export const DEVELOPER_PAUSED = true;
+/** Developer seats were paused for everyone but platform staff from Nov 12 to Nov 15 2026
+ *  (PR 350): a developer saves custom HTML (routes/dev.ts), and the cleaner then was a
+ *  pattern list. Builder item 190 closed that: lib/dev_html.ts reads the HTML the way a
+ *  browser does and writes it out from an allow list (PR 359), and no frame in the app runs
+ *  a drawn page's scripts (the editor's frame wall, PR 413; every other page's frame is
+ *  sandboxed without scripts). So the role is offered again. The switch stays: true pauses
+ *  new Developer seats again for anyone but platform staff, and people.js mirrors it. */
+export const DEVELOPER_PAUSED = false;
 const developerRefused = (role: string, allowDeveloper?: boolean) => role === 'developer' && DEVELOPER_PAUSED && !allowDeveloper;
 export type AddMemberError = 'bad_email' | 'bad_role' | 'role_paused' | 'shared_site' | 'check_failed' | 'is_owner' | 'already_member' | 'was_removed' | 'write_failed';
 /** Invite one person to a site with a role. Builder item 53: an invite never changes

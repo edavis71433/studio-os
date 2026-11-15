@@ -28,8 +28,15 @@ const API = {
   '/schedule': { data: { scheduled: [] } }, '/content-library': { data: [] }, '/redirects': { data: [] },
   '/portal/context': { data: { site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES, is_agency: false, is_operator: false, sees_full_workspace: true, capabilities: ['edit', 'publish', 'invite', 'configure', 'delete', 'use_developer_mode', 'view_all'], landing: '/presence.html', attention_count: 0, nav: STUDIO_NAV, plan_key: 'presence', upsell: null } },
 };
-async function mount(page: Page, hash: string) {
-  await installApp(page, { api: API });
+// Developer seats came back on Nov 15 2026 (lib/workspace.ts DEVELOPER_PAUSED off): signed in as one,
+// with that same code saved as the site's custom HTML, the walls below hold just the same
+const AS_DEVELOPER = {
+  ...API,
+  '/portal/context': { data: { ...API['/portal/context'].data, site_role: 'developer', capabilities: ['view_all', 'edit', 'approve', 'publish', 'connect', 'configure', 'export', 'comment', 'use_developer_mode'] } },
+  '/dev/customization': { data: { theme_tokens: {}, custom_css: '', custom_html: HOSTILE.slice(HOSTILE.indexOf('<img'), HOSTILE.indexOf('</section></main>')), allowed_tokens: [], can_edit_css: true } },
+};
+async function mount(page: Page, hash: string, api: Record<string, unknown> = API) {
+  await installApp(page, { api });
   const pages: string[] = [];
   await page.route('**/functions/v1/presence/preview**', (route: Route) => {
     pages.push(new URL(route.request().url()).searchParams.get('page') || '/');
@@ -83,6 +90,34 @@ test('Preview runs the page as a visitor’s browser would, in a frame that can�
   const before = pages.length;
   await frame.locator('#about').click();
   await expect.poll(() => pages.slice(before)).toContain('/about/');
+});
+
+test.describe('signed in as a Developer, whose custom code is on the page', () => {
+  test('Edit’s canvas and the Overview run none of it', async ({ page }) => {
+    await mount(page, '#design', AS_DEVELOPER);
+    const canvas = page.frameLocator('#designPreview');
+    await expect(canvas.locator('#a h2')).toHaveText('Fresh bread');
+    await page.waitForTimeout(600);
+    await canvas.locator('#js').dispatchEvent('click');
+    await page.waitForTimeout(300);
+    expect(await touched(page)).toEqual([]);
+    await expect(canvas.locator('body')).not.toHaveAttribute('data-own', 'ran');
+    await page.goto('/presence.html');
+    const overview = page.frameLocator('#siteFrame');
+    await expect(overview.locator('#a h2')).toHaveText('Fresh bread');
+    await page.waitForTimeout(600);
+    expect(await touched(page)).toEqual([]);
+    await expect(overview.locator('body')).not.toHaveAttribute('data-own', 'ran');
+  });
+
+  test('Preview runs it only in a frame that can’t reach the app', async ({ page }) => {
+    await mount(page, '#preview', AS_DEVELOPER);
+    const frame = page.frameLocator('#previewFrame');
+    await expect(frame.locator('body')).toHaveAttribute('data-own', 'ran');
+    await expect(frame.locator('body')).toHaveAttribute('data-reach', 'blocked');
+    await page.waitForTimeout(600);
+    expect(await touched(page)).toEqual([]);
+  });
 });
 
 test('a message from anywhere but the Preview page is ignored', async ({ page }) => {
