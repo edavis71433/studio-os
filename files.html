@@ -1688,21 +1688,21 @@ async function del(id){
   // the SAME places the panel lists (the server refuses on them too)
   const uses=(S.current&&S.current.asset&&S.current.asset.id===id&&S.current.usage)||[];
   if(uses.length){toast('This file is in use ('+uses[0].label+(uses.length>1?' and '+(uses.length-1)+' more':'')+') — remove it there first, or archive it.');return;}
-  // a server without the Trash (before its update goes live) still deletes for good: say that, as before
-  if(typeof S.trashCount!=='number'){
-    if(!(await askConfirm('Delete this file permanently?','This cannot be undone.','Delete')))return;
-    const r0=await api('/assets/'+id,'DELETE');
-    if(r0.ok){toast('Deleted');closeDetail();load();}else toast((r0.body&&r0.body.message)||'Could not delete');
-    return;
-  }
-  // item 218: Delete moves the file to the Trash for 30 days, and says so, and what the live site does
   const cur=S.current&&S.current.asset&&S.current.asset.id===id?S.current:null;
   const name=cur?cur.asset.name:'this file';
-  const until=new Date(Date.now()+S.trashDays*86400000).toLocaleDateString('en-US',{month:'long',day:'numeric'});
-  const points=[['It leaves Files and the photo picker now, and stops counting toward your space.'],['You can put it back until '+until+', '+S.trashDays+' days from now.']];
-  if(cur&&cur.on_live)points.push(['Your live site still shows it until you next publish.','warn']);
-  if(!(await askQuestion({icon:'trash',title:'Move “'+name+'” to the Trash?',points,ok:'Move to the Trash',okClass:'dark',okIcon:'trash'})))return;
+  // a server without the Trash (before its update goes live) still deletes for good: say that, as before
+  const forGood=typeof S.trashCount!=='number';
+  if(forGood){
+    if(!(await askConfirm('Delete this file permanently?','This cannot be undone.','Delete')))return;
+  }else{
+    // item 218: Delete moves the file to the Trash for 30 days, and says so, and what the live site does
+    const until=new Date(Date.now()+S.trashDays*86400000).toLocaleDateString('en-US',{month:'long',day:'numeric'});
+    const points=[['It leaves Files and the photo picker now, and stops counting toward your space.'],['You can put it back until '+until+', '+S.trashDays+' days from now.']];
+    if(cur&&cur.on_live)points.push(['Your live site still shows it until you next publish.','warn']);
+    if(!(await askQuestion({icon:'trash',title:'Move “'+name+'” to the Trash?',points,ok:'Move to the Trash',okClass:'dark',okIcon:'trash'})))return;
+  }
   const r=await api('/assets/'+id,'DELETE');
+  if(forGood){if(r.ok){toast('Deleted');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not delete');return;}
   if(!r.ok){toast((r.body&&r.body.message)||'That didn’t move to the Trash. Try again.');return;}
   closeDetail();load();
   undoToast('“'+name+'” is in the Trash.',async()=>{
