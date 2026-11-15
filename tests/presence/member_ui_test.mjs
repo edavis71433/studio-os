@@ -107,6 +107,9 @@ const CONTROLS = [
 // nothing in a page calls these: they answer scripts and the operator's tools
 const NO_CONTROL = {
   'DELETE /projects/:id/deliverables/:id2': /\/deliverables\/[^\n]*DELETE|DELETE[^\n]*\/deliverables\//,
+  // builder list item 221: the welcome card on Send an update is drawn and waits for a yes; until it is built no page calls these
+  'PUT /broadcasts/welcome': /\/broadcasts\/welcome'/,
+  'POST /broadcasts/welcome/test': /\/broadcasts\/welcome\/test/,
 };
 // Sales item 117: the client portal has no shell and no data-needs marks. Its one owner-only
 // control, Cancel retainer, sits on the Documents shelf, which draws nothing of billing for anyone
@@ -137,7 +140,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 50, String(routes.length));   // builder item 158 added the Coming soon page; builder item 203 added the enquiry delete; sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
+  ok('the decided delete and configure lists were read', routes.length === 52, String(routes.length));   // builder list item 221 added the welcome email and its test   // builder item 158 added the Coming soon page; builder item 203 added the enquiry delete; sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r] && !PORTAL_OWNER_ONLY[r]);
   for (const [route, c] of Object.entries(PORTAL_OWNER_ONLY)) {

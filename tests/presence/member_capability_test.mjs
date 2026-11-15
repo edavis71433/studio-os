@@ -56,6 +56,7 @@ const { handleProspect } = await import(`${P}/routes/prospects.ts`);   // sales 
 const { handleFormDelete } = await import(`${P}/routes/commercial.ts`);   // builder list item 203
 const { handleRecurringAction } = await import(`${P}/routes/recurring_invoices.ts`);
 const { handleReportPut, handleReportPreview } = await import(`${P}/ops/monthly_report.ts`);   // builder list item 58
+const { handleWelcomePut, handleWelcomeTest } = await import(`${P}/routes/list_welcome.ts`);   // builder list item 221
 const { handleContactImportUndo, handleContactMerge, handleContactUnmerge } = await import(`${P}/routes/contacts_more.ts`);   // sales review items 86 + 105
 
 const ROOT = new URL('../../', import.meta.url);
@@ -163,6 +164,7 @@ const DECIDED = {
     'PUT /sales/contacts/fields', 'PUT /sales/stages', 'POST /calendar/link', 'DELETE /calendar/link',
     'POST /email/log-address', 'DELETE /email/log-address',
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58
+    'PUT /broadcasts/welcome', 'POST /broadcasts/welcome/test',   // builder list item 221: the welcome email to each new person on the list
     'POST /reviews/google-link',   // sales review item 115: where Google review requests send people is a setting
     'POST /sales/setup',   // sales item 105: hiding Home's setup strip
     'PUT /sales/goal-ai',   // sales item 94: the month's goal (the AI help switch in it is the owner's alone, said by the route)
@@ -367,6 +369,8 @@ const CHANGED = [
   { name: 'PUT /sales/goal-ai', body: { goal_cents: 800000 }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/sales_ai.ts')).handleGoalAi(r, p.jwt || '', A, p, cors) },     // sales item 94: the month's goal
   { name: 'PUT /report/monthly', body: { note: 'A line for the client' }, run: (r, p) => handleReportPut(r, A, p, cors) },     // builder list item 58 (a line, not the switch: this stub answers every read with a row, which reads as a do-not-send entry)
   { name: 'POST /report/monthly/preview', fx: { only: ['clients'] }, run: (r, p) => handleReportPreview(A, p, cors) },   // with every read answering a row the address reads as suppressed; the send is the write
+  { name: 'PUT /broadcasts/welcome', body: { enabled: false }, run: (r, p) => handleWelcomePut(r, A, p, cors) },   // builder list item 221
+  { name: 'POST /broadcasts/welcome/test', body: {}, fx: { only: ['clients'] }, run: (r, p) => handleWelcomeTest(r, A, p, cors) },   // the test email is the outside call that proves the owner reached it
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
   { name: 'POST /site/online', fx: { site: { offline_at: '2026-01-01T00:00:00Z' } }, run: (r, p) => handleBackOnline(A, p, cors) },
   { name: 'POST /site/coming-soon', body: { line: 'Opening soon.' }, fx: { empty: ['presence_publishes'] }, run: (r, p) => handleComingSoon(r, A, p, cors) },   // builder list item 158: never published, so the deploy to Netlify is the outside call that proves the owner reached it
@@ -501,6 +505,7 @@ const WRITE_HANDLERS = [
   'handleCalendarLink',   // sales review item 46: POST and DELETE /calendar/link need configure
   'handleEmailLogAddress',   // sales review item 69: POST and DELETE /email/log-address need configure
   'handleReportPut', 'handleReportPreview',   // builder list item 58: PUT /report/monthly and its preview need configure
+  'handleWelcomePut', 'handleWelcomeTest',   // builder list item 221: PUT /broadcasts/welcome and its test need configure
   'handleReviewGoogleLink',   // sales review item 115: POST /reviews/google-link needs configure
   // sales review item 47: estimates and recurring invoices (see DECIDED.edit and .delete)
   'handleEstimateCreate', 'handleEstimateSend', 'handleEstimateToProposal', 'handleEstimateToInvoice', 'handleEstimateDelete',
