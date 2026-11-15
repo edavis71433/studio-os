@@ -15,6 +15,7 @@ import { SITE_COLS, type SiteRow } from '../lib/site.ts';
 import { liveStateOf, publishPostsOnly } from '../lib/post_publish.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { runPipeline } from '../routes/publish.ts';
+import { schedulerPrincipal } from '../lib/actor_kind.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 const rows = (r: { ok: boolean; json?: unknown }) => (r.ok && Array.isArray(r.json) ? r.json as any[] : []);
@@ -40,7 +41,9 @@ export async function runDuePosts(limit = 25, deps: { run?: typeof runPipeline; 
   const due = rows(q);
   out.due = due.length;
   if (!due.length) return out;
-  const system: Principal = { kind: 'system', userId: 'scheduler', tenantId: null, role: null, email: null, jwt: null, requestId: 'scheduled-posts' };
+  // Item 239: a name the database's uuid columns accept. Who scheduled a post is already in the
+  // change log (their own save set it to scheduled), so the send itself is the scheduler's alone.
+  const system: Principal = schedulerPrincipal('scheduled-posts');
   const errors: string[] = [];
   for (const [siteId, posts] of groupDue(due)) {
     try {

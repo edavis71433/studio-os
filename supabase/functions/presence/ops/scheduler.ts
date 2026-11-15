@@ -23,6 +23,7 @@ import { sendEmail } from '../commerce/account.ts';
 import { SITE_COLS, type SiteRow } from '../lib/site.ts';
 import { checkAgainInAnHour, checkDueBefore } from '../lib/check_soon.ts';
 import { lockStop } from '../lib/publish_lock.ts';
+import { schedulerPrincipal } from '../lib/actor_kind.ts';
 
 const DEFAULT_LIMIT = 40;               // sites per invocation — cron cadence covers the rest
 const OPS_ALERT_EMAIL = Deno.env.get('OPS_ALERT_EMAIL') || 'eric@davisdigitalstudio.com';
@@ -110,8 +111,10 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
   const q = await svc(`presence_scheduled_publishes?status=eq.pending&scheduled_for=lte.${encodeURIComponent(nowIso)}&select=id,site_id,snapshot_id,kind,summary,created_by&order=scheduled_for.asc&limit=${limit}`);
   const rows = (q.ok && Array.isArray(q.json)) ? q.json : [];
   const results: SiteRunResult[] = [];
-  const sysPrincipal: Principal = { kind: 'system', userId: 'scheduler', tenantId: null, role: null, email: null, jwt: null, requestId: 'scheduled-publish' };
   for (const row of rows) {
+    // Item 239: signed as the scheduler on behalf of whoever set the row (created_by), so the
+    // publish record keeps who scheduled it; a sweep's own row ('scheduler:rewindow') has nobody
+    const sysPrincipal: Principal = schedulerPrincipal('scheduled-publish', row.created_by);
     // Item 214: on a site whose publishing is locked, the row waits unclaimed and goes on the first
     // tick after the lock comes off (a lock that can't be read keeps it waiting too)
     if (await lockStop(String(row.site_id), 'staff')) continue;

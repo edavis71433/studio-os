@@ -18,8 +18,25 @@
 // 2026, sales item 121): a part with no "=" (`&title.ilike.*x*`) is quietly IGNORED, so a search written that
 // way filters nothing; a filter with "=" that doesn't parse (`&title=nonsense`) answers 400 PGRST100. A user JWT (anything but the service key) sees only
 // `ownSite[token]` in presence_sites — row-level security, roughly.
+// `strict` (builder item 239) makes a table refuse what the real one refuses, as PostgREST answers it:
+//   strict: { presence_publishes: { uuid: ['actor'], check: { actor_kind: ['client', 'staff'] } } }
+// a value in a `uuid` column that isn't one answers 400 22P02, one outside a `check` list 400 23514
+// naming <table>_<column>_check. Without it nothing is checked, as before.
 export function installFakePostgrest(opts = {}) {
   const SERVICE = opts.service || 'svc-key';
+  const strict = opts.strict || {};
+  const UUIDV = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const refusal = (table, rec) => {
+    const s = strict[table]; if (!s) return null;
+    for (const c of s.uuid || []) {
+      const v = rec[c];
+      if (v !== null && v !== undefined && !UUIDV.test(String(v))) return { code: '22P02', details: null, hint: null, message: `invalid input syntax for type uuid: "${v}"` };
+    }
+    for (const [c, allowed] of Object.entries(s.check || {})) {
+      if (c in rec && !allowed.includes(rec[c])) return { code: '23514', details: 'Failing row contains (…).', hint: null, message: `new row for relation "${table}" violates check constraint "${table}_${c}_check"` };
+    }
+    return null;
+  };
   Deno.env.set('SUPABASE_URL', opts.url || 'https://db.test');
   Deno.env.set('SERVICE_ROLE_KEY', SERVICE);
   Deno.env.set('SUPABASE_ANON_KEY', 'anon-key');
@@ -111,6 +128,8 @@ export function installFakePostgrest(opts = {}) {
       // (sales item 122 sends a hundred people a request and falls back to one by one)
       const pending = [];
       for (const rec0 of (Array.isArray(body) ? body : [body])) {
+        const no = refusal(table, rec0 || {});
+        if (no) return reply(no, 400);
         const now = tick();
         const rec = { id: rec0.id || crypto.randomUUID(), created_at: now, updated_at: now, deleted_at: null, ...rec0 };
         const pool = [...rows, ...pending];
@@ -126,6 +145,8 @@ export function installFakePostgrest(opts = {}) {
       return rep ? reply(out.map((r) => ({ ...r })), 201) : reply(null, 201);
     }
     if (method === 'PATCH') {
+      const no = refusal(table, body || {});
+      if (no) return reply(no, 400);
       const hit = filterRows(rows, params);
       for (const r of hit) { Object.assign(r, body); if ('updated_at' in r) r.updated_at = tick(); }
       return rep ? reply(hit.map((r) => ({ ...r }))) : reply(null, 204);

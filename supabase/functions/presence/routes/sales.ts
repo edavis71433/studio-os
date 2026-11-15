@@ -2995,7 +2995,6 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   await dealEvent(site.id, dealId, 'converted', principal, { to_stage: 'won', detail: { client_id: clientId, site_id: acct.siteId } });
   await clearStaleNextStep(site.id, dealId, 'won');   // Phase 3: closing/signing/deposit steps are behind us
   if (site.client_id) { await clearNotice(site.client_id, 'deal_signed', `signed:${dealId}`); await clearNotice(site.client_id, 'deal_signed', `accepted:${dealId}`); await clearNoticePrefix(site.client_id, 'deal_followup', dealFollowupPeriodPrefix(dealId)); await clearNotice(site.client_id, 'deal_followup', dealFollowupLegacyPeriod(dealId)); } // the deal is a customer now — clear the "ready to convert" + stale "follow up on this deal" notices (weekly-bucketed → prefix clear + legacy key)
-  await writeChangeEvent({ siteId: site.id, entityType: 'deal', entityId: dealId, action: 'convert', summary: `Converted “${deal.title}” to a customer`, principal, provenance: 'human' }).catch(() => {});
 
   // Seam 1: if the converting operator runs an AGENCY, add the new customer to
   // their managed portfolio (shared helper). Idempotent; solo owners skip it.
@@ -3145,7 +3144,7 @@ export async function provisionCustomerAccount(opts: {
  *  Idempotent (site_id is the PK, on_conflict merge). Best-effort: a customer is
  *  still successfully added if this write fails. Returns the stored host. */
 async function recordExistingWebsite(
-  siteId: string, plan: PlanKey, websiteUrl: string, agencySiteId: string, principal: Principal, label: string,
+  siteId: string, plan: PlanKey, websiteUrl: string, principal: Principal, label: string,
 ): Promise<string | null> {
   try {
     if (!websiteUrl) return null;
@@ -3166,7 +3165,9 @@ async function recordExistingWebsite(
       body: JSON.stringify({ site_id: siteId, url: clean1, domain: url.hostname, platform: 'custom', method: 'meta', token, status: 'pending', last_check_note: '' }),
     });
     if (!w.ok) return null;
-    await writeChangeEvent({ siteId: agencySiteId, entityType: 'client', entityId: siteId, action: 'update', summary: `Recorded ${label}’s existing website ${url.hostname} (hosted elsewhere)`, principal, provenance: 'human', fields: ['monitor_connection'] }).catch(() => {});
+    // item 239: on the customer's own site, as the studio working for them, the way the Monitor
+    // card's own Connect records it (routes/monitor.ts); the studio's site refused a 'client' line
+    await writeChangeEvent({ siteId, entityType: 'settings', entityId: null, action: 'update', summary: `Recorded the existing website ${url.hostname} (hosted elsewhere)`, principal: { ...principal, scope: { site_id: siteId, name: label } }, provenance: 'human', fields: ['monitor_connection'] });
     return url.hostname;
   } catch { return null; }
 }
@@ -3323,7 +3324,6 @@ async function askToConnect(site: SiteRow, principal: Principal, email: string, 
   const ok = await requestConnection({ studioSiteId: site.id, agencyId: am?.agency_id || null, email, name, requestedBy: principal.email || principal.userId || '' });
   if (ok) {
     await ensureConnectContact(site.id, email, name, false).catch(() => null);   // they're in your contacts meanwhile
-    await writeChangeEvent({ siteId: site.id, entityType: 'contact', entityId: email, action: 'connect_requested', summary: `Asked ${email} to connect with you`, principal, provenance: 'human' }).catch(() => {});
   }
   return ok;
 }
@@ -3375,12 +3375,10 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
         const r = await bridgeCustomerToStudio({ agencySiteId: site.id, clientId, customerSiteId: customerSite?.id || null, label: businessName });
         projectId = r.projectId; bridged = r.bridged; ownedElsewhere = r.ownedElsewhere;
       }
-      await writeChangeEvent({ siteId: site.id, entityType: 'client', entityId: clientId, action: 'connect', summary: `Connected ${businessName} to your workspace`, principal, provenance: 'human' }).catch(() => {});
       return json({ data: { mode: 'connect', connected: true, created: false, client_id: clientId, site_id: customerSite?.id || null, project_id: projectId, managed, bridged, owned_elsewhere: ownedElsewhere, portal_url: portalUrl, message: 'Connected to their workspace.' } }, 200, cors);
     }
     // No account yet → record the intent (tagged contact) so signup auto-connects.
     const contact = await ensureConnectContact(site.id, email, name, true);
-    await writeChangeEvent({ siteId: site.id, entityType: 'contact', entityId: contact?.id || email, action: 'connect_pending', summary: `Saved ${email} to connect when they sign up`, principal, provenance: 'human' }).catch(() => {});
     return json({ data: { mode: 'connect', pending: true, connected: false, email, contact_id: contact?.id || null, portal_url: portalUrl, message: `Saved. When ${email} signs up, they’ll connect to you automatically.` } }, 200, cors);
   }
 
@@ -3407,7 +3405,7 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   // address on file their established search presence syncs immediately — and
   // without it the analytics board can only say "we don't know where their site
   // is", which is what it now says instead of "publish it first".
-  const externalDomain = acct.siteId ? await recordExistingWebsite(acct.siteId, plan, existingWebsite, site.id, principal, businessName) : null;
+  const externalDomain = acct.siteId ? await recordExistingWebsite(acct.siteId, plan, existingWebsite, principal, businessName) : null;
 
   // Agency–Client Bridge via the shared helper (ensureBridge — one primary agency
   // per customer; idempotent; reuses an existing link; refuses a customer owned by
@@ -3428,6 +3426,5 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
     return json({ data: { already_exists: true, created: false, client_id: clientId, site_id: acct.siteId, project_id: projectId, managed, external_domain: externalDomain, portal_url: portalUrl, message: 'They already have a workspace — nothing was duplicated.' } }, 200, cors);
   }
   const invited = await sendCustomerInvite(site.id, email, acct.isNewLogin);
-  await writeChangeEvent({ siteId: site.id, entityType: 'client', entityId: clientId, action: 'create', summary: `Added ${businessName} as a customer`, principal, provenance: 'human' }).catch(() => {});
   return json({ data: { created: true, client_id: clientId, site_id: acct.siteId, project_id: projectId, hosted: acct.hosted, invited, managed, bridged, owned_elsewhere: ownedElsewhere, plan, external_domain: externalDomain, portal_url: portalUrl } }, 201, cors);
 }
