@@ -49,7 +49,7 @@ import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/se
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionStar, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword, handleComingSoon, handleComingSoonRead } from './routes/publish.ts';
 const { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } = lazyRoutes(() => import('./routes/launches.ts'));
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
-import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob } from './routes/assets.ts';
+import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob, handleAssetsTrash, handleAssetPutBack, handleAssetDeleteForGood } from './routes/assets.ts';
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
 const { handleAdmin, handleDomain, handleDomainLookup, handleDomainForward, handleClientDomain } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
@@ -673,6 +673,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/assets/bulk' && method === 'POST') return handleAssetsBulk(req, site, principal, cors);
   if (route === '/assets/match' && method === 'GET') return handleAssetsMatch(req, site, cors);   // item 115: already in Files?
   if (route === '/assets/folders/move' && method === 'POST') return handleAssetsFolderMove(req, site, principal, cors);   // item 56
+  if (route === '/assets/trash' && method === 'GET') return handleAssetsTrash(site, cors);   // item 218: the Trash
   {
     const msoc = route.match(/^\/assets\/([0-9a-f-]{36})\/social$/);
     if (msoc && method === 'GET') return handleAssetSocial(site, msoc[1], cors);
@@ -702,6 +703,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (mco && method === 'POST') return handleAssetCutout(site, principal, mco[1], cors);
     const mcj = route.match(/^\/assets\/cutout\/([a-z0-9]{10,64}\.[A-Za-z0-9_-]{32})$/);
     if (mcj && method === 'GET') return handleCutoutJob(site, mcj[1], cors);
+    // item 218: out of the Trash, or gone for good
+    const mpb = route.match(/^\/assets\/([0-9a-f-]{36})\/put-back$/);
+    if (mpb && method === 'POST') return handleAssetPutBack(site, principal, mpb[1], cors);
+    const mfg = route.match(/^\/assets\/([0-9a-f-]{36})\/forever$/);
+    if (mfg && method === 'DELETE') return handleAssetDeleteForGood(site, principal, mfg[1], cors);
     const m = route.match(/^\/assets\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleAssetDetail(site, m[1], cors);
     if (m && method === 'PATCH') return handleAssetUpdate(req, site, principal, m[1], cors);
