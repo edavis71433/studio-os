@@ -19659,7 +19659,7 @@ const NOTICE_PRIORITY = ["publish_failed", "connection_expired", "website_enquir
 // The four client-portal notice kinds (migration 0116) belong to the BELL, not
 // to this card. They are in neither table above, so the `notices[0]` fallback
 // below happily rendered "New message from Acme Bakery" as a plum "outgrown your
-// plan" card with a See plans → pricing.html button. Client chatter is never a
+// plan" card with a plan button. Client chatter is never a
 // plan problem — exclude it from this card's candidates entirely.
 const PLAN_CARD_EXCLUDE = ["client_message", "client_upload", "client_request", "client_approval", "deal_signed", "deal_followup", "deal_ready", "proposal_accepted", "lead_followup"];
 async function renderPlanNotice() {
