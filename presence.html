@@ -392,6 +392,7 @@ h1.doc{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.
 .pg-pw{display:flex;flex-direction:column;gap:8px;margin:0 0 8px}
 .pg-pw .field{margin:0}
 .pg-pw .pc-acts{margin:0;align-items:center}
+.pg-pw .pg-unset{margin:0;font-size:12.5px;line-height:1.45;color:var(--ink);background:var(--amber-soft);border-radius:var(--dds-r,10px);padding:8px 10px}   /* item 196: a copied page with no password here */
 .pg-saved{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px}
 .pg-lrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:var(--dds-s1,4px)}
 .pg-lrow label{flex:none;margin:0}
@@ -2726,7 +2727,7 @@ textarea.stk-in{line-height:1.55;resize:vertical}
             <div id="designPreviewWrap">
               <div class="dp-stage" id="dpStage">
                 <div class="dp-frame">
-                  <iframe id="designPreview" title="Live design preview of your draft home page" aria-hidden="true"></iframe>
+                  <iframe id="designPreview" title="Live design preview of your draft home page" aria-hidden="true" sandbox="allow-same-origin allow-scripts"></iframe>
                   <div id="dcZoomNote" role="status">The whole page · back to full size when you leave Looks</div>
                   <div id="designPreviewEmpty" hidden>
                     <p class="eq" id="dpEmptyTitle">Your preview appears once your pages have content.</p>
@@ -2974,7 +2975,7 @@ textarea.stk-in{line-height:1.55;resize:vertical}
     </div>
     <button type="button" class="stage-phone" id="btnOnPhone"></button>
   </div>
-  <div class="stagewrap"><div class="proof" id="proofFrame"><iframe id="previewFrame" title="Preview of your website"></iframe></div></div>
+  <div class="stagewrap"><div class="proof" id="proofFrame"><iframe id="previewFrame" title="Preview of your website" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe></div></div>
 </div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
@@ -3318,7 +3319,15 @@ function nice(e) {
 /* ── API: identical calls to M7 ── */
 // G7 provenance, one wording: WHO last moved the draft, in plain words. Used by
 // the 409 stale_draft message AND the Page ▾ menu's passive "Last edit" line.
-const lcWho = (lc) => lc ? (lc.actor_kind === "staff" ? "your studio" : lc.actor_kind === "system" ? "an automatic update" : "someone else on your account") : "someone else";
+// Item 197 (review finding 38): the studio working inside a client's site is the "operator" kind,
+// which read as "someone else on your account", a stranger to the client. Seen from inside a
+// client, the owner's own change is their client's.
+const lcWho = (lc) => {
+  if (!lc) return "someone else";
+  if (lc.actor_kind === "staff" || lc.actor_kind === "operator") return "your studio";
+  if (lc.actor_kind === "system") return "an automatic update";
+  return studioInClient() ? "your client" : "someone else on your account";
+};
 // The draft version is a hash of the whole draft, so any of these moves it, whether or
 // not the server checks that route against it. One at a time, in order: a write that goes
 // out while another is on its way names a version that one is about to move, and is
@@ -3327,7 +3336,7 @@ const lcWho = (lc) => lc ? (lc.actor_kind === "staff" ? "your studio" : lc.actor
 // the same version and hears the same. Everything else stays out of the line, so a slow
 // ask (an AI draft) can't hold up a save, and /publish still names the version that was
 // reviewed. The server keeps the same list (lib/optimistic_lock.ts).
-const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/(?:duplicate|from-saved)|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$/;
+const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/(?:duplicate|from-saved)|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$|^\/pages\/deleted\/[^/]+\/restore$/;
 let DRAFT_LINE = Promise.resolve(), DRAFT_WRITES_OUT = 0;
 let WRITES_ANSWERED = 0;   // readChanges: has a write been answered since this read left?
 const READS_BY_POST = /^\/preview\/section$/;   // sent by POST for its body, but moves nothing
@@ -7036,6 +7045,9 @@ function pgAccessGroup(slug) {
     const page = dcPageObj(slug); if (!page) return;
     const now = page.access === "password" || page.access === "private" ? page.access : "everyone";
     const shown = asking ? "password" : now;
+    // Item 196 (review finding 30): a page copied from another site keeps its setting, never its
+    // password, so it said "Password saved" and was quietly left off the live site. It asks for one.
+    const unset = now === "password" && (!page.lock || (PG_LOCKS && !PG_LOCKS.has(String(page.lock))));
     g.textContent = "";
     g.appendChild(el("h4", "pg-h", "Who can see it"));
     const row = el("div", "pg-access"); row.setAttribute("role", "group"); row.setAttribute("aria-label", "Who can see it");
@@ -7048,7 +7060,7 @@ function pgAccessGroup(slug) {
     });
     g.appendChild(row);
     g.appendChild(el("p", "pg-says", PG_ACCESS.find((a) => a[0] === shown)[3]));
-    if (shown === "password" && !asking) {
+    if (shown === "password" && !asking && !unset) {
       const saved = el("div", "pg-saved");
       const chip = el("span", "hb-chip good"); chip.appendChild(el("i", "d")); chip.appendChild(document.createTextNode("Password saved"));
       const change = el("button", "dc-modal-cancel", "Change password"); change.type = "button";
@@ -7068,7 +7080,7 @@ function pgAccessGroup(slug) {
         g.appendChild(pgField(label, inp, hint));
       });
     }
-    if (asking) {
+    if (asking || unset) {
       const box = el("div", "pg-pw");
       const pw = el("input"); pw.type = "password"; pw.maxLength = 100; pw.autocomplete = "new-password"; pw.placeholder = "At least 8 letters or numbers";
       // item 204: the page travels to every visitor's browser, locked, so a short password can be guessed there
@@ -7083,7 +7095,8 @@ function pgAccessGroup(slug) {
       const go = () => savePassword(pw.value, save);
       save.addEventListener("click", go);
       pw.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } });
-      acts.append(save, show, cancel); box.appendChild(acts);
+      acts.append(save, show); if (asking) acts.append(cancel); box.appendChild(acts);   // with no password yet there's nothing to go back to
+      if (unset && !asking) box.insertBefore(el("p", "pg-unset", "This page asks for a password, but none is set on this site yet, so it can’t go live. Set one, or choose who can see it."), box.firstChild);
       g.appendChild(box);
       if (focusOn === "pw") setTimeout(() => { try { pw.focus({ preventScroll: true }); box.scrollIntoView({ block: "nearest" }); } catch (_) {} }, 0);
     }
@@ -7117,6 +7130,8 @@ function pgAccessGroup(slug) {
     } catch (err) { msg = nice(err); draw("pw"); }
   };
   draw();
+  const first = dcPageObj(slug);
+  if (!PG_LOCKS && first && first.access === "password") pgLocksRead().then(() => { if (g.isConnected && !asking) draw(); });   // item 196: is its password this site's?
   return g;
 }
 function pgChromeGroup(slug) {
@@ -7779,7 +7794,7 @@ function loadSiteStage(force) {
   apiHtml("/preview?version=draft&page=" + encodeURIComponent(SS_PATH)).finally(() => { if (seq === SS_SEQ) SS_PENDING = false; }).then((html) => {
     if (seq !== SS_SEQ) return;
     SS_LOADED = true; SS_STALE = false;
-    SS_FRAME.write(html);
+    SS_FRAME.write(frameWall(html));   // item 190
     const note = $("ssNote"); if (note) { note.hidden = true; note.textContent = ""; }
     document.documentElement.classList.remove("ss-noplan");
   }).catch((err) => {
@@ -8100,6 +8115,7 @@ $("verSeg").addEventListener("click", (e) => { const b = e.target.closest("butto
 $("devSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; PV.dev = b.dataset.dev; syncStageChrome(); });
 $("pageWords").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; PV.page = b.dataset.page; syncStageChrome(); loadPreview(); });
 window.addEventListener("message", (e) => {
+  if (e.source !== $("previewFrame").contentWindow) return;   // item 190: only the Preview page speaks here
   if (e.data && e.data.presenceNav) { PV.page = e.data.presenceNav; syncStageChrome(); loadPreview(); }
   if (e.data && e.data.presenceRetry && $("stage").classList.contains("on")) loadPreview();   // the proof's own Try again (experience review #13)
 });
@@ -8112,18 +8128,48 @@ function previewIfOpen() { if ($("stage") && $("stage").classList.contains("on")
 // browser dropped the page. The Overview's frame did the same between two quick draws. So a
 // frame's writes go through frameWriter: each is numbered, and a frame that finishes loading an
 // older one is given the newest again (twice in a row at most, so nothing can loop).
+// Item 190: Preview's frame has no origin (frameWall below), so its page can't be read from
+// here; it says which write it shows in a message. The others are read directly, as before.
 function frameWriter(frame) {
   const w = { count: 0, doc: "", redos: 0 };
-  w.write = (doc) => { w.doc = doc ? doc + `<!--dds-proof ${++w.count}-->` : ""; w.redos = 0; frame.srcdoc = w.doc; };
-  frame.addEventListener("load", () => {
+  const sb = frame.getAttribute("sandbox"), sealed = sb !== null && !/\ballow-same-origin\b/.test(sb);
+  const stamp = (n) => (sealed ? `<script>parent.postMessage({ ddsProof: ${n} }, "*")<\/script>` : `<!--dds-proof ${n}-->`);
+  w.write = (doc) => { w.doc = doc ? doc + stamp(++w.count) : ""; w.redos = 0; frame.srcdoc = w.doc; };
+  const shows = (shown) => {
+    if (!w.doc) return;
+    if (shown === w.count) w.redos = 0;
+    else if (shown && shown < w.count && w.redos++ < 2) frame.srcdoc = w.doc;
+  };
+  if (sealed) window.addEventListener("message", (e) => { if (e.source === frame.contentWindow && e.data && Number.isInteger(e.data.ddsProof)) shows(e.data.ddsProof); });
+  else frame.addEventListener("load", () => {
     const d = frame.contentDocument;
     if (!w.doc || !d) return;
     const walk = d.createTreeWalker(d, NodeFilter.SHOW_COMMENT); let n, shown = 0;
     while ((n = walk.nextNode())) { const m = /^dds-proof (\d+)$/.exec(n.data); if (m) shown = +m[1]; }
-    if (shown === w.count) w.redos = 0;
-    else if (shown && shown < w.count && w.redos++ < 2) frame.srcdoc = w.doc;
+    shows(shown);
   });
   return w;
+}
+// ── Item 190 (review file 06, finding 1): the editor's page frames are walled off from the app ──
+// A page the editor draws is the site's own HTML, which a Developer seat can shape (custom HTML,
+// cleaned on the server by lib/dev_html.ts). Drawn in a frame of the app's own origin, a script
+// that got through would run as whoever has the editor open. So:
+// · Edit's canvas (#designPreview) and the Overview (#siteFrame) stay same-origin, because the
+//   editor works inside them (its section tools are drawn in the page and it listens there), but
+//   every page they draw carries a rule that runs none of its own scripts: no <script>, no on…
+//   attribute, no javascript: link. The editor's listeners are the app's own code and still run.
+//   (A sandbox without allow-scripts walls a page off as well in Chromium, but WebKit then drops
+//   the editor's listeners too, so the iPad and iPhone couldn't edit.)
+// · Preview (#previewFrame) is a visitor's view, so the page's own scripts run there (the phone
+//   menu, the hours line, a pop-up), in a frame with no origin, which can't reach the app at all
+//   and speaks to it only by message.
+const FRAME_RULE = `<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'">`;
+function frameWall(html) {
+  const s = String(html || "");
+  const h = /<head\b[^>]*>/i.exec(s);
+  if (h) return s.slice(0, h.index + h[0].length) + FRAME_RULE + s.slice(h.index + h[0].length);
+  const d = /^\s*<!doctype[^>]*>/i.exec(s);   // before anything else, but after the doctype, so the page keeps its mode
+  return d ? d[0] + FRAME_RULE + s.slice(d[0].length) : FRAME_RULE + s;
 }
 // An answer to an older ask (another page or version picked meanwhile, or Preview closed) is
 // dropped, as the Overview's are.
@@ -8331,7 +8377,7 @@ function openRitual(opts) {
 // the one-sentence fallback above.
 function blockerTarget(field) {
   const [head, sub] = String(field || "").split(".");
-  const view = { identity: "business", location: "business", locations: "business", redirects: "business", offerings: "offerings", faqs: "faqs", testimonials: "testimonials", posts: "updates" }[head] || "business";
+  const view = { identity: "business", location: "business", locations: "business", redirects: "business", offerings: "offerings", faqs: "faqs", testimonials: "testimonials", posts: "updates", copied: "design" }[head] || "business";
   let focus = null;
   if (head === "identity" && sub) focus = "f-" + sub;
   else if (head === "location") focus = sub === "hours" ? "hoursGrid" : "f-" + (sub || "address_line1");
@@ -8346,11 +8392,14 @@ function renderBlockerList(list) {
   box.appendChild(el("p", "blockprose", uniq.length === 1 ? "One thing to finish before this can publish:" : `${uniq.length} things to finish before this can publish:`));
   const ul = el("ul", "blocklist");
   uniq.forEach((b) => {
-    const li = el("li"); li.appendChild(ritMark(false)); li.appendChild(el("span", "rit-msg", b.message));
-    const fix = el("button", "textact", b.field === "copied" ? "Change them" : "Fix"); fix.type = "button";
-    fix.setAttribute("aria-label", (b.field === "copied" ? "Change them: " : "Fix: ") + b.message);
+    const copied = b.field === "copied", studio = copied && studioInClient();
+    // items 145, 196 and 216: Keep is the studio's (below); a client is told who can keep them
+    const li = el("li"); li.appendChild(ritMark(false)); li.appendChild(el("span", "rit-msg", copied && !studio ? b.message + " Or ask your studio to keep them as they are." : b.message));
+    const fix = el("button", "textact", copied ? "Change them" : "Fix"); fix.type = "button";
+    fix.setAttribute("aria-label", (copied ? "Change them: " : "Fix: ") + b.message);
     fix.addEventListener("click", () => {
-      const t = b.field === "copied" ? { view: "design", focus: null } : blockerTarget(b.field);   // item 216: copied sections are changed on the page
+      if (blockerOpen(b)) return;   // item 196: the first copied section, or a page's missing password
+      const t = copied ? { view: "design", focus: null } : blockerTarget(b.field);   // item 216: copied sections are changed on the page
       closeRitual(); go(t.view);
       if (t.focus) setTimeout(() => {
         const n = $(t.focus); if (!n) return;
@@ -8361,7 +8410,7 @@ function renderBlockerList(list) {
     });
     li.appendChild(fix);
     // items 145 and 216: the studio has looked at what a template, Duplicate or a saved page copied, and it may publish as it is
-    if (b.field === "copied" && S.isStudio && S.site) {
+    if (studio && S.site) {
       const keep = el("button", "textact", "Keep them as they are"); keep.type = "button";
       keep.addEventListener("click", async () => {
         if (!(await askYes("Keep the copied sections and photos as they are? They can then publish without changes.", { ok: "Keep them" }))) return;
@@ -8373,6 +8422,28 @@ function renderBlockerList(list) {
     ul.appendChild(li);
   });
   box.appendChild(ul);
+}
+// Item 196 (review finding 32): the copied-words item's Fix opened Business details, which has
+// nothing to do with copied sections; it opens the first of them now. A page's missing password
+// opens that page's settings, where it is set.
+function blockerOpen(b) {
+  const f = String(b.field || "");
+  if (f === "copied" && b.at && Number.isInteger(b.at.index)) {
+    const slug = String(b.at.page || ""), i = b.at.index;
+    closeRitual(); go("design");
+    Promise.resolve(slug === DC_PAGE || dcSwitchPage(slug)).then((ok) => {
+      if (!ok) return;
+      if (!BLOCKS_WORK) BLOCKS_WORK = currentBlocks();   // Edit opened just now: its list, as the section card would load it
+      if (BLOCKS_WORK[i]) eeEditBlock(i);
+    });
+    return true;
+  }
+  if (f.indexOf("page_lock.") === 0) {
+    closeRitual(); go("design");
+    setTimeout(() => pgOpenSettings({ href: "/" + f.slice(10) + "/" }), 80);
+    return true;
+  }
+  return false;
 }
 // the checklist's marks: amber for a real blocker, green for what is in place (item 35)
 function ritMark(ok) { const i = el("i", "rit-ck " + (ok ? "ok" : "bad")); i.innerHTML = uiIcon(ok ? "check" : "x", 12); i.setAttribute("aria-hidden", "true"); return i; }
@@ -8504,14 +8575,24 @@ async function runPublish(btn, firstPublish) {
   } catch (err) {
     $("ritBody").innerHTML = pipeHtml(-1);
     $("ritTitle").textContent = "That didn’t go through.";
-    $("ritSub").textContent = "Your live site is unchanged and nothing was lost. The version is kept — try again whenever you’re ready.";
+    // Item 196 (review finding 31): the server says why (publish again in about N seconds, the site
+    // is paused, another publish is running), and that shows now. Try again waits as long as it
+    // was asked to, and isn't offered when only the studio can change the answer.
+    const code = (err && err.stale) ? "stale_draft" : (err && err.body && err.body.error) || "";
+    const why = code === "stale_draft" ? "Your draft changed since you looked it over. Take another look, then publish."
+      : code && code !== "validation_failed" && err.body && err.body.message ? nice(err) : "";
+    $("ritSub").textContent = why ? why + " Your live site is unchanged." : "Your live site is unchanged and nothing was lost. The version is kept — try again whenever you’re ready.";
     if (err.body && err.body.fields) {
       $("ritBlockers").innerHTML = `<p class="blockprose">${(err.body.fields || []).map((f) => esc(typeof f === "string" ? f : f.message || "")).join("<br>")}</p>`;
     }
     $("ritActions").innerHTML = "";
-    const retry = el("button", "pubbtn", "Try again");
-    retry.addEventListener("click", () => loadRitual());
-    $("ritActions").appendChild(retry);
+    if (code !== "site_paused" && code !== "lifecycle_blocked") {
+      const retry = el("button", "pubbtn", code === "stale_draft" ? "Take another look" : "Try again");
+      retry.addEventListener("click", () => loadRitual());
+      const wait = code === "cooldown" ? Math.min(120, Math.max(1, Number(err.body.retry_after) || 60)) : 0;
+      if (wait) { retry.disabled = true; setTimeout(() => { retry.disabled = false; }, wait * 1000); }
+      $("ritActions").appendChild(retry);
+    }
     const ny = el("button", "notyet", "Back to your website");
     ny.addEventListener("click", closeRitual);
     $("ritActions").appendChild(ny);
@@ -9321,8 +9402,13 @@ async function renderDeletedPages() {
       if (back.disabled) return;
       back.disabled = true; back.textContent = "Putting back…";
       try {
-        const r = (await api("POST", `/pages/deleted/${p.id}/restore`, {})).data || {};
-        toast("“" + (r.title || p.title) + "” is back in your pages" + (r.moved ? " as /" + r.slug + "/" : ""));
+        // Item 197 (review finding 40): it ran beside the editor's saves, so it could cross one still
+        // waiting. It goes after them now, in the same line, and says when the menu doesn't show it.
+        if (!(await dcSavePendingEdits())) { back.disabled = false; back.textContent = "Put back"; return; }
+        const r = (await settingsTurn(() => api("POST", `/pages/deleted/${p.id}/restore`, {}))).data || {};
+        const href = "/" + (r.slug || p.slug) + "/", nav = (S.settings && S.settings.nav) || [];
+        const listed = !pgHasCustomNav() || nav.some((it) => it && (it.href === href || (it.children || []).some((k) => k && k.href === href)));
+        toast("“" + (r.title || p.title) + "” is back in your pages" + (r.moved ? " as /" + r.slug + "/" : "") + (listed ? "" : ". It isn’t in your menu yet: add it from Pages."));
         await refreshAll(); renderDeletedPages();
       } catch (err) { toast(nice(err), true); back.disabled = false; back.textContent = "Put back"; }
     });
@@ -11078,7 +11164,7 @@ function renderRankGrid() {
   const latest = RG_PICK && g.latest ? g.latest[RG_PICK] : null;
   const scan = RG_SHOW && RG_SHOW.phrase === RG_PICK ? RG_SHOW : latest;
   meta.textContent = studio
-    ? `${latest ? "Scanned " + svWhen(latest.scanned_at) + " · " : ""}next scan ${g.next} · every month`
+    ? `${latest ? "Scanned " + svWhen(latest.scanned_at) + " · " : ""}${g.due ? "next scan due now" : "next scan " + g.next} · every month`
     : (latest ? `Checked by your studio on ${svWhen(latest.scanned_at)}` : "");
   if (studio && g.today) {
     const leftN = Math.max(0, g.today.cap - g.today.used);
@@ -11100,7 +11186,7 @@ function renderRankGrid() {
     body.appendChild(tabs);
   }
   if (!scan) {
-    body.appendChild(el("p", "rg-empty", RG_PICK ? `No scan of “${RG_PICK}” yet. ${studio ? `Scan now runs one; the monthly scan runs on ${g.next}.` : ""}` : "Add a search to scan in the grid’s settings."));
+    body.appendChild(el("p", "rg-empty", RG_PICK ? `No scan of “${RG_PICK}” yet. ${studio ? (g.due ? "The first scan is due now and usually runs within 15 minutes, then on the 1st of each month." : `Scan now runs one; the monthly scan runs on ${g.next}.`) : ""}` : "Add a search to scan in the grid’s settings."));
     return;
   }
   const past = scan !== latest;
@@ -11312,7 +11398,7 @@ function rgOpenSettings() {
   cancel.addEventListener("click", () => d.close());
   save.addEventListener("click", async () => {
     save.disabled = true;
-    try { await api("PUT", "/visibility/maps", draft); toast(draft.enabled ? "Saved. The grid is on for this client." : "Saved."); d.close(); }
+    try { await api("PUT", "/visibility/maps", draft); toast(draft.enabled && !g.enabled ? "Saved. The grid is on; its first scan usually runs within 15 minutes." : "Saved."); d.close(); }
     catch (err) { save.disabled = false; toast(nice(err), true); }
   });
 }
@@ -11562,7 +11648,8 @@ async function mountBrandKitCard() {
   try { kit = (await api("GET", "/dev/brand-kit")).data.brand_kit; } catch (_) { return; } // not owner/dev → no card
   const T = DESIGN_TOKENS || {};
   const st = {
-    logo_media_id: (kit && kit.logo_media_id) || (S.settings && S.settings.logo_media_id) || null,
+    // item 197: the site's logo is the one its settings hold (a saved kit can hold an older one)
+    logo_media_id: S.settings && "logo_media_id" in S.settings ? (S.settings.logo_media_id || null) : ((kit && kit.logo_media_id) || null),
     primary: normHexJs((kit && kit.primary) || T.accent) || "#5b3fa0",
   };
   // Item 94: type and corners are set in one place, Colors and fonts below. This card showed
@@ -11578,7 +11665,20 @@ async function mountBrandKitCard() {
   const logoWrap = el("span"); const paintLogo = () => { logoWrap.textContent = ""; if (st.logo_media_id) logoWrap.appendChild(mediaThumb(st.logo_media_id)); };
   paintLogo();
   const logoBtn = el("button", null, st.logo_media_id ? "Change logo" : "Choose logo"); logoBtn.type = "button"; logoBtn.style.cssText = miniBtn;
-  logoBtn.addEventListener("click", () => openPicker((id) => { st.logo_media_id = id || null; paintLogo(); logoBtn.textContent = id ? "Change logo" : "Choose logo"; }));
+  const showLogo = () => { paintLogo(); logoBtn.textContent = st.logo_media_id ? "Change logo" : "Choose logo"; };
+  // Item 197 (review finding 39): a picked logo showed here and was saved only by "Build & apply
+  // brand kit", so the Header card's "Add a logo", which comes here, lost it without a word. It saves now.
+  logoBtn.addEventListener("click", () => openPicker(async (id) => {
+    const was = st.logo_media_id;
+    st.logo_media_id = id || null; showLogo();
+    if (st.logo_media_id === ((S.settings && S.settings.logo_media_id) || null)) return;
+    try {
+      await settingsPut({ logo_media_id: st.logo_media_id });
+      toast(id ? "Logo saved. Publish to show it on your live site." : "Logo taken off. Publish to take it off your live site.");
+      scheduleChangesRefresh(); refreshDesignPreview();
+      if ($("hfCard") && $("hfCard").dataset.which === "header") renderHFCard("header");
+    } catch (err) { st.logo_media_id = was; showLogo(); toast(nice(err), true); }
+  }));
   logoRow.append(logoWrap, logoBtn); card.appendChild(logoRow);
   // brand colour
   const colorRow = el("div"); colorRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:10px";
@@ -12760,6 +12860,9 @@ async function dcSavePageName(slug, title, addr) {
       if (pseo["page:" + slug]) { const map = { ...pseo }; map["page:" + newSlug] = map["page:" + slug]; delete map["page:" + slug]; body.page_seo = map; }
       const nix = (S.settings && S.settings.pages_noindex) || [];
       if (nix.includes("page:" + slug)) body.pages_noindex = nix.map((k) => (k === "page:" + slug ? "page:" + newSlug : k));
+      // item 197 (review finding 37): a pop-up set to show on "these pages" kept the old address and stopped showing there
+      const pop = S.settings && S.settings.popup;
+      if (pop && Array.isArray(pop.picked) && pop.picked.includes("page:" + slug)) body.popup = { ...pop, picked: pop.picked.map((k) => (k === "page:" + slug ? "page:" + newSlug : k)) };
     }
     return body;
   };
@@ -12843,6 +12946,7 @@ async function dcClearPage(slug) {
   slug = slug || "";
   if (slug !== DC_PAGE && !(await dcSwitchPage(slug))) return;   // clear the page you picked
   if (!Array.isArray(BLOCKS_WORK) || !BLOCKS_WORK.length) { toast("This page is already blank"); return; }
+  if (BLOCKS_WORK.some(lockedForMe)) { toast(LOCK_PAGE_SAY + " so it can’t be cleared. Ask them if it needs to change.", true); return; }   // item 195: as Delete and Cut do
   if (!(await askYes("Clear all sections from “" + dcPageTitle(slug) + "” and start from a blank canvas? You can Undo this, and your live site is unchanged until you publish.", { ok: "Clear the page", danger: true }))) return;
   dcCaptureScroll(); BLOCKS_WORK = []; BLOCK_FOCUS = null; renderBlocksCard(); saveBlocks();
 }
@@ -13271,11 +13375,22 @@ async function putBlocks() {
     return true;   // review fix 8: callers may announce "Saved" only on a real resolve
   } catch (err) {
     whisper("topWhisper", "failed");
+    // Item 195 (review finding 28): a save refused for a locked section is refused again while
+    // the list still holds that change, so every later edit on the page was refused too, until a
+    // reload threw them all away. The page goes back to how it was last saved; the refusal says why.
+    if (err && err.body && err.body.error === "section_locked" && DC_PAGE === sentPage) lockRefusedPutBack();
     // G7 "someone else is editing": a refused-stale save gets a calm LOAD-LATEST
     // action (with who, when the server knows) instead of a dead-end error.
     if (!(err && err.stale)) toast(nice(err), true);   // a stale one already offers Load the latest (offerLoadLatest)
     return false;
   }
+}
+// The refused save's undo step never landed, so it goes too.
+function lockRefusedPutBack() {
+  if (DC_HIST_LAST != null && DC_UNDO[DC_UNDO.length - 1] === DC_HIST_LAST) DC_UNDO.pop();
+  BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null; LIVE_WANTED = false; LIVE_DRAWN = null;
+  dcHistoryCommit();
+  dcCaptureScroll(); renderBlocksCard(); refreshDesignPreview();
 }
 // ── T-STARTER: apply a pre-arranged, pre-filled starter layout. Replaces the
 //    working sections with a ready-made set the owner then EDITS (never a blank
@@ -13284,6 +13399,7 @@ async function putBlocks() {
 //    overwrites — confirms first when the owner already has sections.
 async function applyStarterLayout(starter) {
   if (!starter || !Array.isArray(starter.blocks) || !starter.blocks.length) return;
+  if ((BLOCKS_WORK || []).some(lockedForMe)) { toast(LOCK_PAGE_SAY + " so a layout can’t replace its sections. Ask them if it needs to change.", true); return; }   // item 195
   const hasContent = Array.isArray(BLOCKS_WORK) && BLOCKS_WORK.length > 0;
   if (hasContent && !(await askYes("Start from the “" + starter.name + "” layout? This replaces your current sections with a ready-made set you can then edit. Your existing sections will be removed.", { ok: "Use this layout", danger: true }))) return;
   // Deep copy so the shared suggestion payload is never mutated, and MULTI-INSTANCE
@@ -15197,7 +15313,7 @@ async function dcTimewarpGo() {
       const html = await apiHtml(`/preview?publish_id=${encodeURIComponent(d.publish_id)}&page=${encodeURIComponent(path)}`);
       if (seq !== DC_TW_SEQ || DC_MODE !== "timewarp") return;
       DP_PAINT_OPEN = DC_PAGE_OPENS;
-      frame.srcdoc = html;
+      frame.srcdoc = frameWall(html);   // item 190
     }
     DC_TW_LOADED = true;
     const when = new Date(dt.value + "T12:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
@@ -15557,22 +15673,23 @@ const INS_THEMES = [
 // The site's colours as the canvas draws them (every template names them alike), or quiet
 // stand-ins before the canvas has drawn.
 function dcSiteColours() {
-  const out = { paper: "#f7f7f5", card: "#ffffff", ink: "#1c2430", soft: "#5b6572", accent: "#23635a", accentDark: "", wash: "#eef1ee" };
+  const out = { paper: "#f7f7f5", card: "#ffffff", ink: "#1c2430", soft: "#5b6572", accent: "#23635a", accentDark: "", band: "", wash: "#eef1ee" };
   try {
     const d = $("designPreview") && $("designPreview").contentDocument;
     const cs = d && d.documentElement && d.defaultView.getComputedStyle(d.documentElement);
-    if (cs) [["paper", "--paper"], ["card", "--card"], ["ink", "--ink"], ["soft", "--soft"], ["accent", "--accent"], ["accentDark", "--accent-dark"], ["wash", "--wash"]].forEach(([k, v]) => {
+    if (cs) [["paper", "--paper"], ["card", "--card"], ["ink", "--ink"], ["soft", "--soft"], ["accent", "--accent"], ["accentDark", "--accent-dark"], ["band", "--accent-band"], ["wash", "--wash"]].forEach(([k, v]) => {
       const x = cs.getPropertyValue(v).trim(); if (x && !/^var\(/.test(x)) out[k] = x;
     });
   } catch (_) {}
   if (!out.accentDark) out.accentDark = out.accent;
+  if (!out.band) out.band = out.accentDark;   // behind an accent section; Slate names a deeper one (.block--bg-accent)
   return out;
 }
 // what a theme looks like: its background, words and button
 function insThemeLook(v, c) {
   if (v === "tinted") return { bg: "color-mix(in srgb," + c.accent + " 8%," + c.paper + ")", ink: c.ink, btn: c.accent };
   if (v === "plain") return { bg: c.paper, ink: c.ink, btn: c.accent };
-  if (v === "accent") return { bg: c.accentDark, ink: "#ffffff", btn: "#ffffff" };
+  if (v === "accent") return { bg: c.band, ink: "#ffffff", btn: "#ffffff" };
   if (v === "dark") return { bg: "#1a1622", ink: "#f2eef8", btn: c.accent };
   return { bg: "linear-gradient(180deg," + c.card + " 0 55%," + c.wash + " 55%)", ink: c.ink, btn: c.accent };
 }
@@ -16048,11 +16165,14 @@ function dcPageStatus(chip) {
   const pg = [...m.menu.map((e) => e.pg), ...m.unlinked].find((p) => p && p.view === "design" && (p.slug || "") === DC_PAGE);
   let word = "Live", tone = "good", says = "Nothing on this page is waiting: your live site shows it as it is here";
   const tp = pg ? hbTreePage(pg) : null;
+  const acc = (pg && pg.slug && (dcPageObj(pg.slug) || {}).access) || "";   // item 196: a private or password page isn't plainly "Live"
   if (tp && HB_TREE_FLAG[tp.status]) { word = tp.status_label; tone = HB_TREE_FLAG[tp.status]; says = tp.status_label; }
+  else if (acc === "private") { word = "Private"; tone = ""; says = "Kept in your draft: it isn’t on your live site or in its menu"; }
   else if (!ctx.siteLive || ctx.firstPublish) { word = "Not live yet"; tone = ""; says = "Your site goes live the first time you publish"; }
   else {
     const n = pg ? ctx.changes.filter((ch) => pcChangeOn(ch, pg)).length : 0;
     if (n) { word = n + (n === 1 ? " change" : " changes"); tone = "warn"; says = n + (n === 1 ? " change on this page is" : " changes on this page are") + " waiting to go live"; }
+    else if (acc === "password") { word = "Password"; tone = ""; says = "On your live site: visitors type its password to open it"; }
   }
   chip.textContent = word; chip.className = "dc-chip" + (tone ? " " + tone : ""); chip.title = says;
 }
@@ -17363,7 +17483,7 @@ function refreshDesignPreview() {
       if (DC_MODE === "timewarp" && DC_TW_LOADED) return;
       if (dpHoldRepaint()) return;   // a session may have opened while that read was in flight
       DP_PAINT_OPEN = opened; DP_READ_PAINTED = read;
-      frame.srcdoc = html;
+      frame.srcdoc = frameWall(html);   // item 190
       const box = $("designPreviewEmpty"); if (box) { box.hidden = true; box.classList.remove("plan"); }
     } catch (err) {
       if (opened !== DC_PAGE_OPENS || read < DP_READ_PAINTED) return;
@@ -17495,17 +17615,23 @@ function dcMoveCol(bi, from, gap) {
 // change its words. The client sees a padlock in its name and fewer tools; only the studio
 // unlocks, and the studio is never held by its own lock. A copy is never locked.
 const blkLock = (b) => (b && b.lock && typeof b.lock.id === "string" ? b.lock : null);
-const lockedForMe = (b) => !!blkLock(b) && !S.isStudio;
+// Item 195 (review finding 29): who may lock is decided as the server decides it
+// (lib/actor_kind.ts): platform staff, or a studio working inside its client (?client=, a scope
+// the server granted). On its own site a studio is that site's owner, so its lock would be refused.
+const locksAsStudio = () => { const c = S.ctx; return !!(c && (c.is_operator || (c.scope && c.scope.site_id))); };
+const lockedForMe = (b) => !!blkLock(b) && !locksAsStudio();
 const LOCK_SAY = "Your studio locked this section so it stays as designed.";
+const LOCK_PAGE_SAY = "Your studio locked a section on this page";
 // Every way to move, copy, cut or delete a section asks this first (the tools are hidden too).
 function lockStop(bi) { if (!lockedForMe(BLOCKS_WORK[bi])) return false; toast(LOCK_SAY + " Ask them if it needs to change.", true); return true; }
-function dcLockBlock(bi, on, words) {
+async function dcLockBlock(bi, on, words) {
   const b = BLOCKS_WORK[bi]; if (!b) return;
   if (on) {
     const id = blkLock(b) ? b.lock.id : "lk-" + ((crypto.randomUUID && crypto.randomUUID().replace(/-/g, "").slice(0, 12)) || Date.now().toString(36));
     b.lock = { id, words: words === undefined ? (blkLock(b) ? b.lock.words : true) : !!words };
   } else delete b.lock;
-  renderBlocksCard(); saveBlocks();
+  renderBlocksCard();
+  if (!(await saveBlocks())) return;   // item 195: said only once it saved; a refusal puts the list back and says why
   toast(!on ? "Unlocked: your client can change this section again"
     : words === undefined ? "Locked: your client can change its words, nothing else" : (b.lock.words ? "Your client can change its words" : "Your client can’t change its words either"));
 }
@@ -18885,7 +19011,7 @@ function dcInjectCanvas(doc, main, live) {
           more.appendChild(mkItem("Add a column", "Add a column", () => dcSetColumns(bi, nc + 1), { cls: nc >= 6 ? "dc-off" : "", icon: "plus" }));
           more.appendChild(mkItem("Remove a column", "Remove a column", () => dcSetColumns(bi, nc - 1), { cls: nc <= 1 ? "dc-off" : "", icon: "x" }));
         }
-        if (S.isStudio) more.appendChild(blkLock(b)   // item 155: only the studio locks and unlocks
+        if (locksAsStudio()) more.appendChild(blkLock(b)   // item 155: only the studio locks and unlocks
           ? mkItem("Unlock", "Unlock this section: your client can change it again", () => dcLockBlock(bi, false), { icon: "unlock" })
           : mkItem("Lock this section", "Lock this section: your client can’t move, restyle or delete it", () => dcLockBlock(bi, true), { icon: "lock" }));
         const mb = mkBtn("More", "More", null, { icon: "more" });

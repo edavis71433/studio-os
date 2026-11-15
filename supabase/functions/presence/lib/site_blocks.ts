@@ -2280,12 +2280,16 @@ ol.toc a{color:var(--accent-dark,var(--accent))}
 @supports (background:color-mix(in srgb,red,#fff)){.block.block--bg-tint{background:var(--block-tint,color-mix(in srgb,var(--accent) 8%,var(--paper,#f7f7f5)))}}
 .block.block--bg-plain{background:none;border-top:0;border-bottom:0}
 /* bold bands — a strong accent or dark section with light text throughout. Text
-   colours are forced light so contrast holds regardless of the block's content. */
-.block.block--bg-accent{background:var(--accent-dark,var(--accent));color:#fff}
+   colours are forced light so contrast holds regardless of the block's content, and on
+   the accent band a form's red required mark (lib/forms.ts) turns white too. The accent
+   band is the darker accent; a template whose accents are both too light for white
+   words names a deeper one, --accent-band (Slate). tests/presence/accent_band_test.mjs */
+.block.block--bg-accent{background:var(--accent-band,var(--accent-dark,var(--accent)));color:#fff}
 .block.block--bg-dark{background:#1a1622;color:#f2eef8}
 .block.block--bg-accent :is(h1,h2,h3,h4,h5,p,li,dt,dd,figcaption,blockquote,strong,em,.nm,.pr,.ds,.stat-v,.stat-l,summary),.block.block--bg-dark :is(h1,h2,h3,h4,h5,p,li,dt,dd,figcaption,blockquote,strong,em,.nm,.pr,.ds,.stat-v,.stat-l,summary){color:inherit}
 .block.block--bg-accent a:not(.btn),.block.block--bg-dark a:not(.btn){color:#fff;text-decoration:underline}
-.block.block--bg-accent .btn{background:#fff;color:var(--accent-dark,var(--accent));border-color:#fff}
+.block.block--bg-accent .ff-req{color:#fff}
+.block.block--bg-accent .btn{background:#fff;color:var(--accent-band,var(--accent-dark,var(--accent)));border-color:#fff}
 .block.block--bg-dark .btn{background:var(--accent);color:#fff;border-color:var(--accent)}
 .block.block--bg-accent .card,.block.block--bg-dark .card{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)}
 /* spacing: vertical padding, honouring the site's --spacing-scale like .block does */
@@ -2412,8 +2416,10 @@ table.site-table tbody tr:last-child td{border-bottom:none}
    progress fills, icons, focus rings — so one remap restyles them all, identically
    across all 8 template families. Custom properties inherit downward, which is the
    point; a NESTED styled section always sets-or-resets its own --ov-* inline, so an
-   inner override never leaks out and an outer one is cleanly shadowed. */
-.block.ov-accent{--accent:var(--ov-accent);--accent-dark:var(--ov-accent-dark,var(--ov-accent))}
+   inner override never leaks out and an outer one is cleanly shadowed. The accent
+   band's colour follows too, so a template's deeper band (Slate's --accent-band) gives
+   way to the owner's pick on an accent section, as the darker accent always did. */
+.block.ov-accent{--accent:var(--ov-accent);--accent-dark:var(--ov-accent-dark,var(--ov-accent));--accent-band:var(--ov-accent-dark,var(--ov-accent))}
 /* font: a pick between the site's TWO faces only (the font_display/font_body token
    slots). Fallback stacks follow the .rw-quote-body precedent: the token when set,
    a face-appropriate system stack when not. The :is() list out-ranks the templates'
