@@ -111,7 +111,8 @@ const DEALS = [
 {
   const read = (rel) => Deno.readTextFileSync(new URL(rel, import.meta.url));
   const st = read('../../settings.html'), pipe = read('../../pipeline.html'), an = read('../../analytics.html'), idx = read('../../supabase/functions/presence/index.ts');
-  ok('Settings: a percents card of its own (the names card keeps its four boxes)', /id="stageChances"/.test(st) && (st.match(/id="sc-(lead|qualified|proposal|contract)" min="0" max="100"/g) || []).length === 4 && /id="scSave">Save percents</.test(st));
+  // builder item 165: one row per stage (its name, its chance, when it stalls), each box saving when it's left
+  ok('Settings: a chance box in each stage’s row, no Save button', /id="stageGrid"/.test(st) && (st.match(/id="sc-(lead|qualified|proposal|contract)" min="0" max="100"/g) || []).length === 4 && !/Save percents/.test(st) && /\$\('sc-' \+ k\)\.addEventListener\('change', \(\) => saveStageChances\(k\)\);/.test(st));
   ok('Settings: saving sends only the percents', /api\('\/sales\/stages', 'PUT', \{ chances \}\)/.test(st));
   ok('Settings: the Domain & email card says where emails go out from and whether it\'s verified', /api\('\/email\/sending'\)/.test(st) && /setStatus\('domains', \{ text: `Verified · emails go out from \$\{d\.from\}`/.test(st) && /Not verified, so emails may land in spam · from \$\{d\.from\}/.test(st));   // bug hunt I6: the state first
   ok('Pipeline: an Expected tile, kept off a phone (it rides under Open there)', /const expT=ex\?tile\('Expected'/.test(pipe) && /\$\{openT\}\$\{expT\}\$\{wonT\}/.test(pipe) && /\.stats \.st-exp\{display:none\}/.test(pipe) && /\.stats \.exp-sub\{display:inline\}/.test(pipe));

@@ -32,14 +32,7 @@
   svg.ic{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
 
-  /* ── breadcrumb + page head ── */
-  .crumbs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--faint);margin:0 0 var(--dds-s4,16px);flex-wrap:wrap}
-  .crumbs a{color:var(--faint);text-decoration:none;display:inline-flex;align-items:center;gap:var(--dds-s1,4px);padding:2px 6px 2px 2px;border-radius:var(--dds-r-sm,6px)}
-  .crumbs a:hover{color:var(--p);background:var(--p-soft)}
-  .crumbs .sep{color:var(--line-strong)}
-  .crumbs [aria-current="page"]{color:var(--ink);font-weight:500}
-  header h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.15;letter-spacing:-.01em;margin:0}
-  header .sub{color:var(--soft);font-size:14.5px;margin:6px 0 0;max-width:62ch}
+  /* ── the page header is the shared one (shell.css .dds-ph, builder item 165), Inbox in its trail ── */
 
   /* ── cards ── */
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s5,20px) var(--dds-s5,20px);box-shadow:var(--shadow);margin-top:var(--dds-s4,16px)}
@@ -208,6 +201,92 @@
     .up-acts button.ghost{flex:1;height:40px}
   }
   @media (pointer:coarse){.var{min-height:40px}}
+  /* ══ Builder list item 221 (Nov 2026, drawn in Figma and agreed): updates kept as templates by
+     the studio, and the welcome email each new person on the list gets ══ */
+  .card-h .tplbtn{margin-left:auto}
+  .tplbtn{font:inherit;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:1px solid var(--line-strong);border-radius:999px;background:var(--card);color:var(--ink);cursor:pointer;flex:0 0 auto}
+  .tplbtn:hover{border-color:var(--p);color:var(--p)}
+  .tplbtn svg{color:var(--p)}
+  .tplbtn .n{font-size:11px;font-weight:700;color:var(--p);background:var(--p-soft);border-radius:999px;padding:1px 7px}
+  dialog.tpldlg{width:min(600px,calc(100vw - 32px))}
+  .tpl-sub{color:var(--soft);font-size:13.5px;line-height:1.5;margin:0 18px 12px}
+  .tpl-find{margin:0 18px 12px;width:calc(100% - 36px)}
+  .tpl-list{padding:0 18px}
+  ul.tpls{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:14px}
+  .tpl{display:flex;gap:12px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
+  .tpl:first-child{border-top:0}
+  .tpl .ti{width:32px;height:32px;border-radius:10px;background:var(--p-soft);color:var(--p);display:grid;place-items:center;flex:0 0 auto}
+  .tpl .tw{flex:1;min-width:0}
+  .tpl .tn{font-weight:600;font-size:14.5px;overflow-wrap:anywhere}
+  .tpl .ts{font-size:13px;font-weight:500;margin-top:1px;overflow-wrap:anywhere}
+  .tpl .tp{font-size:12.5px;color:var(--soft);margin-top:1px;overflow-wrap:anywhere}
+  .tpl .tf{font-size:12px;color:var(--faint);margin-top:2px}
+  .tplmore{position:relative;flex:0 0 auto}
+  .tplmore>summary{list-style:none;cursor:pointer;width:36px;height:36px;display:grid;place-items:center;border-radius:999px;color:var(--soft)}
+  .tplmore>summary::-webkit-details-marker{display:none}
+  .tplmore>summary:hover,.tplmore[open]>summary{background:var(--p-soft);color:var(--p)}
+  .tplmenu{position:absolute;right:0;top:40px;z-index:3;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--dds-shadow-pop,0 12px 30px rgba(23,21,34,.18));padding:4px;display:flex;flex-direction:column;min-width:150px}
+  .tplmenu button{font:inherit;font-size:13.5px;text-align:left;border:0;background:none;color:var(--ink);padding:9px 10px;border-radius:8px;cursor:pointer}
+  .tplmenu button:hover{background:var(--bg)}
+  .tplmenu button.danger{color:var(--dds-bad,#bf3535)}
+  .tpl-empty{text-align:center;background:var(--dds-up,#f7f6fb);border-radius:14px;padding:26px 20px}
+  .tpl-empty .ei{width:44px;height:44px;border-radius:999px;background:var(--p-soft);color:var(--p);display:grid;place-items:center;margin:0 auto 10px}
+  .tpl-empty b{display:block;font-size:15.5px;margin-bottom:4px}
+  .tpl-empty p{color:var(--soft);font-size:13.5px;margin:0 auto;max-width:44ch}
+  .tpl-none{color:var(--soft);font-size:13.5px;padding:12px 2px}
+  .tpl-keep{background:var(--dds-up,#f7f6fb);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--soft);margin-top:12px;line-height:1.5;overflow-wrap:anywhere}
+  .tpl-keep b{color:var(--ink);font-weight:500}
+  .tpl-name{padding:0 18px}
+  .tpl-acts{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin:16px 18px 18px}
+  .tpl-acts button.primary,.tpl-acts button.ghost{border-radius:999px}
+  .wel{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,360px);gap:24px;border:1.5px solid color-mix(in srgb,var(--p) 55%,var(--line))}
+  .wel.off{border-color:var(--line)}
+  .wel-fail{margin-top:12px}
+  .wel-h{display:flex;align-items:center;gap:12px}
+  .wel-ic{width:38px;height:38px;border-radius:12px;background:var(--p);color:var(--dds-on-p,#fff);display:grid;place-items:center;flex:0 0 auto}
+  .wel.off .wel-ic{background:var(--line-strong);color:var(--soft)}
+  .wel-t{min-width:0}
+  .wel .wel-t h2{font-family:var(--serif);font-weight:500;font-size:21px}
+  .wel-t p{font-size:13px;color:var(--soft);margin:1px 0 0}
+  .wel-sw{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;flex:0 0 auto}
+  .wel-sw .on{color:var(--good)}
+  .wel-sw .offw{color:var(--soft)}
+  /* the switch, as Settings draws it */
+  .sw{position:relative;width:40px;height:22px;border-radius:999px;background:var(--dds-line-strong,#d2d2db);cursor:pointer;flex:0 0 auto;border:none;padding:0;transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+  .sw[aria-checked="true"]{background:var(--p)}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+  .sw[aria-checked="true"]::after{transform:translateX(18px)}
+  .sw:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  .sw:disabled{opacity:.5;cursor:default}
+  @media (prefers-reduced-motion:reduce){.sw,.sw::after{transition:none}}
+  @media (pointer:coarse){.wel-sw .sw{width:48px;height:28px}.wel-sw .sw::after{width:24px;height:24px}.wel-sw .sw[aria-checked="true"]::after{transform:translateX(20px)}}
+  .wel-how{font-size:14px;color:var(--soft);margin:12px 0 0;line-height:1.55;max-width:66ch;overflow-wrap:anywhere}
+  .wel-so{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;border-radius:999px;padding:6px 12px;margin:12px 0 0;background:var(--dds-up,#f7f6fb);color:var(--soft)}
+  .wel-so.good{background:var(--good-soft);color:var(--good)}
+  .wel-so.good::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 auto}
+  .wel-off{background:var(--dds-up,#f7f6fb);border-radius:10px;padding:10px 12px;font-size:13.5px;color:var(--soft);margin:12px 0 0}
+  .wel textarea{min-height:160px}
+  .wel-acts{margin-top:14px}
+  .wel-acts button.primary,.wel-acts button.ghost{border-radius:999px}
+  .wel-acts .linkish{margin-top:0}
+  .wel-by{font-size:12.5px;color:var(--faint);margin:10px 0 0;overflow-wrap:anywhere}
+  .wel-see{background:var(--dds-up,#f7f6fb);border-radius:14px;padding:14px;align-self:start}
+  .wel-seebtn{display:none}
+  .mail-band{height:5px;border-radius:4px;background:var(--p);margin:-2px 0 10px}
+  @media (max-width:960px){.wel{grid-template-columns:minmax(0,1fr);gap:16px}}
+  @media (max-width:760px){
+    .wel-see{padding:0;background:none}
+    .wel-seebtn{display:flex;align-items:center;justify-content:space-between;width:100%;font:inherit;font-size:14px;font-weight:600;color:var(--ink);background:var(--dds-up,#f7f6fb);border:0;border-radius:10px;padding:0 14px;min-height:44px;cursor:pointer}
+    .wel-seebtn[aria-expanded="true"] .car{transform:rotate(180deg)}
+    .wel-seebox{display:none;margin-top:10px}
+    .wel-seebox.open{display:block}
+    .wel-acts button.primary,.wel-acts button.ghost{height:44px}
+    .wel-so{border-radius:12px}
+    .tplbtn{height:40px}
+    dialog.tpldlg{width:100%}
+    .tpl{padding:12px}
+    .tpl .ti{display:none}
+  }
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:999px;font-size:14px;opacity:0;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none;z-index:20}
   .toast.show{opacity:1}
@@ -243,6 +322,10 @@ let SEG_OK=true,LIST_OK=true;   // per-read health — one read failing degrades
 let OPEN=null;      // the drilled-in broadcast id (accordion)
 const DETAILS={};   // per-id detail cache (GET /broadcasts/:id)
 let PV=null;        // C1: the composer's open Preview & send card — its draft id and the words it was built from
+let TPL={on:false,list:[],canManage:false};   // builder list item 221: the studio's templates (GET /agency/update-templates), on for a studio's team once 0221 is in
+let FROM_TPL='';    // the template the message was started from
+let WEL=null,WEL_FAIL=false,WEL_FORM=null,WEL_BUSY=false,WEL_SEE=false;   // builder list item 221: the welcome email card (GET /broadcasts/welcome); WEL_FORM holds words typed and not saved
+let SITE_ID='';     // this site, for the client a kept template came from (GET /identity, else ?client=)
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''),'x-region':FN_REGION});
@@ -276,14 +359,14 @@ function askConfirm(title, body, okLabel){
   });
 }
 // Small styled text prompt — matches askConfirm; resolves the trimmed string, or null on cancel/empty.
-function askPrompt(title, body, okLabel, placeholder){
+function askPrompt(title, body, okLabel, placeholder, value){
   return new Promise((resolve)=>{
     const dlg=document.createElement('dialog');
     dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
     const box=document.createElement('div'); box.style.cssText='padding:20px';
     const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
     if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
-    const inp=document.createElement('input'); inp.type='text'; inp.placeholder=placeholder||''; inp.maxLength=200;
+    const inp=document.createElement('input'); inp.type='text'; inp.placeholder=placeholder||''; inp.maxLength=200; inp.value=value||'';
     inp.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--bg,#faf8f5);color:inherit;font:inherit;font-size:14px'; box.appendChild(inp);
     const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
     const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
@@ -304,7 +387,6 @@ function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(is
 function segCount(k){const s=SEGMENTS.find(x=>x.key===k);return s?s.count:0;}
 
 const IC={
-  back:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M15 6l-6 6 6 6"/></svg>',
   users:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/></svg>',
   pen:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13 7l4 4"/></svg>',
   mail:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
@@ -315,10 +397,23 @@ const IC={
   spark:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></svg>',
   car:'<svg class="ic car" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
   tag:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:13px;height:13px"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/></svg>',
+  stack:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/></svg>',
+  bookmark:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
+  more:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
+  welcome:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:19px;height:19px"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/><path d="M18.5 1.8l.7 1.6 1.6.7-1.6.7-.7 1.6-.7-1.6-1.6-.7 1.6-.7z"/></svg>',
 };
+// builder item 202's name for the Inbox: inside a client it is their Messages (the client's name and
+// scope settle once the shell's context lands, so the trail follows it then too)
+const inboxName=()=>(window.ddsScopeInfo&&window.ddsScopeInfo())?'Messages':'Inbox';
+document.addEventListener('dds:context',()=>{const a=document.getElementById('trailInbox');if(a)a.textContent=inboxName();});
 function render(){
-  let h=`<nav class="crumbs" aria-label="Breadcrumb"><a href="/inbox.html">${IC.back}Inbox</a><span class="sep" aria-hidden="true">›</span><span aria-current="page">Send an update</span></nav>
-    <header><h1 id="pagehead" tabindex="-1">Send an update</h1><p class="sub">One email to many people. You see it before it goes, each person can unsubscribe, and nothing ever goes out on its own.</p></header>
+  // builder item 165: the one page header; it opens from the Inbox, so the trail names it as the menu
+  // does (builder item 202: inside a client that is their Messages). Write an update is its one filled
+  // action: it takes you to the message (Send stays with it).
+  let h=`<header class="dds-ph"><nav class="dds-ph-trail" aria-label="Where this page is"><a href="/inbox.html" id="trailInbox">${inboxName()}</a><span aria-hidden="true">›</span></nav>
+    <div class="dds-ph-row"><span class="dds-ph-ic" data-ic="update" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Send an update</h1></div><p class="dds-ph-line">One email to many people. You see it before it goes, each person can unsubscribe, and nothing ever goes out on its own.</p></div>
+      <div class="dds-ph-acts"><button type="button" class="primary dds-ph-fill" id="writeJump">Write an update</button></div></div></header>
     <div class="up">
     <section class="card up-who" aria-labelledby="whoH">
       <div class="card-h"><span class="cic" aria-hidden="true">${IC.users}</span><h2 id="whoH">Who gets it</h2></div>
@@ -327,8 +422,9 @@ function render(){
       ${lastLine()}
     </section>
     <section class="card up-write" aria-labelledby="writeH">
-      <div class="card-h"><span class="cic" aria-hidden="true">${IC.pen}</span><h2 id="writeH">Your message</h2></div>
+      <div class="card-h"><span class="cic" aria-hidden="true">${IC.pen}</span><h2 id="writeH">Your message</h2>${TPL.on?`<button type="button" class="tplbtn" id="tplOpen" aria-haspopup="dialog">${IC.stack}Templates${TPL.list.length?`<span class="n">${TPL.list.length}</span>`:''}</button>`:''}</div>
       ${FROM_POST?`<p class="frompost" role="status">${IC.mail}<span>Started from your post “${esc(FROM_POST)}”. Change anything you like before it goes.</span></p>`:''}
+      ${FROM_TPL&&!FROM_POST?`<p class="frompost" role="status">${IC.stack}<span>Started from your template “${esc(FROM_TPL)}”. Change anything you like before it goes.</span></p>`:''}
       <label for="subj">Subject</label>
       <input type="text" id="subj" maxlength="200" placeholder="A quick update from us" value="${esc(DRAFT&&DRAFT.subject||'')}">
       <label for="bodytx">Message</label>
@@ -342,7 +438,7 @@ function render(){
       </div>
       <div class="vars" role="group" aria-label="Add to your message"><button type="button" class="var" data-var="{{first_name}}">+ First name</button><button type="button" class="var" data-var="{{business_name}}">+ Business</button><button type="button" class="var" id="varBook">+ Booking link</button><button type="button" class="var" id="varImg" aria-haspopup="dialog">+ Image</button></div>
       <p class="varnote" id="varNote" role="status" hidden></p>
-      <div class="up-links"><button class="linkish" id="assist" type="button" title="Ask for a first draft you can edit">${IC.spark}Help me write it</button><button class="linkish" id="sendTest" type="button" title="Email this to yourself first — only you get it">${IC.mail}Send me a test</button></div>
+      <div class="up-links"><button class="linkish" id="assist" type="button" title="Ask for a first draft you can edit">${IC.spark}Help me write it</button><button class="linkish" id="sendTest" type="button" title="Email this to yourself first — only you get it">${IC.mail}Send me a test</button>${TPL.on&&TPL.canManage?`<button class="linkish" id="tplKeep" type="button" title="Keep the subject and words to start an update for any client">${IC.bookmark}Save as a template</button>`:''}</div>
       <div class="row up-acts">
         <button class="ghost" id="preview" type="button">Preview</button>
         <button class="ghost" id="schedule" type="button">Schedule</button>
@@ -357,12 +453,13 @@ function render(){
     </aside>
     </div>
     <div id="stage"></div>
+    <div id="welBox"></div>
     <div class="card">
       <div class="hh"><h2>Recent updates</h2><button class="lbtn" id="bcRefresh" type="button" aria-label="Refresh your updates" title="Refresh">${IC.refresh}</button></div>
       ${histMeta()}
       ${histBody()}
     </div>`;
-  $('main').innerHTML=h;PV=null;wire();   // the stage is rebuilt empty
+  $('main').innerHTML=h;PV=null;wire();paintWelcome();   // the stage is rebuilt empty
 }
 // Bold redesign (Nov 2026): the send button says how many it goes to, and the
 // last update sent sits under the lists (from the history this page reads).
@@ -480,11 +577,14 @@ function wire(){
   const bt=$('bodytx');if(bt)bt.addEventListener('focus',()=>{bt.dataset.caret='1';});
   const sc=$('schedule');if(sc)sc.addEventListener('click',()=>doPreview({scheduleFirst:true}).then(()=>{const w=$('when');if(w)w.focus();}));
   const tt=$('sendTest');if(tt)tt.addEventListener('click',doTest);
+  const to=$('tplOpen');if(to)to.addEventListener('click',openTemplates);   // builder list item 221
+  const tk=$('tplKeep');if(tk)tk.addEventListener('click',()=>keepTemplate(formWords(),tk));
   paintLive();
   document.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>cancelBc(b.getAttribute('data-cancel'))));
   document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>editDraft(b.getAttribute('data-edit'))));
   document.querySelectorAll('[data-resched]').forEach(b=>b.addEventListener('click',()=>reschedule(b.getAttribute('data-resched'))));
   document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>toggleRow(b.getAttribute('data-open'),b)));
+  const wj=$('writeJump');if(wj)wj.addEventListener('click',()=>{const s=$('subj');if(s){s.scrollIntoView({block:'center'});s.focus();}});
   const rf=$('bcRefresh');if(rf)rf.addEventListener('click',()=>load(true).then(()=>{const nr=$('bcRefresh');if(nr)nr.focus();}));
   // notice retries are SOFT — retrying ONE section must not let a transient
   // failure of the OTHER section tear down its last-good render (the ↻ contract)
@@ -524,7 +624,11 @@ async function loadDetail(id){
   }
   DETAILS[id]=r.body.data;paintDetail(box,id);
 }
-function paintDetail(box,id){const d=DETAILS[id];box.innerHTML=detailHtml(d);const f=box.querySelector('iframe');if(f)f.srcdoc=(d&&d.preview_html)||'';}
+function paintDetail(box,id){
+  const d=DETAILS[id];box.innerHTML=detailHtml(d);const f=box.querySelector('iframe');if(f)f.srcdoc=(d&&d.preview_html)||'';
+  // builder list item 221: a good update, kept to start one for any client
+  const k=box.querySelector('[data-keep]');if(k)k.addEventListener('click',()=>{const b=(d&&d.broadcast)||{};keepTemplate({subject:b.subject||'',body:b.body||''},k);});
+}
 // Item 69: "Opened by 3 of 10", and who. Shown once someone has opened it (an
 // update sent before the counter existed simply shows nothing).
 function opensHtml(e){
@@ -543,7 +647,8 @@ function detailHtml(d){
   // The API doesn't expose per-address failures — the honest line is the count.
   const failed=(b.status==='sent'&&b.failed_count)?`<p class="failnote">${b.failed_count} address${b.failed_count===1?'':'es'} couldn’t be reached — everyone else got it.</p>`:'';
   return `<div class="kv"><b>${esc(d.audience_label||'')}</b> · ${esc(counts)}</div>${failed}${opensHtml(b.status==='sent'?d.engagement:null)}
-    <div class="preview"><div class="subj">Subject: <b>${esc(d.preview_subject||b.subject||'')}</b></div><iframe title="${b.status==='sent'?'Email as delivered':'Email preview'}" sandbox=""></iframe></div>`;
+    <div class="preview"><div class="subj">Subject: <b>${esc(d.preview_subject||b.subject||'')}</b></div><iframe title="${b.status==='sent'?'Email as delivered':'Email preview'}" sandbox=""></iframe></div>
+    ${TPL.on&&TPL.canManage&&String(b.subject||'').trim()&&String(b.body||'').trim()?`<div class="acts"><button class="ghost sm" type="button" data-keep>${IC.bookmark}Keep as a template</button></div>`:''}`;
 }
 // ── "Drafts live again" (the L fix): a saved draft reopens INTO THE COMPOSER
 //    with DRAFT.id set, so the next preview PATCHes it instead of POSTing a twin.
@@ -840,6 +945,236 @@ async function cancelBc(id){
   toast('Canceled.');await load();
 }
 
+// ══ Builder list item 221 (Nov 2026, drawn in Figma and agreed) ══════════════════
+// Templates: a good update kept by the studio (agency/update_templates.ts), to start an update
+// for any client. Kept: the subject and the words with their fill-ins; a photo stays with the
+// client it came from. Shown only to a studio's team, once the database step is in.
+const shortDay=(iso)=>{const d=new Date(iso);return isFinite(d)?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';};
+function applyTemplates(r){
+  const b=r&&r.ok&&r.body;
+  if(b&&Array.isArray(b.data)){TPL={on:b.available!==false,list:b.data,canManage:!!b.can_manage};return;}
+  // not a studio's team (403), an older server (404), or an answer this page doesn't know: no templates
+  if(r&&(r.ok||r.status===401||r.status===403||r.status===404))TPL={on:false,list:[],canManage:false};
+  // a failed read keeps what it had
+}
+function updateTplCount(){
+  const b=$('tplOpen');if(!b)return;
+  let n=b.querySelector('.n');const c=TPL.list.length;
+  if(c&&!n){n=document.createElement('span');n.className='n';b.appendChild(n);}
+  if(n){if(c)n.textContent=String(c);else n.remove();}
+}
+function tplDialog(id){
+  let d=$(id);
+  if(!d){
+    d=document.createElement('dialog');d.id=id;d.className='imgdlg tpldlg';d.setAttribute('aria-labelledby',id+'H');document.body.appendChild(d);
+    d.addEventListener('click',(e)=>{if(e.target===d)d.close();});   // a tap outside the sheet closes it
+  }
+  return d;
+}
+async function openTemplates(){
+  const d=tplDialog('tplDlg');
+  d.onclose=()=>{const b=$('tplOpen');if(b)b.focus();};
+  let q='';
+  const rows=()=>TPL.list.filter(t=>!q||[t.name,t.subject,t.preview,t.from_name].join(' ').toLowerCase().includes(q));
+  const listHtml=()=>{
+    if(!TPL.list.length)return `<div class="tpl-empty"><span class="ei" aria-hidden="true">${IC.bookmark}</span><b>No templates yet</b><p>Write an update you like, then press Save as a template. It shows here on every client’s Send an update.</p></div>`;
+    const r=rows();
+    if(!r.length)return `<p class="tpl-none" role="status">No template matches that. Try fewer words.</p>`;
+    return `<ul class="tpls">${r.map(t=>`<li class="tpl"><span class="ti" aria-hidden="true">${IC.stack}</span><div class="tw"><div class="tn">${esc(t.name)}</div><div class="ts">${esc(t.subject)}</div>${t.preview?`<div class="tp">${esc(t.preview)}</div>`:''}<div class="tf">${esc('From '+(t.from_name||'a client')+(t.created_at?' · kept '+shortDay(t.created_at):''))}</div></div>
+      <button class="ghost sm" type="button" data-use="${esc(t.id)}" aria-label="Use ${esc(t.name)}">Use</button>
+      ${TPL.canManage?`<details class="tplmore"><summary aria-label="More for ${esc(t.name)}">${IC.more}</summary><div class="tplmenu"><button type="button" data-ren="${esc(t.id)}">Rename</button><button type="button" class="danger" data-del="${esc(t.id)}">Remove</button></div></details>`:''}</li>`).join('')}</ul>`;
+  };
+  const paintList=()=>{
+    const box=d.querySelector('#tplList');if(!box)return;box.innerHTML=listHtml();
+    box.querySelectorAll('[data-use]').forEach(b=>b.addEventListener('click',()=>useTemplate(b.getAttribute('data-use'))));
+    box.querySelectorAll('[data-ren]').forEach(b=>b.addEventListener('click',()=>{b.closest('details').open=false;renameTemplate(b.getAttribute('data-ren'),paintList);}));
+    box.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{b.closest('details').open=false;removeTemplate(b.getAttribute('data-del'),paintList);}));
+  };
+  d.innerHTML=`<div class="imgdlg-h"><h2 id="tplDlgH">Start from a template</h2><button type="button" class="imgdlg-x" aria-label="Close" data-x>×</button></div>
+    <p class="tpl-sub">Your studio’s templates. Pick one and its words come in here, for ${esc(BIZ||'this business')}. Change anything before it goes.</p>
+    ${TPL.list.length>3?`<input type="text" class="tpl-find" id="tplFind" placeholder="Find a template" aria-label="Find a template">`:''}
+    <div class="tpl-list" id="tplList"></div>
+    <p class="imgdlg-f">Templates belong to your studio, so every client can use them. First name, the business’s name and the booking link fill in for each client. Photos stay with the client they came from.</p>`;
+  d.querySelector('[data-x]').addEventListener('click',()=>d.close());
+  const fi=d.querySelector('#tplFind');if(fi)fi.addEventListener('input',()=>{q=fi.value.trim().toLowerCase();paintList();});
+  paintList();
+  if(!d.open)d.showModal();
+  const first=fi||d.querySelector('[data-use]')||d.querySelector('[data-x]');if(first)first.focus();
+}
+async function useTemplate(id){
+  const t=TPL.list.find(x=>x.id===id);
+  syncDraftFromForm();
+  const has=!!(DRAFT&&(String(DRAFT.subject||'').trim()||String(DRAFT.body||'').trim()));
+  if(has&&!(await askConfirm('Replace what you wrote?','The subject and message you have now go, and “'+(t?t.name:'the template')+'” comes in. Who it goes to stays as it is.','Use the template')))return;
+  const r=await api('/agency/update-templates/'+encodeURIComponent(id));
+  const g=r.ok&&r.body&&r.body.data;
+  if(!g){toast((r.body&&r.body.message)||'That template couldn’t open just now. Try again in a moment.');return;}
+  const d=$('tplDlg');if(d&&d.open){d.onclose=null;d.close();}
+  DRAFT={...(DRAFT||{}),subject:g.subject||'',body:g.body||''};FROM_TPL=g.name||'';FROM_POST='';
+  render();
+  const s=$('subj');if(s)s.focus();
+  toast('“'+(g.name||'The template')+'” is in. Change anything you like before it goes.');
+}
+async function renameTemplate(id,after){
+  const t=TPL.list.find(x=>x.id===id);if(!t)return;
+  const name=await askPrompt('Rename this template',null,'Rename','A name for it',t.name);
+  if(!name||name===t.name)return;
+  const r=await api('/agency/update-templates/'+encodeURIComponent(t.id),'PATCH',{name});
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save. Nothing was changed.');return;}
+  t.name=(r.body&&r.body.data&&r.body.data.name)||name;
+  if(after)after();toast('Renamed.');
+}
+async function removeTemplate(id,after){
+  const t=TPL.list.find(x=>x.id===id);if(!t)return;
+  if(!(await askConfirm('Remove this template?','“'+t.name+'” goes from your studio’s templates. Updates already sent stay as they are.','Remove')))return;
+  const r=await api('/agency/update-templates/'+encodeURIComponent(t.id),'DELETE');
+  if(!r.ok&&r.status!==404){toast((r.body&&r.body.message)||'That didn’t go through. Try again in a moment.');return;}
+  TPL.list=TPL.list.filter(x=>x.id!==id);
+  updateTplCount();if(after)after();toast('Removed.');
+}
+// Save as a template (the message being written) and Keep as a template (one already sent)
+async function keepTemplate(words,opener){
+  const subject=String(words.subject||'').trim(),body=String(words.body||'').trim();
+  if(!subject){toast('Add a subject line first.');return;}
+  if(!body){toast('Write your message first.');return;}
+  const photos=body.split('\n').filter(l=>IMG_LINE.test(l.trim())).length;
+  const d=tplDialog('keepDlg');
+  d.onclose=()=>{if(opener&&opener.isConnected)opener.focus();};
+  d.innerHTML=`<div class="imgdlg-h"><h2 id="keepDlgH">Keep this as a template</h2><button type="button" class="imgdlg-x" aria-label="Close" data-x>×</button></div>
+    <p class="tpl-sub">Your studio keeps the subject and the words, to start an update for any client.</p>
+    <div class="tpl-name"><label for="keepName">Name</label><input type="text" id="keepName" maxlength="80" value="${esc(subject.slice(0,80))}">
+    <div class="tpl-keep"><b>Subject: ${esc(subject)}</b><br>The words, the buttons and the booking link come along.${photos?` ${photos===1?'The photo stays':'The photos stay'} with ${esc(BIZ||'this business')}.`:''}</div></div>
+    <div class="tpl-acts"><button class="ghost" type="button" data-x>Cancel</button><button class="primary" type="button" id="keepGo">Keep template</button></div>`;
+  d.querySelectorAll('[data-x]').forEach(b=>b.addEventListener('click',()=>d.close()));
+  const go=d.querySelector('#keepGo'),nameIn=d.querySelector('#keepName');
+  const submit=async()=>{
+    const name=nameIn.value.trim();
+    if(!name){toast('Give the template a name.');nameIn.focus();return;}
+    go.disabled=true;
+    const r=await api('/agency/update-templates','POST',{site_id:SITE_ID||new URLSearchParams(location.search).get('client')||'',name,subject,body});
+    go.disabled=false;
+    const t=r.ok&&r.body&&r.body.data;
+    if(!t){toast((r.body&&r.body.message)||'That didn’t save. Nothing was kept.');return;}
+    TPL.list=[t,...TPL.list.filter(x=>x.id!==t.id)];updateTplCount();
+    d.close();
+    toast((r.body.photos_left?'Kept as “'+t.name+'”. '+(r.body.photos_left===1?'Its photo stays':'Its photos stay')+' with '+(BIZ||'this business')+'.':'Kept as “'+t.name+'”. It’s in Templates on every client.'));
+  };
+  go.addEventListener('click',submit);
+  nameIn.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();submit();}});
+  if(!d.open)d.showModal();
+  nameIn.focus();nameIn.select();
+}
+
+// The welcome email (routes/list_welcome.ts): one email from the business to each person who
+// joins the list on the website, right after they press "Yes, add me". On from the start in
+// standard words; the switch saves as it flips, the words when Save is pressed. A role that
+// can't change settings never sees the card (data-needs, as on Settings).
+function applyWelcome(r){
+  const d=r&&r.ok&&r.body&&r.body.data;
+  if(d&&typeof d.enabled==='boolean'){WEL=d;WEL_FAIL=false;return;}
+  // an older server has no such route (the page can go live first), and an answer it doesn't know reads the same: no card
+  if(r&&(r.ok||r.status===401||r.status===403||r.status===404)){WEL=null;WEL_FAIL=false;return;}
+  if(!WEL)WEL_FAIL=true;   // a failed read keeps the card it had
+}
+const welSaved=()=>({subject:(WEL&&WEL.words&&WEL.words.subject)||'',body:(WEL&&WEL.words&&WEL.words.body)||''});
+const welWords=()=>WEL_FORM||welSaved();
+function paintWelcome(){
+  const box=$('welBox');if(!box)return;
+  if(WEL_FAIL){
+    box.innerHTML=`<section class="card" id="welcome" aria-labelledby="welH" data-needs="configure"><div class="card-h"><span class="cic" aria-hidden="true">${IC.mail}</span><h2 id="welH">Welcome email</h2></div><div class="notice wel-fail"><span>Your welcome email couldn’t load just now.</span> <button class="ghost sm" id="welRetry" type="button">Try again</button></div></section>`;
+    $('welRetry').addEventListener('click',async()=>{applyWelcome(await api('/broadcasts/welcome').catch(()=>({ok:false,status:0,body:{}})));paintWelcome();});
+    return;
+  }
+  if(!WEL){box.innerHTML='';return;}
+  const w=WEL,on=!!w.enabled,words=welWords(),std=w.standard||{};
+  const isStd=words.subject.trim()===String(std.subject||'')&&words.body.trim()===String(std.body||'');
+  const so=!on?`<p class="wel-off" id="welSo">Off. People who join your list get no welcome email. The words below wait here until you switch it on.</p>`
+    :w.sent>0?`<p class="wel-so good" id="welSo">Sent to ${w.sent} ${w.sent===1?'person':'people'} so far${w.last_sent_at?' · the last one '+esc(when(w.last_sent_at)):''}</p>`
+    :`<p class="wel-so" id="welSo">Nobody has joined since it was switched on. The first person who does gets it.</p>`;
+  const by=w.updated_at&&w.updated_by?`Saved ${esc(shortDay(w.updated_at))} by ${esc(w.updated_by)}.${!w.subject&&!w.body?' These are the standard words.':''}`:'Standard words until someone changes them.';
+  box.innerHTML=`<section class="card wel${on?'':' off'}" id="welcome" aria-labelledby="welH" data-needs="configure">
+    <div class="wel-words">
+      <div class="wel-h"><span class="wel-ic" aria-hidden="true">${IC.welcome}</span>
+        <div class="wel-t"><h2 id="welH">Welcome email</h2><p>Goes by itself to each new person on your list</p></div>
+        <span class="wel-sw"><span class="${on?'on':'offw'}" aria-hidden="true">${on?'On':'Off'}</span><button type="button" class="sw" role="switch" id="welSw" aria-checked="${on?'true':'false'}" aria-label="Send the welcome email"></button></span></div>
+      <p class="wel-how">Someone who joins your list on your website gets this right after they press Yes, add me. It comes from <b id="welBiz">${esc(BIZ||'your business')}</b>, and ${w.reply_to?`their replies go to ${esc(w.reply_to)}`:'their replies come to your Inbox'}.</p>
+      ${so}
+      <label for="welSubj">Subject</label><input type="text" id="welSubj" maxlength="${Number(w.subject_max)||200}" value="${esc(words.subject)}">
+      <label for="welBody">Message</label><textarea id="welBody" maxlength="${Number(w.body_max)||4000}">${esc(words.body)}</textarea>
+      <div class="vars" role="group" aria-label="Add to the welcome email"><button type="button" class="var" data-wvar="{{first_name}}">+ First name</button><button type="button" class="var" data-wvar="{{business_name}}">+ Business</button><button type="button" class="var" id="welBook">+ Booking link</button></div>
+      <p class="varnote" id="welNote" role="status" hidden></p>
+      <div class="row wel-acts"><button class="primary" id="welSave" type="button">Save the words</button><button class="ghost" id="welTest" type="button">Send me a test</button>${isStd?'':'<button class="linkish" id="welStd" type="button">Use the standard words</button>'}</div>
+      <p class="wel-by">${by}</p>
+    </div>
+    <aside class="wel-see" aria-label="What they get">
+      <button type="button" class="wel-seebtn" id="welSeeBtn" aria-expanded="${WEL_SEE?'true':'false'}" aria-controls="welSeeBox">See what they get ${IC.car}</button>
+      <div class="wel-seebox${WEL_SEE?' open':''}" id="welSeeBox">
+        <p class="eyebrow">What they get</p>
+        <div class="mail" id="welPv" aria-live="off"></div>
+        <p class="pvnote">Their first name is filled in when they gave one. Most people join with only an email, so it reads “Hi there”.</p>
+      </div>
+    </aside>
+  </section>`;
+  wireWelcome();
+}
+function paintWelPv(){
+  const host=$('welPv');if(!host)return;
+  const s=(($('welSubj')&&$('welSubj').value)||'').trim(),b=(($('welBody')&&$('welBody').value)||'').trim();
+  host.innerHTML=`<div class="mail-band" aria-hidden="true"></div><div class="mail-from"><span class="mail-mark" aria-hidden="true"></span>${esc(BIZ||'Your business')}</div>
+    <div class="mail-subj">${s?esc(fillTokens(s)):'<span class="mail-ph">Your subject</span>'}</div>
+    <div class="mail-body">${b?liveBody(fillTokens(b)):'<p class="mail-ph">Your welcome shows here as you write it.</p>'}</div>
+    <div class="mail-foot">${esc(BIZ||'Your business')} · Don’t want these emails? <u>Unsubscribe</u></div>`;
+}
+function insertWel(text,line){
+  const t=$('welBody');if(!t)return;
+  const a=t.selectionStart||0,b=t.selectionEnd||0;
+  // a line of its own (the Book a time button) goes after the line the cursor is on
+  if(line){const nl=t.value.indexOf('\n',b),at=nl<0?t.value.length:nl;const before=t.value.slice(0,at),after=t.value.slice(at);const pre=before&&!before.endsWith('\n')?'\n':'';t.value=before+pre+text+after;t.selectionStart=t.selectionEnd=(before+pre+text).length;}
+  else{t.value=t.value.slice(0,a)+text+t.value.slice(b);t.selectionStart=t.selectionEnd=a+text.length;}
+  t.focus();t.dispatchEvent(new Event('input',{bubbles:true}));
+}
+function welBusy(on){['welSw','welSave','welTest','welStd'].forEach((id)=>{const b=$(id);if(b)b.disabled=on;});}
+function wireWelcome(){
+  const sw=$('welSw'),s=$('welSubj'),b=$('welBody');
+  if(sw)sw.addEventListener('click',()=>saveWelcome({enabled:sw.getAttribute('aria-checked')!=='true'},'switch'));
+  const typed=()=>{WEL_FORM={subject:s.value,body:b.value};paintWelPv();};
+  if(s)s.addEventListener('input',typed);if(b)b.addEventListener('input',typed);
+  document.querySelectorAll('[data-wvar]').forEach(x=>{x.addEventListener('mousedown',(e)=>e.preventDefault());x.addEventListener('click',()=>insertWel(x.getAttribute('data-wvar')));});
+  const bk=$('welBook');if(bk){bk.addEventListener('mousedown',(e)=>e.preventDefault());bk.addEventListener('click',async()=>{
+    await ID_READY;
+    const note=$('welNote');
+    if(!BOOK_URL){if(note){note.innerHTML='Add your booking link first: it’s the <b>Reservation link</b> in <a href="/presence.html#business">Your website › Business</a>. Then the email gets a “Book a time” button.';note.hidden=false;}return;}
+    if(note)note.hidden=true;
+    insertWel('{{booking_link}}',true);
+  });}
+  const sv=$('welSave');if(sv)sv.addEventListener('click',()=>saveWelcome({subject:s.value,body:b.value},'words'));
+  const tt=$('welTest');if(tt)tt.addEventListener('click',testWelcome);
+  const st=$('welStd');if(st)st.addEventListener('click',async()=>{
+    if(!(await askConfirm('Use the standard words?','Your own words here go, and the standard welcome comes back. You can change it again any time.','Use the standard words')))return;
+    saveWelcome({standard:true},'standard');
+  });
+  const sb=$('welSeeBtn');if(sb)sb.addEventListener('click',()=>{WEL_SEE=!WEL_SEE;sb.setAttribute('aria-expanded',WEL_SEE?'true':'false');$('welSeeBox').classList.toggle('open',WEL_SEE);});
+  paintWelPv();
+}
+async function saveWelcome(patch,kind){
+  if(WEL_BUSY)return;WEL_BUSY=true;welBusy(true);
+  const r=await api('/broadcasts/welcome','PUT',patch);
+  WEL_BUSY=false;
+  if(!r.ok||!r.body||!r.body.data){welBusy(false);toast((r.body&&r.body.message)||'That didn’t save. Nothing was changed.');return;}
+  WEL=r.body.data;if(kind!=='switch')WEL_FORM=null;   // the switch keeps words still being written
+  paintWelcome();
+  const f=kind==='switch'?$('welSw'):kind==='words'?$('welSave'):$('welSubj');if(f)f.focus();
+  toast(kind==='words'?'Saved. The next person who joins gets these words.':kind==='standard'?'The standard words are back.':WEL.enabled?'On. Each new person on your list gets it.':'Off. New people on your list get no welcome email.');
+}
+async function testWelcome(){
+  if(WEL_BUSY)return;WEL_BUSY=true;welBusy(true);
+  const words={subject:(($('welSubj')&&$('welSubj').value)||'').trim(),body:(($('welBody')&&$('welBody').value)||'').trim()};
+  const r=await api('/broadcasts/welcome/test','POST',words);
+  WEL_BUSY=false;welBusy(false);
+  if(r.ok){const to=r.body&&r.body.data&&r.body.data.sent_to;toast(to?`A test went to ${to}, marked [Test], with the words as they are now.`:'A test went to you, marked [Test].');return;}
+  toast((r.body&&r.body.message)||'The test didn’t send. Try again in a moment.');
+}
+
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to send an update.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 // Try again retries load() IN PLACE — never location.reload() (the leads.html contract).
 function trouble(m){$('main').innerHTML=`<div class="center"><h2>${esc(m||'We couldn’t load this just now.')}</h2><p class="muted" style="margin-bottom:16px">It’s probably a brief hiccup.</p><button id="retry" class="primary" type="button">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>load());}
@@ -851,11 +1186,14 @@ function trouble(m){$('main').innerHTML=`<div class="center"><h2>${esc(m||'We co
 // render and toasts — the error surfaces are for the initial load only.
 async function load(soft){
   const gen=++REQ_SEQ;
-  const [seg,list]=await Promise.all([
+  const [seg,list,wel,tpl]=await Promise.all([
     api('/broadcasts/segments').catch(()=>({ok:false,status:0,body:{}})),
     api('/broadcasts').catch(()=>({ok:false,status:0,body:{}})),
+    api('/broadcasts/welcome').catch(()=>({ok:false,status:0,body:{}})),   // builder list item 221: best-effort, each says so on its own
+    api('/agency/update-templates').catch(()=>({ok:false,status:0,body:{}})),
   ]);
   if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
+  applyWelcome(wel);applyTemplates(tpl);
   if(seg.status===403||list.status===403){$('main').innerHTML=`<div class="center"><h2>Sending updates lives in your studio workspace.</h2></div>`;return;}
   if(!seg.ok&&!list.ok){if(soft)return void toast('Couldn’t refresh just now.');trouble();return;}
   if(soft&&(!seg.ok||!list.ok))toast('Couldn’t refresh just now.');
@@ -879,7 +1217,7 @@ async function load(soft){
   render();
 }
 (async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}
-  ID_READY=api('/identity').then((r)=>{const d=r&&r.ok&&r.body&&r.body.data;if(!d)return;if(d.business_name)BIZ=String(d.business_name);const u=String(d.booking_url||'').trim();BOOK_URL=/^https:\/\/\S+$/i.test(u)?u:'';paintLive();}).catch(()=>{});   // best-effort: the live preview signs with it
+  ID_READY=api('/identity').then((r)=>{const d=r&&r.ok&&r.body&&r.body.data;if(!d)return;if(d.business_name)BIZ=String(d.business_name);if(d.site_id)SITE_ID=String(d.site_id);const u=String(d.booking_url||'').trim();BOOK_URL=/^https:\/\/\S+$/i.test(u)?u:'';paintLive();const wb=$('welBiz');if(wb)wb.textContent=BIZ||'your business';paintWelPv();}).catch(()=>{});   // best-effort: the live preview signs with it
   await load();await takePost();takePhoto();}catch(_){trouble();}})();
 </script>
 </body>

@@ -51,6 +51,23 @@ const CAPS: Record<AgencyRole, Capability[]> = {
 
 export const can = (role: AgencyRole, cap: Capability): boolean => (CAPS[role] || []).includes(cap);
 
+// ── Builder item 220: each studio role in one sentence ──────────────────────
+// What a person on the studio's own team sees, from the table above and lib/scope.ts
+// (only bulk_publish opens a client). `sees` is for the studio's Team card (settings.html
+// keeps a copy, held equal by tests/presence/designer_role_test.mjs); `you` is for the
+// invite email. A studio Designer opens a client's site only through a Designer seat on
+// that site (lib/scope.ts falls back to the person's own seats).
+export const STUDIO_ROLE_WORDS: Record<AgencyRole, { name: string; sees: string; you: string }> = {
+  owner: { name: 'Owner', sees: 'Sees everything: every client, the team, the brand and your plan.', you: 'You see everything: every client, the team, the brand and the plan.' },
+  admin: { name: 'Admin', sees: 'Opens every client and runs the team and the brand; only the owner sees your plan.', you: 'You open every client and run the team and the brand; the plan stays with the owner.' },
+  account_manager: { name: 'Account manager', sees: 'Opens every client to work on their site, records and messages, and publishes; can’t change the team or the brand.', you: 'You open every client to work on their site, records and messages, and publish; the team and the brand stay with the owners.' },
+  content_strategist: { name: 'Content strategist', sees: 'Sees your client list, notes and what’s waiting, and prepares changes for approval; can’t open a client.', you: 'You see the client list, notes and what’s waiting, and prepare changes for approval.' },
+  designer: { name: 'Designer', sees: 'Sees your client list and notes, and works only on the sites you add them to as Designer.', you: 'You see the client list and notes, and work on the sites the studio adds you to as Designer.' },
+  developer: { name: 'Developer', sees: 'Sees your client list and notes, and prepares add-ons for approval; can’t open a client.', you: 'You see the client list and notes, and prepare add-ons for approval.' },
+  support: { name: 'Support', sees: 'Sees your client list and leaves notes; can’t open a client or change anything.', you: 'You see the client list and leave notes.' },
+  readonly: { name: 'Read only', sees: 'Sees your client list and nothing else.', you: 'You see the client list.' },
+};
+
 /** Resolve an authenticated JWT to an active agency membership. Fail-closed. */
 export async function resolveAgencyMember(jwt: string): Promise<AgencyMember | null> {
   if (!jwt) return null;

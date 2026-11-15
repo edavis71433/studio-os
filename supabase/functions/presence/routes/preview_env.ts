@@ -7,7 +7,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { runPipeline } from './publish.ts';
-import { writeChangeEvent } from '../lib/provenance.ts';
+import { writeChangeEvent, draftChangesOnly } from '../lib/provenance.ts';
 import { PUBLISH_BLOCKED_STATES, publishRefusal } from '../lib/lifecycle.ts';
 import { captureDraftSnapshot, loadStagedSnapshot } from '../lib/staging.ts';
 import { renderSnapshot } from '../lib/render.ts';
@@ -36,7 +36,7 @@ async function previewRow(siteId: string) {
 async function draftChangeCount(siteId: string): Promise<number> {
   const last = await svc(`presence_publishes?site_id=eq.${siteId}&status=eq.live&select=created_at&order=created_at.desc&limit=1`);
   const since = last.json?.[0]?.created_at;
-  const ev = await svc(`presence_change_events?site_id=eq.${siteId}${since ? `&created_at=gt.${encodeURIComponent(since)}` : ''}&select=id&limit=500`);
+  const ev = await svc(`presence_change_events?site_id=eq.${siteId}${since ? `&created_at=gt.${encodeURIComponent(since)}` : ''}&${draftChangesOnly()}&select=id&limit=500`);   // item 239: updating the preview isn't a draft change
   return Array.isArray(ev.json) ? ev.json.length : 0;
 }
 async function lastLive(siteId: string) {

@@ -1,5 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // The fixtures' dates are fixed in 2026, so the clock is too: from January a page adds the
 // year to them, and the checks below say "Nov 9" (builder item 108).
@@ -70,7 +71,7 @@ test.describe('Sites: who owns each site (builder item 53)', () => {
     await expect(page.getByRole('dialog', { name: 'People' })).toBeVisible();
     const sheet = page.locator('#dds-people');   // its name follows its heading, which changes with the view
     await expect(sheet.locator('.pp-head .sub')).toHaveText('Maple & Main Realty · maple.example');
-    await expect(sheet.locator('.pp-note')).toHaveText('Sam Reyes owns this site. Your studio works on it as Website manager. People on Sam’s side each get their own sign-in, with a role.');
+    await expect(sheet.locator('.pp-note')).toHaveText('Sam Reyes owns this site. Your studio works on it as Website manager. Each person below sees only what their role says.');   // builder item 220
     await expect(sheet.locator('[data-owner]')).toContainText('Hasn’t signed in yet');
     await expect(sheet.getByRole('combobox', { name: 'Role for dana@maple.example' })).toHaveValue('business_staff');
     await sheet.getByRole('button', { name: '+ Invite someone' }).click();
@@ -119,6 +120,7 @@ test.describe('Sites: who owns each site (builder item 53)', () => {
 
   test('the table: Owner and People columns, the studio’s role said once, People opens the sheet', async ({ page }) => {
     await openSites(page);
+    await headerAction(page, '#dispTable');   // builder item 165: on a phone the switch waits behind the header's ⋯, which this opens
     await page.getByRole('button', { name: 'Table' }).click();
     const table = page.locator('#tableHost');
     await expect(table.locator('.trole')).toHaveText('You are Website manager on all 3 sites. Each business owns its own site.');

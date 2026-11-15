@@ -41,9 +41,9 @@ test.describe('Templates (builder list item 166)', () => {
     page.on('pageerror', (e) => errors.push(String(e)));
     await openTemplates(page);
     await expect(page.getByRole('heading', { level: 1, name: 'Templates' })).toBeVisible();
-    await expect(page.locator('.lmeta')).toHaveText('1 template · 1 starter kit · newest first');
-    await expect(page.locator('.tabs a')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage', 'Changes']);   // items 210 and 215: the Usage and Changes tabs
-    await expect(page.locator('.tabs a[aria-current="page"]')).toHaveText('Templates');
+    await expect(page.locator('#phLine')).toHaveText('1 template · 1 starter kit · newest first');   // builder item 165: the header's line
+    await expect(page.locator('.dds-ph-tabs a')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage', 'Changes']);   // items 210 and 215: the Usage and Changes tabs
+    await expect(page.locator('.dds-ph-tabs a[aria-current="page"]')).toHaveText('Templates');
     const rows = page.locator('.krow');
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0).locator('.kchip')).toHaveText('Template');

@@ -25,27 +25,14 @@
   .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
-  /* ── the list-view header (agency.html's .lhead anatomy) + the Sites · Domains tabs ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
-  .lrow1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  /* the title starts at its own width (Nov 11 2026): plain flex:1 started it at 0, so on a phone and just past 760px
-     the buttons took its room and "Sites" was drawn over the Cards/Table switch; a button that doesn't fit now moves down */
-  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1 1 auto;min-width:0}
+  /* ── the list view's buttons (the header itself is shell.css's .dds-ph, builder item 165) ── */
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;min-height:36px}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
-  /* + New site (Nov 9 2026): on a phone the row can't hold it beside the title, which then shrank under the switch; it takes a row of its own */
-  @media (max-width:640px){#newSiteBtn{flex-basis:100%;justify-content:center;margin-left:0}}
+  /* builder item 165: the header is the shared one (shell.css .dds-ph); on a phone + New site takes a row of its own there */
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
   .seg button{border:none;border-radius:0;padding:6px var(--dds-s3,12px);font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer;min-height:36px}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
-  .tabs{display:flex;gap:var(--dds-s1,4px);margin-top:10px;border-top:1px solid var(--line);padding-top:var(--dds-s2,8px);overflow-x:auto;scrollbar-width:none}   /* item 215: five tabs slide on a phone, never widen the page */
-  .tabs::-webkit-scrollbar{display:none}
-  .tabs a{white-space:nowrap}
-  .tabs a{font-size:13.5px;font-weight:600;color:var(--soft);text-decoration:none;padding:6px var(--dds-s3,12px);border-radius:var(--dds-r,8px)}
-  .tabs a:hover{color:var(--p);background:var(--p-soft)}
-  .tabs a[aria-current="page"]{color:var(--p);background:var(--p-soft)}
   .search{width:100%;font-family:inherit;font-size:14.5px;padding:var(--dds-s3,12px) var(--dds-s4,16px);border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink);margin-bottom:var(--dds-s4,16px)}
   .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
   .notice{font-size:12.5px;color:var(--faint);margin:-6px 0 var(--dds-s3,12px)}
@@ -500,7 +487,7 @@
 
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script src="/sites-tools.js?v=176b"></script>
-<script src="/people.js?v=191"></script>
+<script src="/people.js?v=220"></script>
 <script>
 // ── Sites (builder list items 43 and 45, Nov 2026) ───────────────────────────
 // Every client's website, the way Squarespace's dashboard and Wix's Sites table
@@ -786,22 +773,37 @@ function ordered(){
   return list;
 }
 
+// Builder item 165 (Figma 295:16): the one page header — the Sites icon in its tile, the title,
+// one line with the real counts, the other actions (behind ⋯ on a phone), + New site the one
+// filled action, and the tabs under it. The sort and freshness line stays, under the header.
+function headLine(){
+  const n=SITES.length,needs=SITES.filter(FILTERS.needs.test).length;
+  return `${n} site${n===1?'':'s'} you look after${needs?` · ${needs} need${needs===1?'s':''} you`:''}`;
+}
 function headHtml(shown){
-  return `<header class="lhead">
-    <div class="lrow1">
-      <span class="obj-ic" aria-hidden="true">🌐</span>
-      <h1 id="pagehead" tabindex="-1">Sites</h1>
-      <div class="seg" role="group" aria-label="Display as">
-        <button type="button" id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
-        <button type="button" id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
+  return `<header class="dds-ph">
+    <div class="dds-ph-row">
+      <span class="dds-ph-ic" data-ic="sites" aria-hidden="true"></span>
+      <div class="dds-ph-tt">
+        <div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Sites</h1></div>
+        <p class="dds-ph-line" id="phLine">${esc(headLine())}</p>
       </div>
-      <a class="sbtn" id="weekBtn" href="/week.html">Plan my week</a>
-      <button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
-      ${META.can_create?'<button type="button" class="btn" id="newSiteBtn" style="margin-left:auto">+ New site</button>':''}
+      <div class="dds-ph-acts">
+        <button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
+        <div class="dds-ph-more" id="phMore" popover>
+          <div class="seg" role="group" aria-label="Display as">
+            <button type="button" id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
+            <button type="button" id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
+          </div>
+          <a class="sbtn" id="weekBtn" href="/week.html">Plan my week</a>
+          <button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻<span class="dds-ph-say" aria-hidden="true">Refresh</span></button>
+        </div>
+        ${META.can_create?'<button type="button" class="btn primary dds-ph-fill" id="newSiteBtn">+ New site</button>':''}
+      </div>
     </div>
-    <div class="lmeta" id="lmeta">${lmetaText(shown)}</div>
-    <nav class="tabs" aria-label="Sites, domains, templates, usage and changes"><a href="/sites.html" aria-current="page">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html">Templates</a><a href="/usage.html">Usage</a><a href="/changes.html">Changes</a></nav>
-  </header>`;
+    <nav class="dds-ph-tabs" aria-label="Sites, domains, templates, usage and changes"><a href="/sites.html" aria-current="page">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html">Templates</a><a href="/usage.html">Usage</a><a href="/changes.html">Changes</a></nav>
+  </header>
+  <div class="lmeta" id="lmeta">${lmetaText(shown)}</div>`;
 }
 // the band: the facts the server already knows, across every site; each number filters the cards
 function bandHtml(){

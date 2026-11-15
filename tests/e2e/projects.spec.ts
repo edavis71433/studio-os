@@ -4,7 +4,7 @@ import { installApp } from './helpers/app';
 import { settled } from './helpers/app';
 
 // Projects as a Lightning surface (redesign slice 9): the roster is a list view
-// on the shared .lhead anatomy (📁 icon + #pagehead + refresh + meta) with the
+// on the one page header (builder item 165: icon + #pagehead + refresh + line) with the
 // existing status filter chips and a sortable table (Project / Customer /
 // Status / Progress / Target / Open approvals) — Progress + approvals fed by
 // the EXISTING per-project /report route, customer names by /studio/customers,
@@ -143,19 +143,19 @@ const pinTable = (page: import('@playwright/test').Page) =>
   page.addInitScript(() => { try { if (!localStorage.getItem('dds-display:projects')) localStorage.setItem('dds-display:projects', 'table'); } catch { /* denied */ } });
 
 test.describe('Projects list view', () => {
-  test('renders the shared .lhead header + sortable table; report/customer enrichment fills in, unknown stays "—"', async ({ page }) => {
+  test('renders the one page header + sortable table; report/customer enrichment fills in, unknown stays "—"', async ({ page }) => {
     await pinTable(page);
     await installApp(page, { api: API });
     await routeP3Report404(page);
     await page.goto('/projects.html');
     // header: 📁 object icon + H1 focus target + refresh + meta
-    await expect(page.locator('.lhead .obj-ic')).toHaveText('📁');
+    await expect(page.locator('header.dds-ph .dds-ph-ic[data-ic="projects"]')).toBeVisible();   // builder item 165: the one page header
     await expect(page.locator('#pagehead')).toHaveText('Projects');
     // bold redesign: the line under the title is the studio at a glance (p1's
     // two open approvals put it with a client; its Aug 1 target has passed)
-    await expect(page.locator('.lmeta')).toContainText('2 running');
-    await expect(page.locator('.lmeta')).toContainText('1 waiting on them');
-    await expect(page.locator('.lmeta')).toContainText('1 late');
+    await expect(page.locator('#phLine')).toContainText('2 running');
+    await expect(page.locator('#phLine')).toContainText('1 waiting on them');
+    await expect(page.locator('#phLine')).toContainText('1 late');
     await expect(page.locator('.lmeta')).toContainText('Updated just now');
     // the chips (SS6: an honest role=group, All pressed) carry their counts, and
     // an empty one steps aside
@@ -193,7 +193,8 @@ test.describe('Projects list view', () => {
     // a different column starts ascending
     await page.locator('[data-sort="status"]').click();
     await expect(page.locator('th[aria-sort="ascending"]')).toContainText('Status');
-    // refresh with focus-return (the .lhead contract)
+    // refresh with focus-return (on a phone ↻ waits behind the header's ⋯, builder item 165)
+    if (await page.locator('.dds-ph-dots').isVisible()) await page.locator('.dds-ph-dots').click();
     await page.locator('#refreshBtn').click();
     await expect(page.locator('#refreshBtn')).toBeFocused();
     await expect(page.locator('tbody tr')).toHaveCount(3);
@@ -344,6 +345,7 @@ test.describe('Projects list view', () => {
     await page.locator('#q').fill('acme website');
     await expect(page.locator('tbody tr')).toHaveCount(1);
     const before = reportCalls.length;
+    if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone it waits behind ⋯
     await page.locator('#refreshBtn').click();                // reload with the search active
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect.poll(() => reportCalls.length).toBeGreaterThan(before);
@@ -393,6 +395,7 @@ test.describe('Projects list view', () => {
     // project-name button — Enter opens the record (no tr tabindex hack)
     await page.locator('.crumbs .crumb').click();
     await expect(page.locator('#listWrap')).toBeVisible();
+    if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone it waits behind ⋯
     await page.locator('#dispTable').click();
     const rowBtn = page.locator('tbody tr[data-id="p1"] .rowlink');
     await expect(rowBtn).toHaveText('Acme website build');
@@ -410,6 +413,7 @@ test.describe('Projects list view', () => {
     await expect(page.locator('.tscroll')).toHaveCount(0);
     await expect(page.locator('#dispBoard')).toHaveAttribute('aria-pressed', 'true');
     // switching to Table sticks across a reload
+    if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone it waits behind ⋯
     await page.locator('#dispTable').click();
     await expect(page.locator('tbody tr')).toHaveCount(3);
     await page.goto('/projects.html');
@@ -1055,7 +1059,7 @@ test.describe('Projects — a client context lists that client’s projects', ()
     await page.locator('.crumbs .crumb').click();
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect(page.locator('tbody tr[data-id="p1"]')).toBeVisible();
-    await expect(page.locator('.lmeta')).toContainText('For Acme Bakery');
+    await expect(page.locator('#phLine')).toContainText('For Acme Bakery');
     await expect(page.getByRole('button', { name: 'New project' })).toHaveCount(0);
   });
 

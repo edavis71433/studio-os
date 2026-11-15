@@ -76,10 +76,30 @@ function reviewerNav(): NavSection[] {
   ] }];
 }
 
+/** Builder item 220: a Designer's whole menu is the website they work on, its files
+ *  and Help. No Home, Inbox, Customers, Pipeline, Invoices, Projects, Analytics or
+ *  Settings: index.ts refuses every one of them to a Designer, so none is listed,
+ *  not even as a search entry. Publish and Versions only for a seat that may publish. */
+function designerNav(c: NavContext): NavSection[] {
+  const hid = (key: string, label: string, href: string, desc?: string): NavItem => ({ key, label, href, desc, hidden: true });
+  const sections: NavSection[] = [];
+  if (flagsOf(c).hasWebsite) {
+    const site: NavItem[] = [{ key: 'content', label: 'Website', href: '/presence.html', desc: 'The website you work on: its pages, styles and photos.' }];
+    if (c.edition !== 'monitor') site.push(hid('design', 'Edit site', '/presence.html#design'), hid('add_page', 'Add a page', '/presence.html#addpage', 'A new page on the site — pick a layout or start blank.'));
+    if (canPublish(c)) site.push(hid('publish', 'Publish', '/presence.html#publish', 'Publish now, or schedule it to go live on its own — and see or cancel what’s scheduled.'));
+    site.push(hid('history', 'Versions', '/presence.html#history'));
+    sections.push({ key: 'website', label: 'Website', items: site });
+    sections.push({ key: 'files', label: 'Files', items: [{ key: 'files_all', label: 'Files', href: '/files.html' }] });   // no Visual Studio: keeping an AI image is an approval
+  }
+  sections.push({ key: 'help', label: 'Help', items: [hid('help', 'Help', '/help.html')], utility: true });
+  return sections;
+}
+
 /** Build the visible navigation for a caller. Empty sections are dropped, so
  *  every edition/role feels intentionally designed. */
 export function buildNav(c: NavContext): NavSection[] {
   if (c.role === 'client_reviewer') return reviewerNav();
+  if (c.role === 'designer') return designerNav(c);   // builder item 220
   // A converted/bridged customer owns their own site (role = business_owner) but is
   // the studio's CLIENT — they get the calm client surface, never the operator
   // workspace (no "Customers"/CRM, no "build your site" prompts). Same one surface
@@ -306,7 +326,7 @@ export function buildNav(c: NavContext): NavSection[] {
   // sales item 83: ⌘K "deleted", "restore" or "trash" finds the one place deleted deals, contacts and to-dos wait
   if (studioLevel && f.hasRelationship) settings.push(hid('deleted', 'Recently deleted', '/recently-deleted.html', 'Deals, contacts and to-dos deleted in the last 30 days, each with Restore (trash, undo).'));
   if (f.hasClientPortal && has(c, 'invite')) settings.push(hid('sharing', 'Sharing & access', '/sharing.html', 'Who can sign in — your team, what clients can see, reviewer links.'));
-  if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push(hid('developer', 'Developer Mode', '/developer.html'));
+  if (f.hasDeveloper && has(c, 'use_developer_mode')) settings.push(hid('developer', 'Developer tools', '/developer.html', 'Your site’s colors and type, your own styles (CSS) and a block of your own HTML.'));   // builder item 165: its plain name
   // Oct 2026 audit change 11: the Health Center's door — a status line on the studio's
   // home for platform staff, and ⌘K "health" finds the page itself (staff only).
   if (c.isOperator) settings.push(hid('health', 'Health Center', '/admin-health.html', 'Platform health — background jobs, domains, billing, email posture and errors, in ten areas.'));
@@ -325,6 +345,7 @@ export function buildNav(c: NavContext): NavSection[] {
 /** The caller's landing surface, by role + edition. A CMS-Only account lands on
  *  its website; everyone with Business OS lands on Today; agency on the portfolio. */
 export function landingFor(c: NavContext): string {
+  if (c.role === 'designer') return '/presence.html';   // builder item 220: the website they work on
   if (c.role === 'client_reviewer' || c.isManagedClient) return '/client.html';
   if (c.isAgency) return '/agency.html';
   const f = flagsOf(c);

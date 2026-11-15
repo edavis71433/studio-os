@@ -172,9 +172,10 @@ test.describe('Home (sales 91)', () => {
       const title = await page.locator('h1#pagehead').boundingBox(), hero = await page.locator('.top.hero').boundingBox();
       expect(title && hero && title.y < hero.y).toBeTruthy();
     }
-    await expect(page.locator('.lhead h2')).toHaveText('Customers');
-    await expect(page.locator('.lhead .allc')).toHaveAttribute('href', '/customers.html');
-    await expect(page.locator('.lhead .lmeta')).toContainText('1 customer ·');
+    // builder item 165: the title is the one page header's; the table keeps a small bar of its own (.lsec) and its count line
+    await expect(page.locator('.lsec h2')).toHaveText('Customers');
+    await expect(page.locator('.lsec .allc')).toHaveAttribute('href', '/customers.html');
+    await expect(page.locator('#lmeta')).toContainText('1 customer ·');
     await expect(page.getByLabel('Search customers')).toBeVisible();
     await expect(page.locator('#heroChips')).toContainText('All caught up');   // a studio with customers and nothing waiting
   });

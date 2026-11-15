@@ -126,8 +126,9 @@ export interface TeamMember { who: string; email: string; side: 'studio' | 'clie
 export const STUDIO_EDITORS: readonly AgencyRole[] = ['owner', 'admin', 'account_manager'];
 const STUDIO_ROLE_WORDS: Record<string, string> = { owner: 'Owner', admin: 'Admin', account_manager: 'Account manager' };
 /** A site's seats that carry `edit` (lib/site_roles.ts); a reviewer only reviews. Item 53:
- *  an owner seat is a Co-owner, since the site has one owner, the person the client record names. */
-const SEAT_WORDS: Record<string, string> = { business_owner: 'Co-owner', business_staff: 'Staff', developer: 'Developer' };
+ *  an owner seat is a Co-owner, since the site has one owner, the person the client record names.
+ *  Item 220: a Designer edits the website too. */
+const SEAT_WORDS: Record<string, string> = { business_owner: 'Co-owner', business_staff: 'Staff', developer: 'Developer', designer: 'Designer' };
 
 /** Everyone who can change this site: the studio first, then their side. The
  *  owner counts when they use the full workspace; a client the studio serves
@@ -917,7 +918,6 @@ export async function handleAgencySites(req: Request, route: string, method: str
     await linkContactToCustomer(own.id, ct?.id, client.id).catch(() => {});
     await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_email: email }) }).catch(() => null);
     const invited = await sendCustomerInvite(own.id, email, true).catch(() => false);
-    await writeChangeEvent({ siteId: own.id, entityType: 'client', entityId: client.id, action: 'invite', summary: `Invited the owner of ${label}`, principal, provenance: 'human' }).catch(() => {});
     // builder item 192: the page to share when the email didn't go out (it shows this studio's name)
     const portal_url = `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/portal.html?studio=${own.id}`;
     return json({ data: { site_id: siteId, email, invited, portal_url } }, 200, cors);

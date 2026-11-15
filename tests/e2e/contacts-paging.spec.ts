@@ -96,7 +96,7 @@ test.describe('People (Customers › People): 100 at a time, with the count', ()
     const rows = page.locator('tr[data-person]');
     await expect(rows).toHaveCount(100);
     await expect(page.getByRole('tab', { name: /People/ })).toContainText('240');
-    await expect(page.locator('.lmeta')).toHaveText('100 of 240 people');
+    await expect(page.locator('#lmeta')).toHaveText('100 of 240 people');
     await expect(page.locator('[data-pchip]')).toHaveText(['All 240', 'Customers', 'Not yet']);
     await expect(page.locator('.more-line')).toHaveText('Showing 100 of 240 · Show more');
     await page.locator('#pMoreBtn').click();

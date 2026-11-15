@@ -4,6 +4,7 @@
 // table aggregates, and a single live-site probe. Providers are pure functions
 // of this input; they never fetch, never query, never read the clock.
 import { svc } from '../lib/db.ts';
+import { draftChangesOnly } from '../lib/provenance.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { normalizeSnapshotContent } from '../lib/render_types.ts';
@@ -88,7 +89,7 @@ export async function collect(site: SiteRow): Promise<ObservationInput> {
 
   // unpublished change events since the last live publish (names-only provenance; counts + oldest only)
   const since = lastLive?.created_at ? `&created_at=gt.${encodeURIComponent(lastLive.created_at)}` : '';
-  const evQ = await svc(`presence_change_events?site_id=eq.${site.id}${since}&entity_type=not.in.(publish,restore)&select=created_at&order=created_at.asc&limit=500`);
+  const evQ = await svc(`presence_change_events?site_id=eq.${site.id}${since}&${draftChangesOnly(['publish', 'restore'])}&select=created_at&order=created_at.asc&limit=500`);
   const evs: Array<{ created_at: string }> = Array.isArray(evQ.json) ? evQ.json : [];
 
   // render in memory through the one renderer — observation of the real projection

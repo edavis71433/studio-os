@@ -6,8 +6,9 @@
 // plans still wait on the client; publishing runs the one frozen pipeline).
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
+import { draftChangesOnly } from '../lib/provenance.ts';
 import { noticeTier } from '../lib/inbox_feed.ts';
-import { can, agencySiteIds } from './auth.ts';
+import { can, agencySiteIds, STUDIO_ROLE_WORDS } from './auth.ts';
 import { buildPortfolio, filterPortfolio, buildQueues, buildPatterns } from './portfolio.ts';
 import { needsYouPayload, dealNoticeIds, staleDealNotices, snoozeUntil, SNOOZE_KEY_RE, SNOOZE_MAX_DAYS } from './needs_you.ts';
 import { clearNotice } from '../lib/notice.ts';
@@ -15,7 +16,7 @@ import { healSupportOwners, supportActivity } from '../lib/service_bridge.ts';
 import { buildPortalFeed, noticeHrefFor } from '../routes/workspace.ts';
 import { loadReceivables } from '../routes/sales.ts';
 import { resolveSite, SITE_COLS } from '../lib/site.ts';
-import type { AgencyMember } from './auth.ts';
+import type { AgencyMember, AgencyRole } from './auth.ts';
 import type { PortfolioInput } from './portfolio.ts';
 import type { KitPayload } from '../lib/kits.ts';
 import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
@@ -24,6 +25,7 @@ import { removeTemplatePhotos } from '../lib/media.ts';
 import { handleAgencySites } from './sites.ts';
 import { handleSiteFolders } from './site_folders.ts';   // builder list item 176
 import { handleSavedPages } from './saved_pages.ts';   // builder list item 216
+import { handleUpdateTemplates } from './update_templates.ts';   // builder list item 221
 import { handleClientTools } from './client_tools.ts';
 import { handleSiteNumbers } from './site_numbers.ts';
 import { handleUsage } from './usage.ts';
@@ -112,7 +114,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
   } else {
     const [old, evtQ] = await Promise.all([
       svc(`presence_sites?id=in.(${ids.join(',')})&select=${SITE_FACTS}&limit=1000`),
-      svc(`presence_change_events?${IN}&select=site_id,created_at&order=created_at.desc&limit=1000`),
+      svc(`presence_change_events?${IN}&${draftChangesOnly()}&select=site_id,created_at&order=created_at.desc&limit=1000`),
     ]);
     sitesQ = old;
     for (const e of (evtQ.json ?? []) as Array<{ site_id: string; created_at: string }>) {
@@ -721,6 +723,13 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     if (r) return r;
   }
 
+  // ── Builder list item 221: updates kept as templates by the studio, to start an update for
+  //    any client on Send an update (the list, one whole, keep, rename and remove) ──
+  {
+    const r = await handleUpdateTemplates(req, route, method, member, cors, { ownSite: () => ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal) });
+    if (r) return r;
+  }
+
   // ── team management ──
   if (route === '/agency/members' && method === 'GET') {
     // user_id (learned at each member's sign-in): the Inbox assigns a support request to a person by it (sales review item 34)
@@ -767,9 +776,11 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     // The ONE shared sender (lib/workspace.ts), on the AGENCY's brand (white label).
     const agencyName = String(member.branding?.display_name || member.agency_name || 'your agency');
     const agencyNameHtml = agencyName.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+    const roleWords = STUDIO_ROLE_WORDS[role as AgencyRole];   // builder item 220: the role in one sentence
     const emailed = await sendInviteLink(email, {
       subject: `You’ve been invited to join ${agencyName}`,
-      intro: `You’ve been invited to join the <strong>${agencyNameHtml}</strong> team.`,
+      intro: `You’ve been invited to join the <strong>${agencyNameHtml}</strong> team${roleWords ? ` as ${roleWords.name}` : ''}.`,
+      role: roleWords ? { title: `What a ${roleWords.name} can see`, lines: [roleWords.you] } : undefined,
       brand: brandFromKit({ primary: String(member.branding?.color_accent || '') }, agencyName),
       next: '/agency.html',
     }).catch(() => false);

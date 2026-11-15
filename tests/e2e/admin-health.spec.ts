@@ -78,12 +78,20 @@ test.describe('Admin Health Center — drill footers to fixing surfaces', () => 
   });
 });
 
+/** Builder item 165: the header's other actions sit in its row on a computer, behind ⋯ on a phone. */
+async function openMore(page: import('@playwright/test').Page) {
+  const dots = page.locator('header.dds-ph .dds-ph-dots');
+  await expect(page.locator('#refreshBtn')).toBeAttached();
+  if (await dots.isVisible() && !(await page.locator('#refreshBtn').isVisible())) await dots.click();
+}
 // ── Item 1 · Family chrome: as-of freshness · ↻ soft refresh keep-last-good ────
 test.describe('Admin Health Center — family chrome', () => {
   test('renders an as-of freshness stamp and a refresh control', async ({ page }) => {
     await installApp(page, { api: { '/admin/health-center': HC } });
     await page.goto('/admin-health.html');
     await expect(page.locator('#asof')).toContainText('As of');
+    await openMore(page);   // builder item 165: on a phone they wait behind the header's ⋯
+    await expect(page.locator('#asof')).toBeVisible();
     await expect(page.locator('#refreshBtn')).toBeVisible();
   });
 
@@ -93,6 +101,7 @@ test.describe('Admin Health Center — family chrome', () => {
     await expect(page.locator('.card.area')).toHaveCount(10);
     // the next read fails — the soft refresh must NOT destroy the good render
     await page.route(HEALTH_GLOB, (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{}' }));
+    await openMore(page);
     await page.locator('#refreshBtn').click();
     await expect(page.locator('.toast')).toContainText('Couldn’t refresh');
     await expect(page.locator('.card.area')).toHaveCount(10); // kept, not wiped

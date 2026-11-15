@@ -1,5 +1,6 @@
 import { test, expect, Page, Request } from '@playwright/test';
 import { installApp, ALL_FEATURES, STUDIO_LEVEL_NAV } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Sales item 110 (bug hunt K, Nov 10 2026): Contacts and Customers.
 //   K2  the customer preview reads again after Refresh, open or not
@@ -124,7 +125,8 @@ test.describe('Contacts inside a client (item 110, K3)', () => {
     await installApp(page);
     await serveContacts(page, PEOPLE.slice(0, 3));
     await page.goto('/contacts.html');
-    for (const sel of ['#new', '#addCust', '#importCsv', '#manageFields']) await expect(page.locator(sel)).toBeVisible();
+    await expect(page.locator('#new')).toBeVisible();   // the header's one filled action
+    for (const sel of ['#addCust', '#importCsv', '#manageFields']) await expect(await headerAction(page, sel)).toBeVisible();   // builder item 165: its others, behind ⋯ on a phone
   });
 });
 

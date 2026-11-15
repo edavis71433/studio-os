@@ -41,12 +41,11 @@
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
   a{color:var(--p)}
 
-  /* ── title row · subline · period control ── */
-  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--dds-s4,16px);flex-wrap:wrap}
-  h1.title{font-family:var(--serif);font-weight:500;font-size:28px;letter-spacing:-.01em;margin:0;line-height:1.15;outline-offset:3px}
-  .subline{display:flex;gap:var(--dds-s3,12px);flex-wrap:wrap;align-items:center;color:var(--soft);font-size:13px;margin-top:var(--dds-s1,4px)}
-  .subline .dot{color:var(--faint)}
+  /* ── the page header is the shared one (shell.css .dds-ph, builder item 165): its line says
+        what the numbers cover; the period control sits in its own row under it ── */
+  .dds-ph-line .dot{margin:0 6px;color:var(--faint)}
   .actions{display:flex;gap:var(--dds-s2,8px);align-items:center;flex-wrap:wrap}
+  .actions.periodrow{justify-content:flex-end;margin:0 0 var(--dds-s2,8px)}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;background:var(--bg);max-width:100%}
   .seg button{font:inherit;font-size:12.5px;font-weight:500;color:var(--soft);background:transparent;border:none;padding:var(--dds-s1,4px) 10px;cursor:pointer;white-space:nowrap}
   .seg button:hover{color:var(--ink)}
@@ -269,7 +268,6 @@
     .num-k{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
     .num-k .dchip{display:none}
     .num-s{white-space:normal}
-    .subline .dot{display:none}
     svg.rev12{display:none}
     svg.rev6{display:block}
   }
@@ -285,7 +283,7 @@
   /* the shell's sidebar takes a quarter of a tablet: two columns would leave a table no room for its names */
   @media (max-width:1000px){.grid2{grid-template-columns:minmax(0,1fr)}}
   @media (max-width:760px){.grid2,.grid3{grid-template-columns:minmax(0,1fr)}}
-  @media (max-width:560px){.wrap{padding:16px 16px 90px}h1.title{font-size:24px}.stats{grid-template-columns:minmax(0,1fr)}.stat{border-left:none}.stat+.stat{border-top:1px solid var(--line)}.seg{overflow-x:auto}}
+  @media (max-width:560px){.wrap{padding:16px 16px 90px}.stats{grid-template-columns:minmax(0,1fr)}.stat{border-left:none}.stat+.stat{border-top:1px solid var(--line)}.seg{overflow-x:auto}}
 
   /* ══ Look refresh E ("Fresh & bold", Nov 2026): this page's touch-ups. The
      tokens and the shared anatomy come from shell.css. ══ */
@@ -351,6 +349,8 @@ const FN=SUPABASE_URL+"/functions/v1/presence";
 const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
+// builder item 165: on a phone the header's other actions sit in a sheet behind ⋯; picking one puts the sheet away
+document.addEventListener('click',(e)=>{const m=e.target&&e.target.closest?e.target.closest('.dds-ph-more'):null;if(!m||!e.target.closest('button,a'))return;try{if(m.matches(':popover-open'))m.hidePopover();}catch(_){/* no popover support: there is no sheet */}});
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 let TOKEN="", PERIOD='this_month', CTX=null, DASH=null;
@@ -838,12 +838,17 @@ function websiteBand(d){
 }
 
 // ── render ──
+// builder item 165: the one page header (shell.css .dds-ph). No filled action: Refresh (and
+// Print a report on the studio's page) are its others, behind ⋯ on a phone. The period
+// control is how you read the page, so it stays in sight, in a row of its own under it.
+function phHead(title,line,more){
+  return `<header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" data-ic="analytics" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">${esc(title)}</h1></div><p class="dds-ph-line" id="phLine">${line||''}</p></div>
+      ${more?`<div class="dds-ph-acts"><button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button><div class="dds-ph-more" id="phMore" popover>${more}</div></div>`:''}</div></header>`;
+}
 function headRow(title,subline,withPeriod,extra){
-  return `<header class="toprow">
-      <div><h1 class="title" id="pagehead" tabindex="-1">${esc(title)}</h1>
-        <div class="subline">${subline}</div></div>
-      <div class="actions">${extra||''}${withPeriod?`<div class="seg" id="period" role="group" aria-label="Period">${PERIODS.map(p=>`<button type="button" data-period="${p[0]}" aria-pressed="${PERIOD===p[0]?'true':'false'}">${p[1]}</button>`).join('')}</div>${datesHtml()}`:''}<button type="button" class="btn" id="refreshBtn">Refresh</button></div>
-    </header>`;
+  return phHead(title,subline,`${extra||''}<button type="button" class="btn" id="refreshBtn">Refresh</button>`)
+    +(withPeriod?`<div class="actions periodrow"><div class="seg" id="period" role="group" aria-label="Period">${PERIODS.map(p=>`<button type="button" data-period="${p[0]}" aria-pressed="${PERIOD===p[0]?'true':'false'}">${p[1]}</button>`).join('')}</div>${datesHtml()}</div>`:'');
 }
 // item 175: More dates. Its button names the window while one of its presets or picked
 // dates is on; the panel lists the presets, then two dates picked by hand. The panel's
@@ -1145,7 +1150,7 @@ function closeDates(focus){
 // stencil loading — layout-shaped gray blocks, shown only when the fetch runs
 // >300ms (SLDS: no stencil flash on fast loads)
 function renderStencil(title){
-  $('main').innerHTML=`<header class="toprow"><div><h1 class="title" id="pagehead" tabindex="-1">${esc(title||'Analytics')}</h1></div></header>
+  $('main').innerHTML=`${phHead(title||'Analytics','','')}
     <p class="sr-only" role="status">Loading your dashboard</p>
     <div aria-hidden="true"><div class="st" style="height:92px;margin-top:18px"></div>
     <div class="grid2">${['','','',''].map(()=>`<div class="st" style="height:220px"></div>`).join('')}</div>

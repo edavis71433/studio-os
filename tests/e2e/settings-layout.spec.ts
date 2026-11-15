@@ -28,7 +28,7 @@ test.describe('Settings — the list beside the sections (bold redesign)', () =>
     await expect(sec).toBeVisible();
     await expect(sec.getByRole('heading', { level: 2, name: 'Deal stages' })).toBeVisible();
     // the names, the chances and the stalled days all live here now — not under Automations
-    for (const id of ['#stageNames', '#stageChances', '#st-lead']) await expect(sec.locator(id)).toHaveCount(1);
+    for (const id of ['#stageGrid', '#sn-lead', '#sc-lead', '#st-lead']) await expect(sec.locator(id)).toHaveCount(1);   // item 165: one row per stage
     await expect(page.locator('#automations #stageNames')).toHaveCount(0);
     await expect(page.locator('#st-proposal')).toHaveValue('7');
   });

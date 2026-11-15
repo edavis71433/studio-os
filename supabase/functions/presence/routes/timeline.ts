@@ -19,23 +19,31 @@ import { buildWebsiteTimeline } from '../lib/website_timeline.ts';
 const PROVIDER_LABEL: Record<string, string> = Object.fromEntries(CONNECTED_PROVIDERS.map((p: any) => [p.key, p.name]));
 const arr = (r: { json: unknown }): any[] => (Array.isArray(r.json) ? r.json : []);
 
-export async function handleWebsiteTimeline(site: SiteRow, cors: Record<string, string>) {
+// builder item 220: a Designer's timeline is the website's own story. Enquiries, the
+// business notes, the studio's project and support messages, and any change that isn't
+// website work (a contact, a deal, a customer) stay with the owner and the studio.
+export const WEBSITE_CHANGE_TYPES = ['identity', 'location', 'offering', 'testimonial', 'faq', 'post', 'media', 'voice', 'redirect', 'settings', 'publish', 'restore', 'site', 'domain', 'launch', 'preview', 'content_library'];
+
+export async function handleWebsiteTimeline(site: SiteRow, cors: Record<string, string>, opts: { websiteOnly?: boolean } = {}) {
   const now = new Date().toISOString();
+  const websiteOnly = opts.websiteOnly === true;
+  const skip = Promise.resolve({ json: [] });
+  const changeTypes = websiteOnly ? `&entity_type=in.(${WEBSITE_CHANGE_TYPES.join(',')})` : '';
 
   // ── the customer's OWN site: one bounded parallel gather ───────────────────
   // The last three probes (asc, limit 1) find the EARLIEST live publish / enquiry
   // / testimonial — the real evidence behind the "first …" milestones (CMS-UX-2.1).
   const [pubs, changes, conns, moments, enquiries, scheduled, launches, domain, firstPub, firstEnq, firstTest] = await Promise.all([
     svc(`presence_publishes?site_id=eq.${site.id}&select=id,kind,status,change_summary,actor_kind,created_at,completed_at&order=created_at.desc&limit=25`),
-    svc(`presence_change_events?site_id=eq.${site.id}&select=id,entity_type,action,summary,actor_kind,created_at&order=created_at.desc&limit=40`),
+    svc(`presence_change_events?site_id=eq.${site.id}${changeTypes}&select=id,entity_type,action,summary,actor_kind,created_at&order=created_at.desc&limit=40`),
     svc(`presence_connection_events?site_id=eq.${site.id}&select=id,provider_key,action,actor_kind,created_at&order=created_at.desc&limit=15`),
-    svc(`presence_moments?site_id=eq.${site.id}&status=neq.suppressed&select=id,moment_key,status,headline,summary,created_at,first_seen_at&order=created_at.desc&limit=60`),   // folded to one per note by the builder
-    svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,form_kind,name,email,message,created_at&order=created_at.desc&limit=15`),
+    websiteOnly ? skip : svc(`presence_moments?site_id=eq.${site.id}&status=neq.suppressed&select=id,moment_key,status,headline,summary,created_at,first_seen_at&order=created_at.desc&limit=60`),   // folded to one per note by the builder
+    websiteOnly ? skip : svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,form_kind,name,email,message,created_at&order=created_at.desc&limit=15`),
     svc(`presence_scheduled_publishes?site_id=eq.${site.id}&status=eq.pending&select=id,scheduled_for,summary,kind,created_at&order=scheduled_for.asc&limit=5`),
     svc(`presence_launches?site_id=eq.${site.id}&select=id,name,status,created_at,updated_at,approved_at&order=created_at.desc&limit=15`),
     svc(`presence_infra_plans?site_id=eq.${site.id}&kind=eq.connect_domain&status=eq.applied&select=id,title,applied_at,created_at&order=created_at.desc&limit=5`),
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&kind=eq.publish&select=id,created_at,completed_at&order=created_at.asc&limit=1`),
-    svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,created_at&order=created_at.asc&limit=1`),
+    websiteOnly ? skip : svc(`presence_form_submissions?site_id=eq.${site.id}&spam=eq.false&select=id,created_at&order=created_at.asc&limit=1`),
     svc(`presence_change_events?site_id=eq.${site.id}&entity_type=eq.testimonial&action=eq.create&select=id,created_at&order=created_at.asc&limit=1`),
   ]);
 
@@ -54,7 +62,7 @@ export async function handleWebsiteTimeline(site: SiteRow, cors: Record<string, 
   // ── their linked project(s), if bridged: client-visible events only ────────
   let projectEvents: any[] = [];
   try {
-    if (site.client_id) {
+    if (site.client_id && !websiteOnly) {
       const links = await linksForCustomer(site.client_id);
       if (links.length) {
         // group linked project ids by the agency site their data lives on

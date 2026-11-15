@@ -8,7 +8,7 @@ import { svc, svcCount, type SiteDb } from '../lib/db.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { listTemplates, latestTemplateVersion, getTemplate } from '../lib/render.ts';
 import { draftHashForSite } from '../lib/draft_hash.ts';
-import { writeChangeEvent } from '../lib/provenance.ts';
+import { writeChangeEvent, draftChangesOnly } from '../lib/provenance.ts';
 import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -60,7 +60,7 @@ export async function handleGetSite(db: SiteDb, site: SiteRow, cors: Record<stri
     count('presence_media',        site.id, '&deleted_at=is.null'),
     // draft status: latest change event vs latest live publish (service role —
     // publishes are default-deny to clients).
-    svc(`presence_change_events?site_id=eq.${site.id}&select=created_at&order=created_at.desc&limit=1`),
+    svc(`presence_change_events?site_id=eq.${site.id}&${draftChangesOnly()}&select=created_at&order=created_at.desc&limit=1`),   // item 239: not a launch or preview line
     svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=created_at&order=created_at.desc&limit=1`),
     // M3: the canonical draft-version hash (compute-on-read from the ONE serializer).
     // Fail-soft — a serialize hiccup returns null and never blocks the home view.

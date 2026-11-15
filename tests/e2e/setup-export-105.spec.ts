@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { installApp, ALL_FEATURES, STUDIO_LEVEL_NAV } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Sales item 105's last parts: a setup strip on Home that can be hidden; one clear
 // button on every empty list; and the export for a bookkeeper on Invoices. Drawn in
@@ -80,6 +81,7 @@ test.describe('sales item 105 — setup strip, empty lists, the export for a boo
     await page.goto('/invoices.html');
     // an empty list offers its one thing to do
     await expect(page.locator('#ilist').getByRole('button', { name: 'Send an invoice' })).toBeVisible();
+    await headerAction(page, '#expBtn');   // builder item 165: on a phone it waits behind the header's ⋯, which this opens
     await page.getByRole('button', { name: 'For your bookkeeper' }).click();
     const dlg = page.getByRole('dialog', { name: 'Export for your bookkeeper' });
     await expect(dlg).toBeVisible();
@@ -103,6 +105,7 @@ test.describe('sales item 105 — setup strip, empty lists, the export for a boo
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/invoices': { data: { items: [], today: '2026-11-12', partial: false } } } });
     await page.route(/\/functions\/v1\/presence\/sales\/export\/accounting/, (route: Route) => route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'read_failed', message: 'Your invoices couldn’t load just now, so nothing was downloaded. Try again in a moment.' }) }));
     await page.goto('/invoices.html');
+    await headerAction(page, '#expBtn');   // builder item 165: on a phone it waits behind the header's ⋯, which this opens
     await page.getByRole('button', { name: 'For your bookkeeper' }).click();
     const dlg = page.getByRole('dialog', { name: 'Export for your bookkeeper' });
     await dlg.getByRole('button', { name: 'Pick dates' }).click();

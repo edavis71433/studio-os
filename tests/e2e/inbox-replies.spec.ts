@@ -224,7 +224,8 @@ test.describe('Inbox — saved replies that couldn’t load', () => {
       return route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
     });
     await page.goto('/inbox.html');
-    await page.locator('#ovfBtn').click();
+    const dots = page.locator('header.dds-ph .dds-ph-dots');   // builder item 165: Saved replies is a header action, behind ⋯ on a phone
+    if (await dots.isVisible()) await dots.click();
     await page.locator('#ovfSaved').click();
     await expect(page.locator('#sheet-list')).toContainText('Your saved replies couldn’t load just now. Nothing here can be saved until it loads.');
     await expect(page.locator('#sheet-save')).toBeDisabled();

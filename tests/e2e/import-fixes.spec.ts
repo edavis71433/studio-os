@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp } from './helpers/app';
 import { settled } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // List item 97 (Nov 10 bug hunt, B2 · B5 · B6 and two small ones): the CSV importers.
 // Contacts, Customers and Pipeline share one importer now (shell.js importPanel —
@@ -17,7 +18,7 @@ const toastWith = (page: Page, text: string) => page.locator('.dds-toast').filte
 const csvFile = (name: string, text: string) => ({ name, mimeType: 'text/csv', buffer: Buffer.from(text, 'utf8') });
 const openContactsImport = async (page: Page) => {
   await page.goto('/contacts.html');
-  await page.locator('#importCsv').click();
+  await (await headerAction(page, '#importCsv')).click();
   await expect(page.locator('#csvZone input[type=file]')).toBeVisible();
 };
 // POST /sales/contacts → a new contact each time (deduped:false). With a gate, every answer waits
@@ -82,8 +83,8 @@ test.describe('item 97 — Google and Outlook files map the right columns (B2)',
     await page.route('**/functions/v1/presence/sales/contacts', (route) => { if (route.request().method() !== 'POST') return route.fallback(); contacts.push(route.request().postDataJSON()); return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'ct-' + contacts.length } }) }); });
     await page.route('**/functions/v1/presence/sales/deals', (route) => { if (route.request().method() !== 'POST') return route.fallback(); deals.push(route.request().postDataJSON()); return route.fulfill({ status: 201, contentType: 'application/json', body: '{"data":{}}' }); });
     await page.goto('/pipeline.html');
-    if (await page.locator('#moreBtn').isVisible()) { await page.locator('#moreBtn').click(); await page.getByRole('menuitem', { name: 'Import CSV' }).click(); }
-    else await page.getByRole('button', { name: 'Import CSV' }).click();
+    if (await page.locator('.dds-ph-dots').isVisible()) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone Import CSV waits behind the header's ⋯
+    await page.getByRole('button', { name: 'Import CSV' }).click();
     await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('deals.csv', 'Deal,First Name,Last Name,Last activity date,Account Name,Account Owner\nMenu redesign,Ana,Ruiz,2026-11-01,Harbor Lane Bakery,Sam\n'));
     await expect(page.locator('#csvZone')).toContainText('1 deal found');
     await page.locator('#csvZone').getByRole('button', { name: 'Import 1' }).click();
@@ -130,10 +131,12 @@ test.describe('item 97 — Close stops a running import (B6)', () => {
     await page.locator('#csvZone').getByRole('button', { name: 'Import 40' }).click();
     await expect.poll(() => sent.length).toBe(5);                                                // five at a time, all five on their way
     await expect(page.locator('#csvZone input[type=file]')).toBeDisabled();                     // no second file under a running one
-    await page.getByRole('button', { name: 'Import CSV' }).click();                              // Import CSV again: the running panel stays
+    await (await headerAction(page, '#importCsv')).click();                                                    // Import CSV again: the running panel stays
     await expect(page.locator('#csvZone .dds-csvgo')).toBeDisabled();
     await page.locator('#csvZone').getByRole('button', { name: 'Stop' }).click();
     await expect(page.locator('#csvZone input[type=file]')).toHaveCount(0);
+    // focus goes back to what opened it: Customers keeps Import CSV in the list's own toolbar at every width (builder item 165)
+    await expect(page.locator('#importCsv')).toBeFocused();
     open();                                                                                      // the five on their way land
     await expect(toastWith(page, 'Stopped after 5 of 40 — 5 already yours')).toBeVisible();
     await settled(page);                                                              // a running import would have sent its next five by now

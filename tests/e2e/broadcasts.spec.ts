@@ -409,9 +409,9 @@ test.describe('SS4 — broadcasts console', () => {
     }
     // visual refresh: breadcrumb · the list picker shows label, description and
     // count per row · the composer carries Preview, Send update and the toolbar
-    const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' });
+    const crumbs = page.getByRole('navigation', { name: 'Where this page is' });   // builder item 165: the one page header's trail
     await expect(crumbs.getByRole('link', { name: 'Inbox' })).toHaveAttribute('href', '/inbox.html');   // sales review item 25: it opens from the Inbox, so the crumb says Inbox (it said Customers while the menu lit Inbox)
-    await expect(crumbs.locator('[aria-current="page"]')).toHaveText('Send an update');
+    await expect(page.locator('header.dds-ph h1')).toHaveText('Send an update');
     const contacts = page.locator('[data-seg="contacts"]');
     await expect(contacts).toContainText('All contacts');
     await expect(contacts.locator('.d')).toHaveText('Everyone saved in your contacts.');

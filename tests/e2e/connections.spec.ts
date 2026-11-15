@@ -70,7 +70,7 @@ test.describe('Connections — the Connect button exists at all', () => {
   });
 });
 
-// ── the refresh anatomy: crumb · title + chips · a warning band · rows · rail ──
+// ── the refresh anatomy: trail · title + counts · a warning band · rows · rail ──
 test.describe('Connections — the refreshed page says what is connected, and what needs you', () => {
   const MIXED = () => { const s = SURFACE({
     connection: { status: 'expired', health: 'attention', last_sync_at: '2026-10-12T09:00:00Z', connected_at: '2026-08-02T00:00:00Z',
@@ -82,14 +82,14 @@ test.describe('Connections — the refreshed page says what is connected, and wh
     property: { id: '1', name: 'Bacchus Kitchen', auto_selected: true }, data: { visitors: 512, pageviews: 2100, as_of: '2026-10-19T16:20:00Z' },
   }]; return s; };
 
-  test('crumb, title chips and the warning band are derived from the rows — and Reconnect in the band is the row’s own action', async ({ page }) => {
+  test('trail, the header line’s counts and the warning band are derived from the rows — and Reconnect in the band is the row’s own action', async ({ page }) => {
     await installApp(page, { api: { '/connections': MIXED() } });
     await page.goto('/connections.html');
-    await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toContainText('Settings');
-    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).locator('[aria-current="page"]')).toHaveText('Connections');
+    // builder item 165: the shared header — Settings in its trail, the counts in its one line
+    await expect(page.getByRole('navigation', { name: 'Where this page is' }).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings.html');
     await expect(page.getByRole('heading', { level: 1, name: 'Connections' })).toBeVisible();
     // 1 ok + 1 attention + 1 planned → the two counts, nothing invented
-    await expect(page.locator('#counts .chip')).toHaveText(['1 connected', '1 needs attention']);
+    await expect(page.locator('header.dds-ph .dds-ph-line')).toHaveText('Google, your calendar and email sending, in one place · 1 connected · 1 needs attention');
     // the band names the row and the reason, and its button is the SAME connect action
     const band = page.locator('#attention');
     await expect(band).toContainText('How you show up in Google Search needs attention.');
@@ -132,10 +132,10 @@ test.describe('Connections — the refreshed page says what is connected, and wh
     await expect(activity).toContainText('Connected your visitor numbers');
   });
 
-  test('nothing connected → no band, an honest header chip, and an empty-but-true rail', async ({ page }) => {
+  test('nothing connected → no band, an honest header line, and an empty-but-true rail', async ({ page }) => {
     await installApp(page, { api: { '/connections': SURFACE() } });
     await page.goto('/connections.html');
-    await expect(page.locator('#counts .chip')).toHaveText(['Nothing connected yet']);
+    await expect(page.locator('header.dds-ph .dds-ph-line')).toHaveText('Google, your calendar and email sending, in one place · nothing connected yet');
     await expect(page.locator('#attention')).toHaveCount(0);
     await expect(page.locator('.col-rail .card').first()).toContainText('Nothing is connected yet.');
     await expect(page.locator('.col-rail .card').nth(1)).toContainText('Nothing yet');
@@ -470,6 +470,8 @@ test.describe('Connections — ask the client to connect their Google', () => {
     await expect(ask).toHaveText('Ask Joe’s Plumbing to connect their Google');
     await expect(ask).not.toHaveClass(/primary/);                                   // a second door, not the filled one
     await expect(page.locator('#svc-google_search_console [data-connect]')).toBeVisible();   // the operator path stays
+    // builder item 165: it sits in the page header's actions, behind ⋯ on a phone
+    if ((page.viewportSize()?.width || 0) < 761) await page.locator('header.dds-ph .dds-ph-dots').click();
     await ask.click();
     await expect(page.getByRole('dialog')).toContainText('Email Joe’s Plumbing a link to connect their Google?');
     await page.getByRole('button', { name: 'Send the email' }).click();

@@ -7,7 +7,7 @@ import { installApp, ALL_FEATURES, STUDIO_LEVEL_NAV } from './helpers/app';
 //   picking     the whole cell picks a row, and the count is announced
 //   confirms    bulk Not a fit, bulk Mark as… and Remove view ask in place first
 //   focus       Save view, Remove view, Done and the import panel give focus back
-//   phone       Pipeline folds Manage services, Import and Columns under More; its
+//   phone       Pipeline's tools wait behind the page header's ⋯ (builder item 165); its
 //               tiles never cut a number off; the small controls are 44px
 //   words       Home is headed Home; one money format; Domain & email for an operator
 
@@ -212,20 +212,22 @@ test.describe('batch C — words and numbers', () => {
 test.describe('batch C — the phone', () => {
   test.beforeEach(({ page }) => { test.skip(!isPhone(page), 'phone sizes only'); });
 
-  test('Pipeline: Manage services, Import and Columns fold under More; no tile cuts a number off', async ({ page }) => {
+  test('Pipeline: Manage services, Import, Charts and Print wait behind the header’s ⋯; Columns stays in the toolbar; no tile cuts a number off', async ({ page }) => {
+    // builder item 165: the toolbar's own More menu became the page header's ⋯ (a sheet from the bottom)
     await pinTable(page, 'dds-display:pipeline');
     await installApp(page, { api: PIPE });
     await page.goto('/pipeline.html');
-    await expect(page.locator('#moreBtn')).toBeVisible();
+    await expect(page.locator('.dds-ph-dots')).toBeVisible();
     await expect(page.locator('#importDeals')).toBeHidden();
     await expect(page.locator('#mngServicesTop')).toBeHidden();
-    await page.locator('#moreBtn').click();
-    const menu = page.getByRole('menu', { name: 'More' });
-    await expect(menu.getByRole('menuitem')).toHaveText(['Manage services', 'Import CSV', 'Columns', 'Show charts', 'Print this list']);   // item 105 adds Charts and Print
-    const r = (await menu.boundingBox())!;
+    await expect(page.locator('#colsBtn')).toBeVisible();
+    await page.locator('.dds-ph-dots').click();
+    const sheet = page.locator('#phMore');
+    await expect(sheet.getByRole('button')).toHaveText(['Manage services', 'Import CSV', 'Charts', 'Print', /Refresh/]);
+    const r = (await sheet.boundingBox())!;
     expect(r.x).toBeGreaterThanOrEqual(0);
     expect(r.x + r.width).toBeLessThanOrEqual(page.viewportSize()!.width);   // on screen
-    await menu.getByRole('menuitem', { name: 'Import CSV' }).click();
+    await sheet.getByRole('button', { name: 'Import CSV' }).click();
     await expect(page.locator('#csvZone')).toContainText('CSV');
     const cut = await page.locator('.stats .v').evaluateAll((vs) => vs.filter((v) => v.scrollWidth > v.clientWidth + 1).map((v) => v.textContent));
     expect(cut).toEqual([]);

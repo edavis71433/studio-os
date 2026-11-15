@@ -86,7 +86,7 @@ test.describe('Projects — the board (bold redesign)', () => {
     // archived work stays off the board until asked for
     await expect(page.locator('#list')).not.toContainText('Old flyer');
     // the studio at a glance, under the title
-    const meta = page.locator('.lmeta');
+    const meta = page.locator('#phLine');
     for (const t of ['5 running', '2 waiting on them', '1 launching this week', '1 late', '1 on hold']) await expect(meta).toContainText(t);
   });
 
@@ -138,7 +138,7 @@ test.describe('Projects — the board (bold redesign)', () => {
   test('+ New project sits in the header and opens the dialog', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/projects.html');
-    await page.locator('.lhead #newProject').click();
+    await page.locator('header.dds-ph #newProject').click();
     await expect(page.locator('#newDlg')).toBeVisible();
     await expect(page.locator('#np-name')).toBeFocused();
   });
@@ -184,6 +184,7 @@ test.describe('Projects — the calendar (bold redesign)', () => {
   test('each project on its target date; the month steps and comes home; an entry opens the record', async ({ page }) => {
     await installApp(page, { api: CAL_API });
     await page.goto('/projects.html');
+    if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone it waits behind ⋯
     await page.locator('#dispCal').click();
     await expect(page.locator('#dispCal')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#calTitle')).toHaveText(monthName(0));
@@ -210,6 +211,7 @@ test.describe('Projects — the calendar (bold redesign)', () => {
   test('the choice is remembered', async ({ page }) => {
     await installApp(page, { api: CAL_API });
     await page.goto('/projects.html');
+    if (await page.locator('.dds-ph-dots').isVisible() && !(await page.locator('#phMore').isVisible())) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone it waits behind ⋯
     await page.locator('#dispCal').click();
     await expect(page.locator('#calTitle')).toBeVisible();
     await page.reload();
