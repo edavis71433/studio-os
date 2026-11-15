@@ -37,6 +37,7 @@ import {
   type ReportPart, type ProposeSetting, type Proposal,
 } from '../lib/report_choices.ts';
 import { normalizeDecisions } from '../lib/do_next.ts';
+import { readVisitDrop, sourcesFromRows, type VisitDrop } from '../lib/visit_drop.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { json } from '../../_shared/http.ts';
 
@@ -102,6 +103,10 @@ export interface ReportData {
   // builder list item 211: how fast pages showed for the month's visitors (lib/visits.ts speedOf)
   speed: ReportSpeed | null;
   maps?: ReportMaps | null;      // builder list item 185: the map rank grid, for clients the studio switched it on for
+  // builder list item 219: clicks to contact (the phone numbers and email addresses pressed on
+  // the site, from the same visit rows) with the month before's; and why visits fell, when they did
+  contacts?: { calls: number; emails: number; prior: number | null } | null;
+  drop?: VisitDrop | null;
 }
 /** Builder list item 185: the month's map rank grid. The first search with a scan that
  *  month is drawn; the others are a line each. */
@@ -283,16 +288,18 @@ export function anyZoneInSendDays(nowIso: string): boolean {
 export function foldReport(i: { month: string; label: string; startMs: number; endMs: number; visits: VisitRow[] | null; enquiries: number | null; publishes: Array<{ created_at: string }> | null; address: string; visitsCap: number; timeZone?: string }): ReportData {
   const inMonth = (iso: string) => { const t = Date.parse(iso); return Number.isFinite(t) && t >= i.startMs && t < i.endMs; };
   let visitors: number | null = null, pageviews: number | null = null, topPages: ReportData['topPages'] = [], truncated = false;
+  let contacts: ReportData['contacts'] = null;
   if (i.visits) {
     const rows = i.visits.filter((v) => inMonth(String(v.ts)));
     const days = Math.round((i.endMs - i.startMs) / 86_400_000);
     const agg = aggregateVisits(rows, i.endMs, days);
     visitors = agg.visitors; pageviews = agg.pageviews; topPages = agg.topPages.slice(0, 5); truncated = i.visits.length >= i.visitsCap;
+    contacts = { calls: agg.events.phone || 0, emails: agg.events.email || 0, prior: null };   // item 219
   }
   const pubs = i.publishes ? i.publishes.filter((p) => inMonth(p.created_at)) : null;
   const lastPublishedAt = pubs && pubs.length ? pubs.map((p) => p.created_at).sort().slice(-1)[0] : null;
   return { month: i.month, monthLabel: i.label, visitors, pageviews, truncated, enquiries: i.enquiries, topPages, publishes: pubs ? pubs.length : null, lastPublishedAt, address: i.address, ...(i.timeZone ? { timeZone: i.timeZone } : {}),
-    siteName: '', priorLabel: '', priorVisitors: null, search: null, followed: [], ai: null, reviews: null, health: null, speed: null, maps: null };
+    siteName: '', priorLabel: '', priorVisitors: null, search: null, followed: [], ai: null, reviews: null, health: null, speed: null, maps: null, contacts, drop: null };
 }
 
 /** Builder list item 185: the map rank grid for the report, from the scans in the month and
@@ -365,6 +372,17 @@ export function foldExtras(i: {
 }
 
 const n1 = (n: number) => n.toLocaleString('en-US');
+/** Builder list item 219: "15 calls and 8 emails from the site, up 5 on September", or null
+ *  when nobody pressed either, this month or the one before. Pure. */
+export function contactWords(c: { calls: number; emails: number; prior: number | null }, priorLabel: string): string | null {
+  const total = c.calls + c.emails;
+  if (!total && !c.prior) return null;
+  const bits = [c.calls ? `${n1(c.calls)} call${c.calls === 1 ? '' : 's'}` : '', c.emails ? `${n1(c.emails)} email${c.emails === 1 ? '' : 's'}` : ''].filter(Boolean);
+  const what = bits.length ? `${bits.join(' and ')} from the site` : 'Nobody pressed a phone number or email address';
+  const was = priorLabel || 'the month before';
+  const change = c.prior === null ? '' : total === c.prior ? `, the same as ${was}` : `, ${total > c.prior ? 'up' : 'down'} ${n1(Math.abs(total - c.prior))} on ${was}`;
+  return what + change;
+}
 const ordinalOf = (n: number) => { const t = n % 100; return t >= 11 && t <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] || 'th'; };
 const pageName = (p: string) => p === '/' || p === '' ? 'Home page' : p.replace(/^\//, '').replace(/\/$/, '').replace(/[-_]/g, ' ').replace(/\//g, ' › ');
 
@@ -377,15 +395,20 @@ export function reportHtml(d: ReportData, o: { studioName: string; note: string;
   parts.push(`<p style="margin:0 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#6b6478">Your website in ${esc(d.monthLabel)}</p>`);
   parts.push(`<h1 style="margin:0 0 14px;font-family:'Iowan Old Style',Palatino,Georgia,serif;font-size:24px;line-height:1.2">${who ? `${esc(who)}, here’s` : 'Here’s'} how your website did${d.address ? ` at <a href="${esc(d.address)}" style="text-decoration:none">${esc(d.address.replace(/^https?:\/\//, ''))}</a>` : ''}.</h1>`);
   if (o.note.trim()) parts.push(`<blockquote style="margin:0 0 18px;padding:12px 16px;border-left:3px solid #d6d4e2;background:#f7f6fb;border-radius:0 10px 10px 0;color:#2b2540">${esc(o.note.trim()).replace(/\n/g, '<br>')}<br><span style="font-size:13px;color:#6b6478">${esc(o.studioName)}</span></blockquote>`);
-  const tile = (label: string, value: string, sub: string) => `<td width="50%" style="padding:0 6px 12px 0;vertical-align:top"><div style="background:#f7f6fb;border-radius:12px;padding:14px 16px"><div style="font-size:12px;color:#6b6478">${label}</div><div style="font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:4px 0 2px">${value}</div><div style="font-size:12px;color:#6b6478">${sub}</div></div></td>`;
-  const tiles: string[] = [];
+  // builder list item 219: three tiles share the row (a third for Clicks to contact)
+  const tileSpecs: Array<[string, string, string]> = [];
+  const tile = (label: string, value: string, sub: string, width: number) => `<td width="${width}%" style="padding:0 6px 12px 0;vertical-align:top"><div style="background:#f7f6fb;border-radius:12px;padding:14px 16px"><div style="font-size:12px;color:#6b6478">${label}</div><div style="font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:4px 0 2px">${value}</div><div style="font-size:12px;color:#6b6478">${sub}</div></div></td>`;
   // bug hunt H5: the counter knows a person for one day only, so a month's count is visits
   if (!on('visits')) { /* left out */ }
-  else if (d.visitors === null) tiles.push(tile('Visits', '—', 'We couldn’t read the visit counts this time.'));
-  else tiles.push(tile('Visits', n1(d.visitors), `${n1(d.pageviews || 0)} page${(d.pageviews || 0) === 1 ? '' : 's'} viewed${d.truncated ? ', from recent activity' : ''}${changeOn(d.visitors, d.priorVisitors, d.priorLabel) ? `, ${changeOn(d.visitors, d.priorVisitors, d.priorLabel)}` : ''}`));
+  else if (d.visitors === null) tileSpecs.push(['Visits', '—', 'We couldn’t read the visit counts this time.']);
+  else tileSpecs.push(['Visits', n1(d.visitors), `${n1(d.pageviews || 0)} page${(d.pageviews || 0) === 1 ? '' : 's'} viewed${d.truncated ? ', from recent activity' : ''}${changeOn(d.visitors, d.priorVisitors, d.priorLabel) ? `, ${changeOn(d.visitors, d.priorVisitors, d.priorLabel)}` : ''}${d.drop && d.drop.short ? `, <span style="color:#bf3535">${esc(d.drop.short.charAt(0).toLowerCase() + d.drop.short.slice(1))}</span>` : ''}`]);
+  // item 219: rides the Enquiries switch, as both are people reaching out; a month with none, and none before, says nothing
+  const contacts = d.contacts && on('enquiries') ? contactWords(d.contacts, d.priorLabel) : null;
+  if (contacts) tileSpecs.push(['Clicks to contact', n1(d.contacts!.calls + d.contacts!.emails), contacts]);
   if (!on('enquiries')) { /* left out */ }
-  else if (d.enquiries === null) tiles.push(tile('Enquiries', '—', 'We couldn’t read the enquiries this time.'));
-  else tiles.push(tile('Enquiries', n1(d.enquiries), d.enquiries === 0 ? 'No one wrote in through the site' : `${d.enquiries === 1 ? 'Someone' : 'People'} wrote in through your site`));
+  else if (d.enquiries === null) tileSpecs.push(['Enquiries', '—', 'We couldn’t read the enquiries this time.']);
+  else tileSpecs.push(['Enquiries', n1(d.enquiries), d.enquiries === 0 ? 'No one wrote in through the site' : `${d.enquiries === 1 ? 'Someone' : 'People'} wrote in through your site`]);
+  const tiles = tileSpecs.map(([l, v, sub]) => tile(l, v, sub, Math.floor(100 / tileSpecs.length)));
   if (tiles.length) parts.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${tiles.join('')}</tr></table>`);
   // ── builder list item 184: Google, AI answers, reviews and health ──
   const up = (c: string) => `<span style="color:${/^down/.test(c) ? '#bf3535' : '#11744a'}">${esc(c)}</span>`;
@@ -475,11 +498,20 @@ export async function loadReportData(site: SiteRow, win: { month: string; startI
     health: rows<{ day: string; critical: number; warning: number; fingerprints?: string[] }>(hQ),
   });
   const siteName = String(rows<{ business_name?: string }>(identQ)?.[0]?.business_name || '').trim();
+  // builder list item 219: the month before's presses, and why visits fell when they did (the
+  // sources of this month's visits come from the rows already read, unless they were cut short)
+  const [priorPresses, drop] = await Promise.all([
+    base.contacts ? safe(svcCount(`presence_visits?site_id=eq.${site.id}&kind=in.(phone,email)&ts=gte.${priorWin.startIso}&ts=lt.${win.startIso}`)) : Promise.resolve(null),
+    base.visitors !== null && extras.priorVisitors !== null
+      ? safe(readVisitDrop(site, { startIso: win.startIso, endIso: win.endIso, priorStartIso: priorWin.startIso, month: win.month, prior, wasLabel: priorWin.label.replace(/ \d{4}$/, ''), name: siteName, now: base.visitors, was: extras.priorVisitors, sourcesNow: visits && !vq?.truncated ? sourcesFromRows(visits) : null }))
+      : Promise.resolve(null),
+  ]);
+  const contacts = base.contacts ? { ...base.contacts, prior: typeof priorPresses === 'number' ? priorPresses : null } : null;
   // builder list item 185: the map rank grid, for clients the studio switched it on for
   const grid = await safe(readGridSetting(site.id));
   const mq = grid && grid.enabled && grid.phrases.length ? await safe(svc(`presence_rank_grid_scans?site_id=eq.${site.id}&scanned_at=gte.${encodeURIComponent(priorWin.startIso)}&scanned_at=lt.${encodeURIComponent(win.endIso)}&select=phrase,kind,scanned_at,size,spacing_mi,ranks,top3,total&order=scanned_at.desc&limit=60`)) : null;
   const maps = grid && mq ? foldMaps({ phrases: grid.phrases, now: [Date.parse(win.startIso), Date.parse(win.endIso)], prior: [Date.parse(priorWin.startIso), Date.parse(win.startIso)], scans: rows<any>(mq) }) : null;
-  return { ...base, ...extras, maps, siteName, priorLabel: priorWin.label.replace(/ \d{4}$/, ''), speed: reportSpeed(sq ? sq.rows as SpeedRow[] : null) };
+  return { ...base, ...extras, maps, siteName, priorLabel: priorWin.label.replace(/ \d{4}$/, ''), speed: reportSpeed(sq ? sq.rows as SpeedRow[] : null), contacts, drop };
 }
 
 /** The studio that looks after this client site (the active service link): its brand,
