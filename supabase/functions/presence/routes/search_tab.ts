@@ -9,6 +9,9 @@
 //   GET /visibility/phrases    the two or three phrases the business wants to be found for
 //   PUT /visibility/phrases    { phrases: [...] } (builder list item 160); GET /visibility adds
 //                              them too, each with the page headline it's in, and ideas
+//   GET /visibility            (builder list item 219) adds near_miss: the searches Google
+//                              showed the site for at places 8 to 20, each with its page and
+//                              one thing to fix there; and drop: why last month's visits fell
 // Under /visibility for the reason routes/visibility.ts gives: search works whoever
 // hosts the site, and the /search segment is closed to a watch-only plan. Each read
 // here is best-effort and leaves its own part out when it fails.
@@ -21,6 +24,9 @@ import { readSearchPages } from './analytics.ts';
 import { searchTasks, pageMovers, normalizeFollowed, applyFollow, followedSeries, draftLlmsTxt, FOLLOW_MAX, LLMS_TXT_MAX, type SearchTask } from '../lib/search_tools.ts';
 import { applyPhrases, normalizePhrases, pageHeadlines, phraseFoundIn, phraseIdeas, PHRASES_MAX } from '../lib/search_phrases.ts';
 import { phraseTasks } from '../lib/search_tools.ts';
+import { nearMisses, type NearMiss } from '../lib/near_miss.ts';
+import { readVisitDrop, lastWholeMonths, type VisitDrop } from '../lib/visit_drop.ts';
+import { vocabFor } from '../lib/industry_vocab.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 const rows = (r: unknown): any[] => { const j = (r as { json?: unknown } | null)?.json; return Array.isArray(j) ? j : []; };
@@ -74,7 +80,7 @@ export async function handlePhrasesGet(site: SiteRow, cors: Record<string, strin
 
 /** What GET /visibility adds for the new Search tab. */
 export async function searchTabExtras(site: SiteRow, i: { address: { url: string } | null; consoleConnected: boolean; listingConnected: boolean; period: string | null; review: { issues?: Array<{ title: string; priority: string; fix?: string }> } | null }) {
-  const [set, identQ, redirQ, followRaw, healthQ, nowPages, priorPages, phrases] = await Promise.all([
+  const [set, identQ, redirQ, followRaw, healthQ, nowPages, priorPages, phrases, nearMiss, drop] = await Promise.all([
     searchSettings(site.id),
     safe(svc(`presence_identity?site_id=eq.${site.id}&select=seo_title,seo_description&limit=1`)),
     safe(svc(`presence_redirects?site_id=eq.${site.id}&select=id&limit=50`)),
@@ -83,6 +89,8 @@ export async function searchTabExtras(site: SiteRow, i: { address: { url: string
     i.period ? safe(readSearchPages(site.client_id, i.period, 25)) : Promise.resolve(null),
     i.period ? safe(readSearchPages(site.client_id, monthBefore(i.period), 25)) : Promise.resolve(null),
     phrasesView(site),
+    i.period ? safe(nearMissView(site, i.period, i.address ? i.address.url : '')) : Promise.resolve(null),
+    safe(dropView(site)),
   ]);
   const s = set.row, ident = rows(identQ)[0] || {};
   const followed = normalizeFollowed(followRaw).terms;
@@ -110,7 +118,45 @@ export async function searchTabExtras(site: SiteRow, i: { address: { url: string
     movers,
     follow: { count: followed.length, max: FOLLOW_MAX },
     phrases,
+    near_miss: nearMiss,
+    drop,
   };
+}
+
+/** Builder list item 219: the searches just off page one in the month Search Console last
+ *  kept, from the search-and-page pairs the sync keeps (0220), each checked against the
+ *  page's own search headline. Null when no pairs are kept yet (before 0220, or before the
+ *  first sync after it), so the card waits instead of saying "none". */
+export async function nearMissView(site: SiteRow, period: string, origin: string): Promise<{ period: string; list: NearMiss[]; from: number; to: number } | null> {
+  const cid = encodeURIComponent(String(site.client_id || ''));
+  const hosted = site.edition !== 'monitor';
+  const [pairQ, identQ, setQ] = await Promise.all([
+    safe(svc(`presence_search_terms?client_id=eq.${cid}&dimension=eq.query_page&period=in.(${period},${monthBefore(period)})&select=key,period,clicks,impressions,position&order=impressions.desc&limit=600`)),
+    hosted ? safe(svc(`presence_identity?site_id=eq.${site.id}&select=business_name,seo_title,seo_description&limit=1`)) : Promise.resolve(null),
+    hosted ? safe(svc(`presence_settings?site_id=eq.${site.id}&select=page_seo,pages,pages_noindex,industry_key&limit=1`)) : Promise.resolve(null),
+  ]);
+  if (!fresh(pairQ)) return null;
+  const all = rows(pairQ), now = all.filter((r) => r.period === period);
+  if (!now.length) return null;
+  const ident = rows(identQ)[0] || {}, set = rows(setQ)[0] || {};
+  const readable = hosted && fresh(identQ) && fresh(setQ);
+  const seo = set.page_seo && typeof set.page_seo === 'object' ? set.page_seo as Record<string, { description?: string }> : {};
+  const hidden = Array.isArray(set.pages_noindex) ? set.pages_noindex.map(String) : [];
+  const own = Object.entries(seo).filter(([, v]) => String(v?.description || '').trim()).map(([k]) => k);
+  if (String(ident.seo_description || '').trim()) own.push('home');
+  const headlines = readable ? pageHeadlines({ name: String(ident.business_name || ''), seoTitle: ident.seo_title, industry: set.industry_key, pageSeo: set.page_seo, pages: set.pages, hidden }) : null;
+  const list = nearMisses({ pairs: now, prior: all.filter((r) => r.period !== period), origin: origin || siteOrigin(site), headlines, hidden, ownDescriptions: own, offeringPath: vocabFor(String(set.industry_key || 'generic')).offeringPath });
+  return { period, list, from: 8, to: 20 };
+}
+
+/** Builder list item 219: why last month's visits fell against the month before, when they
+ *  fell enough to say (lib/visit_drop.ts). The whole UTC months, as the Sites table counts. */
+export async function dropView(site: SiteRow, nowIso = new Date().toISOString()): Promise<(VisitDrop & { month: string; prior: string; month_label: string; prior_label: string }) | null> {
+  if (site.edition === 'monitor') return null;   // no visit counter on a site hosted elsewhere
+  const m = lastWholeMonths(nowIso);
+  const nameQ = await safe(svc(`presence_identity?site_id=eq.${site.id}&select=business_name&limit=1`));
+  const d = await readVisitDrop(site, { startIso: m.startIso, endIso: m.endIso, priorStartIso: m.priorStartIso, month: m.month, prior: m.prior, wasLabel: m.priorLabel, name: rows(nameQ)[0]?.business_name || null });
+  return d ? { ...d, month: m.month, prior: m.prior, month_label: m.label, prior_label: m.priorLabel } : null;
 }
 
 /** PUT /visibility/phrases { phrases }: the two or three phrases, as asked (item 160). A new

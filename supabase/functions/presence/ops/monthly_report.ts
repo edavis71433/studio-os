@@ -37,6 +37,7 @@ import {
   type ReportPart, type ProposeSetting, type Proposal,
 } from '../lib/report_choices.ts';
 import { normalizeDecisions } from '../lib/do_next.ts';
+import { readVisitDrop, sourcesFromRows, type VisitDrop } from '../lib/visit_drop.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { json } from '../../_shared/http.ts';
 
@@ -102,6 +103,10 @@ export interface ReportData {
   // builder list item 211: how fast pages showed for the month's visitors (lib/visits.ts speedOf)
   speed: ReportSpeed | null;
   maps?: ReportMaps | null;      // builder list item 185: the map rank grid, for clients the studio switched it on for
+  // builder list item 219: clicks to contact (the phone numbers and email addresses pressed on
+  // the site, from the same visit rows) with the month before's; and why visits fell, when they did
+  contacts?: { calls: number; emails: number; prior: number | null } | null;
+  drop?: VisitDrop | null;
 }
 /** Builder list item 185: the month's map rank grid. The first search with a scan that
  *  month is drawn; the others are a line each. */
@@ -200,6 +205,14 @@ export function blockedReason(email: string | null, suppression: string | null):
   return suppression === 'opt_out' ? 'unsubscribed' : 'bounced';
 }
 
+/** Builder list item 200 (review file 06, finding 60): the report waits until the website
+ *  is live. A site counts once it has gone live, as the portal's own card asks
+ *  (routes/client_delivery.ts), and a website the studio watches on the client's own host
+ *  (edition monitor) is live already, so a watch-plan client keeps getting theirs. Pure. */
+export function reportSiteLive(site: { edition?: string | null; status?: string | null; last_published_at?: string | null } | null | undefined): boolean {
+  return !!site && (site.edition === 'monitor' || site.status === 'live' || !!site.last_published_at);
+}
+
 // ── Bug hunt D7 (Nov 10): the month is the site's own, not London's ──
 // The month's edges, the first days a report may go, and the date of the last publish
 // were all worked out on the UTC clock, so a visit or a publish at 6pm Pacific on October
@@ -283,16 +296,18 @@ export function anyZoneInSendDays(nowIso: string): boolean {
 export function foldReport(i: { month: string; label: string; startMs: number; endMs: number; visits: VisitRow[] | null; enquiries: number | null; publishes: Array<{ created_at: string }> | null; address: string; visitsCap: number; timeZone?: string }): ReportData {
   const inMonth = (iso: string) => { const t = Date.parse(iso); return Number.isFinite(t) && t >= i.startMs && t < i.endMs; };
   let visitors: number | null = null, pageviews: number | null = null, topPages: ReportData['topPages'] = [], truncated = false;
+  let contacts: ReportData['contacts'] = null;
   if (i.visits) {
     const rows = i.visits.filter((v) => inMonth(String(v.ts)));
     const days = Math.round((i.endMs - i.startMs) / 86_400_000);
     const agg = aggregateVisits(rows, i.endMs, days);
     visitors = agg.visitors; pageviews = agg.pageviews; topPages = agg.topPages.slice(0, 5); truncated = i.visits.length >= i.visitsCap;
+    contacts = { calls: agg.events.phone || 0, emails: agg.events.email || 0, prior: null };   // item 219
   }
   const pubs = i.publishes ? i.publishes.filter((p) => inMonth(p.created_at)) : null;
   const lastPublishedAt = pubs && pubs.length ? pubs.map((p) => p.created_at).sort().slice(-1)[0] : null;
   return { month: i.month, monthLabel: i.label, visitors, pageviews, truncated, enquiries: i.enquiries, topPages, publishes: pubs ? pubs.length : null, lastPublishedAt, address: i.address, ...(i.timeZone ? { timeZone: i.timeZone } : {}),
-    siteName: '', priorLabel: '', priorVisitors: null, search: null, followed: [], ai: null, reviews: null, health: null, speed: null, maps: null };
+    siteName: '', priorLabel: '', priorVisitors: null, search: null, followed: [], ai: null, reviews: null, health: null, speed: null, maps: null, contacts, drop: null };
 }
 
 /** Builder list item 185: the map rank grid for the report, from the scans in the month and
@@ -365,6 +380,17 @@ export function foldExtras(i: {
 }
 
 const n1 = (n: number) => n.toLocaleString('en-US');
+/** Builder list item 219: "15 calls and 8 emails from the site, up 5 on September", or null
+ *  when nobody pressed either, this month or the one before. Pure. */
+export function contactWords(c: { calls: number; emails: number; prior: number | null }, priorLabel: string): string | null {
+  const total = c.calls + c.emails;
+  if (!total && !c.prior) return null;
+  const bits = [c.calls ? `${n1(c.calls)} call${c.calls === 1 ? '' : 's'}` : '', c.emails ? `${n1(c.emails)} email${c.emails === 1 ? '' : 's'}` : ''].filter(Boolean);
+  const what = bits.length ? `${bits.join(' and ')} from the site` : 'Nobody pressed a phone number or email address';
+  const was = priorLabel || 'the month before';
+  const change = c.prior === null ? '' : total === c.prior ? `, the same as ${was}` : `, ${total > c.prior ? 'up' : 'down'} ${n1(Math.abs(total - c.prior))} on ${was}`;
+  return what + change;
+}
 const ordinalOf = (n: number) => { const t = n % 100; return t >= 11 && t <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] || 'th'; };
 const pageName = (p: string) => p === '/' || p === '' ? 'Home page' : p.replace(/^\//, '').replace(/\/$/, '').replace(/[-_]/g, ' ').replace(/\//g, ' › ');
 
@@ -377,15 +403,20 @@ export function reportHtml(d: ReportData, o: { studioName: string; note: string;
   parts.push(`<p style="margin:0 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#6b6478">Your website in ${esc(d.monthLabel)}</p>`);
   parts.push(`<h1 style="margin:0 0 14px;font-family:'Iowan Old Style',Palatino,Georgia,serif;font-size:24px;line-height:1.2">${who ? `${esc(who)}, here’s` : 'Here’s'} how your website did${d.address ? ` at <a href="${esc(d.address)}" style="text-decoration:none">${esc(d.address.replace(/^https?:\/\//, ''))}</a>` : ''}.</h1>`);
   if (o.note.trim()) parts.push(`<blockquote style="margin:0 0 18px;padding:12px 16px;border-left:3px solid #d6d4e2;background:#f7f6fb;border-radius:0 10px 10px 0;color:#2b2540">${esc(o.note.trim()).replace(/\n/g, '<br>')}<br><span style="font-size:13px;color:#6b6478">${esc(o.studioName)}</span></blockquote>`);
-  const tile = (label: string, value: string, sub: string) => `<td width="50%" style="padding:0 6px 12px 0;vertical-align:top"><div style="background:#f7f6fb;border-radius:12px;padding:14px 16px"><div style="font-size:12px;color:#6b6478">${label}</div><div style="font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:4px 0 2px">${value}</div><div style="font-size:12px;color:#6b6478">${sub}</div></div></td>`;
-  const tiles: string[] = [];
+  // builder list item 219: three tiles share the row (a third for Clicks to contact)
+  const tileSpecs: Array<[string, string, string]> = [];
+  const tile = (label: string, value: string, sub: string, width: number) => `<td width="${width}%" style="padding:0 6px 12px 0;vertical-align:top"><div style="background:#f7f6fb;border-radius:12px;padding:14px 16px"><div style="font-size:12px;color:#6b6478">${label}</div><div style="font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:4px 0 2px">${value}</div><div style="font-size:12px;color:#6b6478">${sub}</div></div></td>`;
   // bug hunt H5: the counter knows a person for one day only, so a month's count is visits
   if (!on('visits')) { /* left out */ }
-  else if (d.visitors === null) tiles.push(tile('Visits', '—', 'We couldn’t read the visit counts this time.'));
-  else tiles.push(tile('Visits', n1(d.visitors), `${n1(d.pageviews || 0)} page${(d.pageviews || 0) === 1 ? '' : 's'} viewed${d.truncated ? ', from recent activity' : ''}${changeOn(d.visitors, d.priorVisitors, d.priorLabel) ? `, ${changeOn(d.visitors, d.priorVisitors, d.priorLabel)}` : ''}`));
+  else if (d.visitors === null) tileSpecs.push(['Visits', '—', 'We couldn’t read the visit counts this time.']);
+  else tileSpecs.push(['Visits', n1(d.visitors), `${n1(d.pageviews || 0)} page${(d.pageviews || 0) === 1 ? '' : 's'} viewed${d.truncated ? ', from recent activity' : ''}${changeOn(d.visitors, d.priorVisitors, d.priorLabel) ? `, ${changeOn(d.visitors, d.priorVisitors, d.priorLabel)}` : ''}${d.drop && d.drop.short ? `, <span style="color:#bf3535">${esc(d.drop.short.charAt(0).toLowerCase() + d.drop.short.slice(1))}</span>` : ''}`]);
+  // item 219: rides the Enquiries switch, as both are people reaching out; a month with none, and none before, says nothing
+  const contacts = d.contacts && on('enquiries') ? contactWords(d.contacts, d.priorLabel) : null;
+  if (contacts) tileSpecs.push(['Clicks to contact', n1(d.contacts!.calls + d.contacts!.emails), contacts]);
   if (!on('enquiries')) { /* left out */ }
-  else if (d.enquiries === null) tiles.push(tile('Enquiries', '—', 'We couldn’t read the enquiries this time.'));
-  else tiles.push(tile('Enquiries', n1(d.enquiries), d.enquiries === 0 ? 'No one wrote in through the site' : `${d.enquiries === 1 ? 'Someone' : 'People'} wrote in through your site`));
+  else if (d.enquiries === null) tileSpecs.push(['Enquiries', '—', 'We couldn’t read the enquiries this time.']);
+  else tileSpecs.push(['Enquiries', n1(d.enquiries), d.enquiries === 0 ? 'No one wrote in through the site' : `${d.enquiries === 1 ? 'Someone' : 'People'} wrote in through your site`]);
+  const tiles = tileSpecs.map(([l, v, sub]) => tile(l, v, sub, Math.floor(100 / tileSpecs.length)));
   if (tiles.length) parts.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${tiles.join('')}</tr></table>`);
   // ── builder list item 184: Google, AI answers, reviews and health ──
   const up = (c: string) => `<span style="color:${/^down/.test(c) ? '#bf3535' : '#11744a'}">${esc(c)}</span>`;
@@ -475,11 +506,20 @@ export async function loadReportData(site: SiteRow, win: { month: string; startI
     health: rows<{ day: string; critical: number; warning: number; fingerprints?: string[] }>(hQ),
   });
   const siteName = String(rows<{ business_name?: string }>(identQ)?.[0]?.business_name || '').trim();
+  // builder list item 219: the month before's presses, and why visits fell when they did (the
+  // sources of this month's visits come from the rows already read, unless they were cut short)
+  const [priorPresses, drop] = await Promise.all([
+    base.contacts ? safe(svcCount(`presence_visits?site_id=eq.${site.id}&kind=in.(phone,email)&ts=gte.${priorWin.startIso}&ts=lt.${win.startIso}`)) : Promise.resolve(null),
+    base.visitors !== null && extras.priorVisitors !== null
+      ? safe(readVisitDrop(site, { startIso: win.startIso, endIso: win.endIso, priorStartIso: priorWin.startIso, month: win.month, prior, wasLabel: priorWin.label.replace(/ \d{4}$/, ''), name: siteName, now: base.visitors, was: extras.priorVisitors, sourcesNow: visits && !vq?.truncated ? sourcesFromRows(visits) : null }))
+      : Promise.resolve(null),
+  ]);
+  const contacts = base.contacts ? { ...base.contacts, prior: typeof priorPresses === 'number' ? priorPresses : null } : null;
   // builder list item 185: the map rank grid, for clients the studio switched it on for
   const grid = await safe(readGridSetting(site.id));
   const mq = grid && grid.enabled && grid.phrases.length ? await safe(svc(`presence_rank_grid_scans?site_id=eq.${site.id}&scanned_at=gte.${encodeURIComponent(priorWin.startIso)}&scanned_at=lt.${encodeURIComponent(win.endIso)}&select=phrase,kind,scanned_at,size,spacing_mi,ranks,top3,total&order=scanned_at.desc&limit=60`)) : null;
   const maps = grid && mq ? foldMaps({ phrases: grid.phrases, now: [Date.parse(win.startIso), Date.parse(win.endIso)], prior: [Date.parse(priorWin.startIso), Date.parse(win.startIso)], scans: rows<any>(mq) }) : null;
-  return { ...base, ...extras, maps, siteName, priorLabel: priorWin.label.replace(/ \d{4}$/, ''), speed: reportSpeed(sq ? sq.rows as SpeedRow[] : null) };
+  return { ...base, ...extras, maps, siteName, priorLabel: priorWin.label.replace(/ \d{4}$/, ''), speed: reportSpeed(sq ? sq.rows as SpeedRow[] : null), contacts, drop };
 }
 
 /** The studio that looks after this client site (the active service link): its brand,
@@ -571,8 +611,10 @@ export function afterFailure(s: ReportSetting, month: string, before: string | n
  *  month under the studio's visits number is skipped the same way ("quiet"); once the
  *  client's report is out, the extra people and the studio's copy get theirs, each on
  *  its own (one that fails doesn't undo the month). Item 176: the suggestion it carried
- *  is logged, so a picked one rests three months. */
-export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOString()): Promise<{ sent: number; skipped: number; unreachable: number; failures: number; quiet?: number; not_due?: boolean }> {
+ *  is logged, so a picked one rests three months. Item 200: a site that isn't live yet
+ *  is skipped once for the month the same way ("not_live", counted as waiting), before
+ *  anything else is read, and its first report goes out the month after it goes live. */
+export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOString()): Promise<{ sent: number; skipped: number; unreachable: number; failures: number; quiet?: number; waiting?: number; not_due?: boolean }> {
   // D7: each site's month turns on its own clock; on a day no clock is in its first days, read nothing
   if (!anyZoneInSendDays(nowIso)) return { sent: 0, skipped: 0, unreachable: 0, failures: 0, not_due: true };
   // Item 209 (review file 06, finding 63): every client with the report on, a page at a
@@ -585,7 +627,7 @@ export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOStr
       yield* page as Array<{ site_id: string; body: string }>;
     }
   })();
-  let sent = 0, skipped = 0, unreachable = 0, failures = 0, quiet = 0;
+  let sent = 0, skipped = 0, unreachable = 0, failures = 0, quiet = 0, waiting = 0;
   for await (const r of rows) {
     if (sent >= limit) break;
     let seen: ReportSetting; try { seen = normalizeReportSetting(JSON.parse(r.body)); } catch { skipped++; continue; }
@@ -595,6 +637,16 @@ export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOStr
     const sq = await svc(`presence_sites?id=eq.${r.site_id}&select=*&limit=1`);
     const site = (Array.isArray(sq.json) ? sq.json[0] : null) as SiteRow | null;
     if (!site) { skipped++; continue; }
+    // item 200: "how your website did" for a site nobody can visit yet reads as bad news, so the
+    // month is marked skipped with its reason (the same claim: only if still due) and nothing is sent
+    if (!reportSiteLive(site)) {
+      const held = await SAVE(site.id, (s) => {
+        if (!reportDueNow(s, nowIso, tz)) throw new NotDue();
+        return { ...s, last_month: win.month, tries: null, last_result: { month: win.month, status: 'skipped', reason: 'not_live', at: nowIso } };
+      }).catch(() => null);
+      if (held) waiting++; else skipped++;
+      continue;
+    }
     const reach = await reachOf(site);
     // claim the month: only if it is still due on the LATEST setting; only the month mark (and, for a client who can't be emailed, the reason) changes
     let before: string | null = null, claimedSetting: ReportSetting | null = null;
@@ -631,7 +683,7 @@ export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOStr
       await SAVE(site.id, (s) => afterFailure(s, win.month, before, nowIso)).catch(() => null);
     }
   }
-  return { sent, skipped, unreachable, failures, ...(quiet ? { quiet } : {}) };
+  return { sent, skipped, unreachable, failures, ...(quiet ? { quiet } : {}), ...(waiting ? { waiting } : {}) };
 }
 
 // ── the site-scoped routes: GET and PUT /report/monthly, POST /report/monthly/preview ──
@@ -655,6 +707,7 @@ async function reportCard(site: SiteRow, s: ReportSetting, principal: { email?: 
     parts: REPORT_PARTS.map((k) => ({ key: k, words: REPORT_PART_WORDS[k] })),
     maps_on: (await readGridSetting(site.id).catch(() => null))?.enabled === true,   // item 185: the map part waits for the grid
     propose_next: pr.next, propose_options: pr.options,
+    live: reportSiteLive(site),   // item 200: false while the report waits for the website to go live
   };
 }
 export async function handleReportGet(site: SiteRow, principal: { email?: string | null }, cors: Record<string, string>) {
