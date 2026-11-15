@@ -254,6 +254,7 @@
 //   • a per-document `proposal`/`contract` token (links sent before): the single
 //     document, so an old email keeps working.
 const FN="https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/presence";
+const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -271,7 +272,7 @@ async function api(path,method,body){
   const read=!method||method==='GET';
   const ac=read&&typeof AbortController!=='undefined'?new AbortController():null;
   const t=ac?setTimeout(()=>ac.abort(),20000):0;
-  try{const r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY,'apikey':KEY},body:body?JSON.stringify(body):undefined,signal:ac?ac.signal:undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+  try{const r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY,'apikey':KEY,'x-region':FN_REGION},body:body?JSON.stringify(body):undefined,signal:ac?ac.signal:undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
   catch(_){return{ok:false,status:0,offline:true,body:{message:OFFLINE_MSG}};}
   finally{if(t)clearTimeout(t);}
 }
