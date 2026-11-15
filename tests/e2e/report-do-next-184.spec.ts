@@ -39,15 +39,16 @@ test.describe('Settings › Monthly report: what it holds, the PDF copy (builder
     const sec = page.locator('#report');
     await expect(sec.locator('#reportInL')).toHaveText('In the report:');
     // items 160 and 176: each part is a button that leaves it in or out; Most read pages is its own part now
-    await expect(sec.locator('#reportIn button')).toHaveText(['Visits', 'Enquiries', 'On Google', 'AI answers, off', 'Reviews', 'Website health', 'Most read pages', 'What changed']);
+    await expect(sec.locator('#reportIn button')).toHaveText(['Visits', 'Enquiries', 'On Google', 'On Google Maps, off', 'AI answers, off', 'Reviews', 'Website health', 'Most read pages', 'What changed']);   // item 185: the map part waits for its grid, like AI answers
     await expect(sec.locator('#reportIn button').nth(3)).toHaveClass(/off/);
+    await expect(sec.locator('#reportIn button').nth(4)).toHaveClass(/off/);
     await expect(sec).toContainText('how their website did, each part when there’s something to say');
     // as drawn for items 160 and 176: the report's switch, who gets it (a copy, a quiet month), what it says, then the PDF copy and the AI check
     const order = await sec.locator('#sw-report, #sw-copy, #sw-quiet, #reportIn, #sw-pdf, #sw-ai').evaluateAll((els) => els.map((e) => e.id));
     expect(order).toEqual(['sw-report', 'sw-copy', 'sw-quiet', 'reportIn', 'sw-pdf', 'sw-ai']);
     await sec.locator('#sw-ai').click();
-    await expect(sec.locator('#reportIn button').nth(3)).toHaveText('AI answers');
-    await expect(sec.locator('#reportIn button').nth(3)).not.toHaveClass(/off/);
+    await expect(sec.locator('#reportIn button').nth(4)).toHaveText('AI answers');
+    await expect(sec.locator('#reportIn button').nth(4)).not.toHaveClass(/off/);
   });
 
   test('Attach a PDF copy: on by default, saves as it flips', async ({ page }) => {

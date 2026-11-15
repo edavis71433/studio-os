@@ -72,12 +72,18 @@ function shelfRows(invoices,docs,snaps,reports,todayYmd,pending,now){
   }
   for(const i of (invoices||[])){
     if(!i||!i.id)continue;
-    const st=moneyState(i,todayYmd,pending);const amt=i.amount?fmtMoney(i.amount):'';
+    const st=moneyState(i,todayYmd,pending);
+    // sales item 120: paid in parts, the row says what is left of the whole (or the whole, once paid)
+    // and each part sits under it with its own receipt
+    const parts=Array.isArray(i.payments)?i.payments.filter(p=>p&&p.id):[];
+    const whole=parts.length&&Number(i.total)>0?Number(i.total):0;
+    const amt=whole?(st==='paid'?fmtMoney(whole):st?fmtMoney(i.amount)+' left of '+fmtMoney(whole):fmtMoney(i.amount)):i.amount?fmtMoney(i.amount):'';
     const pay=(st==='upcoming'||st==='overdue')&&/^https:\/\//.test(String(i.pay_url||''))?i.pay_url:'';
     const view=shelfUrl(i.view_url);
     const info=[amt,st==='paid'?(i.paid_at?'paid '+shelfDay(i.paid_at,now):'paid'):st==='processing'?'':st?(i.due_date?'due '+shelfDay(i.due_date,now):''):'withdrawn'].filter(Boolean).join(' · ');
     const act=st==='paid'?(view?{verb:'Receipt',href:view}:null):st==='processing'?{note:'processing',inv:i}:!st?null:pay?{verb:'Pay',href:pay,pay:true}:view?{verb:'View',href:view}:{note:'details'};
-    rows.push({cat:'invoices',kind:'Invoice',title:i.name||'Invoice',info,when:String(i.created_at||i.due_date||''),chip:st?MONEY_WORD[st]:'Voided',tone:st==='paid'?'sig':st==='overdue'?'od':st==='processing'?'pr':st?'':'mute',act});
+    rows.push({cat:'invoices',kind:i.number?'Invoice '+i.number:'Invoice',title:i.name||'Invoice',info,when:String(i.created_at||i.due_date||''),chip:st?MONEY_WORD[st]:'Voided',tone:st==='paid'?'sig':st==='overdue'?'od':st==='processing'?'pr':st?'':'mute',act,
+      parts:parts.map(p=>({amount:Number(p.amount)||0,paid_at:p.paid_at,method:String(p.method||''),view:shelfUrl(p.view_url)}))});
   }
   for(const d of (docs||[])){
     if(!d||!d.id)continue;
@@ -158,6 +164,15 @@ const row = (rows, title) => rows.find((r) => r.title === title);
     { kind: 'estimate', id: 'e2', title: 'Logo', status: 'approved', amount: 300, created_at: '2026-10-22T15:00:00Z', view_url: 'https://app.example/doc.html?t=e2' },
     { kind: 'estimate', id: 'e3', title: 'Signage', status: 'declined', amount: 80, created_at: '2026-10-23T15:00:00Z' },
   ];
+  // sales item 120: an invoice paid in parts carries its number, says what is left of the whole, and its parts
+  const parted = shelfRows([{ id: 'i13', number: '#0013', name: 'Website build', amount: 1000, status: 'open', due_date: '2099-01-01', created_at: '2026-11-04T15:00:00Z', pay_url: 'https://pay.example/i13', total: 1500, paid_so_far: 500,
+    payments: [{ id: 'p1', amount: 500, paid_at: '2026-11-06T15:00:00Z', method: 'Check', view_url: 'https://docs.example/p1' }, { id: '', amount: 9 }] },
+    { id: 'i12', number: '#0012', name: 'Deposit', amount: 600, status: 'paid', paid_at: '2026-10-02T15:00:00Z', created_at: '2026-10-01T15:00:00Z', total: 900, payments: [{ id: 'p0', amount: 300, paid_at: '2026-09-20T15:00:00Z', method: '', view_url: 'javascript:alert(1)' }] }], [], [], [], TODAY, [], NOW);
+  ok('item 120: the row is named with the invoice number', parted[0].kind === 'Invoice #0013' && parted[1].kind === 'Invoice #0012', JSON.stringify(parted.map((x) => x.kind)));
+  ok('item 120: open, it says what is left of the whole', parted[0].info.startsWith('$1,000 left of $1,500 · due '), parted[0].info);
+  ok('item 120: paid, it says the whole', parted[1].info.startsWith('$900 · paid '), parted[1].info);
+  ok('item 120: its parts ride along, a part with no id is dropped, and only a safe link is kept', parted[0].parts.length === 1 && parted[0].parts[0].view === 'https://docs.example/p1' && parted[0].parts[0].method === 'Check' && parted[1].parts[0].view === '', JSON.stringify(parted.map((x) => x.parts)));
+  ok('item 120: an invoice without parts has an empty list', shelfRows([{ id: 'x', name: 'A', amount: 5, status: 'open', created_at: '2026-11-01' }], [], [], [], TODAY, [], NOW)[0].parts.length === 0);
   const r = shelfRows([], docs, [], [], TODAY, [], NOW);
   const s1 = row(r, 'Website agreement'), s2 = row(r, 'Care agreement');
   ok('agreement: signed → Signed, View, "signed Sep 3"', s1.cat === 'agreements' && s1.kind === 'Agreement' && s1.chip === 'Signed' && s1.tone === 'sig' && s1.act.verb === 'View' && s1.info === 'signed Sep 3');

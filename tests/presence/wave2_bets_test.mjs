@@ -71,11 +71,15 @@ ok('7: the route ships source_labels on both branches (over the ceiling too)', (
 ok('7: today.html paints chips from source_labels and the honest low-confidence line', /d\.source_labels\) \? d\.source_labels\.filter\(Boolean\)\.slice\(0, 4\)/.test(today) && /class="src"/.test(today) && /Part of this is judgment rather than measurement/.test(today));
 ok('7: help.html does the same', /d\.source_labels\) \? d\.source_labels\.filter\(Boolean\)\.slice\(0, 4\)/.test(help) && /Part of this is judgment rather than measurement/.test(help));
 ok('7: both pages read the route’s `answer` (the old `text` key kept as a fallback)', /d\.answer \|\| d\.text/.test(today) && /d\.answer \|\| d\.text/.test(help));
-ok('7: Draft a reply is on all three Inbox composers', /id="msgDraft">Draft a reply/.test(inbox) && /id="supDraft">Draft a reply/.test(inbox) && /id="leadDraft">Draft a reply/.test(inbox));
-ok('7: the draft comes from the EXISTING /writer/rewrite (action write)', /api\('\/writer\/rewrite','POST',\{action:'write',field:'answer',prompt:/.test(inbox));
-ok('7: the draft lands in the textarea for editing — never submitted', /ta\.value=v\?\(v\+'\\n\\n'\+text\):text;/.test(inbox) && !/draftReply[\s\S]{0,1200}\.submit\(\)/.test(inbox) && !/draftReply[\s\S]{0,1200}'\/forms\/inbox\//.test(inbox));
-ok('7: the quiet "drafted by AI" note stays until the user edits', /note\.textContent='Drafted by AI — edit before sending\.';/.test(inbox) && /ta\.addEventListener\('input',\(\)=>\{const n=ta\.parentNode\.querySelector\('\.ai-note'\);if\(n\)n\.remove\(\);\},\{once:true\}\);/.test(inbox));
-ok('7: Send stays the one filled button in each composer (Draft is a plain button)', !/class="primary"[^>]*id="(msgDraft|supDraft|leadDraft)"/.test(inbox) && !/id="(msgDraft|supDraft|leadDraft)"[^>]*class="primary"/.test(inbox));
+// sales item 94 (Nov 2026) moved the three drafts onto AI help: the whole conversation (or the
+// enquiry and the studio's services) instead of a 400-character prompt, off until the studio's
+// owner switches it on. sales-ai.js draws the pill and its notes; the rules below still hold.
+const salesAi = read('sales-ai.js');
+ok('7: Draft a reply is on all three Inbox composers', [['msgBody', 'msgDraft', 'record'], ['supBody', 'supDraft', 'support'], ['leadBody', 'leadDraft', 'enquiry']].every(([ta, id, kind]) => new RegExp(`aiDraftInto\\('${ta}','${id}',\\{[^\\n]*kind:'${kind}'`).test(inbox)) && /label:'Draft a reply'/.test(inbox) && /<script src="\/sales-ai\.js" defer><\/script>/.test(inbox));
+ok('7: the draft comes from AI help (sales item 94), never the old writer', /o\.req\('\/sales\/ai\/draft', 'POST'/.test(salesAi) && !/writer\/rewrite/.test(inbox));
+ok('7: the draft lands in the box for editing and is never submitted', /o\.ta\.value = d\.text;/.test(salesAi) && !/\.submit\(\)|requestSubmit/.test(salesAi) && !/sales\/email|messages'|forms\/inbox/.test(salesAi));
+ok('7: the note says it was drafted by AI, with Try again and Undo draft, and Send waits while it writes', /Drafted by AI from \$\{d\.from/.test(salesAi) && /data-ai="undo">Undo draft/.test(salesAi) && /data-ai="retry">Try again/.test(salesAi) && /gos\(\)\.forEach\(\(g\) => \{ g\.disabled = true; \}\)/.test(salesAi));
+ok('7: Send stays the one filled button in each composer (Draft is a pill)', !/class="primary"[^>]*id="(msgDraft|supDraft|leadDraft)"/.test(inbox) && !/id="(msgDraft|supDraft|leadDraft)"[^>]*class="primary"/.test(inbox) && /btn\.className = 'ai-pill'/.test(salesAi));
 
 // ═══ 12 · sample data on a new trial ═══
 const rows = X.exampleRows('site-1', new Date('2026-10-20T12:00:00Z'), 'ct-1');

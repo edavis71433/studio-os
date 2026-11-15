@@ -32,7 +32,7 @@ ok('sales: contacts read selects client_id and retries narrow on 400', /company,
 // item 84: the search reads every place through one site constant (S = site.id) and one pattern (like = ilike.*q*)
 ok('search: customers come from the bridge links + clients', /presence_service_links\?agency_site_id=eq\.\$\{S\}&status=eq\.active&select=customer_client_id,customer_site_id/.test(crmRoute) && /clients\?id=in\./.test(crmRoute) && /const S = site\.id/.test(crmRoute));
 ok('search: invoices are searched by title or amount', /presence_invoices\?site_id=eq\.\$\{S\}&deleted_at=is\.null&or=\(title\.\$\{like\}/.test(crmRoute) && /like = `ilike\.\*\$\{eq\}\*`/.test(crmRoute));
-ok('search: a money word lists open invoices', /moneyWord/.test(crmRoute) && /status=eq\.open&select=id,title,amount_cents/.test(crmRoute));
+ok('search: a money word lists open invoices', /moneyWord/.test(crmRoute) && /status=eq\.open&select=\$\{INV_SEL\}/.test(crmRoute) && /INV_SEL = 'id,title,amount_cents,/.test(crmRoute));   // sales item 120: one select, with the number
 ok('search: actions land on the record with ?act=', /tab=billing&act=invoice/.test(crmRoute) && /tab=details&act=message/.test(crmRoute));
 ok('search: every result carries a kind', /kind: 'customer'/.test(crmRoute) && /kind: 'invoice'/.test(crmRoute) && /kind: 'action'/.test(crmRoute));
 

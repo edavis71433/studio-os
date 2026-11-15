@@ -386,6 +386,9 @@
   #sumcards{display:flex;flex-direction:column;gap:var(--dds-s3,12px);margin-bottom:var(--dds-s3,12px)}
   #sumcards .card.sc{margin:0}
   #sumcards:empty{display:none}
+  /* sales item 94: Where things stand, at the top of the rail (sales-ai.js draws it) */
+  #aicard,#aicardMain{margin-bottom:var(--dds-s3,12px)}
+  #aicard:empty,#aicardMain:empty{display:none}
   .sc{padding:14px 16px}
   .sc-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
   .sc-h h2{font-family:var(--sans);font-size:15px;font-weight:650;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -408,8 +411,25 @@
   .sc-dl dt{color:var(--soft)} .sc-dl dd{margin:0;font-weight:600;text-align:right}
   .sc-none{font-size:13px;margin:0}
   @media (pointer:coarse){.sc-link{min-height:44px;display:inline-flex;align-items:center}}
+  /* sales item 93: the hand-over pack for a client who leaves */
+  #handoverDlg{margin:auto;border:none;border-radius:20px;padding:0;width:min(620px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto;background:var(--card);color:var(--ink);box-shadow:0 24px 60px rgba(26,13,64,.25)}
+  #handoverDlg::backdrop{background:rgba(23,21,34,.42)}
+  #handoverDlg form{padding:24px 24px 20px}
+  #handoverDlg h2{margin:0 0 4px;font-size:20px;font-weight:700;color:var(--ink);opacity:1}
+  #handoverDlg h2:focus{outline:none}
+  #handoverDlg .hosub{margin:0 0 14px;color:var(--soft);font-size:14px}
+  #handoverDlg ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+  #handoverDlg li{display:grid;grid-template-columns:38px 1fr;gap:12px;align-items:start}
+  #handoverDlg .hoic{width:38px;height:38px;border-radius:12px;background:var(--p-soft);color:var(--p);display:grid;place-items:center}
+  #handoverDlg .hoic svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  #handoverDlg b{display:block;font-size:14px}
+  #handoverDlg li span{font-size:13px;color:var(--soft)}
+  #handoverDlg .hofoot{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:18px}
+  #handoverDlg .hofoot .note{flex:1 1 180px;font-size:12.5px;color:var(--faint)}
+  #handoverDlg .hofoot .abtn{height:44px;border-radius:999px;padding:0 18px;font-size:14px}
+  #handoverDlg .hoerr{color:var(--bad,#b32929);font-size:13.5px;margin:12px 0 0}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script><script src="/sales-ai.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -703,9 +723,11 @@ function renderShell(){
     <div id="pathwrap"></div>
     <div class="body">
       <div class="col-main">
+        <div id="aicardMain"></div>
         ${avail.length?`<div class="tabs" role="tablist" aria-label="Record sections">${tabsHtml}</div><div id="tabbody" role="tabpanel" aria-labelledby="tab-${TAB||avail[0]}"><div class="spin" role="status" aria-label="Loading"></div></div>`:'<p class="muted">Nothing to show for this record yet.</p>'}
       </div>
       <aside class="rail" ${showRail?'':'hidden'}>
+        <div id="aicard"></div>
         <div id="sumcards"></div>
         <div id="dcard"></div>
       </aside>
@@ -728,6 +750,7 @@ function renderShell(){
   renderHighlights();
   renderActions();
   renderSummaryCards();
+  renderAiCard();
   renderDetailsCard();
 }
 
@@ -870,6 +893,8 @@ function renderActions(){
   if(REC.sections&&REC.sections.overview)btns.push({id:'act-note',label:'Note',on:()=>focusComposer('note')});
   if(ids.project)btns.push({id:'act-project',label:'Open project',href:agHref('projects.html','project='+encodeURIComponent(ids.project))});
   if(ids.deal)btns.push({id:'act-pipeline',label:'Deal in pipeline',href:agHref('pipeline.html','deal='+encodeURIComponent(ids.deal))});
+  // sales item 93: a customer with a website can take everything with them (under More)
+  if(ids.client&&REC&&REC.header&&REC.header.status==='customer')btns.push({id:'act-handover',label:'Hand-over pack',on:()=>openHandover()});
   // visual refresh: one filled verb, two quiet ones, the rest under "More"
   // (every button keeps its id and handler — only where it sits changed).
   // Sales review item 41: three in front — Send invoice, Message, Log activity;
@@ -1914,6 +1939,7 @@ function renderRail(){
   const draft=snapComposer();
   host.innerHTML=`<div id="composer"></div><div id="fchips" class="fchips" role="group" aria-label="Filter the timeline"></div><div id="upband"></div><div id="timeline"></div>`;
   renderComposer(); renderFilters(); renderUpcoming(); renderTimeline();
+  if(AI_SUM)AI_SUM.redraw();   // sales item 94: "N new things since then" counts the history just read
   restoreComposer(draft);
   if(FOCUS_COMPOSER){FOCUS_COMPOSER=false;host.scrollIntoView({block:'start'});const ta=$('msgBody');if(ta)ta.focus();}
 }
@@ -1970,7 +1996,7 @@ function renderComposer(){
   host.innerHTML=html;
   for(const id of COMPOSER_FIELDS){const el=$(id);if(el&&DRAFTS[id]!=null)el.value=DRAFTS[id];}   // B21: what was typed here before
   const eb=$('emBox');
-  if(eb)emailBoxInto(eb,{req:apiAg,ids:mailIds(),idp:'em',focus:EM_FOCUS,values:{subject:DRAFTS.emSubject||'',body:DRAFTS.emBody||''},onSent:emailSent});
+  if(eb)emailBoxInto(eb,{req:apiAg,ids:mailIds(),idp:'em',focus:EM_FOCUS,values:{subject:DRAFTS.emSubject||'',body:DRAFTS.emBody||''},onSent:emailSent,tools:emAiTools});
   host.querySelectorAll('[data-ct]').forEach(b=>b.addEventListener('click',()=>{COMPOSER=b.getAttribute('data-ct');COMPOSER_PICKED=true;renderComposer();}));
   // E2: the composer tablist honors the arrow-key contract — arrows move focus
   // AND selection (the re-render hands focus back to the moved-to tab);
@@ -1995,6 +2021,40 @@ function renderComposer(){
   const tg=$('taskGo'); if(tg)tg.addEventListener('click',addTask);
   host.querySelectorAll('[data-aud]').forEach(b=>b.addEventListener('click',()=>{NEWAUD=b.getAttribute('data-aud');host.querySelectorAll('[data-aud]').forEach(x=>{const on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on?'true':'false');});const hh=$('notehint');if(hh)hh.textContent=NEWAUD==='shared'?'The client will see this note.':'Internal notes stay with your studio.';}));
   const ng=$('noteGo'); if(ng)ng.addEventListener('click',addNote);
+}
+// ── sales item 94: AI help on a record. "Where things stand" tops the rail (kept with its date,
+// so a later visit shows it without paying again) and "Draft it for me" sits in the Email box.
+// Both read the record the way this page does (the keys loadActivity sends, in this page's
+// scope); AI help is off until the studio's owner switches it on, and the server says so.
+// sales-ai.js draws both. Nothing is ever sent by it. ──
+let AI_SUM=null;
+const aiFirst=(n)=>String(n||'').trim().split(/\s+/)[0]||'';
+const aiWho=()=>aiFirst((REC&&REC.header&&(REC.header.person||REC.header.name))||'');
+function aiRecordQuery(){
+  const ids=idParams(),o={};
+  if(ids.project)o.project=ids.project;
+  if(REC&&REC.identity&&REC.identity.client_id)o.client_id=REC.identity.client_id;
+  if(ids.deal)o.deal=ids.deal;
+  if(ids.contact)o.contact=ids.contact;
+  return o;
+}
+function renderAiCard(){
+  // a record with a rail has it at the rail's top; a person on their own (no rail) above the tabs
+  const rail=document.querySelector('aside.rail'),inRail=!!(rail&&!rail.hidden);
+  const host=$(inRail?'aicard':'aicardMain'),other=$(inRail?'aicardMain':'aicard');
+  if(other)other.innerHTML='';
+  if(!host)return;
+  const c=REC&&REC.canonical;
+  if(!c||!c.value){host.innerHTML='';AI_SUM=null;return;}
+  const go=()=>{if(!host.isConnected||!window.ddsSalesAi)return;AI_SUM=window.ddsSalesAi.summary(host,{req:api,subject:c.key+':'+c.value,query:aiRecordQuery,who:aiWho(),dealToo:!!idParams().deal,newSince:(iso)=>{const t=Date.parse(iso);return Number.isFinite(t)?(ACT.items||[]).filter(i=>i&&Date.parse(i.at)>t).length:0;}});};
+  if(window.ddsSalesAi||document.readyState!=='loading')go();else document.addEventListener('DOMContentLoaded',go,{once:true});
+}
+function emAiTools(row,k){
+  if(!window.ddsSalesAi)return;
+  const who=aiWho();
+  window.ddsSalesAi.pill(row,{req:api,ta:k.body,go:k.go,label:'Draft it for me',hint:'AI help · about 1¢ a draft',sendLabel:'Send email',
+    payload:()=>Object.assign({kind:'record',subject:k.subj.value||'',today:recTodayYmd()},aiRecordQuery()),
+    writing:()=>`Writing a draft from ${who?who+'’s':'their'} messages${idParams().deal?' and this deal':''}…`});
 }
 // shell.js loads deferred: on the first draw the kit may still be on its way
 function emailBoxInto(el,o){
@@ -2183,6 +2243,49 @@ function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t lo
     if(!TOKEN){signedOut();return;}await loadRecord();
   }catch(_){trouble();}
 })();
+// ── sales item 93: the hand-over pack for a client who leaves ──────────────────
+// Download builds the zip now (GET /handover/pack, scoped to the customer's site);
+// Email sends the business's owner a note that it waits in their portal's Help tab.
+// Making it changes nothing: their site stays live until the studio pauses it.
+const HO_ICO={photos:'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/>',
+  domain:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/>'};
+const hoIco=(k)=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${HO_ICO[k]||SVG[k]||''}</svg>`;
+const HO_ITEMS=[['site','Their website, ready to host anywhere','Every page as plain files, with a note on how to put them online with any host.'],
+  ['photos','Their photos and files','At full size. A very large file comes as a link that works for 30 days.'],
+  ['domain','Their domain','Where it is registered, when it renews, and the records that keep the site and email working.'],
+  ['person','Their customers','Enquiries, sign-ups, bookings and reviews, as spreadsheets.'],
+  ['paid','Their invoices and receipts from you','Every invoice and what was paid, as a spreadsheet.'],
+  ['key','Who owns what','The accounts to hand over: the domain, the Google listing and Search Console, with a step for each.']];
+function openHandover(){
+  let d=$('handoverDlg');
+  const name=((REC&&REC.header&&REC.header.name)||'this customer');
+  if(!d){d=document.createElement('dialog');d.id='handoverDlg';d.setAttribute('aria-labelledby','hoH');document.body.appendChild(d);}
+  d.innerHTML=`<form method="dialog"><h2 id="hoH" tabindex="-1">Hand-over pack for ${esc(name)}</h2><p class="hosub">Everything they need if they move on, in one download. Making it changes nothing: their site stays live until you pause it.</p>
+    <ul>${HO_ITEMS.map(([i,t,s])=>`<li><span class="hoic" aria-hidden="true">${hoIco(i)}</span><div><b>${esc(t)}</b><span>${esc(s)}</span></div></li>`).join('')}</ul>
+    <p class="hoerr" id="hoErr" role="alert" hidden></p>
+    <div class="hofoot"><span class="note">The email asks them to sign in and download it from Help in their portal.</span><button type="button" class="abtn" id="hoMail">Email them a link</button><button type="button" class="abtn primary" id="hoGet">Download the pack</button></div></form>`;
+  const err=(m)=>{const e=$('hoErr');e.textContent=m;e.hidden=false;};
+  $('hoGet').addEventListener('click',async()=>{
+    const b=$('hoGet');b.disabled=true;b.textContent='Gathering everything…';$('hoErr').hidden=true;
+    try{
+      const r=await fetch(FN+'/handover/pack',{headers:H(true)});
+      if(!r.ok||!/zip/.test(r.headers.get('Content-Type')||'')){const j=await r.json().catch(()=>({}));throw new Error((j&&j.message)||(r.status===404?'The hand-over pack arrives with the next update.':'The pack didn’t download. Try again.'));}
+      const blob=await r.blob();const fname=(/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition')||'')||[])[1]||('hand-over-pack-'+(String(name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'customer')+'.zip');
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
+      d.close();toast('Downloaded '+fname+'.','ok');
+    }catch(x){err(x&&x.message?x.message:'The pack didn’t download. Try again.');}
+    finally{if(b.isConnected){b.disabled=false;b.textContent='Download the pack';}}
+  });
+  $('hoMail').addEventListener('click',async()=>{
+    const b=$('hoMail');b.disabled=true;$('hoErr').hidden=true;
+    const r=await api('/handover/notify','POST',{});
+    b.disabled=false;
+    if(!r.ok)return err((r.body&&r.body.message)||'That email didn’t go out. Try again.');
+    d.close();toast('Sent to '+((r.body&&r.body.data&&r.body.data.to)||'them')+'. They download it from Help in their portal.','ok');
+  });
+  d.showModal();$('hoH').focus();   // the top of the dialog, read out first, on a phone too
+}
 </script>
 </body>
 </html>

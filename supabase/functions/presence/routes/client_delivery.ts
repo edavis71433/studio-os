@@ -20,7 +20,8 @@ import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
 import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { isStudioSide, studioDenied, loadApprovals, clearApprovalOverdue } from './projects.ts';
-import { signDocToken, type DocKind } from '../lib/documents.ts';
+import { signDocToken, invoiceNo, type DocKind } from '../lib/documents.ts';
+import { nestPartPayments, PAY_METHOD_LABEL, type PayMethod } from '../lib/invoice_billing.ts';
 import { proposalTotals } from '../lib/sales_lifecycle.ts';
 import { linkSecret, docViewerUrl } from './sales.ts';
 import { readGsc, readSearchTerms } from './analytics.ts';
@@ -83,7 +84,10 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   // select first, then the pre-0132 shape, so a function deploy ahead of the
   // migration never blanks the client's money surface.
   const SEL = 'id,title,description,amount_cents,status,due_date,paid_at,stripe_url,created_at,site_id';
-  let r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since&order=created_at.desc&limit=200`);
+  // sales item 120 (code pass finding 56): the invoice's number, and which invoice a part
+  // payment paid toward (APPLY-0167), so the portal reads like the client's own copies
+  let r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since,number,payment_for,paid_method&order=created_at.desc&limit=200`);
+  if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since&order=created_at.desc&limit=200`);
   if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL}&order=created_at.desc&limit=200`);
   // Builder list item 179, part four: each invoice on the client's papers shelf opens
   // as the studio's branded copy (doc.html, the Documents tab's own short-lived signed
@@ -97,10 +101,11 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   // formula against the client's LOCAL day (PS2's rule) and adds the
   // just-came-back-from-Stripe case; `state` on the wire is the server's word.
   const today = nowIso().slice(0, 10);
-  const list = await Promise.all(rows(r).map(async (i) => {
+  // a part payment sits under the invoice it paid toward, never beside it as a second paid invoice
+  const list = await Promise.all(nestPartPayments(rows(r)).map(async (i) => {
     const state = moneyState(i, today);
     return {
-      id: i.id, name: clean(i.title, 200), description: clean(i.description, 1000),
+      id: i.id, name: clean(i.title, 200), description: clean(i.description, 1000), number: invoiceNo(i.number),
       amount: (Number(i.amount_cents) || 0) / 100, status: i.status, state, due_date: i.due_date, paid_at: i.paid_at,
       processing_since: i.processing_since || null,
       // Only an invoice that is still WAITING on payment is payable: never a paid
@@ -111,6 +116,12 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
       pay_url: ((state === 'upcoming' || state === 'overdue') && i.stripe_url) ? i.stripe_url : null,
       view_url: state ? await viewUrl(i) : null,
       created_at: i.created_at,
+      // what was paid toward it already, each with its own receipt; total = what is left (or
+      // was paid last) plus those parts
+      ...(i.parts ? {
+        payments: await Promise.all(i.parts.map(async (p: any) => ({ id: p.id, amount: (Number(p.amount_cents) || 0) / 100, paid_at: p.paid_at, method: PAY_METHOD_LABEL[p.paid_method as PayMethod] || '', view_url: await viewUrl(p) }))),
+        paid_so_far: (i.paid_so_far_cents || 0) / 100, total: (i.total_cents || 0) / 100,
+      } : {}),
     };
   }));
   const b = moneyBuckets(list, today);
@@ -358,14 +369,14 @@ async function clientBundleFor(me: string, projectId: string) {
   return { link, siteId: s, project };
 }
 
-export async function handleClientProject(_req: Request, site: SiteRow, _principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+export async function handleClientProject(_req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const me = customerOf(site);
   if (!me) return json({ error: 'not_found' }, 404, cors);
   const ctx = await clientBundleFor(me, id);
   if (!ctx) return json({ error: 'not_found', message: 'That project isn’t here.' }, 404, cors);
   const s = ctx.siteId; const now = nowIso();
-  const [ms, ts, ev, dl, ap, sv] = await Promise.all([
+  const [ms, ts, ev, dl, ap, sv, mine] = await Promise.all([
     svc(`presence_milestones?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&select=id,title,status,due_date,sort_order,completed_at&order=sort_order.asc`),
     // `source` rides along so the portal knows which to-dos are ITS OWN to tick
     // and which the studio settles (clientMayTick) — the button is drawn from
@@ -378,9 +389,13 @@ export async function handleClientProject(_req: Request, site: SiteRow, _princip
     // the deliverable's own row, with "due {date}" when the studio set one
     loadApprovals(`project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&order=created_at.desc&limit=100`, 'id,subject_type,subject_id,title,summary,content_hash,status,decided_at'),
     svc(`presence_surveys?project_id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&status=eq.active&select=id,title,created_at&order=created_at.desc&limit=50`),
+    // item 179: which of those this person already answered, so an answered one stops asking
+    svc(`presence_survey_responses?project_id=eq.${id}&site_id=eq.${s}&respondent=eq.${encodeURIComponent(readerKey(principal))}&status=eq.submitted&deleted_at=is.null&select=survey_id&limit=100`).catch(() => ({ ok: false, json: [] })),
   ]);
   const tasks = rows(ts).sort(compareOrder).map((t) => ({ ...t, derived: deriveTaskState(t, now) }));
-  return json({ data: { project: ctx.project, milestones: rows(ms).sort(compareOrder), tasks, events: rows(ev), deliverables: rows(dl), approvals: ap, surveys: rows(sv), progress: progressOf(rows(ts)) } }, 200, cors);
+  const answered = new Set(rows(mine as any).map((r) => String(r.survey_id)));
+  const surveys = rows(sv).map((r) => (answered.has(String(r.id)) ? { ...r, answered: true } : r));
+  return json({ data: { project: ctx.project, milestones: rows(ms).sort(compareOrder), tasks, events: rows(ev), deliverables: rows(dl), approvals: ap, surveys, progress: progressOf(rows(ts)) } }, 200, cors);
 }
 
 export async function handleClientReport(_req: Request, site: SiteRow, _principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
@@ -503,7 +518,7 @@ export async function handleClientSurveyRespond(req: Request, site: SiteRow, pri
   const found = await linkForCustomerVia(me, 'presence_surveys', id);
   if (!found) return json({ error: 'not_found' }, 404, cors);
   const s = found.link.agency_site_id;
-  const survey = rows(await svc(`presence_surveys?id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&status=eq.active&select=id,project_id,questions&limit=1`))[0];
+  const survey = rows(await svc(`presence_surveys?id=eq.${id}&site_id=eq.${s}&deleted_at=is.null&client_visible=is.true&status=eq.active&select=id,project_id,questions,title&limit=1`))[0];
   if (!survey) return json({ error: 'not_found', message: 'That survey isn’t open.' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const norm = normalizeAnswers(b.answers, survey.questions || []);
@@ -519,6 +534,14 @@ export async function handleClientSurveyRespond(req: Request, site: SiteRow, pri
     return json({ error: 'write_failed' }, 502, cors);
   }
   if (survey.project_id) await clientEvent(s, survey.project_id, 'survey_submitted', principal, { survey_id: id });
+  // item 179: answering the project questionnaire IS sending it back, so its checklist step ticks itself
+  if (survey.project_id) {
+    const { isQuestionnaireTitle } = await import('../lib/starter_questionnaire.ts');
+    if (isQuestionnaireTitle(survey.title)) {
+      const { tickChecklistStep } = await import('../lib/service_bridge.ts');
+      await tickChecklistStep(s, survey.project_id, 'questionnaire_returned', readerKey(principal), principal.kind);
+    }
+  }
   return json({ data: { id: rows(ins)[0].id, status: 'submitted' } }, 201, cors);
 }
 

@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Usage — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<!-- Studio level, never scoped: a stray ?client= is dropped before the shell reads the URL, as on Home. -->
+<script>(function(){try{if(/[?&]client=/.test(location.search)){var u=new URL(location.href);u.searchParams.delete('client');history.replaceState(null,'',u.pathname+(u.search||'')+u.hash);}}catch(_){}})();</script>
+<link rel="stylesheet" href="/fonts/brand.css">
+<style>
+  /* the page skin = the shell's --dds-* tokens, aliased the way agency.html does */
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-soft:var(--dds-p-soft,#efeafa);
+    --good:var(--dds-good,#33664b);--good-soft:var(--dds-good-soft,#e7f1ea);--warn:var(--dds-warn,#775d31);--warn-soft:var(--dds-warn-soft,#f3ead9);--bad:var(--dds-bad,#9a4242);--bad-soft:var(--dds-bad-soft,#fdeaea);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  [hidden]{display:none!important}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
+  .lrow1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;min-height:36px}
+  .lbtn:hover{color:var(--p);background:var(--p-soft)}
+  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
+  .tabs{display:flex;gap:var(--dds-s1,4px);margin-top:10px;border-top:1px solid var(--line);padding-top:var(--dds-s2,8px);flex-wrap:wrap}
+  .tabs a{font-size:13.5px;font-weight:600;color:var(--soft);text-decoration:none;padding:6px var(--dds-s3,12px);border-radius:var(--dds-r,8px)}
+  .tabs a:hover{color:var(--p);background:var(--p-soft)}
+  .tabs a[aria-current="page"]{color:var(--p);background:var(--p-soft)}
+  .sbtn{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:6px var(--dds-s3,12px);text-decoration:none;min-height:36px;display:inline-flex;align-items:center;cursor:pointer}
+  .sbtn:hover{border-color:var(--p);color:var(--p)}
+  .sbtn.main{background:var(--p);border-color:var(--p);color:#fff}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sbtn.main,:root:not([data-theme="light"]) .btn{color:#171320}}
+  :root[data-theme="dark"] .sbtn.main,:root[data-theme="dark"] .btn{color:#171320}
+
+  /* ── builder list item 210: the month in one band (the Sites band's colours) ── */
+  .uband{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:var(--dds-s4,16px);background:var(--dds-grad,linear-gradient(135deg,#4a2c8c,#6436c4 55%,#7d3fb8));color:#fff;border-radius:var(--dds-r-xl,20px);padding:24px 26px;margin-bottom:var(--dds-s5,20px);box-shadow:0 22px 44px -24px rgba(74,44,140,.7);overflow:hidden}
+  .uband .top{display:grid;grid-template-columns:auto minmax(200px,1fr);gap:var(--dds-s5,20px);align-items:end}
+  .uband .eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.8)}
+  .uband .big{font-family:var(--sans);font-weight:700;font-size:clamp(36px,5vw,54px);line-height:1.04;letter-spacing:-.03em;margin-top:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .uband .cost{font-size:19px;font-weight:500;color:rgba(255,255,255,.92);margin-top:2px}
+  .chart .ct{font-size:12px;font-weight:600;color:rgba(255,255,255,.88);margin-bottom:6px}
+  .bars{display:flex;align-items:flex-end;gap:3px;height:72px;border-bottom:1px solid rgba(255,255,255,.35)}
+  .bars i{flex:1;min-width:2px;background:rgba(255,255,255,.5);border-radius:3px 3px 0 0;position:relative}
+  .bars i.peak{background:#fff}
+  .bars i.peak b{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);white-space:nowrap;font-style:normal;font-size:11.5px;font-weight:600;color:#fff;padding-bottom:3px}
+  .axis{display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.8);margin-top:4px}
+  .gauge{margin-top:22px}
+  .gauge .gl{display:flex;justify-content:space-between;gap:12px;font-size:13px;font-weight:600}
+  .gauge .track{height:8px;border-radius:99px;background:rgba(255,255,255,.22);margin-top:8px;overflow:hidden}
+  .gauge .fill{height:100%;border-radius:99px;background:#fff;min-width:4px}
+  .gauge .gc{font-size:12px;color:rgba(255,255,255,.8);margin-top:6px}
+  .facts{display:grid;grid-template-columns:1fr 1fr;gap:var(--dds-s3,12px)}
+  .fact{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:var(--dds-r-lg,14px);padding:14px 16px;min-width:0}
+  .fact .fi{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;margin-bottom:8px}
+  .fact .fi svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .fact .fv{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.15;font-variant-numeric:tabular-nums}
+  .fact .fn{font-size:12.5px;color:rgba(255,255,255,.86);margin-top:3px}
+  .uband :focus-visible{outline:2px solid #fff;outline-offset:2px}
+  @media (max-width:1000px){.uband{grid-template-columns:1fr}}
+  @media (max-width:640px){.uband{padding:18px 16px}.uband .top{grid-template-columns:1fr}}
+
+  /* ── each client ── */
+  .ushead{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--dds-s3,12px);flex-wrap:wrap;margin-bottom:10px}
+  .ushead h2{font-size:16px;font-weight:600}
+  .ushead .sub{font-size:13px;color:var(--soft);margin-top:2px}
+  .seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px;gap:2px}
+  .seg button{font:inherit;font-size:13px;font-weight:600;border:none;border-radius:999px;background:transparent;color:var(--soft);padding:6px 14px;cursor:pointer;min-height:36px}
+  .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
+  .ucard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);box-shadow:var(--shadow);overflow:hidden}
+  .unote{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 18px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--soft)}
+  .unote label{display:inline-flex;align-items:center;gap:6px;color:var(--p);font-weight:600}
+  .unote select{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:5px 8px;min-height:32px}
+  .uscroll{position:relative;overflow-x:auto;-webkit-overflow-scrolling:touch}   /* positioned, so the hidden labels inside scroll with the table, never widen the page */
+  table.utable{width:100%;border-collapse:collapse;font-size:14px;min-width:880px}
+  .utable thead th{text-align:left;font-size:12px;color:var(--faint);font-weight:600;padding:10px 18px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .utable thead th.on{color:var(--p)}
+  .utable tbody td{padding:14px 18px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .utable tbody tr:last-child td{border-bottom:none}
+  .utable tbody tr.hot{background:var(--warn-soft)}
+  .rk{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--p-soft);color:var(--p);font-size:12.5px;font-weight:700}
+  tr:first-child .rk{background:var(--p);color:#fff}
+  .cn{font-weight:600;font-size:14.5px;overflow-wrap:anywhere}
+  .ca{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--soft);margin-top:2px}
+  .pill{display:inline-block;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 8px;background:var(--bg);color:var(--soft);white-space:nowrap}
+  .pill.live{background:var(--good-soft);color:var(--good)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)}
+  .burst{display:inline-flex;align-items:center;gap:5px;margin-top:6px;font-size:12px;font-weight:600;color:var(--warn);background:var(--card);border:1px solid var(--warn);border-radius:999px;padding:2px 9px;white-space:nowrap}
+  .burst svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+  .pn{display:flex;align-items:center;gap:12px}
+  .pn b{font-size:18px;font-weight:700;min-width:26px;font-variant-numeric:tabular-nums}
+  .track{flex:1;height:8px;border-radius:99px;background:var(--p-soft);overflow:hidden;min-width:80px}
+  .track i{display:block;height:100%;border-radius:99px;background:var(--p)}
+  .pd{font-size:12.5px;color:var(--soft);margin-top:3px}
+  .pd strong{color:var(--ink);font-weight:600;margin-right:6px}
+  .sv{white-space:nowrap} .sv b{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums} .sv span{font-size:12.5px;color:var(--soft);margin-left:3px}
+  .meter{display:block;height:6px;border-radius:99px;background:var(--p-soft);overflow:hidden;margin-top:7px;max-width:170px}
+  .meter i{display:block;height:100%;border-radius:99px;background:var(--p);min-width:3px}
+  .vv b{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;display:block}
+  .why{font-size:13px;color:var(--soft);line-height:1.35}
+  .why small{display:block;font-size:12px;color:var(--faint)}
+  .dchip{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 6px;white-space:nowrap;background:var(--bg);color:var(--soft);margin-top:3px}
+  .dchip.up{background:var(--good-soft);color:var(--good)} .dchip.down{background:var(--bad-soft);color:var(--bad)}
+  .open{display:inline-flex;align-items:center;gap:4px;font-size:13.5px;font-weight:600;color:var(--p);text-decoration:none;border:1px solid transparent;border-radius:999px;padding:6px 14px;min-height:36px;white-space:nowrap}
+  .open:hover{border-color:var(--p)}
+  tr.hot .open{border-color:var(--p);background:var(--card)}
+  .ufoot{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--soft);margin-top:var(--dds-s3,12px)}
+  .ufoot svg{flex:0 0 auto;width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;margin-top:2px}
+  .partial{font-size:12.5px;color:var(--warn);margin:-8px 0 var(--dds-s3,12px)}
+  .more{display:none}
+  .ml{display:none}   /* a number's name on a phone card; the table's own header names it on wider screens */
+  /* phones: each client is a card, three numbers side by side, the first three until "Show all" */
+  @media (max-width:640px){
+    table.utable{min-width:0}
+    .utable thead{display:none}
+    .utable tbody tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
+    .utable tbody tr:last-child{border-bottom:none}
+    .utable tbody td{padding:0;border:none}
+    .utable td.c-rank{display:none}
+    .utable td.c-name{grid-column:1/3}
+    .utable td.c-open{grid-column:3;grid-row:1;text-align:right}
+    .utable td.c-pub,.utable td.c-sto,.utable td.c-vis{background:var(--bg);border-radius:var(--dds-r,8px);padding:8px 10px;min-width:0}
+    .utable td.c-pub .track{display:none}
+    .utable .ml{display:block;font-size:11.5px;font-weight:600;color:var(--faint);margin-bottom:2px}
+    .pn b{font-size:16px} .pd{font-size:12px} .pd .px{display:block}
+    .sv{white-space:normal} .sv span{display:block;margin:0}   /* "of 1 GB" under the number, inside the card's box */
+    .lrow1 .sbtn,.lrow1 .btn{display:none}   /* the phone header keeps the page's name and Refresh, as drawn */
+    .open{min-height:44px} .seg button{min-height:44px}
+    .ucard.short tr[data-more]{display:none}
+    .ucard.short .more{display:flex;justify-content:center;padding:10px 16px 16px}
+    .more button{font:inherit;font-size:13.5px;font-weight:600;width:100%;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);min-height:44px;cursor:pointer}
+  }
+  .center{text-align:center;padding:52px var(--dds-s5,20px)}.center h2{font-weight:600;font-size:20px;margin:0 0 var(--dds-s2,8px)}
+  .muted{color:var(--soft);font-size:14px}
+  a.link{color:var(--p);text-decoration:none;font-weight:500}a.link:hover{text-decoration:underline}
+  .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--p);color:#fff;cursor:pointer;min-height:36px;text-decoration:none;display:inline-flex;align-items:center}
+  .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  @media (max-width:767px){.sbtn,.lbtn{min-height:44px}}
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script>
+// ── Usage (builder list item 210, Nov 2026 review, file 03 findings 1, 6 and 11) ────
+// Every publish and every restore of a client's site is a deploy at Netlify, about 10
+// cents each, and nobody was watching it. This tab of Sites shows the month: the
+// publishes that went up and what they cost, the restores among them, the ones skipped
+// because nothing had changed (item 208), the storage their files take and last month's
+// visits; then each client, most publishes first. Drawn in Figma first (page 310:2,
+// option A), as Eric approved it.
+// GET /agency/usage?month=YYYY-MM (agency/usage.ts) beside GET /agency/sites for the names.
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const FN=SUPABASE_URL+"/functions/v1/presence";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+let TOKEN="";
+sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
+async function api(path){
+  try{const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+  catch(_){return{ok:false,status:0,body:{}};}
+}
+const n1=(n)=>Number(n||0).toLocaleString('en-US');
+const plural=(n,w,ws)=>n1(n)+' '+(n===1?w:(ws||w+'s'));
+// about what a deploy costs: "$2.30", and under a dollar "50¢"
+const money=(cents)=>cents<100?Math.round(cents)+'¢':'$'+(cents/100).toFixed(2);
+const centsWords=(cents)=>cents<100?Math.round(cents)+' cents':money(cents);
+function bytesWords(b){
+  if(!b)return'0 MB';
+  const gb=b/1024**3;if(gb>=1)return(gb>=10?Math.round(gb):Math.round(gb*10)/10)+' GB';
+  const mb=b/1024**2;return(mb>=10?Math.round(mb):Math.max(.1,Math.round(mb*10)/10))+' MB';
+}
+const dayName=(ymd)=>new Date(ymd+'T12:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
+const ICON={
+  restore:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>',
+  skip:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>',
+  store:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>',
+  eye:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  info:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
+};
+const SORTS={pub:'most publishes first',store:'most storage first',visits:'most visits first',name:'A to Z'};
+let SITES=[],U=null,META={},WHICH='this',SORT='pub',SHOW_ALL=false,BUSY=false;
+try{const s=localStorage.getItem('dds-usage-sort');if(SORTS[s])SORT=s;}catch(_){}
+
+// the month asked for: this one (the server's default) or the one before, on the server's clock (UTC)
+function monthOf(which){
+  if(which!=='last')return'';
+  const d=new Date();const p=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()-1,1));
+  return p.getUTCFullYear()+'-'+String(p.getUTCMonth()+1).padStart(2,'0');
+}
+// a percent change on the month before; a first month is "New"; both empty says nothing (as Sites draws it)
+function pctChip(v,p){
+  if(p==null||v==null)return'';
+  if(!p)return v?'<span class="dchip">New</span>':'';
+  const pct=Math.round((v-p)/p*100),before=(U&&U.prior_label)||'the month before',w=pct===0?'the same as '+before:(pct>0?'up ':'down ')+Math.abs(pct)+'% on '+before;
+  return `<span class="dchip${pct>0?' up':pct<0?' down':''}" title="${esc(w[0].toUpperCase()+w.slice(1))}"><span aria-hidden="true">${pct===0?'Same':(pct>0?'▲ ':'▼ ')+Math.abs(pct)+'%'}</span><span class="sr-only">${esc(w)}</span></span>`;
+}
+const stateCls=(s)=>s.state==='live'?'live':s.state==='down'?'bad':(s.state==='offline'||s.state==='paused')?'warn':'';
+const hostOf=(u)=>String(u||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+
+// the days of the month so far (this month stops at today)
+function daysShown(){
+  const days=(U&&Array.isArray(U.days))?U.days:[];
+  if(WHICH!=='this')return days;
+  const today=new Date().toISOString().slice(0,10);
+  return days.filter(d=>d.day<=today);
+}
+function bandHtml(){
+  const t=U.totals||{publishes:0,restores:0,skipped:0,cost_cents:0,bytes:0,files:0,visits:0};
+  const plan=U.plan||{publishes:330,cost_cents:10};
+  const days=daysShown();
+  const last=days.length?days[days.length-1].day:'';
+  const label=String(U.month_label||'');
+  const eyebrow=WHICH==='this'?`${label} so far · 1–${last?Number(last.slice(8)):1}`:`${label} · 1–${last?Number(last.slice(8)):''}`;
+  const max=Math.max(0,...days.map(d=>d.publishes));
+  const peak=max?days.find(d=>d.publishes===max):null;
+  const bars=days.map(d=>{
+    const h=max?Math.max(3,Math.round(d.publishes/max*100)):3;
+    const top=peak&&d.day===peak.day;
+    return `<i${top?' class="peak"':''} style="height:${d.publishes?h:3}%">${top?`<b>${esc(n1(max))} on ${esc(dayName(d.day))}</b>`:''}</i>`;
+  }).join('');
+  const chartWords=days.length?(peak?`Publishes each day: most on ${dayName(peak.day)}, with ${max}.`:'Publishes each day: none yet.'):'';
+  const pct=Math.min(100,Math.round(t.publishes/(plan.publishes||330)*100));
+  const saved=t.skipped*(plan.cost_cents||10);
+  return `<section class="uband" aria-label="${esc(label)} in numbers">
+    <div>
+      <div class="top">
+        <div><div class="eyebrow">${esc(eyebrow)}</div><div class="big">${esc(plural(t.publishes,'publish','publishes'))}</div><div class="cost">about ${esc(money(t.cost_cents))} at Netlify</div></div>
+        ${days.length?`<div class="chart" role="img" aria-label="${esc(chartWords)}"><div class="ct" aria-hidden="true">Publishes each day</div><div class="bars" aria-hidden="true">${bars}</div><div class="axis" aria-hidden="true"><span>${esc(dayName(days[0].day))}</span><span>${esc(dayName(last))}${WHICH==='this'?' (today)':''}</span></div></div>`:''}
+      </div>
+      <div class="gauge">
+        <div class="gl"><span>${esc(n1(t.publishes))} of about ${esc(n1(plan.publishes))} publishes Netlify’s plan covers a month</span><span>${pct}%</span></div>
+        <div class="track" role="img" aria-label="${pct}% of the plan’s publishes"><div class="fill" style="width:${pct}%"></div></div>
+        <div class="gc">Your app’s own updates use the same plan.</div>
+      </div>
+    </div>
+    <div class="facts">
+      <div class="fact"><div class="fi">${ICON.restore}</div><div class="fv">${esc(plural(t.restores,'restore'))}</div><div class="fn">${t.restores?`already counted in the ${esc(n1(t.publishes))}`:'none this month'}</div></div>
+      <div class="fact"><div class="fi">${ICON.skip}</div><div class="fv">${esc(n1(t.skipped))} skipped</div><div class="fn">${t.skipped?`because nothing had changed · about ${esc(money(saved))} saved`:'a publish with nothing new costs nothing'}</div></div>
+      <div class="fact"><div class="fi">${ICON.store}</div><div class="fv">${esc(bytesWords(t.bytes))}</div><div class="fn">of photos and files stored</div></div>
+      <div class="fact"><div class="fi">${ICON.eye}</div><div class="fv">${esc(plural(t.visits,'visit'))}</div><div class="fn">last month (${esc(U.visits_label||'')})</div></div>
+    </div>
+  </section>`;
+}
+
+// one client's row: the facts the server knows, or why there are none (never a zero that isn't one)
+function rowsSorted(){
+  const rows=SITES.map(s=>({s,u:(U&&U.data&&U.data[s.site_id])||null}));
+  const pubs=(r)=>r.u&&typeof r.u.publishes==='number'?r.u.publishes:-1;
+  const by={pub:(a,b)=>pubs(b)-pubs(a)||((b.u&&b.u.cost_cents)||0)-((a.u&&a.u.cost_cents)||0),
+    store:(a,b)=>((b.u&&b.u.storage&&b.u.storage.bytes)||0)-((a.u&&a.u.storage&&a.u.storage.bytes)||0),
+    visits:(a,b)=>(b.u&&b.u.visits?b.u.visits.value:-1)-(a.u&&a.u.visits?a.u.visits.value:-1),
+    name:()=>0};
+  return rows.sort((a,b)=>by[SORT](a,b)||String(a.s.name||'').localeCompare(String(b.s.name||'')));
+}
+function rowHtml(r,i,most,limit){
+  const s=r.s,u=r.u,name=s.name||'(unnamed)';
+  let pub;
+  if(!u)pub=`<span class="why">Couldn’t read</span>`;
+  else if(u.publishes_why==='hosted_elsewhere')pub=`<span class="why">Not published from here<small>Their own host puts it live. No cost to you.</small></span>`;
+  else if(u.publishes===null)pub=`<span class="why">Couldn’t read</span>`;
+  else{
+    const extra=[u.restores?plural(u.restores,'restore'):'',u.skipped?n1(u.skipped)+' skipped':''].filter(Boolean).join(' · ');
+    const w=most?Math.round(u.publishes/most*100):0;
+    pub=`<div class="pn"><b>${esc(n1(u.publishes))}</b><span class="track" aria-hidden="true"><i style="width:${w}%"></i></span></div>
+      <div class="pd">${u.publishes_why==='not_live'&&!u.publishes?'Nothing to pay until it goes live':`<strong>≈ ${esc(money(u.cost_cents))}</strong><span class="px">${esc(extra)}</span>`}</div>`;
+  }
+  const st=u&&u.storage;
+  const sto=st?`<div class="sv"><b>${esc(bytesWords(st.bytes))}</b><span>of ${esc(bytesWords(limit))}</span></div><span class="meter" aria-hidden="true"><i style="width:${Math.min(100,Math.round(st.bytes/limit*100))}%"></i></span>`:'<span class="why">Couldn’t read</span>';
+  const VWHY={hosted_elsewhere:'No counter<small>on their host</small>',not_live:'After it goes live',not_ready:'Coming soon',unavailable:'Couldn’t read'};
+  const vis=u&&u.visits?`<div class="vv"><b>${esc(n1(u.visits.value))}</b>${pctChip(u.visits.value,u.visits.prior)}</div>`:`<span class="why">${VWHY[(u&&u.visits_why)||'unavailable']||'Couldn’t read'}</span>`;
+  const burst=u&&u.burst?`<div><span class="burst">${ICON.clock}${esc(plural(u.burst.count,'publish','publishes'))} in one hour on ${esc(dayName(u.burst.day))}</span></div>`:'';
+  const addr=hostOf(s.address)||'No address yet';
+  return `<tr data-site="${esc(s.site_id)}"${u&&u.burst?' class="hot"':''}${i>=3?' data-more':''}>
+    <td class="c-rank"><span class="rk">${i+1}</span></td>
+    <td class="c-name"><div class="cn">${esc(name)}</div><div class="ca"><span>${esc(addr)}</span>${s.state_words?`<span class="pill ${stateCls(s)}">${esc(s.state_words)}</span>`:''}</div>${burst}</td>
+    <td class="c-pub"><span class="ml">Publishes</span>${pub}</td>
+    <td class="c-sto"><span class="ml">Storage</span>${sto}</td>
+    <td class="c-vis"><span class="ml">Visits · ${esc((U.visits_label||'').slice(0,3))}</span>${vis}</td>
+    <td class="c-open"><a class="open" href="/today.html?client=${encodeURIComponent(s.site_id)}" aria-label="Open ${esc(name)}">Open <span aria-hidden="true">›</span></a></td>
+  </tr>`;
+}
+function render(){
+  const rows=rowsSorted();
+  const most=Math.max(0,...rows.map(r=>(r.u&&r.u.publishes)||0));
+  const limit=Number(U.storage_limit)||1024**3;
+  const label=String(U.month_label||'');
+  const days=daysShown(),last=days.length?days[days.length-1].day:'';
+  const range=last?`${label} 1 to ${Number(last.slice(8))}`:label;
+  let h=`<header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🌐</span><h1 id="pagehead" tabindex="-1">Sites</h1>
+      <a class="sbtn" href="/week.html">Plan my week</a>
+      <button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
+      ${META.can_create?'<a class="btn" href="/sites.html#new">+ New site</a>':''}</div>
+    <div class="lmeta">${esc(plural(SITES.length,'site'))} · What each client uses ${WHICH==='this'?'this month':'in '+esc(label)} · Updated just now</div>
+    <nav class="tabs" aria-label="Sites, domains, templates and usage"><a href="/sites.html">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html">Templates</a><a href="/usage.html" aria-current="page">Usage</a></nav></header>`;
+  if(!SITES.length){$('main').innerHTML=h+`<div class="center"><p class="muted">No client sites yet, so nothing to count.</p><p style="margin-top:12px"><a class="link" href="/sites.html#new">Make the first one →</a></p></div>`;wire();return;}
+  h+=bandHtml();
+  if(U.partial)h+=`<p class="partial">Some numbers couldn’t be read just now; the rest are right.</p>`;
+  h+=`<div class="ushead"><div><h2>Each client, ${esc(SORTS[SORT])}</h2><div class="sub">${esc(plural(SITES.length,'site'))} · Open a client to see their site, its history and what was published</div></div>
+    <div class="seg" role="group" aria-label="Which month"><button type="button" data-which="this" aria-pressed="${WHICH==='this'}">This month</button><button type="button" data-which="last" aria-pressed="${WHICH==='last'}">Last month</button></div></div>
+    <div class="ucard${!SHOW_ALL&&rows.length>3?' short':''}" id="ucard">
+      <div class="unote"><span>Publishes and storage: ${esc(range)}. Visits: ${esc(U.visits_label||'')}, compared with ${esc(U.prior_label||'')}. A drop is red.</span>
+        <label>Sort <select id="sortSel">${Object.entries(SORTS).map(([k,w])=>`<option value="${k}"${k===SORT?' selected':''}>${esc(w[0].toUpperCase()+w.slice(1))}</option>`).join('')}</select></label></div>
+      <div class="uscroll"><table class="utable"><caption class="sr-only">What each client uses: publishes, storage and visits</caption>
+        <thead><tr><th scope="col">#</th><th scope="col">Client</th><th scope="col"${SORT==='pub'?' class="on"':''}>Publishes ${WHICH==='this'?'this month':'in '+esc(label)}</th><th scope="col"${SORT==='store'?' class="on"':''}>Storage</th><th scope="col"${SORT==='visits'?' class="on"':''}>Visits last month</th><th scope="col"><span class="sr-only">Open</span></th></tr></thead>
+        <tbody>${rows.map((r,i)=>rowHtml(r,i,most,limit)).join('')}</tbody></table></div>
+      ${rows.length>3?`<div class="more"><button type="button" id="showAll">Show all ${esc(plural(rows.length,'site'))}</button></div>`:''}
+    </div>
+    <p class="ufoot">${ICON.info}<span>A publish or restore costs about ${esc(centsWords((U.plan&&U.plan.cost_cents)||10))} at Netlify. When nothing changed, Studio OS doesn’t publish again, so it costs nothing.</span></p>`;
+  $('main').innerHTML=h;
+  wire();
+}
+function wire(){
+  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',async()=>{if(await load(true)){render();const b=$('refreshBtn');if(b)b.focus();}});
+  document.querySelectorAll('[data-which]').forEach(b=>b.addEventListener('click',async()=>{
+    const w=b.getAttribute('data-which');if(w===WHICH||BUSY)return;
+    const was=WHICH;WHICH=w;SHOW_ALL=false;
+    if(!await load(true))WHICH=was;   // a failed read keeps the month that was showing
+    render();const on=document.querySelector('[data-which="'+WHICH+'"]');if(on)on.focus();
+  }));
+  const ss=$('sortSel');if(ss)ss.addEventListener('change',()=>{SORT=ss.value;try{localStorage.setItem('dds-usage-sort',SORT);}catch(_){}render();const n=$('sortSel');if(n)n.focus();});
+  const sa=$('showAll');if(sa)sa.addEventListener('click',()=>{SHOW_ALL=true;const c=$('ucard');if(c)c.classList.remove('short');const first=document.querySelector('tr[data-more] .open');if(first)first.focus();});
+}
+function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Usage shows what each of a studio’s client sites uses.</p></div>`;}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load the usage just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — it usually passes.</p><button id="retry" class="btn">Try again</button></div>`;const r=$('retry');if(r)r.addEventListener('click',()=>load());}
+// soft=true (↻, or the other month): a failure keeps what is shown and says so. True when read.
+async function load(soft){
+  if(BUSY)return false;BUSY=true;
+  const m=monthOf(WHICH);
+  const [s,u]=await Promise.all([api('/agency/sites'),api('/agency/usage'+(m?'?month='+m:''))]);
+  BUSY=false;
+  if(!s.ok||!u.ok){
+    const st=!s.ok?s.status:u.status;
+    if(st===401){signedOut();return false;}
+    if(st===403){notAgency();return false;}
+    if(soft&&U){toast('Couldn’t read the numbers just now.',true);return false;}
+    trouble();return false;
+  }
+  SITES=Array.isArray(s.body.data)?s.body.data:[];
+  META={can_create:!!s.body.can_create};
+  U=u.body||{};
+  if(!soft)render();
+  return true;
+}
+async function boot(){
+  try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
+    if(!TOKEN){signedOut();return;}
+    await load();
+  }catch(_){trouble();}
+}
+boot();
+</script>
+</body>
+</html>
