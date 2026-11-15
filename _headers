@@ -69,6 +69,8 @@
   Cache-Control: no-cache, must-revalidate
 /prospects
   Cache-Control: no-cache, must-revalidate
+/client-portal
+  Cache-Control: no-cache, must-revalidate
 /todos
   Cache-Control: no-cache, must-revalidate
 /invoices
