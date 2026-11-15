@@ -71,9 +71,11 @@ async function ask(method, route, body) {
 for (const p of ['agency.html', 'customers.html', 'contacts.html']) {
   const h = read(p);
   const di = h.indexOf('<dialog id="custDlg"'), dlg = h.slice(di, h.indexOf('</dialog>', di));
-  ok(`${p}: the dialog has no choice, sign-up link or price page`, di > 0 && !/type="radio"|cumode|cu-signup|sign up themselves|pricing\.html/.test(dlg));
+  ok(`${p}: the dialog has no sign-up wording, link or price page`, di > 0 && !/cu-signup|sign up themselves|pricing\.html/.test(dlg));
+  // Eric (Nov 15): adding a customer starts no website unless asked
+  ok(`${p}: "Just save them for now" is the default; setting them up is the other choice`, /<input type="radio" name="cumode" value="connect" checked>/.test(dlg) && /<strong>Just save them for now<\/strong>/.test(dlg) && /<strong>Set up their website and invite them<\/strong>/.test(dlg));
   ok(`${p}: the page sends no one to the old price page`, !/pricing\.html/.test(h));
-  ok(`${p}: adding always sets them up`, /const body=\{mode:'provision',/.test(h));
+  ok(`${p}: saving sends only who they are; setting them up sends the full set-up`, /const body=mode==='connect'\?\{mode:'connect',name:name\|\|undefined,email\}:\{mode:'provision',/.test(h));
 }
 {
   const c = read('customers.html');

@@ -206,12 +206,17 @@ test.describe('the plan\'s count (builder item 198)', () => {
     const dlg = page.locator('#custDlg');
     await expect(dlg).toBeVisible();
     await expect(dlg.locator('#cu-full')).toBeHidden();
+    await expect(dlg.locator('#cu-name')).toBeFocused();
+    await dlg.getByRole('radio', { name: /Set up their website and invite them/ }).check();   // a full plan only stops setting them up
     await dlg.locator('#cu-email').fill('new@person.example');
     await dlg.locator('#cu-submit').click();
     await expect(dlg.locator('#cu-full')).toBeVisible();
     await expect(dlg.locator('#cu-full')).toContainText('Your plan covers 25 sites, and all 25 are in use.');
     await expect(dlg.locator('#cu-full')).toContainText('Nothing was made.');
     await expect(dlg.locator('#cu-submit')).toBeEnabled();
+    await dlg.getByRole('radio', { name: /Just save them for now/ }).check();   // saving makes no site, so the words go
+    await expect(dlg.locator('#cu-full')).toBeHidden();
+    await expect(dlg.locator('#cu-submit')).toHaveText('Save');
   });
 });
 
