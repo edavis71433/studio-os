@@ -28,7 +28,8 @@ import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/res
 import { siteOrigin } from '../lib/site.ts';
 import { normalizeQuestions, costWords } from '../lib/ai_watch.ts';
 import { normalizeFollowed } from '../lib/search_tools.ts';
-import { reportPdf, reportFileName, changeOn } from '../lib/report_pdf.ts';
+import { reportPdf, reportFileName, changeOn, mapBand, mapsSentence, mapsFootnote } from '../lib/report_pdf.ts';
+import { readGridSetting } from './rank_grid_scans.ts';
 import {
   REPORT_PARTS, REPORT_PART_WORDS, REPORT_CC_MAX, QUIET_DEFAULT, PROPOSE_TEXT_MAX,
   normalizePartsOff, normalizeCc, normalizeQuiet, normalizeCopyTo, normalizePropose,
@@ -98,6 +99,13 @@ export interface ReportData {
   ai: { month: string; asked: number; named: number; priorNamed: number | null; engines: string; questions: Array<{ q: string; named: boolean | null }>; newlyNamed: string | null } | null;
   reviews: { rating: number | null; count: number | null; newGoogle: number | null; unreplied: number | null; ownNew: number | null } | null;
   health: { n: number; then: number | null; fixed: number } | null;
+  maps?: ReportMaps | null;      // builder list item 185: the map rank grid, for clients the studio switched it on for
+}
+/** Builder list item 185: the month's map rank grid. The first search with a scan that
+ *  month is drawn; the others are a line each. */
+export interface ReportMaps {
+  phrase: string; size: number; spacing: number; ranks: Array<number | null>; top3: number; total: number;
+  priorTop3: number | null; checkedAt: string; others: Array<{ phrase: string; top3: number; total: number }>;
 }
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
@@ -282,7 +290,39 @@ export function foldReport(i: { month: string; label: string; startMs: number; e
   const pubs = i.publishes ? i.publishes.filter((p) => inMonth(p.created_at)) : null;
   const lastPublishedAt = pubs && pubs.length ? pubs.map((p) => p.created_at).sort().slice(-1)[0] : null;
   return { month: i.month, monthLabel: i.label, visitors, pageviews, truncated, enquiries: i.enquiries, topPages, publishes: pubs ? pubs.length : null, lastPublishedAt, address: i.address, ...(i.timeZone ? { timeZone: i.timeZone } : {}),
-    siteName: '', priorLabel: '', priorVisitors: null, search: null, followed: [], ai: null, reviews: null, health: null };
+    siteName: '', priorLabel: '', priorVisitors: null, search: null, followed: [], ai: null, reviews: null, health: null, maps: null };
+}
+
+/** Builder list item 185: the map rank grid for the report, from the scans in the month and
+ *  the month before. Each search's monthly scan when there is one, else its newest. Null
+ *  when nothing was scanned that month. Pure. */
+export function foldMaps(i: { phrases: string[]; now: [number, number]; prior: [number, number]; scans: Array<{ phrase: string; kind: string; scanned_at: string; size: number; spacing_mi: number; ranks: Array<number | null>; top3: number; total: number }> | null }): ReportMaps | null {
+  if (!i.scans || !i.phrases.length) return null;
+  const pick = (phrase: string, [from, to]: [number, number]) => {
+    const mine = (i.scans || []).filter((s) => String(s.phrase).toLowerCase() === phrase.toLowerCase() && Date.parse(s.scanned_at) >= from && Date.parse(s.scanned_at) < to)
+      .sort((a, b) => Date.parse(b.scanned_at) - Date.parse(a.scanned_at));
+    return mine.find((s) => s.kind === 'monthly') || mine[0] || null;
+  };
+  const lines = i.phrases.map((p) => ({ phrase: p, now: pick(p, i.now), before: pick(p, i.prior) })).filter((x) => x.now);
+  if (!lines.length) return null;
+  const [first, ...rest] = lines;
+  const s = first.now!;
+  const ranks = Array.isArray(s.ranks) ? s.ranks.map((v) => (v == null ? null : Number(v))) : [];
+  return {
+    phrase: first.phrase, size: Number(s.size) || 7, spacing: Number(s.spacing_mi) || 1, ranks, top3: Number(s.top3) || 0, total: Number(s.total) || ranks.length,
+    priorTop3: first.before ? Number(first.before.top3) || 0 : null, checkedAt: String(s.scanned_at),
+    others: rest.map((x) => ({ phrase: x.phrase, top3: Number(x.now!.top3) || 0, total: Number(x.now!.total) || 0 })),
+  };
+}
+
+const MAP_COLOURS: Record<string, string> = { top3: '#11744a', top10: '#f2b544', top20: '#ec7a3f', out: '#bf3535', gap: '#4a4763' };
+/** The email's part: a small grid as a table of coloured cells, and the sentence. Pure. */
+export function mapsHtml(m: ReportMaps): string {
+  const rowsHtml = Array.from({ length: m.size }, (_, r) => `<tr>${m.ranks.slice(r * m.size, (r + 1) * m.size).map((v) => `<td style="width:12px;height:12px;padding:0;background:${MAP_COLOURS[mapBand(v)]};border-radius:3px;font-size:0;line-height:0">&nbsp;</td>`).join('')}</tr>`).join('');
+  const grid = `<table role="presentation" cellpadding="0" cellspacing="2" style="background:#171522;border-radius:10px;padding:6px;border-collapse:separate">${rowsHtml}</table>`;
+  const others = m.others.map((o) => `<br><span style="color:#6b6478">${esc(o.phrase)}: top 3 at ${o.top3} of ${o.total} spots</span>`).join('');
+  const key = [['top3', 'Top 3'], ['top10', '4 to 10'], ['top20', '11 to 20'], ['out', 'Not in the top 20']].map(([k, w]) => `<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${MAP_COLOURS[k]};vertical-align:middle"></span>&nbsp;${w}`).join(' &nbsp; ');
+  return `<p style="margin:14px 0 6px"><strong>On Google Maps</strong></p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px"><tr><td width="${m.size * 14 + 16}" style="vertical-align:top;padding:0 16px 0 0">${grid}</td><td style="vertical-align:middle">${esc(mapsSentence(m))}${others}</td></tr></table><p style="margin:0 0 6px;font-size:12px;color:#6b6478">${key}</p><p style="margin:0 0 8px;font-size:12px;color:#6b6478">${esc(mapsFootnote(m))}</p>`;
 }
 
 /** Builder list item 184: the fuller report's parts from their reads (null = not read). Pure. */
@@ -358,6 +398,7 @@ export function reportHtml(d: ReportData, o: { studioName: string; note: string;
       }).join('')}</table>`);
     }
   }
+  if (d.maps && on('maps')) parts.push(mapsHtml(d.maps));   // builder list item 185
   if (d.ai && on('ai')) {
     const was = d.ai.priorNamed;
     parts.push(`<p style="margin:14px 0 6px"><strong>In AI answers</strong></p><p style="margin:0 0 8px">${esc(d.ai.engines)} named ${esc(d.siteName || 'you')} for ${d.ai.named} of the ${d.ai.asked} questions we ask it each month${was === null ? '' : was === d.ai.named ? ', the same as the month before' : `, ${d.ai.named > was ? 'up' : 'down'} from ${was}`}.${d.ai.newlyNamed ? ` New this month: “${esc(d.ai.newlyNamed)}”.` : ''}</p>`);
@@ -428,7 +469,11 @@ export async function loadReportData(site: SiteRow, win: { month: string; startI
     health: rows<{ day: string; critical: number; warning: number; fingerprints?: string[] }>(hQ),
   });
   const siteName = String(rows<{ business_name?: string }>(identQ)?.[0]?.business_name || '').trim();
-  return { ...base, ...extras, siteName, priorLabel: priorWin.label.replace(/ \d{4}$/, '') };
+  // builder list item 185: the map rank grid, for clients the studio switched it on for
+  const grid = await safe(readGridSetting(site.id));
+  const mq = grid && grid.enabled && grid.phrases.length ? await safe(svc(`presence_rank_grid_scans?site_id=eq.${site.id}&scanned_at=gte.${encodeURIComponent(priorWin.startIso)}&scanned_at=lt.${encodeURIComponent(win.endIso)}&select=phrase,kind,scanned_at,size,spacing_mi,ranks,top3,total&order=scanned_at.desc&limit=60`)) : null;
+  const maps = grid && mq ? foldMaps({ phrases: grid.phrases, now: [Date.parse(win.startIso), Date.parse(win.endIso)], prior: [Date.parse(priorWin.startIso), Date.parse(win.startIso)], scans: rows<any>(mq) }) : null;
+  return { ...base, ...extras, maps, siteName, priorLabel: priorWin.label.replace(/ \d{4}$/, '') };
 }
 
 /** The studio that looks after this client site (the active service link): its brand,
@@ -602,6 +647,7 @@ async function reportCard(site: SiteRow, s: ReportSetting, principal: { email?: 
     to: reach?.email || null, client_name: reach?.name || null, me: principal.email || null,
     cc_max: REPORT_CC_MAX, cc_blocked: ccBlocked, quiet_default: QUIET_DEFAULT, propose_max: PROPOSE_TEXT_MAX,
     parts: REPORT_PARTS.map((k) => ({ key: k, words: REPORT_PART_WORDS[k] })),
+    maps_on: (await readGridSetting(site.id).catch(() => null))?.enabled === true,   // item 185: the map part waits for the grid
     propose_next: pr.next, propose_options: pr.options,
   };
 }
@@ -614,7 +660,12 @@ export async function handleReportPut(req: Request, site: SiteRow, principal: { 
     || Array.isArray(b.parts_off) || Array.isArray(b.cc) || typeof b.copy === 'boolean' || b.quiet_min !== undefined || (!!b.propose && typeof b.propose === 'object');
   if (!known) return json({ error: 'bad_request', message: 'Say whether the report is on, or give the line to send with it.' }, 400, cors);
   // item 160: say plainly what can't be kept, rather than dropping it
-  if (Array.isArray(b.parts_off) && normalizePartsOff(b.parts_off).length >= REPORT_PARTS.length) return json({ error: 'bad_request', message: 'Leave at least one part in the report.' }, 400, cors);
+  if (Array.isArray(b.parts_off)) {   // at least one part that can show: AI answers and the map part wait for their switches
+    const [cur, grid] = await Promise.all([readReportSetting(site.id).catch(() => null), readGridSetting(site.id).catch(() => null)]);
+    const off = new Set(normalizePartsOff(b.parts_off));
+    const can = REPORT_PARTS.filter((p) => !(p === 'ai' && !(typeof b.ai_checks === 'boolean' ? b.ai_checks : cur?.ai_checks)) && !(p === 'maps' && grid?.enabled !== true));
+    if (can.every((p) => off.has(p))) return json({ error: 'bad_request', message: 'Leave at least one part in the report.' }, 400, cors);
+  }
   if (Array.isArray(b.cc)) {
     const typed = b.cc.map((x) => String(x ?? '').trim()).filter(Boolean);
     const bad = typed.find((e) => normalizeCc([e]).length === 0);

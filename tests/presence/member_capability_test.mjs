@@ -53,6 +53,7 @@ const { handleEmailLogAddress } = await import(`${P}/routes/email_log.ts`);
 const { handleReviewGoogleLink } = await import(`${P}/routes/reviews.ts`);   // sales review item 115
 const { handleEstimateDelete } = await import(`${P}/routes/estimates.ts`);   // sales review item 47
 const { handleProspect } = await import(`${P}/routes/prospects.ts`);   // sales review item 112
+const { handleFormDelete } = await import(`${P}/routes/commercial.ts`);   // builder list item 203
 const { handleRecurringAction } = await import(`${P}/routes/recurring_invoices.ts`);
 const { handleReportPut, handleReportPreview } = await import(`${P}/ops/monthly_report.ts`);   // builder list item 58
 const { handleContactImportUndo, handleContactMerge, handleContactUnmerge } = await import(`${P}/routes/contacts_more.ts`);   // sales review items 86 + 105
@@ -147,6 +148,7 @@ const DECIDED = {
     'POST /client/retainers/:id/cancel',   // sales item 117: a client stopping their own retainer is the owner's call
     'DELETE /sales/estimates/:id', 'POST /sales/recurring/:id/stop',   // sales review item 47
     'DELETE /sales/prospects/:id',   // sales review item 112: taking a prospect off the list
+    'DELETE /forms/inbox/:id',   // builder list item 203: an enquiry and its files go for good
     // sales review items 86 + 105: undoing an import takes people off; a merge folds a record away (and back)
     'POST /sales/contacts/imports/:id/undo', 'POST /sales/contacts/:id/merge', 'POST /sales/contacts/:id/unmerge',
     'POST /sales/invoices/:id/payment/undo',   // sales review item 77: taking back a recorded payment changes the books, like a void
@@ -161,6 +163,8 @@ const DECIDED = {
     'POST /email/log-address', 'DELETE /email/log-address',
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58
     'POST /reviews/google-link',   // sales review item 115: where Google review requests send people is a setting
+    'POST /sales/setup',   // sales item 105: hiding Home's setup strip
+    'PUT /sales/goal-ai',   // sales item 94: the month's goal (the AI help switch in it is the owner's alone, said by the route)
   ],
   approve: [
     'POST /approvals/:id/decide', 'POST /assets/:id/status', 'POST /client/approvals/:id/decide',
@@ -189,7 +193,7 @@ const DECIDED = {
     'PATCH /assets/:id', 'PATCH /bookings/types/:id', 'PATCH /broadcasts/:id', 'PATCH /projects/:id',
     'PATCH /projects/:id/deliverables/:id2', 'PATCH /projects/:id/milestones/:id2', 'PATCH /projects/:id/tasks/:id2',
     'PATCH /sales/contacts/:id', 'PATCH /sales/deal-tasks/:id', 'PATCH /sales/deals/:id', 'PATCH /support/:id',
-    'POST /visibility/check', 'PUT /visibility/follow', 'PUT /visibility/phrases', 'PUT /visibility/ai/questions', 'POST /approve/send', 'POST /assets/:id/duplicate', 'POST /assets/:id/remove-background', 'POST /assets/:id/cutout',
+    'POST /visibility/check', 'PUT /visibility/follow', 'PUT /visibility/phrases', 'PUT /site/usable', 'PUT /visibility/ai/questions', 'POST /approve/send', 'POST /assets/:id/duplicate', 'POST /assets/:id/remove-background', 'POST /assets/:id/cutout',
     'POST /assets/:id/replace', 'POST /assets/:id/rollback', 'POST /assets/:id/suggest', 'POST /assets/bulk', 'POST /assets/folders/move',
     'POST /bookings/appointments/:id/cancel', 'POST /bookings/appointments/:id/complete',
     'POST /bookings/appointments/:id/confirm', 'POST /bookings/appointments/:id/no_show', 'POST /bookings/types',
@@ -214,6 +218,8 @@ const DECIDED = {
     'POST /sales/customers', 'POST /sales/deals', 'POST /sales/deals/:id/activity',
     'POST /sales/tasks', 'POST /sales/people/activity',   // sales items 85 and 106: to-dos and calls for anyone
     'POST /sales/email',   // sales item 80: an email from the record, like the reply to an enquiry
+    'POST /handover/notify',   // sales item 93: the hand-over pack email (only a studio scoped in gets past the route)
+    'POST /sales/ai/draft', 'POST /sales/ai/summary',   // sales item 94: a draft only fills the box; a summary is kept on the record
     'POST /sales/deals/:id/contracts', 'POST /sales/deals/:id/convert', 'POST /sales/deals/:id/invoice',
     'POST /sales/deals/:id/proposals', 'POST /sales/deals/:id/resend-invite', 'POST /sales/deals/:id/retainer',
     'POST /sales/deals/:id/schedule', 'POST /sales/deals/:id/send', 'POST /sales/deals/:id/stage',
@@ -244,6 +250,7 @@ const DECIDED = {
     // only the owner, or their studio asking the owner, can start or stop a transfer (the route refuses anyone else)
     'POST /portal/members/:id/role', 'POST /portal/transfer', 'POST /portal/transfer/cancel',
     'POST /foundations/plans/:id/done',   // builder item 193: studio-only, checked by the route itself
+    'POST /pages/from-saved',   // builder item 216: studio-only, checked by the route itself
   ],
 };
 const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) => ({ name, need })));
@@ -333,6 +340,7 @@ const CHANGED = [
   { name: 'POST /client/retainers/:id/cancel', fx: { rows: { presence_deals: { retainer: { status: 'active' } } } }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/client_retainers.ts')).handleClientRetainerCancel(r, A, p, ROW, cors) },   // sales item 117
   { name: 'DELETE /sales/estimates/:id', run: (r, p) => handleEstimateDelete(A, p, ROW, cors) },     // sales review item 47
   { name: 'DELETE /sales/prospects/:id', run: (r, p) => handleProspect(r, A, p, ROW, cors) },     // sales review item 112
+  { name: 'DELETE /forms/inbox/:id', run: (r, p) => handleFormDelete(A, ROW, cors) },     // builder list item 203
   { name: 'POST /sales/recurring/:id/stop', run: (r, p) => handleRecurringAction(r, A, p, ROW, 'stop', cors) },
   // sales review items 86 + 105
   { name: 'POST /sales/contacts/imports/:id/undo', fx: { rows: { presence_contact_imports: { created_at: new Date().toISOString(), undone_at: null } } }, run: (r, p) => handleContactImportUndo(r, A, p, ROW, cors) },
@@ -353,6 +361,8 @@ const CHANGED = [
   { name: 'POST /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },     // sales review item 69
   { name: 'DELETE /email/log-address', run: (r, p) => handleEmailLogAddress(r, A, p, cors) },
   { name: 'POST /reviews/google-link', body: { place_id: 'ChIJTestPlace_1234' }, run: (r, p) => handleReviewGoogleLink(r, A, p, cors) },     // sales review item 115
+  { name: 'POST /sales/setup', body: { hidden: true }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/setup_strip.ts')).handleSetupStrip(r, A, p, cors) },     // sales item 105: hiding Home's setup strip
+  { name: 'PUT /sales/goal-ai', body: { goal_cents: 800000 }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/sales_ai.ts')).handleGoalAi(r, p.jwt || '', A, p, cors) },     // sales item 94: the month's goal
   { name: 'PUT /report/monthly', body: { note: 'A line for the client' }, run: (r, p) => handleReportPut(r, A, p, cors) },     // builder list item 58 (a line, not the switch: this stub answers every read with a row, which reads as a do-not-send entry)
   { name: 'POST /report/monthly/preview', fx: { only: ['clients'] }, run: (r, p) => handleReportPreview(A, p, cors) },   // with every read answering a row the address reads as suppressed; the send is the write
   { name: 'POST /site/offline', run: (r, p) => handleTakeOffline(A, p, cors) },
@@ -446,7 +456,7 @@ const CHANGED = [
 // A new write handler fails here until someone decides what it needs in lib/site_roles.ts
 // and adds it to DECIDED and to this list. At runtime an unlisted write is refused anyway.
 const WRITE_HANDLERS = [
-  'handleVisibilityCheck', 'handleFollowPut', 'handlePhrasesPut', 'handleAiQuestionsPut', 'handleApprovalDecide', 'handleApprovalsCreate', 'handleApproveSend', 'handleAssetDelete', 'handleAssetDuplicate',
+  'handleVisibilityCheck', 'handleFollowPut', 'handlePhrasesPut', 'handleUsablePut', 'handleAiQuestionsPut', 'handleApprovalDecide', 'handleApprovalsCreate', 'handleApproveSend', 'handleAssetDelete', 'handleAssetDuplicate',
   'handleAssetRemoveBackground', 'handleAssetCutout', 'handleAssetReplace', 'handleAssetRollback', 'handleAssetStatus',
   'handleAssetSuggest', 'handleAssetUpdate', 'handleAssetsBulk', 'handleAssetsFolderMove', 'handleBackOnline', 'handleBookingCancel',
   'handleBookingConfirm', 'handleBookingMark', 'handleBookingSettingsPut', 'handleBookingTypeCreate',
@@ -464,13 +474,14 @@ const WRITE_HANDLERS = [
   'handleCrmNoteAdd', 'handleCrmNoteDelete', 'handleCrmNotePin', 'handleDealTaskCreate', 'handleDealTaskUpdate',
   'handleDeliverable', 'handleDeliverableUploadUrl', 'handleDeliverablesCreate', 'handleDevCustomizationPut',
   'handleDomain', 'handleDomainForward', 'handleEditorImprove', 'handleFaqAdmin', 'handleFormReply',
+  'handleFormDelete',   // builder list item 203: DELETE /forms/inbox/:id needs delete
   'handleFormStatus', 'handleFoundationsDecide', 'handleFoundationsPrepare', 'handleKnowledgeDelete',
   'handleKnowledgeImport', 'handleLaunchCancel', 'handleLaunchCreate', 'handleLaunchDecide', 'handleLaunchPromote',
   'handleLaunchRecapture', 'handleLaunchRollback', 'handleLaunchSchedule', 'handleLocation', 'handleMediaDelete',
   'handleMediaUpdate', 'handleMediaUpload', 'handleMemberAdd', 'handleMemberRevoke', 'handleMessages',
   'handleMilestone', 'handleMilestonesCreate', 'handleMomentDismiss', 'handleMonitorConnect',
   'handleMonitorDisconnect', 'handleMonitorVerify', 'handleNotificationsRead',
-  'handlePageDuplicate', 'handleDeletedPageRestore', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',   // item 154: putting a deleted page back is an edit (contentWriteNeeds)
+  'handlePageDuplicate', 'handlePageFromSaved', 'handleDeletedPageRestore', 'handlePageLockCreate', 'handlePreviewPromote', 'handlePreviewPublish', 'handlePreviewSection', 'handlePreviewSettings',   // item 154: putting a deleted page back is an edit (contentWriteNeeds); item 216: adding a page saved to the studio is open on the member list, the route admits the studio alone
   'handlePreviewShareLink', 'handleProject', 'handleProjectChecklist', 'handleProjectStatus', 'handleProjectSurveys',
   'handleProjects', 'handleProjectTemplates', 'handleTodoTemplates', 'handleDealTasksFromTemplate', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
   'handleRedirectDelete', 'handleRestore', 'handleRestoreToDraft', 'handleReviewApprove', 'handleReviewDismiss',
@@ -500,6 +511,10 @@ const WRITE_HANDLERS = [
   // no member list (an unlisted write refuses every seat — asserted above), and the handlers
   // themselves refuse anyone who isn't platform staff (tool_leads_routes_test.mjs proves it).
   'handleToolLead', 'handleToolLeadConvert',
+  // builder list item 185: the map rank grid spends the platform's Google key, so it is the studio's
+  // alone. Its writes are on no member list (every seat is refused at the gate), and the handlers
+  // refuse anyone who isn't platform staff or a studio scoped in (rank_grid_test.mjs proves it).
+  'handleMapsPut', 'handleMapsPlace', 'handleMapsFind', 'handleMapsScan',
   'handleStudioRequests',   // final pass S1: POST /portal/studio-requests/:id/(accept|decline) are open; the route answers the owner only
   'handleMemberRole', 'handleTransferStart', 'handleTransferCancel',   // builder item 53: open on the member list; each route checks the role itself
   'handleFoundationsPlanDone',   // builder item 193: open on the member list; the route answers the studio only
@@ -512,6 +527,9 @@ const WRITE_HANDLERS = [
   'handleVisualEdit', 'handleVisualGenerate', 'handleVisualVary', 'handleWriteDecide',
   'handleWriteExecute', 'handleWritePrepare', 'handleWriteRollback', 'handleWriterAccept', 'handleWriterDiscard',
   'handleWriterGenerate', 'handleWriterRewrite',
+  'handleSetupStrip',   // sales item 105: POST hides Home's setup strip (configure)
+  'handleHandoverPack',   // sales item 93: POST /handover/notify (edit; the route refuses anyone but the studio)
+  'handleGoalAi', 'handleAiDraft', 'handleAiSummary',   // sales item 94: PUT /sales/goal-ai (configure; the switch is the owner's), POST /sales/ai/(draft|summary) (edit)
 ];
 {
   const idx = read('supabase/functions/presence/index.ts');

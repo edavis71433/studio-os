@@ -65,6 +65,7 @@ import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberA
 const { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut, handleBrandKitApply } = lazyRoutes(() => import('./routes/dev.ts'));
 const { handleStockSearch, handleStockImport } = lazyRoutes(() => import('./routes/stock.ts'));
 const { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } = lazyRoutes(() => import('./routes/content_library.ts'));
+const { handleReadyPages, handlePageFromSaved } = lazyRoutes(() => import('./routes/saved_pages.ts'));   // builder list item 216: Add a page
 import { handleCrmRecord, handleCrmMessages, handleCrmActivity, handleCrmSearch, handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNoteDelete, handleCrmNotePin } from './routes/crm.ts';
 const { handleEmailSending } = lazyRoutes(() => import('./routes/email_sending.ts'));
 import { handleSalesExport } from './routes/sales_export.ts';   // sales review item 69: Download my data
@@ -73,7 +74,7 @@ import { handleRecurringStart, handleRecurringChange, handleRecurringAction } fr
 import { handleInvoicePayment, handleInvoicePaymentUndo } from './routes/invoice_payments.ts';   // sales review item 77
 import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
 const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
-import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost, handleSendTicket, handleSpamLinkGet, handleSpamLinkPost, handleFormFile, handleFormAnswers } from './routes/commercial.ts';
+import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost, handleSendTicket, handleSpamLinkGet, handleSpamLinkPost, handleFormFile, handleFormAnswers, handleFormDelete, handleJoinGet, handleJoinPost } from './routes/commercial.ts';
 const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleManageGet, handleManagePost, handleManageSlots, handleManageIcs, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
 const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest, handleReviewGoogleLink } = lazyRoutes(() => import('./routes/reviews.ts'));
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
@@ -101,7 +102,9 @@ import { handleScopedCommerce } from './routes/commerce_scoped.ts';
 const { handleSystem } = lazyRoutes(() => import('./routes/system.ts'));
 const { handleVisibility, handleVisibilityCheck } = lazyRoutes(() => import('./routes/visibility.ts'));
 const { handleFollowGet, handleFollowPut, handleLlmsDraft, handlePhrasesGet, handlePhrasesPut } = lazyRoutes(() => import('./routes/search_tab.ts'));
+const { handleUsableGet, handleUsablePut } = lazyRoutes(() => import('./routes/usable.ts'));
 const { handleAiGet, handleAiQuestionsPut } = lazyRoutes(() => import('./routes/ai_answers.ts'));
+const { handleMapsGet, handleMapsPut, handleMapsPlace, handleMapsFind, handleMapsNames, handleMapsScan } = lazyRoutes(() => import('./routes/rank_grid.ts'));
 const { handleConnectionsList, handleConnectionProfile, handleConnectionConnect, handleConnectionCallback, handleConnectionRefresh, handleConnectionDisconnect, handleConnectionProperties, handleConnectionPropertySelect, handleWritePrepare, handleWriteList, handleWriteDecide, handleWriteExecute, handleWriteRollback, handleConnectionAsk, handleConnectionAskStatus } = lazyRoutes(() => import('./routes/connections.ts'));
 const { handleMarketplaceList, handleMarketplacePrepare, handleMarketplaceDecide, handleMarketplaceExecute, handleMarketplaceRollback, handleMarketplaceFeatures } = lazyRoutes(() => import('./routes/marketplace.ts'));
 
@@ -199,6 +202,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // item 140: the "This was spam" link in the owner's alert email (spam.html asks, then marks)
     if (route === '/forms/spam' && method === 'GET') return handleSpamLinkGet(req, cors);
     if (route === '/forms/spam' && method === 'POST') return handleSpamLinkPost(req, cors);
+    // item 203: the "Yes, add me" link of Join our list (join.html shows who, then adds them)
+    if (route === '/join' && method === 'GET') return handleJoinGet(req, cors);
+    if (route === '/join' && method === 'POST') return handleJoinPost(req, cors);
   }
   // ── Phase BK: PUBLIC native booking — a website visitor lists services, reads
   //    open slots, and books an appointment. No session; authorized by the site id
@@ -563,9 +569,17 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/visibility/follow' && method === 'PUT') return handleFollowPut(req, site, principal, cors);
   if (route === '/visibility/phrases' && method === 'GET') return handlePhrasesGet(site, cors);             // item 160: what people type to find you
   if (route === '/visibility/phrases' && method === 'PUT') return handlePhrasesPut(req, site, principal, cors);
+  if (route === '/site/usable' && method === 'GET') return handleUsableGet(site, cors);                    // item 150: Usable by everyone, its ticks and the last check
+  if (route === '/site/usable' && method === 'PUT') return handleUsablePut(req, site, principal, cors);
   if (route === '/visibility/llms-draft' && method === 'GET') return handleLlmsDraft(site, cors);         // item 124
   if (route === '/visibility/ai' && method === 'GET') return handleAiGet(site, cors);                     // item 182
   if (route === '/visibility/ai/questions' && method === 'PUT') return handleAiQuestionsPut(req, site, principal, cors);
+  if (route === '/visibility/maps' && method === 'GET') return handleMapsGet(site, principal, cors);                  // item 185: the map rank grid (the writes are the studio's only)
+  if (route === '/visibility/maps' && method === 'PUT') return handleMapsPut(req, site, principal, cors);
+  if (route === '/visibility/maps/place' && method === 'PUT') return handleMapsPlace(req, site, principal, cors);
+  if (route === '/visibility/maps/find' && method === 'POST') return handleMapsFind(req, site, principal, cors);
+  if (route === '/visibility/maps/names' && method === 'GET') return handleMapsNames(req, site, principal, cors);
+  if (route === '/visibility/maps/scan' && method === 'POST') return handleMapsScan(req, site, principal, cors);
   if (route === '/redirects' && method === 'GET') return handleRedirectsList(site, cors);                 // Phase SD
   if (route === '/redirects' && method === 'POST') return handleRedirectCreate(req, site, principal, cors);
   if (route === '/redirects/suggest' && method === 'GET') return handleRedirectSuggest(req, site, cors);   // item 156: the old site's pages, matched
@@ -794,6 +808,13 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/sales/stages' && (method === 'GET' || method === 'PUT')) return handleSalesStages(req, site, principal, cors);   // sales review item 38: rename the open stages
   if (route === '/email/sending' && method === 'GET') return handleEmailSending(cors);
   if (route === '/sales/export' && method === 'GET') return handleSalesExport(site, principal, cors);   // sales review item 69: one zip of CSVs
+  if ((route === '/handover/pack' && method === 'GET') || (route === '/handover/notify' && method === 'POST')) return (await import('./routes/handover_pack.ts')).handleHandoverPack(req, site, principal, cors);   // sales item 93: the hand-over pack for a client who leaves
+  if (route === '/sales/setup' && (method === 'GET' || method === 'POST')) return (await import('./routes/setup_strip.ts')).handleSetupStrip(req, site, principal, cors);   // sales item 105: Home's setup strip
+  if (route === '/sales/export/accounting' && method === 'GET') return (await import('./routes/accounting_export.ts')).handleAccountingExport(req, site, principal, cors);   // sales item 105: the export for a bookkeeper
+  // sales item 94: the month's goal and the AI help switch, and AI help's two presses (lazy: most requests never use them)
+  if (route === '/sales/goal-ai' && (method === 'GET' || method === 'PUT')) return (await import('./routes/sales_ai.ts')).handleGoalAi(req, jwt, site, principal, cors);
+  if (route === '/sales/ai/draft' && method === 'POST') return (await import('./routes/sales_ai.ts')).handleAiDraft(req, jwt, site, principal, cors);
+  if (route === '/sales/ai/summary' && (method === 'GET' || method === 'POST')) return (await import('./routes/sales_ai.ts')).handleAiSummary(req, jwt, site, principal, cors);
   // ── Prospects — the lead list (Semrush review, sales item 112). Lazy: most days nobody prospects. ──
   if (route.startsWith('/sales/prospects')) {
     const px = await import('./routes/prospects.ts');
@@ -1143,6 +1164,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/forms\/inbox\/([0-9a-f-]{36})$/);
     if (m && method === 'POST') return handleFormStatus(req, site, m[1], cors);
+    // item 203: delete an enquiry for good, with the files that came with it
+    if (m && method === 'DELETE') return handleFormDelete(site, m[1], cors);
   }
   {
     const m = route.match(/^\/forms\/inbox\/([0-9a-f-]{36})\/reply$/);
@@ -1330,6 +1353,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // ── Wave-1 G7: page operations on the settings.pages model (duplicate = a
   //    create-with-source over the ONE pages store; refs = delete-awareness) ──
   if (route === '/pages/duplicate' && method === 'POST') return handlePageDuplicate(req, db, site, principal, cors);
+  // builder list item 216: the ready-made pages by what each is for, and a page saved to the studio landing here
+  if (route === '/pages/ready' && method === 'GET') return handleReadyPages(site, cors);
+  if (route === '/pages/from-saved' && method === 'POST') return handlePageFromSaved(req, site, principal, cors);   // the studio's alone: the route checks, not a seat
   if (route === '/pages/refs' && method === 'GET') return handlePageRefs(req, site, cors);
   if (route === '/pages/deleted' && method === 'GET') return handleDeletedPages(site, cors);   // item 154: pages deleted in the last 30 days
   { const dm = route.match(/^\/pages\/deleted\/([0-9a-f-]{36})\/restore$/); if (dm && method === 'POST') return handleDeletedPageRestore(req, db, site, principal, dm[1], cors); }

@@ -108,6 +108,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `DELETE /(media|assets|redirects|content-library|publishes/checkpoints|bookings/types|knowledge/docs)/${ID}`,
     `DELETE /sales/(contacts|deals|proposals|contracts|templates|estimates)/${ID}`,
     `DELETE /sales/prospects/${ID}`,   // sales review item 112: taking a prospect off the list
+    `DELETE /forms/inbox/${ID}`,   // builder list item 203: an enquiry and its files go for good
     `DELETE /projects/${ID}/deliverables/${ID}`,
     `DELETE /projects/templates/${ID}`,   // sales item 106: removing a saved project template, like a saved proposal template
     `DELETE /sales/todo-templates/${ID}`,   // sales item 106: removing a saved to-do list, the same
@@ -125,6 +126,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     '(POST|DELETE) /calendar/link',   // sales review item 46: making or turning off the private calendar link is a setting
     '(POST|DELETE) /email/log-address',   // sales review item 69: the private log-this-email address is a setting too
     'POST /reviews/google-link',   // sales review item 115: where Google review requests send people is a setting
+    'POST /sales/setup',   // sales item 105: hiding Home's setup strip is the studio's setting
+    'PUT /sales/goal-ai',   // sales item 94: the month's goal is the studio's setting (the AI help switch in it is the owner's alone, said by the route)
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58: the client's monthly report is a setting; its preview emails the caller
     '(POST|DELETE) /foundations/domain',
     '(POST|DELETE) /foundations/domain/forward',   // builder list item 174: another domain forwarding here is a domain setting
@@ -170,6 +173,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /visibility/check',
     'PUT /visibility/follow',   // builder item 181: the searches the site follows on Google
     'PUT /visibility/phrases',   // builder item 160: the two or three phrases the business wants to be found for
+    'PUT /site/usable',   // builder item 150: the Usable by everyone ticks, and what its last check found
     'PUT /visibility/ai/questions',   // builder item 182: the questions its monthly AI check asks (the switch is configure)
     'POST /preview/(publish|share-link|section)',   // section: draws one unsaved section for the canvas, stores nothing
     'POST /publishes/checkpoints',
@@ -203,6 +207,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /sales/(contacts|customers|deals|templates)',
     'POST /sales/(tasks|people/activity)',   // sales items 85 and 106: a to-do for anyone, a call logged for a person with no deal
     'POST /sales/email',   // sales item 80: one email to one person on file, like the Inbox's reply to an enquiry
+    'POST /sales/ai/(draft|summary)',   // sales item 94: a draft only fills the box (nothing sends); a summary is kept on the record. Each costs about 1 cent
+    'POST /handover/notify',   // sales item 93: the studio tells a business its hand-over pack is ready (the route itself refuses anyone but the studio)
     'POST /sales/contacts/imports',   // sales review item 86: starting an import (each row is a POST /sales/contacts)
     'POST /sales/prospects(/discover)?',   // sales review item 112: find businesses, save the ticked ones
     `POST /sales/prospects/${ID}/(convert|draft|pack)`,   // item 112: start the deal; a draft only returns words — nothing sends; item 113: pack builds a share link
@@ -258,6 +264,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /portal/studio-requests/${ID}/(accept|decline)`,
     // builder item 193: only the studio marks an approved plan finished; the route refuses anyone else and says why
     `POST /foundations/plans/${ID}/done`,
+    // builder item 216: only the studio adds one of its saved pages; the route refuses anyone else and says why
+    'POST /pages/from-saved',
     'POST /crm/notes',
     `POST /crm/notes/${ID}/pin`,
     `DELETE /crm/notes/${ID}`,

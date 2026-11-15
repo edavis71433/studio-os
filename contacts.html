@@ -137,6 +137,7 @@
   .center{text-align:center;padding:56px var(--dds-s5,20px)}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 var(--dds-s2,8px)}
   a.link{color:var(--p);text-decoration:none;font-weight:500}
+  button.link{background:none;border:0;padding:8px 6px;min-height:44px;font:inherit;color:var(--p);font-weight:500;cursor:pointer}
   /* item 66: "Showing 100 of 240 · Show more" under the list */
   .more-line{margin:var(--dds-s4,16px) 0 var(--dds-s1,4px);text-align:center;font-size:13px;color:var(--faint)}
   .more-line .morebtn{background:none;border:0;color:var(--p);font:inherit;font-weight:600;cursor:pointer;padding:var(--dds-s2,8px) var(--dds-s3,12px);min-height:44px}
@@ -743,7 +744,8 @@ function listHtml(rows){
   // and "Add someone" would file them against the wrong tenant. data-noscope on
   // the exit: carryScopeGlobally would otherwise re-scope it straight back in.
   if(!ALL.length&&inClient())return `<div class="center"><h2>Contacts live at the studio level.</h2><p class="muted">You’re looking at one client. Your contacts belong to your studio, not to a single client, so there’s nothing here to show — and nothing you could usefully add from inside a client.</p><p style="margin-top:16px"><a class="link" data-noscope href="/contacts.html">Leave this client and open Contacts →</a></p></div>`;
-  if(!ALL.length&&!anyFilter())return `<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html">Open Pipeline →</a></p></div>`;
+  // sales item 105: the empty list offers the first thing to do, the same add as the toolbar's
+  if(!ALL.length&&!anyFilter())return `<div class="center"><h2>No contacts yet.</h2><p class="muted">Add someone, or they’ll appear here automatically when a website enquiry or a new deal comes in.</p><p style="margin-top:16px"><button type="button" class="btn" data-first="new">+ Add a contact</button></p><p style="margin-top:10px"><button type="button" class="link" data-first="importCsv">or import a list</button></p></div>`;
   if(!rows.length&&anyFilter()&&!Q.trim())return `<p class="muted" style="text-align:center;padding:30px">Nobody matches these filters. Turn one off, or clear them above.</p>`+moreHtml();
   if(!rows.length)return `<p class="muted" style="text-align:center;padding:30px">${Q?(Q.trim()&&!haveAll()&&!srchNow()?(SRCH_ERR===Q.trim()?'We couldn’t search all your contacts just now. These are the ones loaded so far.':'Looking through all your contacts…'):'No contacts match “'+esc(Q)+'”.'):'Nothing in this view — try “All contacts”.'}</p>`+moreHtml();
   return (DISPLAY==='table'?bulkHtml()+tableHtml(rows):cardsHtml(rows))+moreHtml();
@@ -813,6 +815,8 @@ async function searchServer(){
 // item 110 (K3): inside a client the page reads that client's site, where your contacts don't
 // live — an add or an import there was filed under the client and never reached your list.
 // So the add, import and fields buttons only show at the studio level.
+// sales item 105: the empty list's buttons press the toolbar's own (one way to do each thing)
+document.addEventListener('click',(e)=>{const x=e.target&&e.target.closest?e.target.closest('[data-first]'):null;if(!x)return;const t=$(x.getAttribute('data-first'));if(t)t.click();});
 function addButtons(){
   return `<button class="btn" id="new">+ Add a contact</button><button class="btn ghost" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button><button class="btn ghost" id="manageFields" data-needs="configure" title="Define up to 5 of your own fields — they show on every contact’s record">Manage fields</button>`;
 }
@@ -1162,6 +1166,8 @@ function importTargets(){
     ['tags','Tags'],['notes','Notes'],['found_via','How they found you']]
     .concat((FIELD_DEFS||[]).map(f=>['custom:'+f.key,f.label||f.key]));
 }
+// one row on its own, carrying its import's id (an older server, or a shell.js from before item 122)
+async function sendOne(it,ctx){const body=Object.assign({},it,ctx&&ctx.importId?{import_id:ctx.importId}:{});const r=await api('/sales/contacts','POST',body);if(!r.ok)return'failed';return r.body&&r.body.updated?'updated':(r.body&&r.body.deduped?'existed':'added');}
 async function openImport(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
   await loadFieldDefs().catch(()=>{});   // your own fields are columns an import can fill
@@ -1184,9 +1190,20 @@ async function openImport(){
       if(Object.keys(custom).length)it.custom=custom;
       return it;},
     label:(it)=>it.name||it.email,
-    // the import is a record of its own, so it can be undone; each row carries its id
+    // item 122: the whole file in one request: the server makes the import (for Undo) and takes every
+    // row. An older server answers without counts, having only made the import: then the rows go one by
+    // one against it, as they used to. start and send stay for a shell.js from before sendAll.
+    sendAll:async(items,ctx)=>{
+      let r;try{r=await api('/sales/contacts/imports','POST',{file_name:ctx.fileName||'',on_existing:ctx.onExisting,rows:items});}catch(_){r={ok:false,status:0,body:{}};}
+      const d=r.ok&&r.body&&r.body.data;
+      if(!d){if(r.body&&r.body.message)toast(r.body.message);return{failed:items.length};}
+      ctx.importId=d.id||null;
+      if(d.counts)return d.counts;
+      const c={added:0,updated:0,existed:0,failed:0};
+      for(let i=0;i<items.length;i+=5)await Promise.all(items.slice(i,i+5).map(async it=>{let k='failed';try{k=await sendOne(it,ctx);}catch(_){}c[k]=(c[k]||0)+1;}));
+      return c;},
     start:async(o)=>{let r;try{r=await api('/sales/contacts/imports','POST',{file_name:o.fileName||'',on_existing:o.onExisting});}catch(_){return null;}return r.ok&&r.body&&r.body.data?r.body.data.id:null;},
-    send:async(it,ctx)=>{const body=Object.assign({},it,ctx&&ctx.importId?{import_id:ctx.importId}:{});const r=await api('/sales/contacts','POST',body);if(!r.ok)return'failed';return r.body&&r.body.updated?'updated':(r.body&&r.body.deduped?'existed':'added');},
+    send:(it,ctx)=>sendOne(it,ctx),
     summary:(c)=>`${c.added} added${c.updated?`, ${c.updated} updated`:''}${c.existed?`, ${c.existed} already here and left as they were`:''}${c.failed?`, ${c.failed} couldn’t be imported`:''}.`,
     done:()=>{load().catch(()=>{});loadImportStrip();},
   });
@@ -1398,6 +1415,7 @@ function paintMerge(){
       ${tags.length?`<div class="fl">Tags</div><div class="full">Both sets of tags are kept: ${esc(tags.join(', '))}</div>`:''}</div>
     <p class="mmoves">Everything moves to the one you keep: ${esc(parts.join(', '))}.</p>
     <p class="note">The other record is set aside for 30 days. Undo, in the message after, brings it back.</p>
+    ${d.notes_cut>0?`<p class="note" id="mgCut" style="color:var(--warn-ink,#7a5417)">Their notes together are longer than one record holds, so the last ${esc(d.notes_cut)} characters won’t fit. The line with the old email address stays at the top, and Undo brings back both records with every note in full.</p>`:''}
     ${d.partial?'<p class="note" style="color:var(--bad)">We couldn’t count everything attached just now; the merge still moves all of it.</p>':''}
     <div class="row2"><button type="button" class="btn ghost" id="merge-cancel">Cancel</button><button type="button" class="btn" id="mergeGo" data-needs="delete">Merge into one</button></div>`;
   $('merge-cancel').onclick=()=>{$('mergeDlg').close();};
@@ -1416,7 +1434,8 @@ async function doMerge(){
   }
   const away=(r.body.data&&r.body.data.merged_away)||{id:MERGE.other,name:''};
   $('mergeDlg').close();MERGE=null;
-  const msg=`Merged into one${away.name?` — ${away.name}’s record was set aside`:''}.`;
+  const cut=Number(r.body.data&&r.body.data.notes_cut)||0;   // item 121: a cut is said, never found out later
+  const msg=`Merged into one${away.name?` — ${away.name}’s record was set aside`:''}.${cut?` Their notes were cut by ${cut} characters to fit; Undo brings them back in full.`:''}`;
   if(window.ddsToast)ddsToast(msg,'ok',{label:'Undo',onClick:async()=>{
     let u;try{u=await api('/sales/contacts/'+encodeURIComponent(away.id)+'/unmerge','POST',{});}catch(_){u={ok:false,body:{}};}
     toast(u.ok?'The merge is undone — both records are back.':((u.body&&u.body.message)||'We couldn’t undo that merge just now.'));
@@ -1520,7 +1539,10 @@ async function load(){
   if(Q.trim())searchServer();   // item 66: a search still in the box looks past the loaded pages again
   if(!IMPORT_ASKED){IMPORT_ASKED=true;loadImportStrip();}   // item 86: the newest import of the day, with its Undo
 }
-(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();}catch(_){trouble();}})();
+// sales item 105: ?add=1 (an empty People list's button on Customers) opens Add a contact once the list is in
+(async function(){try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";if(!TOKEN){signedOut();return;}await load();
+  if(new URLSearchParams(location.search).get('add')==='1'){try{history.replaceState(null,'',location.pathname);}catch(_){}const nb=$('new');if(nb)nb.click();}
+}catch(_){trouble();}})();
 </script>
 </body>
 </html>

@@ -103,6 +103,14 @@
   .sw:focus-visible{outline:2px solid var(--p);outline-offset:2px}
   .swrow .t{flex:1;min-width:0} .swrow .t b{display:block;font-weight:600} .swrow .t b input{width:56px;height:28px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 var(--dds-s2,8px);font:inherit;font-size:13.5px;text-align:center;margin:0 2px;background:var(--card);color:var(--ink)}
   .swrow .t .how{font-size:12.5px;color:var(--faint);margin-top:2px}
+  /* sales item 94: the goal's amount box and AI help's four facts */
+  .goalin{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .goalin .cur{font-weight:600;color:var(--soft)}
+  .goalin input{width:132px;height:40px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:0 12px;font:inherit;font-size:15px;font-weight:600;background:var(--card);color:var(--ink)}
+  .goalin .per{font-size:13.5px;color:var(--soft)}
+  .aifacts{list-style:none;margin:10px 0 6px;padding:10px 12px;border-radius:var(--dds-r,8px);background:var(--p-soft,#efeafa);display:grid;gap:4px;font-size:13px;line-height:1.45;color:var(--ink)}
+  .aifacts strong{font-weight:650}
+  @media (max-width:767px){.goalin input{font-size:16px;height:44px;width:150px}.goalin .btn{min-height:44px}}
   /* builder list item 184: what the monthly report holds, as chips */
   .swrow.rp-in{flex-wrap:wrap;align-items:center;gap:6px}
   .rp-in ul{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none;flex:1 1 280px;min-width:0}   /* beside the label when there's room, as drawn */
@@ -148,6 +156,18 @@
   .rp-boxt p{margin:4px 0 6px;font-size:14px;font-weight:500;color:var(--ink);line-height:1.45}
   .rp-from{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:12.5px;color:var(--faint)}
   .linkbtn{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:none;border:none;padding:2px 0;cursor:pointer}
+  /* sales item 124: what to do now at each stage, one row a stage, opened to edit */
+  .sn-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .sn-row{border:1px solid var(--line);border-radius:12px;padding:10px 14px;background:var(--card)}
+  .sn-row.open{border:2px solid color-mix(in srgb,var(--p) 45%,transparent);background:var(--p-soft)}
+  .sn-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .sn-top b{font-weight:600;font-size:14px}
+  .sn-kind{font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;background:var(--bg);color:var(--soft)}
+  .sn-kind.mine{background:var(--p-soft);color:var(--p)}
+  .sn-prev{flex:1 1 200px;min-width:0;font-size:13px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sn-row textarea{display:block;width:100%;box-sizing:border-box;margin-top:8px;font:inherit;font-size:14px;line-height:1.55;padding:10px 12px;border:1px solid var(--dds-line-strong,#d6d4e2);border-radius:10px;background:var(--card);color:var(--ink);resize:vertical}
+  .sn-bot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .sn-bot .linkbtn{margin-left:auto}
   .linkbtn:hover{text-decoration:underline}
   .rp-pickw{position:relative}
   .rp-menu{position:absolute;left:0;top:calc(100% + 6px);z-index:20;width:min(360px,80vw);background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--dds-shadow-pop,var(--dds-shadow));padding:6px;display:flex;flex-direction:column;gap:2px}
@@ -250,6 +270,18 @@
   .chan input{width:18px;height:18px;margin:0;accent-color:var(--p);cursor:pointer}
   .chans[aria-disabled="true"] .chan{color:var(--faint);cursor:not-allowed}
   .nsaved{font-size:12px;font-weight:600;color:var(--good,#11744a);margin-left:6px}
+  /* builder list item 191: two-step sign-in, drawn in Figma (B1 off, B3 on) */
+  .tsrow{margin-top:var(--dds-s3,12px)}
+  .tshead{display:flex;align-items:center;gap:var(--dds-s2,8px);flex-wrap:wrap} .tshead b{font-size:14px;font-weight:600}
+  .tspill{display:inline-flex;align-items:center;min-height:22px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;background:var(--p-soft);color:var(--p)}
+  .tspill.off{background:var(--warn-soft);color:var(--bad)} .tspill.on{background:var(--good-soft);color:var(--good)}
+  .tsline{margin:6px 0 0;font-size:13.5px;line-height:1.5;color:var(--soft);max-width:62ch}
+  .tsacts{display:flex;align-items:center;gap:var(--dds-s3,12px);flex-wrap:wrap;margin-top:var(--dds-s3,12px)}
+  .tsacts .btn{height:auto;min-height:44px;padding:8px 22px;border-radius:999px;font-size:14px;font-weight:600}
+  .tsacts .btn[hidden],.tsnote[hidden]{display:none}
+  .tsnote{font-size:12.5px;color:var(--faint)}
+  .tsalerts{margin-top:var(--dds-s4,16px);padding-top:var(--dds-s4,16px);border-top:1px solid var(--line)}
+  .tsalerts p{margin:0;font-size:13.5px} .tsalerts .tsline{margin-top:4px} .tsalerts .tsto b{font-weight:600;margin-right:6px} .tsalerts .tsto span{color:var(--soft);overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -338,6 +370,39 @@
         <label><span data-stage-label="contract">Agreement out</span> <input type="number" id="sc-contract" min="0" max="100" step="1" placeholder="75" aria-label="Chance a deal at Agreement out closes, in percent"> %</label>
       </div>
       <div style="margin-top:10px;display:flex;align-items:center;gap:10px"><button type="button" class="btn" id="scSave">Save percents</button><span class="how" id="scMsg" role="status" style="margin:0"></span></div>
+    </div>
+    <!-- sales item 124: the note under the stage bar on every deal, one per stage (Won and Not a fit too) -->
+    <div class="swrow" style="display:block" id="stageNotes" hidden>
+      <b style="font-weight:600">What to do now at each stage</b>
+      <div class="how">A short note under the stage bar on every deal. Each stage has a starter note until you change it.</div>
+      <div class="sn-list" id="snList"></div>
+      <span class="how" id="snNoteMsg" role="status" style="margin:6px 0 0;display:block"></span>
+    </div>
+  </section>
+  <!-- sales item 94 (Nov 2026): the month's sales goal, which Home and Pipeline show this month
+       against, and the AI help switch (Draft a reply, Where things stand: about 1 cent a press,
+       off for every studio until its owner switches it on). GET/PUT /sales/goal-ai: the goal
+       saves with its button, the switch as it flips, and only the studio's owner may flip it. -->
+  <section class="card" id="goal" aria-labelledby="goalHead" hidden data-needs="configure">
+    <div class="card-h"><h2 id="goalHead" tabindex="-1">Goal and AI help</h2><span class="hint">Your number for the month, and AI help that drafts and sums up</span></div>
+    <div class="swrow goalrow">
+      <div class="t"><b id="goalL">Monthly sales goal</b>
+        <div class="how" id="goalHow">Home and Pipeline show this month against it: what you’ve won, what open deals should still bring at each stage’s chance, and what’s left to find. Leave it empty and nothing shows.</div>
+        <div class="goalin"><span class="cur" aria-hidden="true">$</span><input id="goalAmt" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="8,000" aria-labelledby="goalL" aria-describedby="goalHow goalEx"><span class="per">a month</span><button type="button" class="btn sm primary" id="goalSave">Save</button></div>
+        <div class="how" id="goalEx"></div></div>
+    </div>
+    <div class="swrow" id="aiRow">
+      <button type="button" class="sw" role="switch" id="sw-aihelp" aria-checked="false" aria-labelledby="sw-aihelp-l" aria-describedby="aiHelpHow aiHelpFacts aiOwner"></button>
+      <div class="t"><b id="sw-aihelp-l">AI help: draft a reply, and sum a person up</b>
+        <div class="how" id="aiHelpHow">Adds “Draft a reply” to the Inbox and to Email on a record, and “Where things stand” to every record. It uses Claude, the same AI as the AI answers check.</div>
+        <ul class="aifacts" id="aiHelpFacts">
+          <li><strong>About 1¢ each press.</strong> Nothing runs by itself: only Draft, Sum them up and Refresh ask.</li>
+          <li><strong>Never sends anything.</strong> A draft lands in the box for you to change; Send stays yours.</li>
+          <li><strong>Stops at 50 a day</strong> (about 50¢), so a stuck button can’t run up a bill.</li>
+          <li><strong>Off for every new studio.</strong> Only the owner can switch it on or off.</li>
+        </ul>
+        <div class="how" id="aiUse"></div>
+        <div class="how" id="aiOwner" hidden>Only the studio’s owner can switch AI help on or off.</div></div>
     </div>
   </section>
   <!-- Benchmark 2026-10, item 6: three switches, not a workflow builder. Each
@@ -497,6 +562,20 @@
         <div class="say"><span class="lbl">What they’ll read</span><span id="say-rev">Thanks for choosing us. If you have a moment, we’d love a quick review — it really helps.</span></div></div>
     </div>
   </section>
+  <!-- builder list item 191: two-step sign-in (Figma B1 off, B3 on; the set-up sheet B2 and the code before
+       Turn off are fresh-code.js). It is the signed-in person's own, so it lives at studio level only. -->
+  <section class="card" id="security" aria-labelledby="securityHead" hidden>
+    <div class="card-h"><h2 id="securityHead" tabindex="-1">Sign-in and security</h2><span class="hint">How you get in, and who hears about the big changes.</span></div>
+    <div class="tsrow" aria-live="polite">
+      <div class="tshead"><b>Two-step sign-in</b><span class="tspill" id="tsPill">Checking…</span></div>
+      <p class="tsline" id="tsLine"></p>
+      <div class="tsacts"><button class="btn primary" type="button" id="tsOn" hidden>Turn on two-step sign-in</button><button class="btn" type="button" id="tsOff" hidden>Turn off</button><span class="tsnote" id="tsOffNote" hidden>Asks for a code from the app first.</span><button class="btn" type="button" id="tsRetry" hidden>Try again</button></div>
+    </div>
+    <div class="tsalerts" data-needs="owner">
+      <p class="tsto"><b>Alerts go to</b><span>the email on this account</span></p>
+      <p class="tsline">We email you when someone is added as a co-owner, a site starts being handed over, a domain is removed or the account is set to close. These can’t be switched off.</p>
+    </div>
+  </section>
   <section class="card" id="team" aria-labelledby="teamHead" hidden>
     <div class="card-h"><h2 id="teamHead" tabindex="-1">Team</h2><span class="hint" id="seats"></span></div>
     <div class="people" id="people" aria-live="polite"></div>
@@ -525,6 +604,7 @@
   </div>
   </div>
 </div>
+<script src="/fresh-code.js?v=191"></script>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
@@ -598,15 +678,21 @@ const IC = {
   auto: '<path d="M13 3L4 14h7l-1 7 9-11h-7z"/>',
   domains: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   dev: '<path d="M8 9l-4 3 4 3"/><path d="M16 9l4 3-4 3"/><path d="M14 5l-4 14"/>',
+  goal: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
   stages: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
   calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
+  security: '<path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z"/><rect x="9" y="11" width="6" height="5" rx="1"/><path d="M10 11V9.5a2 2 0 0 1 4 0V11"/>',
 };
 const CARDS = [
   { key: 'studio', href: '#studio', title: 'Studio profile', desc: 'Name, email, phone, where you work from, and the kind of business — it drives the nudges on Today.', words: 'name email phone address location business industry kind',
     scopedTitle: (who) => possessive(who) + ' profile', scopedDesc: 'Their name, email, phone, where they work from, and the kind of business — it drives their nudges.' },
+  // builder list item 191: the signed-in person's own sign-in, so never inside a client
+  { key: 'security', href: '#security', title: 'Sign-in and security', desc: 'Two-step sign-in with a code from your phone, and who hears about the big changes.', words: 'two step 2fa mfa authenticator code phone password security login sign in alerts', studioOnly: true },
   // the studio's own switches — never a client's (the invoices and deals are the studio's book)
   // Bold redesign (Nov 2026): the deal stages are a section of their own (the studio's book, like Automations)
   { key: 'stages', href: '#stages', title: 'Deal stages', desc: 'Your names for the four open stages, the chance each one closes, and when a deal counts as stalled.', words: 'pipeline deals stalled chance close', studioOnly: true, needs: 'configure' },
+  // sales item 94: the month's goal and the AI help switch (the studio's own, like the stages)
+  { key: 'goal', href: '#goal', title: 'Goal and AI help', desc: 'A monthly sales goal for Home and Pipeline, and AI help that drafts a reply or sums a customer up.', words: 'goal target monthly sales number ai help draft reply summary claude assistant cost', studioOnly: true, needs: 'configure' },
   { key: 'auto', href: '#automations', title: 'Automations', desc: 'Ready-made recipes: answer and follow up enquiries, remind unpaid invoices and quotes about to run out, nudge quiet deals, ask for a review. Each shows what it sends.', words: 'automatic reminders emails nudge review request unpaid recipes follow up quote expires auto reply', studioOnly: true, needs: 'configure' },
   // sales item 87: inside a client, the replies THEIR website sends: the acknowledgement and the follow-ups
   { key: 'replies', icon: 'auto', href: '#automations', title: 'Enquiry replies', desc: 'The reply their website visitors get right away, and two follow-ups if an enquiry goes quiet. In your words or theirs.', words: 'auto reply acknowledgement follow up enquiry automatic email', scopedOnly: true, feature: 'website', needs: 'configure' },
@@ -701,6 +787,10 @@ function renderCards() {
       else toast(NOTIFY ? 'This client’s site isn’t one your studio looks after.' : 'Your notification choices couldn’t load just now. Try again in a moment.', true);   // never an empty part
     });
   });
+  const gl = $('cards').querySelector('[data-card="goal"]');
+  if (gl) gl.addEventListener('click', (e) => { e.preventDefault(); reveal('goal', 'goalHead'); });
+  const kc = $('cards').querySelector('[data-card="security"]');
+  if (kc) kc.addEventListener('click', (e) => { e.preventDefault(); reveal('security', 'securityHead'); });
   const gc = $('cards').querySelector('[data-card="stages"]');
   if (gc) gc.addEventListener('click', (e) => { e.preventDefault(); reveal('stages', 'stagesHead'); });
   markCurrent(CURRENT);
@@ -714,7 +804,7 @@ function markCurrent(id) {
 }
 function spySections() {
   if (!('IntersectionObserver' in window)) return;
-  const ids = ['studio', 'stages', 'report', 'reports', 'menu', 'notify', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 160: the studio's Monthly reports; item 126: Notifications
+  const ids = ['studio', 'security', 'stages', 'goal', 'report', 'reports', 'menu', 'notify', 'automations', 'team', 'billing'];   // C16: a client's Monthly report too; item 160: the studio's Monthly reports; item 126: Notifications; sales item 94: Goal and AI help
   // C16: the band (15–30% down the screen) never reaches the last part when the page ends
   // first, so Plan & billing never lit up; at the very bottom the last part shown is marked
   const atBottom = () => window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
@@ -908,7 +998,10 @@ function wireDeletion() {
   const ask = $('deleteAsk'), cancel = $('deleteCancel'); if (!ask || !cancel) return;
   ask.addEventListener('click', async () => {
     if (!ask.dataset.armed) { ask.dataset.armed = '1'; ask.textContent = 'Are you sure? Press again to confirm'; setTimeout(() => { if (!ask.disabled) { delete ask.dataset.armed; ask.textContent = 'Request deletion'; } }, 6000); return; }
-    const r = await api('/commerce/delete-request', 'POST', {}).catch(() => null);
+    // builder item 191: closing the account asks for a fresh code first (fresh-code.js)
+    const send = (extra) => api('/commerce/delete-request', 'POST', extra || {}).catch(() => null);
+    const r = window.ddsFresh ? await window.ddsFresh.run(send, { sb }) : await send({});
+    if (r && r.cancelled) { delete ask.dataset.armed; ask.textContent = 'Request deletion'; return; }
     if (!r || !r.ok) { toast(nice(r && r.body, 'Couldn’t record that. Nothing changed.'), true); return; }
     const d = r.body && r.body.data;
     showClosing(d && d.scheduled_for, d && d.completes_within_days);
@@ -922,6 +1015,56 @@ function wireDeletion() {
     if (PLAN_STATUS) setStatus('billing', PLAN_STATUS);
     toast((r.body && r.body.data && r.body.data.message) || 'Deletion canceled.');
   });
+}
+// ── builder list item 191: two-step sign-in. Supabase's own app codes: status() reads the
+//    person's factors, turnOn() is the set-up sheet (B2), turnOff() asks the app for a code
+//    first. Turning it on signs every other device out (Supabase does that itself). ──
+let TWO = null;
+async function loadSecurity() {
+  const sec = $('security'); if (!sec || inClient() || !window.ddsFresh) return;
+  sec.hidden = false;
+  TWO = await window.ddsFresh.status(sb);
+  paintSecurity();
+}
+function paintSecurity() {
+  const pill = $('tsPill'), line = $('tsLine'), on = $('tsOn'), off = $('tsOff'), note = $('tsOffNote'), retry = $('tsRetry');
+  on.hidden = off.hidden = note.hidden = retry.hidden = true;
+  if (!TWO || !TWO.read) {
+    // C4: a read that failed is not "off"
+    pill.className = 'tspill'; pill.textContent = 'Couldn’t check';
+    line.textContent = 'Whether two-step sign-in is on couldn’t load just now.';
+    retry.hidden = false; setStatus('security', { text: 'Couldn’t check two-step sign-in', cls: 'warn' });
+    return;
+  }
+  if (TWO.on) {
+    const since = shortDate(TWO.since);
+    pill.className = 'tspill on'; pill.textContent = since ? 'On since ' + since : 'On';
+    line.textContent = 'Codes come from the authenticator app you set up' + (TWO.since && longDate(TWO.since) ? ' on ' + longDate(TWO.since) : '') + '. Signing in on a new device, or after signing out, asks for one.';
+    off.hidden = note.hidden = false;
+    setStatus('security', { text: 'Two-step sign-in is on', cls: '' });
+  } else {
+    pill.className = 'tspill off'; pill.textContent = 'Off';
+    line.textContent = 'Signing in asks for a 6-digit code from an app on your phone, as well as your password. Someone with only your password can’t get in.';
+    on.hidden = false;
+    setStatus('security', { text: 'Two-step sign-in is off', cls: 'warn' });
+  }
+}
+function wireSecurity() {
+  const on = $('tsOn'), off = $('tsOff'), retry = $('tsRetry'); if (!on || !off || !retry || !window.ddsFresh) return;
+  on.addEventListener('click', async () => {
+    const r = await window.ddsFresh.turnOn(sb, { issuer: 'Studio OS' });
+    if (!r.on) return;
+    toast('Two-step sign-in is on. Next time you sign in, have your phone ready.');
+    TWO = await window.ddsFresh.status(sb); paintSecurity();
+  });
+  off.addEventListener('click', async () => {
+    if (!TWO || !TWO.factor) return;
+    const r = await window.ddsFresh.turnOff(sb, TWO.factor);
+    if (!r.off) return;
+    toast('Two-step sign-in is off.');
+    TWO = await window.ddsFresh.status(sb); paintSecurity();
+  });
+  retry.addEventListener('click', () => { loadSecurity().catch(() => {}); });
 }
 async function loadPlan() {
   if (inClient()) return;
@@ -1174,7 +1317,7 @@ async function retryReport(e) {
   await loadReport();
   if (b && b.isConnected) { b.disabled = false; toast('Still couldn’t load — try again in a moment.', true); }
 }
-const REPORT_PARTS = [['visits', 'Visits'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['pages', 'Most read pages'], ['changes', 'What changed']];
+const REPORT_PARTS = [['visits', 'Visits'], ['enquiries', 'Enquiries'], ['google', 'On Google'], ['maps', 'On Google Maps'], ['ai', 'AI answers'], ['reviews', 'Reviews'], ['health', 'Website health'], ['pages', 'Most read pages'], ['changes', 'What changed']];
 const REPORT_BLOCK_WORDS = { no_email: 'there’s no email on their record', unsubscribed: 'they unsubscribed from emails', bounced: 'emails to them bounce', quiet: 'a quiet month, under your number of visits' };
 const CC_BLOCK_WORDS = { unsubscribed: 'unsubscribed', bounced: 'emails bounce' };
 const SUGGEST_FROM = { idea: 'From their Do next list: a Growth Coach idea', ai: 'From their Do next list: an AI answer that misses them', search: 'From their Do next list: a Search to-do', health: 'From their Do next list: a website fix', reviews: 'From their Do next list: Google reviews waiting', own: 'Your own words' };
@@ -1238,12 +1381,14 @@ async function changeCc(next, said) {
   }
 }
 // ── item 160: what it says ──
+// a part that can't show yet: AI answers until the check is on (item 184), the map grid until it is on (item 185)
+const partWaits = (d, k) => (k === 'ai' && !d.ai_checks) || (k === 'maps' && !d.maps_on);
 function paintParts(d) {
   const off = new Set(d.parts_off || []);
   const words = Array.isArray(d.parts) && d.parts.length ? d.parts.map((p) => [p.key, p.words]) : REPORT_PARTS;
   $('reportIn').innerHTML = words.map(([k, w]) => {
-    const aiOff = k === 'ai' && !d.ai_checks;   // item 184: AI answers only with the check on
-    return `<button type="button" class="rpart${aiOff ? ' off' : ''}" data-part="${esc(k)}" aria-pressed="${!aiOff && !off.has(k) ? 'true' : 'false'}">${esc(w)}${aiOff ? ', off' : ''}</button>`;
+    const waits = partWaits(d, k);
+    return `<button type="button" class="rpart${waits ? ' off' : ''}" data-part="${esc(k)}" aria-pressed="${!waits && !off.has(k) ? 'true' : 'false'}">${esc(w)}${waits ? ', off' : ''}</button>`;
   }).join('');
   $('reportIn').querySelectorAll('[data-part]').forEach((b) => b.addEventListener('click', () => togglePart(b.getAttribute('data-part'))));
 }
@@ -1251,10 +1396,11 @@ async function togglePart(k) {
   if (REPORT_BUSY || !REPORT_READ) return;
   const d = REPORT || {};
   if (k === 'ai' && !d.ai_checks) { toast('Switch on “Check AI answers every month” below to put AI answers in the report.'); return; }
+  if (k === 'maps' && !d.maps_on) { toast('Switch the map rank grid on from this client’s Search tab to put it in the report.'); return; }
   const off = new Set(d.parts_off || []);
   const words = (Array.isArray(d.parts) && d.parts.length ? d.parts.map((p) => p.key) : REPORT_PARTS.map((p) => p[0]));
   if (off.has(k)) off.delete(k); else off.add(k);
-  if (words.every((w) => off.has(w))) { toast('Leave at least one part in the report.', true); return; }
+  if (words.filter((w) => !partWaits(d, w)).every((w) => off.has(w))) { toast('Leave at least one part in the report.', true); return; }
   const name = (REPORT_PARTS.find((p) => p[0] === k) || [k, k])[1];
   REPORT = { ...d, parts_off: words.filter((w) => off.has(w)) }; paintParts(REPORT);
   if (await saveReport({ parts_off: REPORT.parts_off })) toast(off.has(k) ? name + ' is left out of the report.' : name + ' is back in the report.');
@@ -1520,6 +1666,79 @@ async function switchOnTheRest() {
 // ── item 54: the menu areas this studio hides (GET/PUT /agency/nav) ──
 let MENU = null;   // { hidden: [...], choices: [{key,label,what}] }
 let MENU_ASKED = false;   // finding C19: once per open, not again after every automation save
+// ── sales item 94: Goal and AI help (GET/PUT /sales/goal-ai) ──────────────────────────
+// The goal is a number for the month; Home and Pipeline show this month against it. The
+// switch turns AI help on for the whole studio (about 1 cent a press, 50 a day at most);
+// only the owner may flip it, so anyone else sees it greyed with the reason.
+let GOALAI = null, GOAL_MONTH = null, GOAL_BUSY = false;
+const usd0 = (c) => '$' + Math.round((Number(c) || 0) / 100).toLocaleString('en-US');
+const localDay = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+function goalCentsOf(v) {   // "$8,000" or "8000.50" → cents; empty → null; anything else → NaN
+  const t = String(v || '').replace(/[$,\s]/g, '');
+  if (!t) return null;
+  return /^\d+(\.\d{1,2})?$/.test(t) ? Math.round(Number(t) * 100) : NaN;
+}
+function paintGoalEx() {
+  const el = $('goalEx'); if (!el) return;
+  const c = goalCentsOf($('goalAmt').value);
+  if (!GOAL_MONTH || !c) { el.textContent = c ? '' : 'No goal yet, so Home and Pipeline show none.'; return; }
+  const won = GOAL_MONTH.won, exp = GOAL_MONTH.expected, left = Math.max(0, c - won - exp);
+  el.textContent = `This month so far: ${usd0(won)} won · ${usd0(exp)} still expected · ${usd0(left)} left to find`;
+}
+function paintGoalAi() {
+  const d = GOALAI; if (!d) return;
+  if (document.activeElement !== $('goalAmt')) $('goalAmt').value = d.goal_cents ? (d.goal_cents / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) : '';
+  paintGoalEx();
+  const sw = $('sw-aihelp');
+  sw.setAttribute('aria-checked', d.ai_on ? 'true' : 'false');
+  if (d.can_switch) sw.removeAttribute('aria-disabled'); else sw.setAttribute('aria-disabled', 'true');
+  $('aiOwner').hidden = !!d.can_switch;
+  const u = d.usage;
+  const at = u && u.last_at ? new Date(u.last_at) : null;
+  const when = at ? (at.toDateString() === new Date().toDateString() ? 'today at ' + at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) : '';
+  $('aiUse').textContent = !u ? '' : u.month_uses
+    ? `This month: ${u.month_uses} use${u.month_uses === 1 ? '' : 's'}, about ${Math.max(1, Math.round(u.month_cents))}¢${when ? ' · last used ' + when : ''}`
+    : (d.ai_on ? 'Not used yet this month.' : '');
+  setStatus('goal', { text: `${d.goal_cents ? usd0(d.goal_cents) + ' a month' : 'No goal yet'} · AI help ${d.ai_on ? 'on' : 'off'}`, cls: 'plain' });
+}
+async function loadGoalAi() {
+  const [r, s] = await Promise.all([
+    api('/sales/goal-ai?today=' + localDay() + '&tzo=' + new Date().getTimezoneOffset()).catch(() => null),
+    api('/sales/summary?today=' + localDay() + '&tzo=' + new Date().getTimezoneOffset()).catch(() => null),
+  ]);
+  const sd = s && s.ok && s.body && s.body.data;
+  if (sd) GOAL_MONTH = { won: Number(sd.won_month && sd.won_month.value_cents) || 0, expected: Number(sd.expected && sd.expected.value_cents) || 0 };
+  if (!r || !r.ok || !r.body || !r.body.data) { $('goalSave').disabled = true; $('sw-aihelp').setAttribute('aria-disabled', 'true'); $('goalEx').textContent = (r && r.body && r.body.message) || 'The goal and AI help couldn’t load just now. Refresh to try again.'; return; }
+  GOALAI = r.body.data; paintGoalAi();
+}
+async function saveGoalAi(patch) {
+  if (GOAL_BUSY) return null; GOAL_BUSY = true;
+  try {
+    const r = await api('/sales/goal-ai', 'PUT', patch).catch(() => null);
+    if (!r || !r.ok) { toast((r && r.body && r.body.message) || 'That didn’t save just now. Try again.', true); return null; }
+    GOALAI = Object.assign({}, GOALAI, r.body.data); paintGoalAi(); return GOALAI;
+  } finally { GOAL_BUSY = false; }
+}
+(function wireGoalAi() {
+  const amt = $('goalAmt'); if (!amt) return;
+  amt.addEventListener('input', paintGoalEx);
+  amt.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('goalSave').click(); } });
+  $('goalSave').addEventListener('click', async () => {
+    const c = goalCentsOf(amt.value);
+    if (Number.isNaN(c)) { toast('Enter the goal in dollars, like 8,000.', true); amt.focus(); return; }
+    const d = await saveGoalAi({ goal_cents: c });
+    if (d) toast(d.goal_cents ? `Saved. Home and Pipeline show this month against ${usd0(d.goal_cents)}.` : 'Goal cleared. Home and Pipeline show none.');
+  });
+  $('sw-aihelp').addEventListener('click', async () => {
+    if (!GOALAI) return;
+    if (!GOALAI.can_switch) { toast('Only the studio’s owner can switch AI help on or off.', true); return; }
+    const next = !GOALAI.ai_on;
+    $('sw-aihelp').setAttribute('aria-checked', next ? 'true' : 'false');
+    const d = await saveGoalAi({ ai_on: next });
+    if (!d) { $('sw-aihelp').setAttribute('aria-checked', GOALAI.ai_on ? 'true' : 'false'); return; }
+    toast(d.ai_on ? 'AI help is on. Draft a reply and Where things stand are ready, about 1¢ each press.' : 'AI help is off. Nothing more runs, and nothing more costs.');
+  });
+})();
 async function loadMenu() {
   const agency = !!(CTX && CTX.is_agency) && !SCOPE;
   if (!agency || !hasCap('configure')) return;
@@ -1654,8 +1873,44 @@ async function loadStageNames() {
   if (STAGE_NAMES_ASKED) return; STAGE_NAMES_ASKED = true;
   const r = await api('/sales/stages').catch(() => null);
   if (r && r.ok) { paintStageNames(r.body && r.body.data); paintStageChances(r.body && r.body.data);
-    stagesStatus(r.body && r.body.data); }
-  else { for (const id of ['stageNames', 'stageChances']) { const box = $(id); if (box) box.hidden = true; } }   // no sales area (or a failed read): the blocks hide, never a dead form
+    stagesStatus(r.body && r.body.data); paintStageNotes(r.body && r.body.data); }
+  else { for (const id of ['stageNames', 'stageChances', 'stageNotes']) { const box = $(id); if (box) box.hidden = true; } }   // no sales area (or a failed read): the blocks hide, never a dead form
+}
+// ── sales item 124: what to do now at each stage (PUT /sales/stages { note }) ──
+// One row a stage with its first step; Edit opens the note, Save keeps it for every deal at
+// that stage, and Put back the starter note brings the starter back. A failed read of the
+// notes (notes: null) hides the block rather than show the starters as if they were yours.
+const NOTE_STAGES = ['lead', 'qualified', 'proposal', 'contract', 'won', 'lost'];
+let SNOTES = null, SNOTES_MINE = {}, SNOTE_LABELS = {}, SNOTE_OPEN = '';
+function paintStageNotes(d) {
+  if (d) { SNOTES = d.notes || null; SNOTES_MINE = d.notes_custom || {}; SNOTE_LABELS = d.labels || SNOTE_LABELS; }
+  const box = $('stageNotes'), list = $('snList'); if (!box || !list) return;
+  if (!SNOTES) { box.hidden = true; return; }
+  box.hidden = false;
+  list.innerHTML = NOTE_STAGES.map((k) => {
+    const label = SNOTE_LABELS[k] || k, text = SNOTES[k] || '', mine = !!SNOTES_MINE[k], open = SNOTE_OPEN === k;
+    return `<div class="sn-row${open ? ' open' : ''}" data-sn="${k}"><div class="sn-top"><b>${esc(label)}</b><span class="sn-kind${mine ? ' mine' : ''}">${mine ? 'Your note' : 'Starter note'}</span>`
+      + (open ? '</div>' + `<label class="sr-only" for="snt-${k}">What to do now at ${esc(label)}, one step a line</label><textarea id="snt-${k}" rows="${Math.min(9, Math.max(3, text.split('\n').length + 1))}">${esc(text)}</textarea>`
+        + `<div class="sn-bot"><span class="how" style="margin:0">One step a line, up to eight.</span><button type="button" class="btn" data-sn-save="${k}">Save note</button><button type="button" class="btn ghost" data-sn-cancel="${k}">Cancel</button>${mine ? `<button type="button" class="linkbtn" data-sn-reset="${k}">Put back the starter note</button>` : ''}</div>`
+        : `<span class="sn-prev">${esc(text.split('\n')[0] || '')}</span><button type="button" class="linkbtn" data-sn-edit="${k}" aria-label="Edit the note for ${esc(label)}">Edit</button></div>`)
+      + '</div>';
+  }).join('');
+  list.querySelectorAll('[data-sn-edit]').forEach((b) => b.addEventListener('click', () => { SNOTE_OPEN = b.getAttribute('data-sn-edit'); paintStageNotes(); const t = $('snt-' + SNOTE_OPEN); if (t) t.focus(); }));
+  list.querySelectorAll('[data-sn-cancel]').forEach((b) => b.addEventListener('click', () => { const k = b.getAttribute('data-sn-cancel'); SNOTE_OPEN = ''; paintStageNotes(); const e = list.querySelector(`[data-sn-edit="${k}"]`); if (e) e.focus(); }));
+  list.querySelectorAll('[data-sn-save]').forEach((b) => b.addEventListener('click', () => { const k = b.getAttribute('data-sn-save'); saveStageNote(k, ($('snt-' + k) || {}).value || '', b); }));
+  list.querySelectorAll('[data-sn-reset]').forEach((b) => b.addEventListener('click', () => saveStageNote(b.getAttribute('data-sn-reset'), '', b)));
+}
+async function saveStageNote(k, text, btn) {
+  const msg = $('snNoteMsg'); if (msg) msg.textContent = '';
+  btn.disabled = true;
+  const note = { stage: k, text };
+  const r = await api('/sales/stages', 'PUT', { note });
+  btn.disabled = false;
+  if (!r.ok) { toast(nice(r.body, 'That note didn’t save — nothing was changed.'), true); return; }
+  SNOTE_OPEN = ''; paintStageNotes(r.body && r.body.data);
+  const label = SNOTE_LABELS[k] || k;
+  if (msg) msg.textContent = String(text).trim() ? `Saved. Every deal at ${label} shows it.` : `The starter note is back for ${label}.`;
+  const e = $('snList').querySelector(`[data-sn-edit="${k}"]`); if (e) e.focus();
 }
 // C16: the Deal stages row says "chances set" only when a percent differs from its usual
 // one (the server always sends every percent), and it follows each save
@@ -1834,8 +2089,10 @@ function holdAnchor(sec) {
     loadTeam().catch(() => {});
     if (!inClient()) { loadStageNames(); loadMenu(); loadReports(); $('reportsAll').addEventListener('click', switchOnTheRest); }   // with the rest, not after the studio details; item 160: every client's report, which loadReports keeps to the studio's own level
     else { wireReport(); loadReport(); }
+    if (!inClient()) loadGoalAi();   // sales item 94: Goal and AI help, the studio's own like Deal stages
     loadNotify();   // item 126: a studio's notifications per client site (agency members only)
     wireDeletion();
+    if (!inClient()) { wireSecurity(); loadSecurity().catch(() => {}); }   // item 191: your own sign-in, in your own business too
     { const dl = $('dlData'); if (dl) dl.addEventListener('click', downloadMyData); }   // item 69: Download my data
     await profile.catch(() => { $('studio').hidden = false; toast('Couldn’t load your studio details just now.', true); });
     renderSubline();
@@ -1845,6 +2102,8 @@ function holdAnchor(sec) {
     if (location.hash === '#billing' && !inClient()) holdAnchor($('billing'));   // I7: billing is the studio's own, never a client's (a client's "Update payment" link lands at the top)
     if (location.hash === '#automations' && automationsHere()) holdAnchor($('automations'));
     if (location.hash === '#stages' && !inClient()) holdAnchor($('stages'));
+    if (location.hash === '#goal' && !inClient()) holdAnchor($('goal'));   // sales item 94: Home's goal card and AI help's Open Settings land here
+    if (location.hash === '#security' && !inClient()) holdAnchor($('security'));   // item 191: the studio home's nudge lands here
     if (location.hash === '#notify') loadNotify().then(() => { if (!$('notify').hidden) holdAnchor($('notify')); });
     spySections();
   } catch (_) {

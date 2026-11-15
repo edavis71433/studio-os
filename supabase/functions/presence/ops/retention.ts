@@ -6,6 +6,7 @@
 // what's already past retention. Fail-safe: errors are swallowed (never block the
 // cycle). Retention windows match the comments on the table definitions.
 import { svc } from '../lib/db.ts';
+import { clearOldSpam, SPAM_KEEP_DAYS } from '../lib/form_files.ts';
 
 const VISITS_DAYS = 180;        // presence_visits — 6 months of first-party traffic
 const SEARCH_TERM_MONTHS = 13;  // presence_search_terms — 13 months (year-over-year headroom)
@@ -41,6 +42,10 @@ export async function runRetentionSweep(now: Date = new Date()): Promise<Record<
   await prune('ops_errors', `ops_errors?created_at=lt.${daysAgo(OPS_ERRORS_DAYS)}`);
   await prune('rate_limit_state', `rate_limit_state?window_start=lt.${daysAgo(RATE_LIMIT_DAYS)}`);
 
+  // Item 203: a message in Spam goes after SPAM_KEEP_DAYS (as long as the Inbox's Spam
+  // shows it), and the files a visitor sent with it go first.
+  try { out.spam_messages = await clearOldSpam(daysAgo(SPAM_KEEP_DAYS)); } catch { out.spam_messages = false; }
+
   // Dismissed notices: nothing ever DELETEd from presence_plan_notices, and a
   // dismissed row is both invisible AND the permanent holder of its unique
   // (client_id, kind, period) key — which is exactly the send-once ledger, so
@@ -59,6 +64,13 @@ export async function runRetentionSweep(now: Date = new Date()): Promise<Record<
   // "cleared out periodically" — this is the mechanism behind that sentence.
   // A lead that hasn't turned into a conversation in a year has no basis left.
   await prune('audit_leads', `audit_leads?created_at=lt.${daysAgo(365)}`);
+
+  // Builder item 191: a fresh code is good for ten minutes; a day on, it goes. Before
+  // migration 0197 there is no table (404): that is a skip, not a failure.
+  try {
+    const r = await svc(`presence_fresh_codes?expires_at=lt.${daysAgo(1)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    if (r.status === 404) out.skipped_fresh_codes = true; else out.fresh_codes = r.ok;
+  } catch { out.fresh_codes = false; }
 
   // Health by day (0170): a pre-0170 environment 404s → recorded false, never throws.
   await prune('health_days', `presence_health_days?day=lt.${daysAgo(HEALTH_DAYS).slice(0, 10)}`);

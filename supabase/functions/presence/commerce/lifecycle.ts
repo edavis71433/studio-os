@@ -289,13 +289,18 @@ export async function runWeeklyDigest(): Promise<{ sent: number; skipped_no_emai
     const ownSite = Array.isArray(ident.json) ? ident.json[0]?.site_id : null;
     if (ownSite) {
       const usd = (c: number) => '$' + (Math.max(0, c) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
-      const [newLeads, wonCount, paidRows, dealRows] = await Promise.all([
+      const [newLeads, wonCount, paidRows, retainerRows, dealRows] = await Promise.all([
         svcCount(`presence_form_submissions?site_id=eq.${ownSite}&spam=is.false&created_at=gt.${since}`),
         svcCount(`presence_deals?site_id=eq.${ownSite}&deleted_at=is.null&converted_at=gt.${since}`),
         svc(`presence_invoices?site_id=eq.${ownSite}&status=eq.paid&paid_at=gt.${since}&deleted_at=is.null&select=amount_cents&limit=500`),
+        // sales item 120: a retainer charge is a payment too, though only ever a deal event
+        svc(`presence_deal_events?site_id=eq.${ownSite}&kind=eq.invoice_paid&detail->>retainer=eq.true&created_at=gt.${since}&select=kind,detail,created_at&limit=500`),
         svc(`presence_deals?site_id=eq.${ownSite}&deleted_at=is.null&select=stage,expected_value_cents,converted_client_id,converted_at,updated_at&limit=2000`),
       ]);
-      const paid = (Array.isArray(paidRows.json) ? paidRows.json : []) as Array<{ amount_cents: number }>;
+      // a money read that failed drops the block below, never a week that reads "no payments"
+      if (!paidRows.ok || !retainerRows.ok) throw new Error('payments unread');
+      const { retainerPayments } = await import('../lib/invoice_billing.ts');
+      const paid = [...(Array.isArray(paidRows.json) ? paidRows.json : []) as Array<{ amount_cents: number }>, ...retainerPayments(retainerRows.json)];
       const collected = paid.reduce((a, r) => a + (Number(r.amount_cents) || 0), 0);
       const summary = summarizePipeline(Array.isArray(dealRows.json) ? dealRows.json : [], new Date().toISOString());
       const nLeads = n(newLeads), nWon = n(wonCount);

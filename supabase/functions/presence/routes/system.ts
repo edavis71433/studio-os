@@ -19,6 +19,7 @@ import { runRecurringInvoices } from './recurring_invoices.ts';   // sales revie
 import { runTrafficSpikes } from '../ops/traffic_spikes.ts';
 import { runMonthlyReports } from '../ops/monthly_report.ts';
 import { runAiChecks } from '../ops/ai_checks.ts';
+import { runRankGridScans } from '../ops/rank_grid_scans.ts';
 import { runSiteTrashPurge } from '../ops/site_trash.ts';
 import { runDuePosts } from '../ops/scheduled_posts.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runReviewRequests, runProspectNurture, runSupportAging, runAgreementRenewalReminders, runBookingReminders, runBookingFollowups, runEmailAuthNudges, runApexDriftWatch, runApprovalReminders } from '../commerce/lifecycle.ts';
@@ -94,7 +95,7 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
   ],
   photos: [
     { name: 'PEXELS_API_KEY', required: false, enables: 'the stock photo search (Pexels; without it the search is off)' },
-    { name: 'PLACES_KEY', required: false, enables: 'the Prospects page’s business search (Google Places; without it, finding businesses says it isn’t switched on)' },
+    { name: 'PLACES_KEY', required: false, enables: 'the Prospects page’s business search and the Search tab’s map rank grid (Google Places; without it, finding businesses and scanning say it isn’t switched on)' },
   ],
   push: [
     { name: 'VAPID_PUBLIC_KEY', required: false, enables: 'device notifications (Web Push), paired with VAPID_PRIVATE_KEY (without both: push is cleanly off)' },
@@ -396,6 +397,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['domains', () => runDomainWatch(10)],
             ['traffic_spikes', () => runTrafficSpikes(200)],   // builder list item 47: a busy day of visitors, said once per site per day
             ['monthly_reports', () => runMonthlyReports(20)],   // builder list item 58: last month's report to each switched-on client, in the first days of a month
+            ['rank_grids', () => runRankGridScans(1)],   // builder list item 185: one switched-on client's monthly map rank grid at most (a few seconds a search)
             ['site_trash', () => runSiteTrashPurge(10)],   // builder list item 154: a site 90 days in a studio's trash is deleted for good
             ['email_auth', () => runEmailAuthNudges(20)],   // DNS #5: escalate persistent SPF/DMARC/DKIM gaps to one owner nudge
             ['apex_drift', () => runApexDriftWatch(10)],    // DNS: verify the apex still points home; surface drift as a finding
@@ -458,6 +460,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const domains = await step('domains', () => runDomainWatch(10));             // INF: RDAP expiry+registrar, 24h dedupe
       await step('traffic_spikes', () => runTrafficSpikes(200));                   // builder list item 47: a busy day of visitors, once per site per day (day:<date> dedupes)
       await step('monthly_reports', () => runMonthlyReports(20));                  // builder list item 58: last month's report to each switched-on client (last_month dedupes)
+      await step('rank_grids', () => runRankGridScans(1));                         // builder list item 185: one switched-on client's monthly map rank grid at most (month claimed first)
       await step('site_trash', () => runSiteTrashPurge(10));                       // builder list item 154: a site 90 days in a studio's trash is deleted for good
       const emailAuth = await step('email_auth', () => runEmailAuthNudges(20));     // DNS #5: escalate persistent SPF/DMARC/DKIM gaps → one owner nudge
       const apexDrift = await step('apex_drift', () => runApexDriftWatch(10));       // DNS: verify the apex still points home; surface drift as a finding

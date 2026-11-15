@@ -91,6 +91,10 @@
   .efilt .n{font-size:11px;font-weight:600;background:var(--card);color:var(--soft);border-radius:999px;padding:0 6px;min-width:18px;text-align:center;line-height:17px}
   .efilt button.on .n{background:var(--p);color:#fff}
   .ebar{display:flex;gap:6px;margin-top:var(--dds-s2,8px);flex-wrap:wrap;align-items:center}
+  /* sales item 121: free-tool leads live on Prospects; Enquiries says so */
+  .enqtool{margin:var(--dds-s2,8px) 0 0;font-size:13px;line-height:1.45;color:var(--soft)}
+  .enqtool b{color:var(--ink);font-weight:600}
+  .enqtool a{color:var(--p);font-weight:600;white-space:nowrap}
   .ebar select{flex:1 1 30%;min-width:0;font-size:13px;padding:6px var(--dds-s2,8px);border-radius:999px;background:var(--bg)}
   .ebar select[data-on="1"]{border-color:var(--p);color:var(--p);font-weight:700;background:var(--p-soft)}
   .ebar #newEnq{flex:0 0 auto;font-size:12.5px;border-radius:999px;padding:6px var(--dds-s3,12px)}
@@ -119,6 +123,16 @@
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .prio.urgent{color:var(--bad)}}
   :root[data-theme="dark"] .prio.urgent{color:var(--bad)}
   .asg{flex:0 0 auto;font-size:12px;color:var(--soft);white-space:nowrap}
+  /* sales item 37: Mine / Everyone on Support, and each request's owner, with a second person on the team */
+  .asg.own{display:inline-flex;align-items:center;gap:5px;font-weight:600;background:var(--tag,#f1eff5);border-radius:999px;padding:1px 8px 1px 2px}
+  .asg.own::before{content:attr(data-ini);width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;background:#2f7d74}
+  .asg.own.me::before{background:var(--p)}
+  .supown{margin:6px 0 2px}
+  .owntog{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:color-mix(in srgb,var(--p) 12%,var(--card))}
+  .owntog button{font:inherit;font-size:13px;font-weight:600;border:none;border-radius:999px;padding:6px 12px;min-height:32px;background:none;color:var(--soft);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .owntog button[aria-pressed="true"]{background:var(--p);color:var(--dds-on-p,#fff)}
+  .owntog .n{font-size:12px;font-weight:700;opacity:.8}
+  @media (max-width:760.98px),(pointer:coarse){.owntog button{min-height:44px}}
   .triage{display:flex;flex-wrap:wrap;align-items:center;gap:var(--dds-s2,8px) var(--dds-s4,16px);margin-top:var(--dds-s3,12px);padding-top:var(--dds-s3,12px);border-top:1px solid var(--line);font-size:12.5px;color:var(--faint)}
   .triage label{display:inline-flex;align-items:center;gap:6px}
   .triage select{font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:4px 8px;min-height:32px}
@@ -177,6 +191,10 @@
   /* Phase 4 (triage): Spam is a quiet text button at the row's far end */
   .acts button.quiet{border-color:transparent;color:var(--faint);margin-left:auto}
   .acts button.quiet:hover{color:var(--ink);background:var(--bg)}
+  .acts .delask{display:inline-flex;flex-wrap:wrap;align-items:center;gap:var(--dds-s2,8px);margin-left:auto;font-size:13.5px}
+  .acts .delask button.danger{background:var(--bad,#a3423a);border-color:var(--bad,#a3423a);color:#fff}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .acts .delask button.danger{color:#171320}}
+  :root[data-theme="dark"] .acts .delask button.danger{color:#171320}
   .pchip.stchip.not_a_fit,.pchip.stchip.archived{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
   /* ── dialogs: Make customer (Phase 2) and Log an enquiry ── */
   /* margin:auto puts the modal back in the middle (the page's *{margin:0} reset pins it top-left) */
@@ -355,7 +373,7 @@
   .deal-explain b{font-weight:700}
   #leadSendDeal{border-radius:999px;font-weight:600}
   .lead-hint{font-size:12px;color:var(--faint);margin:6px 2px 0}
-  #leadDraft::before{content:"✦ ";color:var(--p)}
+  .ai-row{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin:0 0 8px}.ai-row .sr-pick{margin:0}
   /* ══ Bold redesign — the Inbox list: Needs reply · Enquiries · Support · All
      under the search, one segmented row, each with its count ══ */
   .lhead .vseg{display:flex;width:100%;margin-top:var(--dds-s2,8px);gap:2px}
@@ -364,7 +382,7 @@
   .lhead .vseg button[aria-pressed="true"] .n{color:var(--p)}
   @media (pointer:coarse){.lhead .vseg button{min-height:40px}}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script><script src="/sales-ai.js" defer></script>
 </head>
 <body>
 <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
@@ -687,6 +705,7 @@ function renderConsole(){
         <div class="seg vseg" id="vseg" role="group" aria-label="Show"></div>
         <div class="lfilters" id="lfilters" hidden></div>
         ${VIEW==='enquiries'?enqToolbar():''}
+        ${VIEW==='support'?'<div class="supown" id="supOwn" hidden></div>':''}
         <div class="lmeta" id="lmeta"></div>
         <div class="lnotice" id="lnotice" role="status" hidden></div>
       </div>
@@ -749,7 +768,24 @@ function enqToolbar(){
       <select id="kindf" aria-label="Filter by kind" data-on="${KIND_F==='all'?'0':'1'}">${opt('all','All kinds',KIND_F)}${opt('quote','Quotes',KIND_F)}${opt('booking','Bookings',KIND_F)}${opt('contact','Messages',KIND_F)}</select>
       <select id="sortf" aria-label="Sort enquiries">${opt('newest','Newest',SORT)}${opt('oldest','Oldest',SORT)}</select>
       <button type="button" class="btnlink" id="newEnq" data-new>+ New enquiry</button>
-    </div>`;
+    </div>
+    <p class="enqtool" id="enqTool" hidden></p>`;
+}
+// ── Sales item 121 (Nov 2026, Eric's pick): free-tool leads stay on Prospects ──
+// People who run the free Site Review or AI Visibility check and leave their email are
+// the platform's own enquiries (GET /sales/tool-leads answers staff only). They're worked
+// on Prospects, so Enquiries points there, with how many are new. Anyone else gets a
+// 403 and sees nothing; so does one client's Inbox (?client=), whose enquiries are theirs.
+let TOOL_LEADS_P=null;
+function paintToolLeads(){
+  const host=$('enqTool');if(!host||new URLSearchParams(location.search).get('client'))return;
+  TOOL_LEADS_P=TOOL_LEADS_P||api('/sales/tool-leads').then(r=>r.ok&&Array.isArray(r.body&&r.body.data)?r.body.data:null).catch(()=>null);
+  TOOL_LEADS_P.then(list=>{
+    const h=$('enqTool');if(!h||!list)return;
+    const n=list.filter(l=>(l&&l.status||'new')==='new').length;
+    h.innerHTML=(n?`<b>${n} ${n===1?'person':'people'}</b> who ran your free Site Review or AI Visibility check ${n===1?'is':'are'} waiting on Prospects.`:'People who run your free Site Review or AI Visibility check show up on Prospects, not here.')+' <a href="/prospects.html">Open Prospects →</a>';
+    h.hidden=false;
+  });
 }
 function wireEnqToolbar(){
   const ef=$('efilt');if(!ef)return;
@@ -762,6 +798,7 @@ function wireEnqToolbar(){
   const kf=$('kindf');kf.addEventListener('change',()=>{KIND_F=kf.value;kf.setAttribute('data-on',KIND_F==='all'?'0':'1');narrowed();});
   const sf=$('sortf');sf.addEventListener('change',()=>{SORT=sf.value;narrowed();});
   $('newEnq').addEventListener('click',openNew);
+  paintToolLeads();   // item 121
 }
 // the queue's counts on the Open / New chips — every enquiry, before search
 function paintEnqCounts(){
@@ -897,7 +934,7 @@ function lensMatch(r){
 }
 // the Website view = what your site needs: approvals, its enquiries, and the site's own notices
 function visibleRows(){
-  const v=[...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:VIEW==='website'?SYSROWS.filter(r=>r.notice):[])].filter(lensMatch).filter(rowMatch).filter(enqMatch);
+  const v=[...ITEMS.filter(viewMatch),...(VIEW==='everything'?SYSROWS:VIEW==='website'?SYSROWS.filter(r=>r.notice):[])].filter(lensMatch).filter(rowMatch).filter(enqMatch).filter(ownMatch);
   // the Enquiries view can flip to oldest first (ITEMS are newest first)
   return (VIEW==='enquiries'&&SORT==='oldest')?v.sort((a,b)=>String(a.when).localeCompare(String(b.when))):v;
 }
@@ -924,6 +961,7 @@ function activateRow(it){if(it.sys){location.href=it.href||'/today.html';return;
 // ── the list pane rows (two-line, unread dot, channel chip) ──────────────────
 function renderList(){
   const rows=$('rows');if(!rows)return;
+  paintSupOwn();   // item 37
   const vis=visibleRows();
   const convs=vis.filter(r=>!r.sys);   // the meta counts what the list SHOWS (search included)
   const need=convs.filter(i=>i.unread||i.needs).length;
@@ -934,7 +972,7 @@ function renderList(){
     // included) with the "M new" qualifier; the chips carry the totals.
     const newN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new').length;
     const oldN=convs.filter(i=>i.lead&&String(i.lead.status||'new')==='new'&&oldOf(i)).length;
-    $('lmeta').textContent=EFILTER==='spam'?(SPAM===null?'Looking in Spam…':`${convs.length} in Spam, from the last 30 days`)
+    $('lmeta').textContent=EFILTER==='spam'?(SPAM===null?'Looking in Spam…':`${convs.length} in Spam, from the last 30 days. After that it goes for good, with any files.`)
       :`${convs.length} enquir${convs.length===1?'y':'ies'} · ${newN} new${oldN?`, ${oldN} over a month old`:''} · Sorted by ${SORT==='oldest'?'oldest':'newest'}${CUT.queue?` · Showing your newest ${CUT.queue} only`:''}`;
     paintEnqCounts();
   }else{
@@ -961,7 +999,7 @@ function renderList(){
     if(VIEW==='enquiries'&&!FCLIENT&&!FPROJECT){
       const msg=(Q.trim()||KIND_F!=='all')?`No enquiries match${Q.trim()?` “${esc(Q.trim())}”`:' that filter'}.`
         :EFILTER==='new'?'No new enquiries — you’re caught up.'
-        :EFILTER==='spam'?(SPAM===null?'Looking in Spam…':SPAM_FAILED?'Spam couldn’t load just now. Refresh to try again.':'Nothing in Spam. What the spam checks hold back shows here for 30 days, with Not spam.')
+        :EFILTER==='spam'?(SPAM===null?'Looking in Spam…':SPAM_FAILED?'Spam couldn’t load just now. Refresh to try again.':'Nothing in Spam. What the spam checks hold back shows here for 30 days, with Not spam, then goes for good with any files.')
         :'Nothing yet. When someone fills in your website’s contact form, it lands here — and in Customers.';
       rows.innerHTML=`<li class="lempty" role="presentation">${msg}${bits.length?`<div class="lclear"><button type="button" data-clear>${clearLabel(bits.length)}</button></div>`:''}</li>`;
       renderPane();return;
@@ -1140,40 +1178,35 @@ function insertSavedReplies(taId){
   SR_FETCH.then((replies)=>{
     const cur=$(taId);
     if(!replies.length||cur!==ta)return;   // nothing saved / the pane re-rendered under us
-    if(ta.previousElementSibling&&ta.previousElementSibling.classList.contains('sr-pick'))return;
+    if(ta.parentNode.querySelector('.sr-pick'))return;
     const map={};replies.forEach(x=>{map[x.id]=x.body;});
     const sel=document.createElement('select');
     sel.className='sr-pick';sel.setAttribute('aria-label','Insert a saved reply');
     sel.style.cssText='display:block;margin-bottom:6px;max-width:100%';
     sel.innerHTML='<option value="">Insert a saved reply…</option>'+replies.map(x=>`<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('');
     sel.onchange=()=>{const b=map[sel.value];if(b){const v=ta.value;ta.value=v?(v.replace(/\s*$/,'')+'\n\n'+b):b;ta.focus();}sel.value='';};
-    ta.parentNode.insertBefore(sel,ta);
+    const row=ta.previousElementSibling&&ta.previousElementSibling.classList.contains('ai-row')?ta.previousElementSibling:null;
+    if(row){sel.style.cssText='max-width:100%';row.insertBefore(sel,row.firstChild);}else ta.parentNode.insertBefore(sel,ta);   // sales item 94: beside Draft a reply
   });
 }
-// ── Draft a reply (benchmark 7): the EXISTING /writer/rewrite (action 'write')
-// drafts from the person's own message + the studio's fact sheet; the draft
-// lands in the textarea for editing and NOTHING is sent — Send stays the
-// operator's click. A quiet note says it was drafted by AI until they edit.
-// A plan without drafting (403) or a writer that's off (503) answers with the
-// server's own sentence; the manual path is always the product. ──
-async function draftReply(taId, prompt, btn){
-  const ta=$(taId);if(!ta||!btn)return;
-  const was=btn.textContent;btn.disabled=true;btn.textContent='Drafting…';
-  let r;
-  try{r=await api('/writer/rewrite','POST',{action:'write',field:'answer',prompt:String(prompt||'').slice(0,400)});}
-  catch(_){r={ok:false,body:{}};}
-  btn.disabled=false;btn.textContent=was;
-  const cur=$(taId);if(cur!==ta)return;   // the pane re-rendered under us
-  const text=r.ok&&r.body&&r.body.data&&String(r.body.data.text||'').trim();
-  if(!text){toast((r.body&&r.body.message)||'The draft didn’t come through — nothing changed. Write it by hand or try again.');return;}
-  const v=String(ta.value||'').replace(/\s+$/,'');
-  ta.value=v?(v+'\n\n'+text):text;
-  let note=ta.parentNode.querySelector('.ai-note');
-  if(!note){note=document.createElement('div');note.className='ai-note';note.setAttribute('role','note');ta.insertAdjacentElement('afterend',note);}
-  note.textContent='Drafted by AI — edit before sending.';
-  ta.addEventListener('input',()=>{const n=ta.parentNode.querySelector('.ai-note');if(n)n.remove();},{once:true});
-  ta.focus();
+// ── Draft a reply (sales item 94; benchmark 7 before it): AI help drafts from the whole
+// conversation, or the enquiry and the studio's services (/sales/ai/draft, the same press as
+// Email on a record). The draft lands in the box for editing and NOTHING is sent: Send stays
+// the operator's click, and waits while it writes; Undo draft puts their words back. AI help
+// is off until the studio's owner switches it on (Settings, Goal and AI help), and the
+// server's own sentence says so. sales-ai.js draws the pill and its notes. ──
+function aiDraftInto(taId,btnId,o){
+  const go=()=>{
+    const ta=$(taId);if(!ta||!window.ddsSalesAi||ta.parentNode.querySelector('.ai-row'))return;
+    const row=document.createElement('div');row.className='ai-row';ta.parentNode.insertBefore(row,ta);
+    const pick=row.previousElementSibling;if(pick&&pick.classList.contains('sr-pick')){pick.style.cssText='max-width:100%';row.appendChild(pick);}   // the saved replies, when they came first, share the row
+    const sends=ta.form?[...ta.form.querySelectorAll('button.primary,button[type=submit]')]:[];
+    const p=window.ddsSalesAi.pill(row,{req:api,ta,go:sends,label:'Draft a reply',hint:o.hint,sendLabel:o.sendLabel||'Send',payload:o.payload,writing:o.writing});
+    p.button.id=btnId;
+  };
+  if(window.ddsSalesAi||document.readyState!=='loading')go();else document.addEventListener('DOMContentLoaded',go,{once:true});
 }
+const firstOf=(n)=>String(n||'').trim().split(/\s+/)[0]||'';
 function snapComposer(){const s={sel:SEL,vals:{},focus:''};for(const id of COMPOSER_FIELDS){const el=$(id);if(el&&el.value)s.vals[id]=el.value;}const ae=document.activeElement;if(ae&&COMPOSER_FIELDS.includes(ae.id))s.focus=ae.id;return s;}
 function restoreComposer(it){const s=DRAFT;if(!s||s.sel!==it.id)return;DRAFT=null;for(const id in s.vals){const el=$(id);if(el)el.value=s.vals[id];}if(s.focus){const el=$(s.focus);if(el)el.focus();}}
 async function paneMessage(host,it){
@@ -1210,10 +1243,9 @@ async function paneMessage(host,it){
   if(reply){
     pc.innerHTML=`<form id="msgForm"><label for="msgBody" style="font-size:12.5px;color:var(--faint)">Reply to the client</label>
       <textarea id="msgBody" placeholder="Write a message…" aria-label="Reply to the client"></textarea>
-      <div class="crow"><button type="button" id="msgDraft">Draft a reply</button><span class="spacer"></span><button class="primary" type="submit">Send</button></div></form>`;
-    // the newest thing the CLIENT said is what a draft answers (convItem titles the studio's own as "You …")
-    const lastClient=items.find(x=>x&&x.type==='message'&&!/^You\b/.test(String(x.title||'')));
-    $('msgDraft').addEventListener('click',()=>draftReply('msgBody',`A short, friendly reply from the studio to ${it.client||'the client'}'s message: "${String((lastClient&&lastClient.body)||'they asked how the project is going').slice(0,280)}"`,$('msgDraft')));
+      <div class="crow"><span class="spacer"></span><button class="primary" type="submit">Send</button></div></form>`;
+    // sales item 94: the draft reads the whole conversation, as the record does
+    aiDraftInto('msgBody','msgDraft',{hint:'AI help · about 1¢ a draft · reads this conversation',payload:()=>({kind:'record',client_id:it.client_id||undefined,project:it.project_id||undefined}),writing:()=>`Writing a draft from ${firstOf(it.client)?firstOf(it.client)+'’s':'their'} messages…`});
     $('msgForm').onsubmit=async(e)=>{
       e.preventDefault();
       const ta=$('msgBody');const body=(ta.value||'').trim();if(!body)return;
@@ -1290,7 +1322,8 @@ const SUPPORT_LABEL={open:'Open',in_progress:'In progress',resolved:'Resolved',c
 // (/agency/members, by the sign-in id each member's row learns): the assignee
 // picker shows only when a second person has signed in (decision 6).
 const PRIO_LABEL={low:'Low',normal:'Normal',high:'High',urgent:'Urgent'};
-let TEAM=null,TEAM_P=null;
+let TEAM=null,TEAM_P=null,SUP_MINE=true;
+try{SUP_MINE=localStorage.getItem('dds-inbox-sup-mine')!=='0';}catch(_){/* storage may be denied */}
 function loadTeam(){
   if(TEAM)return Promise.resolve(TEAM);
   if(TEAM_P)return TEAM_P;
@@ -1299,17 +1332,40 @@ function loadTeam(){
     const myId=(me.ok&&me.body.data&&me.body.data.member_id)||'';
     const myRow=list.find(m=>m.id===myId);
     const meUid=myRow&&myRow.user_id?String(myRow.user_id):'';
-    const people=list.filter(m=>m&&m.status!=='revoked'&&m.user_id).map(m=>({uid:String(m.user_id),label:String(m.user_id)===meUid?'You':(String(m.email||'').split('@')[0]||'A teammate')}));
-    TEAM={me:meUid,people};return TEAM;
-  }).catch(()=>{TEAM={me:'',people:[]};return TEAM;});
+    // item 37: active seats only (the server checks the same), and who the business owner is
+    const people=list.filter(m=>m&&(m.status||'active')==='active'&&m.user_id).map(m=>{const e=String(m.email||'').split('@')[0],l=e?e.charAt(0).toUpperCase()+e.slice(1):'A teammate';return{uid:String(m.user_id),label:String(m.user_id)===meUid?'You':l,ini:(l.split(/[._-]+/).filter(Boolean).map(x=>x[0]).join('').slice(0,2)||'?').toUpperCase()};});
+    const own=list.find(m=>m&&m.role==='owner'&&m.user_id&&(m.status||'active')==='active');
+    TEAM={me:meUid,owner:own?String(own.user_id):meUid,people};return TEAM;
+  }).catch(()=>{TEAM={me:'',owner:'',people:[]};return TEAM;});
   return TEAM_P;
 }
 function whoHas(uid){if(!uid)return'';const p=TEAM&&TEAM.people.find(x=>x.uid===uid);return p?p.label:(TEAM?'A teammate':'');}
+// ── Sales item 37: owners, and Mine on Support ────────────────────────────────
+// With a second person on the team, every request has an owner: whoever added it, the
+// business owner for one a client sends, or whoever it was handed to. One with no owner
+// (from before owners existed) is the business owner's. Support opens on Mine.
+const teamOn=()=>!!(TEAM&&TEAM.me&&TEAM.people.length>1);
+const reqOwner=(it)=>it&&it.assigned_to?String(it.assigned_to):(TEAM?TEAM.owner:'');
+const isMineReq=(it)=>!!TEAM&&reqOwner(it)===TEAM.me;
+const ownMatch=(r)=>!(VIEW==='support'&&SUP_MINE&&teamOn())||r.kind!=='support'||isMineReq(r);
+function paintSupOwn(){
+  const host=$('supOwn');if(!host)return;
+  if(VIEW!=='support'||!teamOn()){host.hidden=true;host.innerHTML='';return;}
+  const reqs=ITEMS.filter(x=>x.kind==='support'&&!x.queue).filter(lensMatch);
+  host.hidden=false;
+  host.innerHTML=`<div class="owntog" role="group" aria-label="Whose requests"><button type="button" data-supown="mine" aria-pressed="${SUP_MINE?'true':'false'}">Mine <span class="n">${reqs.filter(isMineReq).length}</span></button><button type="button" data-supown="all" aria-pressed="${SUP_MINE?'false':'true'}">Everyone <span class="n">${reqs.length}</span></button></div>`;
+  host.querySelectorAll('[data-supown]').forEach(b=>b.addEventListener('click',()=>{SUP_MINE=b.getAttribute('data-supown')==='mine';try{localStorage.setItem('dds-inbox-sup-mine',SUP_MINE?'1':'0');}catch(_){/* */}renderList();renderPane();const nb=host.querySelector(`[data-supown="${SUP_MINE?'mine':'all'}"]`);if(nb)nb.focus();}));
+}
 function supBadges(it){
   if(it.kind!=='support')return'';
   const p=String(it.priority||'normal');
+  const prio=p==='high'||p==='urgent'?`<span class="prio ${p}">${PRIO_LABEL[p]}</span>`:'';
+  if(teamOn()){   // item 37: every request has an owner, shown with their initials
+    const o=TEAM.people.find(x=>x.uid===reqOwner(it));
+    return prio+(o?`<span class="asg own${o.uid===TEAM.me?' me':''}" data-ini="${esc(o.ini)}" title="Owner: ${esc(o.label)}">${o.uid===TEAM.me?'Yours':esc(o.label)}</span>`:'');
+  }
   const who=whoHas(it.assigned_to);
-  return (p==='high'||p==='urgent'?`<span class="prio ${p}">${PRIO_LABEL[p]}</span>`:'')+(who?`<span class="asg">${who==='You'?'Yours':esc(who)}</span>`:'');
+  return prio+(who?`<span class="asg">${who==='You'?'Yours':esc(who)}</span>`:'');
 }
 async function setSupportField(it,field,value,ctl){
   const prev=field==='priority'?it.priority:it.assigned_to;
@@ -1318,7 +1374,7 @@ async function setSupportField(it,field,value,ctl){
   ctl.disabled=false;
   if(!r.ok){ctl.value=prev||'';toast((r.body&&r.body.message)||'That didn’t save — try again in a moment.');return;}
   if(field==='priority'){it.priority=value;toast('Priority: '+(PRIO_LABEL[value]||value)+'.');}
-  else{it.assigned_to=value||'';toast(value?(whoHas(value)==='You'?'It’s yours.':'Assigned to '+whoHas(value)+'.'):'Nobody has it now.');}
+  else{it.assigned_to=value||'';toast(value?(whoHas(value)==='You'?'It’s yours now.':whoHas(value)+' owns it now.'):'Nobody has it now.');}
   renderList();
 }
 // Oct 2026 review: ONE path for every status change — the select, the header's
@@ -1393,18 +1449,18 @@ async function paneSupport(host,it){
     if(seq!==PANE_SEQ)return;
     const w=$('supAsgWrap');if(!w)return;
     if(team.people.length>1){
-      const known=!it.assigned_to||team.people.some(p=>p.uid===it.assigned_to);
-      w.innerHTML=`<label>Assigned to <select id="supAsg"><option value="">Nobody</option>${team.people.map(p=>`<option value="${esc(p.uid)}"${p.uid===it.assigned_to?' selected':''}>${esc(p.label)}</option>`).join('')}${known?'':`<option value="${esc(it.assigned_to)}" selected>A teammate</option>`}</select></label>`;
+      // item 37: the owner (no owner = the business owner), changeable here; it tells nobody
+      const cur=reqOwner(it),known=team.people.some(p=>p.uid===cur);
+      w.innerHTML=`<label title="Changing the owner tells nobody; it moves the request into their Mine.">Owner <select id="supAsg">${team.people.map(p=>`<option value="${esc(p.uid)}"${p.uid===cur?' selected':''}>${esc(p.label)}</option>`).join('')}${known||!cur?'':`<option value="${esc(cur)}" selected>A teammate</option>`}</select></label>`;
       const as=$('supAsg');if(as)as.addEventListener('change',()=>setSupportField(it,'assigned_to',as.value,as));
-    }else if(it.assigned_to){w.textContent='Assigned to '+(whoHas(it.assigned_to)==='You'?'you':whoHas(it.assigned_to));}
+    }else if(it.assigned_to){w.textContent='Owner: '+(whoHas(it.assigned_to)==='You'?'you':whoHas(it.assigned_to));}
     if(ITEMS.some(x=>x.kind==='support'&&x.assigned_to))renderList();   // the row's "who has it" can name people now
   });
   const canResolve=cur==='open'||cur==='in_progress';
   $('pcomposer').innerHTML=`<form id="supForm"><label for="supBody" style="font-size:12.5px;color:var(--faint)">Reply</label>
     <textarea id="supBody" placeholder="Write a reply…" aria-label="Reply to this request"></textarea>
-    <div class="crow"><span class="muted" style="font-size:12px">${replyReach(it)}</span><button type="button" id="supDraft">Draft a reply</button><span class="spacer"></span>${canResolve?'<button type="button" id="supReplyResolve">Reply and resolve</button>':''}<button class="primary" type="submit">Send</button></div></form>`;
-  const lastClientMsg=[...msgs].reverse().find(m=>m.author_kind==='client'||m.author_kind==='customer');
-  $('supDraft').addEventListener('click',()=>draftReply('supBody',`A short, friendly reply from the studio to a support request "${String(req.subject||'Support request').slice(0,80)}": "${String((lastClientMsg&&lastClientMsg.body)||req.body||'').slice(0,240)}"`,$('supDraft')));
+    <div class="crow"><span class="muted" style="font-size:12px">${replyReach(it)}</span><span class="spacer"></span>${canResolve?'<button type="button" id="supReplyResolve">Reply and resolve</button>':''}<button class="primary" type="submit">Send</button></div></form>`;
+  aiDraftInto('supBody','supDraft',{hint:'AI help · about 1¢ a draft · reads this request',payload:()=>({kind:'support',id:it.support_id}),writing:()=>'Writing a draft from this request…'});   // sales item 94
   // one send path: post the reply; "Reply and resolve" then ends the wait too
   const sendReply=async(andResolve)=>{
     const ta=$('supBody');const body=(ta.value||'').trim();if(!body){ta.focus();return;}
@@ -1507,11 +1563,12 @@ function paneLead(host,it){
         ${st==='new'?`<button id="leadRead">Mark read</button>`:''}
         ${(settled||st==='not_a_fit'||st==='archived')?'':`<button id="leadNotFit" title="Not what you do, or not a real lead — it leaves the queue and stops counting">Not a fit</button>`}
         ${(l.followups&&l.followups.next&&!l.followups.off)?`<button id="leadFuStop" title="No more automatic follow-ups to them">Stop follow-ups</button>`:''}
+        <button id="leadDel" class="quiet" data-needs="delete" title="Delete this message, and any files that came with it, for good">Delete</button>
       </div>
     </div></div>
     ${l.email?`<div class="pcomposer"><form id="leadForm"><label for="leadBody" style="font-size:12.5px;color:var(--faint)">Reply to ${esc(l.name||l.email)} — sent by email from your studio</label>
       <textarea id="leadBody" aria-label="Reply to ${esc(l.name||l.email)}">${esc(leadGreeting(l))}</textarea>
-      <div class="crow"><button type="button" id="leadDraft">Draft a reply</button><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="${inPipe?'primary':''}" type="submit" id="leadSend">Send reply</button>${inPipe?'':'<button class="primary" type="button" id="leadSendDeal">Reply &amp; make it a deal</button>'}</div><p class="lead-hint">${esc(String(l.name||'They').split(' ')[0])} gets this by email · their reply comes back here</p></form></div>`
+      <div class="crow"><a class="link" id="leadMailto" href="${leadReplyHref(l)}" style="font-size:12.5px">Use your email app instead</a><span class="spacer"></span><button class="${inPipe?'primary':''}" type="submit" id="leadSend">Send reply</button>${inPipe?'':'<button class="primary" type="button" id="leadSendDeal">Reply &amp; make it a deal</button>'}</div><p class="lead-hint">${esc(String(l.name||'They').split(' ')[0])} gets this by email · their reply comes back here</p></form></div>`
     :`<p class="muted" style="margin:12px 16px;font-size:12.5px">They left no email — ${l.phone?'call them on '+esc(l.phone)+'.':'there’s no way to reply.'}</p>`}`;
   wireBack();
   // item 28: the studio's private note (saved on the enquiry; the status is left as it is)
@@ -1560,7 +1617,7 @@ function paneLead(host,it){
     const sd=$('leadSendDeal');
     if(sd)sd.addEventListener('click',async()=>{if(await sendLeadReply(sd,'Reply & make it a deal'))createDeal(it,sd);});
     insertSavedReplies('leadBody');   // C3: the saved-reply picker, when any exist
-    const ld=$('leadDraft');if(ld)ld.addEventListener('click',()=>draftReply('leadBody',`A short, friendly reply from the studio to ${l.name||'someone'} who sent a ${KIND[l.form_kind]?KIND[l.form_kind].toLowerCase():'message'} through the website: "${String(l.message||'they left their details without a message').slice(0,280)}". Continue after the greeting already written; do not repeat it.`,ld));
+    aiDraftInto('leadBody','leadDraft',{hint:'AI help · about 1¢ a draft · reads this enquiry and your services',sendLabel:'Send reply',payload:()=>({kind:'enquiry',id:it.lead_id}),writing:()=>`Writing a draft from ${firstOf(l.name)?firstOf(l.name)+'’s':'their'} enquiry and your services…`});   // sales item 94
   }
   restoreComposer(it);   // item 65: also for an enquiry with no email (its note is a composer field too)
   const mr=$('leadRead');if(mr)mr.addEventListener('click',()=>setLeadStatus(it,'read',mr));
@@ -1569,6 +1626,7 @@ function paneLead(host,it){
   const sp=$('leadSpam');if(sp)sp.addEventListener('click',()=>markSpam(it,sp));
   const fpk=$('leadFound');if(fpk)fpk.addEventListener('change',()=>{l.found_pick=fpk.value;const n=$('leadFoundNote');if(n)n.hidden=!(l.visit&&fpk.value===l.visit.found_via);});   // item 89
   const dl=$('leadDeal');if(dl)dl.addEventListener('click',()=>createDeal(it,dl));
+  const dm=$('leadDel');if(dm)dm.addEventListener('click',()=>askDeleteLead(it,dm));   // item 203
   const cv=$('leadConvert');if(cv)cv.addEventListener('click',()=>openConvert(it));
 }
 // ONE path for every enquiry mark. The lead object is shared by the enquiry's
@@ -1579,8 +1637,8 @@ function paneLead(host,it){
 // stays, else returns to the list.
 function leadMarked(it,status){
   const id=it.lead_id;
-  if(status!=='spam'&&it.lead)it.lead.status=status;
-  const leaves=(x)=>status==='spam'||(!x.queue&&(status==='archived'||status==='not_a_fit'));
+  if(status!=='spam'&&status!=='deleted'&&it.lead)it.lead.status=status;
+  const leaves=(x)=>status==='spam'||status==='deleted'||(!x.queue&&(status==='archived'||status==='not_a_fit'));
   ITEMS=ITEMS.filter(x=>!(x.kind==='lead'&&x.lead_id===id&&leaves(x)));
   ITEMS.forEach(x=>{if(x.kind==='lead'&&x.lead_id===id){if(status!=='new')x.unread=false;if(status==='replied')x.needs=false;}});   // C10: replied is no longer waiting for a reply
   TOTAL=inboxCount();
@@ -1611,6 +1669,24 @@ async function setLeadStatus(it,status,btn){
   if(!r.ok){toast('That didn’t update.');if(btn)btn.disabled=false;return;}
   toast(status==='not_a_fit'?'Marked not a fit — it’s off your list.':status==='replied'?'Marked replied.':'Marked read.');
   leadMarked(it,status);
+}
+// Item 203: Delete takes the message, and any files that came with it, for good. It asks
+// first, in place of the button; Keep it puts the button back.
+function askDeleteLead(it,btn){
+  const files=it.lead&&Array.isArray(it.lead.files)?it.lead.files.length:0;
+  const box=document.createElement('span');box.className='delask';box.setAttribute('role','group');box.setAttribute('aria-labelledby','delAskQ');
+  box.innerHTML=`<span id="delAskQ">Delete this message${files?' and the '+(files===1?'file':files+' files')+' with it':''} for good?</span><button type="button" class="danger" data-go>Delete for good</button><button type="button" data-keep>Keep it</button>`;
+  btn.replaceWith(box);
+  const go=box.querySelector('[data-go]'),keep=box.querySelector('[data-keep]');
+  keep.addEventListener('click',()=>{box.replaceWith(btn);btn.focus();});
+  go.addEventListener('click',async()=>{
+    go.disabled=true;keep.disabled=true;go.textContent='Deleting…';
+    const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'DELETE');
+    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through. Try again in a moment.');go.disabled=false;keep.disabled=false;go.textContent='Delete for good';return;}
+    toast(files?'Deleted, with the files that came with it.':'Deleted.');
+    leadMarked(it,'deleted');
+  });
+  go.focus();
 }
 async function markSpam(it,btn){
   btn.disabled=true;
@@ -1737,7 +1813,7 @@ async function loadData(){
   ITEMS=buildItems(FEED,LEADS,NOTIFS);
   if(SPAM)ITEMS=ITEMS.concat(SPAM);   // item 140: the Spam chip's rows survive a refresh
   SYSROWS=buildSystem(FEED,NOTIFS);
-  if(!TEAM&&ITEMS.some(x=>x.kind==='support'&&x.assigned_to))loadTeam().then(()=>{if(seq===REQ_SEQ)renderList();});   // item 34: name who has each request
+  if(!TEAM&&ITEMS.some(x=>x.kind==='support'))loadTeam().then(()=>{if(seq===REQ_SEQ)renderList();});   // items 34 + 37: each request's owner, and Mine
   // the meta line's honesty: TOTAL counts what the Everything view actually
   // RENDERS (conversation items + system rows) — never raw feed rows, which
   // group and fold differently (one row per client; moments stay counted).

@@ -403,6 +403,8 @@
     var IMPORT_MAX = 500;   // one run's worth; the rest of a bigger file is named, never dropped in silence
     // host: an element to fill. o: {title, help, mapHeader(h)→key|null, ready(keys)→'' or a message, toItem(obj)→item|null,
     // label(item)→string, noun, send(item)→Promise<'added'|'existed'|'skipped'|'failed'>, summary(counts)→string, done()}
+    // Sales item 122: a page that can take the whole file at once gives sendAll(items, ctx)→Promise<counts> instead;
+    // then the file goes in ONE request (Contacts), not five rows at a time. send stays for the pages without it.
     function importPanel(host, o) {
       // One run per panel: Import CSV again while rows are going in leaves the running panel as it is
       // (a second run of the same file doubled everyone without an email, who can't be matched)
@@ -475,7 +477,7 @@
           go.addEventListener('click', function () {
             if (run.running || run.stop) return;
             run.running = true; go.disabled = true; file.disabled = true; closer.textContent = 'Stop';   // no second file under a running one
-            var counts = { added: 0, updated: 0, existed: 0, skipped: 0, failed: 0 }, done = 0, i = 0, ctx = { onExisting: how.onExisting || 'skip', importId: null };
+            var counts = { added: 0, updated: 0, existed: 0, skipped: 0, failed: 0 }, done = 0, i = 0, ctx = { onExisting: how.onExisting || 'skip', importId: null, fileName: how.fileName || '' };
             function finish(stopped) {
               run.running = false;
               if (host.__ddsImport === run) { host.__ddsImport = null; host.innerHTML = ''; }
@@ -490,6 +492,17 @@
               var chunk = items.slice(i, i + 5); i += 5;
               Promise.all(chunk.map(function (it) { return Promise.resolve().then(function () { return o.send(it, ctx); }).catch(function () { return 'failed'; }).then(function (k) { counts[k in counts ? k : 'failed']++; done++; }); }))
                 .then(function () { go.textContent = 'Importing ' + Math.min(done, items.length) + '/' + items.length + '…'; live.textContent = 'Imported ' + done + ' of ' + items.length; next(); });
+            }
+            // item 122: the whole file in one request. It can't be stopped halfway, so Close waits for it;
+            // what went in is said when it lands, and Undo takes it back for a day
+            if (o.sendAll) {
+              closer.disabled = true; closer.textContent = 'Close';
+              go.textContent = 'Importing ' + items.length + '…'; live.textContent = 'Importing ' + many(items.length) + ' in one go…';
+              Promise.resolve().then(function () { return o.sendAll(items, ctx); }).catch(function () { return null; }).then(function (got) {
+                if (got && typeof got === 'object') { for (var k in counts) counts[k] = Number(got[k]) || 0; } else counts.failed = items.length;
+                done = items.length; finish(false);
+              });
+              return;
             }
             // item 86: a page that keeps imports starts one first (its id rides on every row, for Undo)
             Promise.resolve(o.start ? o.start({ onExisting: ctx.onExisting, fileName: how.fileName || '' }) : null).then(function (id) { ctx.importId = id || null; }, function () { ctx.importId = null; }).then(next);
@@ -789,6 +802,7 @@
         + '.dm-s{flex:1;min-width:0;font:inherit;font-size:14.5px;padding:9px 12px;min-height:40px;box-sizing:border-box;border:1px solid var(--line,#e6e1ee);border-radius:10px;background:var(--card,#fff);color:var(--ink,#1b1525)}'
         + '.dm-b{display:block;width:100%;box-sizing:border-box;min-height:150px;resize:vertical;font:inherit;font-size:14.5px;line-height:1.5;padding:12px 14px;border:1px solid var(--line,#e6e1ee);border-radius:12px;background:var(--card,#fff);color:var(--ink,#1b1525)}'
         + '.dm-sr{align-self:flex-start;max-width:100%;font:inherit;font-size:13px;color:var(--ink,#1b1525);background:var(--card,#fff);border:1px solid var(--line,#e6e1ee);border-radius:999px;padding:6px 12px;min-height:32px;cursor:pointer}'
+        + '.dm-t{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;min-width:0}.dm-t .dm-sr{align-self:auto}'
         + '.dm-f{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}'
         + '.dm-n{flex:1 1 220px;margin:0;display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:var(--soft,#5c5468)}.dm-n svg{flex:0 0 auto;margin-top:1px}.dm-n span{overflow-wrap:anywhere}'
         + '.dm-go{font:inherit;font-size:14px;font-weight:600;border:0;border-radius:999px;padding:10px 22px;min-height:40px;background:var(--p,#5b3fa0);color:#fff;cursor:pointer;margin-left:auto}.dm-go:disabled{opacity:.65;cursor:default}'
@@ -804,7 +818,8 @@
     }
     // host: where the box draws. o: { req(path, method, body) → {ok, status, body}, ids: one of
     // {deal_id} {contact_id} {client_id}, idp: the field ids' start (idp+'Subject', idp+'Body'),
-    // values: {subject, body} typed before, focus: put the caret in it once drawn, onSent(data, firstName) }
+    // values: {subject, body} typed before, focus: put the caret in it once drawn, onSent(data, firstName),
+    // tools(row, {body, subj, form, go}): a page's own controls beside the saved replies (sales item 94's Draft it for me) }
     function open(host, o) {
       style(); o = o || {};
       var req = o.req || function (p, m, b) { return window.ddsApi(p, { method: m, body: b }); };
@@ -839,6 +854,10 @@
           + '<div class="dm-f"><p class="dm-n">' + MAIL + '<span>Sent as <b>' + esc3(d.as || 'your studio') + '</b>' + (d.from ? ' from ' + esc3(d.from) : '') + ' · ' + esc3(back) + '</span></p><button type="submit" class="dm-go">Send email</button></div>'
           + '<p class="dm-err" role="alert"></p></form>';
         var form = host.querySelector('form'), subj = form.querySelector('.dm-s'), body = form.querySelector('.dm-b'), go = form.querySelector('.dm-go'), errEl = form.querySelector('.dm-err');
+        // one row above the message for the saved replies and a page's own tools, made when either needs it
+        var tools = null;
+        function toolsRow() { if (!tools) { tools = document.createElement('div'); tools.className = 'dm-t'; body.parentNode.insertBefore(tools, body); } return tools; }
+        if (o.tools) o.tools(toolsRow(), { body: body, subj: subj, form: form, go: go });
         // saved replies, when there are any (read once a page)
         if (!SR) SR = Promise.resolve(req('/service/saved-replies')).then(function (r) { return (r && r.ok && r.body && r.body.data && r.body.data.replies) || []; }, function () { return []; });
         SR.then(function (list) {
@@ -847,7 +866,7 @@
           var sel = document.createElement('select'); sel.className = 'dm-sr'; sel.setAttribute('aria-label', 'Insert a saved reply');
           sel.innerHTML = '<option value="">Insert a saved reply…</option>' + list.map(function (x) { return '<option value="' + esc3(x.id) + '">' + esc3(x.title) + '</option>'; }).join('');
           sel.onchange = function () { var b = map[sel.value]; if (b) { var cur = body.value; body.value = cur ? cur.replace(/\s*$/, '') + '\n\n' + b : b; body.dispatchEvent(new Event('input', { bubbles: true })); body.focus(); } sel.value = ''; };
-          body.parentNode.insertBefore(sel, body);
+          var row = toolsRow(); row.insertBefore(sel, row.firstChild);
         });
         function err(m) { errEl.textContent = m || ''; }
         function ready() { go.disabled = false; go.textContent = 'Send email'; }
@@ -2432,6 +2451,25 @@
     root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">S</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/studio.html" aria-label="Sign in">◐</a>';
   }
 
+  // Builder item 191: two-step sign-in is on and this device hasn't had the code from the
+  // phone yet, so the server treats it as signed out. The studio's sign-in page asks for
+  // the code, then brings them back here (dds-studio-return, as for anyone signed out).
+  // The sign-in kept on this device says so, with no call: a fresh sign-in carries the
+  // person's factors, and the token says whether the code was typed (aal2).
+  function secondStepDue(sess) {
+    try {
+      var f = (sess && sess.user && sess.user.factors) || [];
+      if (!f.some(function (x) { return x && x.status === 'verified'; })) return false;
+      return JSON.parse(atob(String(sess.access_token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).aal !== 'aal2';
+    } catch (_) { return false; }
+  }
+  function toSecondStep() {
+    // never twice in a row: if the sign-in page sent them straight back, the page shows signed out
+    try { if (Date.now() - Number(sessionStorage.getItem('dds-step-sent') || 0) < 30000) { minimalShell(); return; } sessionStorage.setItem('dds-step-sent', String(Date.now())); } catch (_) { /* */ }
+    try { localStorage.setItem('dds-studio-return', JSON.stringify({ path: location.pathname + location.search + location.hash, at: Date.now() })); } catch (_) { /* */ }
+    location.replace('/studio.html');
+  }
+
   // ── PT-5: contextual onboarding — teach in context, show ONCE, disappear ────
   // Declarative + reuses the shell: any page marks a `.dds-hint[data-hint]`
   // element (hidden) next to the thing it explains. We reveal unseen ones with a
@@ -2878,6 +2916,7 @@
         TOKEN = (sess && sess.access_token) || "";
         sb.__email = (sess && sess.user && sess.user.email) || '';
         if (!TOKEN) { minimalShell(); return; }
+        if (secondStepDue(sess)) { toSecondStep(); return; }   // builder item 191
         var uid = (sess && sess.user && sess.user.id) || '';
         var kept = keptContext(uid);
         if (kept) {

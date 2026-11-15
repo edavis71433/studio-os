@@ -20,14 +20,14 @@ import { recordCopied } from '../lib/copied_record.ts';
 const rows = <T,>(r: { ok?: boolean; json?: unknown }): T[] => (r.ok !== false && Array.isArray(r.json) ? r.json as T[] : []);
 const UUIDISH = /^[0-9a-f-]{36}$/i;
 /** id=in.(…) reads, a batch at a time (a long list would outgrow the address) */
-async function readByIds<T>(table: string, siteId: string, ids: string[], select: string, extra = ''): Promise<T[]> {
+export async function readByIds<T>(table: string, siteId: string, ids: string[], select: string, extra = ''): Promise<T[]> {
   const out: T[] = [];
   const clean = ids.filter((x) => UUIDISH.test(x));
   for (let i = 0; i < clean.length; i += 80) out.push(...rows<T>(await svc(`${table}?site_id=eq.${siteId}&id=in.(${clean.slice(i, i + 80).join(',')})${extra}&select=${select}&limit=200`)));
   return out;
 }
 /** `fn` over `items`, a few at a time */
-async function inBatches<T, R>(items: T[], size: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+export async function inBatches<T, R>(items: T[], size: number, fn: (x: T) => Promise<R>): Promise<R[]> {
   const out: R[] = [];
   for (let i = 0; i < items.length; i += size) out.push(...await Promise.all(items.slice(i, i + size).map(fn)));
   return out;
