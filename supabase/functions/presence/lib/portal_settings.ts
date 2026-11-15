@@ -6,7 +6,9 @@
 //     clients: { [clientSiteId]: { [part]: boolean } }, one client's own choice for a part
 //                                                       (true shown, false hidden), else the studio's
 //     welcome: string,                                 a note at the top of every client's Home
-//     home_off: Card[] }                               Home's cards the studio hides
+//     home_off: Card[],                                Home's cards the studio hides
+//     parts_at: iso | null,                            when a part was last switched (item 236's set-up list)
+//     previewed_at: iso | null }                       when the studio first saw a client's portal (item 232)
 // Needs you is always on Home. A failed read hides nothing: the portal shows everything
 // rather than going quiet by accident. These hide parts of a client's own portal; they
 // are not a lock on anyone else's data (every /client/* route stays scoped to the caller).
@@ -39,7 +41,7 @@ export const WELCOME_MAX = 500;
 export const PORTAL_MAX_CLIENTS = 1000;
 
 export type ClientChoices = Partial<Record<PortalPart, boolean>>;
-export interface PortalSettings { off: PortalPart[]; clients: Record<string, ClientChoices>; welcome: string; home_off: HomeCard[] }
+export interface PortalSettings { off: PortalPart[]; clients: Record<string, ClientChoices>; welcome: string; home_off: HomeCard[]; parts_at: string | null; previewed_at: string | null }
 
 const SITE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isSiteId = (v: unknown): v is string => typeof v === 'string' && SITE_ID.test(v);
@@ -66,6 +68,7 @@ export function cleanWelcome(v: unknown): string {
     .trim()
     .slice(0, WELCOME_MAX);
 }
+const isoOrNull = (v: unknown): string | null => (typeof v === 'string' && Number.isFinite(Date.parse(v)) ? new Date(Date.parse(v)).toISOString() : null);
 function choicesOf(v: unknown): ClientChoices {
   const out: ClientChoices = {};
   if (!v || typeof v !== 'object') return out;
@@ -86,7 +89,7 @@ export function normalizePortal(raw: unknown): PortalSettings {
   }
   const keys = Object.keys(clients);
   if (keys.length > PORTAL_MAX_CLIENTS) for (const k of keys.slice(0, keys.length - PORTAL_MAX_CLIENTS)) delete clients[k];
-  return { off: partsOf(r.off), clients, welcome: cleanWelcome(r.welcome), home_off: cardsOf(r.home_off) };
+  return { off: partsOf(r.off), clients, welcome: cleanWelcome(r.welcome), home_off: cardsOf(r.home_off), parts_at: isoOrNull(r.parts_at), previewed_at: isoOrNull(r.previewed_at) };
 }
 
 /** Is this part shown to this client? The client's own choice first, else the studio's. Pure. */
@@ -114,12 +117,13 @@ export function pickStudioChange(b: unknown): StudioChange {
   if (typeof r.welcome === 'string') out.welcome = cleanWelcome(r.welcome);
   return out;
 }
-/** The change applied to what's stored now (read just before the write). Pure. */
-export function applyStudioChange(cur: PortalSettings, change: StudioChange): PortalSettings {
+/** The change applied to what's stored now (read just before the write). A part's switch
+ *  stamps parts_at, which ticks "Choose what clients see" on the set-up list. Pure. */
+export function applyStudioChange(cur: PortalSettings, change: StudioChange, nowIso = new Date().toISOString()): PortalSettings {
   const off = new Set(cur.off), homeOff = new Set(cur.home_off);
   if (change.part) { if (change.part.shown) off.delete(change.part.key); else off.add(change.part.key); }
   if (change.card) { if (change.card.shown) homeOff.delete(change.card.key); else homeOff.add(change.card.key); }
-  return normalizePortal({ ...cur, off: [...off], home_off: [...homeOff], welcome: change.welcome === undefined ? cur.welcome : change.welcome });
+  return normalizePortal({ ...cur, off: [...off], home_off: [...homeOff], welcome: change.welcome === undefined ? cur.welcome : change.welcome, parts_at: change.part ? nowIso : cur.parts_at });
 }
 /** One client's change: { part, shown: true | false | null } (null: back to the studio's
  *  choice for that part) or { reset: true } (every part back to the studio's). Pure. */
@@ -130,7 +134,7 @@ export function pickClientChange(b: unknown): { reset: true } | { part: PortalPa
   if (r.shown === null || typeof r.shown === 'boolean') return { part: r.part, shown: r.shown as boolean | null };
   return null;
 }
-export function applyClientChange(cur: PortalSettings, clientSiteId: string, change: NonNullable<ReturnType<typeof pickClientChange>>): PortalSettings {
+export function applyClientChange(cur: PortalSettings, clientSiteId: string, change: NonNullable<ReturnType<typeof pickClientChange>>, nowIso = new Date().toISOString()): PortalSettings {
   const id = clientSiteId.toLowerCase();
   const clients = { ...cur.clients };
   if ('reset' in change) delete clients[id];
@@ -141,7 +145,11 @@ export function applyClientChange(cur: PortalSettings, clientSiteId: string, cha
     else c[change.part] = change.shown;
     if (Object.keys(c).length) clients[id] = c; else delete clients[id];
   }
-  return normalizePortal({ ...cur, clients });
+  return normalizePortal({ ...cur, clients, parts_at: nowIso });
+}
+/** The first time the studio saw a client's portal (item 232); kept, never moved. Pure. */
+export function markPreviewed(cur: PortalSettings, nowIso = new Date().toISOString()): PortalSettings {
+  return cur.previewed_at ? cur : normalizePortal({ ...cur, previewed_at: nowIso });
 }
 
 /** Which part a /client/* request belongs to, or null when it isn't one a studio can turn

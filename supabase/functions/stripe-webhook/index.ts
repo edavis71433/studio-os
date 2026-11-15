@@ -8,12 +8,17 @@
 //
 //  Then in Stripe Dashboard → Developers → Webhooks → Add endpoint:
 //      URL:    https://<project-ref>.supabase.co/functions/v1/stripe-webhook
+//      Version: EXPECTED_STRIPE_VERSION below (the version this file reads)
 //      Events: checkout.session.completed, payment_intent.succeeded,
 //              payment_intent.payment_failed, payment_intent.processing,
 //              checkout.session.async_payment_succeeded,
-//              checkout.session.async_payment_failed
-//      (the last three carry the "Processing" money state for delayed
-//      methods such as ACH — see markPresenceInvoiceProcessing below)
+//              checkout.session.async_payment_failed,
+//              customer.subscription.created / updated / deleted,
+//              invoice.paid, invoice.payment_failed
+//      (payment_intent.processing and the two async events carry the
+//      "Processing" money state for delayed methods such as ACH — see
+//      markPresenceInvoiceProcessing below; invoice.paid / payment_failed are
+//      each retainer charge, sales item 128)
 //  Copy the endpoint's signing secret (whsec_...) into this function's secrets
 //  as STRIPE_WEBHOOK_SECRET. SB_URL / SERVICE_ROLE_KEY / (optionally)
 //  STRIPE_SECRET must also be present, same values as the other functions.
@@ -58,6 +63,14 @@ const WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
 // added events in the Stripe endpoint: checkout.session.completed (already),
 // customer.subscription.created / updated / deleted.
 const BILLING_SYNC_SECRET = Deno.env.get('BILLING_SYNC_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
+
+// Sales item 128: the Stripe version this file (and the presence function, which
+// sends it on every call: commerce/stripe_shape.ts STRIPE_API_VERSION) was written
+// for. The endpoint in Stripe is set to it. An event in another version is still
+// processed (dropping money is never the answer), but the log says so loudly,
+// because a field may have moved. tests/presence/stripe_retainer_charges_128_test.mjs
+// holds this and STRIPE_API_VERSION together.
+const EXPECTED_STRIPE_VERSION = '2026-05-27.dahlia';
 
 // W4 (L3) — livemode guard. A test-mode event must never mutate live billing (or
 // vice-versa). Expected mode is derived from the Stripe secret key prefix
@@ -317,6 +330,9 @@ Deno.serve(async (req: Request) => {
   const obj = event?.data?.object || {};
   const eventTime = event?.created ? new Date(event.created * 1000).toISOString() : new Date().toISOString();
   const livemode = typeof event?.livemode === 'boolean' ? event.livemode : null;
+  if (event?.api_version && event.api_version !== EXPECTED_STRIPE_VERSION) {
+    console.error(`[stripe-webhook] VERSION MISMATCH event ${String(event?.id || '?')} (${type}) is ${event.api_version}, this code reads ${EXPECTED_STRIPE_VERSION} — processed, but check the endpoint's version in Stripe`);
+  }
 
   // L3 — live/test guard: a signature can be valid yet come from the wrong mode
   // (a test event delivered to the live endpoint). Never mutate billing across
@@ -745,18 +761,26 @@ Deno.serve(async (req: Request) => {
       // rides subscription.* + checkout — it never uses invoice.*, so this branch
       // is purely additive and cannot touch SaaS. Forward ONLY when the object is
       // tagged with the service-retainer PURPOSE (on the invoice or its subscription
-      // details); billing-sync then updates the retainer and records the settlement.
-      // (Register invoice.payment_succeeded / invoice.payment_failed in the Stripe
-      // endpoint to enable the per-charge echo; retainer STATUS also stays correct
-      // via the always-registered customer.subscription.* events below.)
-      if (type === 'invoice.payment_succeeded' || type === 'invoice.payment_failed') {
+      // details); billing-sync then updates the retainer and records the settlement,
+      // once per Stripe invoice, so invoice.paid and invoice.payment_succeeded for
+      // the same charge record it once. (Register invoice.paid and
+      // invoice.payment_failed in the Stripe endpoint: without them no charge is
+      // recorded; retainer STATUS also stays correct via the always-registered
+      // customer.subscription.* events below.)
+      // Sales item 128: the endpoint listens for invoice.paid (Stripe's name for a
+      // charge that landed; invoice.payment_succeeded is the older one, still read),
+      // and since Stripe's 2025-03-31 version an invoice carries its subscription's
+      // notes under parent.subscription_details, not subscription_details. Reading
+      // only the old place meant no retainer charge was ever recognised.
+      if (type === 'invoice.paid' || type === 'invoice.payment_succeeded' || type === 'invoice.payment_failed') {
         const imd = obj.metadata || {};
+        const pmd = obj.parent?.subscription_details?.metadata || {};
         const smd = obj.subscription_details?.metadata || {};
-        const isRetainer = imd.purpose === 'service_retainer' || imd.kind === 'service_retainer' || smd.purpose === 'service_retainer' || smd.kind === 'service_retainer';
+        const isRetainer = [imd, pmd, smd].some((m: any) => m.purpose === 'service_retainer' || m.kind === 'service_retainer');
         if (isRetainer) {
           const ok = await forwardBillingSync(type, obj);
           if (!ok) { console.error(`[stripe-webhook] ${type} retainer sync failed — 500 so Stripe retries`); return new Response('sync failed', { status: 500 }); }
-          console.log(`[stripe-webhook] ${type} → service retainer settled (sub ${(typeof obj.subscription === 'string' ? obj.subscription : obj.subscription?.id) || '?'})`);
+          console.log(`[stripe-webhook] ${type} → service retainer settled (sub ${(typeof obj.subscription === 'string' ? obj.subscription : obj.subscription?.id) || obj.parent?.subscription_details?.subscription || '?'})`);
         } else {
           console.log(`[stripe-webhook] ${type} (not a service retainer) — acknowledged, entitlement unaffected`);
         }

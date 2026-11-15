@@ -34,6 +34,7 @@ export const RESERVED_NAMES = {
   domainNotes: '__domain_notes__',        // builder list item 162: the studio's notes on a client's domain (whose account, renews by itself, a note) (agency/sites.ts)
   domainMail: '__domain_mail__',          // builder list item 163: the domain's email records as they were, to say so if they vanish (lib/domain_notify.ts)
   domainLive: '__domain_live__',          // builder list item 164: the domain the "your website is live" email went out for, so it goes once (lib/domain_notify.ts)
+  domainAccess: '__domain_access__',      // builder list item 222: the studio's ask for access to a client's DNS records, until it arrives (lib/domain_access.ts)
   formCheck: '__form_check__',           // builder list item 140: since when the site's pages ask for a time ticket (lib/form_check.ts)
   spamSenders: '__spam_senders__',        // builder list item 140: hashes of the addresses the owner marked as spam (lib/form_check.ts)
   bookingOptions: '__booking_options__',  // builder list item 149: customers may change or cancel; the owner's own calendar's private address (lib/booking_links.ts)

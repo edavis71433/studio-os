@@ -511,6 +511,13 @@
   .pill-build{background:var(--p-soft);color:var(--p)} .pill-draft{background:var(--warn-soft);color:var(--warn)}
   .wsbuild .wsfoot{justify-content:flex-start}
   .wsbuild .wsbar .tag{margin-bottom:0}
+  /* item 232: a studio's preview of a client's portal */
+  .pvbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);padding:10px 16px;font-size:13.5px;line-height:1.45;border-bottom:1px solid var(--line)}
+  .pvbar p{margin:0;flex:1 1 320px;min-width:0}
+  .pvbar .pvback{flex:0 0 auto;font-weight:600;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 14px;text-decoration:none;min-height:36px;display:inline-flex;align-items:center}
+  .pvbar .pvback:hover{border-color:var(--p);color:var(--p)}
+  @media (max-width:719px){.pvbar .pvback{min-height:44px}}
+
   /* item 233: the studio's welcome note, under the greeting */
   .wnote{display:flex;gap:12px;align-items:flex-start}
   .wnote .wnav{flex:0 0 auto;width:30px;height:30px;border-radius:999px;display:grid;place-items:center;background:var(--p-soft);color:var(--p);font-weight:700;font-size:13px}
@@ -718,7 +725,14 @@
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
-const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-client-auth',persistSession:true,autoRefreshToken:true}});
+// Builder list item 232: a studio sees a client's portal as the client does (?preview=<their
+// site>, opened from the studio). Every read is the client's, drilled into them; nothing
+// pressed is saved, sent or paid, and nothing is marked as read: the server refuses every
+// write too. This device keeps nothing of it (no stored Home, no remembered client).
+const PREVIEW=(()=>{try{const v=String(new URLSearchParams(location.search).get('preview')||'').toLowerCase();return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v)?v:'';}catch(_){return'';}})();
+const PREVIEW_BACK=(()=>{try{const b=String(new URLSearchParams(location.search).get('back')||'');return /^\/(?![\/\\])[^\s]*$/.test(b)?b:'';}catch(_){return'';}})();
+// a preview is the studio's own sign-in (the studio pages' realm), never a client's
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:PREVIEW?'dds-portal-auth':'dds-client-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
@@ -728,14 +742,19 @@ sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_tok
 // calls behind one answer crossed the country (about 1 s an answer; 0.4 s beside the
 // database). x-region asks for Oregon; the server's CORS answer allows the header.
 const FN_REGION='us-west-2';
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''),'x-region':FN_REGION});
+const PREVIEW_MSG='This is a preview: nothing is saved, sent or paid.';
+let PREVIEW_REFUSED=0;
+const H=()=>Object.assign({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':PREVIEW||(new URLSearchParams(location.search).get('client')||''),'x-region':FN_REGION},PREVIEW?{'x-dds-preview':'1'}:{});
 // Nov 10 review (G3): no answer at all (no signal, aeroplane mode) used to THROW out
 // of here, so a button switched off before the call stayed grey for good and nothing
 // was said. No answer is now an ordinary failure (status 0, offline, a plain message),
 // so every caller's own "that didn't go through — try again" path runs.
 const OFFLINE_MSG='We couldn’t reach your studio — check your connection and try again.';
-async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,offline:true,body:{message:OFFLINE_MSG}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+async function api(path,method,body){
+  if(PREVIEW&&method&&method!=='GET'){PREVIEW_REFUSED=Date.now();if(path!=='/client/notifications/read')toast(PREVIEW_MSG);return{ok:false,status:403,preview:true,body:{error:'preview',message:PREVIEW_MSG}};}   // item 232
+  let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,offline:true,body:{message:OFFLINE_MSG}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+function toast(m){if(PREVIEW&&Date.now()-PREVIEW_REFUSED<1500)m=PREVIEW_MSG;   // item 232: whatever a refused press says, it says this
+  if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 // relative "when" — calm, human, no clock precision
 function rel(iso){const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+(m===1?' min ago':' mins ago');const h=Math.floor(m/60);if(h<24)return h+(h===1?' hour ago':' hours ago');const d=Math.floor(h/24);if(d<7)return d+(d===1?' day ago':' days ago');return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 let USER=null; // the signed-in session user (for name/email in the welcome + settings cards)
@@ -769,7 +788,7 @@ function firstName(u){if(!u)return'';const cap=(p)=>p.charAt(0).toUpperCase()+p.
 function portalGreeting(h,name){const g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';return g+(name?', '+name:'')+'.';}
 // item 179: the client's own name, from the studio's record of them (/portal/context
 // client_first_name), else what their sign-in knows (firstName)
-function clientName(){const n=PORTAL.ctx&&PORTAL.ctx.client_first_name;return (typeof n==='string'&&n.trim())?n.trim():firstName(USER);}
+function clientName(){const n=PORTAL.ctx&&PORTAL.ctx.client_first_name;return (typeof n==='string'&&n.trim())?n.trim():PREVIEW?'':firstName(USER);}
 // ONE definition of "needs your OK" per project snapshot — pending approvals +
 // to-dos flagged for the client. Each project card's "N things need your OK"
 // line uses it, so Home can never show two contradictory counts on one render.
@@ -993,7 +1012,7 @@ function studioBrand(){return studioNamed()?String(PORTAL.ctx.studio.name).trim(
 function studioInitial(){return studioNamed()?studioBrand().charAt(0).toUpperCase():'✦';}
 function studioLogo(){const s=PORTAL.ctx&&PORTAL.ctx.studio;return (s&&typeof s.logo_url==='string'&&/^https:\/\//.test(s.logo_url))?s.logo_url:'';}
 // the sign-in page shows the same name and logo next time (portal.html reads this)
-function rememberStudio(){try{const s=PORTAL.ctx&&PORTAL.ctx.studio;if(studioNamed())localStorage.setItem('dds-studio-brand',JSON.stringify({name:s.name,logo_url:studioLogo()||null,accent:s.accent||''}));}catch(_){}}
+function rememberStudio(){if(PREVIEW)return;try{const s=PORTAL.ctx&&PORTAL.ctx.studio;if(studioNamed())localStorage.setItem('dds-studio-brand',JSON.stringify({name:s.name,logo_url:studioLogo()||null,accent:s.accent||''}));}catch(_){}}
 function showNav(){
   const nav=$('tabnav');if(!nav)return;
   const acct=(((clientName()||((USER&&USER.email)||''))||'').charAt(0)||'•').toUpperCase();
@@ -2647,7 +2666,7 @@ async function openServiceRequest(svc){
 // only render for a persona that CAN message.
 function accountSectionHtml(canMessage){
   const name=clientName();
-  const email=(USER&&USER.email)?USER.email:'';
+  const email=PREVIEW?String((PORTAL.ctx&&PORTAL.ctx.preview&&PORTAL.ctx.preview.email)||''):(USER&&USER.email)?USER.email:'';
   const av=((name||email||'').charAt(0)||'•').toUpperCase();
   return `<section id="sec-you"><h2>Your account</h2><div class="card">`+
     `<div class="acctid"><span class="acctav" aria-hidden="true">${esc(av)}</span><div class="acctwho"><strong>${name?esc(name):'Signed in'}</strong>${email?`<span class="muted">${esc(email)}</span>`:''}</div></div>`+
@@ -2675,6 +2694,12 @@ function businessesHtml(){
     `</div></div>`;
 }
 function wireAccountSection(){
+  if(PREVIEW){   // item 232: their password, two-step and sign-out are theirs; the buttons say so
+    for(const id of['chgpw','twoStep','signout2']){const b=$(id);if(b){b.hidden=false;b.addEventListener('click',()=>{PREVIEW_REFUSED=Date.now();toast(PREVIEW_MSG);});}}
+    const ln=$('acctTwoLine');if(ln)ln.textContent='Theirs to set: not shown in a preview.';
+    const ap=$('appearance');if(ap)ap.addEventListener('click',()=>{cycleClientTheme();ap.textContent=themeLabel();});
+    return;
+  }
   const email=(USER&&USER.email)?USER.email:'';
   const ap=$('appearance');if(ap)ap.addEventListener('click',()=>{cycleClientTheme();ap.textContent=themeLabel();});
   const cp=$('chgpw');if(cp)cp.addEventListener('click',async()=>{cp.disabled=true;try{await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/set-password.html?next=/portal.html'});toast('Check your email for a link to set a new password.');}catch(_){toast('Couldn’t send that just now.');cp.disabled=false;}});
@@ -3704,9 +3729,9 @@ function takeReturn(){try{const v=JSON.parse(localStorage.getItem(RETURN_KEY)||'
 // reviewer skips the read, and the context answer is checked before trusting it:
 // anyone who has since become more than a reviewer gets the read after all.
 function personaKey(){return 'dds-portal-persona:'+((USER&&USER.id)||'');}
-function rememberedReviewer(){try{return !!(USER&&USER.id)&&localStorage.getItem(personaKey())==='reviewer';}catch(_){return false;}}
-function rememberedClient(){try{return !!(USER&&USER.id)&&localStorage.getItem(personaKey())==='client';}catch(_){return false;}}
-function rememberPersona(c){try{if(!(USER&&USER.id))return;if(PORTAL.persona==='reviewer'&&c.site_role==='client_reviewer')localStorage.setItem(personaKey(),'reviewer');else if(PORTAL.persona==='client')localStorage.setItem(personaKey(),'client');else localStorage.removeItem(personaKey());}catch(_){}}
+function rememberedReviewer(){if(PREVIEW)return false;try{return !!(USER&&USER.id)&&localStorage.getItem(personaKey())==='reviewer';}catch(_){return false;}}
+function rememberedClient(){if(PREVIEW)return false;try{return !!(USER&&USER.id)&&localStorage.getItem(personaKey())==='client';}catch(_){return false;}}
+function rememberPersona(c){if(PREVIEW)return;try{if(!(USER&&USER.id))return;if(PORTAL.persona==='reviewer'&&c.site_role==='client_reviewer')localStorage.setItem(personaKey(),'reviewer');else if(PORTAL.persona==='client')localStorage.setItem(personaKey(),'client');else localStorage.removeItem(personaKey());}catch(_){}}
 let LOADED_ONCE=false;   // the address's #tab and a kept destination are honoured by the first load only (later loads follow an action)
 // ── Builder list item 228: the last visit's Home, at once ──
 // A returning client sees the Home they last saw the moment the page opens, while the
@@ -3719,6 +3744,7 @@ const HOME_CACHE_DAYS=7;
 let HOME_FROM_CACHE=false;
 function homeCacheKey(){return(USER&&USER.id)?HOME_CACHE_PREFIX+USER.id:'';}
 function saveHomeCache(){
+  if(PREVIEW)return;
   try{
     const k=homeCacheKey(),main=$('main'),nav=$('tabnav');
     if(!k||CURRENT_TAB!=='home'||!main||!nav||nav.hidden||!main.querySelector('#home-hero')||main.querySelector('#needs-body .skel'))return;
@@ -3745,7 +3771,8 @@ function dropHomeCacheView(){HOME_FROM_CACHE=false;for(const id of['main','tabna
 function clearHomeCaches(){try{Object.keys(localStorage).filter(k=>k.indexOf(HOME_CACHE_PREFIX)===0||k.indexOf('dds-portal-papers:')===0).forEach(k=>localStorage.removeItem(k));}catch(_){}}   // item 238's memory goes with it
 // the load will land on Home: no link to a project, a request, a payment or a tab, and no destination kept through a sign-in
 function landsOnHome(){try{const q=new URLSearchParams(location.search);if(q.get('support')||q.get('project')||q.get('approval')||q.get('paid')||q.get('connect'))return false;if(String(location.hash||'').length>1)return false;return !localStorage.getItem(RETURN_KEY);}catch(_){return false;}}
-function signedOut(){dropHomeCacheView();clearHomeCaches();$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
+function signedOut(){if(PREVIEW){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio to see a client’s portal.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;return;}   // item 232: this device's client caches stay as they are
+  dropHomeCacheView();clearHomeCaches();$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
 function trouble(){dropHomeCacheView();$('main').innerHTML=`<div class="center"><h2>We couldn’t load your updates just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
 function ownerNote(){dropHomeCacheView();clearHomeCaches();$('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div><h2 style="margin-top:14px">This is the client view.</h2><p class="muted">You have the full workspace.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
 
@@ -3755,7 +3782,7 @@ async function load(){
   const first=!LOADED_ONCE;LOADED_ONCE=true;
   const params=new URLSearchParams(location.search);
   // G2: the destination kept through a sign-in; an address that names its own wins
-  const kept=first?takeReturn():null;
+  const kept=first&&!PREVIEW?takeReturn():null;
   const fromUrl=!!(params.get('support')||params.get('project'));
   const dsup=fromUrl?params.get('support'):((kept&&kept.support)||''); const deep=fromUrl?params.get('project'):((kept&&kept.project)||'');
   // item 179: "Needs your OK" emails carry the approval too — it opens in place, the project stays the fallback
@@ -3765,8 +3792,8 @@ async function load(){
   const wantTab=hashTab||(kept&&kept.tab)||'';
   // studio audit change 9: the studio's "connect your Google" email lands here with
   // ?connect=<signed token>; a sign-in on the way stashes it (see the boot below)
-  const askTok=params.get('connect')||localStorage.getItem('dds-connect-ask')||'';
-  try{localStorage.removeItem('dds-connect-ask');}catch(_){}
+  const askTok=PREVIEW?'':params.get('connect')||localStorage.getItem('dds-connect-ask')||'';
+  if(!PREVIEW)try{localStorage.removeItem('dds-connect-ask');}catch(_){}
   // item 1: back from Stripe — ?paid=<invoice id> (ids are uuids; anything else is ignored)
   const paidId=/^[0-9a-zA-Z-]{1,64}$/.test(params.get('paid')||'')?params.get('paid'):'';
   if(paidId)paidStore(paidId);
@@ -3801,6 +3828,7 @@ async function load(){
   // with or without a project yet) OR an invited reviewer (feed only). Both get the
   // persistent tab nav + the cross-project Home; tabs degrade to calm empty states.
   PORTAL.ctx=c;
+  if(PREVIEW)showPreviewBar(c.preview||{});   // item 232
   {const pc=c.portal||{};PORTAL.off=new Set(Array.isArray(pc.off)?pc.off:[]);PORTAL.welcome=typeof pc.welcome==='string'?pc.welcome:'';PORTAL.homeOff=new Set(Array.isArray(pc.home_off)?pc.home_off:[]);PORTAL.papers=null;}
   rememberStudio();
   try{const fb=$('footby');if(fb)fb.textContent='by '+(studioNamed()?studioBrand():'your studio');}catch(_){}
@@ -3852,6 +3880,24 @@ async function load(){
   if(wantTab){if(hashTab){try{history.replaceState(null,'','/client.html'+location.search);}catch(_){}}showTab(wantTab);return;}
   showTab(CURRENT_TAB||'home');
 }
+// Builder list item 232: the strip across the top of a preview, and Back to the client. A
+// paper's link is the client's to open (its page can accept, sign or pay), so in a preview
+// a press on one says it's a preview instead.
+function showPreviewBar(pv){
+  const name=String(pv.name||'').trim()||'this client';
+  const poss=/s$/i.test(name)?name+'’':name+'’s';
+  const back=PREVIEW_BACK||('/settings.html?client='+encodeURIComponent(PREVIEW)+'#portalParts');
+  let bar=$('pvbar');
+  if(!bar){bar=document.createElement('div');bar.id='pvbar';bar.className='pvbar';bar.setAttribute('role','note');document.body.insertBefore(bar,document.body.firstChild);}
+  bar.innerHTML=`<p>You’re seeing ${esc(poss)} portal as ${esc(name)} sees it. Nothing you press is saved or sent, and nothing is marked as read.</p><a class="pvback" href="${esc(back)}">Back to ${esc(name)}</a>`;
+  document.body.classList.add('previewing');
+}
+if(PREVIEW)document.addEventListener('click',(e)=>{
+  const a=e.target&&e.target.closest?e.target.closest('a[href]'):null;if(!a||a.classList.contains('pvback'))return;
+  const href=a.getAttribute('href')||'';
+  const pays=((PORTAL.billing&&PORTAL.billing.invoices)||[]).map(i=>i&&i.pay_url).filter(Boolean);
+  if(a.hasAttribute('data-pay')||pays.includes(href)||/\/doc\.html\?t=/.test(href)){e.preventDefault();e.stopPropagation();PREVIEW_REFUSED=Date.now();toast(PREVIEW_MSG);}
+},true);
 // Builder list item 238: Documents shows once the client has something there (an invoice, a
 // proposal, an estimate or an agreement, a file or a monthly report) and stays from then on:
 // this device remembers it, so a client who has had a paper never waits for the answer. A read
@@ -3861,8 +3907,8 @@ async function load(){
 // for them (with nothing there it opens Home); anywhere else files count as something.
 const PAPERS_PREFIX='dds-portal-papers:';
 function papersKey(){return(USER&&USER.id)?PAPERS_PREFIX+USER.id:'';}
-function papersRemembered(){try{const k=papersKey();return !!k&&localStorage.getItem(k)==='1';}catch(_){return false;}}
-function rememberPapers(){try{const k=papersKey();if(k)localStorage.setItem(k,'1');}catch(_){}}
+function papersRemembered(){if(PREVIEW)return false;try{const k=papersKey();return !!k&&localStorage.getItem(k)==='1';}catch(_){return false;}}
+function rememberPapers(){if(PREVIEW)return;try{const k=papersKey();if(k)localStorage.setItem(k,'1');}catch(_){}}
 // the reads that answer it, started with Home's others (a refused part answers 403: nothing there)
 function papersStart(){
   if(papersRemembered())return;
@@ -3914,7 +3960,7 @@ async function decidePapers(toHome,landing){
 // Always-available client sign-out (the shell's profile menu is owner-shaped;
 // a client needs an obvious, in-view way out). Lands back on the client door.
 // Shared so both the footer link and the "You & notifications" card use it.
-async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();clearHomeCaches();try{await sb.auth.signOut();}catch(_){}location.href='/portal.html';}
+async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();if(PREVIEW){PREVIEW_REFUSED=Date.now();toast(PREVIEW_MSG);return;}clearHomeCaches();try{await sb.auth.signOut();}catch(_){}location.href='/portal.html';}
 (function(){var s=$('signout');if(s)s.addEventListener('click',doSignOut);})();
 (async function(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";USER=(data&&data.session&&data.session.user)||null;
@@ -3931,7 +3977,7 @@ async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();clearHomeC
       keepReturn(new URLSearchParams(location.search));   // G2: the project or request an email button was opening
       signedOut();return;
     }
-    if(landsOnHome())paintHomeCache();   // item 228
+    if(landsOnHome()&&!PREVIEW)paintHomeCache();   // item 228 (never in a preview: it's this device's own client)
     await load();
   }catch(_){trouble();}
 })();

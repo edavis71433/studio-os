@@ -117,8 +117,8 @@ const SITE_CSS = ':root{--paper:#f7f7f5;--ink:#1c2430;--accent:#23635a;--accent-
   + '.block{padding:40px 22px}.btn{display:inline-block;background:var(--accent);color:#fff;padding:13px 24px;border-radius:10px;text-decoration:none;font-weight:700;font-size:1rem}'
   + '.btn:hover{background:var(--accent-dark)}.btn.ghost{background:transparent;color:var(--accent-dark);border:2px solid var(--accent)}.btn-outline{background:transparent;color:var(--accent-dark);border:2px solid var(--accent)}'
   + 'form.card input,form.card textarea{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font:inherit;margin-top:5px;background:var(--paper)}'
-  + '.block.block--bg-accent{background:var(--accent-dark,var(--accent));color:#fff}.block.block--bg-dark{background:#1a1622;color:#f2eef8}'
-  + '.block.block--bg-accent .btn{background:#fff;color:var(--accent-dark,var(--accent));border-color:#fff}.block.block--bg-dark .btn{background:var(--accent);color:#fff;border-color:var(--accent)}';
+  + '.block.block--bg-accent{background:var(--accent-band,var(--accent-dark,var(--accent)));color:#fff;--soft:currentColor}.block.block--bg-dark{background:#1a1622;color:#f2eef8;--soft:currentColor}'
+  + '.block.block--bg-accent .btn{background:#fff;color:var(--accent-band,var(--accent-dark,var(--accent)));border-color:#fff}.block.block--bg-dark .btn{background:var(--accent-band,var(--accent-dark,var(--accent)));color:#fff;border-color:var(--accent-band,var(--accent-dark,var(--accent)))}';
 const BODY = '<main><section class="block" id="light"><a class="btn" id="m1" href="#">Book a table</a> <a class="btn ghost" id="s1" href="#">See the menu</a> <a class="btn btn-outline" id="o1" href="#">Call us</a></section>'
   + '<section class="block block--bg-dark" id="dark"><a class="btn" id="m2" href="#">Book a table</a> <a class="btn ghost" id="s2" href="#">See the menu</a></section>'
   + '<section class="block block--bg-accent" id="acc"><a class="btn" id="m3" href="#">Book a table</a> <a class="btn ghost" id="s3" href="#">See the menu</a></section>'

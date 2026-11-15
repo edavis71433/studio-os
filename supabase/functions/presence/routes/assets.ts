@@ -17,11 +17,15 @@
 //   POST  /assets/:id/replace     — { with } swap a file for a new version, repoint every use
 //   POST  /assets/:id/rollback    — undo the last replace (restore the prior version)
 //   POST  /assets/:id/duplicate   — copy a file
-//   DELETE /assets/:id            — safe delete (refused while in use)
+//   DELETE /assets/:id            — move to the Trash (refused while in use; item 218)
+//   GET   /assets/trash           — the Trash: each file, when it goes for good, whether the live site still shows it
+//   POST  /assets/:id/put-back    — take a file out of the Trash
+//   DELETE /assets/:id/forever    — delete a file in the Trash for good (not while the live site shows it)
 import { json } from '../../_shared/http.ts';
-import { svc } from '../lib/db.ts';
+import { svc, svcCount } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { deleteMedia, signThumb, signDownload, signOriginalImage, copyObject, isImageMime, signSocialCrop, signCutoutSource, mediaUsage } from '../lib/media.ts';
+import { trashMedia, signThumb, signDownload, signOriginalImage, copyObject, isImageMime, signSocialCrop, signCutoutSource, mediaUsage } from '../lib/media.ts';
+import { trashRow, trashedBy, putBack, putBackRefusal, deleteFromTrash, FILE_TRASH_DAYS } from '../lib/media_trash.ts';
 import { cutoutConfigured, startCutout, checkCutout, jobFor, idFromJob, isPng, cutoutFailWords, CUTOUT_MODEL, CUTOUT_MAX_SIDE, CUTOUT_MAX_BYTES, type CutoutState } from '../lib/cutout.ts';
 import { rateAllow, tooMany } from '../lib/ratelimit.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -101,7 +105,7 @@ async function loadAsset(siteId: string, id: string, includeDeleted = false): Pr
 // that was protected before.
 const SETTINGS_MEDIA_COLS = 'logo_media_id,og_media_id,cover_media_id,blocks,pages,page_seo,brand_kit,industry_key';
 interface Refs { map: Map<string, UsageRef[]>; complete: boolean; library: LibraryItem[]; offeringLabel: string; settings: Record<string, unknown> | null }
-async function referencedRefs(site: SiteRow): Promise<Refs> {
+async function referencedRefs(site: Pick<SiteRow, 'id'>): Promise<Refs> {
   const [settingsR, offs, posts, dels, libR] = await Promise.all([
     // item 158 (0184): with the site icon; a database without it reads the rest
     svc(`presence_settings?site_id=eq.${site.id}&select=${SETTINGS_MEDIA_COLS},icon_media_id&limit=1`).then((r) => (r.ok ? r : svc(`presence_settings?site_id=eq.${site.id}&select=${SETTINGS_MEDIA_COLS}&limit=1`))),
@@ -128,7 +132,7 @@ function siteRefs(map: Map<string, UsageRef[]>): Set<string> {
 
 /** The media ids actually on the CURRENT live site — the live snapshot's manifest.
  *  Lets "where used" distinguish live vs pending-next-publish. */
-async function liveMediaIds(site: SiteRow): Promise<Set<string>> {
+export async function liveMediaIds(site: Pick<SiteRow, 'id'>): Promise<Set<string>> {
   try {
     const pub = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=snapshot_id&order=created_at.desc&limit=1`);
     const snapId = arr(pub)[0]?.snapshot_id;
@@ -284,7 +288,8 @@ function present(a: Asset, opts: { in_use?: boolean; thumb?: string | null; clie
 // ── the library ──────────────────────────────────────────────────────────────
 export async function handleAssetsList(req: Request, site: SiteRow, cors: Record<string, string>) {
   const url = new URL(req.url);
-  const [assets, refInfo, live, byClient] = await Promise.all([loadAssets(site.id), referencedRefs(site), liveMediaIds(site), clientByMedia(site)]);
+  const [assets, refInfo, live, byClient, trash] = await Promise.all([loadAssets(site.id), referencedRefs(site), liveMediaIds(site), clientByMedia(site),
+    svcCount(`presence_media?site_id=eq.${site.id}&trashed_at=not.is.null`)]);   // item 218: the Trash chip's count; null before 0225
   const refs = siteRefs(refInfo.map);
   const rows = searchAssets(assets, {
     collection: url.searchParams.get('collection') || undefined,
@@ -304,6 +309,7 @@ export async function handleAssetsList(req: Request, site: SiteRow, cors: Record
     live_count: [...live].length,
     policy: await policyFor(site),
     storage: await storageFor(site, assets),
+    trash,
   } }, 200, cors);
 }
 
@@ -573,6 +579,7 @@ export async function handleAssetDetail(site: SiteRow, id: string, cors: Record<
   return json({ data: {
     asset: present(asset, { in_use: usage.some((u) => u.site !== false), thumb }),
     usage, summary: usageSummary(usage), usage_complete: refInfo.complete, repeats,
+    on_live: live.has(id),   // item 218: Delete says the live site keeps it until the next publish
     versions: { prior, superseded_by: supersededBy, has_history: !!prior },
     thumb_fallback: thumbFallback,
     download_url: download,
@@ -973,6 +980,8 @@ export async function handleAssetDuplicate(site: SiteRow, principal: Principal, 
 }
 
 // ── safe delete — never remove a live file ────────────────────────────────────
+// Item 218: Delete moves the file to the Trash (lib/media_trash.ts says what a published
+// page then does). Still refused while anything uses it.
 export async function handleAssetDelete(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
   const refInfo = await referencedRefs(site);
   // a read that failed may be hiding the one place this file is used — say so, keep the file
@@ -980,8 +989,66 @@ export async function handleAssetDelete(site: SiteRow, principal: Principal, id:
   const uses = refInfo.map.get(id) || [];
   const check = canDelete({ id } as Asset, uses.length > 0);
   if (!check.ok) return json({ error: 'in_use', message: `This file is in use: ${uses.slice(0, 2).map((u) => u.label).join(' and ')}${uses.length > 2 ? ` and ${uses.length - 2} more` : ''}. Remove it there first, or archive it instead.` }, 409, cors);
-  void principal; // media RLS + site scope enforce ownership; kept for a consistent signature
-  const r = await deleteMedia(site.id, id);
-  if ('error' in r && r.error === 'in_use') return json(r, 409, cors);   // its own check found a use: say which, not "try again"
-  return r.ok ? json({ data: { ok: true } }, 200, cors) : json({ error: 'delete_failed', message: 'That didn’t delete — try again.' }, 502, cors);
+  const [r, live] = await Promise.all([trashMedia(site.id, id, trashedBy(principal)), liveMediaIds(site)]);
+  if ('error' in r) return json(r, r.error === 'in_use' ? 409 : r.error === 'not_found' ? 404 : r.error === 'trash_unavailable' ? 503 : 502, cors);   // its own check found a use: say which, not "try again"
+  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: id, action: 'delete', summary: 'Moved a file to the Trash', principal, provenance: 'human' });
+  return json({ data: { ok: true, trashed: true, goes_at: r.goes_at, days: FILE_TRASH_DAYS, on_live: live.has(id) } }, 200, cors);
+}
+
+// ── the Trash (item 218) ──────────────────────────────────────────────────────
+const TRASH_COLS = 'id,storage_path,alt_text,mime,bytes,width,height,collection,metadata,created_at,trashed_at';
+/** GET /assets/trash — every file in the Trash, newest first, with when it goes for good
+ *  and whether the live site still shows it (then it waits past its days). */
+export async function handleAssetsTrash(site: SiteRow, cors: Record<string, string>) {
+  const [r, live] = await Promise.all([
+    svc(`presence_media?site_id=eq.${site.id}&trashed_at=not.is.null&select=${TRASH_COLS}&order=trashed_at.desc&limit=500`),
+    liveMediaIds(site),
+  ]);
+  if (!r.ok) {
+    if (missingColumnSignal(r.json, r.text, 'trashed_at')) return json({ data: { files: [], days: FILE_TRASH_DAYS, available: false } }, 200, cors);   // before 0225: an empty Trash, said as not on yet
+    return json({ error: 'read_failed', message: 'The Trash didn’t load just now. Try again in a moment.' }, 502, cors);
+  }
+  const now = new Date().toISOString();
+  const rows = arr(r) as Array<Asset & { trashed_at: string }>;
+  const thumbs = await Promise.all(rows.slice(0, LIST_THUMB_CAP).map((a) => signThumb(a.storage_path, a.mime || '')));
+  const files = rows.map((a, i) => ({ ...trashRow(a, now, live.has(a.id)), name: fileName(a), thumb: i < LIST_THUMB_CAP ? thumbs[i] : null }));
+  return json({ data: { files, days: FILE_TRASH_DAYS, available: true } }, 200, { ...cors, 'Cache-Control': 'no-store' });
+}
+
+/** POST /assets/:id/put-back — out of the Trash and back in Files, in the folder it was in.
+ *  Refused when the site is full, as an upload would be. */
+export async function handleAssetPutBack(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
+  const row = arr(await svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}&trashed_at=not.is.null&select=id,bytes,storage_path,alt_text,mime,metadata&limit=1`))[0] as Asset | undefined;
+  if (!row) return json({ error: 'not_in_trash', message: 'That file isn’t in the Trash any more.' }, 404, cors);
+  const q = mediaQuota();
+  const cap = getTemplate(site.template_slug, site.template_version)?.manifest.entities.media?.max ?? 100;
+  const full = putBackRefusal(await mediaUsage(site.id), Number(row.bytes) || 0, { maxFiles: Math.min(cap, q.maxFiles), maxBytes: q.maxBytes });
+  if (full) return json({ error: 'full', message: full === 'files' ? `Files holds ${Math.min(cap, q.maxFiles)} files and it’s full. Move one you don’t need to the Trash, then put this back.` : 'Files is out of space. Move a file you don’t need to the Trash, then put this back.' }, 409, cors);
+  const back = await putBack(site.id, [id]);
+  if (!back.length) return json({ error: 'put_back_failed', message: 'That didn’t come back. Try again.' }, 502, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: id, action: 'restore', summary: 'Put a file back from the Trash', principal, provenance: 'human' });
+  const asset = await loadAsset(site.id, id);
+  return json({ data: { ok: true, asset: asset ? present(asset) : { id, name: fileName(row) } } }, 200, cors);
+}
+
+/** DELETE /assets/:id/forever — gone for good, stored file and all. Not while the live site
+ *  still shows it: publishing first takes it off, and Back online keeps working until then. */
+export async function handleAssetDeleteForGood(site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
+  const [rowQ, live] = await Promise.all([
+    svc(`presence_media?id=eq.${id}&site_id=eq.${site.id}&trashed_at=not.is.null&select=id,storage_path,alt_text,mime,metadata&limit=1`),
+    liveMediaIds(site),
+  ]);
+  const row = arr(rowQ)[0] as Asset | undefined;
+  if (!row) return json({ error: 'not_in_trash', message: 'That file isn’t in the Trash any more.' }, 404, cors);
+  if (live.has(id)) return json({ error: 'still_live', message: `“${fileName(row)}” is still on your live site. Publish your site first: your draft doesn’t use it, so the next publish takes it off. Then it can be deleted for good.` }, 409, cors);
+  if (!(await deleteFromTrash(site.id, row))) return json({ error: 'delete_failed', message: 'That didn’t delete just now. It’s still in the Trash; try again.' }, 502, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: id, action: 'delete', summary: 'Deleted a file for good', principal, provenance: 'human' });
+  return json({ data: { ok: true } }, 200, cors);
+}
+
+/** For the daily sweep (ops/file_trash.ts): the ids the site's draft uses anywhere, and
+ *  whether every read that could name one answered. */
+export async function draftUses(site: Pick<SiteRow, 'id'>): Promise<{ ids: Set<string>; complete: boolean }> {
+  const refs = await referencedRefs(site);
+  return { ids: new Set([...refs.map.keys()]), complete: refs.complete };
 }

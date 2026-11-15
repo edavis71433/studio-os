@@ -193,7 +193,7 @@ const stamped = (over = {}) => ({ id: MEDIA, alt_text: 'Photo', mime: 'image/png
   const c = read('client.html');
   ok('G3: the portal’s server helper turns no answer into an ordinary failure', /catch\(_\)\{return\{ok:false,status:0,offline:true,body:\{message:OFFLINE_MSG\}\};\}/.test(c));
   ok('G2: a signed-out visit keeps the destination, and the first load after sign-in opens it',
-    /keepReturn\(new URLSearchParams\(location\.search\)\);/.test(c) && /const kept=first\?takeReturn\(\):null;/.test(c));
+    /keepReturn\(new URLSearchParams\(location\.search\)\);/.test(c) && /const kept=first&&!PREVIEW\?takeReturn\(\):null;/.test(c));
   ok('G12: a remembered reviewer skips the refused projects read, and is re-checked against the answer',
     /skipProj\?Promise\.resolve\(null\):api\('\/client\/projects'\)/.test(c) && /skipProj&&\(c\.is_managed_client\|\|c\.site_role!=='client_reviewer'\)/.test(c));
   ok('walk: owner asks are kept off a client’s Recent updates', /const moments=\(feed\.moments\|\|\[\]\)\.filter\(portalMoment\);/.test(c));
