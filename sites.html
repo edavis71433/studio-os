@@ -261,7 +261,7 @@
   .sx{margin-left:auto;flex:0 0 auto;width:44px;height:44px;border:1px solid var(--line);border-radius:12px;background:transparent;color:var(--soft);font:inherit;font-size:22px;line-height:1;cursor:pointer}
   .sx:hover{color:var(--p);border-color:var(--p)}
   .sfields{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
-  .sbody{flex:1 1 auto;min-height:0;overflow:auto;display:grid;grid-template-columns:352px minmax(0,1fr);gap:36px;padding:24px 32px 28px;align-items:start}
+  .nbody{flex:1 1 auto;min-height:0;overflow:auto;display:grid;grid-template-columns:352px minmax(0,1fr);gap:36px;padding:24px 32px 28px;align-items:start}
   .sleft,.sright{display:flex;flex-direction:column;gap:16px;min-width:0}
   .sform label.fl,.sform .fl{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:0 0 6px}
   .sform input[type="text"],.sform select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:11px 14px;outline:none}
@@ -314,13 +314,13 @@
     dialog.sheet{width:100%;max-width:none;height:100vh;height:100dvh;max-height:none;margin:0;border-radius:0}
     .stop{padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top))}
     .stop h3{font-size:26px}
-    .sbody{grid-template-columns:minmax(0,1fr);gap:20px;padding:12px 16px 20px}
+    .nbody{grid-template-columns:minmax(0,1fr);gap:20px;padding:12px 16px 20px}
     .designs{grid-template-columns:minmax(0,1fr)}
     .sfootbar{padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
     .sfootbar #new-submit{flex:1 1 100%}
     #new-cancel{display:none}
   }
-  @media (min-width:761px) and (max-width:1100px){.designs{grid-template-columns:repeat(2,minmax(0,1fr))}.sbody{grid-template-columns:300px minmax(0,1fr);gap:28px}}
+  @media (min-width:761px) and (max-width:1100px){.designs{grid-template-columns:repeat(2,minmax(0,1fr))}.nbody{grid-template-columns:300px minmax(0,1fr);gap:28px}}
   /* item 198: "8 of 25 sites" in the header's line; a full plan says so in the warning colour */
   .room{font-weight:600;color:var(--ink)} .room.full{color:var(--warn)}
   .trash{margin-top:var(--dds-s7,32px)}
@@ -481,7 +481,7 @@
       <button type="button" class="sx" id="new-x" aria-label="Close">×</button>
     </div>
     <div id="new-fields" class="sfields">
-      <div class="sbody">
+      <div class="nbody">
         <div class="sleft">
           <div><label class="fl" for="new-biz">Business name</label>
           <input type="text" id="new-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off"></div>
