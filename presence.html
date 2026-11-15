@@ -2939,6 +2939,9 @@ const ENVS = {
 };
 const ENV = new URLSearchParams(location.search).get("env") === "staging" ? ENVS.staging : ENVS.prod;
 const FN = ENV.url + "/functions/v1/presence";
+// run production's server beside its database (Oregon), not nearest the visitor: see shell.js.
+// Staging's server doesn't allow the header, so it goes to production only.
+const REGION_HEADER = ENV === ENVS.prod ? { "x-region": "us-west-2" } : {};
 const sb = supabase.createClient(ENV.url, ENV.anon, { auth: { storageKey: "dds-portal-auth", persistSession: true, autoRefreshToken: true } });
 if (ENV === ENVS.prod) window.__ddsSb = sb;   // shell.js reuses it, so this page runs one auth client
 
@@ -3312,7 +3315,7 @@ async function apiSend(method, route, body, undoRec, named) {
   const r = await fetch(FN + route, {
     method,
     headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''),
-      ...(mut && version ? { "If-Match": version } : {}) },
+      ...REGION_HEADER, ...(mut && version ? { "If-Match": version } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   }).finally(() => { if (mut) WRITES_ANSWERED++; });
   const text = await r.text();
@@ -3386,7 +3389,7 @@ function settingsPut(build, landed) {
 async function apiHtml(route) {
   const { data } = await sb.auth.getSession();
   const jwt = data?.session?.access_token;
-  const r = await fetch(FN + route, { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||'') } });
+  const r = await fetch(FN + route, { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''), ...REGION_HEADER } });
   const text = await r.text();
   if (!r.ok) { let j = null; try { j = JSON.parse(text); } catch {} const e = new Error((j && j.message) || "We couldn’t load that page just now."); e.status = r.status; throw e; }
   // A 200 that is not a page (a JSON envelope, an empty body) must never land
@@ -6232,7 +6235,7 @@ const CUTOUT_POLL_MS = 2500, CUTOUT_POLLS = 72;   // three minutes at most
 async function pickerCutout(id) {
   const call = async (path, method) => {
     const { data } = await sb.auth.getSession();
-    return fetch(FN + path, { method, headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||'') } });
+    return fetch(FN + path, { method, headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''), ...REGION_HEADER } });
   };
   const fail = "The cut-out didn’t come through, so nothing changed. Try again in a moment.";
   let r; try { r = await call("/assets/" + id + "/cutout", "POST"); } catch (_) { return { error: "The cut-out couldn’t start. Check your connection and try again." }; }
@@ -7364,7 +7367,7 @@ async function hmPdf(btn) {
   btn.disabled = true;
   try {
     const { data } = await sb.auth.getSession();
-    const r = await fetch(FN + "/website-health/pdf", { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get("client") || "") } });
+    const r = await fetch(FN + "/website-health/pdf", { headers: { "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": data?.session?.access_token || "", "x-dds-scope-site": (new URLSearchParams(location.search).get("client") || ""), ...REGION_HEADER } });
     if (!r.ok) throw new Error("bad");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(await r.blob());
@@ -15601,22 +15604,23 @@ const INS_THEMES = [
 // The site's colours as the canvas draws them (every template names them alike), or quiet
 // stand-ins before the canvas has drawn.
 function dcSiteColours() {
-  const out = { paper: "#f7f7f5", card: "#ffffff", ink: "#1c2430", soft: "#5b6572", accent: "#23635a", accentDark: "", wash: "#eef1ee" };
+  const out = { paper: "#f7f7f5", card: "#ffffff", ink: "#1c2430", soft: "#5b6572", accent: "#23635a", accentDark: "", band: "", wash: "#eef1ee" };
   try {
     const d = $("designPreview") && $("designPreview").contentDocument;
     const cs = d && d.documentElement && d.defaultView.getComputedStyle(d.documentElement);
-    if (cs) [["paper", "--paper"], ["card", "--card"], ["ink", "--ink"], ["soft", "--soft"], ["accent", "--accent"], ["accentDark", "--accent-dark"], ["wash", "--wash"]].forEach(([k, v]) => {
+    if (cs) [["paper", "--paper"], ["card", "--card"], ["ink", "--ink"], ["soft", "--soft"], ["accent", "--accent"], ["accentDark", "--accent-dark"], ["band", "--accent-band"], ["wash", "--wash"]].forEach(([k, v]) => {
       const x = cs.getPropertyValue(v).trim(); if (x && !/^var\(/.test(x)) out[k] = x;
     });
   } catch (_) {}
   if (!out.accentDark) out.accentDark = out.accent;
+  if (!out.band) out.band = out.accentDark;   // behind an accent section; Slate names a deeper one (.block--bg-accent)
   return out;
 }
 // what a theme looks like: its background, words and button
 function insThemeLook(v, c) {
   if (v === "tinted") return { bg: "color-mix(in srgb," + c.accent + " 8%," + c.paper + ")", ink: c.ink, btn: c.accent };
   if (v === "plain") return { bg: c.paper, ink: c.ink, btn: c.accent };
-  if (v === "accent") return { bg: c.accentDark, ink: "#ffffff", btn: "#ffffff" };
+  if (v === "accent") return { bg: c.band, ink: "#ffffff", btn: "#ffffff" };
   if (v === "dark") return { bg: "#1a1622", ink: "#f2eef8", btn: c.accent };
   return { bg: "linear-gradient(180deg," + c.card + " 0 55%," + c.wash + " 55%)", ink: c.ink, btn: c.accent };
 }

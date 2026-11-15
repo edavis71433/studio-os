@@ -29,7 +29,7 @@ const API = {
   '/portal/context': { data: { site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES, is_agency: false, is_operator: false, sees_full_workspace: true, capabilities: ['edit', 'publish', 'invite', 'configure', 'use_developer_mode', 'view_all'], landing: '/presence.html', attention_count: 0, nav: STUDIO_NAV, plan_key: 'presence', upsell: null } },
 };
 type Write = { method: string; path: string; body: any };
-async function mount(page: Page, blocks: unknown[] = BLOCKS, api: Record<string, unknown> = {}) {
+async function mount(page: Page, blocks: unknown[] = BLOCKS, api: Record<string, unknown> = {}, html = HTML) {
   let settings: Record<string, unknown> = { blocks, section_meta: META };
   await installApp(page, { api: { ...API, ...api, '/settings': { data: settings } } });
   const writes: Write[] = [];
@@ -42,7 +42,7 @@ async function mount(page: Page, blocks: unknown[] = BLOCKS, api: Record<string,
     if (path === '/settings') { settings = { ...settings, ...body }; return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: settings }) }); }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: body || {} }) });
   });
-  await page.route('**/functions/v1/presence/preview**', (route: Route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }));
+  await page.route('**/functions/v1/presence/preview**', (route: Route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html }));
   await page.addInitScript(() => { try { localStorage.setItem('dds-hints', JSON.stringify({ 'edit-tap': 1, 'edit-doubleclick': 1 })); } catch { /* storage may be denied */ } });
   await page.goto('/presence.html#design');
   await expect(page.locator('html')).toHaveClass(/dc-edit/);
@@ -75,6 +75,12 @@ test.describe('a section’s colours and layouts (builder items 49 and 118)', ()
     await expect.poll(() => blocksWrite(writes)?.[1]?.look?.background, { timeout: 8000 }).toBe('tinted');
     await theme(page, 'Default').click();
     await expect.poll(() => blocksWrite(writes)?.[1]?.look, { timeout: 8000 }).toBeUndefined();
+  });
+
+  test('a template that names a deeper accent band (Slate) has its Accent tile drawn in that band', async ({ page }) => {
+    await mount(page, BLOCKS, {}, HTML.replace('--accent-dark:#6e4630;', '--accent-dark:#6e4630;--accent-band:#115e59;'));
+    await openSection(page, 1, 'style');
+    expect(await bg(theme(page, 'Accent').locator('.ins-theme-pic'))).toBe('rgb(17, 94, 89)');   // --accent-band, as the section draws
   });
 
   test('a section with a background colour of its own shows no theme picked and says how to use one', async ({ page }) => {
