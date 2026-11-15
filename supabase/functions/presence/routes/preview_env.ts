@@ -18,6 +18,8 @@ import { rateAllow, clientIp } from '../lib/ratelimit.ts';
 import { previewCache, previewCacheKey } from '../lib/preview_cache.ts';
 import { signPreviewToken, verifyPreviewToken, previewLinkSecret, clampTtlSeconds } from '../lib/preview_link.ts';
 import { injectFeedbackPanel } from '../lib/section_comments.ts';
+import { readReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { comingSoonSince } from '../lib/coming_soon.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { siteOrigin } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -44,17 +46,20 @@ async function lastLive(siteId: string) {
 
 // ── GET /preview/status — the three states for the management surface ────────
 export async function handlePreviewStatus(site: SiteRow, cors: Record<string, string>) {
-  const [p, draftChanges, live, off, pw] = await Promise.all([
+  const [p, draftChanges, live, off, pw, cs] = await Promise.all([
     previewRow(site.id), draftChangeCount(site.id), lastLive(site.id),
     // G10: the offline marker — read separately + best-effort so a database
     // without 0111 applied still serves the status untouched (offline = null).
     svc(`presence_sites?id=eq.${site.id}&select=offline_at&limit=1`).catch(() => ({ ok: false, json: null } as any)),
     // List item 175: the visitor password, the same way (0159).
     svc(`presence_sites?id=eq.${site.id}&select=visitor_password_at&limit=1`).catch(() => ({ ok: false, json: null } as any)),
+    // Builder list item 158: a Coming soon page, up until the first publish replaces it.
+    readReservedJson(site.id, RESERVED_NAMES.comingSoon).catch(() => null),
   ]);
   const offlineAt = (off.ok && off.json?.[0]?.offline_at) || null;
   const passwordAt = (pw.ok && pw.json?.[0]?.visitor_password_at) || null;
-  return json({ data: shapePreviewStatus({ draftChanges, preview: p, live, baseUrl: appUrl(), offlineAt, passwordAt }) }, 200, cors);
+  const comingSoonAt = comingSoonSince(cs, !!live);
+  return json({ data: shapePreviewStatus({ draftChanges, preview: p, live, baseUrl: appUrl(), offlineAt, passwordAt, comingSoonAt }) }, 200, cors);
 }
 
 /** Capture the CURRENT draft into the Preview slot (snapshot + upsert). The ONE
