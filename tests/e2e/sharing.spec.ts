@@ -116,7 +116,7 @@ test.describe('Sharing & access', () => {
     const roles = card.getByRole('radio');
     await expect(roles).toHaveCount(5);   // Co-owner, Staff, Designer (builder item 220), Developer (back since Nov 15 2026: DEVELOPER_PAUSED is off), Reviewer
     await expect(card.locator('.pp-role').filter({ hasText: 'Developer' })).toContainText('Sees what Staff sees plus settings and the code tools, but can’t delete anything.');
-    await expect(card.getByRole('radio', { name: /Staff/ })).toBeChecked();
+    await expect(card.getByRole('radio', { name: /^Staff/ })).toBeChecked();   // anchored: Developer's sentence says "what Staff sees"
     await expect(card.locator('[data-role-card="business_owner"]')).toContainText('Sees everything you see, customers, messages and money included, and can do anything except hand the site over.');
     await expect(card.locator('[data-role-card="client_reviewer"] .pp-can')).toContainText('✓ What you share');
     const tile = (key: string) => card.locator('[data-role-card="' + key + '"]');
