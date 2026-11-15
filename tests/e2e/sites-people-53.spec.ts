@@ -1,6 +1,10 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
 
+// The fixtures' dates are fixed in 2026, so the clock is too: from January a page adds the
+// year to them, and the checks below say "Nov 9" (builder item 108).
+test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z')); });
+
 // ── Who owns each site, on the Sites page (builder list item 53) ──────────────
 // Wix's model: the client owns the site and the studio works on it with a role,
 // said plainly on every card ("Sam Reyes owns it · You: Website manager"), with a

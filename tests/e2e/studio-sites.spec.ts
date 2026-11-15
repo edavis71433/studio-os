@@ -571,6 +571,7 @@ test.describe('Sites: the trash (item 154)', () => {
   });
 
   test('the Trash at the foot of the page: newest first, the day each goes, and Restore', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
     const t = await openSites(page, [BISTRO], { body: { trash: TRASHED } });
     const trash = page.locator('section.trash');
     await expect(trash.locator('h2')).toHaveText('Trash');

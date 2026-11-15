@@ -1,6 +1,10 @@
 import { test, expect, Route } from '@playwright/test';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
 
+// The fixtures' dates are fixed in 2026, so the clock is too: from January a page adds the
+// year to them, and the checks below say "Nov 9" (builder item 108).
+test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z')); });
+
 // Builder list item 166 (Nov 10 review, file 05 finding 13): starter kits could be saved
 // but never seen, renamed or removed. The Templates tab on Sites lists every template
 // and starter kit. The fixtures are GET /agency/kits's real shape (agency/routes.ts):

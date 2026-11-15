@@ -1514,6 +1514,7 @@ const SHARE_FILE = { name: 'Team photos.png', mimeType: 'image/png', buffer: Buf
 
 test.describe('Client portal — Documents shelf: files and documents (slice 12, item 179 part four)', () => {
   test('proposals and agreements sit on the shelf newest first, each with its state and the one thing to do', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
     await installApp(page, { api: { ...FILES_API, '/client/billing': { data: { invoices: [] } } } });
     await page.goto('/client.html');
     await openFilesTab(page);
@@ -1550,6 +1551,7 @@ test.describe('Client portal — Documents shelf: files and documents (slice 12,
   });
 
   test('project files are shelf rows: type icon, honest meta, You-shared chip on client uploads, Save round-trip', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
     await installApp(page, { api: FILES_API });
     await page.addInitScript(() => { (window as any).open = (u: string) => { (window as any).__opened = u; return null; }; });
     await page.route('**/functions/v1/presence/client/deliverables/d1/download', (route) =>
@@ -2344,7 +2346,7 @@ test.describe('PS2 — Invoices on the Documents shelf (B1, item 179 part four)'
     // paid: green chip, formatted amount, the day it was paid (portal walk, Nov 8) — and NO pay link
     const paid = rows.filter({ hasText: 'Kickoff deposit' });
     await expect(paid.locator('.fst.sig')).toHaveText('Paid');
-    await expect(paid.locator('.fmeta')).toHaveText('Invoice · $1,200 · paid Jun 20');
+    await expect(paid.locator('.fmeta')).toHaveText(`Invoice · $1,200 · paid ${new Date().getFullYear() === 2026 ? 'Jun 20' : 'Jun 20, 2026'}`);   // the year only when it isn't this one (builder item 108)
     await expect(paid.locator('a')).toHaveCount(0);   // no receipt link in this payload, and never Pay
     // due-yesterday unpaid: the DERIVED Overdue chip (decision D2) + cents kept
     const over = rows.filter({ hasText: 'Design phase' });

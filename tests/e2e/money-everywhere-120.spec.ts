@@ -1,6 +1,11 @@
 import { test, expect, Page } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 
+// The fixtures' dates are fixed in 2026, and the relative ones count from the same moment, so the
+// clock is pinned there: from January a page adds the year, and the checks say "Nov 6" (builder item 108).
+const PINNED = Date.parse('2026-11-15T18:00:00Z');
+test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date(PINNED)); });
+
 // Sales item 120: the money shows everywhere. The client's portal names each invoice by
 // its number and draws a part payment under the invoice it paid toward, with its own
 // receipt, instead of as a second paid invoice; Analytics' revenue says it counts
@@ -14,7 +19,7 @@ const CTX = { data: {
   nav: [], studio: STUDIO, client_first_name: 'Maria',
 } };
 const ymd = (offsetDays: number) => {
-  const t = new Date(Date.now() + offsetDays * 86400000);
+  const t = new Date(PINNED + offsetDays * 86400000);
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 };
 const INVOICES = [

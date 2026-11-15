@@ -183,6 +183,7 @@ test.describe('Sites: the content form and the hand-over kit (item 176)', () => 
   });
 
   test('Hand-over kit: the facts fill in; who to call, a video and a file; switched on and saved', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
     const { writes } = await openSites(page);
     await openMenu(page, S2);
     await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Hand-over kit' }).click();
