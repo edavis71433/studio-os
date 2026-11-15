@@ -88,7 +88,7 @@ test('Settings: your second business shows the same cards as your first, each ke
   await expect(page.locator('#f-signer')).toBeVisible();   // they sign this business's agreements too
   const put = page.waitForRequest((r) => r.method() === 'PUT' && new URL(r.url()).pathname.endsWith('/presence/settings'));
   await page.locator('#f-signer').fill('Robin Park');
-  await page.locator('#profileSave').click();
+  await page.locator('#f-signer').press('Tab');   // builder item 165: a box saves when you leave it; there's no Save button
   const sent = await put;
   expect(sent.postDataJSON()).toEqual({ signs_as_name: 'Robin Park' });
   expect(sent.headers()['x-dds-scope-site']).toBe(B2);
