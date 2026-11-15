@@ -154,6 +154,21 @@ html.dds-has-shell.dds-has-ctxbar body{padding-top:calc(var(--dds-shell-h) + var
 .dds-sites-pop .row.site .sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:0}
 .dds-sites-pop .row.site.now{background:var(--dds-p-soft)} .dds-sites-pop .row.site.now .n{color:var(--dds-p)}
 .dds-sites-pop .row.all{margin-top:6px;border-top:1px solid var(--dds-line);border-radius:0;padding-top:10px;color:var(--dds-p);font-weight:600}
+/* builder item 201: "Which client?" (Figma 307:8560): the Switch site rows under a question, beside what
+   was pressed on a computer, a sheet from the bottom on a phone */
+#dds-which{position:fixed;width:380px;max-width:calc(100vw - 16px);padding:14px 12px 10px;z-index:2147483002;bottom:auto;right:auto}
+#dds-which.mid{left:50%;top:14vh;transform:translateX(-50%)}
+#dds-which h2{font-size:17px;font-weight:600;color:var(--dds-ink);margin:0 4px 4px;letter-spacing:0}
+#dds-which p{font-size:13.5px;line-height:1.45;color:var(--dds-soft);margin:0 4px 10px}
+#dds-which .wfoot{display:flex;justify-content:space-between;gap:8px;margin-top:6px;border-top:1px solid var(--dds-line)}
+#dds-which .wfoot .row.all{margin-top:0;border-top:0;padding-top:10px}
+#dds-which .row.own{font-size:12.5px;color:var(--dds-soft);padding-top:2px}
+#dds-which-dim{display:none}
+@media (max-width:760.98px){
+  #dds-which,#dds-which.mid{left:0;right:0;top:auto;bottom:0;width:auto;max-width:none;transform:none;border-radius:22px 22px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom,0px));max-height:85vh;max-height:85dvh}
+  #dds-which .row.site{min-height:56px}
+  #dds-which-dim{display:block;position:fixed;inset:0;background:rgba(23,21,34,.38);z-index:2147483001}
+}
 #dds-ctxbar a:focus-visible{outline:2px solid #fff;outline-offset:1px}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #dds-ctxbar{color:#171320} :root:not([data-theme="light"]) #dds-ctxbar .acts a{color:#171320} :root:not([data-theme="light"]) #dds-ctxbar .acts .switch{color:#171320;background:rgba(23,19,32,.12)} :root:not([data-theme="light"]) #dds-ctxbar .acts a.exit{border-color:rgba(23,19,32,.45)} :root:not([data-theme="light"]) #dds-ctxbar a:focus-visible{outline-color:#171320}}
 :root[data-theme="dark"] #dds-ctxbar{color:#171320} :root[data-theme="dark"] #dds-ctxbar .acts a{color:#171320} :root[data-theme="dark"] #dds-ctxbar .acts .switch{color:#171320;background:rgba(23,19,32,.12)} :root[data-theme="dark"] #dds-ctxbar .acts a.exit{border-color:rgba(23,19,32,.45)}
@@ -291,7 +306,7 @@ html.dds-embed .dds-waffle{display:none!important}
   .dds-brand .ctx{display:none}
 }
 /* Very narrow phones: the 44px icon floor makes waffle+brand+search+3 icons
-   overflow a 360px bar. Help moves to the profile menu (it's in UTILS there);
+   overflow a 360px bar. Help moves to the profile menu (its first row, builder item 201);
    the brand may truncate rather than push the controls off-screen. */
 /* item 128: What's new's dot is a dot, not a count */
 .dds-ic .dot.wn-dot{min-width:0;width:8px;height:8px;padding:0;top:8px;right:8px}

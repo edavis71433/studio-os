@@ -532,7 +532,7 @@
     var c = S.pick;
     var t = '';
     if (S.kind === 'call') t = c ? (c.kind === 'contact' ? 'Saved on ' + (c.name || 'them') + ', with no deal needed' : 'Saved on this deal') : 'Pick who you talked to';
-    else if (S.kind === 'invoice') t = c ? (c.kind === 'contact' ? 'Starts a deal for ' + (c.name || 'them') + '; the invoice is saved on it' : 'Saved on this deal, under Billing') : 'Pick who it’s for';
+    else if (S.kind === 'invoice') t = c ? (c.kind === 'contact' ? 'Starts a deal for ' + (c.name || 'them') + '; the invoice is saved on it' : 'Saved on this deal, under Invoices') : 'Pick who it’s for';
     else if (S.kind === 'todo') t = c ? 'Shows in your To-dos and on Home' : 'Pick who it’s for';
     else if (S.kind === 'proposal') t = c ? 'Opens the deal with a new proposal' : 'Pick an open deal';
     else if (S.kind === 'deal') t = 'Starts as a new lead';
