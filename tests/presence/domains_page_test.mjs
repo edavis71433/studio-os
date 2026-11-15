@@ -161,7 +161,7 @@ const SITE = { id: 'site1', client_id: 'c1', custom_domain: 'bistro.example', ne
   const sites = read('supabase/functions/presence/agency/sites.ts');
   ok('the Domains page reads the new facts', /domain_lock,domain_dns_host,domain_statuses,domain_registered_at`/.test(sites));
   ok('Home reads the registry’s words', /domain_serving,domain_statuses(&limit=1000|';)/.test(read('supabase/functions/presence/agency/routes.ts')));   // item 209: one list of the columns, for both reads
-  ok('one domain’s routes: the panel, the notes (manage_clients) and Check now (once a minute)', /\\\/agency\\\/domains\\\/\(\[0-9a-f-\]\{36\}\)\(\?:\\\/\(notes\|check\)\)\?\$/.test(sites) && /what === 'notes' && method === 'PUT'\) \{\s*if \(!can\(member\.role, 'manage_clients'\)\)/.test(sites) && /since < CHECK_NOW_GAP_MS/.test(sites));
+  ok('one domain’s routes: the panel, the notes (manage_clients) and Check now (once a minute)', /\\\/agency\\\/domains\\\/\(\[0-9a-f-\]\{36\}\)\(\?:\\\/\(notes\|check\|access\)\)\?\$/.test(sites) && /what === 'notes' && method === 'PUT'\) \{\s*if \(!can\(member\.role, 'manage_clients'\)\)/.test(sites) && /since < CHECK_NOW_GAP_MS/.test(sites));
   ok('Check now runs the same check as the daily watch', /\)\.checkOneDomain\(/.test(sites) && /const r = await checkOneDomain\(site, nowIso\)/.test(read('supabase/functions/presence/commerce/lifecycle.ts')));
   const page = read('domains.html');
   ok('the page has the filters, the side panel, Download and the Last checked column', ['attention:', 'expiring:', 'waiting:', 'nodomain:'].every((k) => page.includes(k)) && /<dialog class="dpanel" id="dpanel"/.test(page) && /id="dlBtn"/.test(page) && /\['checked','Last checked'/.test(page));

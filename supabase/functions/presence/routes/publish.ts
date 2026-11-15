@@ -14,6 +14,7 @@ import { readPageLocks, pageLocksFound } from './page_locks.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { fetchVariants } from '../lib/media.ts';
+import { putBackUsed, putBackWhatTheDraftUses } from '../lib/media_trash.ts';
 import { deployFileMap, netlifyConfigured, setSitePassword, getSite, digestFiles, sameFiles } from '../lib/netlify.ts';
 import type { DeployFile, NetlifySiteInfo } from '../lib/netlify.ts';
 import { withForwarding } from '../lib/domain_notify.ts';
@@ -218,6 +219,9 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   at('render');
   // Item 208: a photo the live site already has is named by the digest it went up with,
   // and made again only if the host asks for it
+  // Item 218: a version going back up that uses a file in the Trash takes it out of the Trash
+  // first (the stored file is still there, so its photos come out as before)
+  if (kind === 'restore') await putBackUsed(site.id, snapshotArg.mediaManifest.map((m) => String(m.media_id || '')), principal, 'a version going live uses it');
   const lastLive = await liveDeployFiles(site.id);
   const { files: images, failed, reused } = await fetchVariants(snapshotArg.mediaManifest, lastLive?.files ?? null);
   if (failed.length) return await fail('images', `variant generation failed for: ${failed.join('; ')}`);
@@ -408,6 +412,9 @@ export async function handlePublish(req: Request | null, site: SiteRow, principa
   if (!t) return json({ error: 'template_missing', message: CALM }, 500, cors);
 
   const now = new Date().toISOString();
+  // Item 218: a file in the Trash that the draft names (a restore or an undo brought it back)
+  // comes out of the Trash first, so the page doesn't go up without it
+  await putBackWhatTheDraftUses(site.id, principal);
   const { snapshot, mediaManifest, draftSettings } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now });
 
   // M9 optimistic lock: if the caller reviewed a specific draft (If-Match), make

@@ -2664,7 +2664,7 @@
   // operator. Those two anchors are the intended escape hatch UP to the full
   // list, so they must stay unscoped. (broadcasts stays: its handler is per-site,
   // so a drilled scope correctly shows that client's broadcasts.)
-  var APP_PAGES = /^\/(today|presence|crm|contacts|broadcasts|pipeline|leads|projects|inbox|files|visual-studio|analytics|schedule|connections|sharing|attention|approval-center|timeline|upcoming|business-insights|content-tree|snapshot-history|website-health)\.html/;
+  var APP_PAGES = /^\/(today|presence|crm|contacts|broadcasts|pipeline|leads|projects|inbox|files|visual-studio|analytics|schedule|connections|sharing|attention|approval-center|timeline|upcoming|business-insights|content-tree|snapshot-history|website-health|changes)\.html/;
   function carryScopeGlobally() {
     var s = scopeId(); if (!s) return;
     document.querySelectorAll('a[href^="/"]').forEach(function (a) {

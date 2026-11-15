@@ -148,6 +148,8 @@ export function buildNav(c: NavContext): NavSection[] {
     // Publish now or later — one place (Oct 2026 audit change 3: schedule.html retired;
     // the desc keeps "schedule" findable from ⌘K, which matches on desc).
     if (canPublish(c)) items.push(hid('publish', 'Publish', '/presence.html#publish', 'Publish now, or schedule it to go live on its own — and see or cancel what’s scheduled.'));
+    // builder list item 215: who changed what on this site, and when (a reviewer is never shown it)
+    if (has(c, 'edit')) items.push(hid('changes', 'Changes', '/changes.html', 'Who changed what on this website, and when, in sentences: saves, publishes, invites and checkpoints.'));
     if (canPublish(c)) items.push(hid('history', 'Versions', '/presence.html#history'));
     // builder item 202: ⌘K "health" opens the health check where it lives now, the website's Search tab
     // (item 184 moved it there from the Overview, whose description still sent "health" to it)
@@ -208,6 +210,8 @@ export function buildNav(c: NavContext): NavSection[] {
       hid('kits', 'Templates and starter kits', '/templates.html', 'Every template and starter kit you saved: what each brings and where it came from. Rename or remove them.'),
       // builder list item 210: the Usage tab on Sites, one search away
       hid('usage', 'Usage', '/usage.html', 'What each client uses this month: publishes and what they cost at Netlify, storage and visits.'),
+      // builder list item 215: the Changes tab on Sites, one search away
+      hid('changes', 'Changes', '/changes.html', 'Who changed what on every client’s site, and when: the week by who made the changes, then each change in a sentence.'),
       // item 135: ⌘K "new site" opens the New site box (sites.html opens it on #new)
       hid('new_site', 'New site', '/sites.html#new', 'Make a site from a business name and, if you like, a template or starter kit. Nobody is emailed until you invite the owner.'),
     ] });

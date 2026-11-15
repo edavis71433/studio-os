@@ -27,6 +27,7 @@ import { handleSavedPages } from './saved_pages.ts';   // builder list item 216
 import { handleClientTools } from './client_tools.ts';
 import { handleSiteNumbers } from './site_numbers.ts';
 import { handleUsage } from './usage.ts';
+import { handleAgencyChangeLog } from '../routes/change_log.ts';
 import { handleDoNext } from './do_next.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
 import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
@@ -328,6 +329,12 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   // ── builder list item 210: what each client uses (publishes and their cost, storage, visits) ──
   {
     const r = await handleUsage(req, route, method, member, cors, now);
+    if (r) return r;
+  }
+
+  // ── builder list item 215: every client's changes, who made them and when ──
+  {
+    const r = await handleAgencyChangeLog(req, route, method, member, cors, now);
     if (r) return r;
   }
 

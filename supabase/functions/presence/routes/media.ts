@@ -1,7 +1,8 @@
 // POST /media/upload-url · DELETE /media/:id — the media surface (G1 §8).
 import { json } from '../../_shared/http.ts';
 import { svc, svcCount } from '../lib/db.ts';
-import { createUpload, deleteMedia } from '../lib/media.ts';
+import { createUpload, trashMedia } from '../lib/media.ts';
+import { trashedBy, FILE_TRASH_DAYS } from '../lib/media_trash.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
 import { getTemplate } from '../lib/render.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -57,8 +58,9 @@ export async function handleMediaUpdate(req: Request, site: SiteRow, principal: 
 
 export async function handleMediaDelete(site: SiteRow, principal: Principal, mediaId: string, cors: Record<string, string>) {
   if (!/^[0-9a-f-]{36}$/.test(mediaId)) return json({ error: 'bad_request', message: 'Invalid image reference.' }, 400, cors);
-  const res = await deleteMedia(site.id, mediaId);
-  if ('error' in res) return json(res, 409, cors);
-  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: mediaId, action: 'delete', summary: 'Removed a photo', principal, provenance: 'human' });
-  return json({ data: { ok: true } }, 200, cors);
+  // item 218: the editor's Remove moves the photo to the Trash, as Files' Delete does
+  const res = await trashMedia(site.id, mediaId, trashedBy(principal));
+  if ('error' in res) return json(res, res.error === 'in_use' ? 409 : res.error === 'not_found' ? 404 : res.error === 'trash_unavailable' ? 503 : 502, cors);
+  await writeChangeEvent({ siteId: site.id, entityType: 'media', entityId: mediaId, action: 'delete', summary: 'Moved a photo to the Trash', principal, provenance: 'human' });
+  return json({ data: { ok: true, trashed: true, goes_at: res.goes_at, days: FILE_TRASH_DAYS } }, 200, cors);
 }

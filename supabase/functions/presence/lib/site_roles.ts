@@ -155,6 +155,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
   ['delete', [
     `POST /client/retainers/${ID}/cancel`,   // sales item 117: stopping the business's own recurring payment is the owner's call
     `DELETE /(media|assets|redirects|content-library|publishes/checkpoints|bookings/types|knowledge/docs)/${ID}`,
+    `DELETE /assets/${ID}/forever`,   // builder list item 218: a file in the Trash deleted for good, like the Delete that put it there
     `DELETE /sales/(contacts|deals|proposals|contracts|templates|estimates)/${ID}`,
     `DELETE /sales/prospects/${ID}`,   // sales review item 112: taking a prospect off the list
     `DELETE /forms/inbox/${ID}`,   // builder list item 203: an enquiry and its files go for good
@@ -242,6 +243,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /assets/folders/move',   // item 56: rename a folder, or take its files out — no file is deleted
     `PATCH /assets/${ID}`,
     `POST /assets/${ID}/(replace|rollback|duplicate|suggest|remove-background|cutout)`,
+    `POST /assets/${ID}/put-back`,   // builder list item 218: taking a file out of the Trash deletes nothing
     'POST /visual/generate',
     `POST /visual/plans/${ID}/(vary|edit)`,
     `POST /moments/${ID}/dismiss`,
