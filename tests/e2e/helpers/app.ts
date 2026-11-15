@@ -301,16 +301,17 @@ export const showTips = (page: Page) => page.addInitScript(() => {
 // save's 1.2 s, a redraw's 350 ms) and then look. Under load the timer could land after
 // the sleep, and on a quiet machine the sleep was time thrown away. Instead, every page
 // installApp opens counts the timers it has set up to 2 seconds ahead (a toast's 2.2 s
-// and longer are left out, as are repeating timers), and the requests it has sent and
-// not finished reading. settled(page) waits until there are none for 150 ms in a row.
+// and longer are left out, as are repeating timers), the work it has left for an idle
+// moment, and the requests it has sent and not finished reading. settled(page) waits
+// until there are none for 150 ms in a row.
 // { requests: false } waits on the timers alone, for a test holding a request on purpose.
 export async function watchQuiet(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    type Quiet = { (requests?: boolean): boolean; pending: () => { timers: number[]; requests: number } };
+    type Quiet = { (requests?: boolean): boolean; pending: () => { timers: number[]; idle: number; requests: number } };
     const w = window as unknown as Record<string, unknown> & { __e2eQuiet?: Quiet };
     if (w.__e2eQuiet) return;
     const later = window.setTimeout.bind(window), stop = window.clearTimeout.bind(window), send = window.fetch.bind(window);
-    const timers = new Map<number, number>();
+    const timers = new Map<number, number>(), idles = new Set<number>();
     let requests = 0;
     const doneSoon = () => { later(() => { requests--; }, 0); };   // after the caller's own .then has run
     window.setTimeout = ((fn: TimerHandler, ms?: number, ...args: unknown[]) => {
@@ -321,6 +322,15 @@ export async function watchQuiet(page: Page): Promise<void> {
       return id;
     }) as typeof window.setTimeout;
     window.clearTimeout = ((id?: number) => { if (id !== undefined) timers.delete(id); stop(id); }) as typeof window.clearTimeout;
+    if (typeof window.requestIdleCallback === 'function') {
+      const idle = window.requestIdleCallback.bind(window), unidle = window.cancelIdleCallback.bind(window);
+      window.requestIdleCallback = ((fn: IdleRequestCallback, o?: IdleRequestOptions) => {
+        const id: number = idle((d) => { idles.delete(id); fn(d); }, o);
+        idles.add(id);
+        return id;
+      }) as typeof window.requestIdleCallback;
+      window.cancelIdleCallback = ((id: number) => { idles.delete(id); unidle(id); }) as typeof window.cancelIdleCallback;
+    }
     window.fetch = ((...a: Parameters<typeof fetch>) => {
       requests++;
       return send(...a).then((res) => {
@@ -332,8 +342,8 @@ export async function watchQuiet(page: Page): Promise<void> {
         return res;
       }, (e) => { doneSoon(); throw e; });
     }) as typeof fetch;
-    const quiet = ((withRequests = true) => timers.size === 0 && (!withRequests || requests === 0)) as Quiet;
-    quiet.pending = () => ({ timers: [...timers.values()], requests });
+    const quiet = ((withRequests = true) => timers.size === 0 && idles.size === 0 && (!withRequests || requests === 0)) as Quiet;
+    quiet.pending = () => ({ timers: [...timers.values()], idle: idles.size, requests });
     w.__e2eQuiet = quiet;
   });
 }

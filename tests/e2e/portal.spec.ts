@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, OWNER_SESSION, spyRequestBodies, sentBodies } from './helpers/app';
+import { settled } from './helpers/app';
 
 // The client portal (client.html) — a reviewer's calm world: mirror of "needs
 // you" (Phase PP Section 4), then approve what's theirs to approve.
@@ -2962,7 +2963,7 @@ test.describe('PS4 — Help tab (B2)', () => {
     // move on before the read lands
     await page.locator('#tabnav [data-tab="messages"]').click();
     await expect(page.locator('#mrows')).toBeVisible();
-    await page.waitForTimeout(1100);   // let the stale response arrive
+    await settled(page);   // let the stale response arrive
     await expect(page.locator('#mrows')).toBeVisible();   // Messages still owns #main
     await expect(page.locator('#main').getByRole('heading', { name: 'Help', exact: true })).toHaveCount(0);
     await expect(page.locator('#faqSearch')).toHaveCount(0);
@@ -3072,7 +3073,7 @@ test.describe('PS5 — booking flow honesty (B4)', () => {
     await openBookingFlow(page);
     await page.locator('#tabnav [data-tab="messages"]').click();
     await expect(page.locator('#mrows')).toBeVisible();
-    await page.waitForTimeout(1100);
+    await settled(page);
     await expect(page.locator('#mrows')).toBeVisible();   // Messages still owns #main
     await expect(page.getByRole('heading', { name: 'Book a call' })).toHaveCount(0);
     await expect(page.getByText('Online booking isn’t set up yet', { exact: false })).toHaveCount(0);
@@ -3094,7 +3095,7 @@ test.describe('PS5 — booking flow honesty (B4)', () => {
     // move on while the POST is in flight
     await page.locator('#tabnav [data-tab="messages"]').click();
     await expect(page.locator('#mrows')).toBeVisible();
-    await page.waitForTimeout(1100);
+    await settled(page);
     await expect(page.locator('#mrows')).toBeVisible();
     await expect(page.getByRole('heading', { name: /You’re booked/ })).toHaveCount(0);
   });
@@ -3674,7 +3675,7 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await page.locator('[data-survey]').click();          // survey read in flight
     await page.locator('#tabnav [data-tab="messages"]').click();   // …but the client moves on
     await expect(page.locator('#mrows')).toBeVisible();
-    await page.waitForTimeout(900);
+    await settled(page);
     await expect(page.locator('#mrows')).toBeVisible();   // Messages still owns #main
     await expect(page.getByRole('heading', { name: 'How did we do?' })).toHaveCount(0);
   });

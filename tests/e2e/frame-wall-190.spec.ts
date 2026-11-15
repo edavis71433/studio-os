@@ -1,6 +1,6 @@
-import { test, expect, Page, Route } from '@playwright/test';
+import { test, expect, FrameLocator, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
-import { touchScreen } from './helpers/app';
+import { touchScreen, settled } from './helpers/app';
 
 // Builder item 190, second half (Nov 12 review, file 06, finding 1): the editor's page frames
 // are walled off from the app, so a drawn page can't reach the signed-in session. The drawn page
@@ -43,6 +43,11 @@ async function mount(page: Page, hash: string) {
   return { pages };
 }
 const touched = (page: Page) => page.evaluate(() => (window as unknown as { __ran?: string[] }).__ran || []);
+// the broken picture has failed and the drawing has loaded, so any handler the wall let through has run
+async function loaded(page: Page, frame: FrameLocator) {
+  await expect.poll(() => frame.locator('img#bad').evaluate((i) => (i as HTMLImageElement).complete)).toBe(true);
+  await settled(page);
+}
 
 test('Edit’s canvas runs none of the drawn page’s scripts, and the editor still works on it', async ({ page }) => {
   await mount(page, '#design');
@@ -50,7 +55,7 @@ test('Edit’s canvas runs none of the drawn page’s scripts, and the editor st
   const frame = page.frameLocator('#designPreview');
   await expect(frame.locator('#dds-dc-bar')).toBeAttached();
   await expect(frame.locator('#a h2')).toHaveText('Fresh bread');
-  await page.waitForTimeout(600);   // the broken image has failed by now, and the SVG has loaded
+  await loaded(page, frame);
   // the click goes to the link itself: on a tablet the editor's dock covers the page's left edge,
   // so a click at the link's place would press a dock button instead (item 57 added Layers there)
   await frame.locator('#js').dispatchEvent('click');
@@ -67,7 +72,7 @@ test('the Overview runs none of them either', async ({ page }) => {
   await mount(page, '');
   const frame = page.frameLocator('#siteFrame');
   await expect(frame.locator('#a h2')).toHaveText('Fresh bread');
-  await page.waitForTimeout(600);
+  await loaded(page, frame);
   expect(await touched(page)).toEqual([]);
   await expect(frame.locator('body')).not.toHaveAttribute('data-own', 'ran');
 });
@@ -78,7 +83,7 @@ test('Preview runs the page as a visitor’s browser would, in a frame that can�
   await expect(frame.locator('#a h2')).toHaveText('Fresh bread');
   await expect(frame.locator('body')).toHaveAttribute('data-own', 'ran');      // the page's own script ran
   await expect(frame.locator('body')).toHaveAttribute('data-reach', 'blocked'); // and couldn't read the app
-  await page.waitForTimeout(600);
+  await loaded(page, frame);
   expect(await touched(page)).toEqual([]);
   // the page still walks the site: a link inside it asks the editor for that page, by message
   const before = pages.length;
@@ -91,6 +96,6 @@ test('a message from anywhere but the Preview page is ignored', async ({ page })
   await expect(page.frameLocator('#previewFrame').locator('#a h2')).toHaveText('Fresh bread');
   const before = pages.length;
   await page.evaluate(() => window.postMessage({ presenceNav: '/elsewhere/' }, '*'));
-  await page.waitForTimeout(800);
+  await settled(page);
   expect(pages.slice(before)).not.toContain('/elsewhere/');
 });

@@ -1,6 +1,6 @@
 import { test, expect, devices, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks } from './helpers/app';
-import { pointAt, pressButton, touchScreen, showTips } from './helpers/app';
+import { pointAt, pressButton, touchScreen, showTips, settled } from './helpers/app';
 
 // The Website page, Squarespace style (Nov 2026): the Overview is the site itself, with
 // one bar and one to-do line, and the menu lives in the sidebar, grouped by job.
@@ -139,7 +139,7 @@ test.describe('the Overview is the site', () => {
     await page.route('**/functions/v1/presence/preview**', async (r: Route) => { reads++; await r.fallback(); });
     await mount(page, '/presence.html#faqs');
     await expect(page.locator('#view-faqs')).toBeVisible();
-    await page.waitForTimeout(600);
+    await settled(page);
     expect(reads).toBe(0);
     await page.evaluate(() => (window as any).go('today'));
     await expect(page.frameLocator('#siteFrame').locator('h1').first()).toBeVisible();
@@ -172,11 +172,11 @@ test.describe('where everything else went', () => {
     await expect(page.locator('#pagesList .hb-row').first()).toContainText('Home');
     await page.goto('/presence.html#health');
     await expect(page.locator('#view-search')).toBeVisible();
-    await page.waitForTimeout(700);   // and it stays there: it used to jump to the Overview after 0.2 s
+    await settled(page);   // and it stays there: it used to jump to the Overview after 0.2 s
     await expect(page.locator('#view-search')).toBeVisible();
     await page.goto('/presence.html#activity');
     await expect(page.locator('#view-history')).toBeVisible();
-    await page.waitForTimeout(700);
+    await settled(page);
     await expect(page.locator('#view-history')).toBeVisible();
     await expect(page.locator('#view-history h1.doc')).toHaveText('Versions');
     // the versions come first; what happened to the site follows them
@@ -294,7 +294,7 @@ const touchChecks = () => {
     await expect(bar).toHaveClass(/\bon\b/);
     await expect(frame.locator('section#a')).toHaveClass(/dc-hot/);
     await expect(bar.getByRole('button', { name: 'Duplicate this section' })).toBeVisible();
-    await page.waitForTimeout(600);   // the pretend mouse-leave after a tap must not put it away
+    await settled(page);   // the pretend mouse-leave after a tap must not put it away
     await expect(bar).toHaveClass(/\bon\b/);
     await expect(frame.locator('[contenteditable]')).toHaveCount(0);   // the first tap selects, it doesn't edit
   });
@@ -985,6 +985,8 @@ test.describe('a section edited in its panel redraws at once (item 26)', () => {
     const edited = frame.locator('#main > section[data-dds-src="0"]');
     await expect(edited.locator('h2')).toHaveText('Typed live');           // while the field still has focus
     await expect(title).toBeFocused();                                      // nothing rebuilt the panel under the cursor
+    // a real wait: while the field holds the focus the page keeps its 700 ms save timer going,
+    // so the page never settles; this is past one full turn of it
     await page.waitForTimeout(900);
     expect(writes.filter((w) => w.path === '/settings' && w.method === 'PUT')).toHaveLength(0);
     await title.blur();
@@ -1005,7 +1007,7 @@ test.describe('a section edited in its panel redraws at once (item 26)', () => {
     await page.waitForTimeout(400);   // the last keystroke's drawing is in
     const drawn = asked.length;
     await title.blur();
-    await page.waitForTimeout(600);   // past the 200 ms a drawing waits, before the save leaves at 700
+    await settled(page);   // the drawing's 200 ms and the save at 700 are done
     expect(asked.length).toBe(drawn);
   });
   // Each live drawing used to rebuild the whole Contents list and every add-section line.
@@ -1027,7 +1029,7 @@ test.describe('a section edited in its panel redraws at once (item 26)', () => {
   test('a section added or removed waits for the full redraw instead', async ({ page }) => {
     const { asked } = await setup(page);
     await page.evaluate(() => (window as any).dcDuplicate(0));
-    await page.waitForTimeout(700);
+    await settled(page);
     expect(asked).toHaveLength(0);
   });
 });
@@ -1145,7 +1147,7 @@ test.describe('type into the welcome section and About on the canvas', () => {
     await page.keyboard.type(' and more');
     await page.keyboard.press('Escape');
     await expect(p).toHaveText('Hello');
-    await page.waitForTimeout(900);
+    await settled(page);
     expect(identityWrites(writes)).toHaveLength(0);
   });
 
@@ -1168,7 +1170,7 @@ test.describe('type into the welcome section and About on the canvas', () => {
     await page.keyboard.press('Enter');
     await expect(h1).toHaveText('Marlow’s Kitchen');
     await expect(page.getByText('Your business needs a name')).toBeVisible();
-    await page.waitForTimeout(900);
+    await settled(page);
     expect(identityWrites(writes)).toHaveLength(0);
   });
 
@@ -1207,7 +1209,7 @@ test.describe('type into the welcome section and About on the canvas', () => {
     await tag.dblclick();
     await page.keyboard.type('Fresh');
     await page.evaluate(() => (window as any).refreshDesignPreview());   // as when a panel's save lands mid-word
-    await page.waitForTimeout(700);
+    await settled(page);
     await expect(tag).toHaveAttribute('contenteditable', /true|plaintext-only/);
     await page.keyboard.type(' pasta');
     await page.keyboard.press('Enter');
@@ -1299,11 +1301,15 @@ test.describe('Styles show on the page at once, and save behind', () => {
 
   test('a colour shows on the canvas before its save answers, saves once, and the page isn’t redrawn', async ({ page }) => {
     const { log, pick, cssVar, saves } = await styles(page);
+    let release = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    await page.route('**/functions/v1/presence/dev/customization', async (route: Route) => { if (route.request().method() === 'PUT') await held; return route.fallback(); });
     await pick('Evergreen');
     await expect.poll(() => cssVar('--accent')).toBe('#23635a');
-    expect(log).not.toContain('save answered');                  // shown before the save came back
+    expect(log).not.toContain('save answered');                  // shown before the save came back: it waits at the door until now
+    release();
     await expect.poll(saves).toEqual([{ accent: '#23635a', accent_dark: '#17453f', ink: '#1c2430', soft: '#5b6572' }]);
-    await page.waitForTimeout(800);                               // past the redraw's own pause
+    await settled(page);                               // the redraw's own pause is over
     expect(log.filter((x) => x === 'drawing')).toHaveLength(0);
     expect(await cssVar('--accent-dark')).toBe('#17453f');        // the dashed name the templates read, as the server writes it
     await expect(page.locator('#designCard').getByRole('button', { name: 'Evergreen ✓' })).toBeVisible();
@@ -1523,7 +1529,7 @@ test.describe('no drawing nobody asked for (item 85)', () => {
     const on = (r: any) => { const u = new URL(r.url()); if (/\/functions\/v1\/presence\/preview$/.test(u.pathname)) seen.push(u.search); };
     page.on('request', on);
     await act();
-    await page.waitForTimeout(900);                                   // past the 350 ms the old redraw waited
+    await settled(page);                                   // the 350 ms the old redraw waited is over
     page.off('request', on);
     return seen;
   };
@@ -1621,11 +1627,12 @@ test.describe('the website editor reads what it shows, when it shows it (item 84
       await expect.poll(() => own.filter((p) => !reads.slice(before).includes(p)), { message: hash }).toEqual([]);
     }
     // A second round of every tab. Not a wait for a quiet network: the tablet keeps a font
-    // request open in Edit mode, so the network never goes quiet there.
-    await page.waitForTimeout(500);
+    // request open in Edit mode, so the network never goes quiet there. settled() counts only
+    // the page's own timers and fetches.
+    await settled(page);
     const before = reads.length;
     for (const hash of Object.keys(EXTRAS)) { await go(page, hash); await page.waitForTimeout(150); }
-    await page.waitForTimeout(800);
+    await settled(page);
     for (const p of Object.values(EXTRAS).flat()) expect(reads.slice(before), p).not.toContain(p);
   });
 
@@ -1635,12 +1642,12 @@ test.describe('the website editor reads what it shows, when it shows it (item 84
     await page.waitForLoadState('networkidle');
     const healthReads = () => reads.filter((p) => p === '/health').length;
     expect(healthReads()).toBe(1);
-    // A wait for a quiet network returns at once after the first load, so these give a read
-    // the time it would take to go out.
+    // A wait for a quiet network returns at once after the first load, so these wait for any
+    // timer that would send a read, and the read itself (settled).
     await go(page, '#pages');
-    await page.waitForTimeout(400);
+    await settled(page);
     await go(page, '#today');
-    await page.waitForTimeout(800);
+    await settled(page);
     expect(healthReads()).toBe(1);   // nothing saved since, so nothing new to read
     await go(page, '#business');
     await page.locator('#f-business_name').fill('Marlow’s Bistro');
@@ -1784,7 +1791,7 @@ test.describe('the section panel’s arrows keep the canvas pointing at the righ
     };
     await editOn('#a');
     expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
-    await page.waitForLoadState('networkidle');           // Edit's own redraw (item 85) has landed
+    await settled(page);                                  // Edit's own redraw (item 85) has landed
     await page.locator('#inspectorSeg [data-itab="layout"]').click();   // the inspector keeps the arrows on its Layout tab (part two)
     await page.locator('#blkSub-0').getByRole('button', { name: /^Move (this section )?down$/ }).click();   // item 34: an icon, by its name
     expect(await page.evaluate('BLOCKS_WORK.map((b) => b.type).join()')).toBe('richtext,title');

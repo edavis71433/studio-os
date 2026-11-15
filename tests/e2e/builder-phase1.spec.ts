@@ -1,5 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, showTips } from './helpers/app';
+import { settled } from './helpers/app';
 
 // Website builder, Phase 1 (Nov 2026): the editor as one tool. Full-screen Edit mode,
 // one editor per section, one save rule, undo everywhere, one set of tabs.
@@ -179,7 +180,7 @@ test.describe('one save rule', () => {
     await expect.poll(() => writes.filter((w) => w.path === '/settings').length).toBe(1);
     expect(writes[0].body.blocks[1].title).toBe('Our real story');
     await expect(page.locator('#dcWhisper')).toHaveText(/Saved just now|Everything saved/);
-    await page.waitForTimeout(1000);
+    await settled(page);
     expect(writes.filter((w) => w.path === '/settings').length).toBe(1);   // an unchanged list writes nothing
   });
 
@@ -286,7 +287,7 @@ test.describe('undo everywhere', () => {
     await name.press('Control+z');      // inside the field: the browser's own text undo, not ours
     expect(writes.length).toBe(1);
     await name.blur();
-    await page.waitForTimeout(900);
+    await settled(page);
     const before = writes.length;
     await page.locator('h1.hb-title').click();
     await page.keyboard.press('Control+z');
@@ -568,7 +569,7 @@ test.describe('nothing typed gets lost', () => {
     const body = page.locator('#blocksCard textarea').first();
     await title.fill('Heading saved first');
     await title.blur();
-    await page.waitForTimeout(850);                                  // that save has left and hasn't answered yet
+    await settled(page, { requests: false });                                  // that save has left and hasn't answered yet
     await body.fill('Body finished during the save');
     await body.blur();
     await expect.poll(() => putsOf(writes).length, { timeout: 8000 }).toBe(2);
@@ -590,7 +591,7 @@ test.describe('nothing typed gets lost', () => {
     const body = page.locator('#blocksCard textarea').first();
     await title.fill('Heading');
     await title.blur();
-    await page.waitForTimeout(850);
+    await settled(page, { requests: false });   // that save has left and hasn't answered yet
     await body.focus();
     await body.fill('Still typing');
     await expect.poll(() => putsOf(writes).length, { timeout: 8000 }).toBe(1);
@@ -616,7 +617,7 @@ test.describe('nothing typed gets lost', () => {
     const put = putsOf(writes)[0].body;
     expect(put.pages).toBeUndefined();                               // it went to Home, where it was typed
     expect(put.blocks[1].body).toBe('Typed just before switching');
-    await page.waitForTimeout(1200);
+    await settled(page);
     expect(await page.evaluate(() => (0, eval)('BLOCKS_WORK')[0].body)).toBe('Visit page');   // and the Visit page is untouched
     expect(putsOf(writes)).toHaveLength(1);
     await page.evaluate(() => (window as any).dcSwitchPage(''));
@@ -653,7 +654,7 @@ test.describe('nothing typed gets lost', () => {
     const label = page.locator('#formsCard input[placeholder="Question / label"]').first();
     await title.fill('Say hello');
     await title.blur();
-    await page.waitForTimeout(850);
+    await settled(page, { requests: false });   // that save has left and hasn't answered yet
     await label.focus();
     await label.fill('Typing a question');
     await expect.poll(() => putsOf(writes).length, { timeout: 8000 }).toBe(1);
@@ -677,7 +678,7 @@ test.describe('nothing typed gets lost', () => {
     const label = page.locator('#formsCard input[placeholder="Question / label"]').first();
     await title.fill('Say hello');
     await title.blur();
-    await page.waitForTimeout(850);
+    await settled(page, { requests: false });   // that save has left and hasn't answered yet
     await label.fill('Finished during the save');
     await label.blur();
     await expect.poll(() => putsOf(writes).length, { timeout: 8000 }).toBe(2);
@@ -694,7 +695,7 @@ test.describe('nothing typed gets lost', () => {
     await title.fill('Say hello');
     await title.blur();
     await expect.poll(() => putsOf(writes).length, { timeout: 5000 }).toBe(1);
-    await page.waitForTimeout(1200);
+    await settled(page);
     expect(await page.evaluate(() => (0, eval)('blocksDirty()'))).toBe(false);
     expect(putsOf(writes)).toHaveLength(1);
   });

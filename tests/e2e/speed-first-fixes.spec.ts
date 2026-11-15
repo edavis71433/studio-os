@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp, ALL_FEATURES, STUDIO_LEVEL_NAV } from './helpers/app';
+import { settled } from './helpers/app';
 
 // The first speed fixes (Nov 10 2026 review, list items 167 to 169).
 //  - The sign-in context (/portal/context) is asked once per visit: the shell
@@ -56,7 +57,7 @@ test.describe('who am I: asked once per visit', () => {
     await page.goto('/customers.html');
     await expect(page.locator('#dds-bell .dot')).toHaveText('3');
     await expect(page.locator('#dds-nav, .dds-nav').first()).toContainText('Pipeline');
-    await page.waitForTimeout(1500);
+    await settled(page);
     expect(asked(seen, '/portal/context')).toBe(0);
   });
 
@@ -66,7 +67,7 @@ test.describe('who am I: asked once per visit', () => {
       await installApp(page, { api: API });
       await page.goto('/' + p + '.html');
       await expect(page.locator('#dds-bell')).toBeVisible();
-      await page.waitForTimeout(1500);
+      await settled(page);
       expect(asked(seen, '/portal/context')).toBe(1);
     });
   }
@@ -107,7 +108,7 @@ test.describe('who am I: asked once per visit', () => {
     seen.length = 0;
     await page.goto('/files.html?client=11111111-1111-4111-8111-111111111111');
     await expect(page.locator('#dds-bell')).toBeVisible();
-    await page.waitForTimeout(800);
+    await settled(page);
     expect(asked(seen, '/portal/context')).toBe(1);
   });
 
@@ -130,13 +131,13 @@ test.describe('Settings: one round, and nothing asked twice', () => {
     await page.goto('/settings.html');
     await expect(page.locator('#menu')).toBeVisible();
     await expect(page.locator('#team')).toBeVisible();
-    await page.waitForTimeout(800);
+    await settled(page);
     expect(asked(seen, '/agency/usage')).toBe(1);
     expect(asked(seen, '/agency/nav')).toBe(1);
     // an automation save repaints the section; the menu is not read again (finding C19)
     await page.locator('#sw-ack').click();
     await expect(page.locator('#sw-ack')).toHaveAttribute('aria-checked', /true|false/);
-    await page.waitForTimeout(500);
+    await settled(page);
     expect(seen.filter((s) => s === '/agency/nav')).toHaveLength(1);
     // hiding a menu area: the next page asks who-am-I again, so the menu is right
     await page.locator('[data-menu-key="projects"]').click();
@@ -170,7 +171,7 @@ test('Home starts its own reads with /agency/me, not after it', async ({ page })
   await expect.poll(() => ['/agency/needs-you', '/sales/summary', '/agency/portfolio', '/studio/customers', '/sales/receivables'].every((p) => order.includes(p))).toBe(true);
   release();
   await expect(page.locator('#needs')).toBeVisible();
-  await page.waitForTimeout(800);
+  await settled(page);
   // each read went out once: the early answer is the one the page used
   for (const p of ['/agency/needs-you', '/sales/summary', '/agency/portfolio', '/studio/customers', '/sales/receivables', '/sales/my-tasks']) expect(order.filter((o) => o === p), p).toHaveLength(1);
 });

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp, ALL_FEATURES, STUDIO_LEVEL_NAV } from './helpers/app';
+import { settled } from './helpers/app';
 
 // Final pass on the sales side, speed batch B (Nov 8 2026). At studio level a
 // page boot no longer builds the Needs-you list: /portal/context hands back the
@@ -47,7 +48,7 @@ test.describe('batch B — the badge without building the list on every page', (
     await installApp(page, { api: { ...HOME_API, '/portal/context': ctx(5, false), '/agency/needs-you': { data: { total: 9, partial: false } } } });
     await page.goto('/pipeline.html');
     await expect(page.locator('#dds-bell .dot')).toHaveText('5');
-    await page.waitForTimeout(1600);   // past the shell's 1.2 s wait
+    await settled(page);   // the shell's 1.2 s wait is over
     expect(seen.filter((s) => s.startsWith('/agency/needs-you'))).toHaveLength(0);
     await expect(page.locator('#dds-bell .dot')).toHaveText('5');
   });
@@ -58,7 +59,7 @@ test.describe('batch B — the badge without building the list on every page', (
     await page.goto('/agency.html');
     await expect(page.locator('#needs #qt-needs')).toHaveText('Needs you 2');   // item 70: the list's first tab
     await expect(page.locator('#dds-bell .dot')).toHaveText('2');
-    await page.waitForTimeout(1600);
+    await settled(page);
     expect(seen.filter((s) => s.includes('only=total'))).toHaveLength(0);
   });
 
