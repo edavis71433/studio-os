@@ -102,7 +102,12 @@ test.describe('One page header, group 3 (builder item 165)', () => {
         await expect(head.locator('.dds-ph-more')).toBeHidden();
       }
       // nothing in the header spills sideways (the header and everything in it end inside the window)
-      expect(await head.evaluate((h) => Math.max(...[h, ...h.querySelectorAll('*')].filter((e) => e.getClientRects().length > 0).map((e) => e.getBoundingClientRect().right)) - window.innerWidth)).toBeLessThanOrEqual(0);
+      expect(await head.evaluate((h) => {
+        // a strip that slides (the tabs on a phone, item 215's five) counts by its own edge, not the tabs scrolled inside it
+        const inStrip = (e: Element) => { for (let p = e.parentElement; p && p !== h; p = p.parentElement) if (getComputedStyle(p).overflowX !== 'visible') return true; return false; };
+        return Math.max(...[h, ...h.querySelectorAll('*')].filter((e) => e.getClientRects().length > 0 && !inStrip(e)).map((e) => e.getBoundingClientRect().right)) - window.innerWidth;
+      })).toBeLessThanOrEqual(0);
+      expect(await head.evaluate((h) => h.scrollWidth - h.clientWidth)).toBeLessThanOrEqual(0);   // and nothing inside the header runs past its own edge (a sliding strip keeps its tabs to itself)
       expect(errors).toEqual([]);
     });
   }
