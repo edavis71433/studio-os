@@ -8,7 +8,8 @@
 //     welcome: string,                                 a note at the top of every client's Home
 //     home_off: Card[],                                Home's cards the studio hides
 //     parts_at: iso | null,                            when a part was last switched (item 236's set-up list)
-//     previewed_at: iso | null }                       when the studio first saw a client's portal (item 232)
+//     previewed_at: iso | null,                        when the studio first saw a client's portal (item 232)
+//     signin: { google, password } }                   item 230: how clients sign in; the emailed code is always on
 // Needs you is always on Home. A failed read hides nothing: the portal shows everything
 // rather than going quiet by accident. These hide parts of a client's own portal; they
 // are not a lock on anyone else's data (every /client/* route stays scoped to the caller).
@@ -41,7 +42,12 @@ export const WELCOME_MAX = 500;
 export const PORTAL_MAX_CLIENTS = 1000;
 
 export type ClientChoices = Partial<Record<PortalPart, boolean>>;
-export interface PortalSettings { off: PortalPart[]; clients: Record<string, ClientChoices>; welcome: string; home_off: HomeCard[]; parts_at: string | null; previewed_at: string | null }
+/** Builder list item 230: the ways a client may sign in besides the emailed code, which is
+ *  always on so nobody is locked out. Google is off until the studio turns it on; a password
+ *  stays on, as it was before the switch existed. */
+export interface SignIn { google: boolean; password: boolean }
+export const SIGNIN_KEYS = ['google', 'password'] as const;
+export interface PortalSettings { off: PortalPart[]; clients: Record<string, ClientChoices>; welcome: string; home_off: HomeCard[]; parts_at: string | null; previewed_at: string | null; signin: SignIn }
 
 const SITE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isSiteId = (v: unknown): v is string => typeof v === 'string' && SITE_ID.test(v);
@@ -89,7 +95,9 @@ export function normalizePortal(raw: unknown): PortalSettings {
   }
   const keys = Object.keys(clients);
   if (keys.length > PORTAL_MAX_CLIENTS) for (const k of keys.slice(0, keys.length - PORTAL_MAX_CLIENTS)) delete clients[k];
-  return { off: partsOf(r.off), clients, welcome: cleanWelcome(r.welcome), home_off: cardsOf(r.home_off), parts_at: isoOrNull(r.parts_at), previewed_at: isoOrNull(r.previewed_at) };
+  const si = (r.signin && typeof r.signin === 'object' ? r.signin : {}) as Record<string, unknown>;
+  return { off: partsOf(r.off), clients, welcome: cleanWelcome(r.welcome), home_off: cardsOf(r.home_off), parts_at: isoOrNull(r.parts_at), previewed_at: isoOrNull(r.previewed_at),
+    signin: { google: si.google === true, password: si.password !== false } };
 }
 
 /** Is this part shown to this client? The client's own choice first, else the studio's. Pure. */
@@ -106,7 +114,7 @@ export function resolveOff(s: PortalSettings, clientSiteId: string | null | unde
   return PORTAL_PARTS.filter((p) => off.has(p));
 }
 
-export interface StudioChange { part?: { key: PortalPart; shown: boolean }; card?: { key: HomeCard; shown: boolean }; welcome?: string }
+export interface StudioChange { part?: { key: PortalPart; shown: boolean }; card?: { key: HomeCard; shown: boolean }; welcome?: string; signin?: { key: typeof SIGNIN_KEYS[number]; on: boolean } }
 /** The studio-wide change Settings sends, one thing at a time so two quick flips (or two
  *  people) never undo each other: { part, shown }, { card, shown } or { welcome }. Pure. */
 export function pickStudioChange(b: unknown): StudioChange {
@@ -115,6 +123,8 @@ export function pickStudioChange(b: unknown): StudioChange {
   if (isPart(r.part) && typeof r.shown === 'boolean') out.part = { key: r.part, shown: r.shown };
   if (isCard(r.card) && typeof r.shown === 'boolean') out.card = { key: r.card, shown: r.shown };
   if (typeof r.welcome === 'string') out.welcome = cleanWelcome(r.welcome);
+  const si = (r.signin && typeof r.signin === 'object' ? r.signin : {}) as Record<string, unknown>;
+  if ((SIGNIN_KEYS as readonly string[]).includes(String(si.key)) && typeof si.on === 'boolean') out.signin = { key: si.key as typeof SIGNIN_KEYS[number], on: si.on };
   return out;
 }
 /** The change applied to what's stored now (read just before the write). A part's switch
@@ -123,7 +133,8 @@ export function applyStudioChange(cur: PortalSettings, change: StudioChange, now
   const off = new Set(cur.off), homeOff = new Set(cur.home_off);
   if (change.part) { if (change.part.shown) off.delete(change.part.key); else off.add(change.part.key); }
   if (change.card) { if (change.card.shown) homeOff.delete(change.card.key); else homeOff.add(change.card.key); }
-  return normalizePortal({ ...cur, off: [...off], home_off: [...homeOff], welcome: change.welcome === undefined ? cur.welcome : change.welcome, parts_at: change.part ? nowIso : cur.parts_at });
+  const signin = change.signin ? { ...cur.signin, [change.signin.key]: change.signin.on } : cur.signin;
+  return normalizePortal({ ...cur, off: [...off], home_off: [...homeOff], welcome: change.welcome === undefined ? cur.welcome : change.welcome, parts_at: change.part ? nowIso : cur.parts_at, signin });
 }
 /** One client's change: { part, shown: true | false | null } (null: back to the studio's
  *  choice for that part) or { reset: true } (every part back to the studio's). Pure. */

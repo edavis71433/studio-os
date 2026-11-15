@@ -69,7 +69,7 @@ test.describe('Sign-in pages in the new look (builder list item 188)', () => {
     await expect(page.locator('#brand .word')).toHaveCSS('color', 'rgb(255, 255, 255)');   // the name reads on the band
     // the inbox screen gets the two mail buttons
     await page.evaluate(() => (window as unknown as { show: (id: string) => void }).show('codePanel'));
-    await expect(page.getByRole('heading', { level: 1, name: 'Check your inbox' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Check your email' })).toBeVisible();   // builder item 230's words
     await expect(page.locator('#codePanel .qbtn')).toHaveText(['Open Gmail', 'Open Outlook']);
     // the password door has Show
     await page.evaluate(() => (window as unknown as { show: (id: string) => void }).show('pwPanel'));
