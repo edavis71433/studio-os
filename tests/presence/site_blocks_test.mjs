@@ -397,7 +397,7 @@ const ctx = { esc, attr, safeHref };
   ok('look: bold "accent" band validates + emits block--bg-accent', accentR.includes('block--bg-accent'));
   const darkR = renderSiteBlocks(validateBlocks([{ type: 'features', title: 'Why', items: [{ title: 'Fast' }], look: { background: 'dark' } }]), ctx)[0].html;
   ok('look: "dark" band validates + emits block--bg-dark', darkR.includes('block--bg-dark'));
-  ok('look: bold bands force light text + define their CSS (contrast holds)', /\.block\.block--bg-accent\{background:var\(--accent-dark/.test(BLOCK_CSS) && /\.block\.block--bg-dark\{background:#1a1622;color:#f2eef8\}/.test(BLOCK_CSS));
+  ok('look: bold bands force light text + define their CSS (contrast holds)', BLOCK_CSS.includes('.block.block--bg-accent{background:var(--accent-band,var(--accent-dark,var(--accent)));color:#fff}') && /\.block\.block--bg-dark\{background:#1a1622;color:#f2eef8\}/.test(BLOCK_CSS));
   // — features: optional per-item icon (decorative, escaped) —
   const featIconR = renderSiteBlocks(validateBlocks([{ type: 'features', items: [{ title: 'Fast', text: 'quick', icon: '🚚' }, { title: 'Plain' }] }]), ctx)[0].html;
   ok('features: an item icon renders (decorative, aria-hidden); an item without one omits it', featIconR.includes('<div class="svc-ic" aria-hidden="true">🚚</div>') && (featIconR.match(/svc-ic/g) || []).length === 1);
@@ -696,7 +696,7 @@ const ctx = { esc, attr, safeHref };
 
   // — BLOCK_CSS: every rule is static (one CSS churn); classes/vars are the only per-block surface —
   ok('style CSS: static ov-* rules shipped once in BLOCK_CSS', BLOCK_CSS.includes('.block.ov-ink{color:var(--ov-ink)}')
-    && BLOCK_CSS.includes('.block.ov-bg{background:var(--ov-bg)') && BLOCK_CSS.includes('.block.ov-accent{--accent:var(--ov-accent);--accent-dark:var(--ov-accent-dark,var(--ov-accent))}')
+    && BLOCK_CSS.includes('.block.ov-bg{background:var(--ov-bg)') && BLOCK_CSS.includes('.block.ov-accent{--accent:var(--ov-accent);--accent-dark:var(--ov-accent-dark,var(--ov-accent));--accent-band:var(--ov-accent-dark,var(--ov-accent))}')
     && BLOCK_CSS.includes('.block.ov-font-display') && BLOCK_CSS.includes('.block.ov-font-body') && BLOCK_CSS.includes('.block.ov-size-xl{font-size:1.35em}') && BLOCK_CSS.includes('.block.ov-align-right{text-align:right}'));
   ok('style CSS: ink forces the same child-inheritance list the accent/dark bands use',
     /\.block\.ov-ink :is\(h1,h2,h3,h4,h5,p,li,dt,dd,figcaption,blockquote,strong,em,\.nm,\.pr,\.ds,\.stat-v,\.stat-l,summary\)\{color:inherit\}/.test(BLOCK_CSS));

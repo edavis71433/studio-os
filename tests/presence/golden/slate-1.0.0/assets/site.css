@@ -1,4 +1,4 @@
-:root{color-scheme:dark;--ink:#eef1f5;--soft:#9ba4b5;--paper:var(--bg,#101216);--card:#161a21;--accent:#2dd4bf;--accent-dark:#14b8a6;--line:#262a33;--wash:#14171d}
+:root{color-scheme:dark;--ink:#eef1f5;--soft:#9ba4b5;--paper:var(--bg,#101216);--card:#161a21;--accent:#2dd4bf;--accent-dark:#14b8a6;--accent-band:#115e59;--line:#262a33;--wash:#14171d}
 html:root{--ink:#eef1f5;--soft:#9ba4b5;--paper:#101216;--accent:#2dd4bf;--accent-dark:#14b8a6}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
