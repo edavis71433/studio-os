@@ -345,6 +345,35 @@ globalThis.fetch = async (url, init = {}) => {
   ok('pack: it says to run before the deploy', /BEFORE[\s-]+the deploy\.yml run/.test(pack));
 }
 
+// ═══ 10. the pages say the same words, and hide what the role can't use ═══
+{
+  const people = read('people.js');
+  const peopleRoles = Object.fromEntries([...people.matchAll(/\{ key: '([a-z_]+)', name: '([^']+)', desc: '([^']+)'/g)].map((m) => [m[1], { name: m[2], desc: m[3] }]));
+  for (const role of SITE_ROLES) ok(`people.js: ${role}'s sentence is the server's, word for word`, peopleRoles[role]?.desc === SEAT_WORDS[role].sees && peopleRoles[role]?.name === SEAT_WORDS[role].name, peopleRoles[role]?.desc);
+  ok('people.js: the invite offers every role but the paused Developer', people.includes("var OFFERED = ROLES.filter(function (r) { return r.key !== 'developer'; });"));
+  ok('people.js: the switch is sent for a Designer alone, as a strict true or false', people.includes("me.pick === 'designer' ? { email: me.email, role: me.pick, can_publish: me.canPub === true } : { email: me.email, role: me.pick }") && people.includes("{ role: 'designer', can_publish: on }"));
+  ok('people.js: the switch is a real switch with a name, and each seat says its role', people.includes('<input type="checkbox" class="pp-switch" role="switch" ') && people.includes("aria-label=\"' + esc('Can publish to the live site: ' + m.email) + '\"") && people.includes('<p class="pp-sent" data-sent="'));
+  ok('pages: both People pages load the new people.js', read('sites.html').includes('<script src="/people.js?v=220"></script>') && read('sharing.html').includes('<script src="/people.js?v=220"></script>'));
+  const settings = read('settings.html');
+  const studio = Object.fromEntries([...settings.matchAll(/^  ([a-z_]+): \{ sees: '([^']+)', opens: ([01]), team: ([01]), plan: ([01]) \},$/gm)].map((m) => [m[1], { sees: m[2], opens: m[3] === '1', team: m[4] === '1', plan: m[5] === '1' }]));
+  for (const r of Object.keys(STUDIO_ROLE_WORDS)) ok(`settings.html: the Team's ${r} says the server's sentence and reaches what the server lets it`, studio[r]?.sees === STUDIO_ROLE_WORDS[r].sees && studio[r].opens === can(r, 'bulk_publish') && studio[r].team === can(r, 'manage_members') && studio[r].plan === (r === 'owner'), JSON.stringify(studio[r]));
+  ok('settings.html: the long role paragraph is gone; the picked role and the Who sees what table took its place', !settings.includes('const ROLE_HELP') && settings.includes("$('roleHelp').innerHTML = whoSeesHtml();") && settings.includes('<div class="rolepick" id="rolePick" aria-live="polite" hidden></div>'));
+  const shell = read('shell.js'), css = read('shell.css');
+  ok('shell: a Designer lacks the business, approving, and publishing unless their seat allows it', ["if (caps.indexOf('publish') < 0) lacks.push('publish');", "if (caps.indexOf('approve') < 0) lacks.push('approve');", "if (caps.indexOf('design') < 0) lacks.push('design');", "if (caps.indexOf('view_all') < 0) lacks.push('business');"].every((l) => shell.includes(l)));
+  ok('shell: a member\'s own screen carries their role card, on the menu and in a phone\'s Menu', shell.includes("brandHtml + roleCardHtml() +") && shell.includes("drawer.innerHTML = (sidebarMode() ? '' : roleCardHtml(true)) + html;") && shell.includes('var r = CTX && CTX.my_role;'));
+  ok('shell: a page outside a Designer\'s role says so, everywhere but the website, Files and Help', shell.includes('var DESIGNER_PAGES = /^\\/(presence|files|help)(\\.html)?$/;') && shell.includes("if (!ctx || ctx.site_role !== 'designer' || ctx.scope || ctx.is_operator) return;") && /guardRolePage\(ctx\);\n  \}/.test(shell));
+  for (const need of ['publish', 'approve', 'design', 'business']) ok(`css: data-needs="${need}" goes for a role lacking it`, css.includes(`html[data-dds-lacks~="${need}"] [data-needs="${need}"]`));
+  ok('css: the bell goes with the business; the page\'s own content goes outside the role', css.includes('html[data-dds-lacks~="business"] #dds-bell') && css.includes('html.dds-notyours body > :not([id^="dds-"])'));
+  ok('css: a note for someone who can\'t publish shows in Publish\'s place', css.includes('html[data-dds-lacks~="publish"] [data-if-lacks="publish"][hidden]{display:inline-flex!important}'));
+  const builder = read('presence.html');
+  ok('builder: all three Publish buttons are marked, each with its pill', ['id="btnPublish" type="button" data-needs="publish"', 'id="dcBtnPublish" data-needs="publish"', 'id="dockPublish" aria-pressed="false" data-needs="publish"', 'id="btnWaitPub" type="button" hidden data-if-lacks="publish"', 'id="dcBtnWait" hidden data-if-lacks="publish"', 'id="dockWait" aria-pressed="false" hidden data-if-lacks="publish"'].every((m) => builder.includes(m)));
+  ok('builder: the publish step never opens for a role that can\'t publish', /function openRitual\(opts\) \{\n  if \(window\.ddsLacks && window\.ddsLacks\("publish"\)\) \{ openWaitNote\(\); return; \}/.test(builder));
+  ok('builder: launching, scheduling, rolling back and publishing a preview are marked; approving a launch too', ['acts.lastChild.dataset.needs = "approve"; }', 'acts.lastChild.dataset.needs = "publish";   // builder item 220: a Designer goes live only when their seat says so', 'acts.lastChild.dataset.needs = "publish"; }', 'acts.lastChild.dataset.needs = "publish";   // builder item 220\n'].every((m) => builder.includes(m)));
+  ok('builder: the business tabs are marked and never open for a Designer', builder.includes('if (isBusinessTab(view)) b.dataset.needs = "business";') && builder.includes('if (isBusinessTab(view) && window.ddsLacks && window.ddsLacks("business")) view = "today";'));
+  ok('builder: Styles is restyling (design), and the brand card makes no AI images for someone who can\'t approve them', builder.includes('id="btnSettingsOpen" data-needs="design"') && builder.includes('if (window.ddsLacks && window.ddsLacks("approve")) return;'));
+  ok('files: Make an image needs approve', read('files.html').includes('id="makeImage" href="/visual-studio.html" data-needs="approve"'));
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ DESIGNER ROLE: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);

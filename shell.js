@@ -1342,7 +1342,7 @@
       // invoked only (§11.5 — the one nav element that never opens on hover);
       // its panel is the full grouped destination list the burger sheet held.
       '<button class="dds-ic dds-waffle" id="dds-waffle" aria-label="App Launcher" aria-haspopup="true" aria-expanded="false" aria-controls="dds-drawer"><span class="wic" aria-hidden="true"></span></button>' +
-      brandHtml +
+      brandHtml + roleCardHtml() +
       (canCreate() ? '<button type="button" class="dds-create" id="dds-create" aria-haspopup="dialog" aria-expanded="false" aria-keyshortcuts="c">' + icon('plus') + '<span class="lbl">Create</span><kbd aria-hidden="true">C</kbd></button>' : '') +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
@@ -2640,7 +2640,7 @@
       return '<div class="g' + (s.key === secKey ? ' active' : '') + (s.utility ? ' util' : '') + '">' + heading + vis.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + esc(i.label) + '</a>'; }).join('') + '</div>';
     }).join('');
     ensureDrawer();
-    drawer.innerHTML = html; drawer.classList.add('open');
+    drawer.innerHTML = (sidebarMode() ? '' : roleCardHtml(true)) + html; drawer.classList.add('open');   // builder item 220: a phone's Menu says the role too
     setExpanded('dds-waffle', true); setExpanded('dds-mbar-menu', true);
     var f = drawer.querySelector('a'); if (f) f.focus();
   }
@@ -3113,6 +3113,47 @@
     if (caps.indexOf('design') < 0) lacks.push('design');
     if (caps.indexOf('view_all') < 0) lacks.push('business');
     document.documentElement.setAttribute('data-dds-lacks', lacks.join(' '));
+    guardRolePage(ctx);
+  }
+
+  // ── Builder item 220: a member's own role, in one sentence ──
+  // Someone with a seat on a business reads what their role sees and never sees, the words the
+  // owner read when inviting them (GET /portal/context my_role); a Designer also reads who puts
+  // their work live. Owners, a studio and platform staff get no card.
+  var ROLE_SVG = {
+    designer: '<path d="M4 20c2.5 0 4-1.3 4-3.5S9.5 13 11 13l8.5-8.5a1.4 1.4 0 0 0-2-2L9 11c0 1.5-1 3-3.5 3S4 16 4 20z"/>',
+    person: '<circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  };
+  function roleSvg(k) { return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + ROLE_SVG[k] + '</svg>'; }
+  function roleCardHtml(inDrawer) {
+    var r = CTX && CTX.my_role;
+    if (!r || !r.name || !r.you) return '';
+    var who = r.name === 'Staff' ? 'Staff' : 'a ' + r.name;
+    return '<div class="dds-rolecard"' + (inDrawer ? '' : ' id="dds-rolecard"') + ' role="note" aria-label="Your role">' +
+      '<p class="rc-t">' + roleSvg(r.role === 'designer' ? 'designer' : 'person') + '<span>You’re ' + esc(who) + (r.business ? ' on ' + esc(r.business) : ' here') + '</span></p>' +
+      '<p class="rc-s">' + esc(r.you) + '</p>' +
+      (r.publish ? '<p class="rc-p">' + roleSvg('clock') + '<span>' + esc(r.publish) + '</span></p>' : '') + '</div>';
+  }
+  // ── Builder item 220: a page outside a Designer's role says so ──
+  // The server refuses a Designer every read on it (index.ts), so an old link, a bookmark or a
+  // typed address would open a page of errors. The page's own content goes (shell.css), and this
+  // says what the role sees, with the way back.
+  var DESIGNER_PAGES = /^\/(presence|files|help)(\.html)?$/;
+  var PAGE_NAMES = { today: 'Home', agency: 'Home', inbox: 'Inbox', customers: 'Customers', contacts: 'Contacts', crm: 'This record', pipeline: 'Pipeline', invoices: 'Invoices', projects: 'Projects', todos: 'To-dos', analytics: 'Analytics', settings: 'Settings', sharing: 'Sharing', connections: 'Connections', broadcasts: 'Updates', prospects: 'Prospects', sites: 'Sites', domains: 'Domains', 'visual-studio': 'Visual Studio', developer: 'Developer tools', week: 'Plan my week' };
+  function guardRolePage(ctx) {
+    if (!ctx || ctx.site_role !== 'designer' || ctx.scope || ctx.is_operator) return;
+    if (DESIGNER_PAGES.test(location.pathname) || document.getElementById('dds-notyours')) return;
+    var page = PAGE_NAMES[location.pathname.replace(/^\//, '').replace(/\.html$/, '')] || 'This page';
+    var biz = ctx.my_role && ctx.my_role.business;
+    document.documentElement.classList.add('dds-notyours');
+    document.body.appendChild(el('<section id="dds-notyours" role="main" aria-labelledby="dds-notyours-h"><span class="ny-ic">' + roleSvg('lock') + '</span>' +
+      '<h1 id="dds-notyours-h" tabindex="-1">' + esc(page) + ' isn’t part of your role</h1>' +
+      '<p>As a Designer' + (biz ? ' on ' + esc(biz) : '') + ' you see the website, its pages, styles and photos. Customers, contacts, deals, invoices and messages stay with the owner and the studio, so this page shows nothing to you.</p>' +
+      '<div class="ny-acts"><a class="ny-pri" href="' + esc(withScope('/presence.html')) + '">Open the website</a><a href="' + esc(withScope('/files.html')) + '">Files</a></div>' +
+      '<p class="ny-note">Need something from here? Ask the owner or the studio, who can change your role on People.</p></section>'));
+    var h = document.getElementById('dds-notyours-h'); if (h) try { h.focus({ preventScroll: true }); } catch (_) { /* */ }
   }
   window.ddsLacks = function (need) {
     return (' ' + (document.documentElement.getAttribute('data-dds-lacks') || '') + ' ').indexOf(' ' + need + ' ') >= 0;

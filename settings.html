@@ -258,6 +258,24 @@
   .invite > div{flex:1;min-width:180px} .invite label{display:block;font-size:12px;font-weight:600;color:var(--soft);margin:0 0 var(--dds-s1,4px)}
   .invite input,.invite select{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) 10px}
   .seats{font-size:13px;color:var(--soft);margin:0}
+  /* builder item 220: each studio role in one sentence, under each person, under the role being
+     invited, and in a Who sees what table (Figma 405:625) */
+  .member .who .rolesent{display:block;font-size:12.5px;line-height:1.45;color:var(--soft);margin-top:2px}
+  .rolepick{margin:var(--dds-s2,8px) 0 0;background:var(--card);border:1px solid #d9d0f3;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45;color:var(--soft)}
+  .rolepick[hidden]{display:none} .rolepick b{color:var(--p-deep,#40297f);font-weight:600;margin-right:4px}
+  .whosees{margin:var(--dds-s4,16px) 0 0} .whosees h3{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin:0 0 var(--dds-s2,8px)}
+  .whosees table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13px}
+  .whosees th{background:var(--bg,#f6f5fa);color:var(--faint);font-size:12px;font-weight:600;text-align:center;padding:8px 10px} .whosees th:first-child{text-align:left}
+  .whosees td{border-top:1px solid var(--line);padding:10px;vertical-align:middle;text-align:center} .whosees td:first-child{text-align:left}
+  .whosees td b{display:block;font-size:13.5px;color:var(--ink);font-weight:600} .whosees td span.s{display:block;font-size:12.5px;line-height:1.45;color:var(--soft)}
+  .whosees .mk{display:inline-block;min-width:30px;border-radius:999px;padding:2px 10px;font-weight:700;font-size:12.5px;background:var(--bg,#f4f3f9);color:var(--faint)} .whosees .mk.y{background:#e6f5ec;color:#11744a}
+  .whosees .note{font-size:12.5px;color:var(--faint);margin:var(--dds-s2,8px) 0 0}
+  @media (max-width:640px){
+    .whosees table,.whosees tbody,.whosees tr,.whosees td{display:block} .whosees thead{position:absolute;left:-9999px}
+    .whosees tr{border-top:1px solid var(--line);padding:10px 12px} .whosees tr:first-child{border-top:0}
+    .whosees td{border:0;padding:0;text-align:left} .whosees td:not(:first-child){display:inline-flex;align-items:center;gap:6px;margin:8px 12px 0 0;font-size:12px;color:var(--soft)}
+    .whosees td:not(:first-child)::before{content:attr(data-label)}
+  }
   .rolehelp{font-size:12.5px;color:var(--faint);margin:var(--dds-s2,8px) 0 0}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   /* bug hunt C4: a part whose read failed says so (and keeps its save off); C16: a switch that can't be pressed right now */
@@ -589,7 +607,8 @@
       <div><label for="inv-role">Role</label><select id="inv-role"></select></div>
       <div style="flex:0 0 auto"><button class="btn sm primary" type="submit" id="inviteBtn">Invite</button></div>
     </form>
-    <p class="rolehelp" id="roleHelp"></p>
+    <div class="rolepick" id="rolePick" aria-live="polite" hidden></div>
+    <div class="whosees" id="roleHelp"></div>
   </section>
   <section class="card" id="billing" aria-labelledby="billingHead" hidden data-needs="owner">
     <div class="card-h"><h2 id="billingHead" tabindex="-1">Your plan</h2><span class="hint">Your Studio OS plan — not the invoices you send clients.</span></div>
@@ -833,7 +852,31 @@ function spySections() {
 //    or remove. Owners and admins manage (manage_members); everyone else on the
 //    team sees the list read-only. Role words are plain; the server keys stay. ──
 const ROLE_WORD = { owner: 'Owner', admin: 'Admin', account_manager: 'Account manager', content_strategist: 'Content strategist', designer: 'Designer', developer: 'Developer', support: 'Support', readonly: 'Read only' };
-const ROLE_HELP = 'Owners and admins run the team and the brand. Account managers work inside clients and publish. Content strategists, designers and developers prepare work; support reads and leaves notes; read only looks.';
+// builder item 220: each studio role in one sentence, in the server's words (agency/auth.ts
+// STUDIO_ROLE_WORDS, kept the same by tests/presence/designer_role_test.mjs), with what it reaches:
+// opening a client (lib/scope.ts asks bulk_publish), the team and the brand (manage_members), the plan
+const STUDIO_ROLES = {
+  owner: { sees: 'Sees everything: every client, the team, the brand and your plan.', opens: 1, team: 1, plan: 1 },
+  admin: { sees: 'Opens every client and runs the team and the brand; only the owner sees your plan.', opens: 1, team: 1, plan: 0 },
+  account_manager: { sees: 'Opens every client to work on their site, records and messages, and publishes; can’t change the team or the brand.', opens: 1, team: 0, plan: 0 },
+  content_strategist: { sees: 'Sees your client list, notes and what’s waiting, and prepares changes for approval; can’t open a client.', opens: 0, team: 0, plan: 0 },
+  designer: { sees: 'Sees your client list and notes, and works only on the sites you add them to as Designer.', opens: 0, team: 0, plan: 0 },
+  developer: { sees: 'Sees your client list and notes, and prepares add-ons for approval; can’t open a client.', opens: 0, team: 0, plan: 0 },
+  support: { sees: 'Sees your client list and leaves notes; can’t open a client or change anything.', opens: 0, team: 0, plan: 0 },
+  readonly: { sees: 'Sees your client list and nothing else.', opens: 0, team: 0, plan: 0 },
+};
+function whoSeesHtml() {
+  const mk = (on) => `<span class="mk${on ? ' y' : ''}" aria-label="${on ? 'Yes' : 'No'}">${on ? '✓' : '✕'}</span>`;
+  const rows = Object.keys(ROLE_WORD).map((k) => { const r = STUDIO_ROLES[k]; return `<tr data-role="${esc(k)}"><td><b>${esc(ROLE_WORD[k])}</b><span class="s">${esc(r.sees)}</span></td><td data-label="Opens a client">${mk(r.opens)}</td><td data-label="Team and brand">${mk(r.team)}</td><td data-label="Your plan">${mk(r.plan)}</td></tr>`; }).join('');
+  return '<h3 id="whoSeesHead">Who sees what</h3><table aria-labelledby="whoSeesHead"><thead><tr><th scope="col">Role</th><th scope="col">Opens a client</th><th scope="col">Team and brand</th><th scope="col">Your plan</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<p class="note">Inside a client, each person also holds whatever seat that client gave them; a Designer seat there means the website only.</p>';
+}
+function paintRolePick() {
+  const box = $('rolePick'), sel = $('inv-role'); if (!box || !sel) return;
+  const k = sel.value, r = STUDIO_ROLES[k];
+  box.hidden = !canManageTeam() || !r;
+  if (r) box.innerHTML = `<b>${esc(ROLE_WORD[k] || k)}</b> ${esc(r.sees)}`;
+}
 let TEAM = null, TEAM_ME = null;
 function canManageTeam() { return !!(TEAM_ME && (TEAM_ME.role === 'owner' || TEAM_ME.role === 'admin')); }
 function memberHtml(m) {
@@ -844,7 +887,9 @@ function memberHtml(m) {
     ? `<select data-role="${esc(m.id)}" aria-label="Role for ${esc(m.email)}">${Object.keys(ROLE_WORD).map((k) => `<option value="${k}"${m.role === k ? ' selected' : ''}>${ROLE_WORD[k]}</option>`).join('')}</select>`
     : `<span class="rolew">${esc(ROLE_WORD[m.role] || m.role)}${mine ? ' · you' : ''}${revoked ? ' · removed' : (m.status === 'invited' ? ' · invited' : '')}</span>`;
   const act = canManageTeam() && !mine ? (revoked ? `<button class="btn sm" type="button" data-restore="${esc(m.id)}">Restore</button>` : `<button class="btn sm" type="button" data-revoke="${esc(m.id)}">Remove</button>`) : '';
-  return `<div class="member${revoked ? ' revoked' : ''}" data-member="${esc(m.id)}"><div class="who"><b>${esc(m.email)}</b><span>${m.created_at ? 'since ' + esc(shortDate(m.created_at)) : ''}</span></div>${roleCtl}${act}</div>`;
+  // builder item 220: the role's sentence under the name
+  const sent = STUDIO_ROLES[m.role] ? `<span class="rolesent">${esc(STUDIO_ROLES[m.role].sees)}</span>` : '';
+  return `<div class="member${revoked ? ' revoked' : ''}" data-member="${esc(m.id)}"><div class="who"><b>${esc(m.email)}</b><span>${m.created_at ? 'since ' + esc(shortDate(m.created_at)) : ''}</span>${sent}</div>${roleCtl}${act}</div>`;
 }
 // Speed (Nov 10 2026, finding I8): Team and Plan & billing both show the seat and client counts;
 // the page asks for them once per open and both read the one answer.
@@ -868,8 +913,9 @@ async function loadTeam() {
 function renderTeam() {
   $('people').innerHTML = TEAM.length ? TEAM.map(memberHtml).join('') : '<p class="seats">Just you so far.</p>';
   const f = $('inviteForm'); f.hidden = !canManageTeam();
-  $('roleHelp').textContent = ROLE_HELP;
+  $('roleHelp').innerHTML = whoSeesHtml();
   const sel = $('inv-role'); if (sel && !sel.options.length) sel.innerHTML = Object.keys(ROLE_WORD).filter((k) => k !== 'owner').map((k) => `<option value="${k}"${k === 'account_manager' ? ' selected' : ''}>${ROLE_WORD[k]}</option>`).join('');
+  paintRolePick();
   $('people').querySelectorAll('[data-role]').forEach((s) => s.addEventListener('change', async () => {
     const id = s.getAttribute('data-role'), m = TEAM.find((x) => x.id === id); if (!m) return;
     const prev = m.role; s.disabled = true;
@@ -877,6 +923,8 @@ function renderTeam() {
     s.disabled = false;
     if (!r.ok) { s.value = prev; toast(nice(r.body, 'That didn’t save.'), true); return; }
     m.role = (r.body.data && r.body.data.role) || s.value; toast('Role changed.');
+    const line = s.closest('.member') && s.closest('.member').querySelector('.rolesent');   // builder item 220: the sentence follows the role
+    if (line && STUDIO_ROLES[m.role]) line.textContent = STUDIO_ROLES[m.role].sees;
   }));
   $('people').querySelectorAll('[data-revoke],[data-restore]').forEach((b) => b.addEventListener('click', async () => {
     const restore = b.hasAttribute('data-restore'); const id = b.getAttribute(restore ? 'data-restore' : 'data-revoke'); const m = TEAM.find((x) => x.id === id); if (!m) return;
@@ -907,7 +955,7 @@ function onTeamAlready(m, email) {
   row.scrollIntoView({ block: 'center' }); const s = row.querySelector('select'); if (s) s.focus({ preventScroll: true });
 }
 if (inviteForm) {
-  $('inv-email').addEventListener('input', disarmRestore); $('inv-role').addEventListener('change', disarmRestore);
+  $('inv-email').addEventListener('input', disarmRestore); $('inv-role').addEventListener('change', () => { disarmRestore(); paintRolePick(); });
   inviteForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = $('inv-email').value.trim().toLowerCase(), role = $('inv-role').value;

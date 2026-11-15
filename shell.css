@@ -665,6 +665,32 @@ html[data-dds-lacks~="design"] [data-needs="design"],
 html[data-dds-lacks~="business"] [data-needs="business"],
 html[data-dds-lacks~="business"] #dds-bell{display:none!important}
 html[data-dds-lacks~="design"] [data-if-lacks="design"][hidden]{display:block!important}
+html[data-dds-lacks~="publish"] [data-if-lacks="publish"][hidden]{display:inline-flex!important}
+
+/* builder item 220: a member's own role, in one sentence, under the brand on a computer and at the
+   top of a phone's Menu (Figma 407:735) */
+#dds-rolecard{display:none}
+.dds-rolecard{box-sizing:border-box;background:var(--dds-p-soft);color:var(--dds-p-deep);border-radius:var(--dds-r-lg,14px);padding:10px 12px;font-size:12.5px;line-height:1.45}
+.dds-rolecard p{margin:0}.dds-rolecard p + p{margin-top:6px}
+.dds-rolecard svg{width:15px;height:15px;flex:0 0 auto;margin-top:1px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.dds-rolecard .rc-t{display:flex;align-items:flex-start;gap:8px;font-weight:600;font-size:13px}
+.dds-rolecard .rc-p{display:flex;align-items:flex-start;gap:6px;color:var(--dds-soft)}
+.dds-drawer .dds-rolecard{margin:0 0 var(--dds-s4);font-size:13px;column-span:all}
+@media (min-width:761px){html.dds-side #dds-rolecard{display:block;order:1;margin:0 0 10px}}
+/* a page outside a Designer's role: its own content goes, this card stays (shell.js guardRolePage) */
+html.dds-notyours body > :not([id^="dds-"]):not(.dds-drawer):not(.dds-pop):not(script):not(style){display:none!important}
+#dds-notyours{box-sizing:border-box;max-width:560px;margin:14vh auto 40px;padding:36px 40px;background:var(--dds-card);color:var(--dds-ink);border:1px solid var(--dds-line);border-radius:22px;box-shadow:0 12px 40px rgba(26,13,64,.12)}
+#dds-notyours .ny-ic{display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:var(--dds-p-soft);color:var(--dds-p)}
+#dds-notyours .ny-ic svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#dds-notyours h1{font-family:"Fraunces","Iowan Old Style",Georgia,serif;font-size:26px;font-weight:600;line-height:1.2;margin:16px 0 10px;color:var(--dds-ink)}
+#dds-notyours h1:focus{outline:none}
+#dds-notyours p{font-size:15px;line-height:1.55;color:var(--dds-soft);margin:0 0 18px}
+#dds-notyours .ny-acts{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 16px}
+#dds-notyours .ny-acts a{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:999px;border:1px solid var(--dds-line);color:var(--dds-ink);font-weight:600;font-size:14px;text-decoration:none;box-sizing:border-box}
+#dds-notyours .ny-acts a.ny-pri{background:var(--dds-p);border-color:var(--dds-p);color:var(--dds-on-p,#fff)}
+#dds-notyours .ny-acts a:focus-visible{outline:2px solid var(--dds-p);outline-offset:2px}
+#dds-notyours .ny-note{font-size:13px;color:var(--dds-faint);margin:0}
+@media (max-width:760px){#dds-notyours{margin:24px 16px 120px;padding:26px 22px}#dds-notyours h1{font-size:22px}}
 
 /* Final pass (Nov 8, S1): a studio asked to work with this website's owner. The
    owner answers here — nothing is linked until they press Accept. */
