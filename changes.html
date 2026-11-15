@@ -104,8 +104,9 @@
   .fbar .count{margin-left:auto;font-size:12.5px;color:var(--faint)}
   .day{padding:14px 18px 8px;background:var(--raised);font-size:11.5px;font-weight:700;letter-spacing:.08em;color:var(--faint);text-transform:uppercase}
   ol.rows{list-style:none;padding:0}
-  .ch{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;grid-template-areas:"av say chip go";gap:14px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
-  .ch>.av{grid-area:av}.ch>.say{grid-area:say}.ch>.chip{grid-area:chip}.ch>.go{grid-area:go}
+  .ch{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;grid-template-areas:"av say kind go";gap:14px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .ch>.av{grid-area:av}.ch>.say{grid-area:say}.ch>.ckind{grid-area:kind}.ch>.go{grid-area:go}
+  .ch:has(.went){align-items:start}   /* What went live open: the face, kind and button stay beside the sentence */
   .ch.live{background:var(--p-soft)}
   .av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff;background:linear-gradient(135deg,#6d3fd4,#a63f86);flex:0 0 auto}
   .av.owner{background:#127369}.av.seat{background:#8a4c08}.av.support{background:#245fa0}.av.unknown{background:#69667d}
@@ -114,9 +115,10 @@
   .say{min-width:0}
   .say .t{font-size:14.5px;overflow-wrap:anywhere}.say .t b{font-weight:600}
   .say .s{font-size:12.5px;color:var(--soft);margin-top:2px}
-  .chip{font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 9px;white-space:nowrap}
-  .chip.website{background:var(--p-soft);color:var(--p)}.chip.photos,.chip.people{background:var(--info-soft);color:var(--info)}
-  .chip.live{background:var(--good-soft);color:var(--good)}.chip.settings{background:var(--warn-soft);color:var(--warn)}.chip.auto{background:var(--raised);color:var(--soft)}
+  /* the kind of change: not .chip, which shell.css makes a 44px control on touch screens */
+  .ckind{font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 9px;white-space:nowrap}
+  .ckind.website{background:var(--p-soft);color:var(--p)}.ckind.photos,.ckind.people{background:var(--info-soft);color:var(--info)}
+  .ckind.live{background:var(--good-soft);color:var(--good)}.ckind.settings{background:var(--warn-soft);color:var(--warn)}.ckind.auto{background:var(--raised);color:var(--soft)}
   .go{font:inherit;font-size:13.5px;font-weight:600;color:var(--p);text-decoration:none;background:none;border:1px solid transparent;border-radius:999px;padding:6px 10px;min-height:36px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap}
   .go:hover{border-color:var(--p)}
   .went{margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
@@ -130,11 +132,12 @@
   .foot{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--soft);margin-top:var(--dds-s3,12px)}
   .foot svg{flex:0 0 auto;width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;margin-top:2px}
   .partial{font-size:12.5px;color:var(--warn);margin:-8px 0 var(--dds-s3,12px)}
-  /* phones: each change is a card, the chip and Open under the sentence */
+  /* phones: each change is a card, its kind and Open under the sentence */
   @media (max-width:640px){
-    .ch{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"av say say" ". chip go";row-gap:6px;column-gap:12px;margin:10px 12px;border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--card)}
+    .ch{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"av say say" ". kind go";row-gap:6px;column-gap:12px;margin:10px 12px;border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--card)}
     .ch.live{background:var(--p-soft)}
-    .ch>.chip{justify-self:start}
+    .ch>.ckind{justify-self:start}
+    .ch:has(.went)>.ckind,.ch:has(.went)>.go{align-self:center}   /* their own row under the sentence: level with each other */
     ol.rows{padding-bottom:4px}
     .day{background:transparent;padding:14px 16px 0}
     .feed{background:transparent;border:none;box-shadow:none}
@@ -234,11 +237,11 @@ function lead(it){
 function rowHtml(it){
   const when=it.from&&dayKey(it.from)===dayKey(it.at)?`${timeOf(it.from)} to ${timeOf(it.at)}`:timeOf(it.at);
   const sub=[it.detail,it.where,when].filter(Boolean).map(esc).join(' · ');
-  const chip=it.side==='auto'?'<span class="chip auto">Automatic</span>':`<span class="chip ${esc(it.area)}">${esc(AREA_WORD[it.area]||'')}</span>`;
+  const kind=it.side==='auto'?'<span class="ckind auto">Automatic</span>':`<span class="ckind ${esc(it.area)}">${esc(AREA_WORD[it.area]||'')}</span>`;
   const href=hrefFor(it);
   const go=it.publish_id?`<button type="button" class="go" data-went="${esc(it.id)}" aria-expanded="${WENT[it.id]?'true':'false'}">${WENT[it.id]?'Hide':'What went live'} <span aria-hidden="true">${WENT[it.id]?'‹':'›'}</span></button>`
     :href?`<a class="go" href="${esc(href)}">Open <span aria-hidden="true">›</span><span class="sr-only">: ${esc(it.where||'')}</span></a>`:'';
-  return`<li class="ch${it.publish_id?' live':''}" data-id="${esc(it.id)}">${lead(it)}<div class="say"><p class="t">${sentence(it)}</p><p class="s">${sub}</p>${wentHtml(it)}</div>${chip}${go}</li>`;
+  return`<li class="ch${it.publish_id?' live':''}" data-id="${esc(it.id)}">${lead(it)}<div class="say"><p class="t">${sentence(it)}</p><p class="s">${sub}</p>${wentHtml(it)}</div>${kind}${go}</li>`;
 }
 function wentHtml(it){
   const w=WENT[it.id];if(!w)return'';

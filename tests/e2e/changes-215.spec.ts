@@ -76,7 +76,7 @@ test.describe('Changes (builder list item 215)', () => {
     await expect(rows.nth(3).locator('.s')).toHaveText('Files › Photos · 5:18 PM to 5:21 PM');
     await expect(rows.nth(5).locator('.t')).toHaveText('Eric took Bluebird Bakery offline.');
     await expect(rows.nth(5).locator('.s')).toHaveText('Visitors see a simple “temporarily offline” page · Site settings · 9:00 AM');
-    await expect(rows.nth(6).locator('.chip')).toHaveText('Automatic');
+    await expect(rows.nth(6).locator('.ckind')).toHaveText('Automatic');
     await expect(page.locator('h3.day')).toHaveText(['Today · Sunday, Nov 15', 'Yesterday · Saturday, Nov 14', 'Friday, Nov 13']);
     // a change opens its place on that client's site
     await expect(rows.nth(1).getByRole('link', { name: /Open/ })).toHaveAttribute('href', `/presence.html?client=${S1}#business`);
@@ -148,6 +148,9 @@ test.describe('Changes (builder list item 215)', () => {
     }
     const card = await page.locator('li.ch').first().evaluate((n) => getComputedStyle(n).borderRadius);
     expect(card).toBe('14px');
+    // the kind of change is a label, not a control: it stays one line high beside Open
+    const kind = await page.locator('li.ch .ckind').first().evaluate((n) => (n as HTMLElement).getBoundingClientRect().height);
+    expect(kind).toBeLessThan(30);
   });
 
   for (const scheme of ['light', 'dark'] as const) {
