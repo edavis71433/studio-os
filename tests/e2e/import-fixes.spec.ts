@@ -105,13 +105,24 @@ test.describe('item 97 — past 500 rows it says so (B5)', () => {
 });
 
 test.describe('item 97 — Close stops a running import (B6)', () => {
+  // Sales item 122: Contacts sends its whole file in one request now, so there is nothing to stop halfway
+  // there (Close waits for it: import-merge-86.spec.ts). The shared importer still runs Customers and
+  // Pipeline row by row, and Stop still stops those; this proves it on Customers.
   test('Stop mid-run: the rows after it never go in, and the summary says how far it got', async ({ page }) => {
-    await installApp(page, { api: { '/sales/contacts': { data: [] } } });
+    await installApp(page, { api: { '/studio/customers': { data: [] } } });
     let open!: () => void;
-    const sent = await contactPosts(page, new Promise<void>((r) => { open = r; }));   // the first five wait for us
-    await openContactsImport(page);
-    const rows = Array.from({ length: 40 }, (_, i) => `Person ${i + 1},`).join('\n');   // names only: these can't be matched, so a second run would double them
-    await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('people.csv', 'Name,Email\n' + rows + '\n'));
+    const gate = new Promise<void>((r) => { open = r; });
+    const sent: Array<Record<string, unknown>> = [];
+    await page.route('**/functions/v1/presence/sales/customers', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      sent.push(route.request().postDataJSON());
+      await gate;   // the first five wait for us
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { connected: true } }) });
+    });
+    await page.goto('/customers.html');
+    await page.getByRole('button', { name: 'Import CSV' }).click();
+    const rows = Array.from({ length: 40 }, (_, i) => `Business ${i + 1},p${i + 1}@example.com`).join('\n');
+    await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('people.csv', 'Business,Email\n' + rows + '\n'));
     await page.locator('#csvZone').getByRole('button', { name: 'Import 40' }).click();
     await expect.poll(() => sent.length).toBe(5);                                                // five at a time, all five on their way
     await expect(page.locator('#csvZone input[type=file]')).toBeDisabled();                     // no second file under a running one
@@ -122,7 +133,7 @@ test.describe('item 97 — Close stops a running import (B6)', () => {
     // focus goes back to what opened it: Import CSV, or on a phone the header's ⋯ it sits behind (builder item 165)
     await expect(page.locator((page.viewportSize()?.width || 0) < 761 ? 'header.dds-ph .dds-ph-dots' : '#importCsv')).toBeFocused();
     open();                                                                                      // the five on their way land
-    await expect(toastWith(page, 'Stopped after 5 of 40 — 5 added.')).toBeVisible();
+    await expect(toastWith(page, 'Stopped after 5 of 40 — 5 already yours')).toBeVisible();
     await page.waitForTimeout(600);                                                              // a running import would have sent its next five by now
     expect(sent.length).toBe(5);
   });
