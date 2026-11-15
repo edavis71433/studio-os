@@ -78,7 +78,7 @@
       '.pp-role{display:flex;flex-direction:column;gap:8px;border:1px solid var(--dds-line,#e7e6ef);border-radius:14px;padding:12px 14px;cursor:pointer;position:relative}',
       '.pp-role:has(input[type=radio]:checked){border:2px solid var(--dds-p,#6d3fd4);background:var(--dds-p-soft,#efeafa);padding:11px 13px}',
       '.pp-role:focus-within{outline:2px solid var(--dds-p,#6d3fd4);outline-offset:2px}',
-      '.pp-role .top{display:flex;align-items:flex-start;gap:10px}.pp-role input{width:18px;height:18px;margin:1px 0 0;accent-color:var(--dds-p,#6d3fd4);flex:0 0 auto}',
+      '.pp-role .top{display:flex;align-items:flex-start;gap:10px}.pp-role input[type=radio]{width:18px;height:18px;margin:1px 0 0;accent-color:var(--dds-p,#6d3fd4);flex:0 0 auto}',
       '.pp-role .nm{font-weight:600;font-size:14.5px;flex:0 0 auto}.pp-role .ds{color:var(--dds-soft,#55526a);font-size:13px}',
       '.pp-can{display:flex;flex-wrap:wrap;gap:6px;padding-left:28px}.pp-can span{font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 8px;background:var(--dds-bg,#f4f3f9);color:var(--dds-faint,#69667d)}.pp-can span.y{background:var(--dds-good-soft,#e6f5ec);color:var(--dds-good,#11744a)}',
       // builder item 220: the sentence leads; a Designer's card carries the publish switch; each seat says its role
