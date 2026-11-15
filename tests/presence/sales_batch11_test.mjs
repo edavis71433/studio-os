@@ -90,7 +90,8 @@ ok('a site we host, never published, is still getting set up', C.deriveClientHea
 ok('the record says "Hosted elsewhere" in all three places', /const siteWord=\(p\)=>p\.live\?'Live':\(p\.edition==='monitor'\?'Hosted elsewhere'/.test(page) && (page.match(/siteWord\(p\)/g) || []).length >= 3);
 
 // ── item 52: the tip reads the project ──
-ok('the won tip reads the project\'s progress', /function guideNow\(stage\)/.test(page) && /Their project is \$\{pct\}% along\./.test(page) && /const g=guideNow\(stage\);/.test(page));
+// sales item 124: the stage note took the tip strip's place; the project's progress is its fact line
+ok('the won tip reads the project\'s progress', /function stageFact\(stage,d,signed\)/.test(page) && /Their project is \$\{pct\}% along\./.test(page) && /fact=stageFact\(stage,d,signed\)/.test(page));
 
 // ── item 53: My tasks ──
 const P1 = 'aaaaaaaa-0000-4000-8000-000000000001';
@@ -111,7 +112,9 @@ ok('Home shows what\'s next, counts it, and moves the next step up on Done', /co
 // ── items 54–56 ──
 ok('Inbox: the badge reads the name alone', /who:l\.name\|\|l\.email\|\|'Someone'/.test(read('inbox.html')) && !/initialsOf\(it\.name\)/.test(read('inbox.html')));
 const pipe = read('pipeline.html');
-ok('Pipeline: a won or not-a-fit deal never "closes"', /d\.expected_close&&d\.stage!=='won'&&d\.stage!=='lost'\?' · closes '/.test(pipe) && /d\.expected_close&&d\.stage!=='won'&&d\.stage!=='lost'\?`<span class="fact">Closes/.test(pipe));
+// item 121: the list card joins its words with " · " (an unknown source says nothing, so no stray dot)
+// (sales item 37 adds the owner after it, with a second person on the team)
+ok('Pipeline: a won or not-a-fit deal never "closes"', /d\.expected_close&&d\.stage!=='won'&&d\.stage!=='lost'\?'closes '\+niceDay\(d\.expected_close\):''(,[^\]]*)?\]\.filter\(Boolean\)\.join\(' · '\)/.test(pipe) && /d\.expected_close&&d\.stage!=='won'&&d\.stage!=='lost'\?`<span class="fact">Closes/.test(pipe));
 ok('Send an update: a "Your customers" list', B.SEGMENTS[0].key === 'customers' && B.isSegmentKey('customers') && B.isAudienceKey('customers'));
 const bl = read('supabase/functions/presence/lib/broadcast.ts');
 ok('…its people are this studio\'s active customers', /presence_service_links\?agency_site_id=eq\.\$\{siteId\}&status=eq\.active&select=customer_client_id/.test(bl));

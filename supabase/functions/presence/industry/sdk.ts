@@ -5,7 +5,7 @@
 // provider, composed and validated through these functions; they never touch an
 // engine, never bypass approval, never see another tenant.
 //
-//   import { makePack, packProvider, packType, validatePack } from '../sdk.ts';
+//   a pack file in packs/ imports { makePack, packProvider, packType, validatePack } from ../sdk.ts
 //
 // See docs/presence/THIRD-PARTY-PACK-GUIDE.md for the full walkthrough.
 

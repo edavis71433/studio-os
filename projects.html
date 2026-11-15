@@ -411,6 +411,14 @@ const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // list is filtered to that customer's projects. A scope that is NOT a bridged
 // customer keeps the old behaviour (the honest studio-level notice).
 let AG_MODE=false,SCOPED_CLIENT=null,OPENED_ONCE=false;
+// builder item 83: ?client= is also how someone with places in two businesses opens their second one.
+// That is their own business, not a studio inside a client: its projects are its own, read with it in
+// hand, and it can start one. The shell tells the two apart (ddsScopeInfo: the context, else the
+// businesses it remembers from the last visit); before it has loaded, the address decides. A context
+// that lands after the first read and says otherwise reads the page again.
+const inClient=()=>!!scope()&&(window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope())?!!window.ddsScopeInfo():true);
+let LOADED_IN=null;
+document.addEventListener('dds:context',()=>{if(LOADED_IN===null||LOADED_IN===inClient())return;AG_MODE=false;SCOPED_CLIENT=null;CUSTMAP=null;CUSTTRIED=false;load(true);});
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':AG_MODE?'':scope()});
 async function resolveScopedClient(){
   const site=scope(); if(!site)return null;
@@ -418,7 +426,7 @@ async function resolveScopedClient(){
     const r=await fetch(FN+'/studio/customers',{headers:{...H(),'x-dds-scope-site':''}});
     const b=await r.json().catch(()=>({}));
     const rows=Array.isArray(b&&b.data)?b.data:[];
-    if(r.ok)takeCustomers(rows);   // H9: the same roster names the customers, so it isn't asked for twice
+    if(r.ok&&inClient())takeCustomers(rows);   // H9: the same roster names the customers, so it isn't asked for twice (unless the context said meanwhile it's your own business, item 83)
     const hit=rows.find(c=>c&&String(c.customer_site_id||'')===site&&c.client_id);
     return hit?{client_id:String(hit.client_id),name:String(hit.name||'')}:null;
   }catch(_){return null;}
@@ -816,7 +824,9 @@ function wireRoster(){
 async function load(soft){
   if(!soft&&window.ddsSkeleton) window.ddsSkeleton($('list'),4);
   try{
-    if(scope()&&!AG_MODE){const sc=await resolveScopedClient();if(sc){AG_MODE=true;SCOPED_CLIENT=sc;}}
+    if(scope()&&document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));   // the deferred shell answers inClient()
+    LOADED_IN=inClient();
+    if(LOADED_IN&&!AG_MODE){const sc=await resolveScopedClient();if(sc){AG_MODE=true;SCOPED_CLIENT=sc;}}
     // Bold redesign: one read of every project (the chips filter in place, with
     // true counts) — the server's page cap, not its default 25. C14: past 100 it
     // reads on, a page at a time, instead of stopping silently
@@ -829,7 +839,7 @@ async function load(soft){
     // site — projects live on the agency site (service_bridge ensureProjectForDeal
     // takes agencySiteId), so it would land where nothing else can see it. Hide
     // the action rather than offer a button that does the wrong thing quietly.
-    STUDIO=res.is_studio_view!==false; NEW_OK=STUDIO&&!scope();
+    STUDIO=res.is_studio_view!==false; NEW_OK=STUDIO&&!LOADED_IN;
     ITEMS=all;
     if(SCOPED_CLIENT)ITEMS=ITEMS.filter(p=>String(p.client_id||'')===SCOPED_CLIENT.client_id);   // this client's work only
     LOADED_AT=Date.now();

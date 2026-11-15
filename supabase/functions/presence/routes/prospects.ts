@@ -33,6 +33,7 @@ import { packNotes } from '../lib/pitch_notes.ts';
 import { normalizeAddress } from '../lib/contact_fields.ts';
 import { digitsOf, phonePattern } from '../lib/record_search.ts';
 import { missingInsertColumns } from '../lib/inbound_email.ts';
+import { guardedFetch } from '../../_shared/tools/url_guard.ts';   // builder item 204
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const clean = (s: unknown, max = 200) => String(s ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, max);
@@ -53,7 +54,8 @@ export const quickDeps: { fetchPage?: (url: string) => Promise<{ ok: boolean; st
 async function fetchPage(url: string): Promise<{ ok: boolean; status: number; html: string } | null> {
   if (quickDeps.fetchPage) return quickDeps.fetchPage(url);
   try {
-    const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(6000), headers: { 'User-Agent': 'StudioOS-prospect-check/1.0' } });
+    // builder item 204: through the guarded fetcher, so no private or internal address, on any hop
+    const r = await guardedFetch(url, { signal: AbortSignal.timeout(6000), headers: { 'User-Agent': 'StudioOS-prospect-check/1.0' } });
     const html = (await r.text().catch(() => '')).slice(0, 120_000);
     return { ok: r.ok, status: r.status, html };
   } catch { return null; }

@@ -70,7 +70,12 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
+// builder item 83: ?client= is also how someone with places in two businesses opens their second one, and this
+// page then sets up that business: its reads and saves carry it. A studio inside a client is as before. The shell
+// tells the two apart (ddsScopeInfo), once the page has waited for its context.
+const ownBusiness=()=>{const id=new URLSearchParams(location.search).get('client')||'';return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)&&window.ddsScopeInfo&&!window.ddsScopeInfo()?id:'';};
+async function businessKnown(){if(!new URLSearchParams(location.search).get('client'))return;if(document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));if(window.ddsContext)await window.ddsContext().catch(()=>null);}
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':ownBusiness()});
 async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 
 // ── the intake industries + smart default services (mirror of lib/onboarding.ts) ──
@@ -194,11 +199,13 @@ function signedOut(){$('main').innerHTML=`<div class="center"><p class="big">Sig
   try{
     const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){signedOut();return;}
+    await businessKnown();
     // greet by name + skip drafting for editions without a website (route them to Today)
     try{
       // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
-      // Only when UNSCOPED: this page's api() carries no x-dds-scope-site, so under a
-      // drilled-in ?client= the shell's copy describes the CLIENT site, not ours.
+      // Only when UNSCOPED: inside a client this page's api() carries no x-dds-scope-site, so
+      // the shell's copy describes the CLIENT site, not ours (in your own second business the
+      // page's own read carries that business, item 83).
       const useShared=window.ddsContext&&!new URLSearchParams(location.search).get('client');
       const ctx=await (useShared?window.ddsContext().then((d)=>({ok:true,body:{data:d}})):Promise.reject()).catch(()=>api('/portal/context'));
       const c=(ctx.body&&ctx.body.data)||{};

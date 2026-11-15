@@ -82,16 +82,18 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'broadcast',
     q: 'How do I send a broadcast to my customers?',
-    kw: ['broadcast', 'send email', 'newsletter blast', 'email my customers', 'announcement to', 'mass email', 'send a message to'],
-    a: 'Broadcasts let you send an update to your contacts. Open Broadcasts to write one, choose who it goes to, and send — every send is recorded so you can see what went out.',
-    links: [{ href: '/broadcasts.html', label: 'Open Broadcasts' }],
+    // builder item 202: the place is called "Send an update"; the ? panel's own chip asks it in those words
+    kw: ['broadcast', 'send email', 'newsletter blast', 'email my customers', 'announcement to', 'mass email', 'send a message to', 'send an update', 'an update to'],
+    a: 'Send an update writes one email to many of your contacts at once: new hours, a holiday, an offer. You choose who gets it and see it before it goes, and every send is recorded so you can see what went out.',
+    links: [{ href: '/broadcasts.html', label: 'Open Send an update' }],
   },
   {
     id: 'enquiries',
     q: 'Where do I find my enquiries and contacts?',
     kw: ['enquir', 'inquir', 'lead', 'contact', 'customer list', 'pipeline', 'crm', 'who contacted'],
-    a: 'Enquiries, contacts and your pipeline all live under Customers. Anything that needs you also lands in your Inbox and your email, so nothing depends on you checking in.',
-    links: [{ href: '/crm.html', label: 'Open Customers' }, { href: '/inbox.html', label: 'Open your Inbox' }],
+    a: 'A new enquiry from your website lands in your Inbox and your email, so nothing depends on you checking in. The people behind them are on Customers, and the deals they become are on Pipeline.',
+    // builder item 202: Customers is the list (/crm.html alone opened an empty "Open a client" picker)
+    links: [{ href: '/inbox.html#enquiries', label: 'Open your enquiries' }, { href: '/customers.html', label: 'Open Customers' }],
   },
   {
     id: 'connect',
@@ -101,9 +103,26 @@ export const HELP_TOPICS: HelpTopic[] = [
     links: [{ href: '/connections.html', label: 'Open Connections' }],
   },
   {
+    // builder item 202: the Help page asks "How does a client pay an invoice?"; it used to land on
+    // "Where is my project with the studio?"
+    id: 'invoices',
+    q: 'How does a client pay an invoice?',
+    kw: ['pay an invoice', 'pay invoice', 'pay my invoice', 'invoice', 'payment link', 'pay button', 'deposit', 'get paid', 'overdue', 'record a payment'],
+    a: 'An invoice email carries a Pay button: card or bank, through Stripe. Invoices lists what you’re owed, what’s overdue and what’s paid, and a payment by check, cash or transfer can be recorded by hand. Reminders are a switch in Settings, under Automations.',
+    links: [{ href: '/invoices.html', label: 'Open Invoices' }],
+  },
+  {
+    // builder item 202: the Help page asks "What can clients see?"
+    id: 'client_view',
+    q: 'What can my clients see?',
+    kw: ['clients see', 'client see', 'what can clients', 'what do clients', 'client portal', 'portal', 'reviewer', 'client view', 'share with my client'],
+    a: 'Each client sees their own portal: their website, anything waiting on their OK, messages, documents and invoices. Never your other clients or your studio’s own books. Sharing & access sets what they see and makes reviewer links.',
+    links: [{ href: '/sharing.html', label: 'Open Sharing & access' }],
+  },
+  {
     id: 'projects',
     q: 'Where is my project with the studio?',
-    kw: ['project', 'my studio', 'work in progress', 'deliverable', 'proposal', 'invoice', 'sign', 'approve work', 'updates page'],
+    kw: ['project', 'my studio', 'work in progress', 'deliverable', 'proposal', 'sign', 'approve work', 'updates page'],
     a: 'When a studio builds for you, your project lives in one place — progress, files to review, things waiting on your OK, messages and invoices. Anything that needs you also arrives in your email.',
     links: [{ href: '/projects.html', label: 'Open Projects' }, { href: '/client.html', label: 'Open your updates page' }],
   },
@@ -118,15 +137,16 @@ export const HELP_TOPICS: HelpTopic[] = [
     id: 'billing',
     q: 'How do I change my plan, payment or cancel?',
     kw: ['billing', 'plan', 'upgrade', 'downgrade', 'cancel', 'subscription', 'payment method', 'pricing', 'invoice me', 'price'],
-    a: 'Your plan decides which features you see. Upgrading adds capabilities with nothing reset; downgrading simply hides what you’re not using and preserves your information. Manage your subscription, payment method, or cancel any time from your billing portal in your account menu.',
-    links: [{ href: '/pricing.html', label: 'See plans & pricing' }],
+    a: 'Your plan decides which features you see. Upgrading adds capabilities with nothing reset; downgrading simply hides what you’re not using and preserves your information. Change your plan or payment method, or cancel, in Settings under Your plan (the account’s owner sees it there).',
+    // builder item 202: Your plan is a card in Settings (the marketing site's price page was the link)
+    links: [{ href: '/settings.html#billing', label: 'Open Your plan' }],
   },
   {
     id: 'data',
     q: 'How do I export my data or is my data mine?',
     kw: ['export', 'download my data', 'my data', 'ownership', 'own my', 'leave', 'delete my', 'take my data', 'gdpr'],
-    a: 'Your data is yours, always. You can export everything you own at any time, connect or disconnect services freely, and leave without penalty. We store business facts and text, never your customers’ card details (billing is handled by Stripe). The "Download everything I own" option lives in your website editor’s technical desk.',
-    links: [{ href: '/presence.html#export', label: 'Download everything I own' }],
+    a: 'Your data is yours, always. You can export everything you own at any time, connect or disconnect services freely, and leave without penalty. We store business facts and text, never your customers’ card details (billing is handled by Stripe). Download my data, in Settings under Your plan, is one zip of your customers, deals and invoices; your website has its own export.',
+    links: [{ href: '/settings.html#billing', label: 'Download my data' }, { href: '/presence.html#export', label: 'Export your website' }],
   },
   {
     id: 'reliability',

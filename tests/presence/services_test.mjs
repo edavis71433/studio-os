@@ -47,7 +47,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 
 // ═══ 3. email providers — presets as data, DKIM honesty ═══
 {
-  ok('email: four presets exist (google/microsoft/zoho/other) — a new provider is an entry', Object.keys(EMAIL_PROVIDERS).length === 4);
+  ok('email: five presets exist (google/microsoft/zoho/godaddy/other) — a new provider is an entry', Object.keys(EMAIL_PROVIDERS).length === 5);   // builder item 193 added GoDaddy
   for (const slug of ['google_workspace', 'microsoft365', 'zoho']) {
     const p = planEmailSetup('marlows.example', slug);
     const records = p.steps.flatMap((s) => s.records || []);

@@ -38,7 +38,14 @@
   .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
   .lrow1{display:flex;align-items:center;gap:10px}
   .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  .lhead h1{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .lhead h1,.lhead h2{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+  .hometitle{font-family:var(--serif);font-weight:600;font-size:30px;line-height:1.1;letter-spacing:-.02em;margin:0 0 var(--dds-s4,16px);color:var(--ink)}
+  .hometitle:focus{outline:none}
+  .lhead .allc{font-size:13.5px;font-weight:600;color:var(--p);text-decoration:none;white-space:nowrap}
+  .hchip.start{background:#fff;color:#3d2185;border-color:#fff;font-weight:600;text-decoration:none;cursor:pointer}
+  #needsEmpty .firsts{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+  #needsEmpty .firsts .btn{text-decoration:none;display:inline-flex;align-items:center;min-height:40px}
+  @media (max-width:760px){.hometitle{font-size:24px;margin-bottom:12px}}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
@@ -132,6 +139,25 @@
   .need .qmore{margin:var(--dds-s2,8px) 0 0}
   .linkbtn{font:inherit;font-size:12.5px;font-weight:500;color:var(--p);background:none;border:none;padding:0;cursor:pointer}
   .linkbtn:hover{text-decoration:underline}
+  /* sales item 105: the setup strip under the greeting */
+  .setup{margin:0 0 16px;padding:18px 20px 20px;border-radius:18px;border:1px solid color-mix(in srgb,var(--p) 22%,var(--line));background:linear-gradient(135deg,var(--p-soft),var(--card) 70%);box-shadow:var(--shadow)}
+  .setup .shead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .setup h2{margin:0;font-size:19px;font-weight:700;color:var(--ink)}
+  .setup .sprog{font-size:12.5px;font-weight:600;color:var(--p);background:var(--card);border-radius:999px;padding:3px 10px}
+  .setup .sbar{flex:0 1 160px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--p) 18%,transparent);overflow:hidden}
+  .setup .sbar span{display:block;height:100%;background:var(--p);border-radius:4px}
+  .setup .shide{margin-left:auto;font-size:13px;color:var(--soft);min-height:44px;padding:0 6px}
+  .setup .ssteps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .setup .sstep{display:flex;flex-direction:column;gap:6px;align-items:flex-start;background:var(--card);border:1px solid color-mix(in srgb,var(--p) 25%,var(--line));border-radius:14px;padding:12px 14px}
+  .setup .sstep.done{border-color:var(--line);opacity:.85}
+  .setup .smark{width:28px;height:28px;border-radius:999px;display:grid;place-items:center;font-size:13px;font-weight:700;background:var(--p-soft);color:var(--p)}
+  .setup .sstep.done .smark{background:var(--good-soft,#e6f5ec);color:var(--good,#11744a)}
+  .setup .smark svg{width:14px;height:14px}
+  .setup .sstep b{font-size:14px;color:var(--ink)}
+  .setup .swhy{font-size:12.5px;color:var(--soft);line-height:1.4;flex:1 1 auto}
+  .setup .sdone{font-size:12.5px;font-weight:600;color:var(--good,#11744a)}
+  .setup .sstep .btn{font-size:13px;padding:8px 14px;min-height:40px;display:inline-flex;align-items:center;text-decoration:none}
+  @media (max-width:640px){.setup{padding:16px}.setup .shead{gap:8px;margin-bottom:12px}.setup h2{font-size:17px}.setup .sbar{display:none}.setup .ssteps{grid-template-columns:1fr;gap:8px}.setup .sstep{flex-direction:row;flex-wrap:wrap;align-items:center}.setup .sstep b{flex:1 1 50%}.setup .swhy{flex:1 1 100%;order:3;margin-left:38px}.setup .sstep .btn,.setup .sdone{order:2}.setup .sstep.done{padding:8px 12px}.setup .sstep.done .swhy{display:none}}   /* a phone: the count says how far, a done step is one line */
   .need .pnote{font-size:12px;color:var(--faint);margin:var(--dds-s2,8px) 0 0}
   .need .qold{font-size:12.5px;color:var(--soft);margin:0 0 var(--dds-s2,8px)}   /* item 96: the over-a-month line and its Clear */
   /* status words on the roster: Live · Not live yet · Needs you · Archived */
@@ -151,6 +177,23 @@
         read from the studio's OWN site (never scoped) — pipeline's .stats anatomy ── */
   #studio{margin-bottom:var(--dds-s6,24px)}
   .numbers .nhead{display:flex;align-items:baseline;justify-content:space-between;gap:var(--dds-s3,12px)}
+  /* sales item 94: the month's goal (Settings, Goal and AI help): won (solid), still expected
+     from open deals at each stage's chance (light), and what is left to find */
+  .gbar{display:flex;height:12px;border-radius:999px;background:var(--p-soft);overflow:hidden}
+  .gbar .gwon{background:var(--p)} .gbar .gexp{background:color-mix(in srgb,var(--p) 42%,var(--card))}
+  .glegend{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 18px;font-size:13px;color:var(--soft)}
+  .glegend b{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
+  .glegend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+  .glegend .dwon{background:var(--p)} .glegend .dexp{background:color-mix(in srgb,var(--p) 42%,var(--card))} .glegend .dleft{box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--p) 55%,var(--card))}
+  .goalcard{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-card,16px);padding:16px 18px;margin:0 0 var(--dds-s4,16px);box-shadow:var(--dds-shadow,none)}
+  .goalcard .gtop{display:flex;align-items:baseline;gap:4px 12px;flex-wrap:wrap;margin-bottom:10px}
+  .goalcard h2{font-size:13.5px;font-weight:600;color:var(--soft);margin:0}
+  .goalcard .gamt{font-size:22px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .goalcard .gamt span{color:var(--faint);font-weight:600}
+  .goalcard .gleft{margin-left:auto;font-size:12.5px;color:var(--p)}
+  .goalcard .gleft a{color:var(--p);font-weight:600}
+  .goalcard .glegend{margin-top:10px}
+  @media (max-width:640px){.goalcard .gtop{display:grid;grid-template-columns:1fr auto}.goalcard .gamt{grid-column:1 / -1;order:2}.goalcard .gleft{margin-left:0}.goalcard .glegend{flex-direction:column}}
   .numbers .nhead .qhead{margin-bottom:var(--dds-s2,8px)}
   .nall{font-size:13px;font-weight:600;color:var(--p);text-decoration:none;white-space:nowrap}
   .nall:hover{text-decoration:underline}
@@ -163,6 +206,19 @@
   .two .rcard{margin-bottom:0}
   /* the Ask box (moved here from today.html, sales review item 23) */
   .ask{margin-top:var(--dds-s7,32px);padding-top:var(--dds-s6,24px);border-top:1px solid var(--line)}
+  /* builder list item 191: the two-step sign-in nudge, drawn in Figma (B4) */
+  .tsnudge{display:flex;gap:20px;align-items:center;margin:var(--dds-s5,20px) 0;padding:22px 24px;border-radius:var(--dds-r-xl,20px);background:#241d38;color:#fff}
+  .tsnudge svg{flex:0 0 auto}
+  .tsn-words{flex:1;min-width:0}
+  .tsn-eye{margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#b79ceb}
+  .tsnudge h2{margin:0;font-family:var(--dds-serif,'Fraunces',Georgia,serif);font-weight:400;font-size:26px;line-height:1.2;color:#fff}
+  .tsn-line{margin:6px 0 0;font-size:14px;line-height:1.5;color:#d9cdeb;max-width:62ch}
+  .tsn-acts{display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 auto}
+  .tsn-on{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 22px;border-radius:999px;background:#fff;color:#241d38;font-size:14px;font-weight:600;text-decoration:none}
+  .tsn-later{min-height:44px;padding:0 12px;border:0;background:none;color:#fff;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+  .tsn-on:focus-visible,.tsn-later:focus-visible{outline:2px solid #b79ceb;outline-offset:2px}
+  .tsn-nw{white-space:nowrap}
+  @media (max-width:640px){.tsnudge{flex-direction:column;align-items:flex-start;gap:12px;padding:20px}.tsnudge svg{width:36px;height:36px}.tsnudge h2{font-size:22px}.tsn-acts{flex-direction:row;width:100%}.tsn-on{flex:1}}
   .ask h2{font-family:var(--sans);font-weight:600;font-size:17px;margin:0 0 var(--dds-s1,4px)}
   .ask p{margin:0 0 var(--dds-s3,12px);color:var(--soft);font-size:14px}
   .askbox{display:flex;gap:10px}
@@ -472,7 +528,11 @@
 <div class="wrap">
   <!-- the top row, Needs you and the studio strip live OUTSIDE #main: the roster
        re-renders #main.innerHTML per keystroke and must never wipe them -->
+  <!-- sales item 91: the page's title sits at the top, like every other page (it headed the table, two screens down) -->
+  <h1 id="pagehead" class="hometitle" tabindex="-1">Home</h1>
   <div id="top"></div>
+  <!-- sales item 105: the setup strip, until its steps are done or someone hides it -->
+  <section id="setup" class="setup" aria-labelledby="setupHead" hidden data-needs="configure"></section>
   <!-- the bold redesign (sales item 70): what needs you comes first, as one list
        with its actions on each row; the numbers and the pipeline follow -->
   <section id="needs" aria-label="Needs you" hidden></section>
@@ -680,14 +740,15 @@ function lheadHtml(shown){
   return `<header class="lhead">
     <div class="lrow1">
       <span class="obj-ic" aria-hidden="true">🗂</span>
-      <h1 id="pagehead" tabindex="-1">Home</h1>
+      <h2 id="custHead">Customers</h2>
+      <a class="allc" href="/customers.html">All customers →</a>
       <div class="seg" role="group" aria-label="Display as">
         <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
         <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
       </div>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
-    <div class="lmeta">${shown} business${shown===1?'':'es'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
+    <div class="lmeta">${shown} customer${shown===1?'':'s'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
   </header>`;
 }
 function chipsHtml(){
@@ -745,7 +806,7 @@ function render(){
   const list=sortedRows();
   let h=lheadHtml(list.length);
   h+=chipsHtml();
-  h+=`<input class="search" id="search" aria-label="Search clients" placeholder="Search clients…" value="${esc(Q)}">`;
+  h+=`<input class="search" id="search" aria-label="Search customers" placeholder="Search customers…" value="${esc(Q)}">`;
   if(CUST_FAILED)h+=`<div class="notice">Some delivery details wouldn’t load just now — client records still open.</div>`;
   if(VIEWNAME==='archived'&&ARCH_STATE!=='ok'){
     h+=`<div class="center"><p class="muted">${ARCH_STATE==='failed'?'Archived clients wouldn’t load just now.':'Loading archived clients…'}</p>${ARCH_STATE==='failed'?'<p style="margin-top:12px"><button type="button" class="btn ghost" id="archRetry">Try again</button></p>':''}</div>`;
@@ -1019,6 +1080,7 @@ async function load(soft){
   if(AR_ITEMS){paintToday();if(NEEDS||NEEDS_FAILED||MYTASKS)paintNeeds();}   // item 70: Today and Waiting on them read the same invoices
   applyOwed();
   LOADED_ONCE=true;LOADED_AT=Date.now();
+  if(!CLIENTS.length&&NEEDS)paintNeeds();   // sales item 91: an empty studio's greeting and Needs you say where to start
   render();
   paintHero();
 }
@@ -1050,9 +1112,26 @@ function renderTop(){
 // Item 70: the greeting says how many things need you and how many are money,
 // each kind is a chip that narrows the list below to it, and "Go through them"
 // opens the list one at a time.
+// Sales item 91: a brand-new studio (no customers yet, nothing needing it) is told where to start,
+// never "All caught up". The setup steps are sales item 105's strip (#setup; it paints after the
+// greeting and says so with 'dds:setup', so the greeting repaints then);
+// while it shows, the chip leads there, and Needs you offers the first two things to make.
+function brandNew(){return LOADED_ONCE&&!CLIENTS.length&&!(ARCHIVED&&ARCHIVED.length)&&!!NEEDS&&!Number(NEEDS.total||0)&&!needAll().length;}
+function setupStrip(){const el=document.getElementById('setup');return el&&!el.hidden&&el.getClientRects().length?el:null;}
+document.addEventListener('dds:setup',()=>{if(brandNew())paintHero();});
 function paintHero(){
   const sub=$('heroSub'),chips=$('heroChips');if(!sub||!chips)return;
   if(!NEEDS){sub.textContent=NEEDS_FAILED?'':'Checking what needs you…';chips.innerHTML='';return;}
+  const hi=document.querySelector('.hero .hi');
+  if(brandNew()){
+    if(hi)hi.textContent='Welcome to Studio OS';
+    sub.textContent='Nothing needs you yet. Here’s where to start.';
+    chips.innerHTML=setupStrip()?'<a class="hchip start" id="startHere" href="#setup">Start here ↓</a>':'<a class="hchip start" id="startHere" href="#add">Start here: add your first customer</a>';
+    const sh=$('startHere');
+    if(sh)sh.addEventListener('click',(e)=>{e.preventDefault();const st=setupStrip();if(st){st.scrollIntoView({behavior:'smooth',block:'start'});const f=st.querySelector('a[href],button');if(f)f.focus({preventScroll:true});}else openAddCustomer();});
+    return;
+  }
+  if(hi&&hi.textContent==='Welcome to Studio OS')hi.textContent=greetWord();
   const total=Number(NEEDS.total||0),all=needAll();
   const money=all.filter(r=>r.kind==='money').length;
   sub.textContent=total?(total+(total===1?' thing needs you':' things need you')+(money&&all.length>=total?'. '+(money===total?(total===1?'It’s money.':'All of them are money.'):money+(money===1?' is':' are')+' money.'):'.')):'Nothing needs you right now.';
@@ -1241,6 +1320,17 @@ function wireMyTasks(){
     const nx=(row&&(row.querySelector('button.tdone')||row.querySelector('a')))||document.querySelector('#my-tasks .rh');if(nx)nx.focus();
   }));
 }
+// sales item 94: the month's goal, from /sales/summary's `goal` (set in Settings, Goal and AI
+// help). Won this month (solid), what open deals should still bring (light), what is left to find.
+function goalCardHtml(s){
+  const g=s&&s.goal;if(!g||!g.goal_cents)return'';
+  const now=new Date(),left=new Date(now.getFullYear(),now.getMonth()+1,0).getDate()-now.getDate();
+  const w=(c)=>Math.max(0,Math.min(100,Math.round((Number(c)||0)/g.goal_cents*1000)/10));
+  const won=w(g.won_cents),exp=Math.min(100-won,w(g.expected_cents));
+  return `<section class="goalcard" id="goalCard" aria-labelledby="goalH"><div class="gtop"><h2 id="goalH">${esc(now.toLocaleDateString('en-US',{month:'long'}))} goal</h2><span class="gamt">${esc(money(g.won_cents))} <span>of ${esc(money(g.goal_cents))}</span></span><span class="gleft">${g.reached?'Reached':left+' day'+(left===1?'':'s')+' left'} · <a href="/settings.html#goal" data-noscope="1">Edit goal</a></span></div>`
+    +`<div class="gbar" role="img" aria-label="${esc(`Won ${money(g.won_cents)||'$0'}, still expected ${money(g.expected_cents)||'$0'}, left to find ${money(g.left_cents)||'$0'}`)}"><span class="gwon" data-w="${won}"></span><span class="gexp" data-w="${exp}"></span></div>`
+    +`<ul class="glegend"><li><i class="dwon" aria-hidden="true"></i>Won <b>${esc(money(g.won_cents)||'$0')}</b></li><li><i class="dexp" aria-hidden="true"></i>Still expected <b>${esc(money(g.expected_cents)||'$0')}</b></li><li><i class="dleft" aria-hidden="true"></i>Left to find <b>${esc(money(g.left_cents)||'$0')}</b></li></ul></section>`;
+}
 let SSEQ=0;
 async function mountStudio(){
   const host=$('studio');if(!host)return;
@@ -1252,8 +1342,9 @@ async function mountStudio(){
   DEALS=Array.isArray(deals)?deals:null;DEALS_CUT=Array.isArray(deals)&&deals.length>=100;STUDIO_DONE=true;
   paintNeeds();paintToday();   // item 70: My to-dos and Waiting on them are tabs of the list now
   const tiles=statTiles(summary,deals);const strip=pipelineStripHtml(summary,deals);const todos=MYTASKS?[]:weekTodos(deals);const top=strip?[]:keyDeals(deals);const wins=recentWins(deals);
-  if(!tiles.length&&!todos.length&&!top.length&&!wins.length){host.hidden=true;host.innerHTML='';return;}
-  let h='';
+  const goal=goalCardHtml(summary);
+  if(!goal&&!tiles.length&&!todos.length&&!top.length&&!wins.length){host.hidden=true;host.innerHTML='';return;}
+  let h=goal;
   // Oct 2026 nav cut: Analytics left the menu — the home's Numbers section owns
   // it: the money/pipeline tiles plus "See all numbers →" (the full page; ⌘K too).
   if(tiles.length)h+=`<div class="numbers" id="numbers"><div class="nhead"><h2 class="qhead">Numbers</h2><a class="nall" id="allNumbers" href="/analytics.html" data-noscope="1">See all numbers →</a></div><div class="stats" role="list" aria-label="Your numbers">${tiles.map(statHtml).join('')}</div></div>`;
@@ -1267,6 +1358,7 @@ async function mountStudio(){
     h+='</div>';
   }
   host.hidden=false;host.innerHTML=h;
+  host.querySelectorAll('.gbar [data-w]').forEach(e=>{e.style.width=e.getAttribute('data-w')+'%';});   // sales item 94: the goal bar's parts
 }
 
 // ── ADD A CUSTOMER — customers.html's flow, ported wholesale and kept in sync by
@@ -1406,6 +1498,7 @@ async function boot(){
     ME=me.body.data||{};
     renderTop();
     openFromHash();   // ⌘K → /agency.html#add (or #kits)
+    loadSetup();     // sales item 105: the setup strip reads on its own; nothing waits on it
     const needs=mountNeeds();   // what needs the studio — reads alongside the roster; re-paints Status/Next when it lands
     // final pass (Nov 8, batch B): the studio strip reads alongside the roster and
     // Needs you too — it uses neither, and Home's last answer waited on Needs you
@@ -1416,9 +1509,41 @@ async function boot(){
     await studio;
     EARLY.clear();
     mountAsk();      // and the Ask box (sales review item 23)
+    mountTwoStepNudge().catch(()=>{});   // builder item 191
   }catch(_){EARLY.clear();trouble();}
 }
 boot();
+// ── sales item 105: the setup strip. What a studio sets up once, each step checked against
+// the real thing; it goes by itself once all are done, and Hide puts it away for the studio.
+let SETUP=null;
+async function loadSetup(){
+  if(new URLSearchParams(location.search).get('client'))return;   // a client's own Home isn't the studio's setup
+  let r;try{r=await api('/sales/setup');}catch(_){return;}
+  if(!r||!r.ok||!r.body||!r.body.data)return;   // a server without it, or a failed read: no strip, said nowhere
+  SETUP=r.body.data;paintSetup();
+}
+const SETUP_TICK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+function paintSetup(){
+  const host=$('setup');if(!host)return;
+  const d=SETUP,steps=d&&Array.isArray(d.steps)?d.steps:[];
+  // item 91 (Menus session): a brand-new studio's greeting points here while it shows; it hears each paint
+  const said=(shows)=>{try{document.dispatchEvent(new CustomEvent('dds:setup',{detail:{shows:shows}}));}catch(_){}};
+  if(!d||!d.shows||!steps.length){host.hidden=true;host.innerHTML='';said(false);return;}
+  const done=steps.filter(s=>s.done).length,next=steps.findIndex(s=>!s.done);
+  host.innerHTML=`<div class="shead"><h2 id="setupHead">Finish setting up</h2><span class="sprog">${done} of ${steps.length} done</span><span class="sbar" aria-hidden="true"><span style="width:${Math.round(100*done/steps.length)}%"></span></span><button type="button" class="linkbtn shide" id="setupHide" data-needs="configure">Hide</button></div>`
+    +`<ol class="ssteps">${steps.map((s,i)=>`<li class="sstep${s.done?' done':''}"><span class="smark" aria-hidden="true">${s.done?SETUP_TICK:i+1}</span><b>${esc(s.title)}</b><span class="swhy">${esc(s.why)}</span>${s.done?'<span class="sdone">Done</span>':`<a class="btn${i===next?'':' ghost'}" href="${esc(s.href)}">${esc(s.act)}</a>`}</li>`).join('')}</ol>`;
+  host.hidden=false;
+  $('setupHide').addEventListener('click',()=>setSetupHidden(true));
+  said(true);
+}
+async function setSetupHidden(hidden){
+  const b=$('setupHide');if(b)b.disabled=true;
+  const r=await apiSend('POST','/sales/setup',{hidden});
+  if(!r.ok){if(b)b.disabled=false;toast((r.body&&r.body.message)||'That didn’t save just now. Try again.',true);return;}
+  if(!hidden){loadSetup();return;}
+  SETUP={...SETUP,hidden:true,shows:false};paintSetup();
+  if(window.ddsToast)window.ddsToast('Setup steps hidden. Each one stays where it lives: Settings, Files, Pipeline and Contacts.','ok',{label:'Undo',onClick:()=>setSetupHidden(false)});
+}
 // + Create (the sidebar button, the phone's +, the c key) made a deal, logged a
 // call, sent an invoice or added a to-do: the numbers, My to-dos and Needs you
 // catch up without a reload
@@ -1439,6 +1564,24 @@ async function ask(){
   try{const r=await apiSend('POST','/concierge/ask',{question});paintAnswer(box,r.ok?(r.body&&r.body.data):null,r.ok?'I don’t have anything measured on that yet — I’d rather say so than guess.':'I couldn’t answer just now — nothing’s wrong, please try again in a moment.');}
   catch(_){box.textContent='I couldn’t answer just now — nothing’s wrong, please try again in a moment.';}
   btn.disabled=false;btn.textContent='Ask';
+}
+// ── Builder list item 191: until this person's own sign-in has two-step sign-in on, Home
+// asks for it (Figma B4). "Not now" hides it for 14 days; it goes for good once it's on.
+// Only a studio's own people see this page, never a client. The sign-in kept on this
+// device says whether it's on (a verified factor), with no call.
+const NUDGE_KEY='dds-2step-nudge',NUDGE_DAYS=14;
+async function mountTwoStepNudge(){
+  try{const at=Number(localStorage.getItem(NUDGE_KEY)||0);if(at&&Date.now()-at<NUDGE_DAYS*86400000)return;}catch(_){}
+  const{data}=await sb.auth.getSession();const sess=data&&data.session;if(!sess)return;
+  if(((sess.user&&sess.user.factors)||[]).some(f=>f&&f.status==='verified')||$('tsNudge'))return;
+  const n=CLIENTS.length;
+  const sec=document.createElement('section');sec.className='tsnudge';sec.id='tsNudge';sec.setAttribute('aria-labelledby','tsNudgeHead');
+  sec.innerHTML=`<svg viewBox="0 0 24 24" width="44" height="44" aria-hidden="true" focusable="false"><path d="M12 2.5 4.5 5.5v6c0 4.6 3.1 8.6 7.5 10 4.4-1.4 7.5-5.4 7.5-10v-6L12 2.5Z" fill="none" stroke="#b79ceb" stroke-width="1.6" stroke-linejoin="round"/><rect x="8.6" y="10.6" width="6.8" height="5.4" rx="1.2" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M10 10.6V9.2a2 2 0 0 1 4 0v1.4" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>`+
+    `<div class="tsn-words"><p class="tsn-eye">${esc(n?`Your studio looks after ${n} client${n===1?'':'s'}`:'Sign-in and security')}</p><h2 id="tsNudgeHead">Turn on two-step <span class="tsn-nw">sign-in.</span></h2>`+
+    `<p class="tsn-line">With a code from your phone, a stolen password isn’t enough to get into your studio, your clients’ sites or their money.</p></div>`+
+    `<div class="tsn-acts"><a class="tsn-on" href="/settings.html#security" data-noscope="1">Turn it on</a><button type="button" class="tsn-later">Not now</button></div>`;
+  ($('needs')||$('top')).insertAdjacentElement('afterend',sec);
+  sec.querySelector('.tsn-later').addEventListener('click',()=>{try{localStorage.setItem(NUDGE_KEY,String(Date.now()));}catch(_){}sec.remove();});
 }
 function mountAsk(){
   const sec=$('askSec');if(!sec||sec.dataset.on)return;
@@ -1507,6 +1650,8 @@ function needsPanelHtml(){
   if(!NEEDS)return NEEDS_FAILED?`<div class="qfail">Needs you wouldn’t load just now.<button id="needsRetry" type="button">Try again</button></div>`:'<p class="quiet">Checking what needs you…</p>';
   const rows=NEEDS.rows||[],rest=NEEDS.rest||[],more=Number(NEEDS.more||0);
   const partial=NEEDS.partial?`<p class="pnote">Some of this couldn’t be checked just now — ↻ tries again.</p>`:'';
+  // sales item 91: day one, the first two things to make
+  if(!rows.length&&brandNew())return `<div class="rcard need" id="needsEmpty"><p class="nn">Nothing needs you yet. Your first customer is the place to start.</p><div class="firsts"><button type="button" class="btn" id="firstCust">+ Add a customer</button><a class="btn ghost" href="/sites.html#new">+ New site</a></div>${partial}</div>`;
   if(!rows.length)return `<div class="rcard need" id="needsEmpty"><p class="nn">Nothing needs you.</p><p class="quiet" style="margin:0">${esc(NEEDS.empty_line||'')}</p>${partial}</div>`;
   let shown=NEEDS_EXPANDED?rows.concat(rest):rows;
   if(QKIND)shown=rows.concat(rest).filter(r=>heroKind(r.kind)===QKIND);
@@ -1559,6 +1704,7 @@ function wireQueue(){
   });
   const off=$('qfilterOff');if(off)off.addEventListener('click',()=>{QKIND='';NEEDS_EXPANDED=false;paintNeeds();const t=$('qt-needs');if(t)t.focus();});
   const qr=$('needsRetry');if(qr)qr.addEventListener('click',()=>mountNeeds());
+  const fc=$('firstCust');if(fc)fc.addEventListener('click',openAddCustomer);
   const mb=$('needsMore');if(mb)mb.addEventListener('click',()=>{const n=(NEEDS.rows||[]).length;NEEDS_EXPANDED=true;paintNeeds();const l=$('needsList');if(l){const a=l.querySelector('div.row:nth-of-type('+(n+1)+') a');if(a)a.focus();}});
   const cb=$('needsClearOld');if(cb)cb.addEventListener('click',()=>clearOld(cb));
   host.querySelectorAll('[data-snooze]').forEach(b=>b.addEventListener('click',()=>snoozeRow(b.getAttribute('data-snooze'),b)));

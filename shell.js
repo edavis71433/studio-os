@@ -158,15 +158,21 @@
     var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
     if (!a || a.target === '_blank') return;
     var href = a.getAttribute('href') || '';
+    // builder item 201: at studio level a link into the builder asks which client first (openWhichClient)
+    if (!e.defaultPrevented && !e.button && !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) && !a.hasAttribute('data-own-site') && whichClientWanted(href)) {
+      e.preventDefault(); e.stopPropagation(); openWhichClient(href, a); return;
+    }
     var isEdit = a.hasAttribute('data-dds-editor') || a.classList.contains('edit') || /\/presence\.html#[a-z]/i.test(href);
     if (!isEdit) return;
     e.preventDefault();
     window.ddsOpenEditor(a.href);
   }, true);
 
+  // opts.scope: '' sends a request without the client in the address (sales item 91: the studio's
+  // own book, read and written from inside a client, as crm.html's apiAg does)
   window.ddsApi = function (path, opts) {
     opts = opts || {};
-    var init = { method: opts.method || 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': scopeId() } };
+    var init = { method: opts.method || 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': opts.scope !== undefined ? opts.scope : scopeId() } };
     if (opts.body !== undefined) init.body = typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
     return fetch(FN + path, init)
       .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, status: r.status, body: b }; }).catch(function () { return { ok: r.ok, status: r.status, body: {} }; }); })
@@ -403,6 +409,8 @@
     var IMPORT_MAX = 500;   // one run's worth; the rest of a bigger file is named, never dropped in silence
     // host: an element to fill. o: {title, help, mapHeader(h)→key|null, ready(keys)→'' or a message, toItem(obj)→item|null,
     // label(item)→string, noun, send(item)→Promise<'added'|'existed'|'skipped'|'failed'>, summary(counts)→string, done()}
+    // Sales item 122: a page that can take the whole file at once gives sendAll(items, ctx)→Promise<counts> instead;
+    // then the file goes in ONE request (Contacts), not five rows at a time. send stays for the pages without it.
     function importPanel(host, o) {
       // One run per panel: Import CSV again while rows are going in leaves the running panel as it is
       // (a second run of the same file doubled everyone without an email, who can't be matched)
@@ -475,7 +483,7 @@
           go.addEventListener('click', function () {
             if (run.running || run.stop) return;
             run.running = true; go.disabled = true; file.disabled = true; closer.textContent = 'Stop';   // no second file under a running one
-            var counts = { added: 0, updated: 0, existed: 0, skipped: 0, failed: 0 }, done = 0, i = 0, ctx = { onExisting: how.onExisting || 'skip', importId: null };
+            var counts = { added: 0, updated: 0, existed: 0, skipped: 0, failed: 0 }, done = 0, i = 0, ctx = { onExisting: how.onExisting || 'skip', importId: null, fileName: how.fileName || '' };
             function finish(stopped) {
               run.running = false;
               if (host.__ddsImport === run) { host.__ddsImport = null; host.innerHTML = ''; }
@@ -490,6 +498,17 @@
               var chunk = items.slice(i, i + 5); i += 5;
               Promise.all(chunk.map(function (it) { return Promise.resolve().then(function () { return o.send(it, ctx); }).catch(function () { return 'failed'; }).then(function (k) { counts[k in counts ? k : 'failed']++; done++; }); }))
                 .then(function () { go.textContent = 'Importing ' + Math.min(done, items.length) + '/' + items.length + '…'; live.textContent = 'Imported ' + done + ' of ' + items.length; next(); });
+            }
+            // item 122: the whole file in one request. It can't be stopped halfway, so Close waits for it;
+            // what went in is said when it lands, and Undo takes it back for a day
+            if (o.sendAll) {
+              closer.disabled = true; closer.textContent = 'Close';
+              go.textContent = 'Importing ' + items.length + '…'; live.textContent = 'Importing ' + many(items.length) + ' in one go…';
+              Promise.resolve().then(function () { return o.sendAll(items, ctx); }).catch(function () { return null; }).then(function (got) {
+                if (got && typeof got === 'object') { for (var k in counts) counts[k] = Number(got[k]) || 0; } else counts.failed = items.length;
+                done = items.length; finish(false);
+              });
+              return;
             }
             // item 86: a page that keeps imports starts one first (its id rides on every row, for Undo)
             Promise.resolve(o.start ? o.start({ onExisting: ctx.onExisting, fileName: how.fileName || '' }) : null).then(function (id) { ctx.importId = id || null; }, function () { ctx.importId = null; }).then(next);
@@ -530,9 +549,12 @@
         var done = false;
         function finish(v) {
           if (done) return; done = true;
+          // builder item 201: focus goes back to the button that asked, after Yes as well as
+          // Cancel. Removing the box took the focused Yes with it, so focus fell to the page's top
+          // (Safari doesn't focus a clicked button at all, so this never asks where focus was).
           if (box.isConnected) box.remove();
           anchor.hidden = false; resolve(v);
-          if (!v && anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
+          if (anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
         }
         box.querySelector('.go').addEventListener('click', function () { finish(true); });
         box.querySelector('.no').addEventListener('click', function () { finish(false); });
@@ -580,7 +602,8 @@
           if (done) return; done = true;
           if (box.isConnected) box.remove();
           anchor.hidden = false; resolve(v);
-          if (v === null && anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
+          // item 201: as confirmIn, after an answer as well as Cancel, so focus never falls to the page's top
+          if (anchor.isConnected && anchor.focus) try { anchor.focus(); } catch (_) { /* */ }
         }
         go.addEventListener('click', function () {
           var vals = inputs.map(function (el) { return String(el.value || '').trim(); });
@@ -789,6 +812,7 @@
         + '.dm-s{flex:1;min-width:0;font:inherit;font-size:14.5px;padding:9px 12px;min-height:40px;box-sizing:border-box;border:1px solid var(--line,#e6e1ee);border-radius:10px;background:var(--card,#fff);color:var(--ink,#1b1525)}'
         + '.dm-b{display:block;width:100%;box-sizing:border-box;min-height:150px;resize:vertical;font:inherit;font-size:14.5px;line-height:1.5;padding:12px 14px;border:1px solid var(--line,#e6e1ee);border-radius:12px;background:var(--card,#fff);color:var(--ink,#1b1525)}'
         + '.dm-sr{align-self:flex-start;max-width:100%;font:inherit;font-size:13px;color:var(--ink,#1b1525);background:var(--card,#fff);border:1px solid var(--line,#e6e1ee);border-radius:999px;padding:6px 12px;min-height:32px;cursor:pointer}'
+        + '.dm-t{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;min-width:0}.dm-t .dm-sr{align-self:auto}'
         + '.dm-f{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}'
         + '.dm-n{flex:1 1 220px;margin:0;display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:var(--soft,#5c5468)}.dm-n svg{flex:0 0 auto;margin-top:1px}.dm-n span{overflow-wrap:anywhere}'
         + '.dm-go{font:inherit;font-size:14px;font-weight:600;border:0;border-radius:999px;padding:10px 22px;min-height:40px;background:var(--p,#5b3fa0);color:#fff;cursor:pointer;margin-left:auto}.dm-go:disabled{opacity:.65;cursor:default}'
@@ -804,7 +828,8 @@
     }
     // host: where the box draws. o: { req(path, method, body) → {ok, status, body}, ids: one of
     // {deal_id} {contact_id} {client_id}, idp: the field ids' start (idp+'Subject', idp+'Body'),
-    // values: {subject, body} typed before, focus: put the caret in it once drawn, onSent(data, firstName) }
+    // values: {subject, body} typed before, focus: put the caret in it once drawn, onSent(data, firstName),
+    // tools(row, {body, subj, form, go}): a page's own controls beside the saved replies (sales item 94's Draft it for me) }
     function open(host, o) {
       style(); o = o || {};
       var req = o.req || function (p, m, b) { return window.ddsApi(p, { method: m, body: b }); };
@@ -839,6 +864,10 @@
           + '<div class="dm-f"><p class="dm-n">' + MAIL + '<span>Sent as <b>' + esc3(d.as || 'your studio') + '</b>' + (d.from ? ' from ' + esc3(d.from) : '') + ' · ' + esc3(back) + '</span></p><button type="submit" class="dm-go">Send email</button></div>'
           + '<p class="dm-err" role="alert"></p></form>';
         var form = host.querySelector('form'), subj = form.querySelector('.dm-s'), body = form.querySelector('.dm-b'), go = form.querySelector('.dm-go'), errEl = form.querySelector('.dm-err');
+        // one row above the message for the saved replies and a page's own tools, made when either needs it
+        var tools = null;
+        function toolsRow() { if (!tools) { tools = document.createElement('div'); tools.className = 'dm-t'; body.parentNode.insertBefore(tools, body); } return tools; }
+        if (o.tools) o.tools(toolsRow(), { body: body, subj: subj, form: form, go: go });
         // saved replies, when there are any (read once a page)
         if (!SR) SR = Promise.resolve(req('/service/saved-replies')).then(function (r) { return (r && r.ok && r.body && r.body.data && r.body.data.replies) || []; }, function () { return []; });
         SR.then(function (list) {
@@ -847,7 +876,7 @@
           var sel = document.createElement('select'); sel.className = 'dm-sr'; sel.setAttribute('aria-label', 'Insert a saved reply');
           sel.innerHTML = '<option value="">Insert a saved reply…</option>' + list.map(function (x) { return '<option value="' + esc3(x.id) + '">' + esc3(x.title) + '</option>'; }).join('');
           sel.onchange = function () { var b = map[sel.value]; if (b) { var cur = body.value; body.value = cur ? cur.replace(/\s*$/, '') + '\n\n' + b : b; body.dispatchEvent(new Event('input', { bubbles: true })); body.focus(); } sel.value = ''; };
-          body.parentNode.insertBefore(sel, body);
+          var row = toolsRow(); row.insertBefore(sel, row.firstChild);
         });
         function err(m) { errEl.textContent = m || ''; }
         function ready() { go.disabled = false; go.textContent = 'Send email'; }
@@ -1002,6 +1031,146 @@
     loadWhatsNew().then(function (W) { W.open({ who: who, opener: opener, onSeen: function () { setWhatsNewDot(false); } }); })['catch'](function () { /* a press retries */ });
   }
   function bellInner(n) { return icon('bell') + (n > 0 ? '<span class="dot">' + (n > 9 ? '9+' : n) + '</span>' : ''); }
+  // builder item 201: the bell says its number ("Notifications, 3 need you"), not only shows it
+  function bellLabel(n) { return n > 0 ? 'Notifications, ' + n + (n === 1 ? ' needs you' : ' need you') : 'Notifications'; }
+
+  // ── Due today, from any page (sales item 123, drawn in Figma 307:8568) ────────
+  // Salesforce docks a to-do list on every page. Here a small "3 due today" sits in the frame
+  // (under Search in the sidebar, in the top bar on a phone), counted from the same list as
+  // To-dos and Home's My to-dos (GET /sales/my-tasks) in your own day: red, late first, when
+  // anything is late; gone when nothing is due. It opens the day's to-dos where you are: tick
+  // one done (Undo in the message after), open what it's for, or go to To-dos. The count is
+  // read behind the page and kept two minutes, so moving between pages asks nothing; leaving
+  // a page where to-dos get ticked drops the kept copy.
+  var DUE = null, DUE_AT = 0, DUE_LOADING = null, DUE_FRESH_MS = 120000;
+  function dueWanted() {
+    if (!CTX || !TOKEN || isReviewerCtx()) return false;
+    if (CTX.is_agency && CTX.scope && CTX.scope.site_id) return true;   // inside a client it's still the studio's day
+    return (CTX.nav || []).some(function (s) { return s.key === 'todos'; });
+  }
+  function localYmd(d) { d = d || new Date(); var m = d.getMonth() + 1, day = d.getDate(); return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day; }
+  // the day's to-dos from My tasks' items: dated ones only, late first, then today's
+  function dueOf(items, today) {
+    var late = [], now = [];
+    (items || []).forEach(function (t) { if (!t || !t.due) return; if (t.due < today) late.push(t); else if (t.due === today) now.push(t); });
+    return { late: late.length, today: now.length, items: late.concat(now) };
+  }
+  window.ddsDueOf = dueOf;   // read by tests
+  // the studio's own book: inside a client the read goes without the client, as Create's do
+  function bookApi(path, opts) { return window.ddsApi(path, Object.assign({}, opts || {}, CTX && CTX.scope && CTX.scope.site_id ? { scope: '' } : {})); }
+  function dueKey() { return 'dds-due:' + (ctxUid || '-') + ':' + (CTX && CTX.scope ? '-' : (scopeId() || '-')); }
+  function dropDue() { try { sessionStorage.removeItem(dueKey()); } catch (_) { /* */ } }
+  function readDue(fresh) {
+    if (!dueWanted()) return Promise.resolve(null);
+    if (!fresh) {
+      try {
+        var k = JSON.parse(sessionStorage.getItem(dueKey()) || 'null');
+        if (k && k.day === localYmd() && Date.now() - k.at < DUE_FRESH_MS) { DUE = k.d; DUE_AT = k.at; paintDue(); return Promise.resolve(DUE); }
+      } catch (_) { /* storage may be denied: read it */ }
+    }
+    if (DUE_LOADING) return DUE_LOADING;
+    DUE_LOADING = bookApi('/sales/my-tasks').then(function (r) {
+      DUE_LOADING = null;
+      var d = r && r.ok && r.body && r.body.data;
+      if (!d || !Array.isArray(d.items)) return DUE;   // a failed read keeps what is shown, never "nothing due"
+      DUE = dueOf(d.items, localYmd());
+      DUE.capped = d.items.length >= 50 && DUE.items.length === d.items.length;   // the read stops at 50
+      DUE_AT = Date.now();
+      try { sessionStorage.setItem(dueKey(), JSON.stringify({ at: DUE_AT, day: localYmd(), d: DUE })); } catch (_) { /* */ }
+      paintDue(); paintDuePop();
+      return DUE;
+    }, function () { DUE_LOADING = null; return DUE; });
+    return DUE_LOADING;
+  }
+  window.ddsDueRefresh = function () { return readDue(true); };
+  function dueWords(d) { var p = d.capped ? '+' : ''; return d.late ? d.late + p + ' late' + (d.today ? ' · ' + d.today + ' today' : '') : d.today + p + ' due today'; }
+  function paintDue() {
+    var b = document.getElementById('dds-due'); if (!b) return;
+    var n = DUE ? DUE.late + DUE.today : 0;
+    if (!n || !dueWanted()) { b.hidden = true; return; }
+    b.hidden = false; b.classList.toggle('late', DUE.late > 0);
+    b.innerHTML = icon('overview') + '<span class="dw">' + esc(dueWords(DUE)) + '</span><span class="dn" aria-hidden="true">' + (n > 9 ? '9+' : n) + '</span><span class="car" aria-hidden="true">›</span>';
+    b.setAttribute('aria-label', 'To-dos: ' + dueWords(DUE).replace(' · ', ', '));
+  }
+  var duePop = null;
+  function closeDue(refocus) {
+    if (!duePop || !duePop.classList.contains('open')) return;
+    duePop.classList.remove('open'); setExpanded('dds-due', false);
+    if (refocus) { var b = document.getElementById('dds-due'); if (b) b.focus(); }
+  }
+  // what ticking does, the same requests To-dos and Home send (and their Undo)
+  function dueDoneReq(t, back) {
+    if (t.kind === 'next_step') return ['PATCH', '/sales/deals/' + encodeURIComponent(t.id), back ? { next_step: t.title, next_step_at: t.due || null } : { next_step: '', next_step_at: '' }];
+    if (t.kind === 'deal_task') return ['PATCH', '/sales/deal-tasks/' + encodeURIComponent(t.id), { status: back ? 'open' : 'done' }];
+    return ['PATCH', '/projects/' + encodeURIComponent(t.parent_id) + '/tasks/' + encodeURIComponent(t.id), { status: back ? 'todo' : 'done' }];
+  }
+  function dueWhen(t, today) {
+    if (t.due === today) return 'Today';
+    var a = new Date(t.due + 'T12:00:00'), b = new Date(today + 'T12:00:00'), n = Math.round((b - a) / 86400000);
+    return n === 1 ? 'Yesterday' : n + ' days late';
+  }
+  function paintDuePop() {
+    if (!duePop) return;
+    var d = DUE || { late: 0, today: 0, items: [] }, today = localYmd();
+    var inClient = !!(CTX && CTX.scope && CTX.scope.site_id);   // the studio's pages, never re-scoped onto the client
+    var ns = inClient ? ' data-noscope="1"' : '';
+    duePop.querySelector('.dc').innerHTML = (d.late ? '<span class="late">' + d.late + ' late</span>' : '') + (d.today ? '<span class="now">' + d.today + ' today</span>' : '');
+    var body = duePop.querySelector('.body');
+    if (!d.items.length) { body.innerHTML = '<p class="muted">Nothing is due today.</p>'; return; }
+    body.innerHTML = '<div role="list">' + d.items.slice(0, 8).map(function (t, i) {
+      var late = t.due !== today;
+      return '<div class="drow" role="listitem"><button type="button" class="tick" data-i="' + i + '"' + (t.blocked ? ' disabled title="Blocked, so it can’t be ticked here"' : '') + ' aria-label="' + esc('Mark done: ' + t.title) + '"></button>' +
+        '<div class="dt"><a href="' + esc(t.href || '/todos.html') + '"' + ns + '>' + esc(t.title) + '</a><span class="dm"><span class="who">' + esc(t.context || '') + '</span><span class="when' + (late ? ' late' : '') + '">' + esc(dueWhen(t, today)) + '</span></span></div></div>';
+    }).join('') + '</div>' + (d.items.length > 8 ? '<p class="more">' + (d.items.length - 8) + ' more on To-dos</p>' : '');
+    var foot = duePop.querySelector('.dfoot a'); if (foot) { if (inClient) foot.setAttribute('data-noscope', '1'); else foot.removeAttribute('data-noscope'); }
+  }
+  function tickDue(i) {
+    if (!DUE || !DUE.items[i]) return;
+    var t = DUE.items[i], late = t.due !== localYmd();
+    DUE.items.splice(i, 1); if (late) DUE.late--; else DUE.today--;
+    paintDue(); paintDuePop(); dropDue();
+    var f = duePop && duePop.querySelector('.tick'); if (f) f.focus(); else { var a = duePop && duePop.querySelector('.dfoot a'); if (a) a.focus(); }
+    var q = dueDoneReq(t, false);
+    bookApi(q[1], { method: q[0], body: q[2] }).then(function (r) {
+      if (!r || !r.ok) {   // put it back where it was, and say so
+        DUE.items.splice(i, 0, t); if (late) DUE.late++; else DUE.today++;
+        paintDue(); paintDuePop();
+        if (window.ddsToast) window.ddsToast('That didn’t save. It’s still on your list.', 'err');
+        return;
+      }
+      if (window.ddsToast) window.ddsToast('Done — ' + t.title, 'ok', { label: 'Undo', onClick: function () {
+        var u = dueDoneReq(t, true);
+        bookApi(u[1], { method: u[0], body: u[2] }).then(function () { readDue(true); });
+      } });
+    });
+  }
+  function toggleDue(viaKey) {
+    if (duePop && duePop.classList.contains('open')) { closeDue(false); return; }
+    closeAllLayers();
+    if (!duePop) {
+      duePop = el('<div class="dds-pop dds-due-pop" id="dds-due-pop" role="dialog" aria-labelledby="dds-due-h">' +
+        '<div class="dh"><h2 id="dds-due-h">Due today</h2><span class="dc"></span></div><div class="body"></div>' +
+        '<div class="dfoot"><span>Tick one to mark it done</span><a href="/todos.html">Open To-dos →</a></div></div>');
+      document.body.appendChild(duePop);
+      duePop.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var t = e.target && e.target.closest ? e.target.closest('.tick') : null;
+        if (t && !t.disabled) tickDue(Number(t.getAttribute('data-i')));
+      });
+      tabOutCloses(duePop, function () { closeDue(false); }, 'dds-due');
+    }
+    paintDuePop();
+    duePop.classList.add('open'); setExpanded('dds-due', true);
+    var b = document.getElementById('dds-due');
+    if (b && sidebarMode()) placeSiteSwitch(b, duePop); else { duePop.style.left = ''; duePop.style.top = ''; }
+    if (viaKey) { var f = duePop.querySelector('.tick:not([disabled]), .dt a'); if (f) f.focus(); }
+    readDue(true);   // the list you open is today's, not the kept count's
+  }
+  document.addEventListener('click', function () { closeDue(false); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && CTX && Date.now() - DUE_AT > 60000) readDue(true); });
+  window.addEventListener('dds:created', function () { readDue(true); });   // Create made a to-do, a call's next step, a deal
+  // leaving a page where to-dos get ticked: the next page reads the count afresh
+  window.addEventListener('pagehide', function () { if (/^\/(todos|agency|today|pipeline|crm|projects)$/.test(normalizePath(location.pathname))) dropDue(); });
 
   // ── "+ Create" (sales list item 70, the bold redesign, Nov 2026) ─────────────
   // Timed against Salesforce, every everyday job (log a call, a new deal, an
@@ -1011,9 +1180,12 @@
   // sidebar, the middle of the phone bar, "c", ⌘K ("log a call") and any
   // "#create:<kind>" link. create.js draws the forms; it loads while the
   // browser is idle, so the first press opens at once.
+  // Sales item 91: Create stays inside a client (it used to vanish there, just when "send this
+  // client an invoice" is the job), opening for that client. Their menu carries Pipeline as a
+  // search-only item under Studio, so it is found by item as well as by section.
   function canCreate() {
-    if (!CTX || !CTX.is_agency || (CTX.scope && CTX.scope.name) || isReviewerCtx()) return false;
-    return (CTX.nav || []).some(function (s) { return s.key === 'pipeline'; });
+    if (!CTX || !CTX.is_agency || isReviewerCtx()) return false;
+    return (CTX.nav || []).some(function (s) { return s.key === 'pipeline' || (s.items || []).some(function (i) { return i && i.key === 'pipeline'; }); });
   }
   var createP = null;
   function loadCreate() {
@@ -1033,7 +1205,8 @@
   function openCreate(kind, from, viaKey, preset) {
     if (!canCreate()) return false;
     closeAllLayers(); closePalette();
-    loadCreate().then(function (c) { c.open(kind || '', from || null, !!viaKey, preset || null); }, function () {
+    var inC = CTX && CTX.scope && CTX.scope.site_id ? { site_id: CTX.scope.site_id, name: CTX.scope.name || '' } : null;   // sales item 91
+    loadCreate().then(function (c) { c.open(kind || '', from || null, !!viaKey, preset || null, inC); }, function () {
       if (window.ddsToast) window.ddsToast('Create didn’t load — check your connection and try again.', 'err');
     });
     return true;
@@ -1084,6 +1257,7 @@
     { key: 'create_invoice', create: 'invoice', label: 'Send an invoice', section: 'Create', desc: 'new invoice bill' },
     { key: 'create_proposal', create: 'proposal', label: 'Send a proposal', section: 'Create', desc: 'new proposal quote' },
     { key: 'create_todo', create: 'todo', label: 'Add a to-do', section: 'Create', desc: 'new task reminder' },
+    { key: 'create_project', create: 'project', label: 'New project', section: 'Create', desc: 'add a project checklist work' },   // sales item 91
   ].map(function (d) { d.href = '#create:' + d.create; return d; });
   var SETTINGS_DESTS = [
     { key: 'set_stages', label: 'Deal stages', section: 'Settings', desc: 'stage names rename pipeline chance', href: '/settings.html#stages' },
@@ -1091,7 +1265,7 @@
   ];
   // "#create" or "#create:call" in the address (a link from another page, a
   // bookmark) opens it once; the hash is cleared so a reload doesn't reopen it
-  var CREATE_HASH = /^#create(?::(call|deal|invoice|proposal|todo|customer|update))?$/;
+  var CREATE_HASH = /^#create(?::(call|deal|invoice|proposal|todo|project|site|customer|update))?$/;
   function createFromHash() {
     var m = CREATE_HASH.exec(location.hash || '');
     if (!m || !canCreate()) return;
@@ -1111,6 +1285,10 @@
     // lib/shell.ts stays byte-identical.
     var secKey = activeSectionKey(nav, activeKey);
     DESTS = flatten(nav);                          // ⌘K reaches EVERY capability (primary + utility)
+    // builder item 202: search lists only what this person can open. Settings hides the plan from
+    // anyone but the account's owner (data-needs="owner"), so a team member's "plan" found nothing
+    // there; the server stops sending it too, this covers an older one.
+    if (window.ddsLacks && window.ddsLacks('owner')) DESTS = DESTS.filter(function (d) { return d.key !== 'plan'; });
     if (canCreate()) DESTS = DESTS.concat(CREATE_DESTS);
     // item 84: two Settings cards by name ("deal stages", "automations"), for whoever can change them
     if ((CTX && CTX.nav || []).some(function (s) { return s.key === 'settings'; }) && !(CTX.scope && CTX.scope.site_id) && !(window.ddsLacks && window.ddsLacks('configure')))
@@ -1168,14 +1346,17 @@
       (canCreate() ? '<button type="button" class="dds-create" id="dds-create" aria-haspopup="dialog" aria-expanded="false" aria-keyshortcuts="c">' + icon('plus') + '<span class="lbl">Create</span><kbd aria-hidden="true">C</kbd></button>' : '') +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
+      // sales item 123: "3 due today", drawn only when something is due (paintDue)
+      '<button type="button" class="dds-due" id="dds-due" aria-haspopup="dialog" aria-expanded="false" aria-controls="dds-due-pop" hidden></button>' +
       '<div class="dds-right">' +
-        '<button class="dds-ic" id="dds-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
+        '<button class="dds-ic" id="dds-bell" aria-label="' + esc(bellLabel(att)) + '" aria-haspopup="true" aria-expanded="false">' + bellInner(att) + '</button>' +
         (whatsNewWho() ? '<button class="dds-ic" id="dds-new" aria-label="What’s new" aria-haspopup="dialog">' + icon('spark') + '</button>' : '') +
         '<a class="dds-ic" href="/help.html" id="dds-help" aria-label="Help — how do I…?" aria-haspopup="true" aria-expanded="false">' + icon('help') + '</a>' +
         '<button class="dds-ic" id="dds-profile" aria-label="Account" aria-haspopup="true" aria-expanded="false">' + icon('account') + '</button>' +
       '</div>';
 
     wire(nav);
+    paintDue(); readDue(false);   // sales item 123
     mountMobileBar(nav, activeKey, att);
     mountContextBar(scope);
     if (canCreate()) {
@@ -1299,8 +1480,9 @@
     var rows = (CTX.businesses || []).filter(function (b) { return !q || String(b.name || '').toLowerCase().indexOf(q) >= 0; });
     if (!rows.length) { box.innerHTML = '<div class="muted">No business matches that.</div>'; return; }
     box.innerHTML = rows.map(function (b) {
-      return '<a class="row site' + (b.current ? ' now' : '') + '" role="listitem" href="#" data-biz="' + esc(b.site_id) + '" data-noscope="1"' + (b.current ? ' aria-current="true"' : '') + '>' +
-        '<span class="av" aria-hidden="true">' + esc(bizInitials(b.name)) + '</span><span class="tx"><span class="n">' + esc(b.name) + '</span><span class="sub">' + esc(bizRoleLine(b)) + (b.current ? ' · here now' : '') + '</span></span></a>';
+      // builder item 201: each row is a link inside a list item, so it is read as a link
+      return '<div role="listitem"><a class="row site' + (b.current ? ' now' : '') + '" href="#" data-biz="' + esc(b.site_id) + '" data-noscope="1"' + (b.current ? ' aria-current="true"' : '') + '>' +
+        '<span class="av" aria-hidden="true">' + esc(bizInitials(b.name)) + '</span><span class="tx"><span class="n">' + esc(b.name) + '</span><span class="sub">' + esc(bizRoleLine(b)) + (b.current ? ' · here now' : '') + '</span></span></a></div>';
     }).join('');
     [].forEach.call(box.querySelectorAll('[data-biz]'), function (a) { a.addEventListener('click', function (e) { e.preventDefault(); openBusiness(a.getAttribute('data-biz')); }); });
   }
@@ -1393,12 +1575,90 @@
     list.innerHTML = rows.map(function (x) {
       var now = x.site_id === here;
       var ini = String(x.name || '?').trim().charAt(0).toUpperCase();
-      return '<a class="row site' + (now ? ' now' : '') + '" role="listitem" href="/today.html?client=' + encodeURIComponent(x.site_id) + '" data-noscope="1"' + (now ? ' aria-current="true"' : '') + '>' +
-        '<span class="av" aria-hidden="true">' + esc(ini) + '</span><span class="tx"><span class="n">' + esc(x.name || '(unnamed)') + '</span><span class="sub">' + esc(host(x.address) || x.domain || 'No address yet') + (x.state_words ? ' · ' + esc(x.state_words) : '') + (now ? ' · here now' : '') + '</span></span></a>';
+      // builder item 201: a link inside a list item, read as a link (it was announced as a list item only)
+      return '<div role="listitem"><a class="row site' + (now ? ' now' : '') + '" href="/today.html?client=' + encodeURIComponent(x.site_id) + '" data-noscope="1"' + (now ? ' aria-current="true"' : '') + '>' +
+        '<span class="av" aria-hidden="true">' + esc(ini) + '</span><span class="tx"><span class="n">' + esc(x.name || '(unnamed)') + '</span><span class="sub">' + esc(host(x.address) || x.domain || 'No address yet') + (x.state_words ? ' · ' + esc(x.state_words) : '') + (now ? ' · here now' : '') + '</span></span></a></div>';
     }).join('');
   }
   document.addEventListener('click', function () { if (siteSwitchPop()) closeSiteSwitch(false); });
   window.addEventListener('resize', function () { var b = document.getElementById('dds-site-switch'), p = siteSwitchPop(); if (b && p) placeSiteSwitch(b, p); });
+
+  // ── builder item 201 (Nov 12 review, finding 66): "Which client?" ──────────────
+  // At studio level a link into the website builder opened the studio's OWN site, an empty
+  // placeholder while that site isn't live here (Nov 9 took "Your website" out of the menu for
+  // that reason). Settings' Domain & email, Help's Your website, the ? panel's answers and search
+  // results like Publish or Domain still led there. Such a link now asks which client's website
+  // first, from the same rows as Switch site; a pick opens that client's page at the same place.
+  // The studio's own site stays one quiet row at the foot. Drawn in Figma (307:8560).
+  var WHICH_PLACES = { domain: 'Domain & email', publish: 'Publishing', business: 'Business details', design: 'Editing pages', addpage: 'Adding a page', history: 'Versions', search: 'The health check', export: 'The website’s export', bookings: 'Bookings', reviews: 'Reviews', media: 'Photos', settings: 'The website’s settings' };
+  function whichClientWanted(href) {
+    if (!CTX || !CTX.is_agency || CTX.site_live !== false || (CTX.scope && CTX.scope.site_id) || scopeId()) return false;
+    var h = String(href || '');
+    return SAFE_HREF.test(h) && !/[?&]client=/.test(h) && normalizePath(h) === '/presence';
+  }
+  var whichOpener = null;
+  function whichPop() { return document.getElementById('dds-which'); }
+  function closeWhich(refocus) {
+    var pop = whichPop(), dim = document.getElementById('dds-which-dim');
+    if (pop) pop.remove(); if (dim) dim.remove();
+    var back = whichOpener; whichOpener = null;
+    if (refocus && back && back.isConnected && back.focus) try { back.focus(); } catch (_) { /* */ }
+  }
+  function atClient(href, id) {
+    var i = href.indexOf('#'), h = i >= 0 ? href.slice(0, i) : href, hash = i >= 0 ? href.slice(i) : '';
+    return h + (h.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(id) + hash;
+  }
+  function openWhichClient(href, opener) {
+    closeAllLayers(); closePalette(); closeWhich(false);
+    whichOpener = opener || document.activeElement || null;
+    var m = /#([a-z]+)/.exec(href), place = (m && WHICH_PLACES[m[1]]) || 'Editing a website';
+    var dim = el('<div id="dds-which-dim" aria-hidden="true"></div>');
+    var pop = el('<div class="dds-pop dds-sites-pop dds-which open" id="dds-which" role="dialog" aria-labelledby="dds-which-h" aria-describedby="dds-which-p">' +
+      '<h2 id="dds-which-h">Which client’s website?</h2><p id="dds-which-p">' + esc(place) + ' is part of each client’s website. Pick one and it opens there.</p>' +
+      '<input type="search" class="q" id="dds-which-q" placeholder="Find a client…" aria-label="Find a client" autocomplete="off">' +
+      '<div class="list" id="dds-which-list" role="list"><div class="muted">Loading your clients’ sites…</div></div>' +
+      '<div class="wfoot"><a class="row all" href="/sites.html" data-noscope="1">All sites →</a><a class="row all" href="/sites.html#new" data-noscope="1">+ New site</a></div>' +
+      '<a class="row own" href="' + esc(href) + '" data-own-site="1">Your studio’s own site (not live yet)</a></div>');
+    document.body.appendChild(dim); document.body.appendChild(pop);
+    dim.addEventListener('click', function () { closeWhich(true); });
+    pop.addEventListener('click', function (e) { e.stopPropagation(); });
+    // beside what was pressed on a computer; a phone (CSS) or a press with nothing to hang from gets the sheet / the middle
+    var r = whichOpener && whichOpener.getClientRects && whichOpener.getClientRects().length && whichOpener !== document.body ? whichOpener.getBoundingClientRect() : null;
+    if (r && window.matchMedia && window.matchMedia('(min-width:761px)').matches) {
+      var left = r.right + 12 + pop.offsetWidth <= window.innerWidth - 8 ? r.right + 12 : Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left));
+      pop.style.left = left + 'px';
+      pop.style.top = Math.max(8, Math.min(window.innerHeight - pop.offsetHeight - 8, r.top)) + 'px';
+    } else pop.classList.add('mid');
+    var q = pop.querySelector('#dds-which-q'); q.focus();
+    pop.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.stopPropagation(); closeWhich(true); return; }
+      var rows = [].slice.call(pop.querySelectorAll('.list a.row'));
+      var i = rows.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); (rows[i + 1] || rows[0] || q).focus(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); (i > 0 ? rows[i - 1] : q).focus(); }
+    });
+    q.addEventListener('input', function () { paintWhichRows(pop, href, q.value); });
+    siteRows().then(function (rows) {
+      if (whichPop() !== pop) return;
+      if (rows === null) { pop.querySelector('#dds-which-list').innerHTML = '<div class="muted">Couldn’t load your clients’ sites just now.</div>'; return; }
+      paintWhichRows(pop, href, q.value);
+    });
+  }
+  function paintWhichRows(pop, href, query) {
+    var list = pop.querySelector('#dds-which-list'); if (!list) return;
+    var q = String(query || '').trim().toLowerCase();
+    var host = function (u) { return String(u || '').replace(/^https?:\/\//, '').replace(/\/.*$/, ''); };
+    var rows = (SWITCH_ROWS || []).filter(function (x) {
+      return !q || [x.name, x.domain, host(x.address), (x.tags || []).join(' ')].some(function (v) { return String(v || '').toLowerCase().indexOf(q) >= 0; });
+    });
+    if (!rows.length) { list.innerHTML = '<div class="muted">' + (SWITCH_ROWS && SWITCH_ROWS.length ? 'No client matches that.' : 'No client sites yet. + New site makes the first.') + '</div>'; return; }
+    list.innerHTML = rows.map(function (x) {
+      var ini = String(x.name || '?').trim().charAt(0).toUpperCase();
+      return '<div role="listitem"><a class="row site" href="' + esc(atClient(href, x.site_id)) + '" data-noscope="1">' +
+        '<span class="av" aria-hidden="true">' + esc(ini) + '</span><span class="tx"><span class="n">' + esc(x.name || '(unnamed)') + '</span><span class="sub">' + esc(host(x.address) || x.domain || 'No address yet') + (x.state_words ? ' · ' + esc(x.state_words) : '') + '</span></span></a></div>';
+    }).join('');
+  }
+  document.addEventListener('click', function () { if (whichPop()) closeWhich(false); });
 
   // ── mobile bottom bar (≤760px): the daily loop in one tap — Today · Inbox ·
   //    Menu. presence.html keeps its own dock, so we stay out of its way. ──
@@ -1540,6 +1800,8 @@
     });
     var cr = document.getElementById('dds-create');
     if (cr) cr.addEventListener('click', function (e) { e.stopPropagation(); openCreate('', cr, e.detail === 0); });
+    var due = document.getElementById('dds-due');
+    if (due) due.addEventListener('click', function (e) { e.stopPropagation(); toggleDue(e.detail === 0); });
     // search
     var s = document.getElementById('dds-search');
     s.addEventListener('click', openPalette);
@@ -1549,9 +1811,9 @@
       document.addEventListener('click', closeMenus);
       document.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openPalette(); } });
     }
-    // bell + profile
-    document.getElementById('dds-bell').addEventListener('click', function (e) { e.stopPropagation(); toggleNotifications(); });
-    document.getElementById('dds-profile').addEventListener('click', function (e) { e.stopPropagation(); toggleProfile(); });
+    // bell + profile. Builder item 201: opened from the keyboard (e.detail 0), focus moves into the panel
+    document.getElementById('dds-bell').addEventListener('click', function (e) { e.stopPropagation(); toggleNotifications(e.detail === 0); });
+    document.getElementById('dds-profile').addEventListener('click', function (e) { e.stopPropagation(); toggleProfile(e.detail === 0); });
     var newTrig = document.getElementById('dds-new');
     if (newTrig) {
       newTrig.addEventListener('click', function (e) { e.stopPropagation(); closeMenus(); openWhatsNew(newTrig); });
@@ -1594,6 +1856,8 @@
   function closeAllLayers() {
     closeMenus(); closeNotifications(); closeProfile(); closeHelp(); closeDrawer(); closeShortcuts();
     if (siteSwitchPop()) closeSiteSwitch(false);   // bug hunt A11: Switch site is one of the layers too
+    if (whichPop()) closeWhich(false);             // builder item 201: and Which client?
+    closeDue(false);                               // sales item 123: and Due today
   }
 
   // ── command palette ──
@@ -1624,6 +1888,8 @@
         // Shift+Enter on a website row opens the site itself (its "Open website")
         if (e.key === 'Enter' && sel && e.shiftKey && sel.querySelector('[data-alt-href]')) { e.preventDefault(); window.open(sel.querySelector('[data-alt-href]').getAttribute('data-alt-href'), '_blank', 'noopener'); return; }
         if (e.key === 'Enter' && sel) {
+          // builder item 201: a website place at studio level asks which client first
+          if (!sel.hasAttribute('data-own-site') && whichClientWanted(sel.getAttribute('href'))) { e.preventDefault(); openWhichClient(sel.getAttribute('href'), null); return; }
           if (sel.hasAttribute('data-rec-label')) pushRecent(sel.getAttribute('data-rec-label'), sel.getAttribute('data-rec-href'));
           location.href = sel.getAttribute('href');
         }
@@ -1676,6 +1942,7 @@
     var sel = selFirst ? ' sel' : '';
     var attrs = o.rec ? ' data-rec-label="' + esc(o.label) + '" data-rec-href="' + esc(o.href) + '"' : '';
     if (o.create) attrs += ' data-create="' + esc(o.create) + '"';
+    if (o.own) attrs += ' data-own-site="1"';   // item 201: "Your studio’s own site" opens it, never asks which client
     var href = o.raw ? o.href : (/[?&]client=/.test(o.href) ? o.href : withScope(o.href));
     var alt = o.alt && o.alt.href ? '<span class="alt" data-alt-href="' + esc(o.alt.href) + '" title="Opens the website itself (Shift+Enter)">' + esc(o.alt.label || 'Open website') + '</span>' : '';
     return '<a class="res' + sel + '" id="dds-res-' + n + '" role="option" aria-selected="' + (selFirst ? 'true' : 'false') + '" href="' + esc(href) + '"' + attrs + '>'
@@ -1705,7 +1972,7 @@
     var qq = String(q || '').trim().toLowerCase();
     var list = qq ? DESTS.filter(function (d) { return d.label.toLowerCase().indexOf(qq) >= 0 || d.section.toLowerCase().indexOf(qq) >= 0 || (d.desc && d.desc.toLowerCase().indexOf(qq) >= 0); }) : DESTS;
     var box = pal.querySelector('.results');
-    var places = list.map(function (d) { return { kind: d.create ? 'action' : 'place', label: d.label, sub: d.section, href: d.href, create: d.create || '', raw: !!d.create }; });
+    var places = list.map(function (d) { return { kind: d.create ? 'action' : 'place', label: d.label, sub: d.section, href: d.href, create: d.create || '', raw: !!d.create, own: d.key === 'content' }; });
     var placesHtml = palGroups([['places', places]], q);
     box.innerHTML = placesHtml;
     var inp0 = pal.querySelector('input'); if (inp0) inp0.setAttribute('aria-activedescendant', placesHtml ? 'dds-res-0' : '');
@@ -1776,7 +2043,7 @@
   function markAttentionFresh() { lastAttentionAt = Date.now(); }
   function paintBell() {
     var b = document.getElementById('dds-bell');
-    if (b) b.innerHTML = bellInner(badgeCount());
+    if (b) { b.innerHTML = bellInner(badgeCount()); b.setAttribute('aria-label', bellLabel(badgeCount())); }
     paintMobileInboxDot();
   }
   // bug hunt A7: the phone bar's Inbox number was drawn once at boot; it follows the bell now
@@ -1864,6 +2131,18 @@
     return (m && typeof m.count === 'number' && m.count === n) ? 0 : n;
   }
   function setExpanded(id, open) { var b = document.getElementById(id); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+  // Builder item 201: the bell and account panels sit at the end of the page, so Tab from the
+  // last control (or Shift+Tab from the first) closes the panel and puts focus back on its button,
+  // instead of walking off the page.
+  function tabOutCloses(pop, close, triggerId) {
+    pop.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab') return;
+      var f = [].filter.call(pop.querySelectorAll('a[href],button:not([disabled]),input:not([disabled])'), function (n) { return n.tabIndex >= 0 && n.getClientRects().length; });
+      if (!f.length || document.activeElement !== (e.shiftKey ? f[0] : f[f.length - 1])) return;
+      e.preventDefault(); close();
+      var b = document.getElementById(triggerId); if (b) b.focus();
+    });
+  }
   // one row shape for every kind of feed item the bell draws
   function shapeBellRows(d, revr) {
     var out = [];
@@ -1952,7 +2231,7 @@
       else if (window.ddsToast) window.ddsToast('Couldn’t clear those just now — try again in a moment.', 'err');
     });
   }
-  function toggleNotifications() {
+  function toggleNotifications(viaKey) {
     if (notif && notif.classList.contains('open')) { notif.classList.remove('open'); setExpanded('dds-bell', false); return; }
     closeAllLayers();
     if (!notif) {
@@ -1974,9 +2253,11 @@
       });
       notif.querySelector('#dds-bell-read').addEventListener('click', markBellRead);
       notif.querySelector('#dds-bell-clear').addEventListener('click', clearBell);
+      tabOutCloses(notif, closeNotifications, 'dds-bell');
     }
     notif.classList.add('open');
     setExpanded('dds-bell', true);
+    if (viaKey) { var tab0 = notif.querySelector('.tabs [role=tab][aria-selected="true"]') || notif.querySelector('.tabs [role=tab]'); if (tab0) tab0.focus(); }
     // Sales review item 11: at STUDIO level the badge is the studio's one
     // needs-you list, so the Needs-you tab lists exactly those rows (the same
     // read Home heads its list with); Updates keeps the news from the feed.
@@ -2008,7 +2289,8 @@
       var old = notif.querySelector('.foot'); if (old) old.remove();
       var foot = revr
         ? '<a class="row foot" href="/client.html" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See all your updates →</a>'
-        : '<a class="row foot" href="' + esc(withScope('/inbox.html')) + '" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">See everything in your Inbox →</a>';
+        // builder item 202: inside a client that page is their Messages, the name their menu uses
+        : '<a class="row foot" href="' + esc(withScope('/inbox.html')) + '" style="text-align:center;font-weight:600;color:var(--dds-accent,#5b3fa0)">' + (CTX && CTX.scope && CTX.scope.name ? 'See everything in Messages →' : 'See everything in your Inbox →') + '</a>';
       notif.appendChild(el(foot));
     });
   }
@@ -2035,13 +2317,15 @@
       help.addEventListener('click', function (e) { e.stopPropagation(); });
       var inp = help.querySelector('#dds-help-q'); var deb;
       inp.addEventListener('input', function () { clearTimeout(deb); var v = inp.value; deb = setTimeout(function () { askHelp(v); }, 250); });
-      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(deb); askHelp(inp.value); } else if (e.key === 'Escape') { closeHelp(); var t = document.getElementById('dds-help'); if (t) t.focus(); } });
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(deb); askHelp(inp.value); } else if (e.key === 'Escape') { closeHelp(); var t = helpButton(); if (t) t.focus(); } });
     }
     help.classList.add('open'); setExpanded('dds-help', true);
     helpSuggest();
     setTimeout(function () { var i = help.querySelector('#dds-help-q'); if (i) i.focus(); }, 20);
   }
   function closeHelp() { if (help) help.classList.remove('open'); setExpanded('dds-help', false); }
+  // where focus goes back to: the ? button, or on a phone (no room for it) the account menu that holds Help
+  function helpButton() { var t = document.getElementById('dds-help'); return (t && t.getClientRects().length) ? t : document.getElementById('dds-profile'); }
   function helpSuggest() {
     var body = help.querySelector('#dds-help-body');
     var qs = ['Change my hours', 'Publish my changes', 'Set up booking', 'Send an update', 'Connect a service'];
@@ -2074,10 +2358,10 @@
 
   // ── profile / context menu (role, edition, agency, sign out) ──
   var prof;
-  function toggleProfile() {
+  function toggleProfile(viaKey) {
     if (prof && prof.classList.contains('open')) { prof.classList.remove('open'); setExpanded('dds-profile', false); return; }
     closeAllLayers();
-    if (!prof) { prof = el('<div class="dds-pop" role="region" aria-label="Account menu"></div>'); document.body.appendChild(prof); prof.addEventListener('click', function (e) { e.stopPropagation(); }); }
+    if (!prof) { prof = el('<div class="dds-pop" role="region" aria-label="Account menu"></div>'); document.body.appendChild(prof); prof.addEventListener('click', function (e) { e.stopPropagation(); }); tabOutCloses(prof, closeProfile, 'dds-profile'); }
     setExpanded('dds-profile', true);
     var email = (sb && sb.__email) || 'Signed in';
     var role = (CTX && CTX.site_role) || '';
@@ -2085,7 +2369,9 @@
     var ROLE_WORDS = { business_owner: 'Owner', business_staff: 'Team member', client_reviewer: 'Client', developer: 'Developer' };
     var roleWord = ROLE_WORDS[role] || (role ? role.replace(/_/g, ' ').replace(/^\w/, function (c) { return c.toUpperCase(); }) : '');
     var plan = (CTX && CTX.edition_name && role !== 'client_reviewer') ? CTX.edition_name + ' plan' : '';
-    var rows = '';
+    // builder item 201: Help first. A phone (under 420px) has no room for the ? button, and the
+    // first-day tour has always said help lives in this menu.
+    var rows = '<a class="row" href="/help.html" id="dds-help-row">Help<span class="sub">Ask how to do something, or open Help</span></a>';
     if (CTX && CTX.is_agency) rows += '<a class="row" href="/agency.html">Studio</a>' +
       // item 44: the Sites page in one click, from anywhere
       '<a class="row" href="/sites.html" id="dds-all-sites">All sites<span class="sub">Every website you look after</span></a>';
@@ -2114,6 +2400,9 @@
     rows += '<a class="row" href="#" id="dds-signout">Sign out</a>';
     prof.innerHTML = '<div class="who"><div class="n">' + esc(email) + '</div><div class="r">' + esc([roleWord, plan].filter(Boolean).join(' · ')) + '</div></div>' + rows;
     prof.classList.add('open');
+    if (viaKey) { var r0 = prof.querySelector('a.row'); if (r0) r0.focus(); }
+    var hr = document.getElementById('dds-help-row');
+    if (hr) hr.addEventListener('click', function (e) { e.preventDefault(); closeProfile(); toggleHelp(); });
     if (document.getElementById('dds-health-row')) api('/admin/health-center').then(function (r) {
       var sub = document.getElementById('dds-health-sub'); if (!sub || !r.ok) return;
       var areas = (r.body && r.body.data && Array.isArray(r.body.data.areas)) ? r.body.data.areas : [];
@@ -2152,8 +2441,10 @@
     if (openSec) { var sb0 = openSec.querySelector('button[data-sec]'); closeMenus(); if (sb0) sb0.focus(); }
     if (notif && notif.classList.contains('open')) { closeNotifications(); var b1 = document.getElementById('dds-bell'); if (b1) b1.focus(); }
     if (prof && prof.classList.contains('open')) { closeProfile(); var b2 = document.getElementById('dds-profile'); if (b2) b2.focus(); }
-    if (help && help.classList.contains('open')) { closeHelp(); var b3 = document.getElementById('dds-help'); if (b3) b3.focus(); }
+    if (help && help.classList.contains('open')) { closeHelp(); var b3 = helpButton(); if (b3) b3.focus(); }
     if (keys && keys.classList.contains('open')) closeShortcuts();
+    if (whichPop()) closeWhich(true);   // builder item 201
+    if (duePop && duePop.classList.contains('open')) closeDue(true);   // sales item 123
     // ⌘K palette too — its input handles Escape while focused, but the dialog must
     // also close when focus is elsewhere (closePalette returns focus to its trigger).
     if (pal && pal.classList.contains('open')) closePalette();
@@ -2203,7 +2494,7 @@
       keys.querySelector('#dds-keys-close').addEventListener('click', closeShortcuts);
     }
     var rows = [[/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K', 'Search Studio OS'], ['/', 'Search'], ['n', 'New — the page’s + button'], ['?', 'These shortcuts'], ['Esc', 'Close whatever is open']];
-    if (canCreate()) rows.splice(3, 0, ['c', 'Create — log a call, a deal, an invoice…']);
+    if (canCreate()) rows.splice(3, 0, ['c', 'Create — log a call, a deal, an invoice, a project…']);
     var html = rows.map(keyRow).join('');
     if (normalizePath(location.pathname) === '/inbox') html += '<div class="grp">In the Inbox</div>' + INBOX_KEYS.map(keyRow).join('');
     keys.querySelector('.body').innerHTML = html;
@@ -2236,8 +2527,8 @@
       .then(function (s) { pushOn = !!s; }).catch(function () { pushOn = false; });
   }
   function togglePush() {
-    if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.ready.then(function (reg) {
+    if (!('serviceWorker' in navigator)) return Promise.resolve(false);
+    return navigator.serviceWorker.ready.then(function (reg) {
       return reg.pushManager.getSubscription().then(function (existing) {
         if (existing) {
           // turn OFF
@@ -2263,8 +2554,21 @@
             });
           });
       });
-    }).catch(function () { window.ddsToast && window.ddsToast('Couldn’t change notifications just now.', 'err'); });
+    }).catch(function () { window.ddsToast && window.ddsToast('Couldn’t change notifications just now.', 'err'); }).then(function () { return pushOn; });
   }
+  // builder item 202: Settings' Notifications holds the same switch as the account menu's row
+  window.ddsPush = {
+    supported: function () { return !isReviewerCtx() && 'serviceWorker' in navigator && 'PushManager' in window; },
+    // the browser's own answer, else (no worker within a moment) what this tab last knew
+    state: function () {
+      if (!('serviceWorker' in navigator) || !navigator.serviceWorker.ready) return Promise.resolve(pushOn);
+      return Promise.race([
+        navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (s) { pushOn = !!s; return pushOn; }, function () { return pushOn; }),
+        new Promise(function (r) { setTimeout(function () { r(pushOn); }, 1500); }),
+      ]);
+    },
+    toggle: togglePush,
+  };
 
   // ── the App Launcher panel (also the mobile nav sheet) ──────────────────────
   // ONE element serves both: ≥761px it is the waffle's click-invoked popover
@@ -2432,6 +2736,25 @@
     root.innerHTML = '<a class="dds-brand" href="/"><span class="mark">S</span>Studio OS</a><div style="flex:1"></div><a class="dds-ic" href="/help.html" aria-label="Help">?</a><a class="dds-ic" href="/studio.html" aria-label="Sign in">◐</a>';
   }
 
+  // Builder item 191: two-step sign-in is on and this device hasn't had the code from the
+  // phone yet, so the server treats it as signed out. The studio's sign-in page asks for
+  // the code, then brings them back here (dds-studio-return, as for anyone signed out).
+  // The sign-in kept on this device says so, with no call: a fresh sign-in carries the
+  // person's factors, and the token says whether the code was typed (aal2).
+  function secondStepDue(sess) {
+    try {
+      var f = (sess && sess.user && sess.user.factors) || [];
+      if (!f.some(function (x) { return x && x.status === 'verified'; })) return false;
+      return JSON.parse(atob(String(sess.access_token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).aal !== 'aal2';
+    } catch (_) { return false; }
+  }
+  function toSecondStep() {
+    // never twice in a row: if the sign-in page sent them straight back, the page shows signed out
+    try { if (Date.now() - Number(sessionStorage.getItem('dds-step-sent') || 0) < 30000) { minimalShell(); return; } sessionStorage.setItem('dds-step-sent', String(Date.now())); } catch (_) { /* */ }
+    try { localStorage.setItem('dds-studio-return', JSON.stringify({ path: location.pathname + location.search + location.hash, at: Date.now() })); } catch (_) { /* */ }
+    location.replace('/studio.html');
+  }
+
   // ── PT-5: contextual onboarding — teach in context, show ONCE, disappear ────
   // Declarative + reuses the shell: any page marks a `.dds-hint[data-hint]`
   // element (hidden) next to the thing it explains. We reveal unseen ones with a
@@ -2508,6 +2831,8 @@
       { sel: ['#dds-create', '#dds-mbar-create'], title: 'Create', text: 'Log a call, add a deal, send an invoice or a proposal — from any page. You pick who inside the form, so there’s no hunting for their page first.' },
       { sel: ['.dds-nav .sec > button[data-sec="website"]', '.dds-nav .sec > [data-href^="/presence"]', '#dds-mbar-menu'], title: 'Your website', text: 'Everything about your website lives behind this one door — edit pages, update business info, and publish. Nothing goes live without your OK.', mtext: 'On a phone, Menu holds the rest — your Website (edit and publish) and your Customers live in there. Nothing goes live without your OK.' },
       { sel: ['.dds-nav .sec > button[data-sec="customers"]', '.dds-nav .sec > [data-href^="/customers"]'], title: 'Customers', text: 'Your customers and the people behind them — their deal, billing, project, files and messages on one record.' },
+      // sales item 91: a studio's tour stops at Sites too
+      { sel: ['.dds-nav .sec > [data-href^="/sites"]'], title: 'Sites', text: 'Every client’s website is a card here. + New site starts one in private; nobody is emailed until you invite the owner.' },
       { sel: ['#dds-waffle'], title: 'App Launcher', text: 'Every part of your studio, one tap — the full list of destinations, grouped and always within reach.' },
       { sel: ['#dds-bell'], title: 'The bell', text: 'The bell gathers what needs you — approvals, new enquiries, anything worth a look. Quiet means you’re all caught up.' },
       { sel: ['#dds-profile'], title: 'Your account', text: 'Notifications, light or dark appearance, settings, and help live here — and you can take this tour again any time.' }
@@ -2878,6 +3203,7 @@
         TOKEN = (sess && sess.access_token) || "";
         sb.__email = (sess && sess.user && sess.user.email) || '';
         if (!TOKEN) { minimalShell(); return; }
+        if (secondStepDue(sess)) { toSecondStep(); return; }   // builder item 191
         var uid = (sess && sess.user && sess.user.id) || '';
         var kept = keptContext(uid);
         if (kept) {

@@ -92,11 +92,14 @@ eq('the total', od.total_cents, 170000);
 // ── the route and the pages ──
 const sales = read('supabase/functions/presence/routes/sales.ts');
 ok('GET /sales/reports sits with the other /sales routes (the same gate)', /if \(route === '\/sales\/reports' && method === 'GET'\) return handleSalesReports\(req, site, principal, cors\);/.test(read('supabase/functions/presence/index.ts')));
-ok('every read is the signed-in site\'s own', ((sales.match(/export async function handleSalesReports[\s\S]*?\n}\n/) || [''])[0].match(/site_id=eq\.\$\{site\.id\}/g) || []).length === 6);   // final pass F5 added the close-date read; item 69 writes the deals read twice (with found_via, then without before APPLY-0143)
+// sales item 120 retired the count of six: every table the reports read is named with the
+// signed-in site (sales_reads_harness_test.mjs drives the real reads and checks the same)
+const reportReads = ((sales.match(/export async function handleSalesReports[\s\S]*?\n}\n/) || [''])[0].match(/`presence_[a-z_]+\?[^`]*`/g) || []);
+ok('every read is the signed-in site\'s own', reportReads.length >= 6 && reportReads.every((p) => p.includes('site_id=eq.${site.id}')), JSON.stringify(reportReads.filter((p) => !p.includes('site_id=eq.${site.id}'))));
 ok('a failed read marks its report unavailable, never a false zero', /revenue: failed\.has\('revenue'\) \? \{ unavailable: true \}/.test(sales) && /pipeline: dealsOff \? \{ unavailable: true \}/.test(sales) && /overdue: failed\.has\('overdue'\) \|\| !rcv \? \{ unavailable: true \}/.test(sales));
 ok('overdue reads the same receivables as Who owes you', /loadReceivables\(site\)\.catch/.test(sales));
 const an = read('analytics.html');
-ok('both Analytics views carry the reports; never inside a client', /const reportsShell=\(\)=>scope\(\)\?'':/.test(an) && (an.match(/reportsShell\(\)/g) || []).length === 2);
+ok('both Analytics views carry the reports; never inside a client', /const reportsShell=\(\)=>inClient\(\)\?'':/.test(an) && (an.match(/reportsShell\(\)/g) || []).length === 2);
 ok('printing a report prints only that report', /body\[data-print="report"\] \*\{visibility:hidden!important;transition:none!important\}/.test(an) && /document\.body\.setAttribute\('data-print','report'\)/.test(an));
 const pipe = read('pipeline.html');
 const mirror = (pipe.match(/const LOST_REASONS=\[([^\]]+)\]/) || [])[1];

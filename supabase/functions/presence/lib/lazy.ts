@@ -4,8 +4,11 @@
 // desk, occasional pages) now load the first time one of their routes is asked
 // for, and stay loaded for the life of the worker:
 //
-//   const { handleA, handleB } = lazyRoutes(() => import('./routes/x.ts'));
+//   const { handleA, handleB } = lazyRoutes(() => import(ROUTE_FILE));
 //
+// where ROUTE_FILE is the group's path written out, ./routes/system.ts for one. (Not
+// written as a real import here: the local `supabase functions serve` follows import
+// paths even in comments, and stops at one that doesn't exist.)
 // Each name stands in for the handler with its own parameters: it loads the file
 // and calls the real export, so the router's calls read exactly as before. Keep
 // the specifier a string literal inside import(): that is what puts the file in

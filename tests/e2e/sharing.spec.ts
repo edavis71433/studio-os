@@ -327,9 +327,11 @@ test.describe('Sharing & access — client scope', () => {
     const invited = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/members'));
     await page.getByRole('button', { name: 'Send invite', exact: true }).click();
     expect((await invited).headers()['x-dds-scope-site']).toBe(CLIENT);
-    // and NOTHING this page sent went to the studio's own site
+    // and NOTHING this page sent went to the studio's own site. The frame's Due today
+    // chip (sales 123) is the one exception by design: it reads the STUDIO's day
+    // (/sales/my-tasks with no scope) from inside a client too.
     await expect.poll(() => seen.length).toBeGreaterThanOrEqual(6);
-    expect(seen.filter(([, scope]) => scope !== CLIENT)).toEqual([]);
+    expect(seen.filter(([path, scope]) => scope !== CLIENT && !path.endsWith('/sales/my-tasks'))).toEqual([]);
   });
 
   test('without ?client= no request carries a scope; the heading and the breadcrumb are the plain ones', async ({ page }) => {

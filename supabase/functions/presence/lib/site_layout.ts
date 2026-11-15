@@ -57,7 +57,8 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
  *  another website, an email address or a phone number belongs to the old
  *  business, so it stays behind (and a dropdown keeps only its own pages). Pure. */
 export function menuForCopy(nav: unknown): unknown[] {
-  const own = (href: unknown) => { const v = String(href ?? '').trim(); return v === '/' || /^\/[a-z0-9][a-z0-9-]*\/$/.test(v); };
+  // item 225: a jump to a named part of one of its own pages travels too
+  const own = (href: unknown) => { const v = String(href ?? '').trim(); return v === '/' || /^\/[a-z0-9][a-z0-9-]*\/$/.test(v) || /^\/(?:[a-z0-9][a-z0-9-]*\/)?#[a-z0-9][a-z0-9-]*$/.test(v); };
   const out: unknown[] = [];
   for (const it of Array.isArray(nav) ? nav : []) {
     if (!isObj(it) || !own(it.href)) continue;
@@ -152,7 +153,7 @@ export function print53(s: string): string {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
 }
 export interface PrintedSection { print: string; page: string; title: string }
-const SECTION_WORD: Record<string, string> = { richtext: 'Text', image_text: 'Image and text', image: 'Image', gallery: 'Gallery', carousel: 'Slideshow', team: 'Team', cards: 'Cards', columns: 'Columns', features: 'Features', stats: 'Numbers', process: 'Steps', pricing: 'Prices', faq: 'FAQ', accordion: 'Questions', tabs: 'Tabs', cta: 'Call to action', title: 'Title', video: 'Video', map: 'Map', events: 'Events', social: 'Social links', partners: 'Logos', before_after: 'Before and after', spotlight: 'Spotlight', form: 'Form', booking: 'Booking', appointment: 'Appointments', newsletter: 'Newsletter', certifications: 'Credentials', service_areas: 'Service areas', reviews: 'Rating', progress: 'Progress', buttons: 'Buttons', download: 'Download', link_list: 'Links', table: 'Table', freeform: 'Free-form' };
+const SECTION_WORD: Record<string, string> = { richtext: 'Text', image_text: 'Image and text', image: 'Image', gallery: 'Gallery', carousel: 'Slideshow', team: 'Team', cards: 'Cards', columns: 'Columns', features: 'Features', stats: 'Numbers', process: 'Steps', pricing: 'Prices', faq: 'FAQ', accordion: 'Questions', tabs: 'Tabs', cta: 'Call to action', title: 'Title', video: 'Video', map: 'Map', events: 'Events', social: 'Social links', partners: 'Logos', before_after: 'Before and after', spotlight: 'Spotlight', form: 'Form', booking: 'Booking', appointment: 'Appointments', newsletter: 'Newsletter', certifications: 'Credentials', service_areas: 'Service areas', reviews: 'Rating', progress: 'Progress', buttons: 'Buttons', download: 'Download', link_list: 'Links', table: 'Table', freeform: 'Free-form', stack: 'Blocks' };
 /** Every section of a snapshot, printed, with its page and a name for it. Pure. */
 export function printSections(content: unknown): PrintedSection[] {
   const settings = isObj(content) && isObj(content.settings) ? content.settings : {};
@@ -167,6 +168,15 @@ export function printSections(content: unknown): PrintedSection[] {
   add(settings.blocks, 'Home');
   for (const p of Array.isArray(settings.pages) ? settings.pages : []) if (isObj(p)) add(p.blocks, String(p.title || p.slug || 'A page').slice(0, 40));
   return out;
+}
+
+/** The prints of one page's sections ('' = Home), as printSections makes them: what a
+ *  saved page brought when it landed (builder list item 216). Pure. */
+export function printPageSections(content: unknown, slug: string): string[] {
+  const settings = isObj(content) && isObj(content.settings) ? content.settings : {};
+  const page: unknown = slug === '' ? null : (Array.isArray(settings.pages) ? settings.pages : []).find((p) => isObj(p) && p.slug === slug);
+  const blocks = slug === '' ? settings.blocks : isObj(page) ? page.blocks : undefined;
+  return (Array.isArray(blocks) ? blocks : []).filter((b) => isObj(b) && !NOTHING_OF_THEIRS.has(String(b.type))).map((b) => print53(canon(b)));
 }
 
 /** What is still exactly as it was copied: the sections whose print hasn't
@@ -192,7 +202,7 @@ export function copiedBlocker(left: { sections: PrintedSection[]; photos: number
   for (const s of left.sections) byPage.set(s.page, [...(byPage.get(s.page) || []), s.title]);
   const where = [...byPage].slice(0, 4).map(([page, titles]) => `${page}: ${titles.slice(0, 3).join(', ')}${titles.length > 3 ? '…' : ''}`).join('; ');
   const what = [n ? `${n} section${n === 1 ? '' : 's'}${where ? ` (${where}${byPage.size > 4 ? '; …' : ''})` : ''}` : '', p ? `${p} photo${p === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
-  return { field: 'copied', message: `Still exactly as copied from another site: ${what}. Change them for this business, or press Keep on this site’s card in Sites.` };
+  return { field: 'copied', message: `Still exactly as copied from another site: ${what}. Change them for this business, or press “Keep them as they are”.` };
 }
 
 /** A stored record, read safely: anything malformed is no record. Pure. */

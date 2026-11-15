@@ -16,6 +16,7 @@ ok('the max-age is a whole number of seconds, an hour or more', /^\d+$/.test(PRE
   const h = corsFor(from('https://davisdigitalstudio.com'));
   ok('corsFor: the preflight answer says how long to keep it', h['Access-Control-Max-Age'] === PREFLIGHT_MAX_AGE);
   ok('corsFor: the allowed origin, headers and methods are as before', h['Access-Control-Allow-Origin'] === 'https://davisdigitalstudio.com' && /x-dds-user-jwt/.test(h['Access-Control-Allow-Headers']) && /PATCH/.test(h['Access-Control-Allow-Methods']));
+  ok('corsFor: a page may ask to run beside the database (the x-region header), on every answer that sets the list', /(^|, )x-region(,|$)/.test(h['Access-Control-Allow-Headers']));
   ok('corsFor: the answer still varies by origin', h['Vary'] === 'Origin');
   ok('corsFor: an origin not on the list gets the same header', corsFor(from('https://elsewhere.example'))['Access-Control-Max-Age'] === PREFLIGHT_MAX_AGE);
 }

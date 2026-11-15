@@ -51,7 +51,8 @@ ok('⌘K "kit" (and "template") → the Templates tab on Sites (item 166)', hits
 ok('⌘K "client" → Customers (studio + owner)', hits(studio, 'client').some((h) => h.href === '/customers.html') && hits(owner, 'client')[0]?.href === '/customers.html');
 ok('⌘K "health" → the Health Center for platform staff only', hits(staff, 'health').some((h) => h.href === '/admin-health.html') && !hits(studio, 'health').some((h) => h.href === '/admin-health.html'));
 ok('every new entry is ⌘K-only (hidden) — the menu did not grow', ['billing', 'plan', 'team', 'kits', 'health'].every((k) => { const e = flatten(staff).filter((i) => i.key === k); return e.length > 0 && e.every((i) => i.hidden); }));
-ok('the website’s "health check" desc still answers "health" for an owner (no regression)', hits(owner, 'health').some((h) => h.href === '/presence.html'));
+// builder item 202: the health check lives on the website's Search tab now (item 184), and "health" opens it there
+ok('"health" still finds the website’s health check for an owner, on its Search tab', hits(owner, 'health').some((h) => h.href === '/presence.html#search'));
 
 // ═══ change 11: the Health Center's door. Item 96 (Nov 8) moved it from the studio's
 //     Home, where it was staff wording on the owner's page, to the account menu ═══
@@ -80,9 +81,9 @@ ok('connections.ts: one pending slot per client and provider (status pending + t
 ok('connections.ts: the email carries the signed link into the client’s portal, via the ONE mailer', /\/client\.html\?connect=\$\{encodeURIComponent\(token\)\}/.test(route) && /await sendEmail\(email, subject, body, brand, \{ critical: true/.test(route) && /loadEmailBrand\(agencySiteId\)/.test(route));
 ok('connections.ts: the portal read verifies the token and retires an older link after a re-ask', /askedAt = await verifyAsk\(token, site\.id\)/.test(route) && /Number\(r\.config\?\.ask_at\) === askedAt/.test(route));
 ok('index.ts: /connections/ask routes before the /:key handlers', index.indexOf("route === '/connections/ask'") < index.indexOf("/^\\/connections\\/([a-z0-9_]+)(\\/connect"));
-ok('connections.html: the scoped page offers the ask as a second door; the row’s Connect stays', /id="askClient"/.test(conn) && /apiPost\('\/connections\/ask', \{\}\)/.test(conn) && /if\(!SCOPE \|\| !open\.length\)\{ host\.innerHTML=''; return; \}/.test(conn) && /SCOPE \? 'Asked the client' : 'Waiting for your permission'/.test(conn));
+ok('connections.html: the scoped page offers the ask as a second door; the row’s Connect stays', /id="askClient"/.test(conn) && /apiPost\('\/connections\/ask', \{\}\)/.test(conn) && /if\(!IN_CLIENT \|\| !open\.length\)\{ host\.innerHTML=''; return; \}/.test(conn) && /IN_CLIENT \? 'Asked the client' : 'Waiting for your permission'/.test(conn));
 ok('connections-callback.html: a client returns to their portal (same-site path only)', /dds-pending-return/.test(cb) && /\/\^\\\/\[\^\\\/\\\\\]\/\.test\(v\)/.test(cb) && /localStorage\.removeItem\('dds-pending-return'\)/.test(cb));
-ok('client.html: ?connect= is read (and stashed through a sign-in), the ask fetched, the card painted', /params\.get\('connect'\)\|\|localStorage\.getItem\('dds-connect-ask'\)/.test(client) && /api\('\/connections\/ask'\+\(askTok\?'\?token='/.test(client) && /html\+=connectAskHtml\(\);/.test(client) && /localStorage\.setItem\('dds-connect-ask',ct\)/.test(client));
+ok('client.html: ?connect= is read (and stashed through a sign-in), the ask fetched, the card painted', /params\.get\('connect'\)\|\|localStorage\.getItem\('dds-connect-ask'\)/.test(client) && /const askPath='\/connections\/ask'\+\(askTok\?'\?token='/.test(client) && /api\(askPath\)/.test(client) && /html\+=connectAskHtml\(\);/.test(client) && /localStorage\.setItem\('dds-connect-ask',ct\)/.test(client));
 ok('client.html: Connect uses the client’s own session (no scope) and comes back to the portal', /localStorage\.removeItem\('dds-pending-scope'\);localStorage\.setItem\('dds-pending-return','\/client\.html#connections'\)/.test(client) && /api\('\/connections\/'\+encodeURIComponent\(key\)\+'\/connect','POST',\{\}\)/.test(client));
 
 console.log(`\n${pass}/${pass + fail} passed`);

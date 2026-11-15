@@ -42,6 +42,18 @@ export const EMAIL_PROVIDERS: Record<string, EmailProviderPreset> = {
     dkim_note: 'Zoho Mail Admin → Email Authentication → DKIM → generate, then copy the key here.',
     dkim_host_hint: (d) => `zmail._domainkey.${d}`,
   },
+  // GoDaddy's own mailboxes (Workspace Email). GoDaddy also resells Microsoft 365, whose mail
+  // servers are Microsoft's and are matched as microsoft365.
+  godaddy: {
+    slug: 'godaddy', name: 'GoDaddy email',
+    mx: (d) => [
+      { type: 'MX', name: d, value: 'smtp.secureserver.net', priority: 0, ttl: 3600 },
+      { type: 'MX', name: d, value: 'mailstore1.secureserver.net', priority: 10, ttl: 3600 },
+    ],
+    spf: (d) => ({ type: 'TXT', name: d, value: 'v=spf1 include:secureserver.net -all', ttl: 3600 }),
+    dkim_note: 'GoDaddy’s email settings say whether your plan can sign email; if it can, the record to add is shown there.',
+    dkim_host_hint: (d) => `selector._domainkey.${d}`,
+  },
   other: {
     slug: 'other', name: 'Another provider',
     mx: () => [],
@@ -51,7 +63,37 @@ export const EMAIL_PROVIDERS: Record<string, EmailProviderPreset> = {
   },
 };
 
-const dmarc = (d: string): DnsRecord => ({ type: 'TXT', name: `_dmarc.${d}`, value: `v=DMARC1; p=none; rua=mailto:postmaster@${d}`, ttl: 3600 });
+/** PURE: who runs the email, read from the domain's mail servers (Nov 12 review, finding 14).
+ *  null when the servers are nobody we have records for: then no sender record is offered,
+ *  because a guessed one sends the client's real mail to spam. */
+export function detectEmailProvider(mxHosts: string[]): EmailProviderPreset | null {
+  const hosts = (mxHosts || []).map((h) => String(h || '').toLowerCase().replace(/\.$/, ''));
+  const any = (re: RegExp) => hosts.some((h) => re.test(h));
+  if (any(/(^|\.)google(mail)?\.com$/)) return EMAIL_PROVIDERS.google_workspace;
+  if (any(/\.mail\.protection\.outlook\.com$|(^|\.)outlook\.com$/)) return EMAIL_PROVIDERS.microsoft365;
+  if (any(/(^|\.)zoho(mail)?\.(com|eu|in|com\.au)$/)) return EMAIL_PROVIDERS.zoho;
+  if (any(/(^|\.)secureserver\.net$/)) return EMAIL_PROVIDERS.godaddy;
+  return null;
+}
+
+/** PURE: what the domain's email looks like from outside, read on the BARE name (finding 15:
+ *  mail never lives on "www."). The sender record is the TXT at the bare name that starts
+ *  v=spf1; the record for fakes is the TXT at _dmarc.<bare> that starts v=DMARC1. */
+export function emailFacts(records: DnsRecord[], bare: string): { hasMail: boolean; mxHost: string | null; provider: EmailProviderPreset | null; hasSpf: boolean; hasDmarc: boolean } {
+  const at = (r: DnsRecord, name: string) => String(r.name || '').toLowerCase().replace(/\.$/, '') === name;
+  const b = String(bare || '').toLowerCase();
+  const mx = (records || []).filter((r) => r.type === 'MX' && at(r, b)).sort((x, y) => (x.priority ?? 0) - (y.priority ?? 0));
+  return {
+    hasMail: mx.length > 0,
+    mxHost: mx.length ? String(mx[0].value).toLowerCase().replace(/\.$/, '') : null,
+    provider: detectEmailProvider(mx.map((r) => r.value)),
+    hasSpf: (records || []).some((r) => r.type === 'TXT' && at(r, b) && /^v=spf1\b/i.test(String(r.value))),
+    hasDmarc: (records || []).some((r) => r.type === 'TXT' && at(r, `_dmarc.${b}`) && /^v=DMARC1\b/i.test(String(r.value))),
+  };
+}
+
+export const dmarcRecord = (d: string): DnsRecord => ({ type: 'TXT', name: `_dmarc.${d}`, value: `v=DMARC1; p=none; rua=mailto:postmaster@${d}`, ttl: 3600 });
+const dmarc = dmarcRecord;
 
 /** A full guided email setup for one provider — MX + SPF + DMARC prepared and
  *  validated; DKIM named honestly. Same plan machinery, same approval law. */

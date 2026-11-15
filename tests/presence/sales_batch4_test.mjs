@@ -48,7 +48,7 @@ const scoped = all({ ...studioCtx, scoped: true });
 const rec = scoped.find((i) => i.key === 'record');
 eq('a client\'s record is "Record" in their menu', rec && [rec.label, rec.section], ['Record', 'Record']);
 ok('no nav label still says Details & billing or Broadcasts', !buildNav({ ...studioCtx, scoped: true }).concat(buildNav(studioCtx)).some((s) => s.label === 'Details & billing' || (s.items || []).some((i) => i.label === 'Details & billing' || i.label === 'Broadcasts')));
-ok('Home is headed Home (final pass, batch C: the nav says Home; the Customers page is Customers)', /<h1 id="pagehead" tabindex="-1">Home<\/h1>/.test(read('agency.html')));
+ok('Home is headed Home (final pass, batch C: the nav says Home; the Customers page is Customers)', /<h1 id="pagehead" class="hometitle" tabindex="-1">Home<\/h1>/.test(read('agency.html')) && /<h2 id="custHead">Customers<\/h2>/.test(read('agency.html')));   // sales item 91: the title at the top, the table headed Customers
 ok('the Customers column says Requests (batch C: it counts requests only), its badge counts requests', /\['open_support','Requests',/.test(read('customers.html')) && /att\+\(att===1\?' request':' requests'\)/.test(read('customers.html')));
 ok('the record says Waiting on them', /Waiting on them/.test(read('crm.html')) && !/Waiting on client/.test(read('crm.html')));
 ok('the project page says Waiting on them', !/Waiting on client/.test(read('projects.html')));
