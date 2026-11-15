@@ -27,8 +27,8 @@ const FREE = { type: 'freeform', id: 'free-layout', title: 'Placed by hand', asp
   { id: 'photo', kind: 'image', x: 58, y: 10, w: 36, h: 80, z: 2, image: { image_id: '00000000-0000-4000-8000-0000000000f1' } },
   { id: 'go', kind: 'button', x: 6, y: 64, w: 26, h: 20, z: 3, button: { label: 'Book a visit', url: 'https://example.com/book', style: 'primary' } }] };
 
-// Builder item 57: a Blocks section with every kind of block. Its picker sample joins
-// scripts/thumbnails/samples.ts with the editor half, which offers the section.
+// Builder item 57: a second Blocks section, with every kind of block (the picker's sample
+// in scripts/thumbnails/samples.ts has four).
 const STACK = { type: 'stack', items: [
   { kind: 'heading', text: 'Built from blocks' },
   { kind: 'text', body: 'A heading, words, a photo and buttons, **stacked** in reading order.' },

@@ -104,6 +104,7 @@ test.describe('Client portal while the website is being built (item 179)', () =>
 
   test('a studio with no name of its own is “your studio”, never the platform', async ({ page }) => {
     await start(page, { '/portal/context': ctx({ name: 'Studio OS', logo_url: null, accent: '#5b3fa0', is_default: true }) });
+    await page.addInitScript(() => { try { localStorage.setItem('dds-portal-papers:e2e-owner', '1'); } catch { /* storage may be denied */ } });   // item 238: a client who has had a paper keeps the Documents door
     await page.goto('/client.html');
     await expect(card(page)).toBeVisible();
     await expect(page.locator('body')).not.toContainText('Studio OS');

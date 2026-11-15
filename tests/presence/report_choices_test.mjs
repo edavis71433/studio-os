@@ -106,7 +106,7 @@ const D = { month: '2026-10', monthLabel: 'October 2026', visitors: 812, pagevie
   const ids = ['s-b', 's-a', 's-c', 's-gone'];
   const rows = reportRows({
     ids,
-    sites: [{ id: 's-a', client_id: 'c-a' }, { id: 's-b', client_id: 'c-b' }, { id: 's-c', client_id: 'c-c' }],
+    sites: [{ id: 's-a', client_id: 'c-a', status: 'live' }, { id: 's-b', client_id: 'c-b', status: 'paused', last_published_at: '2026-06-01T00:00:00Z' }, { id: 's-c', client_id: 'c-c', status: 'ready', last_published_at: null }],
     names: [{ site_id: 's-a', business_name: 'Bluebird Bakery' }, { site_id: 's-b', business_name: 'Maple & Main Realty' }],
     clients: [{ id: 'c-a', email: 'jo@bluebird.example', name: 'Jo' }, { id: 'c-b', email: 'Sam@Maple.example', name: 'Sam' }, { id: 'c-c', email: null, name: 'Ortiz Photography' }],
     settings: [{ site_id: 's-b', body: JSON.stringify({ enabled: true, cc: ['office@maple.example'], copy_to: 'eric@studio.example', propose: { mode: 'auto' }, last_result: { month: '2026-10', status: 'sent', reason: null, at: NOW } }) }, { site_id: 's-a', body: '{not json' }],
@@ -118,6 +118,7 @@ const D = { month: '2026-10', monthLabel: 'October 2026', visitors: 812, pagevie
   ok('card: an unreadable setting reads as off; an unsubscribed client says so', !blue.enabled && blue.blocked === 'unsubscribed');
   ok('card: no email on their record says so; the name falls back to the client’s', ortiz.blocked === 'no_email' && ortiz.name === 'Ortiz Photography');
   ok('card: who it goes to by first name, for “Sam + 1 more”', maple.who === 'Sam' && blue.who === 'Jo');
+  ok('card (item 200): a site that isn’t live yet says the report waits for it; published or live is live', maple.live === true && blue.live === true && ortiz.live === false);
   ok('card: a first word that isn’t a name is left out', reportRows({ ids: ['s-x'], sites: [{ id: 's-x', client_id: 'c-x' }], names: [], clients: [{ id: 'c-x', email: 'x@x.example', name: 'x@x.example' }], settings: [], suppressed: {} })[0].who === '');
 }
 
