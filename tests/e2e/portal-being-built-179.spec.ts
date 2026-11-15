@@ -209,4 +209,61 @@ test.describe('Client portal while the website is being built (item 179)', () =>
     await expect(page.locator('#main h1')).toHaveText('Project questionnaire');
     await expect(page.locator('#main .sheet .sub')).toHaveText('Your answers help Marlow & Co write your pages.');
   });
+
+  test('every server read asks to run beside the database', async ({ page }) => {
+    await start(page);
+    const regions = new Set<string>();
+    page.on('request', (r) => { if (r.url().includes('/functions/v1/presence/') && r.method() !== 'OPTIONS') regions.add(r.headers()['x-region'] || 'none'); });
+    await page.goto('/client.html');
+    await expect(card(page)).toBeVisible();
+    expect([...regions]).toEqual(['us-west-2']);
+  });
+
+  test('a returning client sees the last Home at once, and it cannot be pressed until the fresh one is in', async ({ page }) => {
+    await start(page);
+    await page.goto('/client.html');
+    await expect(page.locator('#needs-h')).toHaveText('Needs you · 2');
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('dds-portal-home:')).length)).toBe(1);
+    const kept = await page.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find((k) => k.startsWith('dds-portal-home:'))!)!));
+    expect(kept.main).toContain('Needs you · 2');
+    expect(kept.main).not.toContain('<iframe');   // the site's picture is drawn fresh, never kept
+    // the next visit: hold the context read, and the kept Home is already there
+    let release: () => void = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    await page.route('**/functions/v1/presence/portal/context', async (route) => { await held; return route.fallback(); });
+    await page.goto('about:blank'); await page.goto('/client.html');
+    await expect(page.locator('#main #needs-h')).toHaveText('Needs you · 2');
+    await expect(page.locator('#main')).toHaveAttribute('inert', '');
+    await expect(page.locator('#tabnav .cb-name')).toHaveText('Marlow & Co');
+    release();
+    await expect(page.locator('#main')).not.toHaveAttribute('inert', '');
+    await expect(page.locator('#needs-h')).toHaveText('Needs you · 2');
+    await expect(page.locator('#needs-body .qrow').first().getByRole('button')).toBeEnabled();
+  });
+
+  test('a link to a project never shows the kept Home first', async ({ page }) => {
+    await start(page);
+    await page.goto('/client.html');
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('dds-portal-home:')).length)).toBe(1);
+    let release: () => void = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    await page.route('**/functions/v1/presence/portal/context', async (route) => { await held; return route.fallback(); });
+    await page.goto('about:blank'); await page.goto(`/client.html?project=${PID}`);
+    await page.waitForTimeout(300);
+    await expect(page.locator('#main #home-hero')).toHaveCount(0);
+    release();
+    await expect(page.locator('#main h1')).toHaveText('Website build');
+  });
+
+  test('signing out wipes the kept Home from the device', async ({ page }) => {
+    await start(page);
+    await page.goto('/client.html');
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('dds-portal-home:')).length)).toBe(1);
+    // the sign-in page is a blank stand-in: the test's sign-in never really ends, and the real
+    // page would send a signed-in browser straight back to the portal (which keeps a fresh copy)
+    await page.route('**/portal.html', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Sign in</title>' }));
+    await page.evaluate(() => (window as unknown as { doSignOut: (e?: unknown) => Promise<void> }).doSignOut());
+    await page.waitForURL('**/portal.html');
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('dds-portal-home:')).length)).toBe(0);
+  });
 });

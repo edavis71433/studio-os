@@ -716,7 +716,12 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||'')});
+// Speed (items 226 and 227, Nov 15): the database is in Oregon, and Supabase runs the server
+// in the region nearest the visitor, so from the east coast each of the dozen small database
+// calls behind one answer crossed the country (about 1 s an answer; 0.4 s beside the
+// database). x-region asks for Oregon; the server's CORS answer allows the header.
+const FN_REGION='us-west-2';
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''),'x-region':FN_REGION});
 // Nov 10 review (G3): no answer at all (no signal, aeroplane mode) used to THROW out
 // of here, so a button switched off before the call stayed grey for good and nothing
 // was said. No answer is now an ordinary failure (status 0, offline, a plain message),
@@ -1212,8 +1217,9 @@ function renderHome(){
   document.querySelectorAll('[data-ask-connect]').forEach(b=>b.addEventListener('click',()=>askConnect(b.getAttribute('data-ask-connect'),b.getAttribute('data-label'),b)));
   // back from Google (connections-callback.html → #connections): land on the card
   if(location.hash==='#connections'){try{history.replaceState(null,'','/client.html');}catch(_){}const hc=$('home-connect');if(hc)setTimeout(()=>hc.scrollIntoView({block:'start'}),0);}
-  buildNeedsYou();
-  loadWebsiteCard();
+  // item 228: once what needs them and the website card are in, this Home is the one kept for next time
+  const view=VIEW_SEQ;
+  Promise.allSettled([buildNeedsYou(),loadWebsiteCard()]).then(()=>{if(view===VIEW_SEQ)saveHomeCache();});
   loadDomainCard();
 }
 // Fill glances + mini Paths + the aggregated "Needs you" QUEUE — one list-view
@@ -3639,9 +3645,46 @@ function rememberedReviewer(){try{return !!(USER&&USER.id)&&localStorage.getItem
 function rememberedClient(){try{return !!(USER&&USER.id)&&localStorage.getItem(personaKey())==='client';}catch(_){return false;}}
 function rememberPersona(c){try{if(!(USER&&USER.id))return;if(PORTAL.persona==='reviewer'&&c.site_role==='client_reviewer')localStorage.setItem(personaKey(),'reviewer');else if(PORTAL.persona==='client')localStorage.setItem(personaKey(),'client');else localStorage.removeItem(personaKey());}catch(_){}}
 let LOADED_ONCE=false;   // the address's #tab and a kept destination are honoured by the first load only (later loads follow an action)
-function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
-function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your updates just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
-function ownerNote(){$('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div><h2 style="margin-top:14px">This is the client view.</h2><p class="muted">You have the full workspace.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
+// ── Builder list item 228: the last visit's Home, at once ──
+// A returning client sees the Home they last saw the moment the page opens, while the
+// fresh one loads; nothing on it can be pressed until then (inert). Kept on this device
+// only, for this person only (the key carries their id), for a week, and wiped when they
+// sign out or the page finds nobody signed in. The site's picture and the first-visit
+// tour are left out; the greeting is said again for the hour it is now.
+const HOME_CACHE_PREFIX='dds-portal-home:';
+const HOME_CACHE_DAYS=7;
+let HOME_FROM_CACHE=false;
+function homeCacheKey(){return(USER&&USER.id)?HOME_CACHE_PREFIX+USER.id:'';}
+function saveHomeCache(){
+  try{
+    const k=homeCacheKey(),main=$('main'),nav=$('tabnav');
+    if(!k||CURRENT_TAB!=='home'||!main||!nav||nav.hidden||!main.querySelector('#home-hero')||main.querySelector('#needs-body .skel'))return;
+    const m=main.cloneNode(true);m.querySelectorAll('iframe,#welcome').forEach(e=>e.remove());
+    const n=nav.cloneNode(true);n.querySelectorAll('.navpanel').forEach(e=>{e.innerHTML='';e.setAttribute('hidden','');});
+    localStorage.setItem(k,JSON.stringify({v:1,at:Date.now(),main:m.innerHTML,nav:n.innerHTML,first:clientName(),title:document.title}));
+  }catch(_){}
+}
+function paintHomeCache(){
+  try{
+    const k=homeCacheKey();if(!k)return false;
+    const rec=JSON.parse(localStorage.getItem(k)||'null');
+    if(!rec||rec.v!==1||typeof rec.main!=='string'||typeof rec.nav!=='string'||!(Date.now()-(+rec.at||0)<HOME_CACHE_DAYS*864e5)){if(rec)localStorage.removeItem(k);return false;}
+    const main=$('main'),nav=$('tabnav');if(!main||!nav)return false;
+    nav.innerHTML=rec.nav;nav.hidden=false;main.innerHTML=rec.main;
+    try{document.body.classList.add('homeview');}catch(_){}
+    const h=main.querySelector('#home-hero h1');if(h)h.textContent=portalGreeting(new Date().getHours(),String(rec.first||''));
+    if(typeof rec.title==='string'&&rec.title)document.title=rec.title;
+    for(const el of[main,nav]){el.setAttribute('inert','');el.setAttribute('aria-busy','true');}
+    HOME_FROM_CACHE=true;return true;
+  }catch(_){return false;}
+}
+function dropHomeCacheView(){HOME_FROM_CACHE=false;for(const id of['main','tabnav']){const el=$(id);if(el){el.removeAttribute('inert');el.removeAttribute('aria-busy');}}}
+function clearHomeCaches(){try{Object.keys(localStorage).filter(k=>k.indexOf(HOME_CACHE_PREFIX)===0).forEach(k=>localStorage.removeItem(k));}catch(_){}}
+// the load will land on Home: no link to a project, a request, a payment or a tab, and no destination kept through a sign-in
+function landsOnHome(){try{const q=new URLSearchParams(location.search);if(q.get('support')||q.get('project')||q.get('approval')||q.get('paid')||q.get('connect'))return false;if(String(location.hash||'').length>1)return false;return !localStorage.getItem(RETURN_KEY);}catch(_){return false;}}
+function signedOut(){dropHomeCacheView();clearHomeCaches();$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
+function trouble(){dropHomeCacheView();$('main').innerHTML=`<div class="center"><h2>We couldn’t load your updates just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
+function ownerNote(){dropHomeCacheView();clearHomeCaches();$('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div><h2 style="margin-top:14px">This is the client view.</h2><p class="muted">You have the full workspace.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
 
 async function load(){
   setWide(false);
@@ -3683,7 +3726,7 @@ async function load(){
   // …and each project's details go out the moment the list lands, not after the context
   if(early&&toHome)projP.then(r=>{const d=r&&r.ok&&r.body&&r.body.data;if(Array.isArray(d)&&d.length&&!PORTAL.projects.length){PORTAL.projects=d;PORTAL.snapsBoot=ensureSnaps();}}).catch(()=>{});
   const [ctx,proj0,feed]=await Promise.all([api('/portal/context'),projP,api('/portal/feed')]);
-  if(!ctx.ok){hideNav();trouble();return;}
+  if(!ctx.ok){dropHomeCacheView();hideNav();trouble();return;}
   const c=ctx.body.data||{};
   // …unless the answer says they are more than a reviewer now: then the read happens after all
   const proj=(skipProj&&(c.is_managed_client||c.site_role!=='client_reviewer'))?await api('/client/projects').catch(()=>null):proj0;
@@ -3725,6 +3768,10 @@ async function load(){
   if(a&&a.ok&&a.body&&a.body.data&&Array.isArray(a.body.data.providers)&&a.body.data.providers.length)PORTAL.ask=a.body.data;
   else if(a&&!a.ok&&askTok&&a.body&&a.body.message)PORTAL.askProblem=String(a.body.message);
   PORTAL.ready=true;
+  // item 228: with the last Home on screen, swap only once Home's own reads have answered,
+  // so the fresh Home replaces it whole instead of passing through grey placeholders
+  // (at most 4 s: a slow read gets the fresh Home's own placeholders, not a frozen old one)
+  if(HOME_FROM_CACHE){if(toHome)await Promise.race([Promise.allSettled([PORTAL.snapsBoot,PORTAL.billingFetch,PORTAL.wstatsFetch].filter(Boolean)),new Promise(r=>setTimeout(r,4000))]);dropHomeCacheView();}
   showNav();
   // deep links open the relevant drill-down; the nav stays visible around it.
   // ?support= now opens the Messages tab with that thread in the reading pane.
@@ -3743,7 +3790,7 @@ async function load(){
 // Always-available client sign-out (the shell's profile menu is owner-shaped;
 // a client needs an obvious, in-view way out). Lands back on the client door.
 // Shared so both the footer link and the "You & notifications" card use it.
-async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();try{await sb.auth.signOut();}catch(_){}location.href='/portal.html';}
+async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();clearHomeCaches();try{await sb.auth.signOut();}catch(_){}location.href='/portal.html';}
 (function(){var s=$('signout');if(s)s.addEventListener('click',doSignOut);})();
 (async function(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";USER=(data&&data.session&&data.session.user)||null;
@@ -3760,6 +3807,7 @@ async function doSignOut(e){if(e&&e.preventDefault)e.preventDefault();try{await 
       keepReturn(new URLSearchParams(location.search));   // G2: the project or request an email button was opening
       signedOut();return;
     }
+    if(landsOnHome())paintHomeCache();   // item 228
     await load();
   }catch(_){trouble();}
 })();
