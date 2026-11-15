@@ -7,7 +7,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { noticeTier } from '../lib/inbox_feed.ts';
-import { can, agencySiteIds } from './auth.ts';
+import { can, agencySiteIds, STUDIO_ROLE_WORDS } from './auth.ts';
 import { buildPortfolio, filterPortfolio, buildQueues, buildPatterns } from './portfolio.ts';
 import { needsYouPayload, dealNoticeIds, staleDealNotices, snoozeUntil, SNOOZE_KEY_RE, SNOOZE_MAX_DAYS } from './needs_you.ts';
 import { clearNotice } from '../lib/notice.ts';
@@ -15,7 +15,7 @@ import { healSupportOwners, supportActivity } from '../lib/service_bridge.ts';
 import { buildPortalFeed, noticeHrefFor } from '../routes/workspace.ts';
 import { loadReceivables } from '../routes/sales.ts';
 import { resolveSite, SITE_COLS } from '../lib/site.ts';
-import type { AgencyMember } from './auth.ts';
+import type { AgencyMember, AgencyRole } from './auth.ts';
 import type { PortfolioInput } from './portfolio.ts';
 import type { KitPayload } from '../lib/kits.ts';
 import { kitFromSite, applyKitTo, layoutFromSite } from './kit_io.ts';
@@ -780,9 +780,11 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     // The ONE shared sender (lib/workspace.ts), on the AGENCY's brand (white label).
     const agencyName = String(member.branding?.display_name || member.agency_name || 'your agency');
     const agencyNameHtml = agencyName.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+    const roleWords = STUDIO_ROLE_WORDS[role as AgencyRole];   // builder item 220: the role in one sentence
     const emailed = await sendInviteLink(email, {
       subject: `You’ve been invited to join ${agencyName}`,
-      intro: `You’ve been invited to join the <strong>${agencyNameHtml}</strong> team.`,
+      intro: `You’ve been invited to join the <strong>${agencyNameHtml}</strong> team${roleWords ? ` as ${roleWords.name}` : ''}.`,
+      role: roleWords ? { title: `What a ${roleWords.name} can see`, lines: [roleWords.you] } : undefined,
       brand: brandFromKit({ primary: String(member.branding?.color_accent || '') }, agencyName),
       next: '/agency.html',
     }).catch(() => false);

@@ -216,7 +216,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const builder = SOURCE['presence.html'];
   ok('both ways to change the template are marked', builder.includes('<div id="designGallery" hidden data-needs="owner">') && builder.includes('"Use this template"); use.dataset.needs = "owner"'));
   ok('the one template call is the marked one', count(builder, 'api("PUT", "/site/template"') === 1);
-  ok('Styles holds only what staff can\'t use: its button is marked, and the panel says so if reached another way', builder.includes('id="btnSettingsOpen" data-needs="configure"') && builder.includes('id="stylesAsk" hidden data-if-lacks="configure"') && builder.includes('#settingsPanel:not([data-mode="styles"]) #stylesAsk{display:none !important}'));
+  // builder item 220: Styles is restyling ("design": the owner seat, a developer and a Designer), which staff lack
+  ok('Styles holds only what staff can\'t use: its button is marked, and the panel says so if reached another way', builder.includes('id="btnSettingsOpen" data-needs="design"') && builder.includes('id="stylesAsk" hidden data-if-lacks="design"') && builder.includes('#settingsPanel:not([data-mode="styles"]) #stylesAsk{display:none !important}'));
   ok('account deletion moved to Settings, inside the owner-only billing section', !builder.includes('deleteCard') && /id="billing"[^>]*data-needs="owner"[\s\S]*?id="deleteCard"[\s\S]*?<\/section>/.test(SOURCE['settings.html']));
   ok('the Sharing link in the menu is marked', builder.includes('b.dataset.link = "sharing"; b.dataset.needs = "owner"'));
   ok('the plan card and its section are marked: /commerce only knows the caller\'s own account', SOURCE['settings.html'].includes("ownerOnly: true, needs: 'owner' }") && SOURCE['settings.html'].includes('id="billing" aria-labelledby="billingHead" hidden data-needs="owner"'));
