@@ -49,7 +49,7 @@ import { handleSavedReplies, handleFaqAdmin, handleClientFaq } from './routes/se
 import { handlePublish, handleRestore, handlePublishHistory, handleVersionStar, handleVersionLabel, handleCompareVersions, handleTimewarp, handleCheckpointList, handleCheckpointSave, handleCheckpointRestore, handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword, handleComingSoon, handleComingSoonRead } from './routes/publish.ts';
 const { handleLaunchList, handleLaunchCreate, handleLaunchGet, handleLaunchRecapture, handleLaunchDecide, handleLaunchSchedule, handleLaunchPromote, handleLaunchRollback, handleLaunchCancel } = lazyRoutes(() => import('./routes/launches.ts'));
 import { handleMediaUpload, handleMediaUpdate, handleMediaDelete } from './routes/media.ts';
-import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob } from './routes/assets.ts';
+import { handleAssetsList, handleAssetsCollections, handleAssetsHealth, handleAssetsBulk, handleAssetsMatch, handleAssetsFolderMove, handleAssetUpdate, handleAssetStatus, handleAssetDelete, handleAssetDetail, handleAssetDownload, handleAssetReplace, handleAssetRollback, handleAssetDuplicate, handleAssetSuggest, handleAssetSocial, handleAssetCards, handleAssetRemoveBackground, handleAssetCutout, handleCutoutJob, handleAssetsTrash, handleAssetPutBack, handleAssetDeleteForGood } from './routes/assets.ts';
 const { handleVisualKinds, handleVisualGenerate, handleVisualList, handleVisualGet, handleVisualVary, handleVisualEdit, handleVisualDecide } = lazyRoutes(() => import('./routes/visual.ts'));
 const { handleAdmin, handleDomain, handleDomainLookup, handleDomainForward, handleClientDomain } = lazyRoutes(() => import('./routes/admin.ts'));
 import { handleCollection, handleLocation, handleSettings, handleBlockSuggestions, handlePageDuplicate, handlePageRefs, SPECS } from './routes/content.ts';
@@ -59,10 +59,11 @@ import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts
 import { handleHealth, handleChanges, handleContentTree, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
 import { handlePublishLockGet, handlePublishLockPut } from './routes/publish_lock.ts';
 const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'));
+const { handleChangeLog, handleWentLive } = lazyRoutes(() => import('./routes/change_log.ts'));   // builder list item 215: Changes
 const { handleWebsiteHealth, handleWebsiteHealthPdf } = lazyRoutes(() => import('./routes/health_page.ts'));
 const { handleBusinessInsights } = lazyRoutes(() => import('./routes/insights_page.ts'));
 const { handleMomentsList, handleMomentDismiss } = lazyRoutes(() => import('./routes/moments.ts'));
-import { handlePortalContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleMemberRole, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
+import { handlePortalContext, handlePortalPreviewContext, handlePortalFeed, handleMembersList, handleMemberAdd, handleMemberRevoke, handleMemberRole, handleSharesList, handleShareSet, reviewerAllowed, memberWriteGate } from './routes/workspace.ts';
 const { handleDevFiles, handleDevCustomizationGet, handleDevCustomizationPut, handleBrandKitGet, handleBrandKitPut, handleBrandKitApply } = lazyRoutes(() => import('./routes/dev.ts'));
 const { handleStockSearch, handleStockImport } = lazyRoutes(() => import('./routes/stock.ts'));
 const { handleContentLibraryList, handleContentLibrarySave, handleContentLibraryUpdate, handleContentLibraryDelete } = lazyRoutes(() => import('./routes/content_library.ts'));
@@ -492,6 +493,17 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     return json({ error: 'entitlement_paused', message: ent.message }, 403, cors);
   }
 
+  // 4a. Builder list item 232: a studio previewing a client's portal (client.html?preview=),
+  //     drilled into that client. Reading only: nothing pressed is saved or sent and nothing
+  //     is marked as read, so every write is refused here, before any route runs, and only
+  //     the portal's own reads answer. Its context is the client's, not the studio's.
+  if (req.headers.get('x-dds-preview') === '1') {
+    if (!principal.scope || principal.scope.site_id !== site.id) return json({ error: 'preview_denied', message: 'Only a client’s studio can preview their portal.' }, 403, cors);
+    if (method !== 'GET') return json({ error: 'preview', message: 'This is a preview: nothing is saved or sent.' }, 403, cors);
+    if (route === '/portal/context') return handlePortalPreviewContext(site, principal.scope, principal, cors);
+    if (!(route.startsWith('/client/') || route === '/portal/feed' || route === '/connections/ask')) return json({ error: 'preview', message: 'That isn’t part of a client’s portal.' }, 403, cors);
+  }
+
   // 4b. A7.2 reviewer boundary: a client_reviewer (the client portal audience) may
   //     reach ONLY the shared feed + the approvals put to them. Everything else in
   //     the client gate is refused — the simplified portal is a real boundary, not
@@ -672,6 +684,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/assets/bulk' && method === 'POST') return handleAssetsBulk(req, site, principal, cors);
   if (route === '/assets/match' && method === 'GET') return handleAssetsMatch(req, site, cors);   // item 115: already in Files?
   if (route === '/assets/folders/move' && method === 'POST') return handleAssetsFolderMove(req, site, principal, cors);   // item 56
+  if (route === '/assets/trash' && method === 'GET') return handleAssetsTrash(site, cors);   // item 218: the Trash
   {
     const msoc = route.match(/^\/assets\/([0-9a-f-]{36})\/social$/);
     if (msoc && method === 'GET') return handleAssetSocial(site, msoc[1], cors);
@@ -701,6 +714,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (mco && method === 'POST') return handleAssetCutout(site, principal, mco[1], cors);
     const mcj = route.match(/^\/assets\/cutout\/([a-z0-9]{10,64}\.[A-Za-z0-9_-]{32})$/);
     if (mcj && method === 'GET') return handleCutoutJob(site, mcj[1], cors);
+    // item 218: out of the Trash, or gone for good
+    const mpb = route.match(/^\/assets\/([0-9a-f-]{36})\/put-back$/);
+    if (mpb && method === 'POST') return handleAssetPutBack(site, principal, mpb[1], cors);
+    const mfg = route.match(/^\/assets\/([0-9a-f-]{36})\/forever$/);
+    if (mfg && method === 'DELETE') return handleAssetDeleteForGood(site, principal, mfg[1], cors);
     const m = route.match(/^\/assets\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleAssetDetail(site, m[1], cors);
     if (m && method === 'PATCH') return handleAssetUpdate(req, site, principal, m[1], cors);
@@ -726,6 +744,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/changes' && method === 'GET') return handleChanges(site, cors);
   if (route === '/content-tree' && method === 'GET') return handleContentTree(site, cors);
   if (route === '/website-timeline' && method === 'GET') return handleWebsiteTimeline(site, cors);
+  // builder list item 215: who changed what, in sentences (a reviewer is refused above)
+  if (route === '/change-log' && method === 'GET') return handleChangeLog(req, site, principal, cors);
+  if (route === '/change-log/went-live' && method === 'GET') return handleWentLive(req, site, cors);
   if (route === '/website-health' && method === 'GET') return handleWebsiteHealth(site, cors);
   if (route === '/website-health/pdf' && method === 'GET') return handleWebsiteHealthPdf(site, cors);   // item 183
   if (route === '/business-insights' && method === 'GET') return handleBusinessInsights(site, cors);

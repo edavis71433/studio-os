@@ -6,6 +6,8 @@
 //     deleteMedia's reference check when the user removed them, and live sites
 //     ship BAKED variants inside the Netlify deploy (they never read storage),
 //     so removing the stored original can't break a published site.
+//     Not a file in the Trash (trashed_at, item 218): those wait their 30 days and
+//     are emptied by ops/file_trash.ts, which keeps one the live site still shows.
 //  2. Orphaned never-uploaded rows: createUpload issued a row + signed URL but
 //     the object was never PUT (client abandoned). A storage HEAD proves the
 //     object is absent (404) — a row pointing at nothing, safe to drop.
@@ -68,14 +70,14 @@ export async function reapMedia(limit = 100): Promise<MediaGcResult> {
 
   // ── Class 1: soft-deleted past the retention window ──
   const softBefore = new Date(now - gcRetentionMs()).toISOString();
-  const soft = await svc(`presence_media?deleted_at=not.is.null&deleted_at=lte.${encodeURIComponent(softBefore)}&select=id,site_id,storage_path,deleted_at,created_at&order=deleted_at.asc&limit=${lim}`);
+  const soft = await svc(`presence_media?deleted_at=not.is.null&deleted_at=lte.${encodeURIComponent(softBefore)}&trashed_at=is.null&select=id,site_id,storage_path,deleted_at,created_at&order=deleted_at.asc&limit=${lim}`);
   const softRows: MediaRow[] = Array.isArray(soft.json) ? soft.json : [];
   res.soft_scanned = softRows.length;
   for (const m of softRows) {
     if (!agedPast(m.deleted_at, now, gcRetentionMs())) continue; // belt-and-suspenders vs the SQL filter
     try {
       if (m.storage_path) await deleteObject(m.storage_path); // best-effort (often already gone)
-      const del = await svc(`presence_media?id=eq.${m.id}&deleted_at=not.is.null`, { method: 'DELETE' });
+      const del = await svc(`presence_media?id=eq.${m.id}&deleted_at=not.is.null&trashed_at=is.null`, { method: 'DELETE' });
       if (del.ok) res.soft_reaped += 1;
     } catch { /* isolated: skip this row */ }
   }

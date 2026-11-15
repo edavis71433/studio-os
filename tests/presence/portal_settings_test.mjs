@@ -16,9 +16,9 @@ const S1 = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', S2 = 'bbbbbbbb-2222-4222-8222
 const EMPTY = P.normalizePortal(null);
 
 // ── the setting ──
-ok('with nothing stored, every part and card shows and there is no note', same(EMPTY, { off: [], clients: {}, welcome: '', home_off: [] }));
+ok('with nothing stored, every part and card shows and there is no note', same(EMPTY, { off: [], clients: {}, welcome: '', home_off: [], parts_at: null, previewed_at: null }));
 ok('an unreadable setting shows everything', same(P.normalizePortal('nonsense'), EMPTY) && same(P.normalizePortal({ off: 'invoices', home_off: 7, clients: [] }), EMPTY));
-ok('only known parts and cards are kept, each once, in Settings’ order', same(P.normalizePortal({ off: ['reports', 'nope', 'invoices', 'reports'], home_off: ['projects', 'website', 'x'] }), { off: ['invoices', 'reports'], clients: {}, welcome: '', home_off: ['website', 'projects'] }));
+ok('only known parts and cards are kept, each once, in Settings’ order', same(P.normalizePortal({ off: ['reports', 'nope', 'invoices', 'reports'], home_off: ['projects', 'website', 'x'] }), { off: ['invoices', 'reports'], clients: {}, welcome: '', home_off: ['website', 'projects'], parts_at: null, previewed_at: null }));
 ok('only real client site ids are kept, lower-case, and a client with no choice is dropped', (() => {
   const s = P.normalizePortal({ clients: { [S1.toUpperCase()]: { invoices: false, nope: true, files: 'no' }, 'not-a-site': { invoices: false }, [S2]: {} } });
   return same(Object.keys(s.clients), [S1]) && same(s.clients[S1], { invoices: false });

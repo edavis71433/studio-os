@@ -28,7 +28,7 @@ export const PREFLIGHT_MAX_AGE = '86400';
 // regional invocation), and the browser may only send a header this list allows.
 // An address setting (?forceFunctionRegion=) would need no change here, but it alters
 // every address the pages call. Allowing a header grants nothing by itself.
-const ALLOWED_HEADERS = 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt, x-dds-scope-site, if-match, x-operator-secret, x-system-secret, x-region';
+const ALLOWED_HEADERS = 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt, x-dds-scope-site, if-match, x-operator-secret, x-system-secret, x-region, x-dds-preview';   // builder list item 232: a studio's preview of a client's portal (read-only, refused writes)
 
 export function corsFor(req: Request) {
   const origin = req.headers.get('origin') || '';

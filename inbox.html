@@ -1186,6 +1186,9 @@ function insertSavedReplies(taId){
     if(row){sel.style.cssText='max-width:100%';row.insertBefore(sel,row.firstChild);}else ta.parentNode.insertBefore(sel,ta);   // sales item 94: beside Draft a reply
   });
 }
+// shell.js is deferred and runs just before DOMContentLoaded. Made now, while the page parses: after an
+// await, readyState can already say 'interactive' with shell.js still on its way, and the wait was skipped.
+const SHELL_READY=document.readyState==='loading'?new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true})):Promise.resolve();
 // ── Draft a reply (sales item 94; benchmark 7 before it): AI help drafts from the whole
 // conversation, or the enquiry and the studio's services (/sales/ai/draft, the same press as
 // Email on a record). The draft lands in the box for editing and NOTHING is sent: Send stays
@@ -1201,7 +1204,7 @@ function aiDraftInto(taId,btnId,o){
     const p=window.ddsSalesAi.pill(row,{req:api,ta,go:sends,label:'Draft a reply',hint:o.hint,sendLabel:o.sendLabel||'Send',payload:o.payload,writing:o.writing});
     p.button.id=btnId;
   };
-  if(window.ddsSalesAi||document.readyState!=='loading')go();else document.addEventListener('DOMContentLoaded',go,{once:true});
+  if(window.ddsSalesAi)go();else SHELL_READY.then(go);
 }
 const firstOf=(n)=>String(n||'').trim().split(/\s+/)[0]||'';
 function snapComposer(){const s={sel:SEL,vals:{},focus:''};for(const id of COMPOSER_FIELDS){const el=$(id);if(el&&el.value)s.vals[id]=el.value;}const ae=document.activeElement;if(ae&&COMPOSER_FIELDS.includes(ae.id))s.focus=ae.id;return s;}
