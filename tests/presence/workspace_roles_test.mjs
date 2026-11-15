@@ -14,7 +14,8 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 
 // ═══ 1. roles & capabilities ═══
 {
-  ok('roles: four site roles', SITE_ROLES.length === 4 && isSiteRole('client_reviewer') && !isSiteRole('nope'));
+  ok('roles: five site roles (builder item 220 added the Designer)', SITE_ROLES.length === 5 && isSiteRole('client_reviewer') && isSiteRole('designer') && !isSiteRole('nope'));
+  ok('designer: the website only, no full workspace; edits, comments and restyles; nothing else', !seesFullWorkspace('designer') && siteCan('designer', 'view_site') && siteCan('designer', 'edit') && siteCan('designer', 'comment') && siteCan('designer', 'design') && ['publish', 'delete', 'configure', 'invite', 'connect', 'approve', 'export', 'use_developer_mode'].every((c) => !siteCan('designer', c)));
   ok('owner: sees full workspace + can invite/delete/configure', seesFullWorkspace('business_owner') && siteCan('business_owner', 'invite') && siteCan('business_owner', 'delete') && siteCan('business_owner', 'configure'));
   ok('business_staff: operates but cannot delete/configure/invite', seesFullWorkspace('business_staff') && siteCan('business_staff', 'edit') && siteCan('business_staff', 'publish') && !siteCan('business_staff', 'delete') && !siteCan('business_staff', 'configure') && !siteCan('business_staff', 'invite'));
   ok('client_reviewer: view_shared not view_all; can approve/comment/export; cannot edit/publish/connect', !seesFullWorkspace('client_reviewer') && siteCan('client_reviewer', 'view_shared') && siteCan('client_reviewer', 'approve') && siteCan('client_reviewer', 'comment') && siteCan('client_reviewer', 'export') && !siteCan('client_reviewer', 'edit') && !siteCan('client_reviewer', 'publish') && !siteCan('client_reviewer', 'connect'));

@@ -32,9 +32,11 @@ export function devModeAllowed(role: SiteRole, principalKind: string): boolean {
 
 /** Phase COMP (FD-T6-lite): the DESIGN surface — theme tokens only — is an
  *  OWNER capability, not a developer one. Picking a curated palette is everyday
- *  authoring; custom CSS/HTML remain Developer Mode. Pure + exported for tests. */
+ *  authoring; custom CSS/HTML remain Developer Mode. Builder item 220: a Designer
+ *  holds it too (the `design` capability), and so saves colours and fonts but never
+ *  custom code. Pure + exported for tests. */
 export function designAllowed(role: SiteRole, principalKind: string): boolean {
-  return devModeAllowed(role, principalKind) || role === 'business_owner';
+  return devModeAllowed(role, principalKind) || role === 'business_owner' || siteCan(role, 'design');
 }
 
 async function requireDeveloper(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<{ role: SiteRole } | Response> {

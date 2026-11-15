@@ -77,6 +77,6 @@ Applied and deployed to **staging and production**: migration 0036, the `presenc
 **Before opening the doors to real customers, these are the human steps only you can do:**
 
 1. **Confirm the prices** in `commerce/catalog.ts` (the founder/list numbers above are proposed defaults).
-2. **Register the subscription events** on the production Stripe webhook endpoint: `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` (`checkout.session.completed` is already registered).
+2. **Register the subscription events** on the production Stripe webhook endpoint: `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` (`checkout.session.completed` is already registered). For retainer charges (sales item 128) also `invoice.paid` and `invoice.payment_failed`, and keep the endpoint on the API version in `commerce/stripe_shape.ts` (`STRIPE_API_VERSION`), the version every call sends and the webhook reads.
 3. **Confirm `STRIPE_SECRET`** on production is the intended mode (test vs live).
 4. **Add navigation links** to `pricing.html` from the marketing site, and `git push` to publish the pages — that is the switch that makes the flow publicly discoverable and purchasable.

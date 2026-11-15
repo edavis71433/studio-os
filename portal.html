@@ -65,6 +65,11 @@
   .muted button.linky:disabled{color:var(--muted);cursor:default}
   input:focus-visible,button:focus-visible{outline:2px solid var(--p);outline-offset:2px}
   .rule{height:1px;background:var(--line);margin:20px 0 4px}
+  /* item 230: "or", then Continue with Google */
+  .orrule{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px;margin:18px 0 12px}
+  .orrule::before,.orrule::after{content:"";flex:1;height:1px;background:var(--line)}
+  button.gbtn{width:100%;background:var(--card);color:var(--ink);border:1px solid var(--line)}
+  @media (prefers-color-scheme:dark){button.gbtn{color:var(--ink)}}
   .mailbtns{display:flex;gap:10px;margin:2px 0 6px}
   .qbtn{flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:11px 12px}
   .qbtn:focus-visible{outline:2px solid var(--p);outline-offset:2px}
@@ -110,14 +115,17 @@
   <!-- SIGN IN · PASSWORDLESS (primary) -->
   <div id="emailPanel">
     <h1>Sign in</h1>
-    <p class="sub">We’ll email you a link. No password to remember.</p>
+    <p class="sub">We’ll email you a code. No password to remember.</p>
     <form id="fEmail" novalidate>
       <label for="em">Email</label>
       <input id="em" type="email" autocomplete="email" inputmode="email" placeholder="you@yourbusiness.com" required>
-      <button id="sendGo" type="submit">Email me a sign-in link</button>
+      <button id="sendGo" type="submit">Email me a code</button>
     </form>
     <div class="err" id="errEmail" role="alert"></div>
-    <p class="muted"><button class="linky" id="toPw" type="button">Use a password instead</button></p>
+    <!-- builder list item 230: Google only when the studio turned it on; a password only while it's allowed -->
+    <div class="orrule" id="orRule" hidden><span>or</span></div>
+    <button type="button" class="gbtn" id="gGo" hidden>Continue with Google</button>
+    <p class="muted" id="pwWay"><button class="linky" id="toPw" type="button">Use a password instead</button></p>
     <div class="rule" aria-hidden="true"></div>
     <p class="muted">First time here? Use the link in your invitation email to set things up.</p>
     <p class="muted">Run a studio on Studio OS? <a href="/studio.html">Your sign-in is here</a>.</p>
@@ -125,8 +133,8 @@
 
   <!-- CODE ENTRY (after a code is sent) -->
   <div id="codePanel" class="panel">
-    <h1>Check your inbox</h1>
-    <p class="sub" id="codeSub">If that email has an account, a sign-in email is on its way. Enter its 6-digit code below, or tap the link in it.</p>
+    <h1>Check your email</h1>
+    <p class="sub" id="codeSub">If that email has an account here, we’ve sent it a 6-digit code. Type it below, or tap the link in the same email. The code works for a short while.</p>
     <div class="mailbtns"><a class="qbtn" href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">Open Gmail</a><a class="qbtn" href="https://outlook.live.com/mail/0/" target="_blank" rel="noopener">Open Outlook</a></div>
     <form id="fCode" novalidate>
       <label for="code">6-digit code</label>
@@ -135,10 +143,10 @@
              autocorrect="off" autocapitalize="off" spellcheck="false"
              name="dds-signin-code" data-lpignore="true" data-1p-ignore="true"
              oninput="this.value=this.value.replace(/[^0-9]/g,'')" required>
-      <button id="codeGo" type="submit">Sign in →</button>
+      <button id="codeGo" type="submit">Sign in</button>
     </form>
     <div class="err" id="errCode" role="alert"></div>
-    <p class="muted" aria-live="polite" id="resendLine"><button class="linky" id="resend" type="button">Didn't get it? Send again</button></p>
+    <p class="muted" aria-live="polite" id="resendLine"><button class="linky" id="resend" type="button">Send a new code</button></p>
     <p class="muted"><button class="linky" id="toEmail" type="button">Use a different email</button></p>
   </div>
 
@@ -226,6 +234,23 @@ function withTimeout(p, ms){ return Promise.race([p, new Promise(function(_,rej)
 
 var sb = null;
 
+// Builder list item 230: the ways besides the emailed code, as this client's studio chose them
+// (the public brand answer, or the copy this device kept). Google also needs the sign-in
+// service to offer it at all, which its own public settings say.
+var SIGNIN = { google: false, password: true }, GOOGLE_ON = null;   // GOOGLE_ON: null until asked, asked only for a studio that turned Google on
+function applySignIn(si){
+  if (si && typeof si === 'object') SIGNIN = { google: si.google === true, password: si.password !== false };
+  var g = SIGNIN.google && GOOGLE_ON === true;
+  $('gGo').hidden = !g; $('orRule').hidden = !g; $('pwWay').hidden = !SIGNIN.password;
+  if (SIGNIN.google && GOOGLE_ON === null) {
+    GOOGLE_ON = false;
+    withTimeout(fetch(SUPABASE_URL + '/auth/v1/settings', { headers: { apikey: SUPABASE_KEY } }), 6000)
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){ GOOGLE_ON = !!(j && j.external && j.external.google); applySignIn(); })
+      .catch(function(){});
+  }
+}
+
 // ── Builder list item 59: the studio's own name and logo above the form. ──
 // A link from the studio's emails carries ?studio=<their site id>, and a client
 // who has signed in before left the same name and logo in localStorage (client.html
@@ -255,11 +280,12 @@ function paintStudioBrand(b){
   if (!/^[0-9a-f-]{36}$/.test(id)) id = '';
   var remembered = null;
   try { remembered = JSON.parse(localStorage.getItem('dds-studio-brand') || 'null'); } catch(e){}
+  if (remembered && remembered.signin) applySignIn(remembered.signin);   // item 230
   if (!id && remembered) { paintStudioBrand(remembered); return; }
   if (!id) return;
   withTimeout(fetch(FN + '/presence/public/studio/' + id + '/brand', { headers: { apikey: SUPABASE_KEY, 'x-region': FN_REGION } }), 6000)
     .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(j){ var b = j && j.data; if (b && b.name && !b.is_default) { paintStudioBrand(b); try { localStorage.setItem('dds-studio-brand', JSON.stringify({ name: b.name, logo_url: b.logo_url || null, accent: b.accent || '' })); } catch(e){} } })
+    .then(function(j){ var b = j && j.data; if (b && b.signin) applySignIn(b.signin); if (b && b.name && !b.is_default) { paintStudioBrand(b); try { localStorage.setItem('dds-studio-brand', JSON.stringify({ name: b.name, logo_url: b.logo_url || null, accent: b.accent || '', signin: b.signin || null })); } catch(e){} } })
     .catch(function(){});
 })();
 if (typeof supabase !== "undefined") {
@@ -269,6 +295,20 @@ if (typeof supabase !== "undefined") {
 }
 
 var pendingEmail = "";   // the email a code was last sent to (for verify + resend)
+// Builder list item 230: the six boxes (fresh-code.js) over the one #code input when they're
+// here; five wrong codes in a row and the page asks for a new one.
+var CODEBOX = null, WRONG = 0, WRONG_MAX = 5;
+(function(){
+  if (!window.ddsFresh || !window.ddsFresh.boxes) return;
+  var old = $('code'); if (!old) return;
+  CODEBOX = window.ddsFresh.boxes({ id: 'code', describedBy: 'codeSub', onEnter: function(){ if (!$('codeGo').disabled) $('codeGo').click(); } });
+  old.parentNode.replaceChild(CODEBOX.el, old);
+  CODEBOX.el.parentNode.insertBefore(CODEBOX.err, CODEBOX.el.nextSibling);
+})();
+function codeValue(){ return (CODEBOX ? CODEBOX.value() : ($('code').value || '')).replace(/[^0-9]/g, ''); }
+function codeClear(){ if (CODEBOX) CODEBOX.clear(); else $('code').value = ''; }
+function codeFocus(){ if (CODEBOX) CODEBOX.focus(); else $('code').focus(); }
+
 
 var NA_DEFAULT = null;   // the panel's honest default copy (captured once, restored on every retry)
 function noAccess(msg){
@@ -347,8 +387,8 @@ function startResendCooldown(secs){
   b.disabled = true;
   if (cooldownTimer) clearInterval(cooldownTimer);
   var tick = function(){
-    if (left <= 0) { clearInterval(cooldownTimer); cooldownTimer = null; b.disabled = false; b.textContent = "Didn't get it? Send again"; return; }
-    b.textContent = "You can send another code in " + left + "s";
+    if (left <= 0) { clearInterval(cooldownTimer); cooldownTimer = null; b.disabled = false; b.textContent = "Send a new code"; return; }
+    b.textContent = "Send a new code in " + Math.floor(left / 60) + ":" + ("0" + (left % 60)).slice(-2);
     left--;
   };
   tick();
@@ -376,35 +416,40 @@ $('fEmail').addEventListener('submit', async function(ev){
   var b = $('sendGo'); b.disabled = true; b.textContent = 'Sending…';
   await sendCode(em);
   pendingEmail = em;
-  $('codeSub').innerHTML = "If <span class=\"em\"></span> has an account, a sign-in email is on its way. Enter its 6-digit code below, or tap the link in it.";
+  $('codeSub').innerHTML = "If <span class=\"em\"></span> has an account here, we’ve sent it a 6-digit code. Type it below, or tap the link in the same email. The code works for a short while.";
   $('codeSub').querySelector('.em').textContent = em;
-  b.disabled = false; b.textContent = 'Email me a sign-in link';
+  b.disabled = false; b.textContent = 'Email me a code';
   clearErr('errCode');
-  $('code').value = '';
+  WRONG = 0; codeClear(); $('codeGo').disabled = false;
   show('codePanel');
-  startResendCooldown(30);
-  $('code').focus();
+  startResendCooldown(60);
+  codeFocus();
 });
 
 $('fCode').addEventListener('submit', async function(ev){
   ev.preventDefault();
   clearErr('errCode');
   if (!sb) { errIn('errCode', "Connection problem — check your internet and refresh this page."); return; }
-  var token = ($('code').value || '').replace(/[^0-9]/g, '');
-  if (token.length < 6) { errIn('errCode', 'Enter the 6-digit code from your email — or tap the sign-in link in the email instead.'); return; }
+  var token = codeValue();
+  if (WRONG >= WRONG_MAX) { errIn('errCode', 'That’s five wrong tries. Send a new code to keep going.'); return; }
+  if (token.length < 6) { errIn('errCode', 'Type all six digits from your email, or tap the sign-in link in it instead.'); return; }
   var b = $('codeGo'); b.disabled = true; b.textContent = 'Signing in…';
   try {
     var r = await sb.auth.verifyOtp({ email: pendingEmail, token: token, type: 'email' });
     if (r.error || !r.data || !r.data.session) {
-      $('code').value = '';                       // clear the field on failure
-      errIn('errCode', 'That code didn’t work — it may have expired. Check the latest email, or send a new code.');
-      b.disabled = false; b.textContent = 'Sign in →'; $('code').focus(); return;
+      codeClear();                       // clear the boxes on failure
+      WRONG++;
+      b.textContent = 'Sign in';
+      // item 230: five wrong tries and the page asks for a new code (Sign in waits for it)
+      if (WRONG >= WRONG_MAX) { errIn('errCode', 'That’s five wrong tries. Send a new code to keep going.'); b.disabled = true; return; }
+      errIn('errCode', 'That code didn’t work. It may have expired: check the latest email, or send a new code.');
+      b.disabled = false; codeFocus(); return;
     }
     signedIn(r.data.session);
   } catch (e) {
-    $('code').value = '';
-    errIn('errCode', 'Something went wrong — give it another try, or send a new code.');
-    b.disabled = false; b.textContent = 'Sign in →';
+    codeClear();
+    errIn('errCode', 'Something went wrong. Give it another try, or send a new code.');
+    b.disabled = false; b.textContent = 'Sign in';
   }
 });
 
@@ -412,9 +457,9 @@ $('resend').addEventListener('click', async function(){
   if (this.disabled || !pendingEmail) return;
   clearErr('errCode');
   await sendCode(pendingEmail);
-  $('code').value = '';
-  startResendCooldown(30);
-  $('code').focus();
+  WRONG = 0; codeClear(); $('codeGo').disabled = false; $('codeGo').textContent = 'Sign in';
+  startResendCooldown(60);
+  codeFocus();
 });
 
 // ── FALLBACK: email + password (unchanged behavior) ──
@@ -440,6 +485,19 @@ $('forgot').addEventListener('click', async function(){
   show('resetSent');
 });
 
+// ── Builder list item 230: Continue with Google (shown only when the studio turned it on and
+// the sign-in service offers it). Google brings them back here, signed in as a link does. ──
+$('gGo').addEventListener('click', async function(){
+  if (!sb || this.disabled) return;
+  clearErr('errEmail'); this.disabled = true;
+  var studio = ''; try { studio = String(new URLSearchParams(location.search).get('studio') || ''); } catch (e) {}
+  var back = location.origin + '/portal.html' + (/^[0-9a-f-]{36}$/.test(studio) ? '?studio=' + studio : '');
+  try {
+    var r = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: back } });
+    if (r && r.error) throw r.error;
+  } catch (e) { this.disabled = false; errIn('errEmail', 'Google sign-in isn’t available just now. Use the emailed code instead.'); }
+});
+
 // ── panel toggles (calm, keyboard-friendly) ──
 $('toPw').addEventListener('click', function(){ clearErr('err'); if ($('em').value.trim() && !$('empw').value) $('empw').value = $('em').value.trim(); show('pwPanel'); $('empw').focus(); });
 $('toCode').addEventListener('click', function(){ clearErr('errEmail'); if ($('empw').value.trim() && !$('em').value) $('em').value = $('empw').value.trim(); show('emailPanel'); $('em').focus(); });
@@ -452,7 +510,7 @@ $('retry').addEventListener('click', async function(){
 });
 // Builder item 192: the sign-in buttons were left greyed out, saying "Signing in…", by the
 // sign-in that led to this panel. Signing out gives them back.
-function freshButtons(){ [['go', 'Sign in →'], ['codeGo', 'Sign in →']].forEach(function(x){ var b = $(x[0]); if (b) { b.disabled = false; b.textContent = x[1]; } }); }
+function freshButtons(){ [['go', 'Sign in →'], ['codeGo', 'Sign in']].forEach(function(x){ var b = $(x[0]); if (b) { b.disabled = false; b.textContent = x[1]; } }); }
 $('signout1').addEventListener('click', async function(){ if (sb) { try{ await sb.auth.signOut(); }catch(e){} } freshButtons(); show('emailPanel'); });
 
 // ── Builder item 191: the second step. A client who turned two-step sign-in on types the

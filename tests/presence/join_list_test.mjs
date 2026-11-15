@@ -19,7 +19,7 @@ Deno.env.set('APPROVAL_SECRET', 'test-approval-secret');
 Deno.env.set('RESEND_KEY', 'test-resend-key');
 const db = installFakePostgrest();
 const fake = globalThis.fetch;
-const mail = [];   // item 203: the "Yes, add me" emails
+const mail = [];   // item 203: the "Yes, add me" emails; item 221: and the welcome email after it
 let otherTab = null;   // the same person's other tab saves them just before this insert; the database's unique rule refuses it
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
@@ -95,8 +95,14 @@ const yes = async (email) => {
   const c = contacts()[0];
   ok('…“Yes, add me” makes a contact of this site, with when they joined and what they agreed to, where', contacts().length === 1 && c.email === 'sam@customer.example' && !!c.subscribed_at && c.subscribed_note.startsWith(`Joined on /about/: “${SIGNUP_CONSENT}”`) && JOINED === 'You’re on the list. Thank you!', JSON.stringify(c));
   const when = c.subscribed_at;
+  // item 221: right after "Yes, add me", one welcome email from the business, in the standard words
+  const welcome = mail[1] || {};
+  ok('…and the welcome email follows, once (item 221)', mail.length === 2 && [].concat(welcome.to || [])[0] === 'sam@customer.example' && /^Welcome to /.test(welcome.subject || '') && String(welcome.html || '').includes('Thanks for joining our list.'), JSON.stringify(mail.map((m) => m.subject)));
+  ok('…it is list mail: the one-click unsubscribe header and a visible link', !!welcome.headers?.['List-Unsubscribe'] && welcome.headers?.['List-Unsubscribe-Post'] === 'List-Unsubscribe=One-Click' && /Unsubscribe/.test(String(welcome.text || '')));
+  await yes('sam@customer.example');
+  ok('…pressing “Yes, add me” again sends no second welcome', mail.length === 2);
   await join({ email: 'sam@customer.example', consent: 'yes', source_page: '/' });
-  ok('joining twice changes nothing, and sends nothing more', contacts().length === 1 && contacts()[0].subscribed_at === when && contacts()[0].subscribed_note.includes('/about/') && mail.length === 1);
+  ok('joining twice changes nothing, and sends nothing more', contacts().length === 1 && contacts()[0].subscribed_at === when && contacts()[0].subscribed_note.includes('/about/') && mail.length === 2);
 }
 {
   seed([{ id: 'c-1', site_id: SID, name: 'Pat Lee', email: 'pat@customer.example', phone: '555', subscribed_at: null, subscribed_note: '', deleted_at: null }]);
@@ -124,7 +130,7 @@ const yes = async (email) => {
   ok('scripts off: the plain post sends the email and goes to the thank-you page', plain.status === 303 && plain.headers.get('location') === 'https://shop.example/thanks/' && contacts().length === 0 && mail.length === 1);
   await yes('ana@customer.example');
   const robot = await body(await join({ email: 'bot@spam.example', consent: 'yes', _hp: 'gotcha' }));
-  ok('a robot (the hidden box filled) is thanked, and nothing is kept or sent', robot?.data?.message === JOIN_CHECK_EMAIL && contacts().length === 1 && mail.length === 1);
+  ok('a robot (the hidden box filled) is thanked, and nothing is kept or sent', robot?.data?.message === JOIN_CHECK_EMAIL && contacts().length === 1 && mail.length === 2);   // Ana's “Yes, add me” and her welcome
 }
 {
   seed();

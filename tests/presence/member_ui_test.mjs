@@ -97,6 +97,9 @@ const CONTROLS = [
   ['PUT /report/monthly', 'settings.html', `api('/report/monthly', 'PUT', patch)`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],   // builder list item 58
   ['POST /report/monthly/preview', 'settings.html', `api('/report/monthly/preview', 'POST', {})`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],
   ['DELETE /broadcasts/lists/:id', 'broadcasts.html', `api('/broadcasts/lists/'+encodeURIComponent(SEL.slice(5)),'DELETE')`, ['id="dropList" data-needs="delete"']],
+  // builder list item 221: the welcome email card on Send an update, its save and its test (the card and its "couldn't load" stand-in both carry the mark)
+  ['PUT /broadcasts/welcome', 'broadcasts.html', `api('/broadcasts/welcome','PUT',patch)`, ['class="card wel${on?\'\':\' off\'}" id="welcome" aria-labelledby="welH" data-needs="configure"', 'class="card" id="welcome" aria-labelledby="welH" data-needs="configure"']],
+  ['POST /broadcasts/welcome/test', 'broadcasts.html', `api('/broadcasts/welcome/test','POST',words)`, ['class="card wel${on?\'\':\' off\'}" id="welcome" aria-labelledby="welH" data-needs="configure"']],
   ['POST /calendar/link', 'connections.html', `make(mk, 'POST', 'Your calendar link is ready.')`, ['id="calMake" data-needs="configure"']],   // sales review item 46
   ['POST /calendar/link', 'connections.html', `make(nw, 'POST', 'Your new calendar link is ready.')`, ['id="calNew" data-needs="configure"']],
   ['DELETE /calendar/link', 'connections.html', `make(off, 'DELETE', 'Your calendar link is off.')`, ['id="calOff" data-needs="configure"']],
@@ -138,7 +141,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 51, String(routes.length));   // builder list item 218 added Delete for good   // builder item 158 added the Coming soon page; builder item 203 added the enquiry delete; sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
+  ok('the decided delete and configure lists were read', routes.length === 53, String(routes.length));   // builder list item 218 added Delete for good; builder list item 221 added the welcome email and its test   // builder item 158 added the Coming soon page; builder item 203 added the enquiry delete; sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r] && !PORTAL_OWNER_ONLY[r]);
   for (const [route, c] of Object.entries(PORTAL_OWNER_ONLY)) {
@@ -160,6 +163,10 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     'api("DELETE", "/monitor/connection")', `api('/crm/notes/'+b.getAttribute('data-delnote'),'DELETE')`,
     // builder list item 216: removing one of the studio's own saved pages answers to the studio's roles (agency/saved_pages.ts), not a seat
     'api("DELETE", "/agency/pages/" + it.id)',
+    // builder list item 221: removing one of the studio's own update templates, the same (agency/update_templates.ts)
+    `api('/agency/update-templates/'+encodeURIComponent(t.id),'DELETE')`,
+    // builder list item 234: removing a portal page or quick link answers to the studio's roles too (manage_clients, agency/routes.ts)
+    "api(`/agency/portal/${kind}/` + encodeURIComponent(ed.id), 'DELETE')",
   ];
   // both spellings the pages use: api("DELETE", route) and api(route, 'DELETE')
   const deletes = /\bapi\(\s*"DELETE"\s*,[^)\n]*\)|\b(?:api|apiAg)\(['`][^;\n]*?,\s*'DELETE'\)/g;
@@ -210,7 +217,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const builder = SOURCE['presence.html'];
   ok('both ways to change the template are marked', builder.includes('<div id="designGallery" hidden data-needs="owner">') && builder.includes('"Use this template"); use.dataset.needs = "owner"'));
   ok('the one template call is the marked one', count(builder, 'api("PUT", "/site/template"') === 1);
-  ok('Styles holds only what staff can\'t use: its button is marked, and the panel says so if reached another way', builder.includes('id="btnSettingsOpen" data-needs="configure"') && builder.includes('id="stylesAsk" hidden data-if-lacks="configure"') && builder.includes('#settingsPanel:not([data-mode="styles"]) #stylesAsk{display:none !important}'));
+  // builder item 220: Styles is restyling ("design": the owner seat, a developer and a Designer), which staff lack
+  ok('Styles holds only what staff can\'t use: its button is marked, and the panel says so if reached another way', builder.includes('id="btnSettingsOpen" data-needs="design"') && builder.includes('id="stylesAsk" hidden data-if-lacks="design"') && builder.includes('#settingsPanel:not([data-mode="styles"]) #stylesAsk{display:none !important}'));
   ok('account deletion moved to Settings, inside the owner-only billing section', !builder.includes('deleteCard') && /id="billing"[^>]*data-needs="owner"[\s\S]*?id="deleteCard"[\s\S]*?<\/section>/.test(SOURCE['settings.html']));
   ok('the Sharing link in the menu is marked', builder.includes('b.dataset.link = "sharing"; b.dataset.needs = "owner"'));
   ok('the plan card and its section are marked: /commerce only knows the caller\'s own account', SOURCE['settings.html'].includes("ownerOnly: true, needs: 'owner' }") && SOURCE['settings.html'].includes('id="billing" aria-labelledby="billingHead" hidden data-needs="owner"'));

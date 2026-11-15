@@ -991,7 +991,7 @@ function lheadHtml(shown){
   const priv=(S.full||[]).filter(r=>r.client_private).length;
   return filesHead(`${shown} file${shown===1?'':'s'}${priv?` · ${priv} private to a client`:''} · ${updatedLabel()}${DISPLAY==='table'?` · Sorted by ${sortCol[1]} — ${SORT.dir>0?'ascending':'descending'}`:''}`,
     `<div class="seg" role="group" aria-label="Display as"><button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button><button id="dispGrid" aria-pressed="${DISPLAY==='grid'?'true':'false'}">Grid</button></div>
-      <a class="lmake" id="makeImage" href="/visual-studio.html" title="Make an image with Visual Studio">Make an image</a>
+      <a class="lmake" id="makeImage" href="/visual-studio.html" data-needs="approve" title="Make an image with Visual Studio">Make an image</a>
       ${S.canEdit&&DISPLAY==='grid'&&S.assets.length?`<button class="btn" id="selbtn">${S.selectMode?'Done':'Select'}</button>`:''}`,
     S.canEdit?`<button class="btn primary dds-ph-fill" id="add">+ Add files</button>`:'')
     +storageHtml();
@@ -1788,8 +1788,7 @@ function renderTrash(){
     :`<div class="tlist" role="list" aria-label="Files in the Trash">${files.length?files.map(trashRowHtml).join(''):'<p class="tempty">No file in the Trash matches that.</p>'}<div class="tfoot">Put back returns a file to Files and the photo picker, in the folder it came from.</div></div>`;
   const act=document.activeElement;const wasQ=!!(act&&act.id==='tq');const qp=wasQ?act.selectionStart:0;
   $('root').innerHTML=`<div class="layout"><div>
-    <header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🗂</span><h1 id="pagehead" tabindex="-1">Files</h1><button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
-    <div class="lmeta">The Trash${all.length?` · ${all.length} file${all.length===1?'':'s'}`:''} · ${esc(updatedLabel())}</div>${storageHtml()}</header>
+    ${filesHead(`The Trash${all.length?` · ${all.length} file${all.length===1?'':'s'}`:''} · ${updatedLabel()}`)}${storageHtml()}
     ${filtersHtml(`<div class="search">${svg(IC.search)}<input id="tq" type="search" aria-label="Search the Trash" placeholder="Search the Trash" value="${esc(S.trashQ)}" autocomplete="off"></div>`,'')}
     ${band}${body}${S.trashState==='ok'&&all.length?trashHowHtml():''}</div></div>`;
   wireRail();

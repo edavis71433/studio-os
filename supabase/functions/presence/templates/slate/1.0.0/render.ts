@@ -81,9 +81,11 @@ function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = '
 // wherever that sits. Fonts, sizes, corners and spacing still follow the Styles panel.
 // Both teals are light, as a dark page needs, so a section on the accent band (BLOCK_CSS
 // .block--bg-accent: white words) takes a deeper teal of the same family: white reads 7.58:1
-// on it, 2.49:1 on #14b8a6. tests/presence/accent_band_test.mjs
+// on it, 2.49:1 on #14b8a6. tests/presence/accent_band_test.mjs. Its boxes (review cards, the
+// Cards section, a spotlight) are darker than either band, so on a band they keep their own
+// fill (--band-box): white reads 17.95:1 on it. tests/presence/band_words_test.mjs
 // G1 radius token: surfaces (btn, hero/split images, svc/card, svc img, inputs, post hero) take var(--radius,<current>); the tiny 6px nav/kicker chips and brandlogo stay hardcoded — structural to Slate's crisp-grid look.
-const CSS = `:root{color-scheme:dark;--ink:#eef1f5;--soft:#9ba4b5;--paper:var(--bg,#101216);--card:#161a21;--accent:#2dd4bf;--accent-dark:#14b8a6;--accent-band:#115e59;--line:#262a33;--wash:#14171d}
+const CSS = `:root{color-scheme:dark;--ink:#eef1f5;--soft:#9ba4b5;--paper:var(--bg,#101216);--card:#161a21;--accent:#2dd4bf;--accent-dark:#14b8a6;--accent-band:#115e59;--band-box:var(--wash);--line:#262a33;--wash:#14171d}
 html:root{--ink:#eef1f5;--soft:#9ba4b5;--paper:#101216;--accent:#2dd4bf;--accent-dark:#14b8a6}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
