@@ -357,9 +357,10 @@ const DESIGNER_ROUTES: string[] = [
   '(GET|POST) /redirects', 'GET /redirects/suggest',   // a moved page's old address, in the page's own settings
   // photos and files
   'GET /media', 'POST /media/upload-url', `PUT /media/${ID}`,
-  'GET /assets(/collections|/health|/match)?', 'POST /assets/(bulk|folders/move)',
+  'GET /assets(/collections|/health|/match|/trash)?', 'POST /assets/(bulk|folders/move)',
   `(GET|PATCH) /assets/${ID}`, `GET /assets/${ID}/(download|social|cards)`,
   `POST /assets/${ID}/(replace|rollback|duplicate|suggest|remove-background|cutout)`,
+  `POST /assets/${ID}/put-back`,   // builder item 218: the Trash, as staff have it: putting a file back deletes nothing; deleting for good stays with delete
   'GET /assets/cutout/[a-z0-9]{10,64}\\.[A-Za-z0-9_-]{32}',
   'GET /stock/search', 'POST /stock/import',
   '(GET|POST) /content-library', `PUT /content-library/${ID}`,

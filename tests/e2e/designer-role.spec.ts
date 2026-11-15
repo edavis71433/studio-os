@@ -140,6 +140,26 @@ test.describe('A Designer in Files', () => {
     await expect(page.locator('#makeImage')).toBeHidden();   // no Visual Studio: keeping an AI image is an approval
   });
 
+  test('the Trash opens, and a Designer may put a file back but never delete one for good (item 218)', async ({ page }) => {
+    const PHOTO = { id: 'cccccccc-0000-4000-8000-000000000001', name: 'Team photo', alt_text: 'The team', tags: [], asset_status: 'approved', state: 'approved', created_at: '2026-10-01T00:00:00Z', favorite: false, in_use: false, kind: 'image', mime: 'image/jpeg', bytes: 620000, width: 1600, height: 1100 };
+    const GONE = { id: 'cccccccc-0000-4000-8000-000000000011', name: 'Waiting room', kind: 'image', bytes: 605000, folder: '', trashed_at: new Date().toISOString(), goes_at: new Date(Date.now() + 30 * 86400000).toISOString(), days_left: 30, by: 'Sam', live: false, kept_live: false, thumb: null };
+    const refused = await asDesigner(page, false, { ...SITE_API,
+      '/assets': { data: { assets: [PHOTO], total: 1, shown: 1, live_count: 0, policy: 'immediate', trash: 1 } },
+      '/assets/trash': { data: { files: [GONE], days: 30, available: true } } });
+    const sent: string[] = [];
+    page.on('request', (r) => { if (/\/assets\/[0-9a-f-]{36}\/put-back$/.test(r.url())) sent.push(r.method()); });
+    await page.goto('/files.html');
+    await ready(page);
+    await page.locator('#filters [data-col="trash"]').click();
+    await expect(page.locator('.tband h2')).toHaveText('Trash');
+    const row = page.locator(`.trow[data-trash="${GONE.id}"]`);
+    await expect(row.locator('[data-forever]')).toBeHidden();   // deleting for good needs delete, which a Designer never holds
+    await row.getByRole('button', { name: 'Put back Waiting room' }).click();
+    await expect.poll(() => sent).toEqual(['POST']);
+    await settle(page);
+    expect(refused).toEqual([]);
+  });
+
   test('on a phone, the bottom bar offers no Inbox', async ({ page }, info) => {
     test.skip(info.project.name !== 'mobile', 'the bottom bar is a phone\'s');
     await asDesigner(page);

@@ -80,9 +80,9 @@ const DESIGNER_DECIDED = [
   'GET /page-locks', 'POST /page-locks', 'GET /blocks/suggested', 'GET /content-tree',
   'GET /redirects', 'POST /redirects', 'GET /redirects/suggest',
   'GET /media', 'POST /media/upload-url', 'PUT /media/:id',
-  'GET /assets', 'GET /assets/collections', 'GET /assets/health', 'GET /assets/match', 'POST /assets/bulk', 'POST /assets/folders/move',
+  'GET /assets', 'GET /assets/collections', 'GET /assets/health', 'GET /assets/match', 'GET /assets/trash', 'POST /assets/bulk', 'POST /assets/folders/move',
   'GET /assets/:id', 'PATCH /assets/:id', 'GET /assets/:id/download', 'GET /assets/:id/social', 'GET /assets/:id/cards',
-  ...['replace', 'rollback', 'duplicate', 'suggest', 'remove-background', 'cutout'].map((a) => `POST /assets/:id/${a}`),
+  ...['replace', 'rollback', 'duplicate', 'suggest', 'remove-background', 'cutout', 'put-back'].map((a) => `POST /assets/:id/${a}`),   // item 218: put-back deletes nothing
   'GET /assets/cutout/:job',
   'GET /stock/search', 'POST /stock/import',
   'GET /content-library', 'POST /content-library', 'PUT /content-library/:id',
@@ -163,6 +163,7 @@ const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
   }
   ok('business: the routes a client\'s customers write to are refused too', !designerAllowed(`/forms/inbox/${ID}`, 'POST') && !designerAllowed('/sales/contacts', 'GET') && !designerAllowed(`/sales/invoices/${ID}/send`, 'POST'));
   ok('code: no custom code, files or keys for a Designer', !designerAllowed('/dev/files', 'GET') && !designerAllowed('/site/template', 'PUT'));
+  ok('Trash: a Designer may look in it and put a file back, never delete one for good', designerAllowed('/assets/trash', 'GET') && designerAllowed(`/assets/${ID}/put-back`, 'POST') && !designerAllowed(`/assets/${ID}/forever`, 'DELETE') && !designerAllowed(`/assets/${ID}`, 'DELETE') && !designerAllowed(`/media/${ID}`, 'DELETE'));
   ok('AI images: no Visual Studio for a Designer (keeping an image is an approval, and each costs money)', [...SAMPLES].filter((p) => p.startsWith('/visual')).every((p) => METHODS.every((m) => !designerAllowed(p, m))));
 }
 
