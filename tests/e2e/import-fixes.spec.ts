@@ -130,8 +130,8 @@ test.describe('item 97 — Close stops a running import (B6)', () => {
     await expect(page.locator('#csvZone .dds-csvgo')).toBeDisabled();
     await page.locator('#csvZone').getByRole('button', { name: 'Stop' }).click();
     await expect(page.locator('#csvZone input[type=file]')).toHaveCount(0);
-    // focus goes back to what opened it: Import CSV, or on a phone the header's ⋯ it sits behind (builder item 165)
-    await expect(page.locator((page.viewportSize()?.width || 0) < 761 ? 'header.dds-ph .dds-ph-dots' : '#importCsv')).toBeFocused();
+    // focus goes back to what opened it: Customers keeps Import CSV in the list's own toolbar at every width (builder item 165)
+    await expect(page.locator('#importCsv')).toBeFocused();
     open();                                                                                      // the five on their way land
     await expect(toastWith(page, 'Stopped after 5 of 40 — 5 already yours')).toBeVisible();
     await page.waitForTimeout(600);                                                              // a running import would have sent its next five by now

@@ -107,7 +107,7 @@ test.describe('Import: match the columns, update people already here, undo (item
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/contacts/fields': { data: [] } } });
     const seen = await importRoutes(page, { existing: ['bo@example.com'], older: true });
     await page.goto('/contacts.html');
-    await page.locator('#importCsv').click();
+    await (await headerAction(page, '#importCsv')).click();   // builder item 165: behind the header's ⋯ on a phone
     await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('google-contacts.csv', GOOGLE));
     await page.locator('#csvZone').getByRole('button', { name: 'Import 2' }).click();
     await expect.poll(() => seen.rows.length).toBe(2);
@@ -127,7 +127,7 @@ test.describe('Import: match the columns, update people already here, undo (item
       return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'imp-1', undo: true, counts: { added: 2, updated: 0, existed: 0, failed: 0 } } }) });
     });
     await page.goto('/contacts.html');
-    await page.locator('#importCsv').click();
+    await (await headerAction(page, '#importCsv')).click();   // builder item 165: behind the header's ⋯ on a phone
     await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('two.csv', 'Name,Email\nAna Ruiz,ana@example.com\nBo Lee,bo@example.com\n'));
     await page.locator('#csvZone').getByRole('button', { name: 'Import 2' }).click();
     await expect(page.locator('#csvZone .dds-csvlive')).toHaveText('Importing 2 contacts in one go…');
