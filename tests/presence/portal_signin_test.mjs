@@ -32,7 +32,7 @@ ok('the sign-in page’s public answer carries them (and nothing hidden fails it
 const ws = read('supabase/functions/presence/routes/workspace.ts');
 ok('the portal’s context carries them, for the brand the device keeps', /home_off: s\.home_off, signin: s\.signin \}/.test(ws));
 const client = read('client.html');
-ok('the portal keeps them with the studio’s name for the sign-in page', client.includes("signin:(PORTAL.ctx.portal&&PORTAL.ctx.portal.signin)||null}));}catch(_){}}"));
+ok('the portal keeps them with the studio’s name for the sign-in page', client.includes("const si=PORTAL.ctx.portal&&PORTAL.ctx.portal.signin;") && client.includes("si?{signin:si}:{}"));
 
 const door = read('portal.html');
 ok('the sign-in page leads with the emailed code', door.includes('<button id="sendGo" type="submit">Email me a code</button>') && door.includes('We’ll email you a code. No password to remember.') && door.includes('<h1>Check your email</h1>'));

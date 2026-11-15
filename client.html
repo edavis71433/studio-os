@@ -1030,7 +1030,7 @@ function studioBrand(){return studioNamed()?String(PORTAL.ctx.studio.name).trim(
 function studioInitial(){return studioNamed()?studioBrand().charAt(0).toUpperCase():'✦';}
 function studioLogo(){const s=PORTAL.ctx&&PORTAL.ctx.studio;return (s&&typeof s.logo_url==='string'&&/^https:\/\//.test(s.logo_url))?s.logo_url:'';}
 // the sign-in page shows the same name and logo next time (portal.html reads this)
-function rememberStudio(){if(PREVIEW)return;try{const s=PORTAL.ctx&&PORTAL.ctx.studio;if(studioNamed())localStorage.setItem('dds-studio-brand',JSON.stringify({name:s.name,logo_url:studioLogo()||null,accent:s.accent||'',signin:(PORTAL.ctx.portal&&PORTAL.ctx.portal.signin)||null}));}catch(_){}}   // item 230: the brand kept for the sign-in page carries how its clients sign in
+function rememberStudio(){if(PREVIEW)return;try{const s=PORTAL.ctx&&PORTAL.ctx.studio;if(studioNamed()){const si=PORTAL.ctx.portal&&PORTAL.ctx.portal.signin;localStorage.setItem('dds-studio-brand',JSON.stringify(Object.assign({name:s.name,logo_url:studioLogo()||null,accent:s.accent||''},si?{signin:si}:{})));}}catch(_){}}   // item 230: and how its clients sign in, when the context says
 function showNav(){
   const nav=$('tabnav');if(!nav)return;
   const acct=(((clientName()||((USER&&USER.email)||''))||'').charAt(0)||'•').toUpperCase();
