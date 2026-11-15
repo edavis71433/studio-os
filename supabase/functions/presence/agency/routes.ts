@@ -24,6 +24,7 @@ import { removeTemplatePhotos } from '../lib/media.ts';
 import { handleAgencySites } from './sites.ts';
 import { handleSiteFolders } from './site_folders.ts';   // builder list item 176
 import { handleSavedPages } from './saved_pages.ts';   // builder list item 216
+import { handleUpdateTemplates } from './update_templates.ts';   // builder list item 221
 import { handleClientTools } from './client_tools.ts';
 import { handleSiteNumbers } from './site_numbers.ts';
 import { handleUsage } from './usage.ts';
@@ -718,6 +719,13 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
   //    site's draft). ──
   {
     const r = await handleSavedPages(req, route, method, member, cors, { ownSite: () => ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal) });
+    if (r) return r;
+  }
+
+  // ── Builder list item 221: updates kept as templates by the studio, to start an update for
+  //    any client on Send an update (the list, one whole, keep, rename and remove) ──
+  {
+    const r = await handleUpdateTemplates(req, route, method, member, cors, { ownSite: () => ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal) });
     if (r) return r;
   }
 

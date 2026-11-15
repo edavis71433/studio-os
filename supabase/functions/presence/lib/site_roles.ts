@@ -130,6 +130,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /sales/setup',   // sales item 105: hiding Home's setup strip is the studio's setting
     'PUT /sales/goal-ai',   // sales item 94: the month's goal is the studio's setting (the AI help switch in it is the owner's alone, said by the route)
     'PUT /report/monthly', 'POST /report/monthly/preview',   // builder list item 58: the client's monthly report is a setting; its preview emails the caller
+    'PUT /broadcasts/welcome', 'POST /broadcasts/welcome/test',   // builder list item 221: the list's automatic welcome email is a setting, like the auto-reply; its test emails the caller
     '(POST|DELETE) /foundations/domain',
     '(POST|DELETE) /foundations/domain/forward',   // builder list item 174: another domain forwarding here is a domain setting
     'POST /foundations/prepare',
