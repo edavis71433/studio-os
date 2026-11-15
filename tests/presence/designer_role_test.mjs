@@ -96,6 +96,7 @@ const DESIGNER_DECIDED = [
   'GET /launches', 'POST /launches', 'GET /launches/:id', 'POST /launches/:id/recapture', 'POST /launches/:id/cancel',
   'POST /publish', 'POST /restore', 'POST /preview/promote', 'GET /schedule', 'POST /schedule', 'POST /schedule/:id/cancel',
   'POST /launches/:id/schedule', 'POST /launches/:id/promote', 'POST /launches/:id/rollback',
+  'GET /site/publish-lock',   // builder item 214: reading the lock; PUT stays the studio's
   'GET /comments', 'POST /comments', 'POST /comments/:id/resolve',
 ];
 const JOB = 'abcdefghij.' + 'A'.repeat(32);

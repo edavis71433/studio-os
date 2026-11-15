@@ -306,6 +306,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'POST /portal/(members|shares)',
     `POST /portal/members/${ID}/(revoke|role)`,   // builder item 53: changing a seat's role is managing people, like the invite
     'POST /portal/transfer(/cancel)?',   // builder item 53: only the owner, or their studio asking the owner; the route refuses anyone else and says why
+    'PUT /site/publish-lock',   // builder list item 214: only the studio, platform staff, or the owner of a site no studio looks after; the route refuses anyone else and says why
     'PUT /dev/(customization|brand-kit)',
     'POST /dev/brand-kit/apply',
     'PUT /site/template',
@@ -374,6 +375,7 @@ const DESIGNER_ROUTES: string[] = [
   '(GET|POST) /launches', `GET /launches/${ID}`, `POST /launches/${ID}/(recapture|cancel)`,
   // going live: listed, and memberWriteGate passes it only for a seat that may publish
   'POST /(publish|restore|preview/promote)', '(GET|POST) /schedule', `POST /schedule/${ID}/cancel`, `POST /launches/${ID}/(schedule|promote|rollback)`,
+  'GET /site/publish-lock',   // builder item 214: whether publishing is locked, and why; locking stays the studio's
   // notes on the draft
   '(GET|POST) /comments', `POST /comments/${ID}/resolve`,
 ];

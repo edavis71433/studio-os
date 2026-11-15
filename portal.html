@@ -216,6 +216,7 @@
 var SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 var FN = SUPABASE_URL + "/functions/v1";
+var FN_REGION = "us-west-2";   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 var $ = function(id){ return document.getElementById(id); };
 var PANELS = ['emailPanel','codePanel','pwPanel','stepPanel','routing','noAccess','resetSent'];
 function show(id){ PANELS.forEach(function(p){ $(p).style.display = p===id ? 'block' : 'none'; }); }
@@ -256,7 +257,7 @@ function paintStudioBrand(b){
   try { remembered = JSON.parse(localStorage.getItem('dds-studio-brand') || 'null'); } catch(e){}
   if (!id && remembered) { paintStudioBrand(remembered); return; }
   if (!id) return;
-  withTimeout(fetch(FN + '/presence/public/studio/' + id + '/brand', { headers: { apikey: SUPABASE_KEY } }), 6000)
+  withTimeout(fetch(FN + '/presence/public/studio/' + id + '/brand', { headers: { apikey: SUPABASE_KEY, 'x-region': FN_REGION } }), 6000)
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(j){ var b = j && j.data; if (b && b.name && !b.is_default) { paintStudioBrand(b); try { localStorage.setItem('dds-studio-brand', JSON.stringify({ name: b.name, logo_url: b.logo_url || null, accent: b.accent || '' })); } catch(e){} } })
     .catch(function(){});
@@ -307,7 +308,7 @@ async function route(token){
   try {
     var picked = pickedBusiness(token);
     var ask = function(scope){ return withTimeout(fetch(FN + "/presence/portal/context", {
-      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token, "x-dds-scope-site": scope }
+      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token, "x-dds-scope-site": scope, "x-region": FN_REGION }
     }), 9000); };
     var r = await ask(picked);
     if (picked && !r.ok) { picked = ''; r = await ask(''); }   // not one of theirs (any more): the usual landing
@@ -327,7 +328,7 @@ async function route(token){
   try {
     var w = await withTimeout(fetch(FN + "/clever-api", {
       method: "POST",
-      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token },
+      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token, "x-region": FN_REGION },
       body: JSON.stringify({ type: "whoami" })
     }), 9000);
     var wj = await w.json().catch(function(){ return {}; });
