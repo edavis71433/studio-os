@@ -246,6 +246,11 @@ test.describe('Domain & email sheet: clearer messages (item 164)', () => {
     await expect(lines.nth(2)).toHaveAttribute('data-name', 'getbistronine.com');
     expect(asked.sort()).toEqual(['bistronine.co', 'bistronine.com', 'getbistronine.com']);
     await expect(need).toContainText('Buy it in your own name and email, and turn on auto-renew.');
+    // item 222 (review file 04, finding 4): the renewal price, said before the buy line
+    const renew = need.locator('[data-need="renewal"]');
+    await expect(renew).toContainText('Check the renewal price before you buy');
+    await expect(renew).toContainText('The first year is often cheap, and the price after that can be much higher.');
+    expect(await need.evaluate((el) => { const t = el.textContent || ''; return t.indexOf('renewal price') < t.indexOf('Buy it in your own name'); })).toBe(true);
   });
 });
 

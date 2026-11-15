@@ -57,6 +57,8 @@
   Cache-Control: no-cache, must-revalidate
 /usage
   Cache-Control: no-cache, must-revalidate
+/changes
+  Cache-Control: no-cache, must-revalidate
 /today
   Cache-Control: no-cache, must-revalidate
 /inbox

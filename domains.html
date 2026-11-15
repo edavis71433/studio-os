@@ -30,7 +30,9 @@
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;min-height:36px}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
-  .tabs{display:flex;gap:var(--dds-s1,4px);margin-top:10px;border-top:1px solid var(--line);padding-top:var(--dds-s2,8px)}
+  .tabs{display:flex;gap:var(--dds-s1,4px);margin-top:10px;border-top:1px solid var(--line);padding-top:var(--dds-s2,8px);overflow-x:auto;scrollbar-width:none}   /* item 215: five tabs slide on a phone, never widen the page */
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs a{white-space:nowrap}
   .tabs a{font-size:13.5px;font-weight:600;color:var(--soft);text-decoration:none;padding:6px var(--dds-s3,12px);border-radius:var(--dds-r,8px)}
   .tabs a:hover{color:var(--p);background:var(--p-soft)}
   .tabs a[aria-current="page"]{color:var(--p);background:var(--p-soft)}
@@ -111,6 +113,71 @@
   .dp-plan{margin-top:12px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:12px}
   .dp-ptitle{font-weight:600;margin:0 0 4px}
   .dp-steps{margin:8px 0 0;padding-left:18px;display:grid;gap:8px;font-size:13.5px}.dp-steps .dp-rec{margin-top:6px}
+  /* ── item 222: Ask for access (Figma "Files Trash and Ask for access", section B): a card on the
+        panel, a sheet that shows the email the client gets, and a pill on the list's row ── */
+  .acc{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:999px;padding:2px 8px;margin-top:4px;color:var(--p);background:var(--p-soft);white-space:nowrap}
+  .acc.yes{color:var(--good);background:var(--good-soft)}
+  .acc svg{width:12px;height:12px}
+  .linkbtn{font:inherit;font-size:13.5px;font-weight:600;color:var(--p);background:none;border:none;padding:8px 6px;cursor:pointer;min-height:36px}
+  .linkbtn:hover{text-decoration:underline}
+  .dp-acc{margin:14px 16px 2px;border-radius:18px;padding:18px;border:1px solid color-mix(in srgb,var(--p) 30%,transparent);background:var(--p-soft)}
+  .dp-acc.wait{background:var(--card)}
+  .dp-acc.yes{background:var(--good-soft);border-color:color-mix(in srgb,var(--good) 30%,transparent)}
+  .dp-acc .ah{display:flex;align-items:center;gap:12px}
+  .dp-acc .ak,.acc-h .ak{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:var(--p);color:var(--card)}
+  .dp-acc .ak svg,.acc-h .ak svg{width:22px;height:22px}
+  .dp-acc.wait .ak{background:var(--p-soft);color:var(--p)}
+  .dp-acc.yes .ak{background:var(--good);color:var(--card)}
+  .dp-acc .kick{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--p)}
+  .dp-acc.yes .kick{color:var(--good)}
+  .dp-acc h3.at{font-family:var(--serif);font-weight:600;font-size:19px;line-height:1.25;margin:2px 0 0;color:var(--ink);text-transform:none;letter-spacing:0}
+  .dp-acc > p{font-size:13.5px;margin:10px 0 0;color:var(--ink)}
+  .dp-acc > p.muted{font-size:12.5px;color:var(--soft)}
+  .dp-acc .since{margin-left:auto;font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:3px 10px;white-space:nowrap}
+  .dp-acc .btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+  .dp-acc .btn svg{width:16px;height:16px}
+  .dp-track{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px;font-size:13.5px}
+  .dp-track li{display:flex;align-items:center;gap:10px}
+  .dp-track .dot{flex:none;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:var(--line);color:var(--card)}
+  .dp-track .dot svg{width:11px;height:11px}
+  .dp-track li.done .dot{background:var(--good)} .dp-track li.now .dot{background:var(--p)}
+  .dp-track li.now{font-weight:600} .dp-track li.next{color:var(--soft)}
+  .dp-track .when{margin-left:auto;font-size:12px;color:var(--soft);font-weight:400}
+  dialog.accdlg{border:none;border-radius:20px;padding:0;width:min(660px,94vw);max-height:92vh;overflow:auto;background:var(--card);color:var(--ink);box-shadow:0 24px 60px rgba(27,21,37,.3)}
+  dialog.accdlg::backdrop{background:rgba(27,21,37,.32)}
+  @media (max-width:767px){dialog.accdlg{margin:auto 0 0;width:100vw;max-width:100vw;border-radius:20px 20px 0 0;max-height:90vh}}
+  .acc-b{padding:22px 24px 20px;display:grid;gap:16px;margin:0}
+  @media (max-width:767px){.acc-b{padding:18px 16px}}
+  .acc-h{display:flex;gap:12px;align-items:center}
+  .acc-h h2{font-family:var(--serif);font-weight:600;font-size:23px;line-height:1.2;margin:0}
+  .acc-h .sub{font-size:13px;color:var(--soft)}
+  .acc-x{margin-left:auto;flex:none;font:inherit;font-size:22px;line-height:1;background:none;border:none;color:var(--soft);cursor:pointer;width:44px;height:44px;border-radius:10px}
+  .acc-x:hover{background:var(--p-soft);color:var(--p)}
+  .acc-f{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:767px){.acc-f{grid-template-columns:1fr}}
+  .acc-f label,.acc-own label{display:block;font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px}
+  .acc-f select,.acc-f input,.acc-own textarea{width:100%;font:inherit;font-size:14px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg);color:var(--ink)}
+  @media (max-width:767px){.acc-f select,.acc-f input,.acc-own textarea{font-size:16px;min-height:44px}}
+  .acc-hint{font-size:12px;color:var(--soft);margin-top:6px}
+  .acc-hint.bad{color:var(--bad)}
+  .acc-pv{border-radius:16px;background:var(--bg);padding:14px}
+  .acc-pv summary{font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--soft);cursor:pointer;min-height:24px}
+  .acc-meta{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12.5px;margin:10px 0}
+  .acc-meta dt{color:var(--soft)} .acc-meta dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+  .acc-mail{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card)}
+  .acc-mail .band{background:#3c2d5a;color:#fff;font-weight:600;font-size:13.5px;padding:12px 18px}
+  .acc-mail .mb{padding:16px 18px;font-size:13.5px;display:grid;gap:10px}
+  .acc-mail .mb p{margin:0}
+  .acc-mail ol{margin:0;padding-left:20px;display:grid;gap:8px}
+  .acc-mail .signin{justify-self:start;font-size:13px;font-weight:600;color:#fff;background:#6d3fd4;border-radius:999px;padding:8px 14px}
+  .acc-mail .keep{background:var(--good-soft);color:var(--good);border-radius:12px;padding:12px}
+  .acc-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .acc-foot .grow{flex:1}
+  .acc-foot .btn:disabled{opacity:.55;cursor:not-allowed}
+  @media (max-width:767px){.acc-foot .btn,.acc-foot .rowact{flex:1 1 100%;justify-content:center;min-height:44px}.acc-foot .grow{display:none}}
+  .acc-msg{font-size:13px;color:var(--soft);margin:0}
+  .acc-cant{border-radius:12px;background:var(--warn-soft);color:var(--warn);padding:14px;font-size:13.5px}
+  .acc-cant p{margin:6px 0 0}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -141,6 +208,10 @@ sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_tok
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-region':FN_REGION});
 async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 const day=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});};
+const dayShort=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+// item 222: the key and the tick the access card, the sheet and the row's pill use
+const KEY_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>';
+const CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4.5 4.5L19 7"/></svg>';
 
 let DOMAINS=[],BUILTIN=[],PARTIAL=false,LOADED_AT=0,Q='',REQ_SEQ=0;
 let SORT=null;   // null = most urgent first (the server's order)
@@ -151,6 +222,7 @@ const FILTERS={
   attention:{label:'Needs attention',test:(d)=>d.tone==='bad'||d.tone==='warn'||(d.warnings||[]).length>0},
   expiring:{label:'Expiring',test:(d)=>d.status==='expiring'||d.status==='expired'||d.status==='registry'},
   waiting:{label:'Waiting on records',test:(d)=>d.status==='partly'||d.status==='padlock'||d.status==='checking'},
+  access:{label:'Waiting on access',test:(d)=>!!(d.access&&d.access.status==='asked')},   // item 222: shown only while one waits
   nodomain:{label:'No domain yet',test:()=>false},
 };
 const ago=(iso)=>{if(!iso)return'';const t=Date.parse(iso);if(!isFinite(t))return'';const m=Math.round((Date.now()-t)/60000);if(m<2)return'Just now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<24)return h+' hour'+(h===1?'':'s')+' ago';const d=Math.round(h/24);return d+' day'+(d===1?'':'s')+' ago';};
@@ -211,7 +283,7 @@ function padlockCell(d){
 function tableHtml(list){
   const ths=COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;return `<th scope="col"${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('');
   const trs=list.map(d=>`<tr data-domain="${esc(d.domain)}">
-    <td><button type="button" class="dom" data-detail="${esc(d.site_id)}" aria-haspopup="dialog" aria-label="Details for ${esc(d.domain)}">${esc(d.domain)}</button>${d.own?'<br><span class="own">Your studio</span>':''}</td>
+    <td><button type="button" class="dom" data-detail="${esc(d.site_id)}" aria-haspopup="dialog" aria-label="Details for ${esc(d.domain)}">${esc(d.domain)}</button>${d.own?'<br><span class="own">Your studio</span>':''}${d.access?`<br><span class="acc${d.access.status==='arrived'?' yes':''}">${KEY_SVG}Access: ${d.access.status==='arrived'?'yes':'asked '+esc(dayShort(d.access.since))}</span>`:''}</td>
     <td><a class="site" href="${esc(where(d,''))}">${esc(d.name||'(unnamed)')}</a></td>
     <td><span class="pill ${esc(d.tone)}">${esc(d.status_words)}</span>${checksSub(d)}</td>
     <td>${d.provider?esc(d.provider):d.record==='unreadable'?'<span class="muted">Couldn’t read it</span>':'<span class="muted">Not known yet</span>'}${d.dns_host?`<div class="sub">DNS at ${esc(d.dns_host)}</div>`:''}${d.lock===false?'<div class="sub">Lock: off</div>':''}</td>
@@ -229,7 +301,7 @@ function builtinHtml(list){
 function chipsHtml(){
   if(!DOMAINS.length&&!BUILTIN.length)return'';
   const n=(k)=>k==='nodomain'?BUILTIN.length:DOMAINS.filter(FILTERS[k].test).length;
-  return `<div class="chips" role="group" aria-label="Show">${Object.keys(FILTERS).map(k=>`<button type="button" class="chip" data-filter="${k}" aria-pressed="${FILTER===k?'true':'false'}">${esc(FILTERS[k].label)}${k==='all'?'':`<span class="n">${n(k)}</span>`}</button>`).join('')}</div>`;
+  return `<div class="chips" role="group" aria-label="Show">${Object.keys(FILTERS).filter(k=>k!=='access'||n(k)>0||FILTER==='access').map(k=>`<button type="button" class="chip" data-filter="${k}" aria-pressed="${FILTER===k?'true':'false'}">${esc(FILTERS[k].label)}${k==='all'?'':`<span class="n">${n(k)}</span>`}</button>`).join('')}</div>`;
 }
 // item 162: the list as a spreadsheet (what's on screen, in its order)
 function downloadCsv(){
@@ -241,13 +313,14 @@ function downloadCsv(){
 function lmetaText(n){
   const soon=DOMAINS.filter(d=>d.status==='expiring'||d.status==='expired').length;
   const m=Math.floor((Date.now()-LOADED_AT)/60000);
-  return `${n} domain${n===1?'':'s'}${soon?` · ${soon} expiring or expired`:''} · ${m<1?'Updated just now':'Updated '+m+' min ago'}`;
+  const asked=DOMAINS.filter(d=>d.access&&d.access.status==='asked').length;   // item 222
+  return `${n} domain${n===1?'':'s'}${soon?` · ${soon} expiring or expired`:''}${asked?` · ${asked} waiting on access`:''} · ${m<1?'Updated just now':'Updated '+m+' min ago'}`;
 }
 function render(){
   const list=ordered(),bl=BUILTIN.filter(matches);
   let h=`<header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🔗</span><h1 id="pagehead" tabindex="-1">Domains</h1><button type="button" class="lbtn" id="dlBtn" title="Download this list as a spreadsheet">Download</button><button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button></div>
     <div class="lmeta">${esc(lmetaText(list.length))}</div>
-    <nav class="tabs" aria-label="Sites, domains, templates and usage"><a href="/sites.html">Sites</a><a href="/domains.html" aria-current="page">Domains</a><a href="/templates.html">Templates</a><a href="/usage.html">Usage</a></nav></header>`;
+    <nav class="tabs" aria-label="Sites, domains, templates, usage and changes"><a href="/sites.html">Sites</a><a href="/domains.html" aria-current="page">Domains</a><a href="/templates.html">Templates</a><a href="/usage.html">Usage</a><a href="/changes.html">Changes</a></nav></header>`;
   h+=`<label class="sr-only" for="search">Search domains</label><input class="search" id="search" type="search" placeholder="Search by domain, site or provider…" value="${esc(Q)}">`;
   h+=chipsHtml();
   if(PARTIAL)h+=`<div class="notice">Some details wouldn’t load just now — refresh to try again.</div>`;
@@ -319,6 +392,7 @@ function paintPanel(){
   const sel=(v)=>['yes','no','unknown'].map(o=>`<option value="${o}"${(nt.renews||'unknown')===o?' selected':''}>${o==='yes'?'Yes':o==='no'?'No':'Don’t know'}</option>`).join('');
   $('dpBody').innerHTML=`<div class="dp-h"><h2 id="dpTitle">${esc(d.domain)}</h2><span class="pill ${esc(d.tone)}">${esc(d.status_words)}</span><button type="button" class="rowact" id="dpCheck">Check now</button><button type="button" class="rowact" id="dpClose">Close</button></div>
     <p class="muted" id="dpMsg" role="status" style="margin:6px 0 0;font-size:13px"></p>
+    ${accessHtml(d)}
     <section class="dp-sec" aria-labelledby="dpChecksH"><h3 id="dpChecksH">What we checked</h3>${checks.length?`<ul class="dp-list">${checks.join('')}</ul>`:'<p class="muted">Checked once a day. Press Check now to look again.</p>'}
       <div class="dp-acts">${d.hosted?`<a class="rowact" href="${esc(where(d,'#domain'))}">Open the client’s domain steps</a>`:''}<a class="rowact" href="${esc(where(d,''))}">Open ${esc(d.name||'the site')}</a><a class="rowact" href="https://${esc(d.domain)}" target="_blank" rel="noopener">Visit ${esc(d.domain)} ↗</a></div></section>
     ${helpHtml(d)}
@@ -336,6 +410,7 @@ function paintPanel(){
   $('dpCheck').addEventListener('click',checkNow);
   $('dpNotes').addEventListener('submit',saveNotes);
   document.querySelectorAll('#dpBody [data-help]').forEach(b=>b.addEventListener('click',()=>helpPreview(b.getAttribute('data-help'),b)));
+  document.querySelectorAll('#dpBody [data-acc]').forEach(b=>b.addEventListener('click',()=>accessAct(b.getAttribute('data-acc'),b)));   // item 222
 }
 // ── item 162, part two (review domains finding 8): the server's ready-made guides had no button.
 //    Read the steps here first (a preview saves nothing), then put them on the client's
@@ -369,6 +444,136 @@ async function helpSend(goal){
   const sv=$('dpSent');
   if(!r.ok){b.disabled=false;if(sv)sv.textContent=(r.body&&r.body.message)||'That didn’t go through just now.';return;}
   if(sv)sv.textContent=d.own?'Done. It’s on your Domain & email page.':'Done. It’s on their Domain & email page, waiting for their OK.';
+}
+// ── item 222 (Nov 12 review, file 04, finding 2): Ask for access. A card on the panel says
+//    where the ask stands; the sheet shows the email the client gets (the server writes it:
+//    POST …/access with preview), then sends it. It arrived, Undo and Not needed tick it. ──
+const accFound=(d)=>(d.where&&d.where.records_at&&d.where.records_at.company)||'';
+function accessHtml(d){
+  // a server without item 222 (before its update goes live) sends no access at all: no card, so no button that can't work yet
+  if(d.own||!('access' in d))return'';
+  const a=d.access,who=d.name||'the client';
+  const co=a&&a.company&&a.company!=='Another company'?a.company:accFound(d);
+  if(a&&a.status==='arrived'){
+    const rec=d.where&&d.where.records_at,signIn=rec&&rec.sign_in&&rec.company===co?rec.sign_in:'';
+    return `<section class="dp-acc yes" aria-labelledby="dpAccH"><div class="ah"><span class="ak">${CHECK_SVG}</span><div><div class="kick">Your studio’s access</div><h3 class="at" id="dpAccH">Access arrived</h3></div></div>
+      <p>Ticked off ${esc(dayShort(a.arrived_at))}${a.arrived_by?' by '+esc(a.arrived_by):''}. Change the records${co?' at '+esc(co):''} with your studio’s own sign-in; ${esc(who)}’s password never left them.</p>
+      <div class="dp-acts">${signIn?`<a class="btn" href="${esc(signIn)}" target="_blank" rel="noopener">Sign in to ${esc(co)} ↗</a>`:''}<button type="button" class="linkbtn" data-acc="undo">Undo</button></div></section>`;
+  }
+  if(a&&a.status==='asked'){
+    return `<section class="dp-acc wait" aria-labelledby="dpAccH"><div class="ah"><span class="ak">${KEY_SVG}</span><div><div class="kick">Your studio’s access</div><h3 class="at" id="dpAccH">Waiting for access</h3></div><span class="since">Asked ${esc(dayShort(a.asked_at))}</span></div>
+      <ol class="dp-track"><li class="done"><span class="dot">${CHECK_SVG}</span>Asked ${esc(who)}${co?`, with ${esc(co)}’s steps`:''}<span class="when">${esc(dayShort(a.last_asked_at||a.asked_at))}</span></li>
+        <li class="now"><span class="dot"></span>They add ${esc(a.invite)}${co?' at '+esc(co):''}</li>
+        <li class="next"><span class="dot"></span>The invitation arrives and you accept it</li></ol>
+      <p class="muted">Sent to ${esc(a.to)}${a.asks>1?`, ${a.asks} times`:''}. Nothing back after a week? Ask again sends the same steps once more.</p>
+      <div class="dp-acts"><button type="button" class="btn" data-acc="arrived">${CHECK_SVG}It arrived</button><button type="button" class="rowact" data-acc="ask">Ask again</button><button type="button" class="linkbtn" data-acc="clear">Not needed</button></div></section>`;
+  }
+  return `<section class="dp-acc" aria-labelledby="dpAccH"><div class="ah"><span class="ak">${KEY_SVG}</span><div><div class="kick">Your studio’s access</div><h3 class="at" id="dpAccH">Get into its records without their password</h3></div></div>
+    <p>${co?`Its records are kept at ${esc(co)}. `:''}Ask ${esc(who)} to give your studio the DNS records only. They keep their password, their account and the right to renew or move the domain.</p>
+    <div class="dp-acts"><button type="button" class="btn" data-acc="ask">${KEY_SVG}Ask for access</button><button type="button" class="linkbtn" data-acc="have">We already have it</button></div></section>`;
+}
+function syncAccessRow(siteId,a){
+  const i=DOMAINS.findIndex(x=>x.site_id===siteId);if(i<0)return;
+  DOMAINS[i]={...DOMAINS[i],access:a?{status:a.status,since:a.status==='arrived'?a.arrived_at:a.asked_at}:null};render();
+}
+async function accessAct(kind,btn){
+  const d=PANEL;if(!d)return;
+  if(kind==='ask')return openAccess(btn);
+  const [method,body]=kind==='clear'?['DELETE',null]:['PUT',{arrived:kind==='arrived'||kind==='have'}];
+  btn.disabled=true;
+  let r;try{r=await apiSend(method,'/agency/domains/'+encodeURIComponent(d.site_id)+'/access',body);}catch(_){r={ok:false,body:{}};}
+  if(!PANEL||PANEL.site_id!==d.site_id)return;
+  if(!r.ok||!r.body||!r.body.data){btn.disabled=false;$('dpMsg').textContent=(r.body&&r.body.message)||'That didn’t save just now.';return;}
+  PANEL={...PANEL,access:r.body.data.access};paintPanel();
+  $('dpMsg').textContent=kind==='clear'?'The ask is cleared.':kind==='undo'?(PANEL.access?'Back to waiting.':'Untick done.'):'Ticked off: access arrived.';
+  syncAccessRow(d.site_id,PANEL.access);
+  const f=document.querySelector('#dpBody [data-acc]');if(f)f.focus();
+}
+let ACC=null,ACC_SEQ=0,ACC_T=0,ACC_OPENER=null;
+function accDialog(){
+  let dlg=$('accDlg');if(dlg)return dlg;
+  dlg=document.createElement('dialog');dlg.id='accDlg';dlg.className='accdlg';dlg.setAttribute('aria-labelledby','accTitle');document.body.appendChild(dlg);
+  dlg.addEventListener('close',()=>{ACC=null;clearTimeout(ACC_T);if(ACC_OPENER&&document.contains(ACC_OPENER))ACC_OPENER.focus();ACC_OPENER=null;});
+  dlg.addEventListener('click',(e)=>{if(e.target===dlg)dlg.close();});
+  return dlg;
+}
+function openAccess(opener){
+  const d=PANEL;if(!d)return;ACC_OPENER=opener||null;
+  const companies=d.access_companies||['Another company'];
+  const found=accFound(d),prior=d.access&&d.access.company;
+  const pick=prior&&companies.includes(prior)?prior:found&&companies.includes(found)?found:'Another company';
+  ACC={site_id:d.site_id,view:null,pvOpen:!(window.matchMedia&&window.matchMedia('(max-width:767px)').matches)};
+  const dlg=accDialog(),who=d.name||'the client';
+  dlg.innerHTML=`<form class="acc-b" id="accForm">
+    <div class="acc-h"><span class="ak">${KEY_SVG}</span><div><h2 id="accTitle">Ask ${esc(who)} for access</h2><div class="sub">${esc(d.domain)} · they get an email with their own company’s steps</div></div><button type="button" class="acc-x" id="accX" aria-label="Close">×</button></div>
+    <div class="acc-f"><div><label for="accCo">Their records are kept at</label><select id="accCo">${companies.map(c=>`<option${c===pick?' selected':''}>${esc(c)}</option>`).join('')}</select><div class="acc-hint">${found&&pick===found?'Found from the domain’s records today':'Pick the company that keeps the records, if you know it'}</div></div>
+      <div><label for="accInv" id="accInvL">Invite this email</label><input id="accInv" autocomplete="off" value="${esc((d.access&&d.access.invite)||d.access_invite||'')}"><div class="acc-hint" id="accInvHint"></div></div></div>
+    <div class="acc-own"><label for="accNote">A line of your own (optional)</label><textarea id="accNote" rows="2" maxlength="300"></textarea></div>
+    <div id="accOut"><p class="muted" role="status">Getting the message ready…</p></div>
+    <div class="acc-foot"><button type="button" class="linkbtn" id="accCopy" disabled>Copy the message</button><span class="grow"></span><button type="button" class="rowact" id="accCancel">Cancel</button><button type="submit" class="btn" id="accSend" disabled>Send</button></div>
+    <p class="acc-msg" id="accMsg" role="status"></p></form>`;
+  $('accX').addEventListener('click',()=>dlg.close());
+  $('accCancel').addEventListener('click',()=>dlg.close());
+  $('accCo').addEventListener('change',()=>accPreview());
+  const later=()=>{clearTimeout(ACC_T);ACC_T=setTimeout(accPreview,400);};
+  $('accInv').addEventListener('input',later);$('accNote').addEventListener('input',later);
+  $('accCopy').addEventListener('click',accCopy);
+  $('accForm').addEventListener('submit',accSend);
+  dlg.showModal();$('accCo').focus();
+  accPreview();
+}
+function accMailHtml(v){
+  const body=String(v.text||'').split('\n\n').map((b)=>{
+    const lines=b.split('\n');
+    if(lines.every((l)=>/^\d+\. /.test(l)))return `<ol>${lines.map((l)=>`<li>${esc(l.replace(/^\d+\. /,''))}</li>`).join('')}</ol>`;
+    const m=b.match(/^Sign in to (.+): https:\/\/\S+$/);
+    if(m)return `<span class="signin">Sign in to ${esc(m[1])}</span>`;
+    if(/^You keep your password/.test(b))return `<p class="keep">${esc(b)}</p>`;
+    return `<p>${esc(b).replace(/\n/g,'<br>')}</p>`;
+  }).join('');
+  const to=v.to?esc((v.to_name?v.to_name+' ':'')+'<'+v.to+'>'):'<span class="muted">No email on their record</span>';
+  return `<details class="acc-pv"${ACC&&ACC.pvOpen?' open':''}><summary>What ${esc((PANEL&&PANEL.name)||'the client')} gets</summary>
+    <dl class="acc-meta"><dt>To</dt><dd>${to}</dd><dt>Subject</dt><dd>${esc(v.subject)}</dd></dl>
+    <div class="acc-mail"><div class="band">${esc(v.studio||'')}</div><div class="mb">${body}</div></div></details>`;
+}
+async function accPreview(){
+  if(!ACC)return;const gen=++ACC_SEQ,siteId=ACC.site_id;
+  const body={company:$('accCo').value,invite:$('accInv').value.trim(),note:$('accNote').value,preview:true};
+  let r;try{r=await apiSend('POST','/agency/domains/'+encodeURIComponent(siteId)+'/access',body);}catch(_){r={ok:false,body:{}};}
+  if(!ACC||gen!==ACC_SEQ||ACC.site_id!==siteId)return;
+  const out=$('accOut'),send=$('accSend'),copy=$('accCopy'),hint=$('accInvHint');
+  if(r.status===422&&r.body&&r.body.error==='cannot_share'){
+    ACC.view=null;send.disabled=true;copy.disabled=true;hint.textContent='';hint.classList.remove('bad');
+    out.innerHTML=`<div class="acc-cant"><b>${esc(body.company)} can’t share access from the client’s side.</b><p>${esc(r.body.message)}</p><div class="dp-acts"><button type="button" class="rowact" id="accRecords">Send the records instead</button></div></div>`;
+    $('accRecords').addEventListener('click',()=>{$('accDlg').close();const b=document.querySelector('#dpBody [data-help="connect_domain"]');if(b){b.click();b.scrollIntoView({block:'nearest'});}});
+    return;
+  }
+  if(!r.ok||!r.body||!r.body.data){ACC.view=null;send.disabled=true;copy.disabled=true;out.innerHTML=`<p class="muted" role="status">${esc((r.body&&r.body.message)||'The message didn’t load just now. Close and try again.')}</p>`;return;}
+  const v=r.body.data;ACC.view=v;
+  $('accInvL').textContent=v.asks==='username'?`Your studio’s ${v.company} username`:'Invite this email';
+  hint.textContent=v.invite_ok===false?v.invite_message:v.studio_note;hint.classList.toggle('bad',v.invite_ok===false&&!!body.invite);
+  out.innerHTML=accMailHtml(v);
+  const det=out.querySelector('details');if(det)det.addEventListener('toggle',()=>{if(ACC)ACC.pvOpen=det.open;});
+  copy.disabled=false;
+  send.disabled=!v.to||v.invite_ok===false;
+  send.textContent=v.to?'Send to '+v.to:'Send';
+  $('accMsg').textContent=v.to?'':'This client has no email on their record yet. Copy the message and send it yourself, or add their email first.';
+}
+async function accCopy(){
+  const v=ACC&&ACC.view;if(!v)return;
+  try{await navigator.clipboard.writeText('Subject: '+v.subject+'\n\n'+v.text);$('accMsg').textContent='Copied. Paste it into an email or a text to the client.';}
+  catch(_){$('accMsg').textContent='Copying isn’t allowed here. Select the message and copy it instead.';}
+}
+async function accSend(e){
+  if(e)e.preventDefault();
+  if(!ACC||!ACC.view||!ACC.view.to)return;
+  const b=$('accSend'),to=ACC.view.to,siteId=ACC.site_id;b.disabled=true;b.textContent='Sending…';
+  let r;try{r=await apiSend('POST','/agency/domains/'+encodeURIComponent(siteId)+'/access',{company:$('accCo').value,invite:$('accInv').value.trim(),note:$('accNote').value});}catch(_){r={ok:false,body:{}};}
+  if(!ACC||ACC.site_id!==siteId)return;
+  if(!r.ok||!r.body||!r.body.data){b.disabled=false;b.textContent='Send to '+to;$('accMsg').textContent=(r.body&&r.body.message)||'That email didn’t go out just now. Try again.';return;}
+  ACC_OPENER=null;$('accDlg').close();
+  if(PANEL&&PANEL.site_id===siteId){PANEL={...PANEL,access:r.body.data.access};paintPanel();$('dpMsg').textContent='Sent to '+to+'. It waits here until you tick it off.';const f=document.querySelector('#dpBody [data-acc="arrived"]');if(f)f.focus();}
+  syncAccessRow(siteId,r.body.data.access);
 }
 async function checkNow(){
   const d=PANEL;if(!d)return;const b=$('dpCheck');b.disabled=true;b.textContent='Checking…';

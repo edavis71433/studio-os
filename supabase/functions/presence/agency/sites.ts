@@ -34,6 +34,7 @@ import { buildPortfolio, filterPortfolio } from './portfolio.ts';
 import type { PortfolioInput } from './portfolio.ts';
 import { daysBetween, DOMAIN_SOON_DAYS, PADLOCK_SOON_DAYS, PADLOCK_STUCK_HOURS } from './needs_you.ts';
 import { registryWarnings, sameCompany, whereToGo } from '../lib/rdap.ts';
+import { accessGuide, accessCompanies, accessEmail, cleanInvite, normalizeAccess, askedAccess, tickAccess, accessBadge, firstWord } from '../lib/domain_access.ts';
 import { DOWN_THRESHOLD } from '../monitor/heartbeat.ts';
 import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { siteOrigin, hostedName, SITE_COLS } from '../lib/site.ts';
@@ -279,6 +280,8 @@ export interface DomainIn {
   domain_lock?: boolean | null; domain_dns_host?: string | null; domain_statuses?: string[] | null; domain_registered_at?: string | null;
   /** item 174: from the studio's notes, whether it renews by itself (yes · no · unknown) and when that was confirmed */
   domain_renews?: string | null; domain_renews_confirmed_at?: string | null;
+  /** item 222: the studio's ask for access to the records, as the list's pill shows it */
+  domain_access?: { status: 'asked' | 'arrived'; since: string | null } | null;
 }
 export type DomainTone = 'good' | 'warn' | 'bad' | 'quiet';
 /** One domain's status in a few words. Expiry first, on the same 30-day line as
@@ -337,6 +340,7 @@ export function buildDomains(rows: DomainIn[], nowIso: string) {
       // item 174 (Namecheap's auto-renew in every row): the one fact we can't read from outside, as the studio noted it
       renews: r.domain_renews === 'yes' || r.domain_renews === 'no' ? r.domain_renews : 'unknown',
       renews_confirmed_at: r.domain_renews_confirmed_at || null,
+      access: r.domain_access || null,   // item 222: asked for access to the records, or it arrived
       hosted: r.edition !== 'monitor',
     };
   });
@@ -547,7 +551,63 @@ async function domainDetail(siteId: string, nowIso: string) {
     history: domainHistory(rowsOf(evQ), rowsOf(ntQ), built.own === true),
     statuses, all_checks: Array.isArray(row.domain_checks) ? row.domain_checks : [],
     records, notes: normalizeDomainNotes(await readReservedJson(siteId, RESERVED_NAMES.domainNotes)),
+    // item 222: the studio's ask for access to the records, and where they're kept
+    access: built.own ? null : normalizeAccess(await readReservedJson(siteId, RESERVED_NAMES.domainAccess), row.custom_domain),
+    access_companies: accessCompanies(whereToGo(row.domain_registrar, row.domain_dns_host).records_at?.company || row.domain_registrar),
   };
+}
+
+// ── Ask for access (item 222, Nov 12 review, file 04, finding 2) ──
+// POST { company, invite, note, preview }: with preview, the email the client would get and
+// nothing written; without, it goes to the client (from the studio, replies to its Inbox) and
+// the ask is kept on the client's site. PUT { arrived }: ticked off when access arrives, or
+// back to waiting. DELETE: not needed any more. The studio's managers only.
+async function domainAccessRoute(req: Request, method: string, siteId: string, own: SiteRow | null, member: AgencyMember, principal: Principal, now: string, cors: Record<string, string>): Promise<Response> {
+  if (!can(member.role, 'manage_clients')) return forbid(cors);
+  if (own && own.id === siteId) return json({ error: 'own_domain', message: 'This is your studio’s own domain, so there’s no one to ask.' }, 409, cors);
+  const site = rowsOf<{ id: string; custom_domain: string | null; domain_registrar: string | null; domain_dns_host: string | null; domain_serving: string | null }>(
+    await svc(`presence_sites?id=eq.${siteId}&select=id,custom_domain,domain_registrar,domain_dns_host,domain_serving&limit=1`).catch(() => ({ ok: false, json: [] })))[0];
+  if (!site || !site.custom_domain) return json({ error: 'no_domain', message: 'This site has no domain of its own to ask about.' }, 409, cors);
+  const domain = site.custom_domain.toLowerCase();
+  const by = member.email || 'studio';
+  const studio = String(member.branding?.display_name || member.agency_name || 'Your studio').trim();
+  const asStudio: Principal = { ...principal, scope: { site_id: siteId, name: studio } };   // the client's history says "by your studio"
+  let b: Record<string, unknown> | null = null;
+  if (method === 'POST' || method === 'PUT') { try { b = await req.json(); } catch { /* answered below */ } }
+  if (method === 'PUT') {
+    if (!b || typeof b.arrived !== 'boolean') return json({ error: 'bad_request', message: 'Say whether access arrived.' }, 400, cors);
+    const arrived = b.arrived;
+    const next = await updateReservedJson(siteId, RESERVED_NAMES.domainAccess, (cur) => tickAccess(normalizeAccess(cur, domain), { domain, arrived, by, now }) || {}, by);
+    if (next === null) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+    await writeChangeEvent({ siteId, entityType: 'domain', action: 'update', summary: arrived ? 'Access to the records arrived' : 'Access to the records marked as not here yet', principal: asStudio, provenance: 'human' }).catch(() => false);
+    return json({ data: { access: normalizeAccess(next, domain) } }, 200, cors);
+  }
+  if (method === 'DELETE') {
+    const next = await updateReservedJson(siteId, RESERVED_NAMES.domainAccess, () => ({}), by);
+    if (next === null) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+    return json({ data: { access: null } }, 200, cors);
+  }
+  if (method !== 'POST') return json({ error: 'not_found', message: `No route for ${method} access.` }, 405, cors);
+  const where = whereToGo(site.domain_registrar, site.domain_dns_host);
+  const guide = accessGuide(typeof b?.company === 'string' && b.company ? b.company : (where.records_at?.company || site.domain_registrar));
+  if (!guide.shareable) return json({ error: 'cannot_share', message: guide.studio_note, company: guide.company }, 422, cors);
+  const invite = cleanInvite(b?.invite, guide.asks);
+  const inviteMessage = guide.asks === 'username' ? `Type your studio’s ${guide.company} username.` : 'Type the email address to invite.';
+  const facts = await ownerFacts(siteId).catch(() => null);
+  const to = ownerEmailsOf(facts)[0] || '';
+  // a preview before an address is typed shows where it goes in the steps
+  const shown = invite || (guide.asks === 'username' ? `[your ${guide.company} username]` : '[the email you invite]');
+  const mail = accessEmail({ domain, company: guide.company, invite: shown, studio, firstName: firstWord(facts?.contact?.name), note: typeof b?.note === 'string' ? b.note : '', connected: site.domain_serving === 'latest' });
+  const view = { to, to_name: String(facts?.client?.name || ''), studio, subject: mail.subject, text: mail.text, steps: mail.steps, company: guide.company, called: guide.called, exact: guide.exact, caveat: guide.caveat, studio_note: guide.studio_note, asks: guide.asks, sign_in: guide.sign_in, invite_ok: !!invite, ...(invite ? {} : { invite_message: inviteMessage }) };
+  if (b?.preview === true) return json({ data: view }, 200, { ...cors, 'Cache-Control': 'no-store' });
+  if (!invite) return json({ error: 'bad_invite', message: inviteMessage }, 400, cors);
+  if (!to) return json({ error: 'no_email', message: 'This client has no email on their record yet. Add one there, or copy the message and send it yourself.' }, 409, cors);
+  // from the studio, on its brand; a reply lands in the studio's Inbox (a known client: the siteId rule)
+  const sent = await sendEmail(to, mail.subject.slice(0, 180), mail.html, own ? await loadEmailBrand(own.id) : undefined, { critical: true, asBusiness: true, ...(own ? { siteId: own.id } : {}) });
+  if (!sent) return json({ error: 'send_failed', message: 'That email didn’t go out just now, so nothing changed. Try again in a moment.' }, 502, cors);
+  const next = await updateReservedJson(siteId, RESERVED_NAMES.domainAccess, (cur) => askedAccess(normalizeAccess(cur, domain), { domain, company: guide.company, invite, to, by, now }), by);
+  await writeChangeEvent({ siteId, entityType: 'domain', action: 'update', summary: guide.company === 'Another company' ? 'Asked the client for access to the records' : `Asked the client for access to the records at ${guide.company}`, principal: asStudio, provenance: 'human' }).catch(() => false);
+  return json({ data: { ...view, access: normalizeAccess(next, domain) } }, 200, cors);
 }
 
 /** The Sites and Domains routes, or null when the route is someone else's. */
@@ -680,13 +740,18 @@ export async function handleAgencySites(req: Request, route: string, method: str
     // item 174: "renews by itself" from the studio's notes, every domain in one read
     const noteIds = list.filter((d) => d.custom_domain).map((d) => d.site_id);
     if (noteIds.length) {
-      const nq = await svc(`presence_sales_templates?site_id=in.(${noteIds.join(',')})&kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.domainNotes)}&deleted_at=is.null&select=site_id,body,updated_at&order=updated_at.desc&limit=1000`).catch(soft);
-      const notes = new Map<string, DomainNotes>();
-      for (const row of rowsOf<{ site_id: string; body?: string }>(nq)) {
-        if (notes.has(row.site_id)) continue;   // the newest row wins, like every reserved read
-        try { notes.set(row.site_id, normalizeDomainNotes(JSON.parse(String(row.body || 'null')))); } catch { /* an unreadable note reads as none */ }
+      // item 222: and the asks for access, in the same read
+      const nq = await svc(`presence_sales_templates?site_id=in.(${noteIds.join(',')})&kind=eq.proposal&name=in.(${encodeURIComponent(RESERVED_NAMES.domainNotes)},${encodeURIComponent(RESERVED_NAMES.domainAccess)})&deleted_at=is.null&select=site_id,name,body,updated_at&order=updated_at.desc&limit=2000`).catch(soft);
+      const notes = new Map<string, DomainNotes>(), asks = new Map<string, unknown>();
+      for (const row of rowsOf<{ site_id: string; name?: string; body?: string }>(nq)) {
+        const into = row.name === RESERVED_NAMES.domainAccess ? asks : notes;
+        if (into.has(row.site_id)) continue;   // the newest row wins, like every reserved read
+        try { const v = JSON.parse(String(row.body || 'null')); if (into === notes) notes.set(row.site_id, normalizeDomainNotes(v)); else asks.set(row.site_id, v); } catch { /* an unreadable row reads as none */ }
       }
-      for (const d of list) { const n = notes.get(d.site_id); if (n) { d.domain_renews = n.renews; d.domain_renews_confirmed_at = n.renews_confirmed_at; } }
+      for (const d of list) {
+        const n = notes.get(d.site_id); if (n) { d.domain_renews = n.renews; d.domain_renews_confirmed_at = n.renews_confirmed_at; }
+        d.domain_access = d.own ? null : accessBadge(normalizeAccess(asks.get(d.site_id), d.custom_domain));
+      }
     }
     return json({ data: buildDomains(list, now), partial: (extraQ as { ok?: boolean }).ok === false }, 200, cors);
   }
@@ -694,7 +759,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
   // ── one domain: the side panel, the studio's notes, and "Check now" (item 162, review domains
   //    findings 9, 10, 23 and 24). A client of this studio's, or the studio's own site. ──
   {
-    const dm = route.match(/^\/agency\/domains\/([0-9a-f-]{36})(?:\/(notes|check))?$/);
+    const dm = route.match(/^\/agency\/domains\/([0-9a-f-]{36})(?:\/(notes|check|access))?$/);
     if (dm) {
       const siteId = dm[1], what = dm[2] || '';
       if (!can(member.role, 'read')) return forbid(cors);
@@ -719,11 +784,13 @@ export async function handleAgencySites(req: Request, route: string, method: str
         if (since < CHECK_NOW_GAP_MS) return json({ error: 'too_soon', message: 'Checked a moment ago. Give it a minute before checking again.' }, 429, cors);
         await (await import('../commerce/lifecycle.ts')).checkOneDomain({ ...sq, custom_domain: sq.custom_domain }, now);
         const detail = await domainDetail(siteId, now);
-        return detail ? json({ data: detail }, 200, cors) : notYours(cors);
+        return detail ? json({ data: { ...detail, access_invite: detail.own ? '' : member.email || '' } }, 200, cors) : notYours(cors);   // item 222: as the panel's read
       }
+      if (what === 'access') return domainAccessRoute(req, method, siteId, own, member, principal, now, cors);   // item 222
       if (what === '' && method === 'GET') {
         const detail = await domainDetail(siteId, now);
-        return detail ? json({ data: detail }, 200, { ...cors, 'Cache-Control': 'no-store' }) : notYours(cors);
+        // item 222: the address Ask for access invites, unless the studio types another
+        return detail ? json({ data: { ...detail, access_invite: detail.own ? '' : member.email || '' } }, 200, { ...cors, 'Cache-Control': 'no-store' }) : notYours(cors);
       }
       return null;
     }
