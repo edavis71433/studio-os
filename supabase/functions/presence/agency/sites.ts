@@ -126,8 +126,9 @@ export interface TeamMember { who: string; email: string; side: 'studio' | 'clie
 export const STUDIO_EDITORS: readonly AgencyRole[] = ['owner', 'admin', 'account_manager'];
 const STUDIO_ROLE_WORDS: Record<string, string> = { owner: 'Owner', admin: 'Admin', account_manager: 'Account manager' };
 /** A site's seats that carry `edit` (lib/site_roles.ts); a reviewer only reviews. Item 53:
- *  an owner seat is a Co-owner, since the site has one owner, the person the client record names. */
-const SEAT_WORDS: Record<string, string> = { business_owner: 'Co-owner', business_staff: 'Staff', developer: 'Developer' };
+ *  an owner seat is a Co-owner, since the site has one owner, the person the client record names.
+ *  Item 220: a Designer edits the website too. */
+const SEAT_WORDS: Record<string, string> = { business_owner: 'Co-owner', business_staff: 'Staff', developer: 'Developer', designer: 'Designer' };
 
 /** Everyone who can change this site: the studio first, then their side. The
  *  owner counts when they use the full workspace; a client the studio serves

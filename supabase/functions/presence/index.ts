@@ -13,8 +13,8 @@
 //      portfolio and help need no site and answer next
 //   6. the caller's site: their own via RLS, a studio's scope re-checked (never
 //      falling back to another site), or an invited member's seat
-//   7. entitlement (full / readonly / denied), the reviewer boundary, the member
-//      write gate (lib/site_roles.ts), then the Monitor and edition feature gates
+//   7. entitlement (full / readonly / denied), the reviewer and Designer boundaries,
+//      the member write gate (lib/site_roles.ts), then the Monitor and edition feature gates
 //   8. exact method + path routes, else 404
 //
 // The route groups most requests never reach load on first use (lib/lazy.ts):
@@ -83,6 +83,7 @@ const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApp
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
 import { resolveMemberSite, resolveHeldBusiness, resolveSiteRoleCached } from './lib/workspace.ts';
 import type { SiteRole } from './lib/site_roles.ts';
+import { designerAllowed } from './lib/site_roles.ts';
 const { handleConciergeAsk } = lazyRoutes(() => import('./routes/concierge.ts'));
 const { handleHelpAsk } = lazyRoutes(() => import('./routes/help.ts'));
 const { handleWriterGenerate, handleWriterRewrite, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } = lazyRoutes(() => import('./routes/writer.ts'));
@@ -509,11 +510,16 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   //     reach ONLY the shared feed + the approvals put to them. Everything else in
   //     the client gate is refused — the simplified portal is a real boundary, not
   //     a UI facade. Fast-path: sites with no extra members skip this entirely.
-  {
-    const siteRole = await resolveSiteRoleCached(principal, jwt, site.id);
-    if (siteRole === 'client_reviewer' && !reviewerAllowed(route, method)) {
-      return json({ error: 'forbidden', message: 'That lives in your studio’s full workspace — your client view shows what they’ve chosen to share.' }, 403, cors);
-    }
+  //     siteRole stays in reach below: a route a Designer may read can still hold
+  //     some of the business (the website timeline's enquiries), and answers them
+  //     with the website's part only.
+  const siteRole = await resolveSiteRoleCached(principal, jwt, site.id);
+  if (siteRole === 'client_reviewer' && !reviewerAllowed(route, method)) {
+    return json({ error: 'forbidden', message: 'That lives in your studio’s full workspace — your client view shows what they’ve chosen to share.' }, 403, cors);
+  }
+  // builder item 220: a Designer reaches the website and nothing else, reads included
+  if (siteRole === 'designer' && !designerAllowed(route, method)) {
+    return json({ error: 'forbidden', role: 'designer', message: 'That isn’t part of a Designer’s role. Designers work on the website; customers, messages and money stay with the owner and the studio.' }, 403, cors);
   }
 
   // 4c. A member's write gets what lib/site_roles.ts gives their role, on every route.
@@ -744,7 +750,7 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/health' && method === 'GET') return handleHealth(site, cors);
   if (route === '/changes' && method === 'GET') return handleChanges(site, cors);
   if (route === '/content-tree' && method === 'GET') return handleContentTree(site, cors);
-  if (route === '/website-timeline' && method === 'GET') return handleWebsiteTimeline(site, cors);
+  if (route === '/website-timeline' && method === 'GET') return handleWebsiteTimeline(site, cors, { websiteOnly: siteRole === 'designer' });   // builder item 220
   // builder list item 215: who changed what, in sentences (a reviewer is refused above)
   if (route === '/change-log' && method === 'GET') return handleChangeLog(req, site, principal, cors);
   if (route === '/change-log/went-live' && method === 'GET') return handleWentLive(req, site, cors);
