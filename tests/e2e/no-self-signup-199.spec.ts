@@ -36,6 +36,32 @@ test('Home: Add a customer only sets them up; no sign-up choice, link or price p
   await expect(dlg.locator('#cu-submit')).toHaveText('Set up + invite');
 });
 
+// With the choice gone, Name is the dialog's first field, so the browser focuses it the
+// moment the dialog opens and the page's 20ms nudge to Name comes after. The nudge used to
+// pull focus back from wherever someone had moved, so under load a typed email landed in
+// Name and nothing was sent (seen on CI as an empty result). Here the nudge is stretched so
+// it always lands after the move.
+const DIALOGS = [
+  { where: 'Home', path: '/agency.html', api: {}, open: '#top button:has-text("+ Add a customer")' },
+  { where: 'Customers', path: '/customers.html', api: { '/studio/customers': { data: [] } }, open: '#addCust' },
+  { where: 'Contacts', path: '/contacts.html', api: { '/sales/contacts': { data: [] } }, open: '#addCust' },
+];
+for (const d of DIALOGS) {
+  test(`${d.where}: the dialog's late focus never pulls focus back from the email field`, async ({ page }) => {
+    await page.addInitScript(() => {
+      const later = window.setTimeout.bind(window);
+      window.setTimeout = ((fn: TimerHandler, ms?: number, ...rest: unknown[]) => later(fn, ms === 20 ? 300 : ms, ...rest)) as typeof window.setTimeout;
+    });
+    await installApp(page, { api: d.api });
+    await page.goto(d.path);
+    await page.locator(d.open).first().click();
+    await expect(page.locator('#cu-name')).toBeFocused();   // the browser's own focus, before the nudge
+    await page.locator('#cu-email').focus();
+    await page.waitForTimeout(600);   // the stretched nudge has fired by now
+    await expect(page.locator('#cu-email')).toBeFocused();
+  });
+}
+
 test('the builder’s plan card opens Settings → Your plan, never the old price page', async ({ page }) => {
   await installApp(page, { api: { ...EDITOR_API, '/commerce/notices': { data: { notices: [{ id: 'n3', kind: 'capacity', headline: 'You’re close to your plan’s limit', body: 'b', dismissible: true }] } } } });
   await page.goto('/presence.html');

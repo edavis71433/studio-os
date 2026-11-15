@@ -1374,7 +1374,9 @@ function openAddCustomer(){
   syncCuSignup();syncCuKits();
   $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
   const sb2=$('cu-submit');if(sb2){sb2.disabled=false;sb2.textContent='Set up + invite';}
-  $('custDlg').showModal();setTimeout(()=>$('cu-name').focus(),20);
+  // Name is the dialog's first field since the sign-up choice went (item 199), so showModal
+  // already focuses it; the late nudge never pulls focus back from a field someone has moved to
+  $('custDlg').showModal();setTimeout(()=>{const d=$('custDlg'),a=document.activeElement;if(!d.contains(a)||a===d)$('cu-name').focus();},20);
 }
 $('cu-cancel').onclick=()=>$('custDlg').close();
 // ⌘K's "Add a customer" lands here as /agency.html#add (lib/navigation.ts) — open the
