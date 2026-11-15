@@ -1,5 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, settled } from './helpers/app';
 import { newPageLock, gatePage, sealPage } from '../../supabase/functions/presence/lib/page_gate';
 
 // One page's settings in the Pages card (builder list items 48 and 120, Nov 2026; Figma
@@ -118,6 +118,9 @@ test.describe('one page’s settings (builder items 48 and 120)', () => {
   test('Password asks first: nothing changes until it’s saved, the password goes to the server once, and the page names its lock', async ({ page }) => {
     const writes = await mount(page);
     const panel = await openSettings(page, 'Gallery');
+    // the panel draws itself again once its reads land, and what was typed (or focused) before that is lost:
+    // a person on a slow connection meets that too (reported); the test acts on the panel once it has settled
+    await settled(page);
     await accessCard(panel, 'Password').click();
     const pw = panel.getByLabel('Password', { exact: true });
     await expect(pw).toBeFocused();
