@@ -6068,7 +6068,7 @@ function mediaCell(grid, m, manage, onPick) {
     del.addEventListener("click", async () => {
       // item 218: Remove moves the photo to Files' Trash for 30 days; Files puts it back
       if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "?"; del.title = m.used_by?.length ? `It’s at work (${m.used_by.join(", ")}) — remove anyway?` : "Move to the Trash?"; setTimeout(() => { delete del.dataset.armed; del.innerHTML = uiIcon("x", 14); }, 3200); return; }
-      try { await api("DELETE", `/media/${m.id}`); S.media = S.media.filter((x) => x.id !== m.id); renderMediaGrid(grid, true); toast("Moved to the Trash. Put it back from Files within 30 days."); }
+      try { const res = await api("DELETE", `/media/${m.id}`); S.media = S.media.filter((x) => x.id !== m.id); renderMediaGrid(grid, true); toast(res && res.data && res.data.trashed ? "Moved to the Trash. Put it back from Files within 30 days." : "Removed"); }
       catch (err) { toast(nice(err), true); }
     });
     cell.appendChild(del);

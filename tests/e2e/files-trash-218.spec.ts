@@ -168,10 +168,14 @@ test.describe('Files: the Trash (item 218)', () => {
     await expect(page.locator('.thow')).toHaveCount(0);
   });
 
-  test('a server without a Trash shows no chip', async ({ page }) => {
+  test('a server without a Trash (before its update goes live) shows no chip, and Delete still says it is for good', async ({ page }) => {
     await openFiles(page, { trashCount: null });
     await expect(page.locator('#filters [data-col="archive"]')).toBeVisible();
     await expect(page.locator('#filters [data-col="trash"]')).toHaveCount(0);
+    await page.locator(`.tile[data-open="${TEAM.id}"]`).click();
+    await page.locator('#panel .acts').getByRole('button', { name: 'Delete' }).click();
+    await expect(page.locator('dialog[open]')).toContainText('Delete this file permanently?');
+    await page.keyboard.press('Escape');
   });
 
   test('a phone: each file stacks, its two buttons are full width and easy to press, and nothing scrolls sideways', async ({ page }, info) => {
