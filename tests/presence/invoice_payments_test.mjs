@@ -243,7 +243,10 @@ const row = (id) => world.invoices.find((r) => r.id === id);
   seed();
   const r = await pay(INV, { method: 'cash', amount_cents: 300000 });
   ok('more than due: 422 and nothing written', r.status === 422 && world.patches.length === 0 && world.events.length === 0);
-  const f = await pay(INV, { method: 'cash', paid_on: '2026-11-12' }, '2026-11-11');
+  // relative days: callerToday falls back to the real UTC day when ?today= drifts more than a
+  // day from it, so the fixed '2026-11-11'/'2026-11-12' pair went stale on Nov 13 2026
+  const dayAt = (n) => new Date(Date.now() + n * 86400_000).toISOString().slice(0, 10);
+  const f = await pay(INV, { method: 'cash', paid_on: dayAt(1) }, dayAt(0));
   ok('a day after the caller’s today: 422', f.status === 422);
   const bad = await handleInvoicePayment(req('/x', {}), SITE, PRINCIPAL, 'not-a-uuid', CORS);
   ok('a bad id: 400 before any read', bad.status === 400);
