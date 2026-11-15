@@ -182,6 +182,55 @@ const say = (r, names) => { const w = C.describeEvent(r, { item: 'menu item', it
   ok('wiring: the editor’s link to Changes is for those who see the business', /id="activityChanges" href="\/changes\.html" data-needs="business"/.test(read('../../presence.html')));
 }
 
+// ── item 239: the kinds the log takes since migration 0229, and work the scheduler sends ──
+{
+  const S = 'Spring menu';
+  eq('239 launch: its own steps in its words; a checkpoint and going live are told by their own records', [
+    say(ev(1, 't', 'launch', 'create', { summary: `Staged a launch “${S}”` })), say(ev(2, 't', 'launch', 'approve', { summary: `Approved launch “${S}”` })),
+    say(ev(3, 't', 'launch', 'reject', { summary: `Asked for changes on launch “${S}”` })), say(ev(4, 't', 'launch', 'schedule', { summary: `Scheduled launch “${S}”` })),
+    say(ev(5, 't', 'launch', 'update', { summary: `Canceled launch “${S}”` })), say(ev(6, 't', 'launch', 'create', { summary: 'Saved a checkpoint “Before the menu”' })),
+    say(ev(7, 't', 'launch', 'publish', { summary: `Launched “${S}”` })), say(ev(8, 't', 'launch', 'restore', { summary: `Rolled back launch “${S}”` })),
+    say(ev(9, 't', 'launch', 'update', { summary: 'Removed a checkpoint' })),
+  ], [`staged a launch “${S}”`, `approved launch “${S}”`, `asked for changes on launch “${S}”`, `scheduled launch “${S}”`, `canceled launch “${S}”`, null, null, null, 'removed a checkpoint']);
+  eq('239 preview: the link and its password; putting it live is the publish’s', [
+    say(ev(1, 't', 'preview', 'update', { summary: 'Updated the preview site' })), say(ev(2, 't', 'preview', 'update', { summary: 'Password-protected the preview' })),
+    say(ev(3, 't', 'preview', 'update', { summary: 'Shared a timed draft preview link' })), say(ev(4, 't', 'preview', 'publish', { summary: 'Promoted the preview to Live' })),
+  ], ['updated the preview site', 'password-protected the preview', 'shared a timed draft preview link', null]);
+  const upd = C.describeEvent(ev(1, 't', 'content_library', 'update', { summary: 'Updated “Opening hours” — every linked placement will show this' }));
+  eq('239 saved sections: in their words, what follows the dash as its own line', [say(ev(1, 't', 'content_library', 'create', { summary: 'Saved “Opening hours” to the content library' })), upd.text, C.summaryDetail('Updated “Opening hours” — every linked placement will show this'), upd.where, say(ev(2, 't', 'content_library', 'delete', { summary: 'Removed a content library item' }))],
+    ['saved “Opening hours” to the content library', 'updated “Opening hours”', 'Every linked placement will show this', 'Website › Saved sections', 'removed a content library item']);
+  const area = (r) => C.describeEvent(r).area;
+  eq('239 areas: launches and the preview are Going live, opening Versions; a removed checkpoint and saved sections are the website',
+    [area(ev(1, 't', 'launch', 'approve', { summary: 'Approved launch “x”' })), C.describeEvent(ev(1, 't', 'launch', 'approve', { summary: 'Approved launch “x”' })).go, area(ev(2, 't', 'preview', 'update', { summary: 'Reset the preview link' })), area(ev(3, 't', 'launch', 'update', { summary: 'Removed a checkpoint' })), area(ev(4, 't', 'content_library', 'create', { summary: 'Saved “x” to the content library' }))],
+    ['live', '/presence.html#history', 'live', 'website', 'website']);
+
+  const pub = (o) => C.describePublish({ id: 'p', at: 't', site_id: SITE, source: 'publish', actor: ERIC, actor_kind: 'client', kind: 'publish', status: 'live', summary: '3 settings changes', ...o })?.text ?? null;
+  eq('239 publishes: what the scheduler sent says so; a launch, the preview, a post and a timed section in their own words', [
+    pub({ actor_kind: 'system' }), pub({ actor_kind: 'system', kind: 'restore', summary: 'Scheduled revert to an earlier version' }), pub({ actor_kind: 'system', status: 'failed' }),
+    pub({ summary: `Launched “${S}”` }), pub({ actor_kind: 'system', summary: `Launched “${S}”` }), pub({ summary: 'Promoted the preview to Live' }),
+    pub({ actor_kind: 'system', actor: null, summary: 'Scheduled blog post “Winter hours” went live' }), pub({ actor_kind: 'system', actor: null, summary: 'A timed section went live or came down' }),
+    pub({}),
+  ], ['published the site on schedule. 3 changes went live', 'put an earlier version back live on schedule', 'tried to publish on schedule; it didn’t go live',
+    `launched “${S}”. It went live`, `launched “${S}” on schedule. It went live`, 'put the preview live',
+    'put the scheduled blog post “Winter hours” live', 'republished the site so a timed section showed or hid on time',
+    'published the site. 3 changes went live']);
+
+  const people = new Map([[ERIC, { name: 'Eric', email: 'eric@studio.example', side: 'studio' }], [SAM, { name: 'Sam Lee', email: 'sam@bakery.example', side: 'owner' }]]);
+  const ctx = (o = {}) => ({ viewer: null, viewerSide: 'studio', people, ownerOf: new Map([[SITE, people.get(SAM)]]), canPeople: true, ...o });
+  const w = (r, o) => { const x = C.whoOf(r, ctx(o)); return [x.who, x.who_note, x.side]; };
+  const sched = (o) => ({ id: 'p', at: 't', site_id: SITE, source: 'publish', kind: 'publish', status: 'live', summary: '', ...o });
+  eq('239 who: scheduled work is whoever set it, by name; nobody, or someone not known here, is Studio OS', [
+    w(sched({ actor: SAM, actor_kind: 'system' })), w(sched({ actor: ERIC, actor_kind: 'system' })), w(sched({ actor: ERIC, actor_kind: 'system' }), { viewer: ERIC }),
+    w(sched({ actor: null, actor_kind: 'system' })), w(sched({ actor: GONE, actor_kind: 'system' })),
+  ], [['Sam Lee', 'the owner', 'owner'], ['Eric', '', 'studio'], ['You', '', 'you'], ['Studio OS', '', 'auto'], ['Studio OS', '', 'auto']]);
+  eq('239 who: a one-tap decision is the client’s side, never Studio OS', [w(ev(1, 't', 'settings', 'update', { actor: null, actor_kind: 'client' })), w(ev(2, 't', 'settings', 'update', { actor: null, actor_kind: 'client' }), { viewer: SAM, viewerSide: 'client' })],
+    [['Someone on the client’s side', '', 'unknown'], ['Someone on your team', '', 'unknown']]);
+  const items = C.changeItems([sched({ id: 'p1', at: '2026-11-15T09:00:00Z', actor: SAM, actor_kind: 'system', summary: '2 settings changes' }), sched({ id: 'p2', at: '2026-11-15T08:00:00Z', actor: null, actor_kind: 'system', summary: 'A timed section went live or came down' })], ctx());
+  const band = C.changeSummary(items, ['2026-11-15'], (iso) => iso.slice(0, 10));
+  eq('239 band: a publish the owner scheduled counts on the client’s side; a timed section’s, Studio OS by itself', [items.map((i) => [i.who, i.text]), band.by_side],
+    [[['Sam Lee', 'published the site on schedule. 2 changes went live'], ['Studio OS', 'republished the site so a timed section showed or hid on time']], { studio: 0, client: 1, auto: 1 }]);
+}
+
 const failed = results.filter((r) => !r.p).length;
 console.log(`change_log_215: ${results.length - failed} passed, ${failed} failed`);
 if (failed) Deno.exit(1);
