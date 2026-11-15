@@ -21,12 +21,21 @@ export const CORS_ORIGINS = ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : DEFAULT_O
 // It only matters on the OPTIONS answer and is ignored on the others.
 export const PREFLIGHT_MAX_AGE = '86400';
 
+// Speed (Nov 15 2026): the database lives in Oregon (us-west-2), but Supabase runs this
+// code in the region nearest the visitor, so from the east coast each of the dozen small
+// database calls behind one answer crossed the country: about 1 s an answer, 0.4 s when
+// run beside the database. A page asks for that with the x-region header (Supabase's
+// regional invocation), and the browser may only send a header this list allows.
+// An address setting (?forceFunctionRegion=) would need no change here, but it alters
+// every address the pages call. Allowing a header grants nothing by itself.
+const ALLOWED_HEADERS = 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt, x-dds-scope-site, if-match, x-operator-secret, x-system-secret, x-region';
+
 export function corsFor(req: Request) {
   const origin = req.headers.get('origin') || '';
   const allow = CORS_ORIGINS.includes(origin) ? origin : CORS_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': allow,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt, x-dds-scope-site, if-match, x-operator-secret, x-system-secret',
+    'Access-Control-Allow-Headers': ALLOWED_HEADERS,
     // PUT/PATCH/DELETE are not CORS-safelisted; the presence REST routes (M7)
     // need them listed or every browser preflight fails. Additive for the
     // POST-only monolith (extra names in this header grant nothing by themselves).
@@ -55,7 +64,7 @@ export function visitorCors(): Record<string, string> {
 // Uses the canonical origin; per-request CORS is applied at the response layer.
 export const cors = {
   'Access-Control-Allow-Origin': CORS_ORIGINS[0],
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt, x-dds-scope-site, if-match, x-operator-secret, x-system-secret',
+  'Access-Control-Allow-Headers': ALLOWED_HEADERS,
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': PREFLIGHT_MAX_AGE,
   'Vary': 'Origin',
