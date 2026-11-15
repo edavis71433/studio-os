@@ -216,7 +216,7 @@
     }).join('') + '</fieldset>';
     if (me.err) h += '<div class="pp-err" role="alert"><span class="t">' + esc(me.err.message) + '</span>' + (me.err.action ? '<button type="button" class="pp-btn" data-pp="' + esc(me.err.action) + '">' + esc(me.err.label) + '</button>' : '') + '</div>';
     h += '<div class="pp-foot"><button type="button" class="pp-btn pri" data-pp="send"' + (me.busy ? ' disabled' : '') + '>' + (me.busy ? 'Sending…' : 'Send invite') + '</button><button type="button" class="pp-btn" data-pp="back">Cancel</button></div>';
-    h += '<p class="pp-faint">The server checks every request against the role, so a Designer can’t reach customers or messages by typing an address either. Developer is paused while custom code gets a stronger safety check. Nobody but ' + esc(owner) + ' can hand the site to someone else.</p></div>';
+    h += '<p class="pp-faint">The server checks every request against the role, so a Designer can’t reach customers or messages by typing an address either. Nobody but ' + esc(owner) + ' can hand the site to someone else.</p></div>';
     me.host.innerHTML = h; me.wire();
     var f = me.host.querySelector('#pp-email'); if (f) f.focus();
   };
