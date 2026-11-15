@@ -15919,7 +15919,7 @@ function insThemeLook(v, c) {
   if (v === "tinted") return { bg: "color-mix(in srgb," + c.accent + " 8%," + c.paper + ")", ink: c.ink, btn: c.accent };
   if (v === "plain") return { bg: c.paper, ink: c.ink, btn: c.accent };
   if (v === "accent") return { bg: c.band, ink: "#ffffff", btn: "#ffffff" };
-  if (v === "dark") return { bg: "#1a1622", ink: "#f2eef8", btn: c.accent };
+  if (v === "dark") return { bg: "#1a1622", ink: "#f2eef8", btn: c.band };   // its buttons are filled with the band colour (BLOCK_CSS)
   return { bg: "linear-gradient(180deg," + c.card + " 0 55%," + c.wash + " 55%)", ink: c.ink, btn: c.accent };
 }
 function insThemes(host, idx, look, style) {

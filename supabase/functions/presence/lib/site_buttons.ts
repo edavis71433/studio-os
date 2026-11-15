@@ -171,9 +171,12 @@ const SETS: Record<ButtonSet, string> = {
 };
 
 // every box people type into, on forms, the sign-up box, bookings and the pop-up
-const FIELD = `${R} :is(input:not([type=checkbox],[type=radio],[type=file],[type=submit],[type=button],[type=reset],[type=hidden],[type=range],[type=color],[type=image]),textarea,select)`;
+const FIELDS = ':is(input:not([type=checkbox],[type=radio],[type=file],[type=submit],[type=button],[type=reset],[type=hidden],[type=range],[type=color],[type=image]),textarea,select)';
+const FIELD = `${R} ${FIELDS}`;
 const FORMS: Record<FormStyle, string> = {
-  line: `${FIELD}{border:0;border-bottom:2px solid currentColor;border-radius:0;background:transparent;color:inherit;padding-left:2px;padding-right:2px;box-shadow:none}${FIELD}::placeholder{color:inherit;opacity:.78}`,
+  // a Line box's example words are its words, a little lighter; on a band, where the words are
+  // white, at full strength (at .78 they read 3.60:1 on Atelier's accent band)
+  line: `${FIELD}{border:0;border-bottom:2px solid currentColor;border-radius:0;background:transparent;color:inherit;padding-left:2px;padding-right:2px;box-shadow:none}${FIELD}::placeholder{color:inherit;opacity:.78}${BANDS(`${FIELDS}::placeholder`)}{opacity:1}`,
   soft: `${FIELD}{border:1.5px solid transparent;border-radius:12px;background:var(--dds-ff);color:var(--ink);box-shadow:none}${FIELD}::placeholder{color:var(--dds-fp);opacity:1}`,
   round: `${FIELD}{border:1.5px solid var(--dds-fb);border-radius:999px;background:var(--card,#fff);color:var(--ink);padding-left:18px;padding-right:18px;box-shadow:none}${R} textarea:not([hidden]){border-radius:20px}${FIELD}::placeholder{color:var(--dds-fp);opacity:1}`,
 };
