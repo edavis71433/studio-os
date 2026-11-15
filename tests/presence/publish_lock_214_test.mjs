@@ -96,6 +96,11 @@ seed({ presence_sales_templates: [lockRow(SITE, STUDIO_LOCK)] });
   ok('Bring back online: refused', online.status === 409 && (await body(online))?.error === 'publish_locked');
   const offline = await PUB.takeSiteOffline(site(SITE, { netlify_site_id: 'nf-1' }), OWNER);
   ok('Take offline: refused (it changes the live site too)', offline.ok === false && offline.error === 'publish_locked');
+  if (PUB.handleComingSoon) {   // builder item 158's Coming soon page goes up at the site's address too
+    const soonReq = new Request('http://x/site/coming-soon', { method: 'POST', body: JSON.stringify({ line: 'Opening in December' }) });
+    const soon = await PUB.handleComingSoon(soonReq, site(SITE, { netlify_site_id: 'nf-1' }), OWNER, {});
+    ok('Coming soon page: refused too, in the same words', soon.status === 409 && /^Your studio locked publishing on Nov 12\./.test((await body(soon))?.message || ''));
+  }
   ok('nothing was recorded as a publish', db.tables.presence_publishes.length === 2);
 }
 {

@@ -795,6 +795,8 @@ export async function handleComingSoon(req: Request, site: SiteRow, principal: P
   if (!cs.line) return json({ error: 'line_required', message: 'Write one line for the page first, like when you open.' }, 400, cors);
   if (PUBLISH_BLOCKED_STATES.includes(site.status)) return json({ error: 'lifecycle_blocked', message: 'This site is archived and can’t be changed. Contact your studio to reactivate it.' }, 409, cors);
   if (site.status === 'paused' && principal.kind !== 'staff' && principal.kind !== 'system') return json({ error: 'site_paused', message: 'Your site is currently paused. Contact your studio first.' }, 409, cors);
+  const locked = await lockStop(site.id, publishActorKind(principal));   // item 214: a locked site's address stays as it is
+  if (locked) return json(locked.body, locked.status, cors);
   if (!site.netlify_site_id || !netlifyConfigured()) return json({ error: 'config', message: 'Hosting isn’t connected for this site yet.' }, 409, cors);
   // only before the first publish: once the real site is live, there is nothing to stand in for
   const live = await svc(`presence_publishes?site_id=eq.${site.id}&status=eq.live&select=id&limit=1`);
