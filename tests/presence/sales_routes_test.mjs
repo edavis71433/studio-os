@@ -200,9 +200,10 @@ ok('convert: hands off to the EXISTING guided onboarding (get-started)', /get-st
   ok('ui: SERVICE language (never SaaS plan words) + "never pay for software"', /never pay for software/.test(contacts) && /What kind of work is this\?/.test(contacts) && !/subscription|SaaS|per month|\/mo/i.test(contacts.slice(contacts.indexOf('custDlg'), contacts.indexOf('custDlg') + 1400)));
   ok('ui: success state shows "Invitation sent to {email}" + the already-exists case', /Invitation sent to/.test(contacts) && /already_exists/.test(contacts) && /already have a workspace/.test(contacts));
   ok('ui: labels wired to inputs (for/id) + focus managed', /for="cu-email"/.test(contacts) && /id="cu-email"/.test(contacts) && /\$\('cu-name'\)\.focus\(\)/.test(contacts));
-  // builder item 199: the "they'll sign up themselves" choice is gone; adding is setting them up
-  ok('ui: no sign-up choice, sign-up link or price page in the dialog', !/cumode|cu-signup|sign up themselves|pricing\.html/.test(contacts));
-  ok('ui: the POST always sets them up (mode provision)', /const body=\{mode:'provision',/.test(contacts) && !/mode:'connect'/.test(contacts));
+  // builder item 199, then Eric (Nov 15): no sign-up wording; "Just save them for now" is the
+  // default and makes nothing, and setting them up is the other choice
+  ok('ui: no sign-up wording, sign-up link or price page in the dialog', !/cu-signup|sign up themselves|pricing\.html/.test(contacts));
+  ok('ui: saving is the default (mode connect, name and email only); setting up sends mode provision', /value="connect" checked/.test(contacts) && /const body=mode==='connect'\?\{mode:'connect',name:name\|\|undefined,email\}:\{mode:'provision',/.test(contacts));
   ok('ui: distinct success states — request sent / already set up / invitation sent', /heading='Request sent'/.test(contacts) && /already have a workspace/.test(contacts) && /Invitation sent to/.test(contacts));
 }
 
@@ -213,7 +214,7 @@ for (const p of ['agency.html', 'customers.html', 'contacts.html']) {
   const di = h.indexOf('<dialog id="custDlg"'), dlg = h.slice(di, h.indexOf('</dialog>', di) + 9);
   ok(`${p}: no "set their password" anywhere in the dialog or its done screen`, !/set their password/.test(h) && /Adding them creates their client workspace and their site, and emails them a sign-in link\./.test(dlg) && /They’ll sign in from the email and land in their client portal\./.test(h));
   ok(`${p}: the dialog says what adding does (workspace + site + sign-in link, never pay for software)`, /Adding them creates their client workspace and their site, and emails them a sign-in link\. You bill them for your work the usual way — they never pay for software here\./.test(dlg));
-  ok(`${p}: no sign-up choice, sign-up link or price page (builder item 199)`, !/cumode|cu-signup|cu-connect-only|sign up themselves|pricing\.html/.test(h));
+  ok(`${p}: no sign-up wording, sign-up link or price page (builder item 199)`, !/cu-signup|cu-connect-only|sign up themselves|pricing\.html/.test(h));
   ok(`${p}: "Start from" kit select (default "No kit — start empty")`, /id="cu-kit-wrap"/.test(dlg) && /<select id="cu-kit"><option value="">No kit — start empty<\/option><\/select>/.test(dlg));
   ok(`${p}: kits come from GET /agency/kits and apply to the NEW site via POST /agency/kits/:id/apply {site_id}`, /api\('\/agency\/kits'\)/.test(h) && /'\/agency\/kits\/'\+encodeURIComponent\(kitId\)\+'\/apply'/.test(h) && /\{site_id:d\.site_id\}/.test(h));
   ok(`${p}: the done screen names the applied kit, and a kit never repaints the set-up as a failure`, /kitLine=kitOk\?esc\(kitName\)\+' applied\.'/.test(h) && /id="cu-kit-line"/.test(h) && /if\(d\.already_exists\|\|d\.requested\)kitLine=/.test(h));
