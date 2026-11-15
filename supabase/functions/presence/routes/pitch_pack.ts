@@ -261,7 +261,10 @@ export async function handlePackPublic(tokenRaw: string, cors: Record<string, st
   if (!/^[0-9a-f]{24,64}$/.test(t)) return json({ error: 'not_found' }, 404, cors);
   const r = await svc(`presence_pitch_packs?token=eq.${t}&status=eq.ready&select=site_id,prospect_id,pieces,built_at&limit=1`).catch(() => null);
   if (r && !(r as any).ok && tableMissing(r as any)) return json({ error: 'not_found' }, 404, cors);
-  const pack = r && (r as any).ok ? rows(r)[0] : null;
+  // builder list item 200 (review file 06, finding 62): a read that failed is not a dead link, so
+  // pitch.html says to try again rather than to ask for a fresh one
+  if (!r || !(r as any).ok) return json({ error: 'unavailable', message: 'The report couldn’t load just now. Try again in a moment.' }, 503, cors);
+  const pack = rows(r)[0];
   if (!pack) return json({ error: 'not_found' }, 404, cors);
   const p = rows(await svc(`presence_prospects?id=eq.${pack.prospect_id}&select=business_name,address,industry,site_health&limit=1`).catch(() => null) || { json: [] })[0];
   const brand = await studioBrandOf(pack.site_id).catch(() => null);
