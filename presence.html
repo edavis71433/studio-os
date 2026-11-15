@@ -494,6 +494,11 @@ h5.rune .whisper.ok{color:var(--sage)}
 .deskopt .dol::first-letter{text-transform:uppercase}
 .deskopt .dop{font-family:var(--sans);font-size:14px;line-height:1.6;white-space:pre-line;max-height:220px;overflow:auto}
 .deskopt .doa{display:flex;gap:var(--dds-s5,20px);margin-top:var(--dds-s3,12px);align-items:baseline}
+/* item 222 (review file 04, finding 4): "I need to get one" warns that the first year is the cheap one */
+.renewwarn{display:flex;gap:12px;align-items:flex-start;margin-top:10px;padding:12px 14px;border-radius:12px;background:var(--amber-soft);border:1px solid color-mix(in srgb,var(--amber) 30%,transparent);color:var(--amber-text);font-size:13px;line-height:1.45}
+.renewwarn b{display:block;font-size:14px;margin-bottom:2px}
+.renewwarn .rwi{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:color-mix(in srgb,var(--amber) 18%,transparent)}
+.renewwarn .rwi svg{width:18px;height:18px}
 .aihint{font-size:12px;color:var(--ink-2);font-style:normal;font-family:var(--sans)}
 /* builder item 194: one domain record with its Copy button, on the Domain & email sheet */
 .dnsrec{display:flex;gap:8px;align-items:center;margin:5px 0 0 14px;flex-wrap:wrap}
@@ -5049,6 +5054,10 @@ function renderFoundations(f, plans, dom) {
     const nbtn = el("button", "textact", "Check");
     nrow.appendChild(ninp); nrow.appendChild(nbtn); needPanel.appendChild(nrow);
     const nout = el("div"); nout.dataset.need = "results"; nout.setAttribute("role", "status"); needPanel.appendChild(nout);
+    // item 222 (review file 04, finding 4): the first year is often the cheap one; said before they buy
+    const renew = el("div", "renewwarn"); renew.dataset.need = "renewal";
+    renew.innerHTML = '<span class="rwi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span><span><b>Check the renewal price before you buy</b>The first year is often cheap, and the price after that can be much higher. Each company shows what it costs to renew, the price you’ll pay every year after.</span>';
+    needPanel.appendChild(renew);
     const firm = stepLine("Buy it in your own name and email, and turn on auto-renew. Then come back and tap “I already have a domain.”"); firm.style.marginTop = "8px"; needPanel.appendChild(firm);
     const BUY = [["Namecheap", (n) => "https://www.namecheap.com/domains/registration/results/?domain=" + encodeURIComponent(n)], ["Porkbun", (n) => "https://porkbun.com/checkout/search?q=" + encodeURIComponent(n)], ["GoDaddy", (n) => "https://www.godaddy.com/domainsearch/find?domainToCheck=" + encodeURIComponent(n)]];
     let nseq = 0;
