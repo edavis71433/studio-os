@@ -561,7 +561,7 @@ test.describe('Versions', () => {
     await expect(rows(page).nth(1)).toContainText('“Spring menu”');
     await expect(rows(page).nth(1)).toContainText('Published by your studio');
     await expect(rows(page).nth(1)).not.toContainText('Live now');
-    for (const name of ['View', 'Compare', 'Restore']) await expect(rows(page).first().getByRole('button', { name, exact: true })).toBeVisible();
+    for (const name of ['View', 'Compare', 'Restore to draft']) await expect(rows(page).first().getByRole('button', { name, exact: true })).toBeVisible();
     // a failed publish says so and offers nothing to do
     await expect(rows(page).nth(2)).toContainText('didn’t go through');
     await expect(rows(page).nth(2).locator('button')).toHaveCount(0);
@@ -582,7 +582,7 @@ test.describe('Versions', () => {
   });
   test('Restore asks first, and says where it goes', async ({ page }) => {
     await mount(page, '/presence.html#history', VERSIONS);
-    await rows(page).first().getByRole('button', { name: 'Restore', exact: true }).click();
+    await rows(page).first().getByRole('button', { name: 'Restore to draft', exact: true }).click();
     await expect(page.locator('#resSheetTitle')).toHaveText('Restore this version?');
     await expect(page.locator('#btnRestoreGo')).toHaveText('Restore to my draft');
   });
@@ -1077,7 +1077,8 @@ test.describe('one preview screen', () => {
     await page.evaluate((n) => new Promise<void>((done) => {
       const f = document.getElementById('previewFrame') as HTMLIFrameElement;
       f.addEventListener('load', () => done(), { once: true });
-      f.srcdoc = `<div>Loading your draft…</div><!--dds-proof ${n - 1}-->`;
+      // item 190: Preview's frame has no origin, so a write says which it is by message (frameWriter)
+      f.srcdoc = `<div>Loading your draft…</div><script>parent.postMessage({ ddsProof: ${n - 1} }, "*")<\/script>`;
     }), newest);
     await expect(frame.locator('#main > section').first()).toBeVisible();
     await expect(frame.getByText('Loading your draft…')).toHaveCount(0);

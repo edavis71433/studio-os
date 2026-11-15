@@ -107,6 +107,15 @@
   .dchip{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 6px;white-space:nowrap;background:var(--bg);color:var(--soft)}
   .dchip.up{background:var(--good-soft);color:var(--good)} .dchip.down{background:var(--bad-soft);color:var(--bad)}
   .snum .dchip{background:var(--card);white-space:normal} .snum .dchip.up{background:var(--good-soft)} .snum .dchip.down{background:var(--bad-soft)}
+  /* builder list item 219: a red drop says why, in a line under it; pressing it opens the reason in full */
+  .dropwhy{font:inherit;font-size:11.5px;font-weight:600;color:var(--bad);background:none;border:0;padding:2px 0;text-align:left;text-decoration:underline;text-underline-offset:2px;cursor:pointer;flex-basis:100%;line-height:1.3}
+  .whypop{position:absolute;z-index:60;width:min(360px,calc(100vw - 32px));background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(23,21,34,.16);padding:16px 18px}
+  .whypop h3{font-size:15px;font-weight:700;margin:0 0 4px}
+  .whypop p{font-size:13px;margin:0 0 8px}.whypop p.soft{color:var(--soft)}
+  .whypop ul{list-style:none;margin:0 0 8px;padding:0}.whypop li{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:2px 0}
+  .whypop li b.down{color:var(--bad)}.whypop li b.up{color:var(--good)}
+  .whypop a{font-size:13.5px;font-weight:600;color:var(--p);text-decoration:none}
+  @media (pointer:coarse){.dropwhy{min-height:32px}}
   .nochg{font-size:11.5px;color:var(--soft);line-height:1.3}
   .hring{flex:0 0 auto;display:block}
   .hring .trk{fill:none;stroke:var(--line);stroke-width:3.5}
@@ -510,13 +519,14 @@
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const FN=SUPABASE_URL+"/functions/v1/presence";
+const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN});
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-region':FN_REGION});
 async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 async function apiSend(method,path,payload){const r=await fetch(FN+path,{method,headers:H(),body:payload?JSON.stringify(payload):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
 const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
@@ -534,6 +544,7 @@ let SORT=null;   // null = the server's order (pinned, then last opened); else {
 // builder list items 129 and 180: each site's visitors, Google clicks and health, last month
 // against the month before (GET /agency/site-numbers), read after the cards are up
 let NUMS={},NUM_HEAD=null;
+let DROPS={};   // builder list item 219: why visits fell, by site, for the sites that fell enough to say
 // builder list item 176 (Nov 2026, drawn in Figma and agreed): folders, tags and saved views,
 // borrowed from Wix Studio's Sites list. Folders and views are the studio's, shared by the team
 // (GET /agency/sites/organize); a site's tags are its own (PATCH /agency/clients/:id). One folder
@@ -662,7 +673,30 @@ function ringHtml(score){
 // bug hunt H5: the counter knows a person for one day only, so a month's count is visits, as Analytics says
 const VISIT_WORDS='A person counts once a day: someone who comes back on three days is three visits.';
 const whyHtml=(w)=>`<span class="why">${esc(NUM_WHY[w]||'—')}</span>`;
-function visitorsCell(s){const n=NUMS[s.site_id];if(!n)return whyHtml(null);return n.visitors?`<b>${n1(n.visitors.value)}</b>${pctChip(n.visitors.value,n.visitors.prior)}`:whyHtml(n.visitors_why);}
+function visitorsCell(s){const n=NUMS[s.site_id];if(!n)return whyHtml(null);const d=DROPS[s.site_id];return n.visitors?`<b>${n1(n.visitors.value)}</b>${pctChip(n.visitors.value,n.visitors.prior)}${d&&d.short?`<button type="button" class="dropwhy" data-whydrop="${esc(s.site_id)}" aria-haspopup="dialog" aria-expanded="false">${esc(d.short)}</button>`:''}`:whyHtml(n.visitors_why);}
+// item 219: the reason in full, beside the line that was pressed; Escape or a press elsewhere closes it
+let WHY_OPEN=null;
+function closeWhy(back){const p=document.getElementById('whyPop');if(p)p.remove();const id=WHY_OPEN;WHY_OPEN=null;document.querySelectorAll('.dropwhy[aria-expanded="true"]').forEach(b=>b.setAttribute('aria-expanded','false'));if(back&&id){const b=[...document.querySelectorAll('[data-whydrop="'+CSS.escape(id)+'"]')].find(x=>x.offsetParent);if(b)b.focus();}}
+function openWhy(btn){
+  const id=btn.getAttribute('data-whydrop'),d=DROPS[id];if(!d)return;
+  if(WHY_OPEN===id){closeWhy(true);return;}
+  closeWhy(false);WHY_OPEN=id;btn.setAttribute('aria-expanded','true');
+  const s=SITES.find(x=>x.site_id===id)||{};
+  const pop=document.createElement('div');pop.id='whyPop';pop.className='whypop';pop.setAttribute('role','dialog');pop.setAttribute('aria-labelledby','whyPopH');pop.tabIndex=-1;
+  const parts=(d.parts||[]).slice(0,4).map(p=>`<li><span>${esc(p.name)}</span><b class="${p.change<0?'down':'up'}">${p.change>0?'+':'−'}${n1(Math.abs(p.change))}</b></li>`).join('');
+  const search=d.search?`<p class="soft">${d.search.own_name?'Fewer people looked them up by name':'The search that lost the most'}: “${esc(d.search.term)}”, ${n1(d.search.now)} click${d.search.now===1?'':'s'} from Google, against ${n1(d.search.was)}.</p>`:'';
+  pop.innerHTML=`<h3 id="whyPopH">Visits fell ${esc(d.pct)}% in ${esc((NUM_HEAD&&NUM_HEAD.month_label)||'the last month')}</h3><p>${n1(d.now)}, against ${n1(d.was)} in ${esc(priorWord())}.</p>${parts?`<ul>${parts}</ul>`:''}${search}<a href="/presence.html?client=${encodeURIComponent(id)}#search">Open the Search tab${s.name?' for '+esc(s.name):''} ›</a>`;
+  document.body.appendChild(pop);
+  // placed on the page under the line (above it near the bottom of the window), so it scrolls with what it explains
+  const r=btn.getBoundingClientRect(),w=pop.offsetWidth,h=pop.offsetHeight;
+  pop.style.left=(scrollX+Math.max(16,Math.min(r.left,document.documentElement.clientWidth-w-16)))+'px';
+  pop.style.top=(scrollY+(r.bottom+8+h>innerHeight-8&&r.top-h-8>8?r.top-h-8:r.bottom+8))+'px';
+  pop.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.stopPropagation();closeWhy(true);}});
+  pop.focus();
+}
+document.addEventListener('click',(e)=>{const b=e.target.closest&&e.target.closest('.dropwhy');if(b){e.stopPropagation();e.preventDefault();openWhy(b);return;}if(WHY_OPEN&&!(e.target.closest&&e.target.closest('#whyPop')))closeWhy(false);},true);
+document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&WHY_OPEN)closeWhy(true);});
+window.addEventListener('resize',()=>{if(WHY_OPEN)closeWhy(false);});
 function searchCell(s){const n=NUMS[s.site_id];if(!n)return whyHtml(null);return n.search?`<b>${n1(n.search.value)}</b>${pctChip(n.search.value,n.search.prior)}`:whyHtml(n.search_why);}
 function healthCell(s){const n=NUMS[s.site_id];if(s.state==='not_live')return whyHtml('not_live');if(!n)return whyHtml(null);return n.health?`${ringHtml(n.health.score)}${ptsChip(n.health.score,n.health.prior)}`:whyHtml(n.health_why);}
 function numsHtml(s){
@@ -1626,6 +1660,7 @@ async function mountNumbers(){
   let r;try{r=await api('/agency/site-numbers');}catch(_){return;}
   if(gen!==NUMSEQ||!r.ok||!r.body||!r.body.data)return;
   NUMS=r.body.data||{};NUM_HEAD={month_label:String(r.body.month_label||''),prior_label:String(r.body.prior_label||'')};
+  DROPS=r.body.drops&&typeof r.body.drops==='object'?r.body.drops:{};   // item 219
   if(NUM_HEAD.month_label)FILTERS.drops.label='Dropped in '+NUM_HEAD.month_label;
   for(const s of SITES){
     const box=document.querySelector('[data-nums="'+CSS.escape(s.site_id)+'"]');

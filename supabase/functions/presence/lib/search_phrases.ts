@@ -100,3 +100,6 @@ export function phraseIdeas(f: { industry?: string; offerings?: Array<{ name?: s
   }
   return out.slice(0, 6);
 }
+
+// builder list item 219: the near-miss searches check a page's headline the same way
+export { tokens as searchWords, same as sameWord };

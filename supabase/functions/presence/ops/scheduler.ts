@@ -22,6 +22,7 @@ import { runGrowthCoach } from '../coach/engine.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { SITE_COLS, type SiteRow } from '../lib/site.ts';
 import { checkAgainInAnHour, checkDueBefore } from '../lib/check_soon.ts';
+import { lockStop } from '../lib/publish_lock.ts';
 
 const DEFAULT_LIMIT = 40;               // sites per invocation — cron cadence covers the rest
 const OPS_ALERT_EMAIL = Deno.env.get('OPS_ALERT_EMAIL') || 'eric@davisdigitalstudio.com';
@@ -111,6 +112,9 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
   const results: SiteRunResult[] = [];
   const sysPrincipal: Principal = { kind: 'system', userId: 'scheduler', tenantId: null, role: null, email: null, jwt: null, requestId: 'scheduled-publish' };
   for (const row of rows) {
+    // Item 214: on a site whose publishing is locked, the row waits unclaimed and goes on the first
+    // tick after the lock comes off (a lock that can't be read keeps it waiting too)
+    if (await lockStop(String(row.site_id), 'staff')) continue;
     // claim it (pending → running-ish) so a concurrent cycle can't double-fire.
     // fired_at=is.null makes the claim ATOMIC: two overlapping ticks both match
     // status=pending, but only the first PATCH finds fired_at still null.

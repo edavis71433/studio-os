@@ -1,7 +1,8 @@
 // ── Every client's monthly report on one card (builder list item 160, Nov 2026) ──
 //   GET /agency/monthly-reports   one row per client site: on or off, who it goes to,
-//                                 what it suggests, how the last one went, and why it
-//                                 can't go out when it can't
+//                                 what it suggests, how the last one went, why it
+//                                 can't go out when it can't, and (item 200) whether
+//                                 it is waiting for the website to go live
 // Wix Studio sets the client report once and picks which clients get it. Ours lives in
 // the studio's own Settings. Read only: each row's switch is the client's own switch
 // (PUT /report/monthly, scoped to that client, which refuses a client who can't be
@@ -11,7 +12,7 @@ import { svc } from '../lib/db.ts';
 import { can, agencySiteIds } from './auth.ts';
 import type { AgencyMember } from './auth.ts';
 import { RESERVED_NAMES } from '../lib/reserved_store.ts';
-import { normalizeReportSetting, blockedReason } from '../ops/monthly_report.ts';
+import { normalizeReportSetting, blockedReason, reportSiteLive } from '../ops/monthly_report.ts';
 
 const rows = (r: unknown): any[] => { const j = (r as { json?: unknown } | null)?.json; return Array.isArray(j) ? j : []; };
 const safe = async <T>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
@@ -21,12 +22,13 @@ const firstWord = (name: unknown) => { const w = String(name || '').trim().split
 export interface ReportRow {
   site_id: string; name: string; who: string; email: string | null; enabled: boolean; blocked: string | null;
   more: number; copy: boolean; propose: 'off' | 'auto' | 'own'; last: { month: string; status: string; reason: string | null } | null;
+  live: boolean;   // item 200: false while the report waits for the website to go live
 }
 
 /** The rows, by name. Pure: the reads put together. */
 export function reportRows(i: {
   ids: string[];
-  sites: Array<{ id: string; client_id?: string | null }>;
+  sites: Array<{ id: string; client_id?: string | null; status?: string | null; last_published_at?: string | null; edition?: string | null }>;
   names: Array<{ site_id: string; business_name?: string | null }>;
   clients: Array<{ id: string; email?: string | null; name?: string | null }>;
   settings: Array<{ site_id: string; body: string }>;
@@ -46,6 +48,7 @@ export function reportRows(i: {
       blocked: blockedReason(email, email ? i.suppressed[email.toLowerCase()] || null : null),
       more: s.cc.length, copy: !!s.copy_to, propose: s.propose.mode,
       last: s.last_result ? { month: s.last_result.month, status: s.last_result.status, reason: s.last_result.reason } : null,
+      live: reportSiteLive(site),
     });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
@@ -59,7 +62,7 @@ export async function handleMonthlyReports(route: string, method: string, member
   if (!ids.length) return json({ data: { rows: [], can_change: can(member.role, 'manage_clients') } }, 200, cors);
   const list = `(${ids.join(',')})`;
   const [sitesQ, namesQ, setQ] = await Promise.all([
-    svc(`presence_sites?id=in.${list}&select=id,client_id&limit=1000`),
+    svc(`presence_sites?id=in.${list}&select=id,client_id,status,last_published_at,edition&limit=1000`),
     safe(svc(`presence_identity?site_id=in.${list}&select=site_id,business_name&limit=1000`)),
     svc(`presence_sales_templates?site_id=in.${list}&kind=eq.proposal&name=eq.${encodeURIComponent(RESERVED_NAMES.monthlyReport)}&deleted_at=is.null&select=site_id,body&order=updated_at.desc&limit=1000`),
   ]);

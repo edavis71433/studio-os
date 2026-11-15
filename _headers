@@ -173,6 +173,9 @@
 # "+ Create" (create.js) — the shell loads it on idle; same policy as shell.js
 /create.js
   Cache-Control: no-cache, must-revalidate
+# AI help (sales-ai.js, sales item 94): the record and the Inbox load it; same policy as shell.js
+/sales-ai.js
+  Cache-Control: no-cache, must-revalidate
 
 # Canonical extensionless page URLs (generated from sitemap.xml) — the /*.html
 # no-cache rule does not match these, so each gets the same policy explicitly.
@@ -257,5 +260,9 @@
 # on every visit to the builder.
 /fonts/library/*
   Cache-Control: public, max-age=2592000
+# Builder item 190: the editor's Preview draws a page in a frame with no origin, which asks for
+# its fonts the way another website would. The fonts are public files, so anyone may read them.
+/fonts/*
+  Access-Control-Allow-Origin: *
 /thumbs/*
   Cache-Control: public, max-age=86400

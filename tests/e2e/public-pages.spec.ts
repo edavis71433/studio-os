@@ -53,6 +53,35 @@ test.describe('the review page opens on the app', () => {
     await expect(page.locator('h1')).toHaveText('How was your visit to Marlow’s Kitchen?');
     await expect(page.locator('#rv button')).toBeVisible();
   });
+
+  // builder list item 200 (review file 06, finding 62): a link that will never work says so,
+  // and a weak signal says the link is still good, with Try again
+  test('a link to a page that is gone says to ask for a fresh one, with no Try again', async ({ page }) => {
+    await page.route(`${FN}/reviews/${SITE}?embed=1`, (route) => route.fulfill({ status: 404, contentType: 'text/html', headers: { 'Access-Control-Allow-Origin': '*' }, body: '<p>This review page could not be found.</p>' }));
+    await page.goto(`/review.html?site=${SITE}`);
+    await expect(page.getByRole('heading', { name: 'This review link doesn’t work' })).toBeVisible();
+    await expect(page.getByText('Ask the business for a fresh link.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0);
+  });
+
+  test('no answer says to check the connection, and Try again opens the page', async ({ page }) => {
+    let fail = true;
+    await page.route(`${FN}/reviews/${SITE}?embed=1`, (route) => fail ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'text/plain', headers: { 'Access-Control-Allow-Origin': '*' }, body: '<!doctype html><html><body><h1>Leave a review</h1><form id="rv"><button>Send review</button></form></body></html>' }));
+    await page.goto(`/review.html?site=${SITE}`);
+    await expect(page.getByRole('heading', { name: 'This review page couldn’t open' })).toBeVisible();
+    await expect(page.getByText('Check your connection, then try again. The link is still good.')).toBeVisible();
+    fail = false;
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.locator('h1')).toHaveText('Leave a review');
+  });
+
+  test('trouble on our side says to try again in a moment, not to ask for a new link', async ({ page }) => {
+    await page.route(`${FN}/reviews/${SITE}?embed=1`, (route) => route.fulfill({ status: 503, contentType: 'text/html', headers: { 'Access-Control-Allow-Origin': '*' }, body: '<p>Not now.</p>' }));
+    await page.goto(`/review.html?site=${SITE}`);
+    await expect(page.getByRole('heading', { name: 'This review page isn’t available right now' })).toBeVisible();
+    await expect(page.getByText('fresh link')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  });
 });
 
 test.describe('unsubscribe works from the link a person clicks', () => {
