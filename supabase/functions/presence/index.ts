@@ -13,8 +13,8 @@
 //      portfolio and help need no site and answer next
 //   6. the caller's site: their own via RLS, a studio's scope re-checked (never
 //      falling back to another site), or an invited member's seat
-//   7. entitlement (full / readonly / denied), the reviewer boundary, the member
-//      write gate (lib/site_roles.ts), then the Monitor and edition feature gates
+//   7. entitlement (full / readonly / denied), the reviewer and Designer boundaries,
+//      the member write gate (lib/site_roles.ts), then the Monitor and edition feature gates
 //   8. exact method + path routes, else 404
 //
 // The route groups most requests never reach load on first use (lib/lazy.ts):
@@ -80,6 +80,7 @@ const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApp
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
 import { resolveMemberSite, resolveHeldBusiness, resolveSiteRoleCached } from './lib/workspace.ts';
 import type { SiteRole } from './lib/site_roles.ts';
+import { designerAllowed } from './lib/site_roles.ts';
 const { handleConciergeAsk } = lazyRoutes(() => import('./routes/concierge.ts'));
 const { handleHelpAsk } = lazyRoutes(() => import('./routes/help.ts'));
 const { handleWriterGenerate, handleWriterRewrite, handleWriterList, handleWriterGet, handleWriterAccept, handleWriterDiscard } = lazyRoutes(() => import('./routes/writer.ts'));
@@ -499,6 +500,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     const siteRole = await resolveSiteRoleCached(principal, jwt, site.id);
     if (siteRole === 'client_reviewer' && !reviewerAllowed(route, method)) {
       return json({ error: 'forbidden', message: 'That lives in your studio’s full workspace — your client view shows what they’ve chosen to share.' }, 403, cors);
+    }
+    // builder item 220: a Designer reaches the website and nothing else, reads included
+    if (siteRole === 'designer' && !designerAllowed(route, method)) {
+      return json({ error: 'forbidden', role: 'designer', message: 'That isn’t part of a Designer’s role. Designers work on the website; customers, messages and money stay with the owner and the studio.' }, 403, cors);
     }
   }
 

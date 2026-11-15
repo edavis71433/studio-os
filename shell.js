@@ -1684,7 +1684,7 @@
       : (scopedNow && firstPrimary) ? { href: firstPrimary.href, label: firstPrimary.label }
       : { href: (CTX && CTX.landing) || '/today.html', label: 'Home' };
     // the fallback stands in for a menu that names no Inbox at all, never for one the studio hid
-    var inbox = isReviewer ? null : inboxItem ? { href: inboxItem.href, label: inboxItem.label } : inboxHidden ? null : { href: '/inbox.html', label: 'Inbox' };
+    var inbox = isReviewer || window.ddsLacks('business') ? null : inboxItem ? { href: inboxItem.href, label: inboxItem.label } : inboxHidden ? null : { href: '/inbox.html', label: 'Inbox' };   // item 220: none for a Designer
     var herePath = normalizePath(location.pathname);
     var cur = function (href) { return normalizePath(href) === herePath ? ' aria-current="page"' : ''; };
     // Look refresh E: an icon over each word (the words stay the names)
@@ -3106,6 +3106,11 @@
     var lacks = ['owner'];   // a few routes ask for the account owner by role, not by capability
     if (caps.indexOf('delete') < 0) lacks.push('delete');
     if (caps.indexOf('configure') < 0) lacks.push('configure');
+    // builder item 220: a Designer sees the website alone ("business" goes: its places, the bell,
+    // Inbox), publishes only when their seat says so, and restyles ("design", which staff lack)
+    if (caps.indexOf('publish') < 0) lacks.push('publish');
+    if (caps.indexOf('design') < 0) lacks.push('design');
+    if (caps.indexOf('view_all') < 0) lacks.push('business');
     document.documentElement.setAttribute('data-dds-lacks', lacks.join(' '));
   }
   window.ddsLacks = function (need) {

@@ -2643,7 +2643,7 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
         <nav id="dcDock" class="dc-dock" aria-label="Editor tools">
           <button type="button" class="dc-dk" id="dkPages" data-ico="page" aria-haspopup="dialog" aria-controls="pagesCard" aria-expanded="false" title="Your pages"><span class="dc-dk-l">Pages</span></button>
           <button type="button" class="dc-dk" id="btnTrayOpen" data-ico="plus" aria-label="Add section" aria-haspopup="dialog" aria-controls="trayPanel" title="Add a section to this page"><span class="dc-dk-l">Add</span></button>
-          <button type="button" class="dc-dk" id="btnSettingsOpen" data-needs="configure" data-ico="spark" aria-haspopup="dialog" aria-controls="settingsPanel" title="Styles: how the whole site looks"><span class="dc-dk-l">Styles</span></button>
+          <button type="button" class="dc-dk" id="btnSettingsOpen" data-needs="design" data-ico="spark" aria-haspopup="dialog" aria-controls="settingsPanel" title="Styles: how the whole site looks"><span class="dc-dk-l">Styles</span></button>
           <button type="button" class="dc-dk" id="dkPhotos" data-ico="image" aria-haspopup="dialog" aria-controls="trayPanel" title="Your photos and files"><span class="dc-dk-l">Photos</span></button>
           <div class="dc-dock-more" id="dcDockMore">
             <div id="dcModeSeg" class="dc-dkgrp" role="group" aria-label="Canvas mode">
@@ -2759,7 +2759,7 @@ html.bs-open .scrim{z-index:96}   /* Files and the categories card open over the
             <div class="dc-panel-scroll">
               <!-- The site's overall look (theme) lives here now — off the Design page,
                    since starting a page/layout happens through "＋ Page". -->
-              <div class="hint" id="stylesAsk" hidden data-if-lacks="configure" style="padding:16px 18px">Ask the account owner to change your template, colors or fonts.</div>
+              <div class="hint" id="stylesAsk" hidden data-if-lacks="design" style="padding:16px 18px">Ask the account owner to change your template, colors or fonts.</div>
               <div id="designGallery" hidden data-needs="owner"></div>
               <div id="designHost"></div>
               <div id="hfCard"></div>
@@ -3426,6 +3426,8 @@ function syncSiteHome(view) {
   if (acts && bar && acts.parentElement !== bar) bar.appendChild(acts);
 }
 function go(view, early) {
+  // builder item 220: a Designer never opens a business tab, even from its address or a link
+  if (isBusinessTab(view) && window.ddsLacks && window.ddsLacks("business")) view = "today";
   const stays = $("view-" + view) && $("view-" + view).classList.contains("on");
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("on"));
   const target = $("view-" + view); if (!target) return;
@@ -3559,6 +3561,9 @@ const SITE_MENU = [
   ["Site settings", [["business", "Business details"], ["domain", "Domain & email"], ["history", "Versions"], ["connections", "Connections"], ["sharing", "Sharing & access"], ["clientview", "See the client’s view"]]],
 ];
 const SITE_TABS = SITE_MENU.flatMap((g) => g[1]);
+// builder item 220: the tabs about the business, not the website: a Designer never sees them
+// (a function, so go() can ask it however early it runs)
+function isBusinessTab(view) { return ["search", "bookings", "reviews", "analytics", "domain", "connections", "clientview"].includes(view); }
 // Keeps a studio drilled into a client inside that client on the way out of this page.
 function withClient(path) {
   const c = new URLSearchParams(location.search).get("client");
@@ -3589,6 +3594,8 @@ function buildSiteTabs() {
   const cur = document.querySelector(".view.on"); const curView = cur ? cur.id.replace("view-", "") : "today";
   const item = ([view, label]) => {
     const b = el("button", "navitem", label); b.type = "button";
+    // builder item 220: the business's places leave a Designer's menu (shell.js names the lack)
+    if (isBusinessTab(view)) b.dataset.needs = "business";
     if (view === "domain") b.title = "Your domain, DNS records, email and the padlock — connect a custom domain here";
     else if (view === "analytics") { b.dataset.link = "analytics"; b.title = "Visitors, where they come from and your busiest pages"; }
     else if (view === "styles") { b.dataset.link = "styles"; b.title = "Colors, fonts, corners and your template"; }

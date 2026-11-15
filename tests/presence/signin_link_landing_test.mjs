@@ -17,7 +17,7 @@ for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE
 
 const P = '../../supabase/functions/presence';
 const { mintSignInLink, addSiteMember } = await import(`${P}/lib/workspace.ts`);
-const { SITE_ROLES, capabilitiesOf, seesFullWorkspace } = await import(`${P}/lib/site_roles.ts`);
+const { SITE_ROLES, capabilitiesOf, seesSite } = await import(`${P}/lib/site_roles.ts`);
 const { landingFor } = await import(`${P}/lib/navigation.ts`);
 
 const ROOT = new URL('../../', import.meta.url);
@@ -83,8 +83,8 @@ const quiet = (fn) => async (...a) => { const e = console.error, w = console.war
 
 // ═══ 2. each role lands on a door whose session the next page can read ═══
 {
-  const realmOf = (page) => read(page).match(/storageKey:\s*'(dds-[a-z]+-auth)'/)?.[1];
-  const DOOR = { client_reviewer: 'portal.html', business_staff: 'studio.html', developer: 'studio.html', business_owner: 'studio.html' };
+  const realmOf = (page) => read(page).match(/storageKey:\s*['"](dds-[a-z]+-auth)['"]/)?.[1];   // presence.html (item 220's landing) writes it in double quotes
+  const DOOR = { client_reviewer: 'portal.html', business_staff: 'studio.html', developer: 'studio.html', business_owner: 'studio.html', designer: 'studio.html' };   // item 220: a Designer works in the workspace's website
   ok('roles: this covers every role', SITE_ROLES.every((r) => r in DOOR) && Object.keys(DOOR).length === SITE_ROLES.length);
   for (const role of SITE_ROLES) {
     reset();
@@ -96,7 +96,7 @@ const quiet = (fn) => async (...a) => { const e = console.error, w = console.war
     const landing = landingFor({ role, edition: 'presence', capabilities: capabilitiesOf(role), isAgency: false, isOperator: false, siteLive: true });
     ok(`invite ${role}: the door and the page after it (${landing}) share one session`, realmOf(DOOR[role]) && realmOf(DOOR[role]) === realmOf(landing.slice(1)), `${realmOf(DOOR[role])} / ${realmOf(landing.slice(1))}`);
   }
-  ok('roles: the studio door is for whoever sees the full workspace', SITE_ROLES.every((r) => seesFullWorkspace(r) === (DOOR[r] === 'studio.html')));
+  ok('roles: the studio door is for whoever sees the website (the full workspace, or a Designer\'s)', SITE_ROLES.every((r) => seesSite(r) === (DOOR[r] === 'studio.html')));
 
   // A managed client and an agency member go through the same minter from elsewhere.
   ok('client welcome: lands on the client door, then client.html, in one session', /mintSignInLink\(email, '\/portal\.html'\)/.test(read('supabase/functions/presence/routes/sales.ts')) && realmOf('portal.html') === realmOf('client.html'));

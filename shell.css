@@ -657,6 +657,13 @@ html[data-dds-lacks~="delete"] [data-needs="delete"],
 html[data-dds-lacks~="configure"] [data-needs="configure"],
 html[data-dds-lacks~="owner"] [data-needs="owner"]{display:none!important}
 html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:block!important}
+/* builder item 220: a Designer lacks the business (its places, and the bell that rings for it),
+   publishes only when their seat says so, and restyles, which staff lack */
+html[data-dds-lacks~="publish"] [data-needs="publish"],
+html[data-dds-lacks~="design"] [data-needs="design"],
+html[data-dds-lacks~="business"] [data-needs="business"],
+html[data-dds-lacks~="business"] #dds-bell{display:none!important}
+html[data-dds-lacks~="design"] [data-if-lacks="design"][hidden]{display:block!important}
 
 /* Final pass (Nov 8, S1): a studio asked to work with this website's owner. The
    owner answers here — nothing is linked until they press Accept. */

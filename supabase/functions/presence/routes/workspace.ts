@@ -13,7 +13,7 @@ import { json } from '../../_shared/http.ts';
 import { projectIdOfApprovalPeriod } from '../lib/approvals.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
-import { capabilitiesOf, contentWriteNeeds, memberWriteNeeds, siteCan } from '../lib/site_roles.ts';
+import { capabilitiesOf, contentWriteNeeds, memberWriteNeeds, siteCan, seatCan, seatCapabilities, SEAT_WORDS, publishWords } from '../lib/site_roles.ts';
 import { leadIdOfNoticePeriod } from '../lib/commercial.ts';
 import type { SiteRole } from '../lib/site_roles.ts';
 import { buildNav, landingFor, normalizeHidden } from '../lib/navigation.ts';
@@ -88,7 +88,9 @@ export async function memberWriteGate(req: Request, route: string, method: strin
   const fields = route === '/settings' ? Object.keys(await req.clone().json().catch(() => null) ?? {}) : [];
   const content = contentWriteNeeds(route, method, fields);
   const needs = content ?? memberWriteNeeds(route, method);
-  if (needs !== 'open' && (!needs || !siteCan(member.role as SiteRole, needs))) return json({ error: 'forbidden', message: 'Your role on this site doesn’t include that — ask the account owner.' }, 403, cors);
+  // builder item 220: the seat, not the role alone, says whether a Designer publishes
+  if (needs === 'publish' && member.role === 'designer' && !seatCan(member, 'publish')) return json({ error: 'forbidden', message: 'Your changes are saved in the draft. The owner or the studio publishes them.' }, 403, cors);
+  if (needs !== 'open' && (!needs || !seatCan(member, needs))) return json({ error: 'forbidden', message: 'Your role on this site doesn’t include that — ask the account owner.' }, 403, cors);
   member.cleared = !!content;
   return null;
 }
@@ -118,12 +120,14 @@ async function clientGreetingName(agencySiteId: string, clientId: string, siteId
 export async function handlePortalContext(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>, scopedName?: string | null) {
   const role = await resolveSiteRoleCached(principal, jwt, site.id);
   const isOperator = principal.kind === 'staff' || principal.kind === 'system';
-  const caps = capabilitiesOf(role);
+  // builder item 220: a member's own seat says what they may do, a Designer's publish switch included
+  const seat = principal.member?.site_id === site.id ? principal.member : null;
+  const caps = seat ? seatCapabilities(seat) : capabilitiesOf(role);
   const seesFull = siteCan(role, 'view_all');
   const showApprovals = visibleTo(role, 'approvals');
   const reader = String(principal.userId || principal.email || 'anon'); // same key /notifications(/read) uses
   // Invited to work on this site, so not the customer a bridged site's client surface is for.
-  const worksOnSite = role === 'business_staff' || role === 'developer';
+  const worksOnSite = role === 'business_staff' || role === 'developer' || role === 'designer';
 
   // ONE concurrent wave for every independent read on this boot path — agency
   // membership, the bridged-customer links, the entitlement plan, and BOTH
@@ -140,6 +144,10 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // builder item 83: the businesses this person can switch between (someone invited
   // somewhere, with two or more); started now, read at the end
   const businessesP = !isOperator && !scopedName ? listBusinesses(jwt, principal).catch(() => []) : Promise.resolve([]);
+  // builder item 220: the business a member's role card names ("You're a Designer on …"); a seat only
+  const seatBusinessP: Promise<string> = seat && !isOperator && !scopedName
+    ? svc(`presence_identity?site_id=eq.${site.id}&select=business_name&limit=1`).then((r) => String(((r.json as any[]) || [])[0]?.business_name || '').trim()).catch(() => '')
+    : Promise.resolve('');
   const none = Promise.resolve({ ok: true, json: [] as any[] });
   const swallow = () => ({ ok: false, json: null as any });
   const [agencyMember, linksQ, ent, nQ, iQ, wQ, fQ, eQ, supQ, seenQ, msgQ, cmQ] = await Promise.all([
@@ -273,7 +281,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // The bridged CUSTOMER's own badge (their unread client-visible delivery
   // activity) needs reads that DEPEND on their bridge links, so it stays here.
   try {
-    if (!seesFull && site.client_id) {
+    if (!seesFull && site.client_id && role !== 'designer') {   // builder item 220: a Designer's bell counts nothing of the business
       const links = customerLinks ?? (((await svc(`presence_service_links?customer_client_id=eq.${site.client_id}&status=eq.active&select=project_id,agency_site_id&limit=50`)).json as any[]) || []);
       if (links.length) {
         const s = links[0].agency_site_id; const ids = links.filter((l) => l.agency_site_id === s).map((l) => l.project_id);
@@ -315,6 +323,8 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     is_managed_client: isManagedClient,  // a converted/bridged customer on their OWN site → client experience (client.html), not operator tools
     sees_full_workspace: siteCan(role, 'view_all'),
     is_client_portal: siteCan(role, 'view_shared') && !siteCan(role, 'view_all'),
+    // builder item 220: a member's own role in one sentence, for their own screen (null for an owner, a studio or staff)
+    my_role: seat && !isOperator && !scopedName && SEAT_WORDS[role] ? { role, name: SEAT_WORDS[role].name, you: SEAT_WORDS[role].you, publish: publishWords(seat), can_publish: seat.role === 'designer' ? seat.can_publish === true : null, business: (await seatBusinessP) || null } : null,
     landing: landingFor(navCtx),
     scope: scopedName ? { site_id: site.id, name: scopedName } : null,   // SC-1: agency drill-in → the breadcrumb "Studio › {name}"
     attention_count,                     // Phase FLOW: the shell bell badge (notices + pending approvals); null = not known yet (studio level, batch B)
@@ -759,7 +769,7 @@ export async function buildPortalFeed(jwt: string, site: SiteRow, principal: Pri
 }
 
 // Builder item 53: the words a role goes by, everywhere a person reads one
-export const SEAT_ROLE_WORDS: Record<SiteRole, string> = { business_owner: 'Co-owner', business_staff: 'Staff', developer: 'Developer', client_reviewer: 'Reviewer' };
+export const SEAT_ROLE_WORDS: Record<SiteRole, string> = { business_owner: 'Co-owner', business_staff: 'Staff', developer: 'Developer', client_reviewer: 'Reviewer', designer: 'Designer' };
 const STUDIO_ROLE_WORDS: Record<string, string> = { owner: 'Studio owner', admin: 'Admin', account_manager: 'Account manager' };
 
 /** The studio that works on this site, and who on its team can open it (the roles
@@ -797,12 +807,13 @@ export async function handleMembersList(jwt: string, site: SiteRow, principal: P
   const who = ownerWho(facts?.client, facts?.contact?.name);
   const signedIn = who ? await lastSignIn(facts?.contact?.auth_user_id) : undefined;
   const owner = who ? { ...who, signed_in: signedIn === undefined ? null : signedIn !== null, me: !!principal.email && who.email === String(principal.email).toLowerCase() } : null;
-  return json({ data: members.map((m) => ({ ...m, role_words: SEAT_ROLE_WORDS[m.role as SiteRole] || m.role })), owner, studio, transfer: transferSummary(open.row, now), transfer_ready: !open.missing, can_transfer: side }, 200, { ...cors, 'Cache-Control': 'no-store' });
+  // builder item 220: each seat carries its role's sentence, and a Designer's publish switch
+  return json({ data: members.map((m) => ({ ...m, role_words: SEAT_ROLE_WORDS[m.role as SiteRole] || m.role, role_sentence: SEAT_WORDS[m.role as SiteRole]?.sees || '', publish_words: publishWords(m, false) })), owner, studio, transfer: transferSummary(open.row, now), transfer_ready: !open.missing, can_transfer: side }, 200, { ...cors, 'Cache-Control': 'no-store' });
 }
 
 const ADD_WORDS: Record<string, [number, string]> = {
   bad_email: [400, 'That doesn’t look like an email address.'],
-  bad_role: [400, 'Pick a role: Co-owner, Staff or Reviewer.'],
+  bad_role: [400, 'Pick a role: Co-owner, Staff, Designer or Reviewer.'],
   role_paused: [409, 'Developer access is paused while custom code gets a stronger safety check. Pick Staff for now.'],
   shared_site: [400, 'This is your studio’s own site, which holds every client’s files, so a reviewer here would see them all. Open that client and invite the reviewer there instead.'],
   check_failed: [502, 'We couldn’t check this site just now, so nobody was added. Try again in a moment.'],
@@ -831,7 +842,7 @@ export async function handleMemberAdd(req: Request, jwt: string, site: SiteRow, 
     fresh = f;
   }
   // platform staff alone may still make a Developer seat (lib/workspace.ts DEVELOPER_PAUSED)
-  const res = await addSiteMember(site.id, String(body?.email || ''), body?.role, principal.userId || 'owner', { restore: body?.restore === true, ownerEmails, allowDeveloper: principal.kind === 'staff' });
+  const res = await addSiteMember(site.id, String(body?.email || ''), body?.role, principal.userId || 'owner', { restore: body?.restore === true, ownerEmails, allowDeveloper: principal.kind === 'staff', canPublish: body?.can_publish === true });
   if (!res.ok) {
     const m = res.member, words = m ? (SEAT_ROLE_WORDS[m.role as SiteRole] || m.role) : '';
     // bug hunt I1's rule, here too: someone already here is pointed at, never invited again
@@ -868,14 +879,20 @@ export async function handleMemberRole(req: Request, jwt: string, site: SiteRow,
       fresh = f;
     }
   }
-  const res = await changeSiteMemberRole(site.id, memberId, body?.role, { allowDeveloper: principal.kind === 'staff' });
+  // builder item 220: a Designer's publish switch rides on the role change (the same role, the switch turned)
+  const res = await changeSiteMemberRole(site.id, memberId, body?.role, { allowDeveloper: principal.kind === 'staff', canPublish: body?.can_publish === true });
   if (!res.ok) {
     if (res.error === 'not_found') return json({ error: 'not_found', message: 'That person isn’t on this site any more.' }, 404, cors);
     const [status, message] = ADD_WORDS[res.error || 'write_failed'] || ADD_WORDS.write_failed;
     return json({ error: res.error, message }, status, cors);
   }
   if (coOwner && fresh.way !== 'none') await alertOwner(site.id, 'coowner_added', { who: seatEmail || String(res.member?.email || ''), by: principal.email || 'Someone signed in', confirmedWith: fresh.way });
-  return json({ data: { ok: true, member: res.member, message: `${res.member?.email || 'Their role'} is now ${SEAT_ROLE_WORDS[body.role as SiteRole] || body.role}.` } }, 200, cors);
+  // the People sheet's switch sends the role it already has with can_publish; a role pick sends the role alone
+  const who = res.member?.email || 'They';
+  const message = body?.role === 'designer' && typeof body?.can_publish === 'boolean'
+    ? (body.can_publish ? `${who} can publish now.` : `${who}: changes now wait for the owner or the studio to publish.`)
+    : `${res.member?.email || 'Their role'} is now ${SEAT_ROLE_WORDS[body.role as SiteRole] || body.role}.`;
+  return json({ data: { ok: true, member: res.member, message } }, 200, cors);
 }
 
 export async function handleMemberRevoke(jwt: string, site: SiteRow, memberId: string, principal: Principal, cors: Record<string, string>) {
