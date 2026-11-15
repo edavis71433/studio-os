@@ -31,6 +31,7 @@ import { handleDoNext } from './do_next.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
 import { readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { readNotify, normalizeNotify, prefFor, quietSites, applyNotifyChange, pickFlags, isSiteId, foldNews } from '../lib/site_notify.ts';
+import { normalizePortal, pickStudioChange, applyStudioChange, pickClientChange, applyClientChange, resolveOff, forgetPortalOff, isSiteId as isPortalSiteId, PORTAL_PARTS, PART_WORDS, HOME_CARDS, CARD_WORDS, WELCOME_MAX } from '../lib/portal_settings.ts';
 import { sendInviteLink } from '../lib/workspace.ts';
 import { emailMatch, isUniqueViolation } from '../lib/contact_email.ts';
 import { brandFromKit } from '../lib/email_brand.ts';
@@ -264,6 +265,56 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       const saved = await updateReservedJson(own.id, RESERVED_NAMES.siteNotify, (cur) => applyNotifyChange(normalizeNotify(cur), siteId, change), member.email);
       if (!saved) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
       return json({ data: { site_id: siteId, ...prefFor(saved, siteId) } }, 200, cors);
+    }
+  }
+
+  // ── builder list items 229 and 233: what the studio's clients see in the portal, the
+  //    welcome note and Home's cards. Kept once per studio on its own site, like the menu.
+  //    GET answers the studio's choices and each client's own; PUT changes the studio's,
+  //    PUT /agency/portal/clients/:site one client's. ──
+  if (route === '/agency/portal' && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+    if (!own) return json({ error: 'no_studio_site', message: 'Portal choices are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+    let stored: unknown;
+    try { stored = await readReservedJsonOrThrow(own.id, RESERVED_NAMES.portalSettings); }
+    catch { return json({ error: 'read_failed', message: 'Your portal choices couldn’t load just now.' }, 502, cors); }   // never switches that lie
+    const ps = normalizePortal(stored);
+    const input = await sharedGather(member.agency_id, now);
+    const clients = input.links.filter((l) => l.status === 'active')
+      .map((l) => ({ site_id: l.site_id, name: input.clientNames[l.site_id] || 'A client', choices: ps.clients[l.site_id] || {} }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
+    return json({ data: { off: ps.off, welcome: ps.welcome, home_off: ps.home_off, clients,
+      parts: PORTAL_PARTS.map((k) => ({ key: k, label: PART_WORDS[k][0], sub: PART_WORDS[k][1] })),
+      cards: HOME_CARDS.map((k) => ({ key: k, label: CARD_WORDS[k][0], sub: CARD_WORDS[k][1] })),
+      welcome_max: WELCOME_MAX, can_edit: can(member.role, 'manage_clients') } }, 200, cors);
+  }
+  if (route === '/agency/portal' && method === 'PUT') {
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    const change = pickStudioChange(await body());
+    if (!Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which part or card to show or hide, or the welcome note.' }, 400, cors);
+    const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+    if (!own) return json({ error: 'no_studio_site', message: 'Portal choices are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+    const saved = await updateReservedJson(own.id, RESERVED_NAMES.portalSettings, (cur) => applyStudioChange(normalizePortal(cur), change), member.email);
+    if (!saved) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+    forgetPortalOff();
+    return json({ data: { off: saved.off, welcome: saved.welcome, home_off: saved.home_off } }, 200, cors);
+  }
+  {
+    const pm = route.match(/^\/agency\/portal\/clients\/([^/]+)$/);
+    if (pm && method === 'PUT') {
+      if (!can(member.role, 'manage_clients')) return forbid(cors);
+      const siteId = decodeURIComponent(pm[1]).toLowerCase();
+      const change = pickClientChange(await body());
+      if (!isPortalSiteId(siteId) || !change) return json({ error: 'bad_request', message: 'Say which client, and which part to show or hide for them.' }, 400, cors);
+      const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+      if (!own) return json({ error: 'no_studio_site', message: 'Portal choices are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+      const input = await sharedGather(member.agency_id, now);
+      if (!input.links.some((l) => l.site_id === siteId && l.status === 'active')) return json({ error: 'not_found', message: 'That isn’t one of your clients.' }, 404, cors);
+      const saved = await updateReservedJson(own.id, RESERVED_NAMES.portalSettings, (cur) => applyClientChange(normalizePortal(cur), siteId, change), member.email);
+      if (!saved) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+      forgetPortalOff();
+      return json({ data: { site_id: siteId, choices: saved.clients[siteId] || {}, off: resolveOff(saved, siteId) } }, 200, cors);
     }
   }
 

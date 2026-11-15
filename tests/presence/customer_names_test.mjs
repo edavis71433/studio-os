@@ -25,7 +25,7 @@ eq('greeting: a business with no person behind it gets no name (Home just says g
 eq('greeting: an initial, an address or nothing is never a name', [N.greetingName({ person_name: 'j. smith' }), N.greetingName({ person_name: 'maria@example.com' }), N.greetingName({ name: 'Customer' }), N.greetingName(null)], ['', '', '', '']);
 eq('greeting: a name already in capitals keeps them', N.greetingName({ person_name: 'McKenna Ruiz' }), 'McKenna');
 const ws = read('supabase/functions/presence/routes/workspace.ts');
-ok('greeting: /portal/context reads it beside the studio brand and hands it over', /const \[studio, clientFirstName\] = await Promise\.all\(/.test(ws) && /client_first_name: clientFirstName \|\| null/.test(ws) && /loadCustomerNames\(agencySiteId, \[\{ clientId, clientName: c\?\.name, customerSiteId: siteId \}\], read\)/.test(ws));
+ok('greeting: /portal/context reads it beside the studio brand and hands it over', /const \[studio, clientFirstName, portalSettings\] = await Promise\.all\(/.test(ws) && /client_first_name: clientFirstName \|\| null/.test(ws) && /loadCustomerNames\(agencySiteId, \[\{ clientId, clientName: c\?\.name, customerSiteId: siteId \}\], read\)/.test(ws));
 
 const cd = read('supabase/functions/presence/routes/client_delivery.ts');
 // item 49 moved the reads into lib/customer_names.ts (loadCustomerNames) — see sales_batch11_test.mjs
