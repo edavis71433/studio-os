@@ -43,6 +43,7 @@ export const RESERVED_NAMES = {
   salesGoalAi: '__sales_goal_ai__',       // sales item 94: the month's sales goal, and whether AI help is on (routes/sales_ai.ts)
   bookingBusy: '__booking_busy__',        // builder list item 149: the busy times last read from that calendar, and how the last read went (routes/booking.ts)
   usableCheck: '__usable_check__',        // builder list item 150: the three ticks only a person can judge, and the last check's count and worst line (lib/usable_check.ts)
+  publishLock: '__publish_lock__',        // builder list item 214: publishing locked (a launch freeze or a dispute), when, by whom, the client's note (lib/publish_lock.ts)
 } as const;
 
 const rowsOf = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];

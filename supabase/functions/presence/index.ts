@@ -57,6 +57,7 @@ import { handlePostPublish, handlePostUnpublish, handlePostEmailDraft } from './
 import { handleDeletedPages, handleDeletedPageRestore } from './routes/deleted_pages.ts';
 import { handlePageLockCreate, handlePageLockList } from './routes/page_locks.ts';
 import { handleHealth, handleChanges, handleContentTree, handleRestoreToDraft, handleMediaList } from './routes/room.ts';
+import { handlePublishLockGet, handlePublishLockPut } from './routes/publish_lock.ts';
 const { handleWebsiteTimeline } = lazyRoutes(() => import('./routes/timeline.ts'));
 const { handleWebsiteHealth, handleWebsiteHealthPdf } = lazyRoutes(() => import('./routes/health_page.ts'));
 const { handleBusinessInsights } = lazyRoutes(() => import('./routes/insights_page.ts'));
@@ -608,6 +609,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/site/password' && method === 'POST') return handleSitePassword(req, site, principal, cors);   // list item 175
   if (route === '/site/coming-soon' && method === 'GET') return handleComingSoonRead(site, cors);   // builder list item 158: a Coming soon page before the first publish
   if (route === '/site/coming-soon' && method === 'POST') return handleComingSoon(req, site, principal, cors);
+  if (route === '/site/publish-lock' && method === 'GET') return handlePublishLockGet(jwt, site, principal, cors);   // item 214: a launch freeze or a dispute
+  if (route === '/site/publish-lock' && method === 'PUT') return handlePublishLockPut(req, jwt, site, principal, cors);
   if (route === '/publishes' && method === 'GET') return handlePublishHistory(site, cors);
   if (route === '/publishes/stars' && method === 'PUT') return handleVersionStar(req, site, principal, cors);   // item 158: star the versions that matter
   // ── Version tools: compare any two versions · Timewarp · draft checkpoints ──
