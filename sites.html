@@ -109,7 +109,7 @@
   .snum .dchip{background:var(--card);white-space:normal} .snum .dchip.up{background:var(--good-soft)} .snum .dchip.down{background:var(--bad-soft)}
   /* builder list item 219: a red drop says why, in a line under it; pressing it opens the reason in full */
   .dropwhy{font:inherit;font-size:11.5px;font-weight:600;color:var(--bad);background:none;border:0;padding:2px 0;text-align:left;text-decoration:underline;text-underline-offset:2px;cursor:pointer;flex-basis:100%;line-height:1.3}
-  .whypop{position:fixed;z-index:60;width:min(360px,calc(100vw - 32px));background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(23,21,34,.16);padding:16px 18px}
+  .whypop{position:absolute;z-index:60;width:min(360px,calc(100vw - 32px));background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(23,21,34,.16);padding:16px 18px}
   .whypop h3{font-size:15px;font-weight:700;margin:0 0 4px}
   .whypop p{font-size:13px;margin:0 0 8px}.whypop p.soft{color:var(--soft)}
   .whypop ul{list-style:none;margin:0 0 8px;padding:0}.whypop li{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:2px 0}
@@ -685,17 +685,18 @@ function openWhy(btn){
   const pop=document.createElement('div');pop.id='whyPop';pop.className='whypop';pop.setAttribute('role','dialog');pop.setAttribute('aria-labelledby','whyPopH');pop.tabIndex=-1;
   const parts=(d.parts||[]).slice(0,4).map(p=>`<li><span>${esc(p.name)}</span><b class="${p.change<0?'down':'up'}">${p.change>0?'+':'−'}${n1(Math.abs(p.change))}</b></li>`).join('');
   const search=d.search?`<p class="soft">${d.search.own_name?'Fewer people looked them up by name':'The search that lost the most'}: “${esc(d.search.term)}”, ${n1(d.search.now)} click${d.search.now===1?'':'s'} from Google, against ${n1(d.search.was)}.</p>`:'';
-  pop.innerHTML=`<h3 id="whyPopH">Visits fell ${esc(d.pct)}% in ${esc((NUM_HEAD&&NUM_HEAD.month_label)||'the last month')}</h3><p>${n1(d.now)}, against ${n1(d.was)} in ${esc(priorWord())}.</p>${parts?`<ul>${parts}</ul>`:''}${search}<a href="/presence.html?client=${encodeURIComponent(id)}#search">Open ${esc(s.name||'their')} Search tab ›</a>`;
+  pop.innerHTML=`<h3 id="whyPopH">Visits fell ${esc(d.pct)}% in ${esc((NUM_HEAD&&NUM_HEAD.month_label)||'the last month')}</h3><p>${n1(d.now)}, against ${n1(d.was)} in ${esc(priorWord())}.</p>${parts?`<ul>${parts}</ul>`:''}${search}<a href="/presence.html?client=${encodeURIComponent(id)}#search">Open the Search tab${s.name?' for '+esc(s.name):''} ›</a>`;
   document.body.appendChild(pop);
+  // placed on the page under the line (above it near the bottom of the window), so it scrolls with what it explains
   const r=btn.getBoundingClientRect(),w=pop.offsetWidth,h=pop.offsetHeight;
-  pop.style.left=Math.max(16,Math.min(r.left,innerWidth-w-16))+'px';
-  pop.style.top=(r.bottom+8+h>innerHeight-8?Math.max(8,r.top-h-8):r.bottom+8)+'px';
+  pop.style.left=(scrollX+Math.max(16,Math.min(r.left,document.documentElement.clientWidth-w-16)))+'px';
+  pop.style.top=(scrollY+(r.bottom+8+h>innerHeight-8&&r.top-h-8>8?r.top-h-8:r.bottom+8))+'px';
   pop.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.stopPropagation();closeWhy(true);}});
   pop.focus();
 }
 document.addEventListener('click',(e)=>{const b=e.target.closest&&e.target.closest('.dropwhy');if(b){e.stopPropagation();e.preventDefault();openWhy(b);return;}if(WHY_OPEN&&!(e.target.closest&&e.target.closest('#whyPop')))closeWhy(false);},true);
 document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&WHY_OPEN)closeWhy(true);});
-window.addEventListener('scroll',()=>{if(WHY_OPEN)closeWhy(false);},{passive:true});
+window.addEventListener('resize',()=>{if(WHY_OPEN)closeWhy(false);});
 function searchCell(s){const n=NUMS[s.site_id];if(!n)return whyHtml(null);return n.search?`<b>${n1(n.search.value)}</b>${pctChip(n.search.value,n.search.prior)}`:whyHtml(n.search_why);}
 function healthCell(s){const n=NUMS[s.site_id];if(s.state==='not_live')return whyHtml('not_live');if(!n)return whyHtml(null);return n.health?`${ringHtml(n.health.score)}${ptsChip(n.health.score,n.health.prior)}`:whyHtml(n.health_why);}
 function numsHtml(s){
