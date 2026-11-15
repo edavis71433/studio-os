@@ -14,7 +14,7 @@ const DESIGNER_NAV = [
     { key: 'add_page', label: 'Add a page', href: '/presence.html#addpage', hidden: true },
     { key: 'history', label: 'Versions', href: '/presence.html#history', hidden: true },
   ] },
-  { key: 'files', label: 'Files', items: [{ key: 'files_all', label: 'Files', href: '/files.html' }, { key: 'files_visual', label: 'Visual Studio', href: '/visual-studio.html', hidden: true }] },
+  { key: 'files', label: 'Files', items: [{ key: 'files_all', label: 'Files', href: '/files.html' }] },
   { key: 'help', label: 'Help', utility: true, items: [{ key: 'help', label: 'Help', href: '/help.html', hidden: true }] },
 ];
 const designerCtx = (canPublish = false) => ({ data: {
@@ -67,14 +67,14 @@ test.describe('A Designer on the website', () => {
     await asDesigner(page);
     await page.goto('/presence.html');
     await ready(page);
-    expect(await lacks(page)).toEqual(['business', 'configure', 'delete', 'owner', 'publish']);
+    expect(await lacks(page)).toEqual(['approve', 'business', 'configure', 'delete', 'owner', 'publish']);
   });
 
   test('with the publish switch on, publishing is theirs too', async ({ page }) => {
     await asDesigner(page, true);
     await page.goto('/presence.html');
     await ready(page);
-    expect(await lacks(page)).toEqual(['business', 'configure', 'delete', 'owner']);
+    expect(await lacks(page)).toEqual(['approve', 'business', 'configure', 'delete', 'owner']);
   });
 
   test('the editor asks the server for nothing a Designer can\'t reach', async ({ page }) => {
@@ -135,6 +135,7 @@ test.describe('A Designer in Files', () => {
     await ready(page);
     await settle(page);
     expect(refused).toEqual([]);
+    await expect(page.locator('#makeImage')).toBeHidden();   // no Visual Studio: keeping an AI image is an approval
   });
 
   test('on a phone, the bottom bar offers no Inbox', async ({ page }, info) => {

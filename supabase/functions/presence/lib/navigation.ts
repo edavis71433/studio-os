@@ -89,7 +89,7 @@ function designerNav(c: NavContext): NavSection[] {
     if (canPublish(c)) site.push(hid('publish', 'Publish', '/presence.html#publish', 'Publish now, or schedule it to go live on its own — and see or cancel what’s scheduled.'));
     site.push(hid('history', 'Versions', '/presence.html#history'));
     sections.push({ key: 'website', label: 'Website', items: site });
-    sections.push({ key: 'files', label: 'Files', items: [{ key: 'files_all', label: 'Files', href: '/files.html' }, ...(canDraft(c) ? [hid('files_visual', 'Visual Studio', '/visual-studio.html', 'Make an image for the site.')] : [])] });
+    sections.push({ key: 'files', label: 'Files', items: [{ key: 'files_all', label: 'Files', href: '/files.html' }] });   // no Visual Studio: keeping an AI image is an approval
   }
   sections.push({ key: 'help', label: 'Help', items: [hid('help', 'Help', '/help.html')], utility: true });
   return sections;

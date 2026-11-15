@@ -3109,6 +3109,7 @@
     // builder item 220: a Designer sees the website alone ("business" goes: its places, the bell,
     // Inbox), publishes only when their seat says so, and restyles ("design", which staff lack)
     if (caps.indexOf('publish') < 0) lacks.push('publish');
+    if (caps.indexOf('approve') < 0) lacks.push('approve');   // an AI image is kept by approving it
     if (caps.indexOf('design') < 0) lacks.push('design');
     if (caps.indexOf('view_all') < 0) lacks.push('business');
     document.documentElement.setAttribute('data-dds-lacks', lacks.join(' '));

@@ -360,7 +360,7 @@ const DESIGNER_ROUTES: string[] = [
   'GET /assets/cutout/[a-z0-9]{10,64}\\.[A-Za-z0-9_-]{32}',
   'GET /stock/search', 'POST /stock/import',
   '(GET|POST) /content-library', `PUT /content-library/${ID}`,
-  'GET /visual/(kinds|plans)', `GET /visual/plans/${ID}`, 'POST /visual/generate', `POST /visual/plans/${ID}/(vary|edit)`,
+  // no Visual Studio: an AI image costs money and is kept only by approving it, which stays with the owner and the studio
   // looks and words: routes/dev.ts keeps custom code to a developer, so a Designer saves colours and fonts only
   '(GET|PUT) /dev/(customization|brand-kit)', 'POST /dev/brand-kit/apply',
   'POST /writer/(generate|rewrite)', 'GET /writer/drafts', `GET /writer/drafts/${ID}`, `POST /writer/drafts/${ID}/(accept|discard)`,

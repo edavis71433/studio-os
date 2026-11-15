@@ -11618,6 +11618,7 @@ function renderBrandImageryReport(host, d) {
   host.innerHTML = "";
   const im = (d && d.imagery) || {}; const list = im.recolorable || [];
   if (!list.length && !im.not_recolorable_count) return;
+  if (window.ddsLacks && window.ddsLacks("approve")) return;   // builder item 220: a Designer makes no AI images (keeping one is an approval)
   const box = el("div"); box.style.cssText = "margin-top:10px;border:1px solid var(--plum-line,#e6ddf5);background:var(--plum-tint,#faf7ff);border-radius:10px;padding:10px 12px";
   box.appendChild(Object.assign(el("div", null, "Your images, on-brand"), { style: "font-size:12px;font-weight:600;margin-bottom:4px" }));
   if (list.length) {

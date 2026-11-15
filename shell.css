@@ -660,6 +660,7 @@ html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:bl
 /* builder item 220: a Designer lacks the business (its places, and the bell that rings for it),
    publishes only when their seat says so, and restyles, which staff lack */
 html[data-dds-lacks~="publish"] [data-needs="publish"],
+html[data-dds-lacks~="approve"] [data-needs="approve"],
 html[data-dds-lacks~="design"] [data-needs="design"],
 html[data-dds-lacks~="business"] [data-needs="business"],
 html[data-dds-lacks~="business"] #dds-bell{display:none!important}

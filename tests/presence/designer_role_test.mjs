@@ -85,7 +85,6 @@ const DESIGNER_DECIDED = [
   'GET /assets/cutout/:job',
   'GET /stock/search', 'POST /stock/import',
   'GET /content-library', 'POST /content-library', 'PUT /content-library/:id',
-  'GET /visual/kinds', 'GET /visual/plans', 'GET /visual/plans/:id', 'POST /visual/generate', 'POST /visual/plans/:id/vary', 'POST /visual/plans/:id/edit',
   'GET /dev/customization', 'PUT /dev/customization', 'GET /dev/brand-kit', 'PUT /dev/brand-kit', 'POST /dev/brand-kit/apply',
   'POST /writer/generate', 'POST /writer/rewrite', 'GET /writer/drafts', 'GET /writer/drafts/:id', 'POST /writer/drafts/:id/accept', 'POST /writer/drafts/:id/discard',
   'POST /editor/improve',
@@ -162,6 +161,7 @@ const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
   }
   ok('business: the routes a client\'s customers write to are refused too', !designerAllowed(`/forms/inbox/${ID}`, 'POST') && !designerAllowed('/sales/contacts', 'GET') && !designerAllowed(`/sales/invoices/${ID}/send`, 'POST'));
   ok('code: no custom code, files or keys for a Designer', !designerAllowed('/dev/files', 'GET') && !designerAllowed('/site/template', 'PUT'));
+  ok('AI images: no Visual Studio for a Designer (keeping an image is an approval, and each costs money)', [...SAMPLES].filter((p) => p.startsWith('/visual')).every((p) => METHODS.every((m) => !designerAllowed(p, m))));
 }
 
 // ═══ 3. the boundary in index.ts ═══
