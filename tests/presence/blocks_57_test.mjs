@@ -235,6 +235,30 @@ const draw = (list) => renderSiteBlocks(resolveBlockMedia(validateBlocks(list), 
   }
 }
 
+// ═══ 8 · the editor's canvas (tests/e2e/builder-blocks-57.spec.ts) ═══
+// A Blocks section and a Text section, stamped by the real renderer the way the editor's
+// preview draws them, with the stored list and the editor's sidecar beside them.
+{
+  const ROOT = new URL('../../', import.meta.url);
+  const BLOCKS = [
+    { type: 'stack', items: [
+      { kind: 'heading', text: 'Our story' },
+      { kind: 'text', body: 'Started as a **Saturday stall** at the farmers market.' },
+      { kind: 'image', image_id: PHOTO, alt: 'Loaves cooling' },
+      { kind: 'button', buttons: [{ label: 'See the menu', url: '/menu/' }] },
+    ] },
+    { type: 'richtext', title: 'Visit us', body: 'Open every day from seven.' },
+  ];
+  const { blocks, map } = validateBlocksWithMap(BLOCKS);
+  const sections = renderSiteBlocks(resolveBlockMedia(blocks, ref), { esc, attr, safeHref, src: map.map((m) => m.src_index) }).map((r) => r.html).join('');
+  const json = JSON.stringify({ blocks: BLOCKS, meta: { blocks: map, pages: {} }, sections }, null, 1) + '\n';
+  ok('the canvas fixture carries both sections, stamped', sections.includes('data-dds-sid="stack"') && sections.includes('data-dds-item="3"') && sections.includes('data-dds-src="1"'));
+  const url = new URL('tests/e2e/fixtures/blocks-57/canvas.json', ROOT);
+  if (Deno.args.includes('--update-fixtures')) Deno.writeTextFileSync(url, json);
+  let onDisk = ''; try { onDisk = Deno.readTextFileSync(url); } catch { /* missing */ }
+  ok('the canvas fixture is what the renderer draws today (regenerate: --update-fixtures)', onDisk === json);
+}
+
 const failed = results.filter((r) => !r).length;
 console.log(`\n════ BLOCKS (ITEM 57): ${results.length - failed}/${results.length} PASSED ════`);
 if (failed) Deno.exit(1);

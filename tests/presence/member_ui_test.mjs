@@ -24,6 +24,7 @@ const needOf = (name) => { const [m, r] = name.split(' '); return contentWriteNe
 // [route, page, the call as the page writes it, the marks on its control]
 const CONTROLS = [
   ['DELETE /assets/:id', 'files.html', `api('/assets/'+id,'DELETE')`, ['data-needs="delete" onclick="del(']],
+  ['DELETE /assets/:id/forever', 'files.html', `api('/assets/'+id+'/forever','DELETE')`, ['data-needs="delete" data-forever="']],   // builder list item 218: Delete for good, in the Trash
   ['DELETE /bookings/types/:id', 'presence.html', `api("DELETE", "/bookings/types/" + t.id)`, ['el("button", null, "Remove"); del.dataset.needs = "delete"']],
   ['DELETE /content-library/:id', 'presence.html', `api("DELETE", "/content-library/" + it.id)`, ['icoBtn("x", "Remove from library", null, 14); del.dataset.needs = "delete"']],
   ['DELETE /knowledge/docs/:id', 'presence.html', 'api("DELETE", `/knowledge/docs/${d.id}`)', ['el("button", "quietact", "Remove"); del.dataset.needs = "delete"']],
@@ -140,7 +141,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 52, String(routes.length));   // builder list item 221 added the welcome email and its test   // builder item 158 added the Coming soon page; builder item 203 added the enquiry delete; sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
+  ok('the decided delete and configure lists were read', routes.length === 53, String(routes.length));   // builder list item 218 added Delete for good; builder list item 221 added the welcome email and its test   // builder item 158 added the Coming soon page; builder item 203 added the enquiry delete; sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r] && !PORTAL_OWNER_ONLY[r]);
   for (const [route, c] of Object.entries(PORTAL_OWNER_ONLY)) {
@@ -175,7 +176,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   // crm.html: 4 — the record's two note removals are one removeNote since item 98 (it asks first now); item 108 added the draft estimate's
   // contacts.html: 3 since item 90 (Delete for the people picked sends the confirmed call too)
   // pipeline.html: 6 since sales item 106 added removing a saved to-do list
-  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 6 && sent('presence.html').length === 14 && sent('contacts.html').length === 3 && sent('crm.html').length === 4 && sent('files.html').length === 1);
+  ok('tripwire: the DELETE scan found the calls it is meant to find', sent('pipeline.html').length === 6 && sent('presence.html').length === 14 && sent('contacts.html').length === 3 && sent('crm.html').length === 4 && sent('files.html').length === 2);   // files.html: 2 since item 218 (Delete for good in the Trash)
 
   const CONFIG = /\/(?:foundations\/(?:domain|prepare)|preview\/settings|site\/(?:offline|online)|bookings\/settings|sales\/contacts\/fields)\b/;
   const writes = new RegExp(`(?:api\\(\\s*["'](?:POST|PUT|DELETE)["']\\s*,\\s*["'\`]|act\\(["']|siteSetState\\(["'])${CONFIG.source}|api\\(["'\`]${CONFIG.source}["'\`]\\s*,\\s*["'](?:POST|PUT|DELETE)["']`, 'g');

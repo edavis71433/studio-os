@@ -154,10 +154,32 @@ test.describe('Pitch pack — build and share (item 113)', () => {
     await expect(plain).not.toContainText('seconds to show');
   });
 
-  test('a dead or rebuilt link says so kindly', async ({ page }) => {
+  test('a dead or rebuilt link says so kindly, and what to do', async ({ page }) => {
     await page.route('**/functions/v1/presence/sales/pack/**', (r) => r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found' }) }));
     await page.goto('/pitch.html?t=deadbeefdeadbeefdeadbeefdeadbeef');
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('This link isn’t live');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('This link doesn’t work any more');
+    await expect(page.getByText('ask for a fresh link')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0);   // asking again would never help
+  });
+
+  // builder list item 200 (review file 06, finding 62): a weak signal is not a dead link
+  test('no answer says to check the connection, the link still works, and Try again loads it', async ({ page }) => {
+    let fail = true;
+    await page.route(`**/functions/v1/presence/sales/pack/${TOKEN}`, (r) => fail ? r.abort('internetdisconnected') : r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: PACK }) }));
+    await page.goto(`/pitch.html?t=${TOKEN}`);
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('We couldn’t load your report just now');
+    await expect(page.getByText('The link is still good.')).toBeVisible();
+    await expect(page.getByText('fresh link')).toHaveCount(0);
+    fail = false;
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('How Old Diner’s web presence compares');
+  });
+
+  test('a failure on our side is not a dead link either', async ({ page }) => {
+    await page.route(`**/functions/v1/presence/sales/pack/${TOKEN}`, (r) => r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'unavailable', message: 'The report couldn’t load just now. Try again in a moment.' }) }));
+    await page.goto(`/pitch.html?t=${TOKEN}`);
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('We couldn’t load your report just now');
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
   });
 
   test('a prospect name with markup stays text on the public page', async ({ page }) => {

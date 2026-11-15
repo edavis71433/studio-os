@@ -29,7 +29,7 @@ const { resolveSiteRoleCached } = await import(`${P}/lib/workspace.ts`);
 const { memberWriteGate, reviewerAllowed } = await import(`${P}/routes/workspace.ts`);
 const { handleMediaDelete } = await import(`${P}/routes/media.ts`);
 const { handleInvoicePaymentUndo } = await import(`${P}/routes/invoice_payments.ts`);   // sales review item 77
-const { handleAssetDelete, handleAssetStatus } = await import(`${P}/routes/assets.ts`);
+const { handleAssetDelete, handleAssetStatus, handleAssetDeleteForGood } = await import(`${P}/routes/assets.ts`);
 const { handleRedirectDelete } = await import(`${P}/routes/search.ts`);
 const { handleContentLibraryDelete } = await import(`${P}/routes/content_library.ts`);
 const { handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSitePassword, handleComingSoon } = await import(`${P}/routes/publish.ts`);
@@ -155,6 +155,7 @@ const DECIDED = {
     'POST /sales/invoices/:id/payment/undo',   // sales review item 77: taking back a recorded payment changes the books, like a void
     'DELETE /projects/templates/:id',   // sales item 106: removing a saved project template
     'DELETE /sales/todo-templates/:id',   // sales item 106: removing a saved to-do list
+    'DELETE /assets/:id/forever',   // builder list item 218: a file in the Trash deleted for good, like the Delete that put it there
   ],
   configure: [
     'DELETE /foundations/domain', 'POST /foundations/domain', 'POST /foundations/prepare',
@@ -198,6 +199,7 @@ const DECIDED = {
     'PATCH /sales/contacts/:id', 'PATCH /sales/deal-tasks/:id', 'PATCH /sales/deals/:id', 'PATCH /support/:id',
     'POST /visibility/check', 'PUT /visibility/follow', 'PUT /visibility/phrases', 'PUT /site/usable', 'PUT /visibility/ai/questions', 'POST /approve/send', 'POST /assets/:id/duplicate', 'POST /assets/:id/remove-background', 'POST /assets/:id/cutout',
     'POST /assets/:id/replace', 'POST /assets/:id/rollback', 'POST /assets/:id/suggest', 'POST /assets/bulk', 'POST /assets/folders/move',
+    'POST /assets/:id/put-back',   // builder list item 218: taking a file out of the Trash deletes nothing
     'POST /bookings/appointments/:id/cancel', 'POST /bookings/appointments/:id/complete',
     'POST /bookings/appointments/:id/confirm', 'POST /bookings/appointments/:id/no_show', 'POST /bookings/types',
     'POST /brand/reports/:id/dismiss', 'POST /brand/review', 'POST /broadcasts', 'POST /broadcasts/lists', 'POST /broadcasts/:id/cancel',
@@ -325,6 +327,7 @@ const ALL = Object.entries(DECIDED).flatMap(([need, names]) => names.map((name) 
 const CHANGED = [
   { name: 'DELETE /media/:id', fx: { only: ['presence_media'] }, run: (r, p) => handleMediaDelete(A, p, ROW, cors) },
   { name: 'DELETE /assets/:id', fx: { only: ['presence_media'] }, run: (r, p) => handleAssetDelete(A, p, ROW, cors) },
+  { name: 'DELETE /assets/:id/forever', fx: { only: ['presence_media'] }, run: (r, p) => handleAssetDeleteForGood(A, p, ROW, cors) },   // builder list item 218
   { name: 'DELETE /redirects/:id', run: (r, p) => handleRedirectDelete(A, p, ROW, cors) },
   { name: 'DELETE /content-library/:id', run: (r, p) => handleContentLibraryDelete(A, p, ROW, cors) },
   { name: 'DELETE /publishes/checkpoints/:id', run: (r, p) => handleCheckpointDelete(A, p, ROW, cors) },
@@ -465,6 +468,7 @@ const CHANGED = [
 // and adds it to DECIDED and to this list. At runtime an unlisted write is refused anyway.
 const WRITE_HANDLERS = [
   'handleVisibilityCheck', 'handleFollowPut', 'handlePhrasesPut', 'handleUsablePut', 'handleAiQuestionsPut', 'handleApprovalDecide', 'handleApprovalsCreate', 'handleApproveSend', 'handleAssetDelete', 'handleAssetDuplicate',
+  'handleAssetPutBack', 'handleAssetDeleteForGood',   // builder list item 218: POST /assets/:id/put-back is edit; DELETE /assets/:id/forever is delete
   'handleAssetRemoveBackground', 'handleAssetCutout', 'handleAssetReplace', 'handleAssetRollback', 'handleAssetStatus',
   'handleAssetSuggest', 'handleAssetUpdate', 'handleAssetsBulk', 'handleAssetsFolderMove', 'handleBackOnline', 'handleBookingCancel',
   'handleBookingConfirm', 'handleBookingMark', 'handleBookingSettingsPut', 'handleBookingTypeCreate',
