@@ -822,10 +822,13 @@ function wireRoster(){
   });
 }
 
+// shell.js is deferred and runs just before DOMContentLoaded. Made now, while the page parses: after an
+// await, readyState can already say 'interactive' with shell.js still on its way, and the wait was skipped.
+const SHELL_READY=document.readyState==='loading'?new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true})):Promise.resolve();
 async function load(soft){
   if(!soft&&window.ddsSkeleton) window.ddsSkeleton($('list'),4);
   try{
-    if(scope()&&document.readyState==='loading')await new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true}));   // the deferred shell answers inClient()
+    if(scope())await SHELL_READY;   // the deferred shell answers inClient()
     LOADED_IN=inClient();
     if(LOADED_IN&&!AG_MODE){const sc=await resolveScopedClient();if(sc){AG_MODE=true;SCOPED_CLIENT=sc;}}
     // Bold redesign: one read of every project (the chips filter in place, with
