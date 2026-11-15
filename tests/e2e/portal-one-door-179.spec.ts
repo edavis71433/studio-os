@@ -92,6 +92,8 @@ test.describe('Client portal part three — one Messages door (item 179)', () =>
   });
 
   test('a project conversation reads like a chat: the studio on the left, you on the right, the days marked, what happened as a quiet line', async ({ page }) => {
+    // the hour that split Nov 9 in two: 15:00Z was more than six days back, 16:00Z less (the labels are calendar days now)
+    await page.clock.setFixedTime(new Date('2026-11-15T15:30:00Z'));
     await start(page);
     await page.goto('/client.html');
     await openMessages(page);
@@ -109,7 +111,7 @@ test.describe('Client portal part three — one Messages door (item 179)', () =>
     const studioBox = await bubbles.nth(0).locator('.cb').boundingBox();
     const mineBox = await bubbles.nth(1).locator('.cb').boundingBox();
     expect(mineBox!.x + mineBox!.width).toBeGreaterThan(studioBox!.x + studioBox!.width);   // yours sits to the right
-    await expect(pane.locator('.cday')).toHaveCount(2);   // two days, each marked once
+    await expect(pane.locator('.cday')).toHaveText(['Monday', 'Tuesday']);   // two days, each marked once
     await expect(pane.locator('.csys').nth(0)).toHaveText('Marlow & Co shared a file: Homepage.pdf');
     await expect(pane.locator('.csys').nth(1)).toContainText('You approved a change');
     // screen readers hear who wrote each line
