@@ -10426,7 +10426,7 @@ function renderRankGrid() {
   const latest = RG_PICK && g.latest ? g.latest[RG_PICK] : null;
   const scan = RG_SHOW && RG_SHOW.phrase === RG_PICK ? RG_SHOW : latest;
   meta.textContent = studio
-    ? `${latest ? "Scanned " + svWhen(latest.scanned_at) + " · " : ""}next scan ${g.next} · every month`
+    ? `${latest ? "Scanned " + svWhen(latest.scanned_at) + " · " : ""}${g.due ? "next scan within 15 minutes" : "next scan " + g.next} · every month`
     : (latest ? `Checked by your studio on ${svWhen(latest.scanned_at)}` : "");
   if (studio && g.today) {
     const leftN = Math.max(0, g.today.cap - g.today.used);
@@ -10448,7 +10448,7 @@ function renderRankGrid() {
     body.appendChild(tabs);
   }
   if (!scan) {
-    body.appendChild(el("p", "rg-empty", RG_PICK ? `No scan of “${RG_PICK}” yet. ${studio ? `Scan now runs one; the monthly scan runs on ${g.next}.` : ""}` : "Add a search to scan in the grid’s settings."));
+    body.appendChild(el("p", "rg-empty", RG_PICK ? `No scan of “${RG_PICK}” yet. ${studio ? (g.due ? "The first scan runs within 15 minutes, then on the 1st of each month." : `Scan now runs one; the monthly scan runs on ${g.next}.`) : ""}` : "Add a search to scan in the grid’s settings."));
     return;
   }
   const past = scan !== latest;
@@ -10660,7 +10660,7 @@ function rgOpenSettings() {
   cancel.addEventListener("click", () => d.close());
   save.addEventListener("click", async () => {
     save.disabled = true;
-    try { await api("PUT", "/visibility/maps", draft); toast(draft.enabled ? "Saved. The grid is on for this client." : "Saved."); d.close(); }
+    try { await api("PUT", "/visibility/maps", draft); toast(draft.enabled && !g.enabled ? "Saved. The grid is on; its first scan runs within 15 minutes." : "Saved."); d.close(); }
     catch (err) { save.disabled = false; toast(nice(err), true); }
   });
 }

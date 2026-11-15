@@ -257,6 +257,7 @@ const post = (body) => new Request('http://x/visibility/maps/scan', { method: 'P
   eq('place: one Google doesn’t know is refused', [gone.status, gone.body.error], [400, 'not_found']);
   const on = await call(R.handleMapsPut, put({ enabled: true, phrases: ['plumber', 'emergency plumber'] }), site, studio, {});
   eq('put: on, with two searches, the next scan named', [on.status, on.body.data.enabled, on.body.data.phrases, on.body.data.next], [200, true, ['plumber', 'emergency plumber'], G.nextScanDay(new Date().toISOString())]);
+  eq('put: just switched on, this month’s scan is still to run (the next tick does it)', on.body.data.due, true);
   eq('put: nothing to change is refused', (await call(R.handleMapsPut, put({}), site, studio, {})).status, 400);
   google = [];
   const found = await call(R.handleMapsFind, new Request('http://x', { method: 'POST', body: '{}' }), site, studio, {});
@@ -286,6 +287,9 @@ const post = (body) => new Request('http://x/visibility/maps/scan', { method: 'P
   ok('get: each search’s newest scan in full, with the change since the one before', latest && latest.ranks.length === 49 && latest.change.top3 === latest.top3 - 6 && g.latest['emergency plumber'].change === null);
   ok('get: the studio’s view has the rivals, the spots’ ids, the centre and the cost', latest.rivals.length === 3 && latest.tops.length === 49 && latest.center && latest.center.lat === CENTER.lat && latest.cost_words === 'half a cent');
   eq('get: today’s Scan now count, and the history newest first', [g.today, g.history.length, g.history[0].phrase], [{ used: 3, cap: 3 }, 3, 'emergency plumber']);
+  eq('get: the month not handled yet reads as due, for the card’s “within 15 minutes”', g.due, true);
+  grid = { body: JSON.stringify({ ...G.normalizeGridSetting(JSON.parse(grid.body)), month: new Date().toISOString().slice(0, 7) }), updated_at: 'th' };
+  eq('get: once this month is handled it isn’t due', (await call(R.handleMapsGet, site, studio, {})).body.data.due, false);
   const client = (await call(R.handleMapsGet, site, owner, {})).body.data;
   const cl = client.latest.plumber;
   ok('get: the client sees the grid and its numbers once it is on', client.enabled && cl.ranks.length === 49 && typeof cl.top3 === 'number' && client.history.length === 3);
