@@ -146,10 +146,20 @@ test.describe('item 124 — what to do now, under the stage bar', () => {
     await expect(said).toHaveText('Couldn’t save · Try again');
     await expect(box).toHaveValue('Book the call this week');
     await expect(box).toHaveAttribute('aria-invalid', 'true');
+    // opening another note can't close this one away: it stays open with its words and Try again
+    await page.getByRole('button', { name: 'Edit the note for Won' }).click();
+    await expect(box).toBeFocused();
+    await expect(box).toHaveValue('Book the call this week');
+    await expect(said).toHaveText('Couldn’t save · Try again');
+    await expect(page.getByLabel('What to do now at Won, one step a line')).toHaveCount(0);
     fail = false;
     await said.getByRole('button', { name: 'Try again' }).click();
     await expect(said).toHaveText('Saved');
+    await expect(box).not.toHaveAttribute('aria-invalid', 'true');
     expect(sent).toEqual([{ note: { stage: 'qualified', text: 'Book the call this week' } }]);
+    // once it has saved, Edit opens the next note as usual
+    await page.getByRole('button', { name: 'Edit the note for Won' }).click();
+    await expect(page.getByLabel('What to do now at Won, one step a line')).toBeFocused();
   });
 
   test('when the notes can’t be read, what the deal knows still shows (they signed: convert them), with no Edit note', async ({ page }) => {
