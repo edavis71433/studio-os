@@ -47,14 +47,19 @@ async function payerOf(jwt: string, site: SiteRow, principal: Principal): Promis
   return '';
 }
 
-/** Only the owner switches AI help: never a seat, never from inside a client, and of a
- *  studio's team only its owner. */
-async function canSwitch(jwt: string, principal: Principal): Promise<boolean> {
-  if (principal.scope || principal.member) return false;
+/** The studio's owner: never a seat, and of a studio's team only its owner. Inside a client
+ *  they are still the owner, so a press there that finds AI help off points them to their
+ *  own Settings (found live Nov 15: a customer's record opens inside that customer, and the
+ *  owner was told to "ask the studio's owner"). */
+async function isStudioOwner(jwt: string, principal: Principal): Promise<boolean> {
+  if (principal.member) return false;
   if (principal.kind === 'staff') return principal.role === 'owner' || principal.role === 'admin';
   if (principal.kind !== 'client') return false;
   try { const m = await resolveAgencyMember(jwt); return !m || m.role === 'owner'; } catch { return false; }
 }
+/** Only the owner switches AI help, and only from the studio's own Settings, never from
+ *  inside a client. */
+const canSwitch = async (jwt: string, principal: Principal): Promise<boolean> => !principal.scope && await isStudioOwner(jwt, principal);
 
 const readGoalAi = async (siteId: string): Promise<GoalAi> => normalizeGoalAi(await readReservedJsonOrThrow(siteId, RESERVED_NAMES.salesGoalAi));
 const tableReady = async (): Promise<boolean> => { try { return (await svc('presence_sales_ai?select=id&limit=1')).ok; } catch { return false; } };
@@ -160,7 +165,7 @@ async function gate(jwt: string, site: SiteRow, principal: Principal, cors: Reco
   let st: GoalAi;
   try { st = await readGoalAi(payer); } catch { return say(502, 'read_failed', 'Couldn’t check AI help just now. Try again.', cors); }
   if (!st.ai_on) {
-    const mine = await canSwitch(jwt, principal);
+    const mine = await isStudioOwner(jwt, principal);   // the owner, even inside a client: Settings is where they switch it
     return say(409, 'ai_off', mine ? 'AI help is off. Switch it on in Settings, under Goal and AI help. It costs about 1¢ each time you press Draft or Sum up.' : 'AI help is off. Ask the studio’s owner to switch it on.', cors, { can_switch: mine });
   }
   if (!claudeKey() || !(await tableReady())) return say(503, 'not_ready', 'AI help isn’t ready yet. Try again in a little while.', cors);

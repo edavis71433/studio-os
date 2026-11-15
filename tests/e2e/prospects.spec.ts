@@ -31,7 +31,7 @@ async function withProspects(page: Page, state: { list: unknown[]; discover?: un
     if (path === '/sales/prospects/export') return route.fulfill({ status: 200, contentType: 'text/csv', headers: { 'Content-Disposition': 'attachment; filename="prospects.csv"' }, body: 'Business,Phone\nFresh Fades Barbershop,(818) 555-0102\n' });
     if (path === '/sales/prospects' && m === 'GET') return ok({ data: state.list });
     if (path === '/sales/prospects' && m === 'POST') { return ok({ data: { saved: [saved()], skipped: 1 } }, 201); }
-    if (/\/convert$/.test(path)) { (state.list[0] as Record<string, unknown>).deal_id = DEAL; (state.list[0] as Record<string, unknown>).status = 'In pipeline'; return ok({ data: { id: DEAL, title: 'Fresh Fades Barbershop', stage: 'lead' } }, 201); }
+    if (/\/convert$/.test(path)) { (state.list[0] as Record<string, unknown>).deal_id = DEAL; (state.list[0] as Record<string, unknown>).status = 'In pipeline'; return ok({ data: { id: DEAL, title: 'Fresh Fades Barbershop', stage: 'lead' }, contact: { id: '44444444-4444-4444-8444-444444444444', name: 'Fresh Fades Barbershop', reused: false } }, 201); }
     if (/\/draft$/.test(path)) return ok({ data: { subject: 'A website for Fresh Fades Barbershop', body: 'Hi,\n\nI’m writing from Davis Digital Studio — I couldn’t find a website for Fresh Fades Barbershop.', sent: false, note: 'This is only a draft to copy — Studio OS doesn’t send it.' } });
     if (m === 'PATCH') return ok({ data: saved({ status: 'Contacted' }) });
     if (m === 'DELETE') { state.list.shift(); return ok({ data: { removed: true } }); }
@@ -77,6 +77,13 @@ test.describe('Prospects — find, keep, pitch (item 112)', () => {
     await expect(page.locator('.saved-row')).toContainText('Fresh Fades Barbershop');
   });
 
+  test('item 119: the list says “→ Deal” brings the business in as its contact', async ({ page }) => {
+    await installApp(page);
+    await withProspects(page, { list: [saved()] });
+    await page.goto('/prospects.html');
+    await expect(page.locator('section[aria-label="Your prospects"] .hint')).toContainText('with the business as its contact');
+  });
+
   test('“→ Deal” starts the deal once, then the row opens it', async ({ page }) => {
     await installApp(page);
     const state = { list: [saved(), diner()] };
@@ -85,7 +92,8 @@ test.describe('Prospects — find, keep, pitch (item 112)', () => {
     const row = page.locator('.saved-row').first();
     await expect(row).toContainText('Fresh Fades Barbershop');
     await row.getByRole('button', { name: '→ Deal' }).click();
-    await expect(page.locator('.dds-toast, #toast').last()).toContainText('Deal started.');
+    // sales item 119: the deal comes with its contact
+    await expect(page.locator('.dds-toast, #toast').last()).toContainText('Deal and contact started.');
     await expect(row.getByRole('link', { name: 'Open the deal' })).toHaveAttribute('href', `/pipeline.html?deal=${DEAL}`);
     await expect(row.getByRole('button', { name: '→ Deal' })).toHaveCount(0);
     expect(calls.filter((c) => c.endsWith('/convert')).length).toBe(1);

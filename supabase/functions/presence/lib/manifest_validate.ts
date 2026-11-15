@@ -4,6 +4,9 @@
 // invalid snapshot: this runs first, always.
 import { normalizeSnapshotContent } from './render_types.ts';
 import type { Snapshot, TemplateManifest } from './render_types.ts';
+import type { SiteBlock, SnapshotContent } from './render_types.ts';
+import { sectionIdsFor } from './site_blocks.ts';
+import { jumpTarget, sectionLinks } from './section_links.ts';
 
 export interface ValidationResult {
   ok: boolean;
@@ -90,10 +93,44 @@ export function validateSnapshot(snapshot: Snapshot, manifest: TemplateManifest)
     if (r.to_path?.startsWith('/') && froms.has(r.to_path)) b.push({ field: 'redirects', message: `Redirect “${r.from_path}” chains into another redirect (“${r.to_path}”) — point it at the final destination.` });
   }
 
+  // item 225: a menu item or a button that jumps to a link name no section has any more
+  for (const message of deadJumps(c)) w.push({ field: 'links', message });
+
   // contract/template compatibility
   if (snapshot.content_contract_version !== manifest.content_contract_version) {
     b.push({ field: 'snapshot', message: 'This site’s template needs an upgrade before publishing (content version mismatch).' });
   }
 
   return { ok: b.length === 0, blockers: b, warnings: w };
+}
+
+/** Item 225: the menu items and section buttons that jump to a named part of a page that isn't
+ *  there: the page is gone, or no section on it has that link name (renamed or deleted since).
+ *  One plain sentence each, at most ten. Pure. */
+export function deadJumps(c: SnapshotContent): string[] {
+  const settings = (c.settings || {}) as NonNullable<SnapshotContent['settings']>;
+  const pages = new Map<string, { title: string; blocks: SiteBlock[] }>([['', { title: 'Home', blocks: settings.blocks || [] }]]);
+  for (const p of settings.pages || []) if (p && p.slug) pages.set(p.slug, { title: p.title || p.slug, blocks: p.blocks || [] });
+  const ids = new Map<string, Set<string>>();
+  const idsOn = (slug: string) => {
+    if (!ids.has(slug)) ids.set(slug, new Set(sectionIdsFor((pages.get(slug)?.blocks || []).map((b) => (b.type === 'divider' || b.type === 'toc' ? null : b))).filter((x): x is string => !!x)));
+    return ids.get(slug)!;
+  };
+  const named = (slug: string) => (slug === '' ? 'Home' : `the ${pages.get(slug)?.title || slug} page`);
+  const out = new Set<string>();
+  const check = (href: unknown, from: string, who: string) => {
+    const t = jumpTarget(href); if (!t) return;
+    const page = t.page === null ? from : t.page;
+    if (!pages.has(page)) out.add(`${who} jumps to #${t.anchor} on a page that isn’t on the site any more.`);
+    else if (!idsOn(page).has(t.anchor)) out.add(`${who} jumps to #${t.anchor} on ${named(page)}, and no section there has that link name.`);
+  };
+  for (const it of settings.nav || []) {
+    check(it.href, '', `The menu item “${it.label}”`);
+    for (const k of it.children || []) check(k.href, '', `The menu item “${k.label}”`);
+  }
+  for (const [slug, pg] of pages) for (const b of pg.blocks) {
+    const title = String((b as { title?: unknown }).title || '').trim();
+    for (const href of sectionLinks(b)) check(href, slug, `A button in ${title ? `“${title}”` : 'a section'} on ${named(slug)}`);
+  }
+  return [...out].slice(0, 10);
 }

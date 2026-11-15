@@ -114,7 +114,7 @@ test.describe('item 98 — the Money and Deal cards (B11, B12)', () => {
     await expect(money.locator('.sc-list li').nth(0)).toContainText('Launch balance');
     await expect(money.locator('.sc-list li').nth(1)).toContainText('Deposit');
     await expect(money).not.toContainText('Old balance');
-    await expect(money.getByRole('button', { name: 'All 3 on Billing →' })).toBeVisible();   // Billing still has all three
+    await expect(money.getByRole('button', { name: 'All 3 under Invoices →' })).toBeVisible();   // the Invoices tab still has all three
   });
 
   test('moving the stage on the path updates the Deal card beside it', async ({ page }) => {
@@ -235,7 +235,7 @@ test.describe('item 98 — the small ones on the record (B21)', () => {
     await page.locator('#tabbody').getByRole('button', { name: 'Set up a retainer' }).click();
     await page.locator('#bf-amt').fill('500');
     await page.locator('#bf-go').click();
-    await expect(toastWith(page, 'Retainer set up — copy its authorization link from Billing.')).toBeVisible();
+    await expect(toastWith(page, 'Retainer set up — copy its authorization link from Invoices.')).toBeVisible();
     await expect(toastWith(page, 'link copied')).toHaveCount(0);
   });
 

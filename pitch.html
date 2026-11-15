@@ -13,6 +13,9 @@
   nearby rivals, read by the pack's own unguessable token (?t=…). Public and
   read-only; printing it is the PDF. No sign-in, no shell — the reader is a
   stranger to Studio OS, and this page is the studio's pitch, not the app.
+  Sales item 119: it speaks only to the prospect. Why a piece couldn't be
+  checked is the studio's business: those notes stay on Prospects, and the
+  server sends this page scores and names only.
 ═══════════════════════════════════════════════════════════════════════════ -->
 <style>
   :root{
@@ -32,6 +35,8 @@
   h1{font-family:var(--serif);font-weight:500;font-size:clamp(26px,5vw,34px);line-height:1.2;margin-bottom:8px}
   .sub{color:var(--soft);font-size:15.5px;max-width:56ch}
   .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:28px 0 10px}
+  .cols.n2{grid-template-columns:repeat(2,1fr)}
+  .cols.n1{grid-template-columns:1fr;max-width:320px}
   .col{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px 16px;text-align:center}
   .col.you{border-color:var(--p);border-width:2px}
   .col .who{font-weight:600;font-size:14.5px;min-height:2.6em;display:flex;align-items:center;justify-content:center}
@@ -55,7 +60,7 @@
   .center{text-align:center;padding:80px 12px}
   .spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:80px auto;animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
-  @media (max-width:640px){.cols{grid-template-columns:1fr}.col.you{order:-1}}
+  @media (max-width:640px){.cols,.cols.n2{grid-template-columns:1fr}.col.you{order:-1}}
   @media print{.printbtn{display:none}body{background:#fff}.col,.card,.cta{box-shadow:none}}
 </style>
 </head>
@@ -65,14 +70,15 @@
 const FN="https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/presence";
 const $=(s)=>document.querySelector(s);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const scoreCol=(who,tag,piece,extra)=>{
+// item 119: a column without a score says so in the prospect's terms, never why
+const scoreCol=(who,tag,piece)=>{
   const s=piece&&piece.summary;
+  const none=tag==='you'&&piece&&piece.no_site?'No website found':'Not checked this time';
   return `<div class="col${tag==='you'?' you':''}">
     ${tag==='you'?'<span class="tag">This is you</span>':'<span class="tag" style="color:var(--faint)">Nearby</span>'}
     <div class="who">${esc(who)}</div>
     ${s?`<div class="score">${esc(s.overall)}</div><div class="lbl">out of 100 · ${esc(s.label||'')}</div>`
-       :`<div class="score na">${esc((piece&&piece.note)||'Not checked')}</div>`}
-    ${extra||''}
+       :`<div class="score na">${esc(none)}</div>`}
   </div>`;
 };
 async function load(){
@@ -84,23 +90,21 @@ async function load(){
   if(d.brand&&d.brand.accent)document.documentElement.style.setProperty('--p',d.brand.accent);
   const you=d.you||{};
   const rivals=(d.rivals||[]).slice(0,2);
-  const ai=d.ai, aiS=ai&&ai.summary;
+  const aiS=d.ai&&d.ai.summary;
   const issues=(you.summary&&you.summary.top_issues)||[];
   document.title='How '+(d.business_name||'your business')+'’s website compares';
   $('#main').innerHTML=`
     ${d.brand?`<header class="brand">${d.brand.logo_url?`<img src="${esc(d.brand.logo_url)}" alt="${esc(d.brand.name)}">`:''}<span class="nm">${esc(d.brand.name)}</span></header>`:''}
     <h1>How ${esc(d.business_name)}’s web presence compares${d.town?` in ${esc(d.town)}`:''}</h1>
-    <p class="sub">The same website check we run for our clients — your score beside two nearby businesses${d.industry?` (${esc(d.industry.toLowerCase())}s and neighbors)`:''}. A score is out of 100; higher means the site works harder for you.</p>
-    <div class="cols">
+    <p class="sub">The same website check we run for our clients${rivals.length?` — your score beside ${rivals.length===1?'a nearby business':'two nearby businesses'}${d.industry?` (${esc(d.industry.toLowerCase())}s and neighbors)`:''}`:''}. A score is out of 100; higher means the site works harder for you.</p>
+    <div class="cols${rivals.length===1?' n2':rivals.length===0?' n1':''}">
       ${scoreCol(d.business_name,'you',you)}
       ${rivals.map(rv=>scoreCol(rv.name,'rival',rv)).join('')}
-      ${rivals.length===0?`<div class="col"><div class="who">Nearby businesses</div><div class="score na">${esc(d.rivals_note||'None checked yet')}</div></div>`:''}
     </div>
     ${issues.length?`<section class="card"><h2>What we’d fix first on your site</h2><ul class="iss">${issues.map(i=>`<li>${esc(i)}</li>`).join('')}</ul></section>`:''}
-    ${!you.summary&&you.note?`<section class="card"><h2>About your website</h2><p class="sub">${esc(you.note)}</p></section>`:''}
-    ${ai!==null&&ai!==undefined?`<section class="card"><h2>When people ask AI for a recommendation</h2>
-      ${aiS?`<div class="aiwrap"><span class="aiscore">${esc(aiS.overall)}<span style="font-size:15px;color:var(--faint)"> / 100</span></span><span class="sub">${esc(aiS.label||'')} — how often AI assistants mention ${esc(d.business_name)} when asked for ${d.industry?esc(d.industry.toLowerCase())+'s':'businesses like yours'}${d.town?` in ${esc(d.town)}`:''}.</span></div>`
-          :`<p class="sub">${esc((ai&&ai.note)||'Not checked this time.')}</p>`}
+    ${you.no_site?`<section class="card"><h2>About your website</h2><p class="sub">We couldn’t find a working website for ${esc(d.business_name)}. Most people look a business up online before they call, so that’s where we’d start.</p></section>`:''}
+    ${aiS?`<section class="card"><h2>When people ask AI for a recommendation</h2>
+      <div class="aiwrap"><span class="aiscore">${esc(aiS.overall)}<span style="font-size:15px;color:var(--faint)"> / 100</span></span><span class="sub">${esc(aiS.label||'')} — how often AI assistants mention ${esc(d.business_name)} when asked for ${d.industry?esc(d.industry.toLowerCase())+'s':'businesses like yours'}${d.town?` in ${esc(d.town)}`:''}.</span></div>
     </section>`:''}
     <div class="cta"><p>This took us a few minutes to run, and it’s yours to keep. If you’d like the fixes handled, reply to the email this came with — a short note back, not a sales call.</p></div>
     <p class="foot">Prepared by ${esc(d.brand?d.brand.name:'your local web studio')}${d.built_at?` · ${esc(String(d.built_at).slice(0,10))}`:''} · Scores from a standard automated review; details gladly shared.</p>

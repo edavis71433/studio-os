@@ -7,6 +7,7 @@
 // consumes, computes the media manifest (deterministic output paths per
 // variant), and stamps contract/template versions + timestamp.
 import { normalizePopup } from './popup.ts';
+import { jumpTarget } from './section_links.ts';
 import { svc } from './db.ts';
 import { isImageMime } from './media.ts';
 import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer, SiteBlock } from './render_types.ts';
@@ -369,6 +370,7 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
     const v = String(raw ?? '').trim();
     if (!v) return null;
     if (v === '/' || /^\/[a-z0-9][a-z0-9-]*\/$/.test(v)) return v;              // home or a single-segment internal page
+    if (v.startsWith('/') && jumpTarget(v)) return v;                            // item 225: a named part of a page ("/#hours", "/menu/#specials")
     if (/^https:\/\/[^\s<>"']+$/i.test(v)) return v.slice(0, 300);              // external https
     if (/^mailto:[^\s<>"']+$/i.test(v) || /^tel:[+0-9()\-.\s]+$/i.test(v)) return v.slice(0, 300);
     return null;

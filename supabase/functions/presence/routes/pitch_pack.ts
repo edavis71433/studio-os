@@ -15,12 +15,17 @@
 // a PLACES_KEY they are topped up from a Places search. A piece that can't be
 // built (no website, AI not configured, scan failed) is skipped WITH ITS REASON
 // — the pack says what it knows, never pretends.
+//
+// Sales item 119: the reasons are the STUDIO's. The public read carries only what
+// the prospect should see (scores, their names, whether they have a website); the
+// notes on what couldn't be checked, and what to do about it, ride the studio's
+// own reads (the build's progress and GET /sales/prospects, as `notes`).
 import { json } from '../../_shared/http.ts';
 import { insert, select } from '../../_shared/tools/db.ts';
 import { logUsage, spendCapReached } from '../../_shared/tools/guard.ts';
 import { TOOLS_BASE_URL } from '../../_shared/tools/config.ts';
 import { assertPublicHttpUrl } from '../../_shared/tools/url_guard.ts';
-import { ERROR_MESSAGES, runSiteReview, type ScanDeps } from '../../_shared/tools/site_review/scan.ts';
+import { runSiteReview, type ScanDeps } from '../../_shared/tools/site_review/scan.ts';
 import { runAiVisibility, type AiScanDeps } from '../../_shared/tools/ai_visibility/scan.ts';
 import { enabledEngines } from '../../_shared/tools/ai_visibility/engines.ts';
 import { reportUrlFilter } from '../lib/search_visibility.ts';
@@ -29,6 +34,8 @@ import { rateAllow } from '../lib/ratelimit.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { tableMissing } from './estimates.ts';
 import { studioBrandOf } from './studio_brand.ts';
+import { townOf } from '../lib/town.ts';
+import { packNotes } from '../lib/pitch_notes.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -43,13 +50,7 @@ export const packDeps: { scan?: Partial<ScanDeps>; ai?: Partial<AiScanDeps>; now
 const now = () => (packDeps.now ? packDeps.now() : Date.now());
 
 const host = (u: unknown) => { try { return new URL(String(u)).hostname.replace(/^www\./, ''); } catch { return ''; } };
-/** "2 Main St, Burbank, CA 91501" → "Burbank"; else the town in "plumbers in Burbank". */
-export function townOf(p: { address?: unknown; search_query?: unknown }): string {
-  const parts = String(p.address || '').split(',').map((s) => s.trim()).filter(Boolean);
-  if (parts.length >= 3) return clean(parts[parts.length - 2].replace(/\d{4,}.*$/, ''), 60);
-  const m = String(p.search_query || '').match(/\sin\s+(.+)$/i);
-  return clean(m ? m[1] : '', 60);
-}
+export { townOf };   // item 119: one town reader (lib/town.ts) for the pack and the first-email draft
 
 /** The small summary a pack keeps: the score and the three things to lead with. */
 function packScore(row: any) {
@@ -131,15 +132,14 @@ async function pickRivals(site: SiteRow, p: any, town: string): Promise<Array<{ 
   return out;
 }
 
-const SKIP_WORDS: Record<string, string> = {
-  no_site: 'They have no working website — which is the whole story.',
-  resting: 'The day’s checking budget is used up; try again tomorrow.',
-  failed: 'Their website couldn’t be checked just now.',
-  ai_unavailable: 'The AI check isn’t switched on for this platform.',
-  engines_failed: 'The AI services couldn’t be reached just now.',
-  ambiguous: 'Too many businesses share this name for a clean AI answer.',
-};
-const skipWord = (why: string) => SKIP_WORDS[why] || (ERROR_MESSAGES as Record<string, string>)[why] || 'This piece couldn’t be built.';
+/** What the PROSPECT may read about each piece: scores and names, never a reason. */
+function publicPieces(pieces: any) {
+  const p = pieces && typeof pieces === 'object' ? pieces : {};
+  const you = p.you ? { name: clean(p.you.name, 200), domain: p.you.domain || null, summary: p.you.summary || null, no_site: p.you.why === 'no_site' } : null;
+  const rivals = (Array.isArray(p.rivals) ? p.rivals : []).map((r: any) => ({ name: clean(r?.name, 120), summary: r?.summary || null })).filter((r: any) => r.name);
+  const ai = p.ai && p.ai.summary ? { summary: p.ai.summary } : null;
+  return { you, rivals, ai };
+}
 
 async function loadProspect(siteId: string, id: string): Promise<any | null> {
   if (!UUID_RE.test(id)) return null;
@@ -159,6 +159,7 @@ function progress(pack: any, prospect: any) {
     state: pack.status, done, total,
     share_url: pack.status === 'ready' ? `/pitch.html?t=${pack.token}` : null,
     business_name: prospect.business_name,
+    notes: pack.status === 'ready' ? packNotes(pieces) : [],   // item 119: the studio's, never the public page's
   };
 }
 
@@ -193,31 +194,30 @@ export async function handleProspectPack(req: Request, site: SiteRow, _principal
   // ONE expensive thing per request, in a fixed order
   if (!pieces.you) {
     if (!p.website || p.site_health === 'no_website' || p.site_health === 'unreachable') {
-      pieces.you = { name: p.business_name, domain: host(p.website) || null, summary: null, why: 'no_site', note: SKIP_WORDS.no_site };
+      pieces.you = { name: p.business_name, domain: host(p.website) || null, summary: null, why: 'no_site' };
     } else {
       const got = await reviewFor(String(p.website), String(p.industry || ''), town, 'pitch pack: the prospect');
-      pieces.you = { name: p.business_name, domain: host(p.website), summary: got.summary, ...(got.why ? { why: got.why, note: skipWord(got.why) } : {}) };
+      pieces.you = { name: p.business_name, domain: host(p.website), summary: got.summary, ...(got.why ? { why: got.why } : {}) };
     }
   } else if (!Array.isArray(pieces.rivals)) {
     const rivals = await pickRivals(site, p, town);
     pieces.rivals = rivals.map((r) => ({ name: r.name, domain: host(r.website), website: r.website, summary: null }));
-    if (!pieces.rivals.length) pieces.rivals_note = 'No nearby rivals on your list yet — save a couple with websites and rebuild the pack.';
   } else if (pieces.rivals.some((r: any) => !r.summary && !r.why)) {
     const r = pieces.rivals.find((x: any) => !x.summary && !x.why);
     const got = await reviewFor(String(r.website || ''), String(p.industry || ''), town, 'pitch pack: a rival');
     r.summary = got.summary;
-    if (got.why) { r.why = got.why; r.note = skipWord(got.why); }
+    if (got.why) r.why = got.why;
     delete r.website;   // the public pack names rivals; it doesn't link them
   } else if (pieces.ai === undefined) {
     const kept = p.business_name && town ? await latestFresh('ai_visibility', host(p.website)) : null;
     if (kept) {
       pieces.ai = { summary: packScore(kept) };
     } else if (!town) {
-      pieces.ai = { summary: null, why: 'failed', note: 'Without a town on record, the AI check can’t tell this business from namesakes.' };
+      pieces.ai = { summary: null, why: 'no_town' };
     } else if (!((packDeps.ai?.engines ?? enabledEngines()).length)) {
-      pieces.ai = { summary: null, why: 'ai_unavailable', note: SKIP_WORDS.ai_unavailable };
+      pieces.ai = { summary: null, why: 'ai_unavailable' };
     } else if (await spendCapReached()) {
-      pieces.ai = { summary: null, why: 'resting', note: SKIP_WORDS.resting };
+      pieces.ai = { summary: null, why: 'resting' };
     } else {
       const result = await runAiVisibility(
         { businessName: String(p.business_name), city: town, businessType: '', searchPhrases: '', url: p.website ? String(p.website) : null, detail: '' },
@@ -226,10 +226,10 @@ export async function handleProspectPack(req: Request, site: SiteRow, _principal
       if (result && result.ok) {
         const row = await insert('tool_reports', { tool: 'ai_visibility', input: result.input, raw_results: result.raw, findings: result.findings, scores: result.scores, unlocked: true, unlocked_at: new Date().toISOString() }).catch(() => null);
         if (row) await logUsage({ tool: 'ai_visibility', kind: 'scan', report_id: String(row.id), cost_usd: result.costUsd, note: 'pitch pack' }).catch(() => {});
-        pieces.ai = row ? { summary: packScore(row) } : { summary: null, why: 'failed', note: SKIP_WORDS.failed };
+        pieces.ai = row ? { summary: packScore(row) } : { summary: null, why: 'engines_failed' };
       } else {
-        const why = result && !result.ok ? String((result as any).error || 'failed') : 'failed';
-        pieces.ai = { summary: null, why, note: skipWord(why === 'not_configured' ? 'ai_unavailable' : why) };
+        const why = result && !result.ok ? String((result as any).error || 'engines_failed') : 'engines_failed';
+        pieces.ai = { summary: null, why: why === 'not_configured' ? 'ai_unavailable' : why };
       }
     }
   }
@@ -253,15 +253,15 @@ export async function handlePackPublic(tokenRaw: string, cors: Record<string, st
   if (!pack) return json({ error: 'not_found' }, 404, cors);
   const p = rows(await svc(`presence_prospects?id=eq.${pack.prospect_id}&select=business_name,address,industry,site_health&limit=1`).catch(() => null) || { json: [] })[0];
   const brand = await studioBrandOf(pack.site_id).catch(() => null);
-  const pieces = pack.pieces || {};
+  // item 119: only what the prospect should read — no reasons, no notes, no rivals' addresses
+  const pub = publicPieces(pack.pieces);
   return json({ data: {
-    business_name: clean(p?.business_name, 200) || String(pieces.you?.name || ''),
+    business_name: clean(p?.business_name, 200) || String(pub.you?.name || ''),
     town: p ? townOf(p) : '',
     industry: clean(p?.industry, 80),
-    you: pieces.you || null,
-    rivals: Array.isArray(pieces.rivals) ? pieces.rivals : [],
-    rivals_note: pieces.rivals_note ? String(pieces.rivals_note) : null,
-    ai: pieces.ai ?? null,
+    you: pub.you,
+    rivals: pub.rivals,
+    ai: pub.ai,
     built_at: pack.built_at,
     brand: brand ? { name: brand.name, logo_url: brand.logo_url, accent: brand.accent } : null,
     report_base: TOOLS_BASE_URL,
