@@ -20,9 +20,10 @@ const cssOf = (files) => String(files[Object.keys(files).find((k) => k.startsWit
 
 // ── the band's colour, and who reads it ──
 const BAND = 'var(--accent-band,var(--accent-dark,var(--accent)))';
-ok('an accent section is drawn in --accent-band where a template names one, else the darker accent', BLOCK_CSS.includes(`.block.block--bg-accent{background:${BAND};color:#fff}`));
+ok('an accent section is drawn in --accent-band where a template names one, else the darker accent, and the site’s grey words follow its white ones', BLOCK_CSS.includes(`.block.block--bg-accent{background:${BAND};color:#fff;--soft:currentColor}`));
 ok('its buttons are white, with words in the band’s colour', BLOCK_CSS.includes(`.block.block--bg-accent .btn{background:#fff;color:${BAND};border-color:#fff}`));
-ok('a form’s red required mark takes the band’s white words', BLOCK_CSS.includes('.block.block--bg-accent .ff-req{color:#fff}'));
+const bandWords = (/\.block\.block--bg-accent :is\(([^)]*)\)[^{]*\{color:inherit\}/.exec(BLOCK_CSS)?.[1] || '').split(',');
+ok('a form’s labels and its red required mark (a span) take the band’s white words', bandWords.includes('label') && bandWords.includes('span'));
 ok('a section’s own accent colour (its Style tab) still colours its band', BLOCK_CSS.includes('.block.ov-accent{--accent:var(--ov-accent);--accent-dark:var(--ov-accent-dark,var(--ov-accent));--accent-band:var(--ov-accent-dark,var(--ov-accent))}'));
 ok('the section’s Accent theme tile is drawn in the band’s colour, as the canvas has it', PAGE.includes('["band", "--accent-band"]') && PAGE.includes('if (v === "accent") return { bg: c.band,'));
 
@@ -40,16 +41,27 @@ const screenRules = (css) => {
 /** The rules that reach into an accent section. */
 const bandRules = (css) => screenRules(css).filter((r) => r.sels.some((s) => s.includes('.block--bg-accent')));
 const prop = (decl, name) => { let v; for (const m of decl.matchAll(new RegExp(`(?:^|;)\\s*${name}\\s*:\\s*([^;]+)`, 'g'))) v = m[1].trim(); return v; };
-/** What a colour value draws on this site: the band's colour, white or a hex, or a share of white
- *  over the band (the cards); null for a value this check can't read yet. */
-const colour = (v, band) => {
+/** What a colour value draws on this site: the band's colour, white or a hex, a share of white or
+ *  black over the band (the cards, the boxes), or the boxes' own fill where the template names one
+ *  (--band-box); null for a value this check can't read yet. */
+const colour = (v, band, box) => {
   if (v === BAND) return band;
-  const w = /^rgba\(255,\s*255,\s*255,\s*([\d.]+)\)$/.exec(v);
-  return w ? mixHex('#ffffff', band, Number(w[1])) : hex6(v);
+  const named = /^var\(--band-box,(.*)\)$/.exec(v);
+  if (named) return box || colour(named[1], band);
+  const w = /^rgba\((255|0),\s*\1,\s*\1,\s*([\d.]+)\)$/.exec(v);
+  return w ? mixHex(w[1] === '255' ? '#ffffff' : '#000000', band, Number(w[2])) : hex6(v);
+};
+/** A template's --band-box, followed to a hex through its :root variables; null where it names none. */
+const boxOf = (css) => {
+  const vars = {};
+  for (const r of screenRules(css)) if (r.sels.includes(':root')) for (const m of r.decl.matchAll(/--([\w-]+)\s*:\s*([^;]+)/g)) vars[m[1]] = m[2].trim();
+  let v = vars['band-box'];
+  for (let n = 0; v && n < 5; n++) { const m = /^var\(--([\w-]+)\)$/.exec(v); if (!m) break; v = vars[m[1]]; }
+  return v ? hex6(v) : null;
 };
 /** Every colour of words the band draws, every colour behind them (the band, its cards), and the
  *  buttons that bring their own colour. */
-function drawn(rules, band) {
+function drawn(rules, band, box) {
   const self = rules.find((r) => r.sels.includes('.block.block--bg-accent'));
   const ink = colour(prop(self?.decl || '', 'color') || '', band);
   const behind = [['the band', band]], words = [['the band’s words', ink]], own = [], unread = [];
@@ -58,7 +70,7 @@ function drawn(rules, band) {
     const what = r.sels.find((s) => s.includes('.block--bg-accent'));
     const bgv = prop(r.decl, 'background') ?? prop(r.decl, 'background-color'), fgv = prop(r.decl, 'color');
     const clear = bgv === undefined || bgv === 'transparent' || bgv === 'none';
-    const bg = clear ? null : colour(bgv, band), fg = fgv === undefined ? null : fgv === 'inherit' ? ink : colour(fgv, band);
+    const bg = clear ? null : colour(bgv, band, box), fg = fgv === undefined ? null : fgv === 'inherit' ? ink : colour(fgv, band, box);
     if ((!clear && !bg) || (fgv !== undefined && !fg)) { unread.push(`${what}{${r.decl}}`); continue; }
     if (bg && fg) own.push([what, fg, bg]);
     else if (bg) behind.push([what, bg]);
@@ -89,7 +101,7 @@ for (const { slug } of listTemplates()) {
     for (const set of [null, ...BUTTON_SETS]) {
       const style = set ? buttonStyle(set, null, c).replace(/^<style[^>]*>|<\/style>$/g, '') : '';
       const setRules = bandRules(style);
-      const d = drawn([...rules, ...setRules], c.band), w = `${set || 'the template’s'} buttons, ${choice.name}`;
+      const d = drawn([...rules, ...setRules], c.band, boxOf(css)), w = `${set || 'the template’s'} buttons, ${choice.name}`;
       d.unread.forEach((x) => unread.add(x));
       for (const [wa, fg] of d.words) for (const [ba, bg] of d.behind) note('words on the band and on a card in it', contrast(fg, bg), `${wa} ${fg} on ${ba} ${bg}, ${w}`);
       for (const [wa, fg, bg] of d.own) note('a button on the band, its words on its own colour', contrast(fg, bg), `${wa} ${fg} on ${bg}, ${w}`);
