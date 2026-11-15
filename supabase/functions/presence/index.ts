@@ -76,6 +76,7 @@ import { handleRecurringStart, handleRecurringChange, handleRecurringAction } fr
 import { handleInvoicePayment, handleInvoicePaymentUndo } from './routes/invoice_payments.ts';   // sales review item 77
 import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
 const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
+const { handleWelcomeGet, handleWelcomePut, handleWelcomeTest } = lazyRoutes(() => import('./routes/list_welcome.ts'));   // builder list item 221
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost, handleSendTicket, handleSpamLinkGet, handleSpamLinkPost, handleFormFile, handleFormAnswers, handleFormDelete, handleJoinGet, handleJoinPost } from './routes/commercial.ts';
 const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleManageGet, handleManagePost, handleManageSlots, handleManageIcs, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
 const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest, handleReviewGoogleLink } = lazyRoutes(() => import('./routes/reviews.ts'));
@@ -776,6 +777,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/broadcasts/lists' && method === 'POST') return handleBroadcastListCreate(req, site, principal, cors);   // items 31 + 39: picked people
   { const lm = route.match(/^\/broadcasts\/lists\/([A-Za-z0-9-]{6,40})$/); if (lm && method === 'DELETE') return handleBroadcastListDelete(site, principal, lm[1], cors); }
   if (route === '/broadcasts/draft-assist' && method === 'POST') return handleBroadcastDraftAssist(req, site, cors);
+  // builder list item 221: the welcome email to each new person on the site's list, and a test of it to yourself
+  if (route === '/broadcasts/welcome' && method === 'GET') return handleWelcomeGet(site, cors);
+  if (route === '/broadcasts/welcome' && method === 'PUT') return handleWelcomePut(req, site, principal, cors);
+  if (route === '/broadcasts/welcome/test' && method === 'POST') return handleWelcomeTest(req, site, principal, cors);
   {
     let m = route.match(/^\/broadcasts\/([0-9a-f-]{36})$/);
     if (m && method === 'GET') return handleBroadcastGet(site, m[1], cors);
