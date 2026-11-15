@@ -100,12 +100,13 @@ const selects = (table) => db.log.filter((l) => l.method === 'GET' && l.url.star
   ok('Pipeline: the charts repaint with the meta line, so every search, filter and chip moves them', /el\.textContent=m;\n  paintCharts\(\);/.test(pipe));
   ok('Pipeline: the board counts its open cards, the list and table their filtered deals', /const dealsInView=\(\)=>VIEW==='board'\?boardVisible\(\):visibleDeals\(\);/.test(pipe));
   ok('Pipeline: the list and the table each have one order, which the print reads too', /const list=listOrder\(visibleDeals\(\)\);/.test(pipe) && /const list=tableOrder\(visibleDeals\(\)\);/.test(pipe) && /if\(VIEW==='table'\)return tableOrder\(list\);/.test(pipe));
-  ok('Pipeline: on a phone Charts and Print are in More', /#colsWrap,#chartsBtn,#printBtn\{display:none!important\}/.test(pipe) && /data-more="charts"/.test(pipe) && /data-more="print"/.test(pipe));
+  ok('Pipeline: on a phone Charts and Print wait behind the page header\'s ⋯ (builder item 165)', /<div class="dds-ph-more" id="phMore" popover>[^\n]*id="chartsBtn"[^\n]*id="printBtn"/.test(pipe));
   ok('Pipeline: Charts is remembered', /const CHARTS_KEY='dds-charts:pipeline';/.test(pipe));
   ok('Contacts: the charts repaint with the list (a search, a tag, Show more)', (contacts.match(/paintCharts\(\);\n\}/g) || []).length === 2);
   ok('Contacts: Print first loads the rest of the view, up to 1,000 people', /for\(let i=0;i<10&&moreToLoad\(\);i\+\+\)/.test(contacts) && /if\(!r\.ok\|\|!takePage\(r,s\)\)break;/.test(contacts));
   ok('Contacts: Show more and Print share one page-append', /if\(!takePage\(r,s\)\)\{renderListZone\(\);return;\}/.test(contacts));
-  ok('Contacts: the tools stay at the studio level with the rest of the header\'s tools', /\$\{inClient\(\)\?'':`<div class="ltools">[^`]*id="chartsBtn"[^`]*id="printBtn"/.test(contacts));
+  // builder item 165: the tools row follows the one page header; Charts and Print stay at the studio level
+  ok('Contacts: the tools stay at the studio level with the rest of the header\'s tools', /\$\{studio\?`<button class="lbtn txt" id="saveView"[^`]*id="chartsBtn"[^`]*id="printBtn"/.test(contacts) && /const studio=!inClient\(\);/.test(contacts));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

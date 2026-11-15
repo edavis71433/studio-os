@@ -50,21 +50,25 @@ test.describe('Settings — the monthly report card (101, I4)', () => {
     await sw.click();
     await expect(sw).toHaveAttribute('aria-checked', 'true');
     await expect(sw).toHaveAttribute('aria-disabled', 'true');      // greyed while it saves
-    await expect(page.locator('#reportSave')).toBeDisabled();        // and the line waits its turn
     await sw.click({ force: true });                                 // Playwright won't press a greyed switch unless forced
     await expect(sw).toHaveAttribute('aria-checked', 'true');        // the press showed nothing…
     expect(puts).toEqual([{ enabled: true }]);                       // …and sent nothing
+    // builder item 165: the line has no Save button; left while the switch saves, it waits its turn
+    await page.locator('#report-note').fill('A line written meanwhile.');
+    await page.locator('#report-note').press('Tab');
+    expect(puts).toEqual([{ enabled: true }]);
     release();
     await expect(sw).not.toHaveAttribute('aria-disabled', 'true');
-    await expect(page.locator('#reportSave')).toBeEnabled();
     await expect(page.locator('.dds-toast', { hasText: 'On. The first report goes out' })).toBeVisible();
+    await expect.poll(() => puts).toEqual([{ enabled: true }, { note: 'A line written meanwhile.' }]);
+    await expect(page.locator('#fs-report-note')).toHaveText('Saved');
     await sw.click();                                                // free again: a press is sent
     await expect(sw).toHaveAttribute('aria-checked', 'false');
-    await expect.poll(() => puts).toEqual([{ enabled: true }, { enabled: false }]);
+    await expect.poll(() => puts).toEqual([{ enabled: true }, { note: 'A line written meanwhile.' }, { enabled: false }]);
     await page.locator('#report-note').fill('A new line.');
-    await page.locator('#reportSave').click();
-    await expect(page.locator('#reportMsg')).toHaveText('Saved.');
-    expect(puts[2]).toEqual({ note: 'A new line.' });
+    await page.locator('#report-note').press('Tab');
+    await expect.poll(() => puts.length).toBe(4);
+    expect(puts[3]).toEqual({ note: 'A new line.' });
   });
 
   test('I4 — a report that could not be read is held: it says so, nothing can be pressed or saved, Try again reads it', async ({ page }) => {
@@ -83,7 +87,6 @@ test.describe('Settings — the monthly report card (101, I4)', () => {
     await expect(sec.locator('.unread')).toContainText('This client’s monthly report couldn’t load just now.');   // …which says why
     await expect(page.locator('#sw-report')).toBeHidden();        // no switch that lies
     await expect(page.locator('#report-note')).toBeHidden();      // no blank line to save over the real one
-    await expect(page.locator('#reportSave')).toBeHidden();
     expect(puts).toEqual([]);
     fail = false;
     await sec.locator('.unread button').click();
@@ -230,7 +233,7 @@ test.describe('Settings — automations and the status lines (I3, I6, I7)', () =
     await deal.click();
     await expect.poll(() => answers.length).toBe(2);
     await answers[1]();                                         // the second answer lands first
-    await expect(page.locator('.dds-toast', { hasText: 'Saved.' }).first()).toBeVisible();
+    await expect(page.locator('#fs-row-deal')).toHaveText('Saved');   // builder item 165: the tick beside its row
     await expect(ack).toHaveAttribute('aria-checked', 'true');  // its own save is still out: it stays as pressed
     await expect(deal).toHaveAttribute('aria-checked', 'true');
     await answers[0]();                                         // then the first (it still says deal_nudges: false)

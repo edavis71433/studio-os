@@ -32,14 +32,7 @@
   svg{display:block}
   a{color:var(--p)}
 
-  /* ── crumb · title row ── */
-  .crumb{font-size:12.5px;color:var(--faint);display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-  .crumb a{color:var(--faint);text-decoration:none;border-radius:var(--dds-r-sm,6px);padding:1px var(--dds-s1,4px);margin-left:-4px}
-  .crumb a:hover{color:var(--p);background:var(--p-soft)}
-  .crumb [aria-current="page"]{color:var(--ink);font-weight:500}
-  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--dds-s4,16px);flex-wrap:wrap}
-  h1.title{font-family:var(--serif);font-weight:500;font-size:28px;letter-spacing:-.01em;margin:0;line-height:1.15}
-  .subline{color:var(--soft);font-size:13px;margin:var(--dds-s1,4px) 0 0;max-width:64ch}
+  /* ── the page header is the shared one (shell.css .dds-ph, builder item 165), Files in its trail ── */
   .actions{display:flex;gap:var(--dds-s2,8px);align-items:center;flex-wrap:wrap}
   .hint{font-size:12.5px;color:var(--faint)}
 
@@ -120,19 +113,20 @@
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
   @media (max-width:900px){.setgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.opts{grid-template-columns:minmax(0,1fr)}}
-  @media (max-width:640px){.wrap{padding:16px 16px 90px}.setgrid,.form2{grid-template-columns:minmax(0,1fr)}h1.title{font-size:24px}}
+  @media (max-width:640px){.wrap{padding:16px 16px 90px}.setgrid,.form2{grid-template-columns:minmax(0,1fr)}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
-  <nav class="crumb" aria-label="Breadcrumb"><a href="/files.html">Files</a><span aria-hidden="true">›</span><span aria-current="page">Visual Studio</span></nav>
-  <header class="toprow">
-    <div>
-      <h1 class="title">Visual Studio</h1>
-      <p class="subline">Make images for your website — a page banner, a social post, a link preview — shaped by your brand. You approve the one you want; nothing is saved until you do.</p>
-    </div>
-    <div class="actions"><a class="btn" href="/files.html" id="uploadOwn">Upload your own</a></div>
+  <!-- builder item 165: the one page header. It lives inside Files, so the trail says Files. Make 3
+       options (in the form below) stays the screen's one filled button; Upload your own is the other action. -->
+  <header class="dds-ph"><nav class="dds-ph-trail" aria-label="Where this page is"><a href="/files.html">Files</a><span aria-hidden="true">›</span></nav>
+    <div class="dds-ph-row"><span class="dds-ph-ic" data-ic="spark" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Visual Studio</h1></div>
+        <p class="dds-ph-line">Make images for your website — a page banner, a social post, a link preview — shaped by your brand. You approve the one you want; nothing is saved until you do.</p></div>
+      <div class="dds-ph-acts"><button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
+        <div class="dds-ph-more" id="phMore" popover><a class="btn" href="/files.html" id="uploadOwn">Upload your own</a></div></div></div>
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>

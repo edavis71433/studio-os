@@ -33,19 +33,15 @@
   .brand small{display:block;font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.03em}
   .rolebadge{font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:var(--dds-s1,4px) var(--dds-s3,12px)}
 
-  /* ── list-view header (SLDS list-view anatomy, dds skin) — the same .lhead/
-        .lrow1/.obj-ic/.lbtn/.lmeta treatment as customers.html / files.html ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
-  .lrow1{display:flex;align-items:center;gap:10px}
-  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  .lhead h1,.lhead h2{font-family:var(--sans);font-weight:600;font-size:20px;margin:0;letter-spacing:-.01em;flex:1;min-width:0}
-  .hometitle{font-family:var(--serif);font-weight:600;font-size:30px;line-height:1.1;letter-spacing:-.02em;margin:0 0 var(--dds-s4,16px);color:var(--ink)}
-  .hometitle:focus{outline:none}
-  .lhead .allc{font-size:13.5px;font-weight:600;color:var(--p);text-decoration:none;white-space:nowrap}
+  /* ── builder item 165: the page's header is the shared one (shell.css .dds-ph), drawn at the top of #top.
+        The customer list keeps a small bar of its own: its name, Table/Cards, ↻ and the count line ── */
+  .lsec{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 6px}
+  .lsec h2{font-size:16px;font-weight:600;letter-spacing:-.005em;margin:0;flex:1 1 auto;min-width:0}
+  .lsec + .lmeta{margin:0 0 var(--dds-s4,16px)}
+  .lsec .allc{font-size:13.5px;font-weight:600;color:var(--p);text-decoration:none;white-space:nowrap}   /* sales item 91: All customers → */
   .hchip.start{background:#fff;color:#3d2185;border-color:#fff;font-weight:600;text-decoration:none;cursor:pointer}
   #needsEmpty .firsts{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
   #needsEmpty .firsts .btn{text-decoration:none;display:inline-flex;align-items:center;min-height:40px}
-  @media (max-width:760px){.hometitle{font-size:24px;margin-bottom:12px}}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
@@ -321,17 +317,10 @@
   .hchip .hn{font-weight:700}
   .hgo{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#3d2185;background:#fff;border-radius:999px;padding:7px 15px;text-decoration:none;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
   .hgo:hover{background:#f3eefe}
-  .hero .acts{position:absolute;top:22px;right:24px}
-  .hero .btn{background:#fff;color:#3d2185;box-shadow:0 8px 20px -10px rgba(0,0,0,.45)}
-  .hero .btn:hover{filter:none;background:#f3eefe}
-  .hero .btn.week{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.32);box-shadow:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}   /* item 176: Plan my week */
-  .hero .btn.week:hover{background:rgba(255,255,255,.26)}
   .hero a:focus-visible,.hero button:focus-visible{outline:2px solid #fff;outline-offset:2px}
   @media (max-width:759px){
     .top.hero{padding:20px 18px 18px;border-radius:var(--dds-r-lg,16px)}
     .hero .hi{font-size:28px;margin-top:10px}
-    .hero .acts{position:static;margin-top:var(--dds-s4,16px)}
-    .hero .btn{width:100%;min-height:44px}
     .hchip,.hgo{min-height:44px}
   }
   /* section headings read as headings now */
@@ -400,9 +389,9 @@
      The greeting and a Today card side by side; then one list with tabs (Needs
      you · My to-dos · Waiting on them · Snoozed), each row with its own verb and
      Snooze and Done; "Go through them" shows the list one at a time. */
-  #top.has-today{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:var(--dds-s4,16px);align-items:stretch;margin-bottom:var(--dds-s5,20px)}
+  #top.has-today .tgrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:var(--dds-s4,16px);align-items:stretch;margin-bottom:var(--dds-s5,20px)}
   #top.has-today .top.hero{margin-bottom:0}
-  @media (max-width:1099px){#top.has-today{grid-template-columns:1fr}}
+  @media (max-width:1099px){#top.has-today .tgrid{grid-template-columns:1fr}}
   @media (max-width:760px){#top .todaycard{display:none}}
   .hero .hrow .hdate{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.78)}
   .hero .hrow .sep{color:rgba(255,255,255,.5)}
@@ -459,8 +448,6 @@
     .hero .hrow .rolebadge,.hero .hchips button.hchip{display:none}
     .hero .hchips{margin-top:14px}
     button.hgo{width:100%;justify-content:center;min-height:48px}
-    .hero .acts{margin-top:10px}
-    .hero .acts .btn{width:auto;min-height:44px;background:rgba(255,255,255,.16);color:#fff;box-shadow:none;border:1px solid rgba(255,255,255,.28)}
     .qtabs{display:flex;width:100%;box-sizing:border-box}
     .qtabs [role=tab]{flex:1 0 auto;padding:7px 6px;font-size:12.5px}   /* the tabs grow into any spare room; tight padding keeps "My to-dos" and its neighbours on a 375px phone */
     .need .t .what{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -531,8 +518,7 @@
 <div class="wrap">
   <!-- the top row, Needs you and the studio strip live OUTSIDE #main: the roster
        re-renders #main.innerHTML per keystroke and must never wipe them -->
-  <!-- sales item 91: the page's title sits at the top, like every other page (it headed the table, two screens down) -->
-  <h1 id="pagehead" class="hometitle" tabindex="-1">Home</h1>
+  <!-- sales item 91 put the title at the top; builder item 165's one header (drawn first in #top) is that title -->
   <div id="top"></div>
   <!-- sales item 105: the setup strip, until its steps are done or someone hides it -->
   <section id="setup" class="setup" aria-labelledby="setupHead" hidden data-needs="configure"></section>
@@ -613,7 +599,7 @@
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // Agency roster (A7.2 → standards sweep SS2): the studio's portfolio as a real
-// list view — shared .lhead, fixed-view chips, sortable typed columns behind a
+// list view — its own small bar (the page header is .dds-ph), fixed-view chips, sortable typed columns behind a
 // persisted Table ⇄ Cards toggle, REQ_SEQ-guarded reads, honest failure states
 // (a failed portfolio read is NEVER "No clients yet"), and once-wired starter-kit
 // events (the old per-load listeners double-POSTed). Consumes the existing
@@ -736,9 +722,9 @@ function nextText(c){const n=nextFor(c);return n?String(n.what):'Nothing — all
 
 function lheadHtml(shown){
   const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
-  return `<header class="lhead">
-    <div class="lrow1">
-      <span class="obj-ic" aria-hidden="true">🗂</span>
+  // builder item 165: the page's title moved to the shared header at the top; the list keeps its own small bar,
+  // in sales item 91's words (Customers, with All customers → beside it)
+  return `<div class="lsec">
       <h2 id="custHead">Customers</h2>
       <a class="allc" href="/customers.html">All customers →</a>
       <div class="seg" role="group" aria-label="Display as">
@@ -747,9 +733,15 @@ function lheadHtml(shown){
       </div>
       <button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
     </div>
-    <div class="lmeta">${shown} customer${shown===1?'':'s'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>
-  </header>`;
+    <div class="lmeta" id="lmeta">${shown} customer${shown===1?'':'s'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>`;
 }
+// the header's line: the customers the studio looks after and how many of them need you (the list's own rows)
+function headLine(){
+  if(!LOADED_ONCE)return'';
+  const live=CLIENTS.filter(c=>!c.archived),n=live.length,needs=live.filter(c=>!!nextFor(c)).length;
+  return n?`${n} customer${n===1?'':'s'} you look after${needs?` · ${needs} need${needs===1?'s':''} you`:''}`:'No customers yet';
+}
+function paintHeadLine(){const l=$('phLine');if(l)l.textContent=headLine();}
 function chipsHtml(){
   return `<div class="filters" role="group" aria-label="Filter clients">${
     VIEWS.map(([k,label])=>`<button data-view="${k}" aria-pressed="${VIEWNAME===k?'true':'false'}">${label}</button>`).join('')
@@ -825,6 +817,7 @@ function render(){
   const hkVals=hkf?Array.from(hkf.elements).filter(el=>el.name).map(el=>[el.name,el.type==='checkbox'?el.checked:el.value]):null;
   const hkFocus=hkf&&act&&hkf.contains(act)&&act.name?act.name:null;
   $('main').innerHTML=h;
+  paintHeadLine();
   wire();
   if(wasQ){const nq=$('search');if(nq){if(qv!=null)nq.value=qv;nq.focus();try{nq.setSelectionRange(qp,qp);}catch(_){/* */}}}
   if(hkVals){const nf=document.querySelector(hkSel);if(nf){hkVals.forEach(([n,v])=>{const el=nf.elements.namedItem(n);if(!el||!('value' in el))return;if(el.type==='checkbox')el.checked=v;else el.value=v;});
@@ -1101,10 +1094,16 @@ function todayWords(){try{return new Date().toLocaleDateString('en-US',{weekday:
 function renderTop(){
   const t=$('top');if(!t)return;
   t.classList.add('has-today');
-  t.innerHTML=`<div class="top hero"><div class="hrow"><span class="hdate">${esc(todayWords())}</span><span class="sep" aria-hidden="true">·</span><div class="brand">${esc((ME&&ME.agency)||'Your agency')}</div><span class="rolebadge">● ${esc(roleWords(ME&&ME.role))}</span></div>
-    <p class="hi">${esc(greetWord())}</p><p class="hsub" id="heroSub"></p><div class="hchips" id="heroChips"></div>
-    <div class="acts"><button type="button" class="btn" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button><a class="btn week" id="weekBtn" href="/week.html" data-noscope="1">Plan my week</a></div></div>
-    <aside class="todaycard" id="todayCard" aria-labelledby="todayHead"><h2 id="todayHead"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Today</h2><div id="todayRows"><p class="tq">Looking…</p></div></aside>`;
+  // builder item 165: the one page header (shell.css .dds-ph) leads the page: Home, its line with the real
+  // counts, Plan my week behind ⋯ on a phone and + Add a customer the one filled action; the greeting card follows
+  t.innerHTML=`<header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" data-ic="home" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Home</h1></div><p class="dds-ph-line" id="phLine">${esc(headLine())}</p></div>
+      <div class="dds-ph-acts"><button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
+        <div class="dds-ph-more" id="phMore" popover><a class="btn ghost" id="weekBtn" href="/week.html" data-noscope="1">Plan my week</a></div>
+        <button type="button" class="btn primary dds-ph-fill" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button></div></div></header>
+    <div class="tgrid"><div class="top hero"><div class="hrow"><span class="hdate">${esc(todayWords())}</span><span class="sep" aria-hidden="true">·</span><div class="brand">${esc((ME&&ME.agency)||'Your agency')}</div><span class="rolebadge">● ${esc(roleWords(ME&&ME.role))}</span></div>
+    <p class="hi">${esc(greetWord())}</p><p class="hsub" id="heroSub"></p><div class="hchips" id="heroChips"></div></div>
+    <aside class="todaycard" id="todayCard" aria-labelledby="todayHead"><h2 id="todayHead"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Today</h2><div id="todayRows"><p class="tq">Looking…</p></div></aside></div>`;
   const ac=$('addCust');if(ac)ac.addEventListener('click',openAddCustomer);
   paintHero();paintToday();
 }

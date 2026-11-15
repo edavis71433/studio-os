@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Builder list item 175 (Nov 2026), borrowed from Squarespace. Analytics keeps its four
 // quick windows and gains More dates beside them: Today, Yesterday, This week, Last week,
@@ -102,7 +103,7 @@ test.describe('Analytics: More dates (item 175)', () => {
     await expect(page.locator('#winDates')).toHaveText('Jun 3 to Jun 17');
     await expect(panel(page)).toBeHidden();
     // Refresh asks for the same dates again
-    await page.locator('#refreshBtn').click();
+    await (await headerAction(page, '#refreshBtn')).click();
     await expect.poll(() => seen.length).toBeGreaterThan(before + 1);
     const again = seen[seen.length - 1];
     expect([again.searchParams.get('period'), again.searchParams.get('from'), again.searchParams.get('to')]).toEqual(['custom', '2026-06-03', '2026-06-17']);

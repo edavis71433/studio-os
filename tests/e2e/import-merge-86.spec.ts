@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { installApp, ALL_FEATURES, STUDIO_LEVEL_NAV } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Sales items 86 + 105 (Nov 2026): an import matches its columns, updates people already
 // there and can be undone for a day; two records for one person can be merged (and the
@@ -51,7 +52,7 @@ test.describe('Import: match the columns, update people already here, undo (item
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/contacts/fields': { data: [] } } });
     const seen = await importRoutes(page, { existing: ['bo@example.com'] });
     await page.goto('/contacts.html');
-    await page.locator('#importCsv').click();
+    await (await headerAction(page, '#importCsv')).click();
     await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('google-contacts.csv', GOOGLE));
     const map = page.locator('#csvZone .dds-csvmap');
     await expect(map.locator('tbody tr')).toHaveCount(12);
@@ -86,7 +87,7 @@ test.describe('Import: match the columns, update people already here, undo (item
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/contacts/fields': { data: [] } } });
     const seen = await importRoutes(page);
     await page.goto('/contacts.html');
-    await page.locator('#importCsv').click();
+    await (await headerAction(page, '#importCsv')).click();
     await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('list.csv', 'Who,Mail\nAna Ruiz,ana@example.com\n'));
     const map = page.locator('#csvZone .dds-csvmap');
     await expect(map.locator('select[data-col="0"]')).toHaveValue('');
@@ -106,7 +107,7 @@ test.describe('Import: match the columns, update people already here, undo (item
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/contacts/fields': { data: [] } } });
     const seen = await importRoutes(page, { existing: ['bo@example.com'], older: true });
     await page.goto('/contacts.html');
-    await page.locator('#importCsv').click();
+    await (await headerAction(page, '#importCsv')).click();   // builder item 165: behind the header's ⋯ on a phone
     await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('google-contacts.csv', GOOGLE));
     await page.locator('#csvZone').getByRole('button', { name: 'Import 2' }).click();
     await expect.poll(() => seen.rows.length).toBe(2);
@@ -126,7 +127,7 @@ test.describe('Import: match the columns, update people already here, undo (item
       return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { id: 'imp-1', undo: true, counts: { added: 2, updated: 0, existed: 0, failed: 0 } } }) });
     });
     await page.goto('/contacts.html');
-    await page.locator('#importCsv').click();
+    await (await headerAction(page, '#importCsv')).click();   // builder item 165: behind the header's ⋯ on a phone
     await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('two.csv', 'Name,Email\nAna Ruiz,ana@example.com\nBo Lee,bo@example.com\n'));
     await page.locator('#csvZone').getByRole('button', { name: 'Import 2' }).click();
     await expect(page.locator('#csvZone .dds-csvlive')).toHaveText('Importing 2 contacts in one go…');
@@ -140,7 +141,7 @@ test.describe('Import: match the columns, update people already here, undo (item
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/contacts/fields': { data: [{ key: 'size', label: 'Team size', type: 'number' }] } } });
     const seen = await importRoutes(page);
     await page.goto('/contacts.html');
-    await page.locator('#importCsv').click();
+    await (await headerAction(page, '#importCsv')).click();
     await page.locator('#csvZone input[type=file]').setInputFiles(csvFile('t.csv', 'Name,Email,Team size\nAna Ruiz,ana@example.com,12\n'));
     await expect(page.locator('#csvZone .dds-csvmap select[data-col="2"]')).toHaveValue('custom:size');
     await page.locator('#csvZone').getByRole('button', { name: 'Import 1' }).click();

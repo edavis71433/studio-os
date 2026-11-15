@@ -32,11 +32,10 @@
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1180px;margin:0 auto;padding:var(--dds-s6,24px) var(--dds-s5,20px) 90px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-  .head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
-  .head .grow{flex:1 1 320px;min-width:0}
-  h1{font-family:var(--serif);font-weight:600;font-size:30px;letter-spacing:-.01em;line-height:1.2}
-  .lede{color:var(--soft);font-size:15px;margin:4px 0 0}
-  .tools{display:flex;gap:10px;flex-wrap:wrap}
+  /* builder item 165: the header is the shared one (shell.css .dds-ph); these are its buttons */
+  /* builder item 165: beside a tablet's menu the header's actions wrap inside the row instead of pushing the page sideways
+     (shell.css .dds-ph-acts is flex:0 0 auto with no cap) */
+  header.dds-ph .dds-ph-acts{max-width:100%}
   .pill{font:inherit;font-size:14px;font-weight:600;border:1px solid var(--dds-line-strong,#d6d4e2);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 18px;min-height:42px;cursor:pointer}
   .pill:hover{background:var(--p-soft)}
   .pill.go{background:var(--dds-grad-btn,var(--p));border-color:transparent;color:var(--dds-on-p,#fff)}
@@ -114,8 +113,7 @@
   @media (max-width:900px){.totals{grid-template-columns:repeat(2,1fr)}}
   @media (max-width:767px){
     .wrap{padding:16px 16px 100px}
-    h1{font-size:26px}
-    .tools{width:100%}.tools .pill{flex:1 1 auto;min-height:44px}
+    .pill{min-height:44px}
     .totals{gap:10px;margin:14px 0}.tot{padding:12px 14px}.tot .v{font-size:22px}.tot .s{display:none}
     .bar .chips{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px 8px;width:calc(100% + 32px)}
     .bar .chips::-webkit-scrollbar{display:none}
@@ -242,8 +240,15 @@ function render(focusSel){
   const all=DATA.items.filter(i=>!isPart(i));
   const n=(k)=>k==='all'?all.length:k==='overdue'?all.filter(i=>kindOf(i)==='unpaid'&&!(i.processing||i.state==='processing')&&i.due_date&&dayDiff(i.due_date.slice(0,10),today)<0).length:all.filter(i=>kindOf(i)===k).length;
   const months=[...new Set(all.map(i=>localDay(i.issued_at).slice(0,7)).filter(Boolean))].sort().reverse();
-  let h=`<div class="head"><div class="grow"><h1>Invoices</h1><p class="lede">Every invoice you’ve sent, newest first. Record a payment, download the PDF or open the deal from any row.</p></div>
-    <div class="tools"><button type="button" class="pill" id="testInvBtn">Send a test to myself</button><button type="button" class="pill" id="csvBtn">Download CSV</button><button type="button" class="pill" id="expBtn">For your bookkeeper</button><button type="button" class="pill go" id="sendBtn">Send an invoice</button></div></div>
+  // builder item 165: the one page header (shell.css .dds-ph); its line counts every invoice sent and what is owed,
+  // Send an invoice is the one filled action, the test and the download wait behind ⋯ on a phone
+  const all0=all.length;
+  let h=`<header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" data-ic="invoices" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Invoices</h1></div>
+        <p class="dds-ph-line" id="phLine">${all0?`${plural(all0,'invoice')} sent${t.owedN?` · ${money(t.owed)} owed to you`:''}${t.lateN?` · ${t.lateN} overdue`:''}`:'Every invoice you send shows here'}</p></div>
+      <div class="dds-ph-acts"><button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
+        <div class="dds-ph-more" id="phMore" popover><button type="button" class="pill" id="testInvBtn">Send a test to myself</button><button type="button" class="pill" id="csvBtn">Download CSV</button><button type="button" class="pill" id="expBtn">For your bookkeeper</button></div>
+        <button type="button" class="pill go dds-ph-fill" id="sendBtn">Send an invoice</button></div></div></header>
     <div class="totals">
       <div class="tot"><div class="l">Owed to you</div><div class="v">${money(t.owed)}</div><div class="s">${t.owedN} unpaid${t.proc?' · '+money(t.proc)+' of it on its way':''}</div></div>
       <div class="tot bad"><div class="l">Overdue</div><div class="v">${money(t.late)}</div><div class="s">${t.lateN?plural(t.lateN,'invoice')+' · the oldest '+plural(t.oldest,'day')+' late':'Nothing late'}</div></div>

@@ -92,7 +92,9 @@ test.describe('item 124 — what to do now, under the stage bar', () => {
     await expect(note.getByRole('button', { name: 'Edit note' })).toBeHidden();
   });
 
-  test('Settings › Deal stages: all six notes, one opened and saved', async ({ page }) => {
+  // builder item 165: on Settings a note saves when its box is left (no Save note button), with
+  // the Saved tick beside the stage's name; Escape puts the box away unsaved
+  test('Settings › Deal stages: all six notes, one opened and saved as it is left', async ({ page }) => {
     const OWNER = { data: { site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES, is_agency: true, is_operator: false, sees_full_workspace: true, capabilities: ['edit', 'publish', 'invite', 'configure', 'use_developer_mode', 'view_all'], landing: '/agency.html', attention_count: 0, nav: STUDIO_NAV } };
     await installApp(page, { api: { '/portal/context': OWNER, '/identity': { data: { business_name: 'Brightline Studio' } }, '/settings': { data: {} } } });
     const sent = await notesServer(page);
@@ -106,11 +108,58 @@ test.describe('item 124 — what to do now, under the stage bar', () => {
     const box = page.getByLabel('What to do now at Proposal sent, one step a line');
     await expect(box).toBeFocused();
     await box.fill('Call on day two');
-    await rows.nth(2).getByRole('button', { name: 'Save note' }).click();
+    await expect(rows.nth(2).getByRole('button', { name: /^Save/ })).toHaveCount(0);
+    await box.press('Tab');                                          // leaving the box saves it
     await expect.poll(() => sent.length).toBe(1);
     expect(sent[0]).toEqual({ note: { stage: 'proposal', text: 'Call on day two' } });
     await expect(rows.nth(2).locator('.sn-kind')).toHaveText('Your note');
-    await expect(page.locator('#snNoteMsg')).toHaveText('Saved. Every deal at Proposal sent shows it.');
+    await expect(page.locator('#fs-sn-proposal')).toHaveText('Saved');
+    await expect(box).toHaveValue('Call on day two');                // the box stays where you were
+    // Put back the starter note, from the same open box
+    await rows.nth(2).getByRole('button', { name: 'Put back the starter note' }).click();
+    await expect.poll(() => sent.length).toBe(2);
+    expect(sent[1]).toEqual({ note: { stage: 'proposal', text: '' } });
+    await expect(rows.nth(2).locator('.sn-kind')).toHaveText('Starter note');
+    await expect(box).not.toHaveValue('Call on day two');
+    // Escape puts a box away unsaved
+    await page.getByRole('button', { name: 'Edit the note for Won' }).click();
+    const won = page.getByLabel('What to do now at Won, one step a line');
+    await won.fill('Something half-typed');
+    await won.press('Escape');
+    await expect(won).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Edit the note for Won' })).toBeFocused();
+    expect(sent).toHaveLength(2);
+  });
+
+  test('Settings › Deal stages: a note that didn’t save says so beside the stage and keeps the words', async ({ page }) => {
+    const OWNER = { data: { site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES, is_agency: true, is_operator: false, sees_full_workspace: true, capabilities: ['edit', 'publish', 'invite', 'configure', 'use_developer_mode', 'view_all'], landing: '/agency.html', attention_count: 0, nav: STUDIO_NAV } };
+    await installApp(page, { api: { '/portal/context': OWNER, '/identity': { data: { business_name: 'Brightline Studio' } }, '/settings': { data: {} } } });
+    const sent = await notesServer(page);
+    let fail = true;
+    await page.route('**/functions/v1/presence/sales/stages', (route) => (route.request().method() === 'PUT' && fail ? route.abort('internetdisconnected') : route.fallback()));
+    await page.goto('/settings.html#stages');
+    await page.getByRole('button', { name: 'Edit the note for Qualified' }).click();
+    const box = page.getByLabel('What to do now at Qualified, one step a line');
+    await box.fill('Book the call this week');
+    await box.press('Tab');
+    const said = page.locator('#fs-sn-qualified');
+    await expect(said).toHaveText('Couldn’t save · Try again');
+    await expect(box).toHaveValue('Book the call this week');
+    await expect(box).toHaveAttribute('aria-invalid', 'true');
+    // opening another note can't close this one away: it stays open with its words and Try again
+    await page.getByRole('button', { name: 'Edit the note for Won' }).click();
+    await expect(box).toBeFocused();
+    await expect(box).toHaveValue('Book the call this week');
+    await expect(said).toHaveText('Couldn’t save · Try again');
+    await expect(page.getByLabel('What to do now at Won, one step a line')).toHaveCount(0);
+    fail = false;
+    await said.getByRole('button', { name: 'Try again' }).click();
+    await expect(said).toHaveText('Saved');
+    await expect(box).not.toHaveAttribute('aria-invalid', 'true');
+    expect(sent).toEqual([{ note: { stage: 'qualified', text: 'Book the call this week' } }]);
+    // once it has saved, Edit opens the next note as usual
+    await page.getByRole('button', { name: 'Edit the note for Won' }).click();
+    await expect(page.getByLabel('What to do now at Won, one step a line')).toBeFocused();
   });
 
   test('when the notes can’t be read, what the deal knows still shows (they signed: convert them), with no Edit note', async ({ page }) => {

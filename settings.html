@@ -24,10 +24,7 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1040px;margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
-  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--dds-s4,16px);flex-wrap:wrap}
-  h1{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.2;margin:0;letter-spacing:-.01em}
-  .subline{display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--soft);font-size:13px;margin-top:var(--dds-s1,4px)}
-  .subline .dot{color:var(--faint)}
+  /* builder item 165: the page header is the shared one (shell.css .dds-ph); its line is #subline */
   .setgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--dds-s4,16px);margin-top:var(--dds-s5,20px)}
   @media (max-width:700px){.setgrid{grid-template-columns:minmax(0,1fr)}}
   /* ══ Bold redesign — Settings (Nov 2026): on a computer a list on the left that
@@ -286,11 +283,57 @@
   .unread{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:var(--dds-s3,12px);padding:10px 12px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--bg);font-size:13.5px;color:var(--soft)}
   [data-held]{display:none!important}   /* C4: the rows a failed read feeds (their own display rules would beat [hidden]) */
   .sw[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
-  /* item 126: a client site's two channels under its switch, and the Saved tick */
+  /* item 126: a client site's two channels under its switch (the Saved tick is item 165's .fs) */
   .chans{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px}
   .chan{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink);cursor:pointer;min-height:32px}
   .chan input{width:18px;height:18px;margin:0;accent-color:var(--p);cursor:pointer}
   .chans[aria-disabled="true"] .chan{color:var(--faint);cursor:not-allowed}
+  /* ══ Builder item 165 (Nov 2026, Figma 295:100): one way to save ══
+     Everything here saves as you go: a box when you leave it, a pick when you make it, a
+     switch when you flip it. A small "Saved" tick shows beside what changed; a save that
+     doesn't go says "Couldn't save · Try again" in the same place, and the box keeps your
+     words. A card's title has a line of its own, its hint under it: at 390 wide "Your menu"
+     broke as "Your men / u" beside its hint (the shell lets words break anywhere in a .card
+     on a phone, and the title was allowed to shrink). */
+  .card-h{flex-wrap:wrap;row-gap:4px}
+  .card-h h2{font-family:var(--serif);font-size:22px;font-weight:600;letter-spacing:-.01em;line-height:1.25;overflow-wrap:normal;word-break:normal}
+  .card-h .hint{flex:1 1 100%;font-size:13px;color:var(--soft)}
+  .fs{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;line-height:1.3;vertical-align:middle}
+  .fs.ok{color:var(--good)}
+  .fs.ok::before{content:"";width:13px;height:13px;flex:0 0 auto;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+  .fs.bad{color:var(--bad)}
+  .fs .again{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+  @media (pointer:coarse){.fs .again{min-height:32px}}
+  .flab{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-bottom:var(--dds-s1,4px)}
+  .form2 .flab label{margin:0}
+  .flab .wl{margin:0}
+  .swrow .t > .fs{display:flex;margin-top:2px}
+  .form2 input[aria-invalid="true"],.form2 select[aria-invalid="true"],.stgrid input[aria-invalid="true"],.swrow textarea[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
+  .unitbox:has(input[aria-invalid="true"]){border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
+  /* Deal stages, as drawn: a row per open stage — its name, the chance it closes, when it stalls */
+  .stgrid{margin-top:var(--dds-s3,12px)}
+  .strow{display:grid;grid-template-columns:minmax(0,200px) 90px 120px minmax(0,1fr);gap:8px 12px;align-items:center;padding:6px 0}
+  .strow.sthead{padding:0 0 2px;font-size:12.5px;font-weight:500;color:var(--soft)}
+  .strow > .c-name{grid-column:1} .strow > .c-chance{grid-column:2} .strow > .c-stale{grid-column:3} .strow > .fs{grid-column:4}
+  .stgrid .stin{width:100%;height:36px;border:1px solid var(--dds-line-strong,var(--line));border-radius:10px;padding:0 11px;font:inherit;font-size:14px;background:var(--card);color:var(--ink)}
+  .stgrid .stin:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .stgrid .fixed{display:none;font-size:14px;font-weight:500}
+  .unitbox{display:flex;align-items:center;gap:4px;height:36px;border:1px solid var(--dds-line-strong,var(--line));border-radius:10px;padding:0 11px;background:var(--card);cursor:text}
+  .unitbox input{flex:1 1 auto;width:100%;min-width:0;height:100%;border:0;padding:0;background:transparent;font:inherit;font-size:14px;color:var(--ink);-moz-appearance:textfield}
+  .unitbox input::-webkit-outer-spin-button,.unitbox input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .unitbox input:focus{outline:none}
+  .unitbox:focus-within{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .unitbox span{flex:0 0 auto;font-size:14px;color:var(--soft)}
+  .stgrid.no-sales .c-name .stin,.stgrid.no-sales .c-chance{display:none}
+  #stages:has(#staleRow[data-held]) .c-stale{visibility:hidden}
+  .stgrid.no-sales .c-name .fixed{display:inline}
+  #stagesHow{font-size:12.5px;color:var(--faint)}
+  @media (max-width:560px){
+    .strow{grid-template-columns:minmax(0,1fr) 66px 90px;column-gap:8px;row-gap:0}
+    .stgrid .stin,.unitbox{padding:0 8px}
+    .strow > .fs{grid-column:1/-1}   /* the tick drops under its row (an empty one takes no room, and stays a live region) */
+    .strow > .fs:not(:empty){margin-top:6px}
+  }
   .nsaved{font-size:12px;font-weight:600;color:var(--good,#11744a);margin-left:6px}
   /* items 229 and 233: a client's own choice says so beside the part */
   .pchip{display:inline-block;margin-left:8px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--p-soft,#ece6f8);color:var(--p,#5b3fa0);vertical-align:1px}
@@ -340,29 +383,31 @@
 </head>
 <body>
 <div class="wrap" id="main">
-  <div class="toprow">
-    <div><h1 id="pagehead" tabindex="-1">Settings</h1><div class="subline" id="subline"><span>Loading…</span></div></div>
-  </div>
+  <header class="dds-ph">
+    <div class="dds-ph-row"><span class="dds-ph-ic" data-ic="settings" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Settings</h1></div><p class="dds-ph-line" id="subline">Loading…</p></div></div>
+  </header>
   <div class="setlay">
   <nav class="setnav" aria-label="Settings areas"><input type="search" id="setFind" class="setfind" placeholder="Search settings" aria-label="Search settings" aria-controls="cards" autocomplete="off"><div class="setgrid" id="cards"></div></nav>
   <div class="setmain">
   <section class="card" id="studio" aria-labelledby="profileHead" hidden>
-    <div class="card-h"><h2 id="profileHead">Studio profile</h2><button class="btn sm primary" type="button" id="profileSave">Save</button></div>
+    <!-- builder item 165: no Save pill. A box saves when you leave it, a pick when you make it -->
+    <div class="card-h"><h2 id="profileHead">Studio profile</h2><span class="hint" id="profileHint">Changes save as you go.</span></div>
     <form class="form2" id="profileForm">
-      <div><label for="f-name">Studio name</label><input id="f-name" maxlength="120" autocomplete="organization"></div>
-      <div data-needs="configure"><label for="f-industry">Kind of business</label><select id="f-industry"><option value="generic">General / other</option>
+      <div><div class="flab"><label for="f-name">Studio name</label><span class="fs" id="fs-f-name" role="status"></span></div><input id="f-name" maxlength="120" autocomplete="organization" aria-describedby="fs-f-name"></div>
+      <div data-needs="configure"><div class="flab"><label for="f-industry">Kind of business</label><span class="fs" id="fs-f-industry" role="status"></span></div><select id="f-industry" aria-describedby="fs-f-industry"><option value="generic">General / other</option>
           <option value="restaurant">Restaurant</option><option value="coffee_shop">Coffee shop / café</option><option value="bar">Bar</option>
           <option value="salon">Salon</option><option value="barber">Barber</option><option value="spa">Spa</option><option value="fitness">Fitness / gym</option>
           <option value="home_services">Home services</option><option value="plumber">Plumber</option><option value="hvac">HVAC</option><option value="electrician">Electrician</option><option value="contractor">Contractor</option><option value="landscaping">Landscaping</option><option value="cleaning">Cleaning</option><option value="roofing">Roofing</option>
           <option value="medical">Medical</option><option value="dental">Dental</option><option value="veterinary">Veterinary</option>
           <option value="law">Law</option><option value="accounting">Accounting</option><option value="insurance">Insurance</option><option value="consulting">Consulting</option><option value="marketing">Marketing</option><option value="real_estate">Real estate</option><option value="photography">Photography</option>
           <option value="retail">Retail / shop</option><option value="nonprofit">Nonprofit</option><option value="church">Church</option><option value="professional">Professional services</option></select></div>
-      <div><label for="f-email">Email</label><input id="f-email" type="email" maxlength="160" autocomplete="email"></div>
-      <div><label for="f-phone">Phone</label><input id="f-phone" type="tel" maxlength="40" placeholder="Optional" autocomplete="tel"></div>
-      <div class="full"><label for="f-area">Where you work from</label><input id="f-area" maxlength="160" placeholder="e.g. Burbank, CA"></div>
+      <div><div class="flab"><label for="f-email">Email</label><span class="fs" id="fs-f-email" role="status"></span></div><input id="f-email" type="email" maxlength="160" autocomplete="email" aria-describedby="fs-f-email"></div>
+      <div><div class="flab"><label for="f-phone">Phone</label><span class="fs" id="fs-f-phone" role="status"></span></div><input id="f-phone" type="tel" maxlength="40" placeholder="Optional" autocomplete="tel" aria-describedby="fs-f-phone"></div>
+      <div class="full"><div class="flab"><label for="f-area">Where you work from</label><span class="fs" id="fs-f-area" role="status"></span></div><input id="f-area" maxlength="160" placeholder="e.g. Burbank, CA" aria-describedby="fs-f-area"></div>
       <!-- sales item 88: who signs agreements for the studio; added beside the client's signature, at the same moment -->
-      <div data-needs="configure" data-signer><label for="f-signer">Who signs your agreements</label><input id="f-signer" maxlength="120" placeholder="Your name" autocomplete="name"></div>
-      <div data-needs="configure" data-signer><label for="f-signer-title">Their title <span class="muted">(optional)</span></label><input id="f-signer-title" maxlength="80" placeholder="e.g. Owner"></div>
+      <div data-needs="configure" data-signer><div class="flab"><label for="f-signer">Who signs your agreements</label><span class="fs" id="fs-f-signer" role="status"></span></div><input id="f-signer" maxlength="120" placeholder="Your name" autocomplete="name" aria-describedby="fs-f-signer"></div>
+      <div data-needs="configure" data-signer><div class="flab"><label for="f-signer-title">Their title <span class="muted">(optional)</span></label><span class="fs" id="fs-f-signer-title" role="status"></span></div><input id="f-signer-title" maxlength="80" placeholder="e.g. Owner" aria-describedby="fs-f-signer-title"></div>
       <div class="full how" data-needs="configure" data-signer id="signerHow">Added beside the client’s signature, with the same date and time, the moment they sign. Left blank, it’s your account’s name.</div>
       <!-- builder list item 59: what clients see of this studio (GET /brand/studio). The logo is the
            site's own, set in Files with Set as logo; this only shows it and says where to change it. -->
@@ -389,48 +434,46 @@
   <!-- Bold redesign (Nov 2026): the deal stages have their own section — the
        studio's names for the four open stages, the chance each one closes, and
        when a deal counts as stalled (they lived under Automations) -->
+  <!-- Bold redesign (Nov 2026): the deal stages have their own section. Builder item 165 (Figma
+       295:127): one row per open stage, as drawn: your name for it (sales review item 38; Won and
+       Not a fit keep theirs), the chance it closes (item 69; Won is 100%, Not a fit 0%) and when a
+       deal there counts as stalled (item 13). Each box saves when you leave it; no Save buttons. -->
   <section class="card" id="stages" aria-labelledby="stagesHead" hidden data-needs="configure">
-    <div class="card-h"><h2 id="stagesHead" tabindex="-1">Deal stages</h2><span class="hint">Names · chances · when a deal stalls</span></div>
-    <div class="swrow" style="display:block" id="staleRow">
-      <b style="font-weight:600">Flag a deal as stalled after</b>
-      <div class="how">The pipeline board marks a deal “Stalled” when nothing has moved for this many days. Per stage; 14 unless you say otherwise.</div>
-      <div class="stale">
-        <label><span data-stage-label="lead">New lead</span> <input type="number" id="st-lead" min="1" max="365" placeholder="14" aria-label="Stale after days — New lead"> days</label>
-        <label><span data-stage-label="qualified">Qualified</span> <input type="number" id="st-qualified" min="1" max="365" placeholder="14" aria-label="Stale after days — Qualified"> days</label>
-        <label><span data-stage-label="proposal">Proposal sent</span> <input type="number" id="st-proposal" min="1" max="365" placeholder="14" aria-label="Stale after days — Proposal sent"> days</label>
-        <label><span data-stage-label="contract">Agreement out</span> <input type="number" id="st-contract" min="1" max="365" placeholder="14" aria-label="Stale after days — Agreement out"> days</label>
+    <div class="card-h"><h2 id="stagesHead" tabindex="-1">Deal stages</h2><span class="hint" id="stagesHint">Your names for the four open stages, the chance each closes, and when a deal counts as stalled. Changes save as you go.</span></div>
+    <div class="stgrid" id="stageGrid" role="group" aria-labelledby="stagesHead">
+      <div class="strow sthead" aria-hidden="true"><span class="c-name">Stage</span><span class="c-chance" id="sth-chance">Chance</span><span class="c-stale" id="sth-stale">Stalled after</span></div>
+      <div class="strow" data-stage="lead">
+        <span class="c-name"><input type="text" class="stin" id="sn-lead" maxlength="30" placeholder="New lead" aria-label="Your name for New lead" aria-describedby="fs-stage-lead"><span class="fixed" data-stage-label="lead">New lead</span></span>
+        <label class="c-chance unitbox" id="scc-lead"><input type="number" id="sc-lead" min="0" max="100" step="1" placeholder="10" aria-label="Chance a deal at New lead closes, in percent" aria-describedby="fs-stage-lead"><span aria-hidden="true">%</span></label>
+        <label class="c-stale unitbox" id="stc-lead"><input type="number" id="st-lead" min="1" max="365" placeholder="14" aria-label="Stale after days — New lead" aria-describedby="fs-stage-lead"><span aria-hidden="true">days</span></label>
+        <span class="fs" id="fs-stage-lead" role="status"></span>
+      </div>
+      <div class="strow" data-stage="qualified">
+        <span class="c-name"><input type="text" class="stin" id="sn-qualified" maxlength="30" placeholder="Qualified" aria-label="Your name for Qualified" aria-describedby="fs-stage-qualified"><span class="fixed" data-stage-label="qualified">Qualified</span></span>
+        <label class="c-chance unitbox" id="scc-qualified"><input type="number" id="sc-qualified" min="0" max="100" step="1" placeholder="25" aria-label="Chance a deal at Qualified closes, in percent" aria-describedby="fs-stage-qualified"><span aria-hidden="true">%</span></label>
+        <label class="c-stale unitbox" id="stc-qualified"><input type="number" id="st-qualified" min="1" max="365" placeholder="14" aria-label="Stale after days — Qualified" aria-describedby="fs-stage-qualified"><span aria-hidden="true">days</span></label>
+        <span class="fs" id="fs-stage-qualified" role="status"></span>
+      </div>
+      <div class="strow" data-stage="proposal">
+        <span class="c-name"><input type="text" class="stin" id="sn-proposal" maxlength="30" placeholder="Proposal sent" aria-label="Your name for Proposal sent" aria-describedby="fs-stage-proposal"><span class="fixed" data-stage-label="proposal">Proposal sent</span></span>
+        <label class="c-chance unitbox" id="scc-proposal"><input type="number" id="sc-proposal" min="0" max="100" step="1" placeholder="50" aria-label="Chance a deal at Proposal sent closes, in percent" aria-describedby="fs-stage-proposal"><span aria-hidden="true">%</span></label>
+        <label class="c-stale unitbox" id="stc-proposal"><input type="number" id="st-proposal" min="1" max="365" placeholder="14" aria-label="Stale after days — Proposal sent" aria-describedby="fs-stage-proposal"><span aria-hidden="true">days</span></label>
+        <span class="fs" id="fs-stage-proposal" role="status"></span>
+      </div>
+      <div class="strow" data-stage="contract">
+        <span class="c-name"><input type="text" class="stin" id="sn-contract" maxlength="30" placeholder="Agreement out" aria-label="Your name for Agreement out" aria-describedby="fs-stage-contract"><span class="fixed" data-stage-label="contract">Agreement out</span></span>
+        <label class="c-chance unitbox" id="scc-contract"><input type="number" id="sc-contract" min="0" max="100" step="1" placeholder="75" aria-label="Chance a deal at Agreement out closes, in percent" aria-describedby="fs-stage-contract"><span aria-hidden="true">%</span></label>
+        <label class="c-stale unitbox" id="stc-contract"><input type="number" id="st-contract" min="1" max="365" placeholder="14" aria-label="Stale after days — Agreement out" aria-describedby="fs-stage-contract"><span aria-hidden="true">days</span></label>
+        <span class="fs" id="fs-stage-contract" role="status"></span>
       </div>
     </div>
-    <!-- sales review item 38: rename the four open stages (Won and Not a fit keep theirs) -->
-    <div class="swrow" style="display:block" id="stageNames">
-      <b style="font-weight:600">Name your deal stages</b>
-      <div class="how">Call the four open stages what you call them; the Pipeline, records and reports all follow. Won and Not a fit keep their names. Leave one blank for its usual name.</div>
-      <div class="stale snames">
-        <label>New lead <input type="text" id="sn-lead" maxlength="30" placeholder="New lead" aria-label="Your name for New lead"></label>
-        <label>Qualified <input type="text" id="sn-qualified" maxlength="30" placeholder="Qualified" aria-label="Your name for Qualified"></label>
-        <label>Proposal sent <input type="text" id="sn-proposal" maxlength="30" placeholder="Proposal sent" aria-label="Your name for Proposal sent"></label>
-        <label>Agreement out <input type="text" id="sn-contract" maxlength="30" placeholder="Agreement out" aria-label="Your name for Agreement out"></label>
-      </div>
-      <div style="margin-top:10px;display:flex;align-items:center;gap:10px"><button type="button" class="btn" id="snSave">Save stage names</button><span class="how" id="snMsg" role="status" style="margin:0"></span></div>
-    </div>
-    <!-- sales review item 69: the chance each open stage closes (Won is 100%, Not a fit 0%) -->
-    <div class="swrow" style="display:block" id="stageChances">
-      <b style="font-weight:600">The chance each stage closes</b>
-      <div class="how">Pipeline’s Expected total is each open deal’s value times its stage’s chance. Won counts as 100% and Not a fit as 0%.</div>
-      <div class="stale">
-        <label><span data-stage-label="lead">New lead</span> <input type="number" id="sc-lead" min="0" max="100" step="1" placeholder="10" aria-label="Chance a deal at New lead closes, in percent"> %</label>
-        <label><span data-stage-label="qualified">Qualified</span> <input type="number" id="sc-qualified" min="0" max="100" step="1" placeholder="25" aria-label="Chance a deal at Qualified closes, in percent"> %</label>
-        <label><span data-stage-label="proposal">Proposal sent</span> <input type="number" id="sc-proposal" min="0" max="100" step="1" placeholder="50" aria-label="Chance a deal at Proposal sent closes, in percent"> %</label>
-        <label><span data-stage-label="contract">Agreement out</span> <input type="number" id="sc-contract" min="0" max="100" step="1" placeholder="75" aria-label="Chance a deal at Agreement out closes, in percent"> %</label>
-      </div>
-      <div style="margin-top:10px;display:flex;align-items:center;gap:10px"><button type="button" class="btn" id="scSave">Save percents</button><span class="how" id="scMsg" role="status" style="margin:0"></span></div>
-    </div>
+    <span id="staleRow" hidden></span>   <!-- C4: held when /settings can't be read; the Stalled after column hides with it -->
+    <div class="how" id="stagesHow" style="margin-top:8px">Pipeline’s Expected total is each open deal’s value times its stage’s chance. A deal is marked Stalled when nothing has moved for that many days (14 unless you say otherwise). Leave a name blank for its usual one.</div>
     <!-- sales item 124: the note under the stage bar on every deal, one per stage (Won and Not a fit too) -->
     <div class="swrow" style="display:block" id="stageNotes" hidden>
       <b style="font-weight:600">What to do now at each stage</b>
-      <div class="how">A short note under the stage bar on every deal. Each stage has a starter note until you change it.</div>
+      <div class="how">A short note under the stage bar on every deal. Each stage has a starter note until you change it. A note saves when you leave its box.</div>
       <div class="sn-list" id="snList"></div>
-      <span class="how" id="snNoteMsg" role="status" style="margin:6px 0 0;display:block"></span>
     </div>
   </section>
   <!-- sales item 94 (Nov 2026): the month's sales goal, which Home and Pipeline show this month
@@ -438,11 +481,11 @@
        off for every studio until its owner switches it on). GET/PUT /sales/goal-ai: the goal
        saves with its button, the switch as it flips, and only the studio's owner may flip it. -->
   <section class="card" id="goal" aria-labelledby="goalHead" hidden data-needs="configure">
-    <div class="card-h"><h2 id="goalHead" tabindex="-1">Goal and AI help</h2><span class="hint">Your number for the month, and AI help that drafts and sums up</span></div>
+    <div class="card-h"><h2 id="goalHead" tabindex="-1">Goal and AI help</h2><span class="hint">Your number for the month, and AI help that drafts and sums up. Changes save as you go.</span></div>
     <div class="swrow goalrow">
-      <div class="t"><b id="goalL">Monthly sales goal</b>
+      <div class="t"><b id="goalL">Monthly sales goal</b> <span class="fs" id="fs-goal" role="status"></span>
         <div class="how" id="goalHow">Home and Pipeline show this month against it: what you’ve won, what open deals should still bring at each stage’s chance, and what’s left to find. Leave it empty and nothing shows.</div>
-        <div class="goalin"><span class="cur" aria-hidden="true">$</span><input id="goalAmt" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="8,000" aria-labelledby="goalL" aria-describedby="goalHow goalEx"><span class="per">a month</span><button type="button" class="btn sm primary" id="goalSave">Save</button></div>
+        <div class="goalin"><span class="cur" aria-hidden="true">$</span><input id="goalAmt" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="8,000" aria-labelledby="goalL" aria-describedby="goalHow goalEx"><span class="per">a month</span></div>
         <div class="how" id="goalEx"></div></div>
     </div>
     <div class="swrow" id="aiRow">
@@ -517,9 +560,9 @@
         <div class="how" id="aiLast"></div></div>
     </div>
     <div class="swrow rp-block" id="reportLineRow">
-      <b style="font-weight:600">A line from you, at the top</b>
+      <b style="font-weight:600" id="report-note-l">A line from you, at the top</b> <span class="fs" id="fs-report-note" role="status"></span>
       <div class="how">Goes at the top of every report, in your words. Written once; change it any time.</div>
-      <textarea id="report-note" maxlength="600" rows="3" placeholder="e.g. Thanks for a great month. The new photos are bringing people to the Services page." style="width:100%;margin-top:8px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical"></textarea>
+      <textarea id="report-note" aria-labelledby="report-note-l" aria-describedby="fs-report-note" maxlength="600" rows="3" placeholder="e.g. Thanks for a great month. The new photos are bringing people to the Services page." style="width:100%;margin-top:8px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical"></textarea>
     </div>
     <h3 class="rp-h" id="reportSugH">What to suggest next</h3>
     <div class="swrow rp-block" id="reportSugRow">
@@ -533,12 +576,12 @@
       </div>
       <div class="rp-own" id="sugOwn" hidden>
         <label class="sr-only" for="sug-text">Your suggestion</label>
-        <textarea id="sug-text" maxlength="400" rows="3" placeholder="e.g. A page for your spring menu, ready before Easter. We can have it live in a week."></textarea>
-        <div class="rp-ownb"><button type="button" class="btn primary" id="sugSave">Save the suggestion</button><span class="how">Goes in every report until you change it.</span></div>
+        <textarea id="sug-text" aria-describedby="fs-sug" maxlength="400" rows="3" placeholder="e.g. A page for your spring menu, ready before Easter. We can have it live in a week."></textarea>
+        <div class="rp-ownb"><span class="fs" id="fs-sug" role="status"></span><span class="how">Goes in every report until you change it. It saves when you leave the box.</span></div>
       </div>
       <div class="how">One suggestion a month, in plain words, ending “Reply to this email and we’ll set it up”. It’s picked from this client’s Do next list (Growth Coach ideas, searches they miss, AI answers that skip them), never repeats within three months, and shows here and in the preview before it goes. A reply lands in your Inbox.</div>
     </div>
-    <div class="rp-actions" id="reportActRow"><button type="button" class="btn primary" id="reportSave">Save the line</button><button type="button" class="btn ghost" id="reportPreview">Send me a preview</button><button type="button" class="btn ghost" id="reportPdf">Download last month’s PDF</button><span class="how" id="reportMsg" role="status"></span></div>
+    <div class="rp-actions" id="reportActRow"><button type="button" class="btn ghost" id="reportPreview">Send me a preview</button><button type="button" class="btn ghost" id="reportPdf">Download last month’s PDF</button><span class="how" id="reportMsg" role="status"></span></div>
   </section>
   <!-- builder list item 160 (Nov 2026): every client's monthly report on one card, the studio's own
        Settings only (GET /agency/monthly-reports). Each switch is that client's own switch
@@ -554,7 +597,7 @@
        studio level only; saved once per studio (GET/PUT /agency/nav), so everyone on the
        team sees the same menu. Each switch saves as you flip it. -->
   <section class="card" id="menu" aria-labelledby="menuHead" hidden>
-    <div class="card-h"><h2 id="menuHead" tabindex="-1">Your menu</h2><span class="hint">Turn off an area your studio doesn’t use. It stays one search away, and its page keeps working.</span></div>
+    <div class="card-h"><h2 id="menuHead" tabindex="-1">Your menu</h2><span class="hint">Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away. Changes save as you go.</span></div>
     <div id="menuRows"></div>
     <div class="how" id="menuNote" style="margin-top:10px">Home and Settings always stay. The menu changes the next time a page opens.</div>
   </section>
@@ -564,7 +607,7 @@
        one. Kept once per studio (GET /agency/notify, PUT /agency/notify/:site). Each switch
        saves as you flip it. -->
   <section class="card" id="notify" aria-labelledby="notifyHead" hidden>
-    <div class="card-h"><h2 id="notifyHead" tabindex="-1">Notifications</h2><span class="hint" id="notifyHint">What you hear about each client’s site, and how. Each switch saves as you flip it.</span></div>
+    <div class="card-h"><h2 id="notifyHead" tabindex="-1">Notifications</h2><span class="hint" id="notifyHint">What you hear about each client’s site, and how. Changes save as you go.</span></div>
     <!-- builder item 202: the same switch as the account menu's row, for this phone or computer -->
     <div class="swrow" id="row-push" hidden>
       <button type="button" class="sw" role="switch" id="sw-push" aria-checked="false" aria-labelledby="sw-push-l"></button>
@@ -649,29 +692,29 @@
     </form>
   </dialog>
   <section class="card" id="automations" aria-labelledby="autoHead" hidden data-needs="configure">
-    <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint" id="autoHint">Ready-made recipes, and the switches behind them. Each saves as you flip it.</span></div>
+    <div class="card-h"><h2 id="autoHead" tabindex="-1">Automations</h2><span class="hint" id="autoHint">Ready-made recipes, and the switches behind them. Changes save as you go.</span></div>
     <!-- sales item 87: Wix-style recipes, each one tap; it switches on the rows below -->
     <div class="recipes" id="recipes" role="list" aria-label="Ready-made recipes"></div>
     <div class="swrow" id="row-ack" data-scoped="1">
       <button type="button" class="sw" role="switch" id="sw-ack" aria-checked="false" aria-labelledby="sw-ack-l"></button>
-      <div class="t"><b id="sw-ack-l">Acknowledge new enquiries within a minute</b>
+      <div class="t"><b id="sw-ack-l">Acknowledge new enquiries within a minute</b><span class="fs" id="fs-row-ack" role="status"></span>
         <div class="how">Someone who writes in through your website gets one short reply right away, on your brand, with a copy of what they wrote. You still answer them yourself. A new website starts with this on.</div>
-        <label class="wl" for="w-ack">In your own words <span class="muted">(optional)</span></label>
-        <textarea id="w-ack" class="words" maxlength="1200" rows="2" placeholder="Thanks for getting in touch — we’ve got your message and will reply within one business day."></textarea>
+        <div class="flab"><label class="wl" for="w-ack">In your own words <span class="muted">(optional)</span></label><span class="fs" id="fs-w-ack" role="status"></span></div>
+        <textarea id="w-ack" aria-describedby="fs-w-ack" class="words" maxlength="1200" rows="2" placeholder="Thanks for getting in touch — we’ve got your message and will reply within one business day."></textarea>
         <div class="say"><span class="lbl">What they’ll read</span><span id="say-ack">Thanks for getting in touch — we’ve got your message and will reply within one business day.</span><span class="sayq">…then a copy of what they wrote.</span></div></div>
     </div>
     <div class="swrow" id="row-fu" data-scoped="1">
       <button type="button" class="sw" role="switch" id="sw-fu" aria-checked="false" aria-labelledby="sw-fu-l"></button>
-      <div class="t"><b id="sw-fu-l">Follow up quiet enquiries after <input type="number" id="n-fu1" min="1" max="14" value="3" aria-label="Days before the first follow-up"> and <input type="number" id="n-fu2" min="3" max="30" value="7" aria-label="Days before the second follow-up"> days</b>
+      <div class="t"><b id="sw-fu-l">Follow up quiet enquiries after <input type="number" id="n-fu1" min="1" max="14" value="3" aria-label="Days before the first follow-up"> and <input type="number" id="n-fu2" min="3" max="30" value="7" aria-label="Days before the second follow-up"> days</b><span class="fs" id="fs-row-fu" role="status"></span>
         <div class="how">Two short emails in your name if they go quiet. They stop the moment they write back, book, or you mark the enquiry in your Inbox (Not a fit, or made a deal) or press Stop follow-ups there. Each one has an unsubscribe link.</div>
-        <label class="wl" for="w-fu1">The first one, in your own words <span class="muted">(optional)</span></label>
-        <textarea id="w-fu1" class="words" maxlength="1200" rows="2" placeholder="Just checking in on your message. If you still need a hand, reply to this email and we’ll pick it up straight away."></textarea>
-        <label class="wl" for="w-fu2">The second and last one <span class="muted">(optional)</span></label>
-        <textarea id="w-fu2" class="words" maxlength="1200" rows="2" placeholder="One last note from us about your message. If the timing isn’t right, no problem at all. Whenever you’re ready, just reply."></textarea></div>
+        <div class="flab"><label class="wl" for="w-fu1">The first one, in your own words <span class="muted">(optional)</span></label><span class="fs" id="fs-w-fu1" role="status"></span></div>
+        <textarea id="w-fu1" aria-describedby="fs-w-fu1" class="words" maxlength="1200" rows="2" placeholder="Just checking in on your message. If you still need a hand, reply to this email and we’ll pick it up straight away."></textarea>
+        <div class="flab"><label class="wl" for="w-fu2">The second and last one <span class="muted">(optional)</span></label><span class="fs" id="fs-w-fu2" role="status"></span></div>
+        <textarea id="w-fu2" aria-describedby="fs-w-fu2" class="words" maxlength="1200" rows="2" placeholder="One last note from us about your message. If the timing isn’t right, no problem at all. Whenever you’re ready, just reply."></textarea></div>
     </div>
     <div class="swrow" id="row-inv">
       <button type="button" class="sw" role="switch" id="sw-inv" aria-checked="false" aria-labelledby="sw-inv-l"></button>
-      <div class="t"><b id="sw-inv-l">Remind unpaid invoices <input type="number" id="n-inv" min="1" max="90" value="2" aria-label="Days after the due date"> days after they’re due, at most once a day</b>
+      <div class="t"><b id="sw-inv-l">Remind unpaid invoices <input type="number" id="n-inv" min="1" max="90" value="2" aria-label="Days after the due date"> days after they’re due, at most once a day</b><span class="fs" id="fs-row-inv" role="status"></span>
         <div class="how">A week before the due date, on the due date, and once more <span id="n-inv-echo">2</span> days after — three reminders at most, with the same secure payment link, to the deal’s contact. An invoice with no due date counts as due a week after it was sent.</div>
         <div class="say"><span class="lbl">What they’ll read</span><span id="say-inv">Just a friendly nudge: the invoice for $1,250.00 is still open. The same secure link works whenever you’re ready — nothing expires.</span></div>
         <div class="subrow"><button type="button" class="sw" role="switch" id="sw-inv2" aria-checked="false" aria-labelledby="sw-inv2-l"></button>
@@ -679,19 +722,19 @@
     </div>
     <div class="swrow" id="row-exp">
       <button type="button" class="sw" role="switch" id="sw-exp" aria-checked="false" aria-labelledby="sw-exp-l"></button>
-      <div class="t"><b id="sw-exp-l">Remind them a week before a proposal or estimate runs out</b>
+      <div class="t"><b id="sw-exp-l">Remind them a week before a proposal or estimate runs out</b><span class="fs" id="fs-row-exp" role="status"></span>
         <div class="how">A proposal is good for 30 days after you send it, an estimate until the date you set. One note with a fresh link, never on the day another reminder went, and never for a proposal you replaced.</div>
         <div class="say"><span class="lbl">What they’ll read</span><span id="say-exp">A quick note: your proposal for Website refresh is good until December 11, a week from now. Here’s the link if you’d like another look.</span></div></div>
     </div>
     <div class="swrow" id="row-deal">
       <button type="button" class="sw" role="switch" id="sw-deal" aria-checked="false" aria-labelledby="sw-deal-l"></button>
-      <div class="t"><b id="sw-deal-l">Nudge me when a deal has had no next step for <input type="number" id="n-deal" min="1" max="90" value="3" aria-label="Quiet days before a nudge"> days</b>
+      <div class="t"><b id="sw-deal-l">Nudge me when a deal has had no next step for <input type="number" id="n-deal" min="1" max="90" value="3" aria-label="Quiet days before a nudge"> days</b><span class="fs" id="fs-row-deal" role="status"></span>
         <div class="how">An open deal with no edit, no logged contact and nothing scheduled for that long rings your bell and emails you — once a week while it stays quiet.</div>
         <div class="say"><span class="lbl">What you’ll read</span><span id="say-deal">This deal has had no next step for 3 days — a quick follow-up keeps it moving.</span></div></div>
     </div>
     <div class="swrow" id="row-rev">
       <button type="button" class="sw" role="switch" id="sw-rev" aria-checked="false" aria-labelledby="sw-rev-l"></button>
-      <div class="t"><b id="sw-rev-l">Ask for a review <input type="number" id="n-rev" min="1" max="90" value="3" aria-label="Days after a project is done"> days after a project is done</b>
+      <div class="t"><b id="sw-rev-l">Ask for a review <input type="number" id="n-rev" min="1" max="90" value="3" aria-label="Days after a project is done"> days after a project is done</b><span class="fs" id="fs-row-rev" role="status"></span>
         <div class="how">When you mark a project complete, its client gets one email <span id="n-rev-echo">3</span> days later with a link to your review page — the same email as a request you send by hand. Once per project. Every client is asked, whatever they said in the quick survey: asking only happy clients breaks Google’s rules on reviews.</div>
         <div class="say"><span class="lbl">What they’ll read</span><span id="say-rev">Thanks for choosing us. If you have a moment, we’d love a quick review — it really helps.</span></div></div>
     </div>
@@ -784,6 +827,36 @@ async function api(path, method, body) {
   return { ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) };
 }
 const toast = (m, bad) => { if (window.ddsToast) window.ddsToast(m, bad ? 'err' : 'ok'); };
+// ── Builder item 165 (Nov 2026, Figma 295:100): one way to save. A box saves when you leave
+//    it, a pick when you make it, a switch when you flip it; the small "Saved" tick shows in the
+//    place beside what changed (an element with class fs), and a save that doesn't go says
+//    "Couldn't save · Try again" there instead, while the box keeps what you typed. ──
+const fsSlot = (id) => $('fs-' + id);
+function saidNothing(slot) { if (!slot) return; clearTimeout(slot._t); slot.className = 'fs'; slot.textContent = ''; }
+function saidSaved(slot) {
+  if (!slot) return;
+  clearTimeout(slot._t); slot.className = 'fs ok'; slot.textContent = 'Saved';
+  slot._t = setTimeout(() => { if (slot.classList.contains('ok')) saidNothing(slot); }, 5000);
+}
+// again: what Try again does (none when trying again can't help, like a box that needs a name)
+function saidFailed(slot, again, words) {
+  if (!slot) return;
+  clearTimeout(slot._t); slot.className = 'fs bad'; slot.textContent = (words || 'Couldn’t save') + (again ? ' · ' : '');
+  if (!again) return;
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'again'; b.textContent = 'Try again';
+  b.addEventListener('click', () => { saidNothing(slot); again(); });
+  slot.appendChild(b);
+}
+function markBad(el, bad) { if (!el) return; if (bad) el.setAttribute('aria-invalid', 'true'); else el.removeAttribute('aria-invalid'); }
+// A refusal that says why (a 4xx with the server's own words, or a field's own check) says
+// it, without Try again: trying again won't change the answer. Anything else — a dropped
+// connection, a hiccup on our side — is "Couldn't save · Try again".
+function saidRefused(slot, r, again, field) {
+  const b = r && r.body, st = r ? r.status : 0;
+  const own = field && b && Array.isArray(b.fields) ? b.fields.find((x) => x && x.field === field) : null;
+  const why = own && typeof own.message === 'string' ? own.message : (st >= 400 && st < 500 && st !== 408 && st !== 429 ? nice(b, '') : '');
+  if (why) saidFailed(slot, null, 'Couldn’t save. ' + why); else saidFailed(slot, again);
+}
 // sales review item 69: "Download my data" — the zip arrives as a file, so this one fetch reads bytes, not JSON
 async function downloadMyData() {
   const b = $('dlData'); if (!b) return;
@@ -864,8 +937,9 @@ const CARDS = [
   { key: 'portal', href: '#portalParts', title: 'Client portal', desc: 'What your clients see in their portal, a welcome note on their Home, and Home’s cards.', words: 'client portal clients see hide invoices messages files reports welcome note home cards pages quick links guide sign in google password code', studioTeam: true, scoped: true,
     scopedTitle: (who) => possessive(who) + ' portal', scopedDesc: 'What this client sees in their portal: the same as your studio’s choices unless you change it here.' },
   // the developer tools are the STUDIO's, never a client's — the card stays unscoped and says so while drilled in
-  { key: 'dev', href: '/developer.html', title: 'Developer', desc: 'API keys, webhooks, the schema dump. For you, not clients.', words: 'api keys webhooks schema developer code', feature: 'developer', cap: 'use_developer_mode',
-    scopedTitle: () => 'Your studio’s developer tools', scopedDesc: 'API keys, webhooks, the schema dump — your studio’s own, not this client’s. Opening it leaves the client.' },
+  // builder item 165: named for what the page holds (it promised API keys, webhooks and a schema dump it doesn't have)
+  { key: 'dev', href: '/developer.html', title: 'Developer tools', desc: 'Your site’s colors and type, your own styles and a block of your own HTML. For you, not your clients.', words: 'developer code css html theme colors styles tokens', feature: 'developer', cap: 'use_developer_mode',
+    scopedTitle: () => 'Your studio’s developer tools', scopedDesc: 'Your studio’s own colors, styles and HTML, not this client’s. Opening it leaves the client.' },
   // list item 175: website settings that live on the website page, found by searching only
   { key: 'site_access', icon: 'domains', href: '/presence.html', title: 'Who can see your website', desc: 'Public, a visitor password, or offline. On your website’s Overview.', words: 'password private public offline availability hide lock coming soon', feature: 'website', scoped: true, searchOnly: true },
   { key: 'ai_crawlers', icon: 'domains', href: '/presence.html#search', title: 'AI assistants', desc: 'Let ChatGPT, Claude and other AI assistants read your website, or ask them not to. In your website’s Search.', words: 'ai crawlers robots chatgpt claude perplexity gemini bots block', feature: 'website', scoped: true, searchOnly: true },
@@ -1010,10 +1084,11 @@ function memberHtml(m) {
   const roleCtl = canManageTeam() && !mine && !revoked
     ? `<select data-role="${esc(m.id)}" aria-label="Role for ${esc(m.email)}">${Object.keys(ROLE_WORD).map((k) => `<option value="${k}"${m.role === k ? ' selected' : ''}>${ROLE_WORD[k]}</option>`).join('')}</select>`
     : `<span class="rolew">${esc(ROLE_WORD[m.role] || m.role)}${mine ? ' · you' : ''}${revoked ? ' · removed' : (m.status === 'invited' ? ' · invited' : '')}</span>`;
+  const said = canManageTeam() && !mine && !revoked ? `<span class="fs" id="fs-m-${esc(m.id)}" role="status"></span>` : '';   // item 165
   const act = canManageTeam() && !mine ? (revoked ? `<button class="btn sm" type="button" data-restore="${esc(m.id)}">Restore</button>` : `<button class="btn sm" type="button" data-revoke="${esc(m.id)}">Remove</button>`) : '';
   // builder item 220: the role's sentence under the name
   const sent = STUDIO_ROLES[m.role] ? `<span class="rolesent">${esc(STUDIO_ROLES[m.role].sees)}</span>` : '';
-  return `<div class="member${revoked ? ' revoked' : ''}" data-member="${esc(m.id)}"><div class="who"><b>${esc(m.email)}</b><span>${m.created_at ? 'since ' + esc(shortDate(m.created_at)) : ''}</span>${sent}</div>${roleCtl}${act}</div>`;
+  return `<div class="member${revoked ? ' revoked' : ''}" data-member="${esc(m.id)}"><div class="who"><b>${esc(m.email)}</b><span>${m.created_at ? 'since ' + esc(shortDate(m.created_at)) : ''}</span>${sent}</div>${roleCtl}${said}${act}</div>`;
 }
 // Speed (Nov 10 2026, finding I8): Team and Plan & billing both show the seat and client counts;
 // the page asks for them once per open and both read the one answer.
@@ -1043,10 +1118,13 @@ function renderTeam() {
   $('people').querySelectorAll('[data-role]').forEach((s) => s.addEventListener('change', async () => {
     const id = s.getAttribute('data-role'), m = TEAM.find((x) => x.id === id); if (!m) return;
     const prev = m.role; s.disabled = true;
-    const r = await api('/agency/members/' + encodeURIComponent(id), 'PATCH', { role: s.value });
+    const want = s.value, slot = fsSlot('m-' + id);
+    saidNothing(slot);
+    const r = await api('/agency/members/' + encodeURIComponent(id), 'PATCH', { role: want });
     s.disabled = false;
-    if (!r.ok) { s.value = prev; toast(nice(r.body, 'That didn’t save.'), true); return; }
-    m.role = (r.body.data && r.body.data.role) || s.value; toast('Role changed.');
+    // item 165: said beside it; Try again picks the role again
+    if (!r.ok) { s.value = prev; saidRefused(slot, r, () => { s.value = want; s.dispatchEvent(new Event('change')); }); return; }
+    m.role = (r.body.data && r.body.data.role) || want; saidSaved(slot);
     const line = s.closest('.member') && s.closest('.member').querySelector('.rolesent');   // builder item 220: the sentence follows the role
     if (line && STUDIO_ROLES[m.role]) line.textContent = STUDIO_ROLES[m.role].sees;
   }));
@@ -1310,8 +1388,9 @@ async function loadPlan() {
   });
 }
 
-// ── the studio profile, inline: GET /identity + the industry from /settings;
-//    Save = PUT /identity (the builder's own route, same validation) + PUT /settings. ──
+// ── the studio profile, inline: GET /identity + the industry from /settings; each box
+//    saves when you leave it (item 165): PUT /identity (the builder's own route, same
+//    validation) or PUT /settings, with only that box's field. ──
 let IDENT = null, SETTINGS = null;
 // builder list item 59: the name and logo clients see on their sign-in page, their portal and every email
 async function loadStudioLook() {
@@ -1361,7 +1440,7 @@ let IDENT_READ = false, SETTINGS_READ = false;
 // the line blank, and "Save the line" wrote that blank over the client's saved line.
 let REPORT_TRIED = false, REPORT_READ = false;
 const UNREAD = {
-  studio: { rows: ['profileForm'], off: ['profileSave'], words: 'Your details couldn’t load just now. Saving is off until they do, so nothing you had is written over.' },
+  studio: { rows: ['profileForm'], words: 'Your details couldn’t load just now. Saving is off until they do, so nothing you had is written over.' },
   automations: { rows: [], words: 'Your automations couldn’t load just now. They can’t be changed until they do; nothing is switched on or off meanwhile.' },
   stages: { rows: ['staleRow'], words: 'When a deal counts as stalled couldn’t load just now. It can’t be changed until it does.' },
   // items 160 and 176: every new row is held too
@@ -1403,33 +1482,56 @@ async function retryReads(e) {
   if (SETTINGS_READ && automationsHere()) paintAutomations();
   if (b && b.isConnected) { b.disabled = false; toast('Still couldn’t load — try again in a moment.', true); }
 }
-async function saveProfile() {
+// Builder item 165: the profile saves a box at a time, when you leave it (a pick when you make
+// it). Names, email, phone and area go to /identity (the builder's own route, same checks), the
+// kind of business and who signs to /settings, each with only its own field.
+const PROFILE_FIELDS = [
+  { id: 'f-name', to: 'identity', key: 'business_name', need: () => (studioOwn() ? 'Give your studio a name.' : 'Give the business a name.') },   // builder item 202's words
+  { id: 'f-email', to: 'identity', key: 'email' },
+  { id: 'f-phone', to: 'identity', key: 'phone' },
+  { id: 'f-area', to: 'identity', key: 'service_area' },
+  { id: 'f-industry', to: 'settings', key: 'industry_key', configure: true },
+  { id: 'f-signer', to: 'settings', key: 'signs_as_name', configure: true, studio: true },   // sales item 88
+  { id: 'f-signer-title', to: 'settings', key: 'signs_as_title', configure: true, studio: true },
+];
+const FIELD_BUSY = {}, FIELD_AGAIN = {};
+function savedValue(f) {
+  if (f.to === 'identity') return String((IDENT && IDENT[f.key]) || '');
+  const v = SETTINGS && SETTINGS[f.key];
+  return f.key === 'industry_key' ? String(v || 'generic') : String(v || '');
+}
+async function saveField(f) {
   if (!IDENT_READ || !SETTINGS_READ) return;   // C4: held — the boxes aren't what is saved
-  const b = $('profileSave'); b.disabled = true;
-  const name = $('f-name').value.trim();
-  if (!name) { toast(studioOwn() ? 'Give your studio a name.' : 'Give the business a name.', true); b.disabled = false; $('f-name').focus(); return; }
-  const identity = { business_name: name, email: $('f-email').value.trim(), phone: $('f-phone').value.trim(), service_area: $('f-area').value.trim() };
-  const industry = $('f-industry').value || 'generic';
-  const writes = [api('/identity', 'PUT', identity)];
-  const setPatch = {};
-  // the select is gone for a role without configure, and it can still read differently from an unset row
-  const mayConfigure = !(window.ddsLacks && window.ddsLacks('configure'));
-  if (mayConfigure && (!SETTINGS || SETTINGS.industry_key !== industry)) setPatch.industry_key = industry;
-  // sales item 88: who signs agreements, never from inside a client
-  if (mayConfigure && !inClient()) {
-    const sn = $('f-signer').value.trim(), stt = $('f-signer-title').value.trim();
-    if ((SETTINGS && SETTINGS.signs_as_name || '') !== sn) setPatch.signs_as_name = sn;
-    if ((SETTINGS && SETTINGS.signs_as_title || '') !== stt) setPatch.signs_as_title = stt;
+  const el = $(f.id), slot = fsSlot(f.id); if (!el) return;
+  // the select is gone for a role without configure; who signs is the studio's, never a client's
+  if (f.configure && window.ddsLacks && window.ddsLacks('configure')) return;
+  if (f.studio && inClient()) return;   // builder item 83: in your own second business it is yours
+  if (FIELD_BUSY[f.id]) { FIELD_AGAIN[f.id] = true; return; }   // one at a time: this box goes again when the last save lands
+  const value = f.key === 'industry_key' ? (el.value || 'generic') : el.value.trim();
+  if (value === savedValue(f) && el.getAttribute('aria-invalid') !== 'true') return;   // nothing changed
+  if (f.need && !value) { markBad(el, true); saidFailed(slot, null, typeof f.need === 'function' ? f.need() : f.need); return; }
+  FIELD_BUSY[f.id] = true; saidNothing(slot);
+  const r = await api(f.to === 'identity' ? '/identity' : '/settings', 'PUT', { [f.key]: value });
+  FIELD_BUSY[f.id] = false;
+  if (!r.ok) {
+    markBad(el, true); saidRefused(slot, r, () => saveField(f), f.key);   // the box keeps your words, and says why when it can
+  } else {
+    markBad(el, false);
+    if (f.to === 'identity') IDENT = (r.body && r.body.data) || { ...(IDENT || {}), [f.key]: value };
+    else { const got = (r.body && r.body.data) || {}; SETTINGS = { ...(SETTINGS || {}) }; SETTINGS[f.key] = f.key in got ? got[f.key] : value; }   // C3: only the field it wrote
+    saidSaved(slot);
+    if (f.key === 'business_name') renderSubline();
   }
-  if (Object.keys(setPatch).length) writes.push(api('/settings', 'PUT', setPatch));
-  const rs = await Promise.all(writes);
-  b.disabled = false;
-  const bad = rs.find((r) => !r.ok);
-  if (bad) { toast(nice(bad.body, bad.status === 422 ? 'Some fields need a second look.' : 'That didn’t save — nothing was changed.'), true); return; }
-  IDENT = (rs[0].body && rs[0].body.data) || { ...(IDENT || {}), ...identity };
-  if (rs[1]) { const got = (rs[1].body && rs[1].body.data) || {}; SETTINGS = { ...(SETTINGS || {}) }; for (const k of Object.keys(setPatch)) SETTINGS[k] = k in got ? got[k] : setPatch[k]; }   // C3: only the fields it wrote
-  toast('Saved.');
-  renderSubline();
+  if (FIELD_AGAIN[f.id]) { FIELD_AGAIN[f.id] = false; saveField(f); }
+}
+function wireProfile() {
+  for (const f of PROFILE_FIELDS) { const el = $(f.id); if (el) el.addEventListener('change', () => saveField(f)); }
+  // Enter in a box saves that box (there is no Save button to press)
+  $('profileForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = PROFILE_FIELDS.find((x) => document.activeElement && x.id === document.activeElement.id);
+    if (f) saveField(f);
+  });
 }
 // ── the three switches (+ the stale threshold): read from the same /settings row
 //    loadProfile fetched; every control writes itself the moment it changes. ──
@@ -1463,7 +1565,7 @@ function paintAutomations() {
   // a repaint after one save must never clobber the field the owner is typing in, nor
   // (I3) a switch or box whose own save is still on its way: it shows what was pressed
   const typing = document.activeElement;
-  const setVal = (id, v, key) => { const el = $(id); if (el !== typing && !AUTO_FLIGHT[key]) el.value = v; };
+  const setVal = (id, v, key) => { const el = $(id); if (el !== typing && !AUTO_FLIGHT[key] && !AUTO_KEEP[key]) { el.value = v; markBad(el, false); } };
   const setSw = (id, key) => { if (!AUTO_FLIGHT[key]) $(id).setAttribute('aria-checked', st[key] === true ? 'true' : 'false'); };
   // the sentence beside a days box follows the box, so it is left alone while that box is typed in
   const echoes = (id, key) => $(id) !== typing && !AUTO_FLIGHT[key];
@@ -1476,7 +1578,7 @@ function paintAutomations() {
   paintRecipes();
   // inside a client only their website's two rows; the studio's book stays out
   $('automations').querySelectorAll('.swrow').forEach((row) => { row.hidden = inClient() && !row.hasAttribute('data-scoped'); });
-  $('autoHint').textContent = inClient() ? 'What ' + possessive(scopeName() || 'this client') + ' website sends when someone writes in. Each saves as you flip it.' : 'Ready-made recipes, and the switches behind them. Each saves as you flip it.';
+  $('autoHint').textContent = inClient() ? 'What ' + possessive(scopeName() || 'this client') + ' website sends when someone writes in. Changes save as you go.' : 'Ready-made recipes, and the switches behind them. Changes save as you go.';
   const nRev = Number(st.review_request_after_days) >= 1 ? Math.trunc(Number(st.review_request_after_days)) : 3;
   setVal('n-rev', String(nRev), 'review_request_after_days'); if (echoes('n-rev', 'review_request_after_days')) $('n-rev-echo').textContent = String(nRev);
   $('say-rev').textContent = reviewAskSentence(IDENT && IDENT.business_name);
@@ -1526,7 +1628,7 @@ let CC_OPEN = false, SUG_EDITING = false, SUG_MENU = false;
 function paintReport() {
   const d = REPORT || {};
   $('sw-report').setAttribute('aria-checked', d.enabled ? 'true' : 'false');
-  if (document.activeElement !== $('report-note')) $('report-note').value = d.note || '';
+  if (document.activeElement !== $('report-note') && !REPORT_KEEP.note) $('report-note').value = d.note || '';   // item 165: a line that didn't save keeps your words
   $('reportLast').textContent = reportStatusLine(d);
   const n = reportPeople(d);
   // item 200: before the website is live the report waits, and the card says so instead of a date
@@ -1662,20 +1764,35 @@ function monthWords(ym) { const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); 
 // switch flipped while nothing was sent, and a line saved during a switch save was dropped unsaid.
 function paintReportBusy() {
   for (const id of ['sw-report', 'sw-pdf', 'sw-ai', 'sw-copy', 'sw-quiet']) { const sw = $(id); if (REPORT_BUSY) sw.setAttribute('aria-disabled', 'true'); else sw.removeAttribute('aria-disabled'); }   // items 160, 182 and 184: every switch waits its turn
-  for (const id of ['reportSave', 'ccSave', 'sugSave', 'n-quiet']) { const el = $(id); if (el) el.disabled = REPORT_BUSY; }
+  for (const id of ['ccSave', 'n-quiet']) { const el = $(id); if (el) el.disabled = REPORT_BUSY; }   // item 165: the line and the suggestion wait their turn instead (saveReportBox)
   // greyed, not disabled: a control pressed with the keyboard keeps its focus while it saves
   $('report').querySelectorAll('.rpart, .rp-x, .rp-add, #sugModes [data-mode], #sugMenu [data-pick], #sugPick, #sugEdit').forEach((b) => { if (REPORT_BUSY) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled'); });
 }
-async function saveReport(patch) {
+// Builder item 165: the line and your own suggestion save when you leave their box, after any
+// save already on its way (item 101's one at a time), with the tick beside them. One that
+// doesn't go says so there and keeps your words.
+const REPORT_KEEP = {};
+async function saveReportBox(patch, slot, keep, again) {
+  if (!REPORT_READ) return false;
+  while (REPORT_BUSY) await new Promise((r) => setTimeout(r, 120));
+  saidNothing(slot);
+  const ok = await saveReport(patch, { slot, keep, again });
+  if (ok) saidSaved(slot);
+  return ok;
+}
+async function saveReport(patch, box) {
   if (REPORT_BUSY || !REPORT_READ) return false;   // I4: never written over what couldn't be read
   REPORT_BUSY = true; paintReportBusy();
   const r = await api('/report/monthly', 'PUT', patch);
   REPORT_BUSY = false;
   if (!r.ok) {
     if (r.body && r.body.blocked) REPORT = { ...(REPORT || {}), blocked: r.body.blocked };   // the warning line names why
-    paintReport();   // back to what is saved
-    toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); return false;
+    if (box && box.keep) REPORT_KEEP[box.keep] = true;
+    paintReport();   // back to what is saved (a box being saved keeps your words)
+    if (box && box.slot) saidRefused(box.slot, r, box.again); else toast(nice(r.body, 'That didn’t save — nothing was changed.'), true);
+    return false;
   }
+  if (box && box.keep) delete REPORT_KEEP[box.keep];
   REPORT = { ...(REPORT || {}), ...(r.body.data || patch) }; paintReport();   // keeps what only GET answers (blocked, who, the suggestion)
   return true;
 }
@@ -1750,11 +1867,15 @@ function wireReport() {
     SUG_EDITING = true; paintSuggest(REPORT || {});
     $('sug-text').value = next ? next.text : ''; $('sug-text').focus();
   });
-  $('sugSave').addEventListener('click', async () => {
-    const text = $('sug-text').value.trim();
-    if (!text) { toast('Write the suggestion, or pick one of ours.', true); $('sug-text').focus(); return; }
-    if (await saveReport({ propose: { mode: 'own', text } })) { SUG_EDITING = false; paintSuggest(REPORT || {}); toast('Saved. It goes in every report until you change it.'); }
-  });
+  // item 165: your own suggestion saves when you leave its box (it had a Save the suggestion button)
+  const saveSug = async () => {
+    const text = $('sug-text').value.trim(), slot = fsSlot('sug');
+    if (!text) { markBad($('sug-text'), true); saidFailed(slot, null, 'Write the suggestion, or pick one of ours'); return; }
+    markBad($('sug-text'), false);
+    if (await saveReportBox({ propose: { mode: 'own', text } }, slot, null, saveSug)) { SUG_EDITING = false; paintSuggest(REPORT || {}); }
+    else markBad($('sug-text'), true);   // the box stays open with your words (still being edited)
+  };
+  $('sug-text').addEventListener('change', saveSug);
   // GET /report/monthly/pdf: last month's report as a file (a fetch with the sign-in, saved as a download)
   $('reportPdf').addEventListener('click', async () => {
     const b = $('reportPdf'); b.disabled = true; $('reportMsg').textContent = 'Making the PDF…';
@@ -1769,7 +1890,9 @@ function wireReport() {
     } catch (_) { $('reportMsg').textContent = ''; toast('The PDF didn’t download. Nothing changed; try again.', true); }
     b.disabled = false;
   });
-  $('reportSave').addEventListener('click', async () => { if (await saveReport({ note: $('report-note').value })) { $('reportMsg').textContent = 'Saved.'; setTimeout(() => { $('reportMsg').textContent = ''; }, 2500); } });
+  // item 165: the line saves when you leave its box (it had a Save the line button)
+  const saveNote = async () => { const ok = await saveReportBox({ note: $('report-note').value }, fsSlot('report-note'), 'note', saveNote); markBad($('report-note'), !ok); };
+  $('report-note').addEventListener('change', saveNote);
   $('reportPreview').addEventListener('click', async () => {
     const b = $('reportPreview'); b.disabled = true; $('reportMsg').textContent = 'Sending…';
     const r = await api('/report/monthly/preview', 'POST', {});
@@ -1909,27 +2032,32 @@ async function loadGoalAi() {
   ]);
   const sd = s && s.ok && s.body && s.body.data;
   if (sd) GOAL_MONTH = { won: Number(sd.won_month && sd.won_month.value_cents) || 0, expected: Number(sd.expected && sd.expected.value_cents) || 0 };
-  if (!r || !r.ok || !r.body || !r.body.data) { $('goalSave').disabled = true; $('sw-aihelp').setAttribute('aria-disabled', 'true'); $('goalEx').textContent = (r && r.body && r.body.message) || 'The goal and AI help couldn’t load just now. Refresh to try again.'; return; }
+  if (!r || !r.ok || !r.body || !r.body.data) { $('goalAmt').disabled = true; $('sw-aihelp').setAttribute('aria-disabled', 'true'); $('goalEx').textContent = (r && r.body && r.body.message) || 'The goal and AI help couldn’t load just now. Refresh to try again.'; return; }
   GOALAI = r.body.data; paintGoalAi();
 }
-async function saveGoalAi(patch) {
+async function saveGoalAi(patch, slot, again) {
   if (GOAL_BUSY) return null; GOAL_BUSY = true;
   try {
     const r = await api('/sales/goal-ai', 'PUT', patch).catch(() => null);
-    if (!r || !r.ok) { toast((r && r.body && r.body.message) || 'That didn’t save just now. Try again.', true); return null; }
+    if (!r || !r.ok) { if (slot) saidRefused(slot, r, again); else toast((r && r.body && r.body.message) || 'That didn’t save just now. Try again.', true); return null; }   // item 165: a box says so beside itself
     GOALAI = Object.assign({}, GOALAI, r.body.data); paintGoalAi(); return GOALAI;
   } finally { GOAL_BUSY = false; }
 }
 (function wireGoalAi() {
   const amt = $('goalAmt'); if (!amt) return;
   amt.addEventListener('input', paintGoalEx);
-  amt.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('goalSave').click(); } });
-  $('goalSave').addEventListener('click', async () => {
-    const c = goalCentsOf(amt.value);
-    if (Number.isNaN(c)) { toast('Enter the goal in dollars, like 8,000.', true); amt.focus(); return; }
-    const d = await saveGoalAi({ goal_cents: c });
-    if (d) toast(d.goal_cents ? `Saved. Home and Pipeline show this month against ${usd0(d.goal_cents)}.` : 'Goal cleared. Home and Pipeline show none.');
-  });
+  // builder item 165: the goal saves when you leave its box (or press Enter); no Save button
+  const saveGoal = async () => {
+    const c = goalCentsOf(amt.value), slot = fsSlot('goal');
+    if (Number.isNaN(c)) { markBad(amt, true); saidFailed(slot, null, 'Enter the goal in dollars, like 8,000'); return; }
+    if (GOALAI && (GOALAI.goal_cents || 0) === (c || 0) && amt.getAttribute('aria-invalid') !== 'true') return;   // nothing changed
+    while (GOAL_BUSY) await new Promise((r) => setTimeout(r, 120));
+    saidNothing(slot);
+    const d = await saveGoalAi({ goal_cents: c }, slot, saveGoal);
+    markBad(amt, !d); if (d) saidSaved(slot);
+  };
+  amt.addEventListener('change', saveGoal);
+  amt.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveGoal(); } });
   $('sw-aihelp').addEventListener('click', async () => {
     if (!GOALAI) return;
     if (!GOALAI.can_switch) { toast('Only the studio’s owner can switch AI help on or off.', true); return; }
@@ -1959,25 +2087,29 @@ function paintMenu() {
   const off = MENU_BUSY || menuLocked();
   $('menuRows').innerHTML = ((MENU && MENU.choices) || []).map((c) => `<div class="swrow">
       <button type="button" class="sw" role="switch" id="sw-menu-${esc(c.key)}" data-menu-key="${esc(c.key)}" aria-checked="${hidden.has(c.key) ? 'false' : 'true'}" aria-labelledby="sw-menu-${esc(c.key)}-l"${off ? ' aria-disabled="true"' : ''}></button>
-      <div class="t"><b id="sw-menu-${esc(c.key)}-l">${esc(c.label)}</b><div class="how">${esc(c.what)}${hidden.has(c.key) ? ' <span class="muted">Hidden from the menu.</span>' : ''}</div></div>
+      <div class="t"><b id="sw-menu-${esc(c.key)}-l">${esc(c.label)}</b>${menuSaid(c.key)}<div class="how">${esc(c.what)}${hidden.has(c.key) ? ' <span class="muted">Hidden from the menu.</span>' : ''}</div></div>
     </div>`).join('');
+  const failed = MENU_SAID && MENU_SAID.ok === false ? fsSlot('menu-' + MENU_SAID.key) : null;   // item 165: Try again flips it again
+  if (failed) { const k = MENU_SAID.key; saidRefused(failed, MENU_SAID.r, () => toggleMenu(k)); }
   $('menuRows').querySelectorAll('[data-menu-key]').forEach((b) => b.addEventListener('click', () => toggleMenu(b.getAttribute('data-menu-key'))));
   if (had) { const b = $('sw-menu-' + had); if (b) b.focus(); }   // the redraw keeps your place
   $('menuNote').textContent = menuLocked() ? 'Your role can see the menu but not change it. Your studio’s owner, an admin or an account manager can.' : 'Home and Settings always stay. The menu changes the next time a page opens.';
 }
 let MENU_BUSY = false;
+// item 165: the last switch changed, and how its save went, so a redraw keeps the tick beside it
+let MENU_SAID = null;
+const menuSaid = (key) => `<span class="fs${MENU_SAID && MENU_SAID.key === key && MENU_SAID.ok ? ' ok' : ''}" id="fs-menu-${esc(key)}" role="status">${MENU_SAID && MENU_SAID.key === key && MENU_SAID.ok ? 'Saved' : ''}</span>`;
 async function toggleMenu(key) {
   if (MENU_BUSY || !MENU || menuLocked()) return;
-  MENU_BUSY = true;
+  MENU_BUSY = true; MENU_SAID = null;
   const before = (MENU.hidden || []).slice();
   const hidden = before.includes(key) ? before.filter((k) => k !== key) : before.concat([key]);
   MENU = { ...MENU, hidden }; paintMenu();
   const r = await api('/agency/nav', 'PUT', { hidden });
   MENU_BUSY = false;
-  if (!r.ok) { MENU = { ...MENU, hidden: before }; paintMenu(); toast(nice(r.body, 'That didn’t save — the menu is as it was.'), true); return; }
-  MENU = r.body.data || MENU; paintMenu();
-  try { if (window.ddsContextForget) window.ddsContextForget(); } catch (_) { /* */ }   // the next page asks for the menu again
-  toast(hidden.includes(key) ? 'Hidden. The menu changes the next time a page opens.' : 'Back in the menu from the next page on.');
+  if (!r.ok) { MENU = { ...MENU, hidden: before }; MENU_SAID = { key, ok: false, r }; paintMenu(); return; }   // as it was, and says so beside it
+  MENU = r.body.data || MENU; MENU_SAID = { key, ok: true }; paintMenu();
+  try { if (window.ddsContextForget) window.ddsContextForget(); } catch (_) { /* */ }   // the next page asks for the menu again (the note under the card says when)
 }
 // ── item 126: one notifications switch per client site (GET /agency/notify, PUT /agency/notify/:site) ──
 // The site's switch first, then its two channels; a channel waits while the switch is off.
@@ -1985,6 +2117,7 @@ async function toggleMenu(key) {
 // when it doesn't save. A failed read leaves the part away: never a switch that lies.
 let NOTIFY = null, NOTIFY_ASKED = null;
 const NOTIFY_BUSY = new Set(), NOTIFY_SAVED = new Set();
+const NOTIFY_FAILED = new Map();   // item 165: site → the change that didn't save and its answer, for Try again
 function loadNotify() {
   if (!(CTX && CTX.is_agency)) return Promise.resolve();
   if (NOTIFY_ASKED) return NOTIFY_ASKED;
@@ -2005,7 +2138,7 @@ let PUSH_BUSY = false;
 async function paintPush() {
   const row = $('row-push'), sw = $('sw-push'); if (!row || !sw) return;
   const P = window.ddsPush;
-  if (!(CTX && CTX.is_agency)) { const h = $('notifyHint'); if (h) h.textContent = 'How Studio OS tells you something needs you. The switch saves as you flip it.'; $('notifyNote').textContent = 'Enquiries, approvals and support requests also land in your Inbox, and in your email.'; }
+  if (!(CTX && CTX.is_agency)) { const h = $('notifyHint'); if (h) h.textContent = 'How Studio OS tells you something needs you. Changes save as you go.'; $('notifyNote').textContent = 'Enquiries, approvals and support requests also land in your Inbox, and in your email.'; }
   row.hidden = false;
   if (!P || !P.supported()) { sw.setAttribute('aria-disabled', 'true'); $('pushHow').textContent = 'This browser can’t show notifications. On a phone, add Studio OS to your home screen first.'; return; }
   sw.setAttribute('aria-checked', (await P.state()) ? 'true' : 'false');
@@ -2030,7 +2163,7 @@ function paintNotify() {
     const chanOff = off || !x.on;
     return `<div class="swrow" data-notify-site="${id}">
       <button type="button" class="sw" role="switch" id="sw-n-${id}" data-notify-on="${id}" aria-checked="${x.on ? 'true' : 'false'}" aria-labelledby="sw-n-${id}-l"${off ? ' aria-disabled="true"' : ''}></button>
-      <div class="t"><b id="sw-n-${id}-l">${esc(x.name)}${NOTIFY_SAVED.has(x.site_id) ? '<span class="nsaved" role="status">Saved</span>' : ''}</b><div class="how">${esc(how)}</div>
+      <div class="t"><b id="sw-n-${id}-l">${esc(x.name)}</b><span class="fs${NOTIFY_SAVED.has(x.site_id) ? ' ok' : ''}" id="fs-n-${id}" role="status">${NOTIFY_SAVED.has(x.site_id) ? 'Saved' : ''}</span><div class="how">${esc(how)}</div>
         <div class="chans" role="group" aria-label="${esc('How you hear about ' + x.name)}"${chanOff ? ' aria-disabled="true"' : ''}>
           <label class="chan"><input type="checkbox" id="ch-d-${id}" data-notify-chan="dashboard" data-site="${id}"${x.dashboard ? ' checked' : ''}${chanOff ? ' disabled' : ''}>On Home and in the bell</label>
           <label class="chan"><input type="checkbox" id="ch-e-${id}" data-notify-chan="email" data-site="${id}"${x.email ? ' checked' : ''}${chanOff ? ' disabled' : ''}>By email</label>
@@ -2039,6 +2172,7 @@ function paintNotify() {
   }).join('');
   $('notifyRows').querySelectorAll('[data-notify-on]').forEach((b) => b.addEventListener('click', () => { const sid = b.getAttribute('data-notify-on'); const x = notifyRows().find((r) => r.site_id === sid); if (x) saveNotify(sid, { on: !x.on }); }));
   $('notifyRows').querySelectorAll('[data-notify-chan]').forEach((c) => c.addEventListener('change', () => saveNotify(c.getAttribute('data-site'), { [c.getAttribute('data-notify-chan')]: c.checked })));
+  for (const [sid, f] of NOTIFY_FAILED) saidRefused(fsSlot('n-' + sid), f.r, () => saveNotify(sid, f.patch));
   if (had) { const n = $(had); if (n) n.focus(); }   // the redraw keeps your place
   $('notifyNote').textContent = notifyLocked() ? 'Your role can see these but not change them. Your studio’s owner, an admin or an account manager can.' : 'Money owed, something broken and messages from your clients always reach you. The emails your clients get never change.';
 }
@@ -2046,11 +2180,11 @@ async function saveNotify(siteId, patch) {
   if (!NOTIFY || notifyLocked() || NOTIFY_BUSY.has(siteId)) return;
   const i = NOTIFY.sites.findIndex((x) => x.site_id === siteId); if (i < 0) return;
   const before = NOTIFY.sites[i];
-  NOTIFY_BUSY.add(siteId); NOTIFY_SAVED.delete(siteId);
+  NOTIFY_BUSY.add(siteId); NOTIFY_SAVED.delete(siteId); NOTIFY_FAILED.delete(siteId);
   NOTIFY.sites[i] = { ...before, ...patch }; paintNotify();
   const r = await api('/agency/notify/' + encodeURIComponent(siteId), 'PUT', patch);
   NOTIFY_BUSY.delete(siteId);
-  if (!r.ok || !r.body || !r.body.data) { NOTIFY.sites[i] = before; paintNotify(); toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
+  if (!r.ok || !r.body || !r.body.data) { NOTIFY.sites[i] = before; NOTIFY_FAILED.set(siteId, { patch, r }); paintNotify(); return; }   // as it was, and says so beside it
   const d = r.body.data;
   NOTIFY.sites[i] = { ...before, on: d.on, dashboard: d.dashboard, email: d.email };
   NOTIFY_SAVED.add(siteId); paintNotify();
@@ -2428,21 +2562,32 @@ async function removeThing(kind) {
 // Two switches flipped close together used to repaint each other from an answer that left
 // before the other save, showing off what was on.
 const AUTO_SEQ = {}, AUTO_FLIGHT = {}, AUTO_TAKEN = {};
-async function saveAutomation(patch, undo) {
+// Builder item 165: `where` is the tick's place (a slot, or several), and `keep` names the
+// boxes whose words stay on screen when a save doesn't go (a switch flips back instead).
+const AUTO_KEEP = {};
+async function saveAutomation(patch, undo, where, keep, retry) {
+  const slots = [].concat(where || []).filter(Boolean);
+  const again = retry || (() => saveAutomation(patch, undo, where, keep));
   if (!SETTINGS_READ) { if (undo) undo(); toast('Your settings couldn’t load, so nothing was saved. Try again first.', true); return false; }   // C4
   const keys = Object.keys(patch), mine = {};
   for (const k of keys) { mine[k] = AUTO_SEQ[k] = (AUTO_SEQ[k] || 0) + 1; AUTO_FLIGHT[k] = (AUTO_FLIGHT[k] || 0) + 1; }
+  slots.forEach(saidNothing);
   const r = await api('/settings', 'PUT', patch);
   for (const k of keys) AUTO_FLIGHT[k] -= 1;
-  // a refusal puts back what is saved (SETTINGS) once no other save of the field is out
-  if (!r.ok) { toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); paintAutomations(); return false; }
+  // a refusal puts back what is saved (SETTINGS) once no other save of the field is out —
+  // except a box you typed in, which keeps your words and says so (item 165)
+  if (!r.ok) {
+    for (const k of [].concat(keep || [])) AUTO_KEEP[k] = true;
+    if (slots.length) slots.forEach((x) => saidRefused(x, r, again)); else toast(nice(r.body, 'That didn’t save — nothing was changed.'), true);
+    paintAutomations(); return false;
+  }
   // C3: only the fields this save wrote are taken from its answer — a switch's answer
   // that left the server before a days save must not put the old days back on screen
   const got = (r.body && r.body.data) || {};
   SETTINGS = { ...(SETTINGS || {}) };
-  for (const k of keys) if (mine[k] > (AUTO_TAKEN[k] || 0)) { AUTO_TAKEN[k] = mine[k]; SETTINGS[k] = k in got ? got[k] : patch[k]; }
+  for (const k of keys) { delete AUTO_KEEP[k]; if (mine[k] > (AUTO_TAKEN[k] || 0)) { AUTO_TAKEN[k] = mine[k]; SETTINGS[k] = k in got ? got[k] : patch[k]; } }
   paintAutomations();
-  toast('Saved.');
+  slots.forEach(saidSaved);
   return true;
 }
 // ── sales review item 38: the studio's names for its four open stages (GET/PUT /sales/stages) ──
@@ -2452,6 +2597,8 @@ function paintStageNames(d) {
   for (const k of STAGE_KEYS) {
     const i = $('sn-' + k); if (i && document.activeElement !== i) i.value = custom[k] || '';
     document.querySelectorAll('[data-stage-label="' + k + '"]').forEach((el) => { if (labels[k]) el.textContent = labels[k]; });
+    // item 165: the boxes beside a renamed stage say its name to a screen reader too
+    if (labels[k]) { const c = $('sc-' + k), st = $('st-' + k); if (c) c.setAttribute('aria-label', 'Chance a deal at ' + labels[k] + ' closes, in percent'); if (st) st.setAttribute('aria-label', 'Stale after days — ' + labels[k]); }
   }
 }
 async function loadStageNames() {
@@ -2459,14 +2606,17 @@ async function loadStageNames() {
   const r = await api('/sales/stages').catch(() => null);
   if (r && r.ok) { paintStageNames(r.body && r.body.data); paintStageChances(r.body && r.body.data);
     stagesStatus(r.body && r.body.data); paintStageNotes(r.body && r.body.data); }
-  else { for (const id of ['stageNames', 'stageChances', 'stageNotes']) { const box = $(id); if (box) box.hidden = true; } }   // no sales area (or a failed read): the blocks hide, never a dead form
+  else { $('stageGrid').classList.add('no-sales'); const sn = $('stageNotes'); if (sn) sn.hidden = true; }   // no sales area (or a failed read): the names, chances and notes hide, never a dead form
 }
 // ── sales item 124: what to do now at each stage (PUT /sales/stages { note }) ──
-// One row a stage with its first step; Edit opens the note, Save keeps it for every deal at
-// that stage, and Put back the starter note brings the starter back. A failed read of the
+// One row a stage with its first step; Edit opens the note. Builder item 165: like every box on
+// this page it saves when you leave it (there is no Save note button), with the Saved tick beside
+// the stage's name, or "Couldn't save · Try again" there with your words kept. Escape puts the
+// box away unsaved; Put back the starter note brings the starter back. A failed read of the
 // notes (notes: null) hides the block rather than show the starters as if they were yours.
 const NOTE_STAGES = ['lead', 'qualified', 'proposal', 'contract', 'won', 'lost'];
-let SNOTES = null, SNOTES_MINE = {}, SNOTE_LABELS = {}, SNOTE_OPEN = '';
+let SNOTES = null, SNOTES_MINE = {}, SNOTE_LABELS = {}, SNOTE_OPEN = '', SNOTE_SKIP = '';
+const SNOTE_BUSY = {};
 function paintStageNotes(d) {
   if (d) { SNOTES = d.notes || null; SNOTES_MINE = d.notes_custom || {}; SNOTE_LABELS = d.labels || SNOTE_LABELS; }
   const box = $('stageNotes'), list = $('snList'); if (!box || !list) return;
@@ -2474,28 +2624,57 @@ function paintStageNotes(d) {
   box.hidden = false;
   list.innerHTML = NOTE_STAGES.map((k) => {
     const label = SNOTE_LABELS[k] || k, text = SNOTES[k] || '', mine = !!SNOTES_MINE[k], open = SNOTE_OPEN === k;
-    return `<div class="sn-row${open ? ' open' : ''}" data-sn="${k}"><div class="sn-top"><b>${esc(label)}</b><span class="sn-kind${mine ? ' mine' : ''}">${mine ? 'Your note' : 'Starter note'}</span>`
-      + (open ? '</div>' + `<label class="sr-only" for="snt-${k}">What to do now at ${esc(label)}, one step a line</label><textarea id="snt-${k}" rows="${Math.min(9, Math.max(3, text.split('\n').length + 1))}">${esc(text)}</textarea>`
-        + `<div class="sn-bot"><span class="how" style="margin:0">One step a line, up to eight.</span><button type="button" class="btn" data-sn-save="${k}">Save note</button><button type="button" class="btn ghost" data-sn-cancel="${k}">Cancel</button>${mine ? `<button type="button" class="linkbtn" data-sn-reset="${k}">Put back the starter note</button>` : ''}</div>`
+    return `<div class="sn-row${open ? ' open' : ''}" data-sn="${k}"><div class="sn-top"><b>${esc(label)}</b><span class="sn-kind${mine ? ' mine' : ''}">${mine ? 'Your note' : 'Starter note'}</span><span class="fs" id="fs-sn-${k}" role="status"></span>`
+      + (open ? '</div>' + `<label class="sr-only" for="snt-${k}">What to do now at ${esc(label)}, one step a line</label><textarea id="snt-${k}" aria-describedby="fs-sn-${k} snh-${k}" rows="${Math.min(9, Math.max(3, text.split('\n').length + 1))}">${esc(text)}</textarea>`
+        + `<div class="sn-bot"><span class="how" id="snh-${k}" style="margin:0">One step a line, up to eight. It saves when you leave the box; Escape puts it away unsaved.</span><button type="button" class="linkbtn" data-sn-reset="${k}"${mine ? '' : ' hidden'}>Put back the starter note</button></div>`
         : `<span class="sn-prev">${esc(text.split('\n')[0] || '')}</span><button type="button" class="linkbtn" data-sn-edit="${k}" aria-label="Edit the note for ${esc(label)}">Edit</button></div>`)
       + '</div>';
   }).join('');
-  list.querySelectorAll('[data-sn-edit]').forEach((b) => b.addEventListener('click', () => { SNOTE_OPEN = b.getAttribute('data-sn-edit'); paintStageNotes(); const t = $('snt-' + SNOTE_OPEN); if (t) t.focus(); }));
-  list.querySelectorAll('[data-sn-cancel]').forEach((b) => b.addEventListener('click', () => { const k = b.getAttribute('data-sn-cancel'); SNOTE_OPEN = ''; paintStageNotes(); const e = list.querySelector(`[data-sn-edit="${k}"]`); if (e) e.focus(); }));
-  list.querySelectorAll('[data-sn-save]').forEach((b) => b.addEventListener('click', () => { const k = b.getAttribute('data-sn-save'); saveStageNote(k, ($('snt-' + k) || {}).value || '', b); }));
-  list.querySelectorAll('[data-sn-reset]').forEach((b) => b.addEventListener('click', () => saveStageNote(b.getAttribute('data-sn-reset'), '', b)));
+  list.querySelectorAll('[data-sn-edit]').forEach((b) => b.addEventListener('click', () => {
+    const was = SNOTE_OPEN && $('snt-' + SNOTE_OPEN);
+    if (was && was.getAttribute('aria-invalid') === 'true') { was.focus(); return; }   // a note that didn't save stays open, words and Try again kept, until it saves or Escape puts it away
+    SNOTE_OPEN = b.getAttribute('data-sn-edit'); SNOTE_SKIP = ''; paintStageNotes(); const t = $('snt-' + SNOTE_OPEN); if (t) t.focus();
+  }));
+  list.querySelectorAll('textarea[id^="snt-"]').forEach((t) => {
+    const k = t.id.slice(4);
+    t.addEventListener('change', () => saveStageNote(k, t.value));
+    t.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault(); e.stopPropagation();
+      SNOTE_SKIP = k; SNOTE_OPEN = ''; paintStageNotes();   // put away unsaved (it was Cancel)
+      const ed = list.querySelector(`[data-sn-edit="${k}"]`); if (ed) ed.focus();
+    });
+  });
+  list.querySelectorAll('[data-sn-reset]').forEach((b) => b.addEventListener('click', () => saveStageNote(b.getAttribute('data-sn-reset'), '', true)));
 }
-async function saveStageNote(k, text, btn) {
-  const msg = $('snNoteMsg'); if (msg) msg.textContent = '';
-  btn.disabled = true;
+// the row as it now stands, changed in place: a redraw would take the box you just moved to away
+function patchStageNote(k) {
+  const row = $('snList') && $('snList').querySelector(`[data-sn="${k}"]`); if (!row) return;
+  const mine = !!SNOTES_MINE[k], text = String((SNOTES && SNOTES[k]) || '');
+  const kind = row.querySelector('.sn-kind'); if (kind) { kind.textContent = mine ? 'Your note' : 'Starter note'; kind.classList.toggle('mine', mine); }
+  const box = $('snt-' + k); if (box) { markBad(box, false); if (document.activeElement !== box) box.value = text; }
+  const prev = row.querySelector('.sn-prev'); if (prev) prev.textContent = text.split('\n')[0] || '';
+  const reset = row.querySelector('[data-sn-reset]'); if (reset) reset.hidden = !mine;
+}
+async function saveStageNote(k, text, reset) {
+  if (SNOTE_SKIP === k && !reset) { SNOTE_SKIP = ''; return; }   // Escape put it away: nothing to save
+  const box = $('snt-' + k);
+  if (!reset && SNOTES && String(text).trim() === String(SNOTES[k] || '').trim() && !(box && box.getAttribute('aria-invalid') === 'true')) return;   // nothing changed
+  while (SNOTE_BUSY[k]) await new Promise((res) => setTimeout(res, 120));   // one save a note at a time
+  SNOTE_BUSY[k] = true; saidNothing(fsSlot('sn-' + k));
   const note = { stage: k, text };
   const r = await api('/sales/stages', 'PUT', { note });
-  btn.disabled = false;
-  if (!r.ok) { toast(nice(r.body, 'That note didn’t save — nothing was changed.'), true); return; }
-  SNOTE_OPEN = ''; paintStageNotes(r.body && r.body.data);
-  const label = SNOTE_LABELS[k] || k;
-  if (msg) msg.textContent = String(text).trim() ? `Saved. Every deal at ${label} shows it.` : `The starter note is back for ${label}.`;
-  const e = $('snList').querySelector(`[data-sn-edit="${k}"]`); if (e) e.focus();
+  SNOTE_BUSY[k] = false;
+  if (!r.ok) {   // said beside the stage's name; the box keeps your words
+    const b2 = $('snt-' + k); markBad(b2, true);
+    saidRefused(fsSlot('sn-' + k), r, () => saveStageNote(k, reset ? '' : (b2 ? b2.value : text), reset));
+    return;
+  }
+  const d = r.body && r.body.data;
+  if (d) { SNOTES = d.notes || SNOTES; SNOTES_MINE = d.notes_custom || {}; SNOTE_LABELS = d.labels || SNOTE_LABELS; }
+  patchStageNote(k);
+  saidSaved(fsSlot('sn-' + k));
+  if (reset) { const b3 = $('snt-' + k); if (b3) b3.focus(); }   // the button that was pressed has gone: back to the box
 }
 // C16: the Deal stages row says "chances set" only when a percent differs from its usual
 // one (the server always sends every percent), and it follows each save
@@ -2515,44 +2694,66 @@ function paintStageChances(d) {
     i.value = String(c[k] ?? def[k] ?? CHANCE_DEFAULTS[k]);
   }
 }
-async function saveStageChances() {
-  const btn = $('scSave'), msg = $('scMsg'); msg.textContent = '';
-  const chances = {};
-  for (const k of STAGE_KEYS) {
-    const raw = ($('sc-' + k).value || '').trim();
-    const n = raw === '' ? CHANCE_DEFAULTS[k] : Math.round(Number(raw));   // blank = the usual percent
-    if (!Number.isFinite(n) || n < 0 || n > 100) { toast('Each chance is a percent from 0 to 100.', true); $('sc-' + k).focus(); return; }
-    chances[k] = n;
-  }
-  btn.disabled = true;
-  const r = await api('/sales/stages', 'PUT', { chances });
-  btn.disabled = false;
-  if (!r.ok) { toast(nice(r.body, 'Your percents didn’t save — nothing was changed.'), true); return; }
-  paintStageChances(r.body && r.body.data); stagesStatus(r.body && r.body.data);
-  msg.textContent = 'Saved. Pipeline’s Expected total uses these.';
+// Builder item 165: each box saves when you leave it, and its row says Saved (or Couldn't save,
+// with Try again, and the box keeps what you typed). A save is built from all four boxes as they
+// stand, one at a time; a change made while one is saving goes next, with the boxes as they are.
+const STAGE_Q = {};
+function stageQueue(kind, k, run) {
+  const q = STAGE_Q[kind] || (STAGE_Q[kind] = { busy: false, rows: new Set() });
+  q.rows.add(k);
+  if (q.busy) return;
+  q.busy = true;
+  (async () => {
+    try { while (q.rows.size) { const rows = [...q.rows]; q.rows.clear(); await run(rows); } }
+    finally { q.busy = false; }
+  })();
 }
-async function saveStageNames() {
-  const btn = $('snSave'), msg = $('snMsg'); btn.disabled = true; msg.textContent = '';
-  const names = {}; for (const k of STAGE_KEYS) names[k] = ($('sn-' + k).value || '').trim();
-  const r = await api('/sales/stages', 'PUT', { names });
-  btn.disabled = false;
-  if (!r.ok) { toast(nice(r.body, 'Your stage names didn’t save — nothing was changed.'), true); return; }
-  paintStageNames(r.body && r.body.data); stagesStatus(r.body && r.body.data);
-  const kept = Object.keys((r.body && r.body.data && r.body.data.custom) || {}).length;
-  msg.textContent = kept ? 'Saved. The Pipeline, records and reports use these names.' : 'Saved — the usual names are back.';
+function saveStageChances(k) {
+  stageQueue('chances', k, async (rows) => {
+    const chances = {};
+    for (const s2 of STAGE_KEYS) {
+      const el = $('sc-' + s2), raw = (el.value || '').trim();
+      const n = raw === '' ? CHANCE_DEFAULTS[s2] : Math.round(Number(raw));   // blank = the usual percent
+      if (!Number.isFinite(n) || n < 0 || n > 100) { markBad(el, true); saidFailed(fsSlot('stage-' + s2), null, 'Use a percent from 0 to 100'); return; }
+      chances[s2] = n;
+    }
+    const r = await api('/sales/stages', 'PUT', { chances });
+    for (const s2 of rows) {
+      if (!r.ok) { markBad($('sc-' + s2), true); saidRefused(fsSlot('stage-' + s2), r, () => saveStageChances(s2)); }
+      else { markBad($('sc-' + s2), false); saidSaved(fsSlot('stage-' + s2)); }
+    }
+    if (!r.ok) return;
+    paintStageChances(r.body && r.body.data); stagesStatus(r.body && r.body.data);
+  });
+}
+function saveStageNames(k) {
+  stageQueue('names', k, async (rows) => {
+    const names = {}; for (const s2 of STAGE_KEYS) names[s2] = ($('sn-' + s2).value || '').trim();
+    const r = await api('/sales/stages', 'PUT', { names });
+    for (const s2 of rows) {
+      if (!r.ok) { markBad($('sn-' + s2), true); saidRefused(fsSlot('stage-' + s2), r, () => saveStageNames(s2)); }
+      else { markBad($('sn-' + s2), false); saidSaved(fsSlot('stage-' + s2)); }
+    }
+    if (!r.ok) return;
+    paintStageNames(r.body && r.body.data); stagesStatus(r.body && r.body.data);
+  });
 }
 function wireAutomations() {
-  const sn = $('snSave'); if (sn) sn.addEventListener('click', saveStageNames);
-  const sc = $('scSave'); if (sc) sc.addEventListener('click', saveStageChances);   // item 69
-  const flip = (id, key) => { const b = $(id); b.addEventListener('click', () => { const on = b.getAttribute('aria-checked') !== 'true'; b.setAttribute('aria-checked', on ? 'true' : 'false'); saveAutomation({ [key]: on }, () => b.setAttribute('aria-checked', on ? 'false' : 'true')); }); };   // the undo only serves C4's "couldn't load" refusal
+  for (const k of STAGE_KEYS) {   // item 165: the stage boxes save when they're left
+    $('sn-' + k).addEventListener('change', () => saveStageNames(k));
+    $('sc-' + k).addEventListener('change', () => saveStageChances(k));   // item 69
+  }
+  // item 165: the row's own place for the tick (fs-row-ack …), under its title
+  const rowSlot = (el) => { const row = el && el.closest('.swrow'); return row ? fsSlot('row-' + row.id.replace(/^row-/, '')) : null; };
+  const flip = (id, key) => { const b = $(id); b.addEventListener('click', () => { const on = b.getAttribute('aria-checked') !== 'true'; b.setAttribute('aria-checked', on ? 'true' : 'false'); saveAutomation({ [key]: on }, () => b.setAttribute('aria-checked', on ? 'false' : 'true'), rowSlot(b)); }); };   // the undo only serves C4's "couldn't load" refusal
   flip('sw-ack', 'auto_ack_enquiries'); flip('sw-inv', 'invoice_reminders'); flip('sw-deal', 'deal_nudges'); flip('sw-rev', 'review_requests');
   flip('sw-fu', 'enquiry_followups'); flip('sw-inv2', 'invoice_overdue_repeat'); flip('sw-exp', 'quote_expiry_reminders');   // item 87
   // item 87: the owner's own words save when the box is left; blank keeps the standard words
-  const words = (id, key) => { const t = $(id); t.addEventListener('change', () => saveAutomation({ [key]: t.value.trim() })); };
+  const words = (id, key) => { const t = $(id); t.addEventListener('change', () => { markBad(t, false); saveAutomation({ [key]: t.value.trim() }, null, fsSlot(id), key).then((ok) => { if (!ok) markBad(t, true); }); }); };
   words('w-ack', 'auto_ack_message'); words('w-fu1', 'enquiry_followup_1_message'); words('w-fu2', 'enquiry_followup_2_message');
   $('w-ack').addEventListener('input', () => { $('say-ack').textContent = ackPreview($('w-ack').value); });
   // the two follow-up days: the second at least two days after the first (lib/follow_ups.ts followupDays)
-  const fuDays = () => { let a = Math.trunc(Number($('n-fu1').value)); let b = Math.trunc(Number($('n-fu2').value)); if (!Number.isFinite(a) || a < 1) a = 3; if (a > 14) a = 14; if (!Number.isFinite(b)) b = 7; b = Math.min(30, Math.max(a + 2, b)); $('n-fu1').value = String(a); $('n-fu2').value = String(b); saveAutomation({ enquiry_followup_1_days: a, enquiry_followup_2_days: b }); };
+  const fuDays = () => { let a = Math.trunc(Number($('n-fu1').value)); let b = Math.trunc(Number($('n-fu2').value)); if (!Number.isFinite(a) || a < 1) a = 3; if (a > 14) a = 14; if (!Number.isFinite(b)) b = 7; b = Math.min(30, Math.max(a + 2, b)); $('n-fu1').value = String(a); $('n-fu2').value = String(b); saveAutomation({ enquiry_followup_1_days: a, enquiry_followup_2_days: b }, null, fsSlot('row-fu'), ['enquiry_followup_1_days', 'enquiry_followup_2_days']); };
   $('n-fu1').addEventListener('change', fuDays); $('n-fu2').addEventListener('change', fuDays);
   // a recipe's Turn on switches its rows on in one save; Change it goes to the row
   $('recipes').addEventListener('click', async (e) => {
@@ -2560,14 +2761,14 @@ function wireAutomations() {
     const b = e.target.closest('[data-recipe-on]'); if (!b) return;
     const r = RECIPES.find((x) => x.key === b.getAttribute('data-recipe-on')); if (!r) return;
     b.disabled = true;
-    if (await saveAutomation(r.patch)) goRow(r.row); else b.disabled = false;
+    if (await saveAutomation(r.patch, null, fsSlot(r.row))) goRow(r.row); else b.disabled = false;
   });
-  const days = (id, key, min, max, fallback) => { const i = $(id); i.addEventListener('change', () => { let n = Math.trunc(Number(i.value)); if (!Number.isFinite(n) || n < min) n = fallback; if (n > max) n = max; i.value = String(n); saveAutomation({ [key]: n }); }); };
+  const days = (id, key, min, max, fallback) => { const i = $(id); i.addEventListener('change', () => { let n = Math.trunc(Number(i.value)); if (!Number.isFinite(n) || n < min) n = fallback; if (n > max) n = max; i.value = String(n); saveAutomation({ [key]: n }, null, rowSlot(i), key); }); };
   days('n-inv', 'invoice_remind_after_days', 1, 90, 2); days('n-deal', 'deal_nudge_days', 1, 90, 3); days('n-rev', 'review_request_after_days', 1, 90, 3);
   $('n-rev').addEventListener('input', () => { $('n-rev-echo').textContent = $('n-rev').value || '3'; });
   $('n-inv').addEventListener('input', () => { $('n-inv-echo').textContent = $('n-inv').value || '2'; });
   $('n-deal').addEventListener('input', () => { const n = Math.trunc(Number($('n-deal').value)); $('say-deal').textContent = dealNudgeSentence(Number.isFinite(n) && n >= 1 ? n : 3); });
-  for (const k of STAGE_KEYS) $('st-' + k).addEventListener('change', saveStaleDays);
+  for (const k of STAGE_KEYS) $('st-' + k).addEventListener('change', () => saveStaleDays(k));
 }
 // ── C3 (bug hunt, Nov 10): the four stalled-days boxes are ONE setting. Each save
 //    used to send the copy read with the page plus the one box changed, so changing
@@ -2576,6 +2777,7 @@ function wireAutomations() {
 //    time: a change made while one is saving waits, then goes with the boxes as they
 //    are, and nothing repaints the boxes under a change still waiting. ──
 let STALE_SAVING = false, STALE_AGAIN = false;
+const STALE_ROWS = new Set();   // item 165: the rows whose boxes changed, for their ticks
 function staleFromBoxes() {
   const cur = (SETTINGS && SETTINGS.stage_stale_days && typeof SETTINGS.stage_stale_days === 'object') ? { ...SETTINGS.stage_stale_days } : {};
   for (const k of STAGE_KEYS) {
@@ -2585,20 +2787,32 @@ function staleFromBoxes() {
   return cur;
 }
 function paintStaleDays() {
+  if (AUTO_KEEP.stage_stale_days) return;   // item 165: a save that didn't go keeps what you typed
   const stale = (SETTINGS && SETTINGS.stage_stale_days && typeof SETTINGS.stage_stale_days === 'object') ? SETTINGS.stage_stale_days : {};
   for (const k of STAGE_KEYS) { const el = $('st-' + k), n = Math.trunc(Number(stale[k])); if (el && el !== document.activeElement) el.value = (Number.isFinite(n) && n >= 1) ? String(n) : ''; }
 }
-async function saveStaleDays() {
+async function saveStaleDays(k) {
+  if (k) STALE_ROWS.add(k);
   if (STALE_SAVING) { STALE_AGAIN = true; return; }
   STALE_SAVING = true;
-  try { let ok = true; do { STALE_AGAIN = false; ok = await saveAutomation({ stage_stale_days: staleFromBoxes() }); } while (ok && STALE_AGAIN); }
-  finally { STALE_SAVING = false; paintStaleDays(); }   // what was kept (365 at most), or after a refusal what is really saved
+  let ok = true;
+  try {
+    do {
+      STALE_AGAIN = false;
+      const rows = [...STALE_ROWS]; STALE_ROWS.clear();
+      ok = await saveAutomation({ stage_stale_days: staleFromBoxes() }, null, rows.map((x) => fsSlot('stage-' + x)), 'stage_stale_days', () => saveStaleDays());
+      rows.forEach((x) => markBad($('st-' + x), !ok));
+      if (!ok) rows.forEach((x) => STALE_ROWS.add(x));   // Try again sends them with the boxes as they stand
+    } while (ok && STALE_AGAIN);
+  }
+  finally { STALE_SAVING = false; if (ok) paintStaleDays(); }   // what was kept (365 at most); after a refusal the boxes keep what you typed
 }
 function renderSubline() {
   const bits = [];
   if (IDENT && IDENT.business_name) bits.push(esc(IDENT.business_name));
   if (CTX && CTX.edition_name) bits.push(esc(CTX.edition_name));
-  $('subline').innerHTML = bits.map((x, i) => (i ? '<span class="dot">·</span>' : '') + '<span>' + x + '</span>').join('');
+  // builder item 165: the header's one line — the business and its plan, or one plain sentence
+  $('subline').innerHTML = bits.length ? bits.join(' · ') : (studioOwn() ? 'How your studio works, in one place.' : 'How your business works, in one place.');   // builder item 202's words
 }
 function signedOut() {
   $('main').innerHTML = '<div class="center"><h2>Sign in to see your settings.</h2><p><a class="link" href="/studio.html">Sign in →</a></p></div>';
@@ -2622,6 +2836,7 @@ function holdAnchor(sec) {
 // await, readyState can already say 'interactive' with shell.js still on its way, and the wait was skipped.
 const SHELL_READY = document.readyState === 'loading' ? new Promise((r) => document.addEventListener('DOMContentLoaded', r, { once: true })) : Promise.resolve();
 (async function init() {
+  wireProfile();   // item 165: each box saves as you go (wired before anything can show the boxes)
   try {
     const { data } = await sb.auth.getSession();
     TOKEN = (data && data.session && data.session.access_token) || "";
@@ -2639,8 +2854,6 @@ const SHELL_READY = document.readyState === 'loading' ? new Promise((r) => docum
     paintScope();
     paintOwnerWords();
     renderCards();
-    $('profileSave').addEventListener('click', saveProfile);
-    $('profileForm').addEventListener('submit', (e) => { e.preventDefault(); saveProfile(); });
     // small, honest statuses on the cards that can answer quickly — never a blocker
     // GET /connections answers { data: { groups: { <category>: [ { connection: { status, health } } ] } } }
     // (routes/connections.ts) — the same rows connections.html paints its chips from.

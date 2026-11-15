@@ -275,7 +275,7 @@ test.describe('Templates: the built-in designs (builder item 198)', () => {
   }
   test('the eight designs come first, each with its picture, its words and "New site with this"', async ({ page }) => {
     await openTemplates(page);
-    await expect(page.locator('.lmeta')).toHaveText('8 built-in designs · 1 template · 1 starter kit');
+    await expect(page.locator('#phLine')).toHaveText('8 built-in designs · 1 template · 1 starter kit');   // the one page header's line (item 165)
     await expect(page.getByRole('heading', { level: 2, name: 'Built-in designs' })).toBeVisible();
     const cells = page.locator('.dgrid .dcell');
     await expect(cells).toHaveCount(8);
@@ -291,7 +291,7 @@ test.describe('Templates: the built-in designs (builder item 198)', () => {
     await expect(page.locator('.dgo')).toHaveCount(0);
     await openTemplates(page, { data: {} });
     await expect(page.locator('.dgrid')).toHaveCount(0);
-    await expect(page.locator('.lmeta')).toHaveText('1 template · 1 starter kit');
+    await expect(page.locator('#phLine')).toHaveText('1 template · 1 starter kit');
     await expect(page.locator('.krow')).toHaveCount(2);
   });
   test('phone width: one design under another, nothing wider than the screen', async ({ page }) => {
