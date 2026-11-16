@@ -13,7 +13,8 @@
 //   2  Publish in the same state: the same
 //   3  that answer also lets the timed-section sweep work out this version's next instant
 //   4  the holding page really up: Bring back online deploys over it, and the mark is gone
-//   5  a slow deploy the reconciler finishes takes the mark off; one the host failed leaves it
+//   5  a slow deploy the reconciler finishes takes the mark off (and asks for the site's health
+//      check, as item 206 wants of every door to live); one the host failed leaves it
 //
 // The routes run for real: the database is fake_pgrst, the host (Netlify) and the photo
 // store are stubbed here, as in publish_sends_what_changed_208_test.mjs.
@@ -148,10 +149,12 @@ async function liveThenMarkedOffline() {
   seed(); resetHost();
   const at = '2026-11-15T10:00:00Z';
   siteRow().offline_at = at;
+  siteRow().last_observed_at = '2026-11-15T09:00:00Z';   // its last health check (item 206)
   db.tables.presence_publishes.push({ id: hex('d', 1), site_id: SITE, status: 'deploying', netlify_deploy_id: 'dep-slow', kind: 'restore', created_at: at });
   const done = await quiet(() => reconcileOnePublish({ id: hex('d', 1), site_id: SITE, netlify_deploy_id: 'dep-slow', created_at: at }, Date.now()));
   ok('the reconciler finds the deploy ready and marks the publish live', done === 'live' && db.tables.presence_publishes[0].status === 'live', `${done} ${db.tables.presence_publishes[0].status}`);
   ok('and takes the Offline mark off the site', siteRow().offline_at === null && siteRow().status === 'live', `${siteRow().offline_at} ${siteRow().status}`);
+  ok('and asks for the site’s health check at the next tick, as a publish that goes live does (item 206)', siteRow().last_observed_at === null, String(siteRow().last_observed_at));
 
   seed(); resetHost();
   siteRow().offline_at = at;
