@@ -52,7 +52,7 @@ const pin = (page: Page, key: string, value: string) =>
   page.addInitScript(([k, v]) => { try { if (!localStorage.getItem(k)) localStorage.setItem(k, v); } catch { /* storage denied */ } }, [key, value]);
 
 test.describe('Add a customer on Contacts (sales routes, item 212)', () => {
-  test('+ Add a customer opens the dialog focused on the name, its labels name their fields, and it speaks of their work, never a software plan', async ({ page }) => {
+  test('+ Add a customer opens the box focused on the name, its labels name their fields, and it saves the customer and nothing else', async ({ page }) => {
     await pin(page, 'dds-display:contacts', 'table');
     await installApp(page, { api: { '/sales/contacts': CONTACTS } });
     const unplanned = await planWrites(page);
@@ -60,8 +60,8 @@ test.describe('Add a customer on Contacts (sales routes, item 212)', () => {
     await page.route('**/functions/v1/presence/sales/customers', (route) => {
       if (route.request().method() !== 'POST') return route.fallback();
       posts.push(route.request().postDataJSON());
-      return route.fulfill(posts.length === 1 ? answer(201, SET_UP)
-        : answer(200, { data: { already_exists: true, created: false, client_id: 'c-8', portal_url: 'https://studio.example/portal.html' } }));
+      return route.fulfill(posts.length === 1 ? answer(201, { data: { mode: 'save', saved: true, created: true, client_id: 'c-7', email: 'jane@acmebakery.example' } })
+        : answer(200, { data: { mode: 'save', saved: true, already: true, created: false, client_id: 'c-8', email: 'sam@example.com' } }));
     });
     await page.goto('/contacts.html');
     const add = page.locator('#addCust');
@@ -69,82 +69,40 @@ test.describe('Add a customer on Contacts (sales routes, item 212)', () => {
     await (await headerAction(page, '#addCust')).click();
     const dlg = page.locator('#custDlg');
     await expect(dlg).toBeVisible();
-    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's own focus lands a beat after it opens
-    await page.locator('#custDlg').getByRole('radio', { name: /Set up their website and invite them/ }).check();   // builder item 199: saving is the default, setting up is chosen
-    await expect(dlg).toContainText('What kind of work is this?');
-    await expect(dlg).toContainText('they never pay for software here');
+    await expect(page.locator('#cu-name')).toBeFocused();   // the box's own focus lands a beat after it opens
+    await expect(dlg).toContainText('No website is made and nobody is emailed.');
     expect((await dlg.textContent()) || '').not.toMatch(/subscription|SaaS|per month|\/mo\b/i);
     // each label names its field: filling by the words on screen reaches the right input
     await dlg.getByLabel('Their name').fill('Jane Doe');
     await dlg.getByLabel('Email', { exact: true }).fill('jane@acmebakery.example');
-    await dlg.getByLabel('Business name').fill('Acme Bakery');
+    await dlg.getByLabel('Business name (optional)').fill('Acme Bakery');
     await page.locator('#cu-submit').click();
     await expect.poll(() => posts.length).toBe(1);
-    expect(posts[0]).toMatchObject({ mode: 'provision', name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.example', edition: 'presence' });
+    expect(posts[0]).toEqual({ mode: 'save', name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.example' });
     const done = page.locator('#cust-done');
-    await expect(done.locator('h3')).toHaveText('Invitation sent');
-    await expect(done).toContainText('Invitation sent to jane@acmebakery.example.');
-    // the same person again: the server says they are already set up, and so does the dialog
-    await page.locator('#cu-close').click();
-    await (await headerAction(page, '#addCust')).click();
+    await expect(done.locator('h3')).toHaveText('Saved to your customers');
+    // the same person again: the server says they're already a customer, and so does the box
+    await done.getByRole('button', { name: 'Add another' }).click();
     await expect(page.locator('#cu-name')).toBeFocused();
-    await page.locator('#custDlg').getByRole('radio', { name: /Set up their website and invite them/ }).check();   // builder item 199: saving is the default, setting up is chosen
     await dlg.getByLabel('Email', { exact: true }).fill('sam@example.com');
     await page.locator('#cu-submit').click();
-    await expect(done.locator('h3')).toHaveText('They already have a workspace');
-    await expect(done).toContainText('Nothing duplicated');
-    await expect(done).not.toContainText('Invitation sent');
+    await expect(done.locator('h3')).toHaveText('Already your customer');
+    await expect(done).toContainText('Nothing new was made.');
     expect(posts).toHaveLength(2);
     expect(unplanned).toEqual([]);
   });
 
-  for (const [file, roster] of [
-    ['customers.html', { '/studio/customers': CUSTOMERS, '/agency/me': { data: { agency: 'Bright Studio', role: 'owner' } }, '/agency/portfolio': { data: [] }, '/agency/queues': { data: { queues: [] } } }],
-    ['contacts.html', { '/sales/contacts': CONTACTS }],
-  ] as const) {
-    test(`${file}: a chosen kit goes to the NEW site the set-up names, and a kit that fails never repaints the set-up as a failure`, async ({ page }) => {
+  for (const file of ['customers.html', 'contacts.html'] as const) {
+    test(`${file}: the box offers no starter kit and reads none (a kit starts a website, from New site)`, async ({ page }) => {
       await pin(page, file === 'customers.html' ? 'dds-display:customers' : 'dds-display:contacts', 'table');
-      await installApp(page, { api: { ...roster, '/portal/context': AGENCY_CTX, '/agency/kits': KITS } });
-      const unplanned = await planWrites(page);
-      const setUps: Array<Record<string, unknown>> = [], applies: Array<{ kit: string; body: unknown }> = [];
-      await page.route('**/functions/v1/presence/sales/customers', (route) => {
-        if (route.request().method() !== 'POST') return route.fallback();
-        setUps.push(route.request().postDataJSON());
-        return route.fulfill(answer(201, SET_UP));
-      });
-      await page.route('**/functions/v1/presence/agency/kits/*/apply', (route) => {
-        const kit = new URL(route.request().url()).pathname.split('/').slice(-2)[0];
-        applies.push({ kit, body: route.request().postDataJSON() });
-        return route.fulfill(kit === KIT_R ? answer(200, { data: { applied: { offerings: 6, faqs: 4 }, skipped: [] } }) : answer(500, { error: 'boom' }));
-      });
+      let kitReads = 0;
+      await installApp(page, { api: { ...(file === 'customers.html' ? { '/studio/customers': CUSTOMERS } : { '/sales/contacts': CONTACTS }), '/portal/context': AGENCY_CTX } });
+      await page.route('**/functions/v1/presence/agency/kits', (route) => { kitReads++; return route.fulfill(answer(200, KITS)); });
       await page.goto('/' + file);
       await (await headerAction(page, '#addCust')).click();
-      await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter', 'Trades starter']);
       await expect(page.locator('#cu-name')).toBeFocused();
-      await page.locator('#custDlg').getByRole('radio', { name: /Set up their website and invite them/ }).check();   // builder item 199: saving is the default, setting up is chosen
-      await page.locator('#cu-email').fill('ana@marlows.example');
-      await page.locator('#cu-kit').selectOption({ label: 'Restaurant starter' });
-      await page.locator('#cu-submit').click();
-      const done = page.locator('#cust-done');
-      await expect(done.locator('#cu-kit-line')).toHaveText('Restaurant starter applied.');
-      await expect(done).toContainText('Invitation sent');
-      expect(setUps[0]).not.toHaveProperty('kit_id');                          // the kit is applied after, never sent to the set-up
-      expect(applies).toEqual([{ kit: KIT_R, body: { site_id: NEW_SITE } }]);   // to the site the set-up answered with
-      // a kit that won't apply: the set-up still reads as done, and the kit says so on its own line
-      await page.locator('#cu-close').click();
-      await (await headerAction(page, '#addCust')).click();
-      await expect(page.locator('#cu-name')).toBeFocused();
-      await page.locator('#custDlg').getByRole('radio', { name: /Set up their website and invite them/ }).check();   // builder item 199: saving is the default, setting up is chosen
-      await page.locator('#cu-email').fill('jo@parkflorist.example');
-      await page.locator('#cu-kit').selectOption({ label: 'Trades starter' });
-      await page.locator('#cu-submit').click();
-      await expect(done).toContainText('Invitation sent');
-      await expect(done.locator('#cu-kit-line')).toContainText('The Trades starter kit didn’t apply');
-      await expect(page.locator('#cu-kit-again')).toBeVisible();
-      await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t set them up' })).toHaveCount(0);
-      expect(applies.map((a) => a.kit)).toEqual([KIT_R, KIT_T]);
-      expect(setUps).toHaveLength(2);
-      expect(unplanned).toEqual([]);
+      await expect(page.locator('#cu-kit, #cu-kit-wrap')).toHaveCount(0);
+      expect(kitReads).toBe(0);
     });
   }
 });

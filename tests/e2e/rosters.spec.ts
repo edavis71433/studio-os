@@ -221,44 +221,39 @@ test.describe('Contacts list view', () => {
 
 // ── SS6 (C4/C5/D7): customers gets Add-a-customer + unscoped read + search ───
 test.describe('Customers — SS6 quick wins', () => {
-  test('C4 — "+ Add a customer" (contacts’ dialog, ported): provision POSTs /sales/customers and shows the invite outcome', async ({ page }) => {
+  test('C4 — "+ Add a customer" (the one box): saves the customer, says so, and offers their profile (builder item 241)', async ({ page }) => {
     await pinTable('dds-display:customers')(page);
+    let sent: unknown = null;
     await installApp(page, { api: {
       '/studio/customers': CUSTOMERS,
-      '/sales/customers': { data: { created: true, invited: true, portal_url: 'https://x.example/portal.html' } },
+      'POST /sales/customers': (b: unknown) => { sent = b; return { data: { mode: 'save', saved: true, created: true, client_id: 'cccccccc-1234-4234-8234-cccccccccccc', email: 'jane@acmebakery.com' } }; },
     } });
     await page.goto('/customers.html');
     await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
-    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog focuses Name a beat after opening — a fill() racing it lands in the wrong field
-    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
+    await expect(page.locator('#cu-name')).toBeFocused();   // the box focuses Name a beat after opening — a fill() racing it lands in the wrong field
     await page.locator('#cu-name').fill('Jane Doe');
     await page.locator('#cu-biz').fill('Acme Bakery');
     await page.locator('#cu-email').fill('jane@acmebakery.com');
-    const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/sales/customers'));
     await page.locator('#cu-submit').click();
-    // exactly what handleSalesAddCustomer reads: mode/name/business_name/email/edition
-    expect((await post).postDataJSON()).toEqual({ mode: 'provision', name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com', edition: 'presence' });
-    await expect(page.locator('#cust-done')).toContainText('Invitation sent');
-    await expect(page.locator('#cust-done')).toContainText('jane@acmebakery.com');
+    await expect(page.locator('#cust-done')).toContainText('Saved to your customers');
+    expect(sent).toEqual({ mode: 'save', name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com' });
+    await expect(page.locator('#cust-done')).toContainText('Acme Bakery is on your Customers list. No website yet, and nothing was emailed.');
+    await expect(page.locator('#cust-done').getByRole('link', { name: 'Open their profile' })).toHaveAttribute('href', '/crm.html?client_id=cccccccc-1234-4234-8234-cccccccccccc');
   });
 
-  test('C4 — builder item 199: "Just save them for now" is the default; setting them up is the other choice', async ({ page }) => {
+  test('C4 — builder items 199 and 241: the box only saves; no choice to set them up, no sign-up or price page', async ({ page }) => {
     await pinTable('dds-display:customers')(page);
     await installApp(page, { api: { '/studio/customers': CUSTOMERS } });
     await page.goto('/customers.html');
     await (await headerAction(page, '#addCust')).click();
     const dlg = page.locator('#custDlg');
     await expect(dlg).toBeVisible();
-    await expect(dlg.locator('input[name="cumode"]')).toHaveCount(2);
-    await expect(dlg.getByRole('radio', { name: /Just save them for now/ })).toBeChecked();   // Eric (Nov 15): no website unless asked
+    await expect(dlg.locator('input[type=radio], select')).toHaveCount(0);   // Eric (Nov 15): adding a customer starts nothing
     await expect(dlg).not.toContainText('sign up themselves');
     await expect(dlg.locator('a[href*="pricing"], #cu-signup')).toHaveCount(0);
-    await expect(dlg.locator('#cu-biz')).toBeHidden();   // saving needs only who they are
-    await expect(page.locator('#cu-submit')).toHaveText('Save');
-    await dlg.getByRole('radio', { name: /Set up their website and invite them/ }).check();
-    await expect(dlg.locator('#cu-biz')).toBeVisible();
-    await expect(page.locator('#cu-submit')).toHaveText('Set up + invite');
+    await expect(dlg.getByLabel('Business name (optional)')).toBeVisible();   // Create website fills it in later
+    await expect(page.locator('#cu-submit')).toHaveText('Save customer');
   });
 
   test('D7 — a stray ?client= cannot blank the roster: /studio/customers is asked UNSCOPED', async ({ page }) => {

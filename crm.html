@@ -829,7 +829,7 @@ async function sendInvite(btn,email){
 function openDeleteCustomer(){
   if(!CUST||!window.ddsCustomerDelete)return;
   const name=(REC&&REC.header&&REC.header.name)||CUST.business_name||'this customer';
-  window.ddsCustomerDelete.open({request:(m,p,b)=>apiAg(p,m,b),toast,customer:{client_id:CUST.client_id,name,website:CUST.website,can_manage_sites:!!(CUST.offers&&CUST.offers.can_manage_sites)},onDeleted:(d)=>showDeleted(name,d)});
+  window.ddsCustomerDelete.open({request:(m,p,b)=>apiAg(p,m,b),toast,back:$('act-more'),customer:{client_id:CUST.client_id,name,website:CUST.website,can_manage_sites:!!(CUST.offers&&CUST.offers.can_manage_sites)},onDeleted:(d)=>showDeleted(name,d)});
 }
 // the profile is gone: say so in place, with Undo for the next while and the way back to Customers
 function showDeleted(name,d){

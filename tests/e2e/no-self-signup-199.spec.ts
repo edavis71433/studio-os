@@ -27,7 +27,7 @@ const EDITOR_API = {
   '/portal/context': OWNER_CTX,
 };
 
-test('Home: Add a customer saves them by default; no sign-up wording, link or price page', async ({ page }) => {
+test('Home: Add a customer saves them and nothing else; no sign-up wording, link or price page (items 199, 241)', async ({ page }) => {
   await installApp(page);
   await page.goto('/agency.html');
   await page.locator('#top').getByRole('button', { name: '+ Add a customer' }).click();
@@ -35,12 +35,9 @@ test('Home: Add a customer saves them by default; no sign-up wording, link or pr
   await expect(dlg).toBeVisible();
   await expect(dlg.locator('#cu-signup, a[href*="pricing"]')).toHaveCount(0);
   await expect(dlg).not.toContainText('sign up themselves');
-  await expect(dlg.getByRole('radio', { name: /Just save them for now/ })).toBeChecked();
-  await expect(dlg.locator('#cu-biz')).toBeHidden();
-  await expect(dlg.locator('#cu-submit')).toHaveText('Save');
-  await dlg.getByRole('radio', { name: /Set up their website and invite them/ }).check();
+  await expect(dlg.locator('input[type=radio]')).toHaveCount(0);   // nothing to choose: saving is all it does
   await expect(dlg.locator('#cu-biz')).toBeVisible();
-  await expect(dlg.locator('#cu-submit')).toHaveText('Set up + invite');
+  await expect(dlg.locator('#cu-submit')).toHaveText('Save customer');
 });
 
 // Name is the dialog's first field (the save-or-set-up choice comes after Email), so the
@@ -69,12 +66,12 @@ for (const d of DIALOGS) {
     await expect(page.locator('#cu-email')).toBeFocused();
   });
 
-  test(`${d.where}: saving sends only who they are, and says no website was made and nothing was emailed`, async ({ page }) => {
+  test(`${d.where}: saving sends who they are, and says no website was made and nothing was emailed`, async ({ page }) => {
     let sent: unknown = null;
     await installApp(page, { api: d.api });
     await page.route('**/functions/v1/presence/sales/customers', (route) => {
       sent = route.request().postDataJSON();
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { mode: 'connect', pending: true, connected: false, email: 'ana@harbor.example', contact_id: 'c1', message: 'Saved' } }) });
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { mode: 'save', saved: true, created: true, client_id: 'cccccccc-5555-4555-8555-cccccccccccc', email: 'ana@harbor.example' } }) });
     });
     await page.goto(d.path);
     await (await headerAction(page, d.open)).first().click();   // behind ⋯ on a phone (builder item 165)
@@ -83,10 +80,10 @@ for (const d of DIALOGS) {
     await page.locator('#cu-email').fill('ana@harbor.example');
     await page.locator('#cu-submit').click();
     const done = page.locator('#cust-done');
-    await expect(done).toContainText('Saved');
-    await expect(done).toContainText('Ana Ruiz is saved to your contacts. No website yet, and nothing was emailed.');
+    await expect(done).toContainText('Saved to your customers');
+    await expect(done).toContainText('Ana Ruiz is on your Customers list. No website yet, and nothing was emailed.');
     await expect(done).not.toContainText('Invitation sent');
-    expect(sent).toEqual({ mode: 'connect', name: 'Ana Ruiz', email: 'ana@harbor.example' });
+    expect(sent).toEqual({ mode: 'save', name: 'Ana Ruiz', email: 'ana@harbor.example' });   // builder item 241: the customer and nothing else
   });
 }
 

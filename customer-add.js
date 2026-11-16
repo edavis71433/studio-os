@@ -179,7 +179,7 @@
     document.body.appendChild(d);
     var back = function () { var b = $('cd-back'); var t = d.querySelector('input[name="cdsite"]:checked'); if (b) b.textContent = 'Changed your mind? Bring them back from Recently deleted for 30 days' + (t && t.value === 'trash' ? ', and their ' + what + ' with them' : '') + '.'; };
     d.querySelectorAll('input[name="cdsite"]').forEach(function (r) { r.addEventListener('change', back); });
-    var opener = document.activeElement;
+    var opener = o.back || document.activeElement;
     var close = function () { d.close(); };
     d.addEventListener('close', function () { d.remove(); if (opener && opener.isConnected && opener.focus) try { opener.focus(); } catch (_) { /* */ } });
     $('cd-cancel').onclick = close;

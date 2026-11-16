@@ -73,11 +73,10 @@ test('Customers: adding someone whose account isn\'t yours says "Request sent"',
   await page.goto('/customers.html');
   await page.locator('#addCust').click();
   await expect(page.locator('#cu-name')).toBeFocused();   // the dialog focuses Name a beat after opening
-  await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
   await page.locator('#cu-email').fill('sam@harbor.test');
   await page.locator('#cu-submit').click();
   await expect(page.locator('#cust-done')).toContainText('Request sent');
   await expect(page.locator('#cust-done')).toContainText('they need to say yes first');
   await expect(page.locator('#cust-done')).not.toContainText('Their sign-in page');
-  expect(sent).toMatchObject({ mode: 'provision', email: 'sam@harbor.test' });
+  expect(sent).toMatchObject({ mode: 'save', email: 'sam@harbor.test' });   // builder item 241: the box saves; someone else's account is still asked, never taken
 });
