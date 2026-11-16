@@ -1,35 +1,36 @@
 {
   "content": {
     "identity": {
-      "business_name": "Vermilion & Vine",
-      "tagline": "Neighborhood wine bar & wood-fired kitchen in Highland Park",
-      "description": "A small neighborhood spot where wood-fired plates meet a thoughtful natural wine list. Walk-ins welcome at the bar; the patio seats twenty under the pepper tree.",
-      "story": "We opened in 2019 with one oven, six tables, and a wine list written on butcher paper.\n\nFive years later the butcher paper is framed above the bar, the patio doubled, and the menu still changes with whatever the Wednesday farmers market has too much of.",
-      "phone": "(323) 555-0142",
-      "email": "hello@vermilionandvine.example",
-      "service_area": "Highland Park, Eagle Rock, and northeast Los Angeles",
-      "booking_url": "https://resy.example/vermilion-and-vine",
+      "business_name": "Ember Boxing & Strength",
+      "tagline": "Boxing, strength and conditioning classes in North Hollywood. Your first class is free.",
+      "description": "A coach-led gym for boxing, strength training and conditioning. Classes are capped at fourteen, beginners are welcome at every one, and your first class is on us.",
+      "story": "Coach Andre Little boxed as an amateur for ten years before opening Ember in a North Hollywood warehouse in 2020.\n\nWe built it for people who want real coaching without the attitude: wraps on, phones away, and someone watching your form every set.",
+      "phone": "(818) 555-0152",
+      "email": "coach@emberboxing.example",
+      "service_area": "North Hollywood, Studio City, Toluca Lake and Burbank",
+      "booking_url": "https://book.example/ember",
       "ordering_url": "",
       "social": {
-        "instagram": "https://instagram.com/vermilionvine.example"
+        "instagram": "https://instagram.com/emberboxing.example",
+        "youtube": "https://youtube.com/@emberboxing.example"
       },
-      "seo_title": "Vermilion & Vine — Wine Bar & Wood-Fired Kitchen, Highland Park",
-      "seo_description": "Wood-fired plates and natural wine in Highland Park, Los Angeles. Patio seating, weekend brunch, walk-ins welcome."
+      "seo_title": "Ember Boxing & Strength — Boxing Gym in North Hollywood",
+      "seo_description": "Coach-led boxing, barbell strength and conditioning classes in North Hollywood, capped at fourteen. Your first class is free."
     },
     "offerings": [
       {
         "id": "o1",
-        "name": "Charred Leeks & Romesco",
-        "category": "To Start",
-        "description": "Wood-fired leeks, almond romesco, smoked olive oil",
-        "price_text": "$14",
+        "name": "Boxing fundamentals",
+        "category": "Boxing",
+        "description": "Stance, footwork and combinations on the bag and the pads. Gloves provided.",
+        "price_text": "$28 drop-in",
         "sort_order": 1,
         "media": {
-          "alt": "Charred leeks on almond romesco",
+          "alt": "Two boxers training on the pads in a gym",
           "variants": {
-            "w400": "/img/leeks-400.webp",
-            "w800": "/img/leeks-800.webp",
-            "w1600": "/img/leeks-1600.webp"
+            "w400": "/img/pad-work-400.webp",
+            "w800": "/img/pad-work-800.webp",
+            "w1600": "/img/pad-work-1600.webp"
           },
           "width": 1600,
           "height": 1067
@@ -37,95 +38,95 @@
       },
       {
         "id": "o2",
-        "name": "Burrata & Market Peaches",
-        "category": "To Start",
-        "description": "With basil, chile crisp, grilled sourdough",
-        "price_text": "$17",
+        "name": "Fight conditioning",
+        "category": "Boxing",
+        "description": "Rounds of bag work, sprints and core. Hard, but scaled to you.",
+        "price_text": "$28 drop-in",
         "sort_order": 2
       },
       {
         "id": "o3",
-        "name": "Oven Chicken for Two",
-        "category": "Wood-Fired",
-        "description": "Half chicken, salsa verde, pan drippings, little gems",
-        "price_text": "$38",
+        "name": "Barbell strength",
+        "category": "Strength",
+        "description": "Squat, press and deadlift with a coach, in small groups.",
+        "price_text": "$30 drop-in",
         "sort_order": 1
       },
       {
         "id": "o4",
-        "name": "Mushroom Cavatelli",
-        "category": "Wood-Fired",
-        "description": "Maitake, brown butter, pecorino, black pepper",
-        "price_text": "$24",
+        "name": "Mobility and recovery",
+        "category": "Strength",
+        "description": "Forty minutes of stretching and breathing to undo the week.",
+        "price_text": "$20 drop-in",
         "sort_order": 2
       },
       {
         "id": "o5",
-        "name": "Whole Branzino",
-        "category": "Wood-Fired",
-        "description": "Charred lemon, herb salad — market price",
-        "price_text": "market price",
-        "sort_order": 3
+        "name": "Unlimited membership",
+        "category": "Memberships",
+        "description": "Every class, open gym hours and a monthly form check.",
+        "price_text": "$179 a month",
+        "sort_order": 1
       },
       {
         "id": "o6",
-        "name": "Basque Cheesecake",
-        "category": "Sweet",
-        "description": "Burnt top, cold center",
-        "price_text": "$11",
-        "sort_order": 1
+        "name": "Ten-class pack",
+        "category": "Memberships",
+        "description": "Ten classes to use any time within three months.",
+        "price_text": "$240",
+        "sort_order": 2
       }
     ],
     "testimonials": [
       {
         "id": "t1",
-        "quote": "The chicken for two is the best date-night order on the east side.",
-        "author": "Maria G.",
+        "quote": "I had never boxed before. Two months in I'm stronger, calmer, and I look forward to 6am.",
+        "author": "Tasha R.",
         "source": "Google",
         "sort_order": 1
       },
       {
         "id": "t2",
-        "quote": "Wine list is small and perfect. Staff always finds us something new.",
-        "author": "Devon P.",
-        "source": "Yelp",
+        "quote": "Real coaching. Andre fixed my deadlift in one session.",
+        "author": "Marco V.",
+        "source": "ClassPass",
         "sort_order": 2
       }
     ],
     "faqs": [
       {
         "id": "f1",
-        "question": "Do you take walk-ins?",
-        "answer": "Always at the bar, and we keep a third of the patio unreserved. Parties of 5+ should book ahead.",
+        "question": "I'm a complete beginner. Is that OK?",
+        "answer": "Yes. Every class has beginners in it, and the coaches scale each round to where you are.",
         "sort_order": 1
       },
       {
         "id": "f2",
-        "question": "Is the patio dog-friendly?",
-        "answer": "Yes — water bowls provided, treats negotiable.",
+        "question": "What should I bring?",
+        "answer": "Water, a towel, and hand wraps if you have them. We lend gloves and wraps for your first visits.",
         "sort_order": 2
       },
       {
         "id": "f3",
-        "question": "Do you have vegetarian options?",
-        "answer": "About half the menu, and the kitchen is happy to adapt most plates. Just ask your server.",
+        "question": "Is the first class really free?",
+        "answer": "Yes. Book any class online and tell the coach it is your first time.",
         "sort_order": 3
       }
     ],
     "posts": [
       {
         "id": "p1",
-        "title": "Winter menu is live",
-        "slug": "winter-menu-2026",
-        "excerpt": "Six new plates, two returning favorites, and a mulled thing for the patio.",
-        "body_md": "The **winter menu** landed this week.\n\n## What's new\n\n- Squash agnolotti with brown butter\n- Wood-fired cabbage with bagna cauda\n- The return of the *short rib* for two\n\nBook the patio heaters early on weekends — [reservations here](https://resy.example/vermilion-and-vine).",
-        "published_at": "2026-01-12T18:00:00Z",
+        "title": "A new 6am class starts in March",
+        "slug": "new-6am-class",
+        "excerpt": "Fight conditioning before work, on Monday, Wednesday and Friday.",
+        "body_md": "You asked, and **fight conditioning** is coming to the early slot.\n\n## The details\n\n- Monday, Wednesday and Friday at *6am*\n- Forty-five minutes, capped at fourteen\n- Open to every level\n\n[Book your spot](https://book.example/ember); the first week fills fast.",
+        "published_at": "2026-02-20T17:00:00Z",
         "hero": {
-          "alt": "Squash agnolotti in brown butter",
+          "alt": "A row of heavy bags in an empty gym at dawn",
           "variants": {
-            "w400": "/img/winter-400.webp",
-            "w800": "/img/winter-800.webp",
-            "w1600": "/img/winter-1600.webp"
+            "w400": "/img/heavy-bags-400.webp",
+            "w800": "/img/heavy-bags-800.webp",
+            "w1600": "/img/heavy-bags-1600.webp"
           },
           "width": 1600,
           "height": 1067
@@ -134,37 +135,42 @@
     ],
     "redirects": [
       {
-        "from_path": "/menu.html",
-        "to_path": "/menu/"
+        "from_path": "/schedule",
+        "to_path": "/classes/"
       },
       {
-        "from_path": "/reservations",
-        "to_path": "https://resy.example/vermilion-and-vine"
+        "from_path": "/join",
+        "to_path": "https://book.example/ember"
       }
     ],
     "locations": [
       {
-        "address_line1": "5119 York Boulevard",
+        "address_line1": "5300 Lankershim Blvd",
         "address_line2": "",
-        "city": "Los Angeles",
+        "city": "North Hollywood",
         "region": "CA",
-        "postal_code": "90042",
+        "postal_code": "91601",
         "country": "US",
-        "phone": "(323) 555-0142",
+        "phone": "(818) 555-0152",
         "timezone": "America/Los_Angeles",
         "hours": [
           {
             "day": "mon",
-            "closed": true,
-            "intervals": []
+            "closed": false,
+            "intervals": [
+              {
+                "open": "06:00",
+                "close": "21:00"
+              }
+            ]
           },
           {
             "day": "tue",
             "closed": false,
             "intervals": [
               {
-                "open": "17:00",
-                "close": "22:00"
+                "open": "06:00",
+                "close": "21:00"
               }
             ]
           },
@@ -173,8 +179,8 @@
             "closed": false,
             "intervals": [
               {
-                "open": "17:00",
-                "close": "22:00"
+                "open": "06:00",
+                "close": "21:00"
               }
             ]
           },
@@ -183,8 +189,8 @@
             "closed": false,
             "intervals": [
               {
-                "open": "17:00",
-                "close": "23:00"
+                "open": "06:00",
+                "close": "21:00"
               }
             ]
           },
@@ -193,12 +199,8 @@
             "closed": false,
             "intervals": [
               {
-                "open": "12:00",
-                "close": "14:30"
-              },
-              {
-                "open": "17:00",
-                "close": "24:00"
+                "open": "06:00",
+                "close": "20:00"
               }
             ]
           },
@@ -207,12 +209,8 @@
             "closed": false,
             "intervals": [
               {
-                "open": "10:00",
-                "close": "14:30"
-              },
-              {
-                "open": "17:00",
-                "close": "24:00"
+                "open": "08:00",
+                "close": "14:00"
               }
             ]
           },
@@ -221,8 +219,8 @@
             "closed": false,
             "intervals": [
               {
-                "open": "10:00",
-                "close": "15:00"
+                "open": "09:00",
+                "close": "12:00"
               }
             ]
           }
@@ -231,18 +229,18 @@
           {
             "date": "2026-11-26",
             "label": "Thanksgiving",
-            "closed": true
+            "closed": false,
+            "intervals": [
+              {
+                "open": "08:00",
+                "close": "11:00"
+              }
+            ]
           },
           {
             "date": "2026-12-24",
             "label": "Christmas Eve",
-            "closed": false,
-            "intervals": [
-              {
-                "open": "12:00",
-                "close": "20:00"
-              }
-            ]
+            "closed": true
           }
         ],
         "temporarily_closed": false,
@@ -251,7 +249,7 @@
     ],
     "settings": {
       "category_order": [],
-      "industry": "plumber"
+      "industry": "gym"
     }
   },
   "content_contract_version": 1,

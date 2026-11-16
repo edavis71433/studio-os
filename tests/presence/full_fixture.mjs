@@ -94,16 +94,17 @@ export function fullFixture(slug, words = (x) => x) {
   };
   // Builder list item 40: a post with a category, an author with a photo and a photo in its
   // text, and a second post in another category, so the list, the category pages, the byline,
-  // the figure and the author's line are all drawn.
+  // the figure and the author's line are all drawn. The words fit any business (item 103:
+  // each template's sample is a different kind of business).
   const [first] = fx.content.posts || [];
   if (first) {
     const PIC = '00000000-0000-4000-8000-0000000000a8';
     fx.content.posts = [
       { ...first, category: { id: 'news', name: words('News') },
-        author: { id: 'maria-lopez', name: words('Maria Lopez'), bio: words('Owner and head chef'), photo: ref('00000000-0000-4000-8000-0000000000a7') },
-        body_md: `${first.body_md}\n\n![${words('The room on a quiet night')}](media:${PIC} "${words('Before the doors open')}")\n\n${words('See you soon.')}`,
+        author: { id: 'maria-lopez', name: words('Maria Lopez'), bio: words('Owner'), photo: ref('00000000-0000-4000-8000-0000000000a7') },
+        body_md: `${first.body_md}\n\n![${words('Inside, on a quiet morning')}](media:${PIC} "${words('Before the doors open')}")\n\n${words('See you soon.')}`,
         images: { [PIC]: ref(PIC) } },
-      { id: 'p2', title: words('Wine dinner on the patio'), slug: 'wine-dinner', body_md: words('Five courses, five wines, one long table.'), excerpt: '', published_at: '2026-02-02T18:00:00Z',
+      { id: 'p2', title: words('An open house this spring'), slug: 'open-house', body_md: words('Come by, meet the team, and see what is new.'), excerpt: '', published_at: '2026-02-02T18:00:00Z',
         category: { id: 'events', name: words('Events') }, author: { id: 'sam-ortiz', name: words('Sam Ortiz') } },
     ];
   }

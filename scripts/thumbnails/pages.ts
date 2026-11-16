@@ -31,12 +31,14 @@ function ref(id: string) {
 }
 const fixture = (slug: string) => {
   const fx = JSON.parse(Deno.readTextFileSync(new URL(`supabase/functions/presence/templates/${slug}/1.0.0/fixture.json`, ROOT)));
-  // every photo in the sample site becomes a placeholder
+  // every photo in the sample site becomes a placeholder, numbered by its place in the sample:
+  // each template's first photo is the same placeholder, and the sections' numbers never move
+  let n = 0;
   const swap = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(swap);
     if (v && typeof v === 'object') {
       const o = v as Record<string, unknown>;
-      if (o.variants && typeof o.variants === 'object') return { ...o, variants: ref('fx-' + JSON.stringify(o.variants).length + '-' + String(o.alt || '')).variants };
+      if (o.variants && typeof o.variants === 'object') return { ...o, variants: ref(`fx-${n++}`).variants };
       return Object.fromEntries(Object.entries(o).map(([k, x]) => [k, swap(x)]));
     }
     return v;

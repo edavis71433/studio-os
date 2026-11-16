@@ -1,35 +1,36 @@
 {
   "content": {
     "identity": {
-      "business_name": "Vermilion & Vine",
-      "tagline": "Neighborhood wine bar & wood-fired kitchen in Highland Park",
-      "description": "A small neighborhood spot where wood-fired plates meet a thoughtful natural wine list. Walk-ins welcome at the bar; the patio seats twenty under the pepper tree.",
-      "story": "We opened in 2019 with one oven, six tables, and a wine list written on butcher paper.\n\nFive years later the butcher paper is framed above the bar, the patio doubled, and the menu still changes with whatever the Wednesday farmers market has too much of.",
-      "phone": "(323) 555-0142",
-      "email": "hello@vermilionandvine.example",
-      "service_area": "Highland Park, Eagle Rock, and northeast Los Angeles",
-      "booking_url": "https://resy.example/vermilion-and-vine",
+      "business_name": "Larkspur Tax & Bookkeeping",
+      "tagline": "Tax returns and monthly books for small businesses and families in Burbank",
+      "description": "A small accounting office that does your taxes, keeps your books and answers the phone. Flat prices quoted before we start, and meetings in person or by video.",
+      "story": "Dana Whitfield opened the office in 2011 after twelve years at a downtown firm, with one desk and a promise to return every call the same day.\n\nToday a team of five looks after about 400 households and 120 small businesses, from food trucks to dental offices, and we still answer our own phone.",
+      "phone": "(818) 555-0143",
+      "email": "hello@larkspurtax.example",
+      "service_area": "Burbank, Glendale and the east San Fernando Valley",
+      "booking_url": "https://book.example/larkspur-tax",
       "ordering_url": "",
       "social": {
-        "instagram": "https://instagram.com/vermilionvine.example"
+        "linkedin": "https://linkedin.com/company/larkspurtax.example",
+        "facebook": "https://facebook.com/larkspurtax.example"
       },
-      "seo_title": "Vermilion & Vine — Wine Bar & Wood-Fired Kitchen, Highland Park",
-      "seo_description": "Wood-fired plates and natural wine in Highland Park, Los Angeles. Patio seating, weekend brunch, walk-ins welcome."
+      "seo_title": "Larkspur Tax & Bookkeeping — Accountants in Burbank, CA",
+      "seo_description": "Tax returns, bookkeeping and payroll for small businesses and families in Burbank and Glendale. Flat prices and same-day callbacks."
     },
     "offerings": [
       {
         "id": "o1",
-        "name": "Charred Leeks & Romesco",
-        "category": "To Start",
-        "description": "Wood-fired leeks, almond romesco, smoked olive oil",
-        "price_text": "$14",
+        "name": "Personal tax return",
+        "category": "Taxes",
+        "description": "Federal and California returns, filed electronically, with a review call.",
+        "price_text": "from $225",
         "sort_order": 1,
         "media": {
-          "alt": "Charred leeks on almond romesco",
+          "alt": "An accountant going over a tax return with a client",
           "variants": {
-            "w400": "/img/leeks-400.webp",
-            "w800": "/img/leeks-800.webp",
-            "w1600": "/img/leeks-1600.webp"
+            "w400": "/img/tax-review-400.webp",
+            "w800": "/img/tax-review-800.webp",
+            "w1600": "/img/tax-review-1600.webp"
           },
           "width": 1600,
           "height": 1067
@@ -37,57 +38,57 @@
       },
       {
         "id": "o2",
-        "name": "Burrata & Market Peaches",
-        "category": "To Start",
-        "description": "With basil, chile crisp, grilled sourdough",
-        "price_text": "$17",
+        "name": "Small business tax return",
+        "category": "Taxes",
+        "description": "Sole owners, partnerships and S corporations, with quarterly estimates.",
+        "price_text": "from $650",
         "sort_order": 2
       },
       {
         "id": "o3",
-        "name": "Oven Chicken for Two",
-        "category": "Wood-Fired",
-        "description": "Half chicken, salsa verde, pan drippings, little gems",
-        "price_text": "$38",
-        "sort_order": 1
-      },
-      {
-        "id": "o4",
-        "name": "Mushroom Cavatelli",
-        "category": "Wood-Fired",
-        "description": "Maitake, brown butter, pecorino, black pepper",
-        "price_text": "$24",
-        "sort_order": 2
-      },
-      {
-        "id": "o5",
-        "name": "Whole Branzino",
-        "category": "Wood-Fired",
-        "description": "Charred lemon, herb salad — market price",
-        "price_text": "market price",
+        "name": "IRS and state letters",
+        "category": "Taxes",
+        "description": "We read the letter, explain it plainly and answer it for you.",
+        "price_text": "from $150",
         "sort_order": 3
       },
       {
-        "id": "o6",
-        "name": "Basque Cheesecake",
-        "category": "Sweet",
-        "description": "Burnt top, cold center",
-        "price_text": "$11",
+        "id": "o4",
+        "name": "Monthly bookkeeping",
+        "category": "Books and payroll",
+        "description": "Reconciled books in QuickBooks or Xero, with a one-page report each month.",
+        "price_text": "from $300 a month",
         "sort_order": 1
+      },
+      {
+        "id": "o5",
+        "name": "Payroll",
+        "category": "Books and payroll",
+        "description": "Pay runs, direct deposit, W-2s and the quarterly filings.",
+        "price_text": "from $90 a month",
+        "sort_order": 2
+      },
+      {
+        "id": "o6",
+        "name": "New business setup",
+        "category": "Books and payroll",
+        "description": "Choosing the right entity, getting an EIN and setting up your books.",
+        "price_text": "$400",
+        "sort_order": 3
       }
     ],
     "testimonials": [
       {
         "id": "t1",
-        "quote": "The chicken for two is the best date-night order on the east side.",
-        "author": "Maria G.",
+        "quote": "They found a credit our old preparer missed two years running. Calm, quick and clear.",
+        "author": "Renee T.",
         "source": "Google",
         "sort_order": 1
       },
       {
         "id": "t2",
-        "quote": "Wine list is small and perfect. Staff always finds us something new.",
-        "author": "Devon P.",
+        "quote": "Our bakery's books were a shoebox. Now we get a one-page report every month and actually read it.",
+        "author": "Omar K.",
         "source": "Yelp",
         "sort_order": 2
       }
@@ -95,37 +96,37 @@
     "faqs": [
       {
         "id": "f1",
-        "question": "Do you take walk-ins?",
-        "answer": "Always at the bar, and we keep a third of the patio unreserved. Parties of 5+ should book ahead.",
+        "question": "What should I bring to the first meeting?",
+        "answer": "Last year's return, this year's W-2s and 1099s, and any letters from the IRS or the state. We send a checklist when you book.",
         "sort_order": 1
       },
       {
         "id": "f2",
-        "question": "Is the patio dog-friendly?",
-        "answer": "Yes — water bowls provided, treats negotiable.",
+        "question": "Can we meet by video?",
+        "answer": "Yes. About half our clients never visit the office, and you can send documents through a secure link.",
         "sort_order": 2
       },
       {
         "id": "f3",
-        "question": "Do you have vegetarian options?",
-        "answer": "About half the menu, and the kitchen is happy to adapt most plates. Just ask your server.",
+        "question": "Do you work with people outside Burbank?",
+        "answer": "Yes, anywhere in California, and we file in most other states for clients who moved.",
         "sort_order": 3
       }
     ],
     "posts": [
       {
         "id": "p1",
-        "title": "Winter menu is live",
-        "slug": "winter-menu-2026",
-        "excerpt": "Six new plates, two returning favorites, and a mulled thing for the patio.",
-        "body_md": "The **winter menu** landed this week.\n\n## What's new\n\n- Squash agnolotti with brown butter\n- Wood-fired cabbage with bagna cauda\n- The return of the *short rib* for two\n\nBook the patio heaters early on weekends — [reservations here](https://resy.example/vermilion-and-vine).",
+        "title": "Five things to do before tax season",
+        "slug": "before-tax-season",
+        "excerpt": "A short checklist that saves you time and money in April.",
+        "body_md": "**Tax season** opens in late January, and a little work now makes it painless.\n\n## Before you book\n\n- Keep each *1099* as it arrives\n- Write down big changes: a move, a new baby, a new business\n- Check your estimated payments\n\nSpots fill up in March, so [book yours early](https://book.example/larkspur-tax).",
         "published_at": "2026-01-12T18:00:00Z",
         "hero": {
-          "alt": "Squash agnolotti in brown butter",
+          "alt": "A desk with a calculator and tax forms",
           "variants": {
-            "w400": "/img/winter-400.webp",
-            "w800": "/img/winter-800.webp",
-            "w1600": "/img/winter-1600.webp"
+            "w400": "/img/tax-season-400.webp",
+            "w800": "/img/tax-season-800.webp",
+            "w1600": "/img/tax-season-1600.webp"
           },
           "width": 1600,
           "height": 1067
@@ -134,37 +135,42 @@
     ],
     "redirects": [
       {
-        "from_path": "/menu.html",
-        "to_path": "/menu/"
+        "from_path": "/services.html",
+        "to_path": "/services/"
       },
       {
-        "from_path": "/reservations",
-        "to_path": "https://resy.example/vermilion-and-vine"
+        "from_path": "/book",
+        "to_path": "https://book.example/larkspur-tax"
       }
     ],
     "locations": [
       {
-        "address_line1": "5119 York Boulevard",
+        "address_line1": "411 N Glenoaks Blvd, Suite 3",
         "address_line2": "",
-        "city": "Los Angeles",
+        "city": "Burbank",
         "region": "CA",
-        "postal_code": "90042",
+        "postal_code": "91502",
         "country": "US",
-        "phone": "(323) 555-0142",
+        "phone": "(818) 555-0143",
         "timezone": "America/Los_Angeles",
         "hours": [
           {
             "day": "mon",
-            "closed": true,
-            "intervals": []
+            "closed": false,
+            "intervals": [
+              {
+                "open": "09:00",
+                "close": "17:30"
+              }
+            ]
           },
           {
             "day": "tue",
             "closed": false,
             "intervals": [
               {
-                "open": "17:00",
-                "close": "22:00"
+                "open": "09:00",
+                "close": "17:30"
               }
             ]
           },
@@ -173,8 +179,8 @@
             "closed": false,
             "intervals": [
               {
-                "open": "17:00",
-                "close": "22:00"
+                "open": "09:00",
+                "close": "17:30"
               }
             ]
           },
@@ -183,8 +189,8 @@
             "closed": false,
             "intervals": [
               {
-                "open": "17:00",
-                "close": "23:00"
+                "open": "09:00",
+                "close": "17:30"
               }
             ]
           },
@@ -193,12 +199,8 @@
             "closed": false,
             "intervals": [
               {
-                "open": "12:00",
-                "close": "14:30"
-              },
-              {
-                "open": "17:00",
-                "close": "24:00"
+                "open": "09:00",
+                "close": "17:00"
               }
             ]
           },
@@ -208,23 +210,14 @@
             "intervals": [
               {
                 "open": "10:00",
-                "close": "14:30"
-              },
-              {
-                "open": "17:00",
-                "close": "24:00"
+                "close": "14:00"
               }
             ]
           },
           {
             "day": "sun",
-            "closed": false,
-            "intervals": [
-              {
-                "open": "10:00",
-                "close": "15:00"
-              }
-            ]
+            "closed": true,
+            "intervals": []
           }
         ],
         "holiday_exceptions": [
@@ -239,8 +232,8 @@
             "closed": false,
             "intervals": [
               {
-                "open": "12:00",
-                "close": "20:00"
+                "open": "09:00",
+                "close": "12:00"
               }
             ]
           }
@@ -251,7 +244,7 @@
     ],
     "settings": {
       "category_order": [],
-      "industry": "plumber"
+      "industry": "accounting"
     }
   },
   "content_contract_version": 1,

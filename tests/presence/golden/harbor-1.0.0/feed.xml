@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
 <channel>
-<title>Vermilion &amp; Vine — Updates</title>
+<title>Copper Line Plumbing — Updates</title>
 <link>https://vermilionandvine.example/updates/</link>
-<description>Latest updates from Vermilion &amp; Vine</description>
+<description>Latest updates from Copper Line Plumbing</description>
 <item>
-<title>Winter menu is live</title>
-<link>https://vermilionandvine.example/updates/winter-menu-2026/</link>
-<guid>https://vermilionandvine.example/updates/winter-menu-2026/</guid>
-<pubDate>Mon, 12 Jan 2026 18:00:00 GMT</pubDate>
+<title>Is your water heater near the end?</title>
+<link>https://vermilionandvine.example/updates/water-heater-signs/</link>
+<guid>https://vermilionandvine.example/updates/water-heater-signs/</guid>
+<pubDate>Tue, 20 Jan 2026 17:00:00 GMT</pubDate>
 <category>News</category>
-<description>Six new plates, two returning favorites, and a mulled thing for the patio.</description>
+<description>Four signs it is time to replace it, before it floods the garage.</description>
 </item>
 <item>
-<title>Wine dinner on the patio</title>
-<link>https://vermilionandvine.example/updates/wine-dinner/</link>
-<guid>https://vermilionandvine.example/updates/wine-dinner/</guid>
+<title>An open house this spring</title>
+<link>https://vermilionandvine.example/updates/open-house/</link>
+<guid>https://vermilionandvine.example/updates/open-house/</guid>
 <pubDate>Mon, 02 Feb 2026 18:00:00 GMT</pubDate>
 <category>Events</category>
 </item>
