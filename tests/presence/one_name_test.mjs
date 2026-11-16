@@ -8,7 +8,7 @@
 // server's own sentences. Comments and code names can keep them.
 import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
-const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
+const read = (p) => (p === 'presence.html' ? editorSource() : Deno.readTextFileSync(new URL(p, ROOT)));   // builder item 38: the editor is four files now
 const results = [];
 const ok = (n, p, note = '') => { results.push(p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
 
