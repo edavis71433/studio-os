@@ -11,7 +11,9 @@
 // So every tick this asks Stripe about a few things, each at most once a day, oldest
 // first: each open invoice with a pay link (presence_invoices.stripe_checked_at), each
 // live retainer (presence_stripe_checks), and each online payment of the last three
-// days whose receipt hasn't gone out. What it finds is put right through the same
+// days whose receipt hasn't gone out. Once a day it also lists the refunds and disputes
+// of the last week, and the disputes still open here, and hands each to
+// commerce/charge_returns.ts (sales items 126, 127), which records only what is new. What it finds is put right through the same
 // code the messages use, so the studio and the client hear exactly what they would
 // have heard: the paid echo (routes/commerce.ts invoicePaidEcho) and the retainer sync
 // (commerce/retainers.ts applyRetainerSync). Everything is safe to run twice.
@@ -23,7 +25,8 @@
 // failing count as errors, which mark the tick failed; those are tried again next tick.
 import { svc } from '../lib/db.ts';
 import { raiseNotice, clearNotice, clearNoticePrefix } from '../lib/notice.ts';
-import { stripeConfigured, retrieveSubscription, searchInvoicePayments, listSubscriptionPaidInvoices, listLinkCompletedSessions } from './stripe.ts';
+import { stripeConfigured, retrieveSubscription, searchInvoicePayments, listSubscriptionPaidInvoices, listLinkCompletedSessions, listRecentRefunds, listRecentDisputes } from './stripe.ts';
+import { syncCharge, syncDispute } from './charge_returns.ts';
 import { applyRetainerSync, recordRetainerCharge, retainerStatusNow, retainerStatusFromStripe, type RetainerState } from './retainers.ts';
 import { subscriptionPeriodEnd } from './stripe_shape.ts';
 
@@ -37,17 +40,24 @@ export const RECEIPT_DAYS = 3;
 const RECEIPT_GRACE_MS = 3600_000;
 /** A retainer that ended is still checked this long for a charge whose message was lost. */
 const ENDED_DAYS = 40;
+/** How far back the daily list of refunds and disputes looks: Stripe tries a message for
+ *  three days, and a week also covers a few days when this check couldn't run. */
+export const RETURNS_DAYS = 7;
+/** At most this many refunds, and this many disputes, are handed on in one day. */
+const RETURNS_CAP = 50;
 
 export interface StripeCheckResult {
   invoices_checked: number; invoices_paid: number;
   retainers_checked: number; retainers_fixed: number; charges_found: number;
   receipts_sent: number;
+  returns_checked: number; returns_found: number;   // refunds and disputes (sales items 126, 127)
   stripe_unanswered: number;   // Stripe didn't answer: asked again next tick, never a page
   errors: number;              // our own writes that failed: these mark the tick failed
   skipped_no_stripe?: true;    // no Stripe key here
   skipped_not_set_up?: true;   // before APPLY-0235
 }
-const zero = (): StripeCheckResult => ({ invoices_checked: 0, invoices_paid: 0, retainers_checked: 0, retainers_fixed: 0, charges_found: 0, receipts_sent: 0, stripe_unanswered: 0, errors: 0 });
+const zero = (): StripeCheckResult => ({ invoices_checked: 0, invoices_paid: 0, retainers_checked: 0, retainers_fixed: 0, charges_found: 0, receipts_sent: 0, returns_checked: 0, returns_found: 0, stripe_unanswered: 0, errors: 0 });
+const idOf = (v: unknown): string => String((typeof v === 'string' ? v : (v && typeof v === 'object' ? (v as { id?: unknown }).id : '')) || '');
 const rowsOf = (r: { json?: unknown }) => (Array.isArray((r as any)?.json) ? (r as any).json : []) as any[];
 const money = (c: unknown) => '$' + ((Number(c) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
 
@@ -260,9 +270,50 @@ async function sendMissedReceipts(out: StripeCheckResult, n: number, nowMs: numb
   }
 }
 
+// ── 4. refunds and disputes whose messages were lost ─────────────────────────
+// Once a day ('returns:week'): every refund Stripe made and every dispute opened in the
+// last week, and every dispute still open here (its ending can come months later). The
+// recording is commerce/charge_returns.ts's (sales items 126, 127): it reads Stripe fresh,
+// records only what is new, and tells nobody twice, so a refund the webhook already
+// recorded costs a read and changes nothing.
+async function checkReturns(out: StripeCheckResult, nowMs: number): Promise<void> {
+  const checked = await lastChecked(['returns:week']);
+  if (!checked) { out.errors++; return; }
+  if (!dueSubjects(['returns:week'], checked, 1, nowMs).length) return;
+  const since = Math.floor((nowMs - RETURNS_DAYS * DAY_MS) / 1000);
+  let refunds: any[] = [], disputes: any[] = [];
+  try {
+    refunds = await listRecentRefunds(since);
+    disputes = await listRecentDisputes(since);
+  } catch (e) {
+    console.warn(`[stripe-check] Stripe didn't list the week's refunds and disputes: ${String((e as Error)?.message || e)}`);
+    out.stripe_unanswered++;
+    if (!(await stamp('returns:week', 'unanswered', nowMs))) out.errors++;
+    return;
+  }
+  const charges = [...new Set(refunds.map((r) => idOf(r?.charge)).filter(Boolean))].slice(0, RETURNS_CAP);
+  const disputeIds = new Set(disputes.map((d) => String(d?.id || '')).filter(Boolean));
+  const open = await svc('presence_money_returns?kind=eq.dispute&status=eq.open&select=stripe_id&order=happened_at.asc&limit=50').catch(() => ({ ok: false, json: null }));
+  if (open.ok) for (const r of rowsOf(open)) disputeIds.add(String(r.stripe_id));
+  let found = false;
+  for (const c of charges) {
+    const res = await syncCharge(c);
+    out.returns_checked++;
+    if (!res.ok) out.stripe_unanswered++; else if (res.changed) { out.returns_found++; found = true; }
+  }
+  for (const d of [...disputeIds].slice(0, RETURNS_CAP)) {
+    const res = await syncDispute(d);
+    out.returns_checked++;
+    if (!res.ok) out.stripe_unanswered++; else if (res.changed) { out.returns_found++; found = true; }
+  }
+  if (found) console.log(`[stripe-check] ${out.returns_found} refund or dispute change(s) whose message never came, recorded now`);
+  if (!(await stamp('returns:week', found ? 'fixed' : 'same', nowMs))) out.errors++;
+}
+
 /** Every tick: a few open invoices, a few retainers and a few missed receipts, each at
- *  most once a day. Bounded so a tick stays quick; with nothing due it only reads. */
-export async function runStripeCheck(limits: { invoices?: number; retainers?: number; receipts?: number } = {}, nowMs: number = Date.now()): Promise<StripeCheckResult> {
+ *  most once a day, and the week's refunds and disputes once a day. Bounded so a tick
+ *  stays quick; with nothing due it only reads. */
+export async function runStripeCheck(limits: { invoices?: number; retainers?: number; receipts?: number; returns?: number } = {}, nowMs: number = Date.now()): Promise<StripeCheckResult> {
   const out = zero();
   if (!stripeConfigured()) return { ...out, skipped_no_stripe: true };
   // before APPLY-0235 the check has nowhere to keep what it asked: it does nothing
@@ -271,5 +322,6 @@ export async function runStripeCheck(limits: { invoices?: number; retainers?: nu
   await checkOpenInvoices(out, limits.invoices ?? 4, nowMs);
   await checkRetainers(out, limits.retainers ?? 3, nowMs);
   await sendMissedReceipts(out, limits.receipts ?? 3, nowMs);
+  if (limits.returns !== 0) await checkReturns(out, nowMs);
   return out;
 }

@@ -33,7 +33,7 @@ const { handleCommerce, invoicePaidEcho } = await import(`${P}/routes/commerce.t
 const { sweepIssues } = await import(`${P}/routes/system.ts`);
 
 // ═══ the pretend Stripe and mail; the webhook's hop to billing-sync runs the real route ═══
-const world = { stripe: [], mail: [], subs: {}, pis: {}, subInvoices: {}, linkSessions: {}, down: new Set() };
+const world = { stripe: [], mail: [], subs: {}, pis: {}, subInvoices: {}, linkSessions: {}, down: new Set(), charges: {}, refunds: [], disputes: {}, intents: {} };
 const PUBLIC = { kind: 'public', userId: null, tenantId: null, role: null, email: null, jwt: null, requestId: 't' };
 const fakeDb = globalThis.fetch;
 globalThis.fetch = async (input, init = {}) => {
@@ -41,7 +41,7 @@ globalThis.fetch = async (input, init = {}) => {
   const method = (init.method || 'GET').toUpperCase();
   if (u.hostname === 'api.stripe.com') {
     const path = u.pathname.replace('/v1/', '');
-    world.stripe.push(`${method} ${path}`);
+    world.stripe.push(`${method} ${path}${u.searchParams.has('created[gte]') ? ' (week)' : ''}`);
     const kind = path.split('/')[0];
     if (world.down.has(kind)) return jres(500, { error: { message: 'Stripe is having a moment' } });
     if (method !== 'GET') return jres(400, { error: { message: `the daily check only reads; it sent ${method} ${path}` } });
@@ -52,6 +52,14 @@ globalThis.fetch = async (input, init = {}) => {
     if (path.startsWith('subscriptions/')) { const s = world.subs[path.split('/')[1]]; return s ? jres(200, s) : jres(404, { error: { message: 'No such subscription', code: 'resource_missing' } }); }
     if (path === 'invoices') return jres(200, { object: 'list', data: world.subInvoices[u.searchParams.get('subscription')] || [] });
     if (path === 'checkout/sessions') return jres(200, { object: 'list', data: world.linkSessions[u.searchParams.get('payment_link')] || [] });
+    // refunds and disputes (the reads commerce/charge_returns.ts makes, items 126 and 127)
+    const [, id] = path.split('/');
+    if (kind === 'refunds' && !id) { const c = u.searchParams.get('charge'); return jres(200, { object: 'list', data: (c ? world.refunds.filter((r) => r.charge === c) : world.refunds).slice().reverse() }); }
+    if (kind === 'disputes' && id) return world.disputes[id] ? jres(200, world.disputes[id]) : jres(404, { error: { message: `No such dispute: ${id}` } });
+    if (kind === 'disputes') { const c = u.searchParams.get('charge'); return jres(200, { object: 'list', data: Object.values(world.disputes).filter((d) => !c || d.charge === c) }); }
+    if (kind === 'charges' && id) return world.charges[id] ? jres(200, world.charges[id]) : jres(404, { error: { message: `No such charge: ${id}` } });
+    if (kind === 'payment_intents' && id) return world.intents[id] ? jres(200, world.intents[id]) : jres(404, { error: { message: `No such payment_intent: ${id}` } });
+    if (kind === 'invoice_payments') return jres(200, { object: 'list', data: [] });
     return jres(404, { error: { message: 'unplanned Stripe read' } });
   }
   if (u.hostname === 'api.resend.com') { const b = JSON.parse(String(init.body)); world.mail.push({ to: String(b.to), subject: String(b.subject), html: String(b.html) }); return jres(200, { id: 'm' }); }
@@ -95,10 +103,10 @@ function seed(o = {}) {
     presence_contacts: [{ id: CONTACT, site_id: STUDIO.id, name: 'Jordan Ellis', email: o.noEmail ? '' : 'jordan@client.example' }],
     presence_identity: [{ site_id: STUDIO.id, business_name: 'Test Studio', email: 'owner@studio.example' }],
     presence_invoices: o.invoices || [],
-    presence_deal_events: [], presence_plan_notices: o.notices || [], presence_stripe_checks: o.checks || [], stripe_webhook_events: [],
+    presence_deal_events: [], presence_plan_notices: o.notices || [], presence_stripe_checks: o.checks || [], stripe_webhook_events: [], presence_money_returns: o.returns || [],
     presence_contracts: [{ id: '66666666-6666-4666-8666-666666666666', site_id: STUDIO.id, deal_id: DEAL, status: 'signed', deleted_at: null }],
   });
-  Object.assign(world, { stripe: [], mail: [], subs: o.subs || {}, pis: o.pis || {}, subInvoices: o.subInvoices || {}, linkSessions: o.linkSessions || {}, down: new Set(o.down || []) });
+  Object.assign(world, { stripe: [], mail: [], subs: o.subs || {}, pis: o.pis || {}, subInvoices: o.subInvoices || {}, linkSessions: o.linkSessions || {}, down: new Set(o.down || []), charges: o.charges || {}, refunds: o.refunds || [], disputes: o.disputes || {}, intents: o.intents || {} });
 }
 const check = (at = NOW, limits) => quiet(() => runStripeCheck(limits, at));
 const deal = () => db.tables.presence_deals[0];
@@ -253,7 +261,7 @@ const noBareFalse = (r) => Object.values(r).every((v) => v !== false);
   seed({ retainer: retainer(), subs: { sub_1: sub({ status: 'past_due' }) } });
   db.failMethod.set('presence_deals', 'PATCH');
   const w = await check();
-  ok('error: a retainer that didn\'t save is an error, nobody is told of a state not held, and it is tried next tick', w.errors === 1 && notices((n) => n.kind === 'retainer_status').length === 0 && !db.tables.presence_stripe_checks.length);
+  ok('error: a retainer that didn\'t save is an error, nobody is told of a state not held, and it is tried next tick', w.errors === 1 && notices((n) => n.kind === 'retainer_status').length === 0 && !db.tables.presence_stripe_checks.some((c) => c.subject === `retainer:${DEAL}`));
 }
 
 // ═══ 5. a receipt that didn't go out ═══
@@ -294,9 +302,44 @@ const noBareFalse = (r) => Object.values(r).every((v) => v !== false);
   ok('echo: a receipt the mail service refused lets go of its mark, so the check sends it later', failed.receipted === false && !inv().receipt_sent_at);
 }
 
-// ═══ 6. the tick: quick when there's nothing to do, and never a bare false ═══
+// ═══ 6. refunds and disputes whose messages were lost (recorded by items 126 and 127) ═══
 {
-  seed({});
+  const T = sec('2026-11-15T09:00:00Z');
+  const paidInv = openInvoice({ status: 'paid', paid_at: '2026-11-10T15:30:00.000Z', paid_ref: 'pi_r1aaaaaa', receipt_sent_at: '2026-11-10T15:31:00.000Z', refunded_cents: 0, dispute_status: null });
+  const charge = { id: 'ch_r1aaaaaa', object: 'charge', amount: 120000, amount_captured: 120000, amount_refunded: 120000, refunded: true, disputed: false, currency: 'usd', payment_intent: 'pi_r1aaaaaa', payment_method_details: { type: 'card' }, metadata: {}, livemode: false, created: sec('2026-11-10T15:30:00Z') };
+  const refund = { id: 're_r1aaaaaa', object: 'refund', amount: 120000, charge: 'ch_r1aaaaaa', payment_intent: 'pi_r1aaaaaa', currency: 'usd', created: T, status: 'succeeded', reason: 'requested_by_customer' };
+  seed({ invoices: [paidInv], charges: { ch_r1aaaaaa: charge }, refunds: [refund], intents: { pi_r1aaaaaa: payment({ id: 'pi_r1aaaaaa', latest_charge: 'ch_r1aaaaaa' }) } });
+  const r = await check();
+  await settle();
+  ok('returns: a refund whose message never came is recorded, once a day\'s list finds it', r.returns_found === 1 && (db.tables.presence_money_returns || []).some((x) => x.stripe_id === 're_r1aaaaaa' && x.kind === 'refund') && Number(inv().refunded_cents) === 120000, JSON.stringify({ r, ret: db.tables.presence_money_returns, inv: inv() }));
+  ok('returns: the client hears about their refund, as with the webhook', world.mail.filter((m) => m.to === 'jordan@client.example').length === 1);
+  ok('returns: it only read from Stripe', world.stripe.every((c) => c.startsWith('GET ')) && world.stripe.includes('GET refunds (week)') && world.stripe.includes('GET disputes (week)'));
+  await check(NOW + 3600_000);
+  ok('returns: the list is read once a day, not every tick', world.stripe.filter((c) => c === 'GET refunds (week)').length === 1);
+  const next = await check(NOW + 21 * 3600_000);
+  ok('returns: the next day the same refund records nothing and tells nobody again', next.returns_found === 0 && (db.tables.presence_money_returns || []).length === 1 && world.mail.filter((m) => m.to === 'jordan@client.example').length === 1, JSON.stringify(next));
+}
+{
+  // a dispute held here as open, whose closing message never came: Stripe says it was won
+  const DUE = sec('2026-11-30T00:00:00Z');
+  const paidInv = openInvoice({ status: 'paid', paid_at: '2026-11-01T15:30:00.000Z', paid_ref: 'pi_d1aaaaaa', receipt_sent_at: '2026-11-01T15:31:00.000Z', refunded_cents: 0, dispute_status: 'open' });
+  const won = { id: 'du_d1aaaaaa', object: 'dispute', amount: 120000, charge: 'ch_d1aaaaaa', payment_intent: 'pi_d1aaaaaa', currency: 'usd', created: sec('2026-11-03T00:00:00Z'), reason: 'product_not_received', status: 'won',
+    evidence_details: { due_by: DUE, has_evidence: true, past_due: false, submission_count: 1 }, balance_transactions: [{ object: 'balance_transaction', amount: -120000, fee: 1500, net: -121500 }, { object: 'balance_transaction', amount: 120000, fee: -1500, net: 121500 }],
+    payment_method_details: { type: 'card' }, is_charge_refundable: false, livemode: false, metadata: {} };
+  const held = { id: 'mr-1', site_id: STUDIO.id, invoice_id: INV, deal_id: DEAL, kind: 'dispute', applies_to: 'invoice', stripe_id: 'du_d1aaaaaa', amount_cents: 120000, counted_cents: 120000, fee_cents: 1500, status: 'open', stripe_status: 'needs_response', method: 'card', due_by: new Date(DUE * 1000).toISOString(), happened_at: '2026-11-03T00:00:00.000Z', closed_at: null, client_emailed: false, livemode: false };
+  seed({ invoices: [paidInv], returns: [held], disputes: { du_d1aaaaaa: won }, charges: { ch_d1aaaaaa: { id: 'ch_d1aaaaaa', object: 'charge', amount: 120000, amount_captured: 120000, amount_refunded: 0, refunded: false, disputed: true, currency: 'usd', payment_intent: 'pi_d1aaaaaa', payment_method_details: { type: 'card' }, livemode: false } }, intents: { pi_d1aaaaaa: payment({ id: 'pi_d1aaaaaa', latest_charge: 'ch_d1aaaaaa' }) } });
+  const r = await quiet(() => runStripeCheck({ invoices: 0, retainers: 0, receipts: 0 }, NOW));
+  ok('returns: a dispute still open here, which Stripe says was won, is closed as won', r.returns_found === 1 && db.tables.presence_money_returns[0].status === 'won' && inv().dispute_status === 'won', JSON.stringify({ r, ret: db.tables.presence_money_returns[0], d: inv().dispute_status }));
+}
+{
+  seed({ down: ['refunds'] });
+  const r = await check();
+  ok('returns: Stripe not listing the week is no failure of ours: tried again tomorrow', r.stripe_unanswered === 1 && r.errors === 0 && db.tables.presence_stripe_checks.find((c) => c.subject === 'returns:week')?.outcome === 'unanswered' && sweepIssues({ stripe_check: r }).length === 0);
+}
+
+// ═══ 7. the tick: quick when there's nothing to do, and never a bare false ═══
+{
+  seed({ checks: [{ subject: 'returns:week', checked_at: new Date(NOW - 3600_000).toISOString(), outcome: 'same' }] });
   const idle = await check();
   ok('tick: nothing to do: no Stripe call, a clean result', world.stripe.length === 0 && sweepIssues({ stripe_check: idle }).length === 0 && noBareFalse(idle), JSON.stringify(idle));
   seed({});
