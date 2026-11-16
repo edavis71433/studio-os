@@ -51,6 +51,8 @@ const jr = (data, status = 200) => new Response(data === null ? '' : JSON.string
  *   retainer      {...} → the deal's stored retainer state
  *   projectEventFails n → first n presence_project_events POSTs return 500
  *   dealTasks / nextStepDeals → rows for the reminder sweep
+ *   receiptSent   true  → the client's receipt already went out (sales item 130:
+ *                         presence_invoices.receipt_sent_at is set, so the claim finds no row)
  */
 function installFake(cfg = {}) {
   const calls = [];
@@ -73,6 +75,8 @@ function installFake(cfg = {}) {
       if (eventFails > 0) { eventFails--; return jr({ message: 'boom' }, 500); }
       return jr(null, 201);
     }
+    // sales item 130: the receipt's claim is a PATCH matching receipt_sent_at=is.null — no row once it went out
+    if (url.includes('presence_invoices') && method === 'PATCH' && url.includes('receipt_sent_at=is.null')) return jr(cfg.receiptSent ? [] : [{ id: INVOICE }]);
     if (url.includes('presence_invoices')) return jr([{ id: INVOICE, site_id: AGENCY, deal_id: DEAL, title: 'Deposit', amount_cents: 50000, purpose: 'deposit' }]);
     if (url.includes('presence_deal_tasks')) return jr(cfg.dealTasks || []);
     if (url.includes('presence_deals') && url.includes('next_step_at=not.is.null')) return jr(cfg.nextStepDeals || []);
@@ -136,17 +140,28 @@ try {
     restore();
   }
   {
-    const { sent } = installFake({ noticeCreated: false });
+    const { sent } = installFake({ noticeCreated: false, receiptSent: true });
     const out = await (await echo()).json();
     ok('A3: a retry answers notice:false, already:TRUE (the operator was told before) and re-sends nothing',
       out.data?.notice === false && out.data?.already === true && sent.length === 0);
     restore();
   }
   {
+    // sales item 130: the webhook's floor wrote the studio's line while this server was
+    // down, so the line is old when the echo finally runs. The receipt has its own claim
+    // now, so the client still gets it, once; the studio isn't emailed a second time.
+    const { sent } = installFake({ noticeCreated: false });
+    const out = await (await echo()).json();
+    ok('A3b: a late echo after the webhook\'s floor still sends the client\'s receipt, once, and no second studio email',
+      out.data?.already === true && out.data?.receipted === true && sent.filter((x) => x?.to === 'jordan@client.test').length === 1 && !sent.some((x) => x?.to === 'studio@davisdigitalstudio.com'));
+    restore();
+  }
+  {
     const { sent } = installFake({ noticeStatus: 400 });
     const out = await (await echo()).json();
     ok('A4: a FAILED insert answers notice:false, already:false — the hollow 200 the webhook floor keys on',
-      out.data?.notice === false && out.data?.already === false && sent.length === 0);
+      out.data?.notice === false && out.data?.already === false && !sent.some((x) => x?.to === 'studio@davisdigitalstudio.com'));
+    ok('A4: …and the client\'s receipt doesn\'t hang on the studio\'s line (sales item 130)', sent.filter((x) => x?.to === 'jordan@client.test').length === 1);
     restore();
   }
   {
