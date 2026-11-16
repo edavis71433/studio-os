@@ -245,7 +245,7 @@ export function buildNav(c: NavContext): NavSection[] {
     const customers: NavItem[] = [{ key: 'customers', label: 'Customers', href: '/customers.html', desc: 'Every customer — each client and the people behind them — with their deal, project, files and messages on one record.' }];
     // Oct 2026 studio audit, change 4: onboarding stays findable from ⌘K ("add",
     // "client", "new") — agency.html opens its Add-a-customer dialog on #add.
-    if (studioLevel) customers.push(hid('add_client', 'Add a customer', '/agency.html#add', 'Save a new customer. Their website and their portal invite come later, from their profile.'));
+    if (studioLevel) customers.push(hid('add_client', 'Add a customer', '/agency.html#add', 'Save a new customer or client. Their website and their portal invite come later, from their profile.'));
     customers.push(hid('contacts', 'Contacts', '/contacts.html', 'The people — one may belong to a customer. Also the People tab on Customers.'));
     sections.push({ key: 'customers', label: 'Customers', items: customers });
   }

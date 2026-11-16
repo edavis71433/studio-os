@@ -87,6 +87,16 @@ test.describe('a customer’s profile: two steps, each on its own', () => {
     await expect(page.getByRole('button', { name: 'Send the invite' })).toBeEnabled();
   });
 
+  test('an invite whose email didn’t go out says so honestly: their portal is ready, share the sign-in page instead', async ({ page }) => {
+    await installApp(page, { api: PROFILE_API({ [`POST /sales/customers/${CID}/invite`]: { data: { invited: false, again: false, email: 'maya@willowash.example', portal_url: 'https://app.test/portal.html?studio=s' } } }) });
+    await openProfile(page);
+    await page.getByRole('button', { name: 'Invite to their portal' }).click();
+    await page.getByRole('button', { name: 'Send the invite' }).click();
+    const t = page.locator('.dds-toast').last();
+    await expect(t).toContainText('Their portal is ready, but our email to maya@willowash.example didn’t go out.');
+    await expect(t).not.toContainText('Invitation sent');
+  });
+
   test('their site lives somewhere else: the address is kept, and the card says it lives on its own host', async ({ page }) => {
     let sent: unknown = null;
     await installApp(page, { api: PROFILE_API({ [`POST /sales/customers/${CID}/website`]: (b: unknown) => { sent = b; return { data: { site_id: SITE, address: 'acmebakery.example' } }; } }) });
