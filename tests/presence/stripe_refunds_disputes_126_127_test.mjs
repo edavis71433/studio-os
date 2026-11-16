@@ -432,6 +432,11 @@ const stateOf = (n) => moneyState(inv(n), TODAY);
     { id: id('77777777', 3), site_id: STUDIO.id, deal_id: DEAL, kind: 'invoice_paid', detail: { invoice_id: INV(1), amount_cents: 100000, purpose: 'service' }, created_at: '2026-11-02T10:00:00Z' },
     { id: id('77777777', 4), site_id: STUDIO.id, deal_id: DEAL, kind: 'payment_undone', detail: { dispute: 'opened', amount_cents: 100000 }, created_at: '2026-11-16T15:00:00Z' },
   ];
+  db.tables.presence_projects = [{ id: id('56565656', 1), site_id: STUDIO.id, deal_id: DEAL, name: 'Harbor website build', deleted_at: null, created_at: '2026-10-22T10:00:00Z' }];
+  db.tables.presence_project_events = [
+    { id: id('57575757', 1), project_id: id('56565656', 1), site_id: STUDIO.id, kind: 'milestone_completed', detail: { title: 'Homepage design' }, created_at: '2026-10-28T10:00:00Z' },
+    { id: id('57575757', 2), project_id: id('56565656', 1), site_id: STUDIO.id, kind: 'approval_decided', detail: { title: 'Final site', decision: 'approved' }, created_at: '2026-11-01T10:00:00Z' },
+  ];
   db.tables.presence_money_returns = [
     { id: id('12121212', 1), site_id: STUDIO.id, invoice_id: INV(1), deal_id: DEAL, kind: 'dispute', applies_to: 'invoice', stripe_id: 'du_test1aaaa', amount_cents: 100000, due_by: new Date(DUE * 1000).toISOString(), status: 'open' },
     { id: id('12121212', 2), site_id: OTHER.id, invoice_id: null, deal_id: null, kind: 'dispute', applies_to: 'invoice', stripe_id: 'du_other1aa', amount_cents: 5000, status: 'open' },
@@ -447,6 +452,7 @@ const stateOf = (n) => moneyState(inv(n), TODAY);
   const hist = new TextDecoder().decode(files['history.txt'] || new Uint8Array());
   ok('the proof: the READ-ME names the deadline and where each file goes in Stripe', readMe.includes('Proof for the disputed payment: Website build ($1,000.00)') && readMe.includes('Answer in Stripe by November 30, 2026.') && /The signed agreement: under the customer's signature/.test(readMe) && /The receipt: under receipt/.test(readMe), readMe);
   ok('the proof: the history, oldest first, from the signature to the payment and the dispute', /2026-10-21 16:00 UTC {2}Agreement signed — Marcus Bell[\s\S]*2026-11-02 10:00 UTC {2}Invoice paid — \$1,000[\s\S]*Payment disputed — \$1,000/.test(hist), hist);
+  ok('the proof: then the project’s own history, the work delivered and approved', /The project: Harbor website build, oldest first\r\n\r\n2026-10-28 10:00 UTC {2}A milestone was completed: Homepage design\r\n2026-11-01 10:00 UTC {2}An approval was decided: Final site \(approved\)/.test(hist), hist);
   const theirs = await quietly(() => handleDisputeProof(new Request('https://x'), { id: STUDIO.id, client_id: STUDIO.client_id }, owner, id('12121212', 2), {}));
   ok('the proof: another studio’s dispute is not there', theirs.status === 404);
   const designer = await quietly(() => handleDisputeProof(new Request('https://x'), { id: STUDIO.id, client_id: STUDIO.client_id }, { ...owner, member: { role: 'designer' } }, id('12121212', 1), {}));

@@ -5,7 +5,8 @@
 //                            (who signed, when, from where, the document's fingerprint)
 //   Proposal-*.pdf           the accepted proposal: what they agreed to buy
 //   Receipt-*.pdf            the disputed invoice as the paid receipt it now is
-//   history.txt              the deal's history, oldest first: what was sent, opened, signed and paid
+//   history.txt              the deal's history, oldest first: what was sent, opened, signed and paid;
+//                            then the project's: milestones met, files delivered, approvals, messages
 //   READ-ME.txt              what each file is and where it goes in Stripe's form
 // :id is the dispute's row (presence_money_returns), which must be this studio's.
 // Owners always; a team seat only when its role may see everything and download it, like
@@ -35,18 +36,32 @@ export function proofReadMe(p: { what: string; amount: number; due: string; file
     ...(p.signed ? ['  The signed agreement: under the customer\'s signature, or service documentation. Its last page is the certificate of who signed, when and from where.'] : []),
     ...(p.accepted ? ['  The proposal: under service documentation. It shows what they chose to buy.'] : []),
     '  The receipt: under receipt. It is the invoice, showing what they paid and when.',
-    '  history.txt: under customer communication. It shows every step, from the first message to the payment.',
+    '  history.txt: under customer communication, or service documentation. It shows every step, from the first message to the payment, and the work delivered.',
     '',
     'Add a few plain sentences of your own: what the work was, when it was delivered, and how they agreed to it.',
     '',
   ].filter((l, i, a) => !(l === '' && a[i - 1] === '')).join('\r\n');
 }
 
-/** The deal's history as plain lines, oldest first. Pure. */
-export function historyText(title: string, items: Array<{ at: string; text: string; who?: string }>): string {
-  const lines = items.slice().sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
-    .map((it) => `${day(it.at)}  ${String(it.text || '').replace(/\s+/g, ' ').trim()}`);
-  return [`History of ${title || 'the deal'}, oldest first`, '', ...lines, ''].join('\r\n');
+/** The history as plain lines, oldest first, a section for the deal and one for each
+ *  project it became. Pure. */
+export function historyText(sections: Array<{ heading: string; items: Array<{ at: string; text: string }> }>): string {
+  const out: string[] = [];
+  for (const sec of sections) {
+    if (!sec.items.length) continue;
+    out.push(sec.heading, '');
+    for (const it of sec.items.slice().sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))) out.push(`${day(it.at)}  ${String(it.text || '').replace(/\s+/g, ' ').trim()}`);
+    out.push('');
+  }
+  return out.join('\r\n');
+}
+
+/** One project event in words: what happened, and what it was about when the event names it. Pure. */
+export function projectEventText(kind: string, detail: Record<string, unknown> | null, label: (k: string) => string): string {
+  const d = detail || {};
+  const about = String(d.title || d.name || d.label || d.file_name || d.subject || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+  const decision = typeof d.decision === 'string' ? d.decision : typeof d.status === 'string' && kind === 'approval_decided' ? d.status : '';
+  return label(kind) + (about ? `: ${about}` : '') + (decision ? ` (${decision})` : '');
 }
 
 export async function handleDisputeProof(_req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
@@ -60,8 +75,8 @@ export async function handleDisputeProof(_req: Request, site: SiteRow, principal
   const dsp = rows(r)[0];
   if (!dsp) return json({ error: 'not_found', message: 'That dispute isn’t here.' }, 404, cors);
 
-  const [{ docRow }, { docContextFor }, { documentPdf, pdfFileName }, { loadEmailBrand }, { mergeDealTimeline }] = await Promise.all([
-    import('./sales.ts'), import('../lib/doc_context.ts'), import('../lib/doc_pdf.ts'), import('../lib/email_brand.ts'), import('../crm/deal_activity.ts'),
+  const [{ docRow }, { docContextFor }, { documentPdf, pdfFileName }, { loadEmailBrand }, { mergeDealTimeline }, { notifLabel }] = await Promise.all([
+    import('./sales.ts'), import('../lib/doc_context.ts'), import('../lib/doc_pdf.ts'), import('../lib/email_brand.ts'), import('../crm/deal_activity.ts'), import('../lib/notifications.ts'),
   ]);
   const brand = await loadEmailBrand(site.id).catch(() => undefined);
   const files: Array<{ name: string; data: Uint8Array }> = [];
@@ -89,18 +104,26 @@ export async function handleDisputeProof(_req: Request, site: SiteRow, principal
     }
     if (dsp.deal_id && UUID_RE.test(String(dsp.deal_id))) {
       const dealId = String(dsp.deal_id);
-      const [deal, ks, ps, evs] = await Promise.all([
+      const [deal, ks, ps, evs, pjs] = await Promise.all([
         svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&select=title&limit=1`),
         svc(`presence_contracts?deal_id=eq.${dealId}&site_id=eq.${site.id}&status=eq.signed&deleted_at=is.null&select=id&order=signed_at.asc`),
         svc(`presence_proposals?deal_id=eq.${dealId}&site_id=eq.${site.id}&status=eq.accepted&deleted_at=is.null&select=id&order=decided_at.asc`),
         svc(`presence_deal_events?deal_id=eq.${dealId}&site_id=eq.${site.id}&select=id,kind,from_stage,to_stage,detail,actor,created_at&order=created_at.asc&limit=1000`),
+        svc(`presence_projects?deal_id=eq.${dealId}&site_id=eq.${site.id}&deleted_at=is.null&select=id,name&order=created_at.asc&limit=5`),
       ]);
-      if (!deal.ok || !ks.ok || !ps.ok || !evs.ok) throw new Error('read');
+      if (!deal.ok || !ks.ok || !ps.ok || !evs.ok || !pjs.ok) throw new Error('read');
       title = String(rows(deal)[0]?.title || '');
       if (!dsp.invoice_id) what = `Retainer charge${title ? ': ' + title : ''}`;
       for (const k of rows(ks)) signed = (await pdfOf('contract', String(k.id))) || signed;
       for (const p of rows(ps)) accepted = (await pdfOf('proposal', String(p.id))) || accepted;
-      add('history.txt', enc.encode(historyText(title, mergeDealTimeline(rows(evs)))));
+      // the project the deal became: the work being delivered, step by step
+      const sections: Array<{ heading: string; items: Array<{ at: string; text: string }> }> = [{ heading: `History of ${title || 'the deal'}, oldest first`, items: mergeDealTimeline(rows(evs)).map((it) => ({ at: it.at, text: it.text })) }];
+      for (const pj of rows(pjs)) {
+        const pe = await svc(`presence_project_events?project_id=eq.${pj.id}&site_id=eq.${site.id}&select=kind,detail,created_at&order=created_at.asc&limit=1000`);
+        if (!pe.ok) throw new Error('read');
+        sections.push({ heading: `The project${pj.name ? ': ' + String(pj.name) : ''}, oldest first`, items: rows(pe).map((e: any) => ({ at: String(e.created_at || ''), text: projectEventText(String(e.kind || ''), e.detail, notifLabel) })) });
+      }
+      add('history.txt', enc.encode(historyText(sections)));
     }
   } catch {
     return json({ error: 'read_failed', message: 'The proof couldn’t be gathered just now, so nothing was downloaded. Try again in a moment.' }, 502, cors);
