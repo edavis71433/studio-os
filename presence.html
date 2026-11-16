@@ -20616,14 +20616,14 @@ const NOTICE_ACTION = {
   lead_followup:    { label: "View enquiries",          href: "inbox.html#enquiries" },
   domain_expiry:    { label: "Manage domain",           href: "presence.html#domain" },
   search_setup:     { label: "Finish search setup",     href: "presence.html#search" },
-  renewal_reminder: { label: "See plans",               href: "pricing.html" },
+  renewal_reminder: { label: "Open Your plan",          href: "settings.html#billing" },
   winddown_reminder:{ label: "Download everything",     href: "presence.html#foundations" },   // the export button lives in the technical desk
-  win_back:         { label: "See plans",               href: "pricing.html" },
-  trial_ending:     { label: "See plans",               href: "pricing.html" },
-  trial_ended:      { label: "See plans",               href: "pricing.html" },
+  win_back:         { label: "Open Your plan",          href: "settings.html#billing" },
+  trial_ending:     { label: "Open Your plan",          href: "settings.html#billing" },
+  trial_ended:      { label: "Open Your plan",          href: "settings.html#billing" },
   payment_trouble:  { label: "Update payment",          href: "settings.html#billing" },
   account_lapsed:   { label: "Update payment",          href: "settings.html#billing" },
-  capacity:         { label: "See plans",               href: "pricing.html" },
+  capacity:         { label: "Open Your plan",          href: "settings.html#billing" },
 };
 // Only alerts about this website or this account reach the website page. Everything
 // else, sales above all, stays in the bell, Home and Pipeline: a deposit or a signed
@@ -20632,7 +20632,7 @@ const NOTICE_PRIORITY = ["publish_failed", "connection_expired", "website_enquir
 // The four client-portal notice kinds (migration 0116) belong to the BELL, not
 // to this card. They are in neither table above, so the `notices[0]` fallback
 // below happily rendered "New message from Acme Bakery" as a plum "outgrown your
-// plan" card with a See plans → pricing.html button. Client chatter is never a
+// plan" card with a plan button. Client chatter is never a
 // plan problem — exclude it from this card's candidates entirely.
 const PLAN_CARD_EXCLUDE = ["client_message", "client_upload", "client_request", "client_approval", "deal_signed", "deal_followup", "deal_ready", "proposal_accepted", "lead_followup"];
 async function renderPlanNotice() {
@@ -20644,7 +20644,8 @@ async function renderPlanNotice() {
   if (!n) return;
   const host = $("welcomeWrap");
   if (!host) return;
-  const act = NOTICE_ACTION[n.kind] || { label: "See plans", href: "pricing.html" };
+  // builder item 199: plans are changed in Settings → Your plan; the old price page is gone
+  const act = NOTICE_ACTION[n.kind] || { label: "Open Your plan", href: "settings.html#billing" };
   const card = el("div", "deskopt");
   card.style.borderColor = "var(--plum-line,#d9cbf3)";
   card.style.background = "var(--plum-tint,#faf7ff)";

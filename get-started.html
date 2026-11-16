@@ -120,6 +120,7 @@ function renderIntake(){
         <button class="primary" id="build">Build my website →</button>
         <button class="plain" id="manual">I’ll set it up myself</button>
       </div>
+      <p class="hint" id="needMore" role="alert" hidden style="color:var(--ink);font-weight:600">Add one thing you offer, or a sentence about the business, so there’s something to draft from.</p>
       <p class="hint">We’ll draft your homepage, pages, and the words that help customers find you on Google — then you review and publish when it’s right.</p>
     </div>`;
   wireIntake();
@@ -152,7 +153,8 @@ async function build(){
   // await: the draft's template reads industry_key for the right vocabulary/schema,
   // so the PUT must land before /writer/generate runs (else wrong-vocab drafts).
   await saveIndustry();
-  if(!INTAKE.services.some(s=>s.trim())&&INTAKE.description.trim().length<8){renderIntake();$('desc').focus();return;}
+  // file 06, finding 46: the button used to do nothing here and say nothing; it says what's missing
+  if(!INTAKE.services.some(s=>s.trim())&&INTAKE.description.trim().length<8){renderIntake();const nm=$('needMore');if(nm)nm.hidden=false;$('desc').focus();return;}
   $('main').innerHTML=`<div class="center"><div class="spin" role="status"></div><p class="big">Drafting your website…</p><p class="sub" style="margin:0 auto">Turning what you told us into real pages and homepage copy, written so customers can find you on Google. This takes a few seconds.</p></div>`;
   const req=buildStarterRequest(INTAKE);
   const gen=await api('/writer/generate','POST',req);

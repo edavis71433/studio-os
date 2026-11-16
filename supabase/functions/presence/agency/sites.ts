@@ -6,7 +6,10 @@
 // domain in one list (status, provider, expiry); Pin and Duplicate on each site's
 // menu. Item 135 (Nov 10): + New site makes a site from a business name and,
 // if picked, a starter kit, with nobody emailed; Invite the owner is the later
-// step that gives the owner a login and makes them a customer.
+// step that gives the owner a login and makes them a customer. Item 198 (Nov 15):
+// it also asks what kind of business it is and starts on one of the eight built-in
+// designs (GET /agency/designs, lib/design_gallery.ts), and the list shows
+// "8 of 25 sites" from the one site-limit rule (lib/site_room.ts).
 // Item 154 (Nov 10): Move to trash takes a site offline and into the Trash
 // at the foot of the page for 90 days (lib/site_trash.ts), where one press
 // restores it; ops/site_trash.ts deletes it for good after that.
@@ -39,7 +42,7 @@ import { DOWN_THRESHOLD } from '../monitor/heartbeat.ts';
 import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { siteOrigin, hostedName, SITE_COLS } from '../lib/site.ts';
 import type { SiteRow } from '../lib/site.ts';
-import { getTemplate, renderForBuilder, latestTemplateVersion } from '../lib/render.ts';
+import { getTemplate, renderForBuilder, latestTemplateVersion, listTemplates } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import type { MediaManifestEntry } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
@@ -59,6 +62,9 @@ import { takeSiteOffline } from '../routes/publish.ts';
 import { normalizeCopied } from '../lib/site_layout.ts';
 import { keepCopied } from '../lib/copied_record.ts';
 import { claimPortfolioSite } from '../lib/connect_requests.ts';
+import { galleryPayload } from '../lib/design_gallery.ts';
+import { isKnownIndustry } from '../lib/industry_vocab.ts';
+import { roomOf, roomFullMessage, studioList } from '../lib/site_room.ts';
 import { attachOwnerLogin, validEmail, sendEmail } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { ownerReplyTo } from '../lib/service_bridge.ts';
@@ -680,7 +686,17 @@ export async function handleAgencySites(req: Request, route: string, method: str
     }
     const manage = can(member.role, 'manage_clients');
     // item 53: what the studio is on every client's site, said once (Wix's "Agency · Website Manager")
-    return json({ data: rows, partial, can_open: canOpen, can_pin: pins.own, can_duplicate: manage, can_create: manage, can_trash: manage, can_people: manage, studio_role: canOpen ? 'Website manager' : 'View only', studio_name: member.agency_name || '', trash, trash_days: TRASH_DAYS }, 200, cors);
+    // item 198: "8 of 25 sites", by the one rule every door uses (the Trash doesn't count)
+    const room = roomOf((input.links || []).map((l) => l.status), member.client_limit);
+    return json({ data: rows, partial, can_open: canOpen, can_pin: pins.own, can_duplicate: manage, can_create: manage, can_trash: manage, can_people: manage, studio_role: canOpen ? 'Website manager' : 'View only', studio_name: member.agency_name || '', trash, trash_days: TRASH_DAYS, room }, 200, cors);
+  }
+
+  // ── + New site's gallery and the Templates tab (item 198): the eight built-in
+  //    designs with their words, the kinds of business, and the three designs each
+  //    kind sees first. The same for every studio, so the page may keep it a while. ──
+  if (route === '/agency/designs' && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    return json({ data: galleryPayload(listTemplates()) }, 200, { ...cors, 'Cache-Control': 'private, max-age=300' });
   }
 
   // ── + New site (item 135): a site from a business name and, if picked, one of
@@ -692,13 +708,22 @@ export async function handleAgencySites(req: Request, route: string, method: str
   //    provisionCustomerAccount, no email: "a studio-managed workspace"). ──
   if (route === '/agency/sites' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
-    let b: { business_name?: unknown; kit_id?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+    let b: { business_name?: unknown; kit_id?: unknown; template_slug?: unknown; industry_key?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
     const name = String(b.business_name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
     if (!name) return json({ error: 'bad_request', message: 'Name the business.' }, 400, cors);
     const kitId = b.kit_id == null || b.kit_id === '' ? '' : String(b.kit_id);
     if (kitId && !UUID_RE.test(kitId)) return json({ error: 'not_found', message: 'That starter kit isn’t one of yours.' }, 404, cors);
-    const links = rowsOf<{ site_id: string }>(await svc(`presence_agency_clients?agency_id=eq.${member.agency_id}&select=site_id&limit=1000`));
-    if (links.length >= member.client_limit) return json({ error: 'client_limit', message: `The plan covers ${member.client_limit} clients — the limit can grow with the plan.` }, 400, cors);
+    // item 198: the look (one of the built-in designs) and the kind of business, both checked
+    // before anything is made
+    const look = b.template_slug == null || b.template_slug === '' ? '' : String(b.template_slug);
+    const lookVersion = look ? latestTemplateVersion(look) : null;
+    if (look && !lookVersion) return json({ error: 'bad_template', message: 'That design isn’t one of the built-in ones.' }, 400, cors);
+    const industry = b.industry_key == null || b.industry_key === '' ? '' : String(b.industry_key);
+    if (industry && !isKnownIndustry(industry)) return json({ error: 'bad_industry', message: 'Pick the kind of business from the list.' }, 400, cors);
+    // item 198: one rule at every door, the Trash doesn't count (lib/site_room.ts)
+    const list = await studioList(member.agency_id);
+    const room = list ? roomOf(list.map((l) => l.status), member.client_limit) : null;
+    if (room?.full) return json({ error: 'client_limit', message: roomFullMessage(room.limit, 'new'), room }, 409, cors);
     // the kit is checked before anything is made, so a wrong one makes nothing
     const kit = kitId ? rowsOf<{ name: string; payload: KitPayload }>(await svc(`presence_starter_kits?id=eq.${kitId}&agency_id=eq.${member.agency_id}&select=name,payload&limit=1`))[0] : null;
     if (kitId && !kit) return json({ error: 'not_found', message: 'That starter kit isn’t one of yours.' }, 404, cors);
@@ -709,6 +734,21 @@ export async function handleAgencySites(req: Request, route: string, method: str
       await svc(`clients?id=eq.${acct.clientId}`, { method: 'DELETE' }).catch(() => {});   // nothing lingers: the site and its plan go with the client
       return json({ error: 'write_failed', message: 'The site didn’t save — please try again.' }, 502, cors);
     }
+    // item 198: the kind of business is the site's industry_key (Settings → Kind of business),
+    // and the design its look, the way Styles sets it. A saved template brings its own look,
+    // so a design isn't applied under one. Neither undoes the site if it doesn't save.
+    let lookOut: { slug: string; name: string; applied: boolean } | null = null;
+    let industryOut: { key: string; applied: boolean } | null = null;
+    if (industry) {
+      const w = await svc('presence_settings?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: acct.siteId, industry_key: industry }) }).catch(() => null);
+      industryOut = { key: industry, applied: !!w?.ok };
+    }
+    if (look && lookVersion && !(kit && kit.payload.layout)) {
+      const tpl = getTemplate(look, lookVersion);
+      const w = await svc(`presence_sites?id=eq.${acct.siteId}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ template_slug: look, template_version: lookVersion }) }).catch(() => null);
+      lookOut = { slug: look, name: tpl?.manifest.name || look, applied: !!w?.ok };
+      if (w?.ok) await writeChangeEvent({ siteId: acct.siteId, entityType: 'settings', entityId: null, action: 'update', summary: `Started with the ${lookOut.name} design`, principal, provenance: 'human', fields: ['template_slug'] }).catch(() => {});
+    }
     // the kit, on its own: a kit that won't apply never undoes the site (the page offers it again)
     let kitOut: { id: string; name: string; applied?: Record<string, unknown>; skipped?: string[]; failed?: boolean } | null = null;
     if (kit) {
@@ -717,7 +757,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
       try { kitOut = { id: kitId, name: kit.name, ...(await applyKitTo(kit.payload, acct.siteId, principal, `Started from the “${kit.name}” ${tpl ? 'template' : 'starter kit'}`, tpl ? { label: `your “${kit.name}” template` } : {})) }; }
       catch { kitOut = { id: kitId, name: kit.name, failed: true }; }
     }
-    return json({ data: { site_id: acct.siteId, client_id: acct.clientId, name, kit: kitOut } }, 201, cors);
+    return json({ data: { site_id: acct.siteId, client_id: acct.clientId, name, kit: kitOut, look: lookOut, industry: industryOut } }, 201, cors);
   }
 
   // ── every domain: the clients' and the studio's own ──
@@ -914,7 +954,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     const label = String(client.name || '').trim() || 'New customer';
     // best-effort from here, as in Add a customer: the login is the truth
     await bridgeCustomerToStudio({ agencySiteId: own.id, clientId: client.id, customerSiteId: siteId, label }).catch(() => null);
-    const ct = await ensureConnectContact(own.id, email, person, false).catch(() => null);
+    const ct = await ensureConnectContact(own.id, email, person).catch(() => null);
     await linkContactToCustomer(own.id, ct?.id, client.id).catch(() => {});
     await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_email: email }) }).catch(() => null);
     const invited = await sendCustomerInvite(own.id, email, true).catch(() => false);
@@ -965,6 +1005,11 @@ export async function handleAgencySites(req: Request, route: string, method: str
   //    taken offline stays offline until it is published or brought back online. ──
   if (what === 'restore' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
+    // item 198: a site back from the Trash counts again, so a full plan says so first
+    const list = await studioList(member.agency_id);
+    const inTrash = list?.some((l) => l.site_id === siteId && l.status === 'trashed');
+    const room = list ? roomOf(list.map((l) => l.status), member.client_limit) : null;
+    if (inTrash && room?.full) return json({ error: 'client_limit', message: roomFullMessage(room.limit, 'restore'), room }, 409, cors);
     const w = await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}&status=eq.trashed&select=site_id,trashed_was_live`, {
       method: 'PATCH', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ status: 'active', trashed_at: null, trashed_by: null, trashed_was_live: false }),

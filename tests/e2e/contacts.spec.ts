@@ -441,6 +441,7 @@ test.describe('Contacts — Add-a-customer work-type dropdown', () => {
     // the dialog moves focus to the name field a beat after it opens; wait for
     // that to land, or a fill() racing it can be redirected into the wrong field
     await expect(page.locator('#cu-name')).toBeFocused();
+    await page.locator('input[name="cumode"][value="provision"]').check();   // the work type comes with setting them up (saving is the default since Nov 15)
   };
 
   test('every dropdown value is distinct and the four real situations are all offered', async ({ page }) => {

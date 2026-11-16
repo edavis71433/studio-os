@@ -102,7 +102,7 @@ for (const t of ['invoice_reminder', 'approval_needed', 'invoice_paylink', 'clie
 }
 
 // 8. deployed surfaces reachable (frontends ride the same release train)
-for (const p of ['/portal.html', '/dds-studio-manage-9k2p.html']) {
+for (const p of ['/portal.html', '/studio.html']) {   // builder item 199: the old admin console's address forwards to /studio.html
   const r = await fetch(`${SITE}${p}`, { method: 'HEAD' });
   record(`deploy: ${p} reachable`, '200', String(r.status), r.status === 200, true);
 }

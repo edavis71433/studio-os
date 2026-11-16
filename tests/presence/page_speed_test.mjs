@@ -35,9 +35,10 @@ ok('there are pages to check', served.length > 80, String(served.length));
   ok('no page loads a script in its head that stops it drawing', blocking.length === 0, blocking.join(' | '));
 }
 {
-  // the four pages that had it there: the library now comes right before the script that uses it
+  // the pages that had it there: the library now comes right before the script that uses it
+  // (signup.html was the fourth; builder item 199 removed it)
   const LIB = '<script src="/vendor/supabase-js-2.45.4.js"></script>';
-  for (const f of ['pipeline.html', 'projects.html', 'set-password.html', 'signup.html']) {
+  for (const f of ['pipeline.html', 'projects.html', 'set-password.html']) {
     const html = read(f);
     const at = html.indexOf(LIB), body = html.search(/<body[\s>]/i);
     const next = html.slice(at + LIB.length).match(/^\s*<script>([\s\S]*?)<\/script>/);

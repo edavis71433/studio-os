@@ -21,8 +21,8 @@ ok('0130 opens with a rollback note', /^-- rollback:/.test(migration));
 // the routes that set it
 ok('sales: linkContactToCustomer exists and is UUID-guarded', /async function linkContactToCustomer/.test(sales) && /UUID_RE\.test\(String\(contactId\)\)/.test(sales));
 ok('sales: deal convert links the deal contact to the new customer', /await linkContactToCustomer\(site\.id, deal\.contact_id, clientId\)/.test(sales));
-ok('sales: add-customer (connect) links the contact', /const ct = await ensureConnectContact\(site\.id, email, name, false\);\s*await linkContactToCustomer\(site\.id, ct\?\.id, clientId\)/.test(sales));
-ok('sales: add-customer (provision) links the contact', /\{ const ct = await ensureConnectContact\(site\.id, email, name, false\); await linkContactToCustomer\(site\.id, ct\?\.id, clientId\)/.test(sales));
+ok('sales: add-customer (connect) links the contact', /const ct = await ensureConnectContact\(site\.id, email, name\);\s*await linkContactToCustomer\(site\.id, ct\?\.id, clientId\)/.test(sales));
+ok('sales: add-customer (provision) links the contact', /\{ const ct = await ensureConnectContact\(site\.id, email, name\); await linkContactToCustomer\(site\.id, ct\?\.id, clientId\)/.test(sales));
 ok('sales: an enquiry converted this way is marked converted', /async function markSubmissionConverted/.test(sales) && (sales.match(/markSubmissionConverted\(site\.id, b\.source_submission_id\)/g) || []).length >= 2);
 // the read tolerates a database without the column
 // item 90: the select chain runs through pathFor (the page by offset, or by the ids a field filter kept)

@@ -23,17 +23,14 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('editor JS intact: api()/whisper()/publish path unchanged', /async function api\(method, route, body, named\)/.test(h) && /function whisper\(id, state\)/.test(h));
 }
 
-// ── portal-workspace.html retired via a REVERSIBLE redirect (zero inbound links) ──
+// ── portal-workspace.html: retired, then removed (builder item 199) ──
+// It was a stub that sent everyone to the client door. Old links still land there:
+// _redirects forwards both spellings to /portal.html, and the file is gone.
 {
-  const w = read('portal-workspace.html');
-  // Two-door consolidation: the legacy portal APP (and its #growth tab) is retired —
-  // the stub now lands on the client DOOR, which routes each account to its home.
-  ok('portal-workspace.html is a reversible redirect (RETIRED toggle)', /var RETIRED = true/.test(w) && /if \(RETIRED\) \{ location\.replace\('\/portal\.html'\)/.test(w));
-  ok('portal-workspace.html points at the client door (no dead #growth anchor)', /\/portal\.html/.test(w) && !/#growth/.test(w));
-  ok('portal-workspace.html documents rollback (git history)', /git show HEAD~1:portal-workspace\.html/.test(w));
-  // it must be tiny now (retired stub), not the old duplicate app that fetched clever-api
-  ok('portal-workspace.html is a small stub, not the old duplicate app', w.length < 2500);
-  ok('portal-workspace.html no longer CALLS clever-api (no backend fetch)', !/functions\/v1\/clever-api/.test(w) && !/gp_workspace/.test(w));
+  const redirects = read('_redirects');
+  let gone = false; try { read('portal-workspace.html'); } catch { gone = true; }
+  ok('portal-workspace.html is gone (item 199)', gone);
+  ok('_redirects forwards /portal-workspace (both spellings) to the client door', /^\/portal-workspace\s+\/portal\.html\s+301!/m.test(redirects) && /^\/portal-workspace\.html\s+\/portal\.html\s+301!/m.test(redirects));
 }
 
 // ── portal.html KEPT (sign-in entry + deferred capabilities) — NOT retired ──

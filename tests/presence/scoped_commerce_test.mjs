@@ -1,5 +1,5 @@
 // ── What /commerce answers while a studio works on a client's site (SC-1) ────
-// /commerce is dispatched before the client gate so a stranger can sign up. That
+// /commerce is dispatched before the client gate so the price list needs no sign-in. That
 // left the signed-in routes answering for the CALLER while the pages asked in the
 // CLIENT's context (?client= → x-dds-scope-site). Inside a client's view a studio
 // got its own notices, Dismiss changed its own rows, the portal opened its own
@@ -449,8 +449,8 @@ for (const [label, header] of [['no header', undefined], ['the empty header the 
   ok('I9: Manage billing comes back to Settings, not the website page', stripeCalls.length === 1 && /settings\.html#billing$/.test(String(stripeCalls[0].return_url || '')), JSON.stringify(stripeCalls[0] || {}));
 }
 
-// ═══ 6. public routes ignore a stray scope: a stranger can still sign up ═══
-for (const [method, route, body, status] of [['GET', '/commerce/plans', undefined, 200], ['GET', '/commerce/checkout-status?session_id=cs_1', undefined, 200], ['POST', '/commerce/verify', { token: 'nope' }, 404], ['POST', '/commerce/billing-sync', { type: 'x' }, 403], ['POST', '/commerce/invoice-paid', { invoice_id: 'x' }, 403]]) {
+// ═══ 6. public routes ignore a stray scope (sign-up's three answer the closed reply, item 199) ═══
+for (const [method, route, body, status] of [['GET', '/commerce/plans', undefined, 200], ['GET', '/commerce/checkout-status?session_id=cs_1', undefined, 410], ['POST', '/commerce/verify', { token: 'nope' }, 410], ['POST', '/commerce/signup', { email: 'a@b.example' }, 410], ['POST', '/commerce/billing-sync', { type: 'x' }, 403], ['POST', '/commerce/invoice-paid', { invoice_id: 'x' }, 403]]) {
   reset();
   const r = await call(null, method, route, { scope: SITE_A, body });
   ok(`public ${method} ${route.split('?')[0]}: answers as before under a stray scope`, r.status === status && audit().length === 0, `${r.status} ${r.text.slice(0, 100)}`);

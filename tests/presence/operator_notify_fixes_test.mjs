@@ -137,8 +137,8 @@ const { notifyStudioOfClientAction, deliverStudioNotification } =
     ['client_message', 'client_upload', 'client_request', 'client_approval'].every((k) => new RegExp(`"${k}"`).test(excl)));
   ok('F2: the exclusion is applied BEFORE the notices[0] fallback (the actual leak)',
     /notices = [^;]*filter\(/.test(fn) || /const candidates =[^;]*filter\(/.test(fn));
-  ok('F2: the See-plans → pricing.html default CTA is still the fallback for real plan notices',
-    /label: "See plans", *href: "pricing\.html"/.test(fn) || /label: 'See plans'/.test(fn));
+  ok('F2: Open Your plan → Settings is still the fallback for real plan notices (item 199: the old price page is gone)',
+    /label: "Open Your plan", *href: "settings\.html#billing"/.test(fn));
   // /commerce/notices has exactly ONE consumer — this card — and it reads only
   // the top 3 active notices. So the same exclusion belongs there too, or a
   // chatty client crowds a real payment_trouble notice out of the window before
