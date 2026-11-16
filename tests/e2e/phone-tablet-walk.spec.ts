@@ -116,9 +116,10 @@ test.describe('Phone and tablet walk (sales list item 43)', () => {
         expect(spill, `the title fits its box at ${w}px`).toBeLessThanOrEqual(1);
         expect(overlaps(await rect(title), await rect(send))).toBe(false);
       }
-      // either way "Send an update" stays one tap away under ⋯
-      await page.locator('#ovfBtn').click();
-      await expect(page.locator('#ovfSend')).toBeVisible();
+      // either way "Send an update" stays in reach: in the header's row, or behind its ⋯ (builder item 165)
+      const dots = page.locator('header.dds-ph .dds-ph-dots');
+      if (await dots.isVisible()) await dots.click();
+      await expect(send).toBeVisible();
     }
   });
 

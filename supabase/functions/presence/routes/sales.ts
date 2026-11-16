@@ -12,6 +12,7 @@ import { mintSignInLink } from '../lib/workspace.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
+import { roomOf, roomFullMessage, studioList, addsToRoom } from '../lib/site_room.ts';
 import { isCustomerOfStudio, claimPortfolioSite, requestConnection } from '../lib/connect_requests.ts';
 import { ensureProjectForDeal, ensureBridge, linksForCustomer, emailOperator, tickChecklistForDeal } from '../lib/service_bridge.ts';
 import { loadEmailBrand, EMAIL_BRAND_DEFAULT, emailBand, emailFacts } from '../lib/email_brand.ts';
@@ -82,11 +83,11 @@ const SERVICES_CATALOG_NAME = '__services_catalog__';
 const NOT_RESERVED_STORE = Object.values(RESERVED_NAMES).map((n) => `&name=neq.${encodeURIComponent(n)}`).join('');
 /** Every Studio OS settings row is named __like_this__; no template may be. */
 export const isReservedName = (n: unknown) => /^__.*__$/.test(String(n ?? '').trim());
-// A machine marker on a presence_contacts row (site-scoped) that says "this studio
-// wants THIS email as a customer — auto-connect them the moment they self-serve
-// sign up". The studio IS its presence site, and presence_contacts.site_id is
-// exactly the agency_site_id the frozen bridge (ensureBridge) keys on — so this
-// needs NO new table. commerce/handleSignup reads this same tag on signup.
+// A machine marker older presence_contacts rows still carry in their notes: it said
+// "auto-connect this email to this studio the moment they self-serve sign up". Builder
+// item 199 (Nov 15 2026) closed self-serve sign-up and took that join with it (it
+// trusted an email nobody had proved), so nothing writes or reads the marker for a
+// join any more; crm.ts only keeps it out of the notes it shows.
 export const CONNECT_INTENT_TAG = '[[connect-on-signup]]';
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const actorOf = (p: Principal) => ({ actor: p.email || p.userId || 'system', actor_kind: p.kind });
@@ -2915,6 +2916,27 @@ export async function handleSalesDocumentLink(site: SiteRow, kind: DocKind, id: 
   return json({ url: docViewerUrl(token), pdf_url: `${fnBase()}/functions/v1/presence/sales/doc/${encodeURIComponent(token)}?format=pdf` }, 200, cors);
 }
 
+// ── Builder item 198: the one site-limit rule at the sales doors (lib/site_room.ts) ──
+// Add a customer and Convert put the customer's site in the studio's list, so a full
+// plan is refused before anything is made, the way + New site refuses. Only a studio
+// (an agency member) has a list, and an email whose site is already in it adds nothing.
+async function fullPlanFor(principal: Principal, email: string): Promise<{ used: number; limit: number | null } | null> {
+  if (!principal.jwt) return null;
+  const am = await resolveAgencyMember(principal.jwt).catch(() => null);
+  if (!am) return null;
+  const list = await studioList(am.agency_id);
+  if (!list) return null;
+  const room = roomOf(list.map((l) => l.status), am.client_limit);
+  if (!room.full) return null;
+  const existing = email ? await findClientByEmail(email).catch(() => null) : null;
+  if (existing) {
+    const q = await svc(`presence_sites?client_id=eq.${existing.id}&select=id&limit=5`).catch(() => null);
+    const theirs = q ? rows(q) : [];
+    if (theirs.some((x) => !addsToRoom(list, String(x.id)))) return null;   // already in the list
+  }
+  return { used: room.used, limit: room.limit };
+}
+
 // ═══ CONVERT TO CUSTOMER (idempotent) ═══
 export async function handleSalesConvert(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
@@ -2954,6 +2976,9 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   const businessName = clean((contact?.company || contact?.name || deal.title), 120) || 'New customer';
   const email = clean(contact?.email, 160).toLowerCase();
   const plan = pickPlan(cb.plan); // selectable edition (default 'presence'); billing formalized in P2-E (active access, unbilled — a deliberate P2-C decision)
+  // item 198: a full plan is said before anything is made
+  const fullAt = await fullPlanFor(principal, email);
+  if (fullAt) { await unclaim(); return json({ error: 'client_limit', message: roomFullMessage(fullAt.limit, 'convert'), room: { ...fullAt, full: true } }, 409, cors); }
 
   // 1+2) resolve/create the customer ACCOUNT (login) and run the ONE idempotent
   //    provisioning path (entitlement + site + hosting + seeds). This is the SHARED
@@ -2995,7 +3020,6 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   await dealEvent(site.id, dealId, 'converted', principal, { to_stage: 'won', detail: { client_id: clientId, site_id: acct.siteId } });
   await clearStaleNextStep(site.id, dealId, 'won');   // Phase 3: closing/signing/deposit steps are behind us
   if (site.client_id) { await clearNotice(site.client_id, 'deal_signed', `signed:${dealId}`); await clearNotice(site.client_id, 'deal_signed', `accepted:${dealId}`); await clearNoticePrefix(site.client_id, 'deal_followup', dealFollowupPeriodPrefix(dealId)); await clearNotice(site.client_id, 'deal_followup', dealFollowupLegacyPeriod(dealId)); } // the deal is a customer now — clear the "ready to convert" + stale "follow up on this deal" notices (weekly-bucketed → prefix clear + legacy key)
-  await writeChangeEvent({ siteId: site.id, entityType: 'deal', entityId: dealId, action: 'convert', summary: `Converted “${deal.title}” to a customer`, principal, provenance: 'human' }).catch(() => {});
 
   // Seam 1: if the converting operator runs an AGENCY, add the new customer to
   // their managed portfolio (shared helper). Idempotent; solo owners skip it.
@@ -3145,7 +3169,7 @@ export async function provisionCustomerAccount(opts: {
  *  Idempotent (site_id is the PK, on_conflict merge). Best-effort: a customer is
  *  still successfully added if this write fails. Returns the stored host. */
 async function recordExistingWebsite(
-  siteId: string, plan: PlanKey, websiteUrl: string, agencySiteId: string, principal: Principal, label: string,
+  siteId: string, plan: PlanKey, websiteUrl: string, principal: Principal, label: string,
 ): Promise<string | null> {
   try {
     if (!websiteUrl) return null;
@@ -3166,7 +3190,9 @@ async function recordExistingWebsite(
       body: JSON.stringify({ site_id: siteId, url: clean1, domain: url.hostname, platform: 'custom', method: 'meta', token, status: 'pending', last_check_note: '' }),
     });
     if (!w.ok) return null;
-    await writeChangeEvent({ siteId: agencySiteId, entityType: 'client', entityId: siteId, action: 'update', summary: `Recorded ${label}’s existing website ${url.hostname} (hosted elsewhere)`, principal, provenance: 'human', fields: ['monitor_connection'] }).catch(() => {});
+    // item 239: on the customer's own site, as the studio working for them, the way the Monitor
+    // card's own Connect records it (routes/monitor.ts); the studio's site refused a 'client' line
+    await writeChangeEvent({ siteId, entityType: 'settings', entityId: null, action: 'update', summary: `Recorded the existing website ${url.hostname} (hosted elsewhere)`, principal: { ...principal, scope: { site_id: siteId, name: label } }, provenance: 'human', fields: ['monitor_connection'] });
     return url.hostname;
   } catch { return null; }
 }
@@ -3253,7 +3279,7 @@ export async function sendCustomerInvite(siteId: string, email: string, _isNewLo
 }
 
 /** Form the Agency–Client Bridge for a customer that has NO originating deal (a
- *  direct add, a connect-by-email, or a self-serve signup a studio pre-listed).
+ *  direct add or a connect-by-email).
  *  Reuses the ONE frozen bridge path (ensureBridge + presence_customer_agency =
  *  one primary agency per customer) — never a parallel bridge. Idempotent: reuses
  *  an existing link for this customer under this studio instead of minting a second
@@ -3275,11 +3301,9 @@ export async function bridgeCustomerToStudio(opts: {
   return { bridged: true, projectId: project.id, ownedElsewhere: false };
 }
 
-/** Find-or-create the site-scoped CRM contact for (site, email) — the record that
- *  lets a later self-serve signup find THIS studio. `mark` stamps the connect-intent
- *  tag (so signup only auto-connects emails the studio explicitly pre-listed, never
- *  a coincidental CRM lead); it's appended, never clobbering the operator's notes.
- *  Reuses the presence_contacts store's (site,email) uniqueness — no new table. */
+/** Find-or-create the site-scoped CRM contact for (site, email), so the person is in
+ *  the studio's contacts. Reuses the presence_contacts store's (site,email)
+ *  uniqueness — no new table. */
 // Phase 2 (one customer model): a contact belongs to the customer it became.
 // presence_contacts.client_id (migration 0130) is set here on deal convert and
 // on "Add a customer"; best-effort — a database without the column just keeps
@@ -3296,18 +3320,12 @@ async function markSubmissionConverted(siteId: string, submissionId: unknown): P
   try { await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ status: 'converted' }) }); } catch { /* best-effort */ }
 }
 
-export async function ensureConnectContact(siteId: string, emailIn: string, name: string, mark: boolean) {
+export async function ensureConnectContact(siteId: string, emailIn: string, name: string) {
   const email = normEmail(emailIn);   // K1: an enquiry's Jane@Example.com is the contact jane@example.com
   const existing = rows(await svc(`presence_contacts?site_id=eq.${siteId}&${emailMatch(email)}&deleted_at=is.null&select=id,notes&limit=1`))[0];
-  if (existing) {
-    if (mark && !String(existing.notes || '').includes(CONNECT_INTENT_TAG)) {
-      const notes = (String(existing.notes || '').trim() ? existing.notes.trim() + ' ' : '') + CONNECT_INTENT_TAG;
-      await svc(`presence_contacts?id=eq.${existing.id}&site_id=eq.${siteId}`, { method: 'PATCH', body: JSON.stringify({ notes: clean(notes, 2000) }) }).catch(() => {});
-    }
-    return existing;
-  }
+  if (existing) return existing;
   const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ site_id: siteId, name: name || '', email, notes: mark ? CONNECT_INTENT_TAG : '' }) });
+    body: JSON.stringify({ site_id: siteId, name: name || '', email, notes: '' }) });
   // K6: an import adding the same new person twice at once — the second is them, not a failure
   if (!ins.ok && isUniqueViolation(ins)) return rows(await svc(`presence_contacts?site_id=eq.${siteId}&${emailMatch(email)}&deleted_at=is.null&select=id,notes&limit=1`))[0] || null;
   return rows(ins)[0] || null;
@@ -3322,8 +3340,7 @@ async function askToConnect(site: SiteRow, principal: Principal, email: string, 
   const am = principal.jwt ? await resolveAgencyMember(principal.jwt).catch(() => null) : null;
   const ok = await requestConnection({ studioSiteId: site.id, agencyId: am?.agency_id || null, email, name, requestedBy: principal.email || principal.userId || '' });
   if (ok) {
-    await ensureConnectContact(site.id, email, name, false).catch(() => null);   // they're in your contacts meanwhile
-    await writeChangeEvent({ siteId: site.id, entityType: 'contact', entityId: email, action: 'connect_requested', summary: `Asked ${email} to connect with you`, principal, provenance: 'human' }).catch(() => {});
+    await ensureConnectContact(site.id, email, name).catch(() => null);   // they're in your contacts meanwhile
   }
   return ok;
 }
@@ -3336,10 +3353,10 @@ const requestUnavailable = (cors: Record<string, string>) => json({ error: 'requ
 //      internals (account + workspace + service-role entitlement + agency bridge +
 //      set-password invite). Idempotent: an email that already has a workspace
 //      returns a friendly "already set up", never a duplicate.
-//   B) mode='connect' — they'll sign up themselves; the owner just RECORDS the
-//      email. If an account already exists → bridge it to this studio NOW. If not →
-//      record the intent on a site-scoped contact so commerce/handleSignup
-//      auto-connects them the moment that email self-serve-signs-up. NEVER
+//   B) mode='connect' — record the email and email nobody (the Customers CSV import;
+//      builder item 199 took "they'll sign up themselves" out of Add a customer). An
+//      account that is already this studio's customer → bridge it NOW; someone else's
+//      → ask (S1). No account → a contact in the studio's list, nothing more. NEVER
 //      provisions a workspace, mints a login, or sends a set-password email.
 // A SERVICE customer either way — active access, no Stripe subscription (billing
 // stays the studio's own invoicing, P2-E).
@@ -3367,7 +3384,7 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
       const clientId = existing.id;
       const customerSite = rows(await svc(`presence_sites?client_id=eq.${clientId}&select=id&limit=1`))[0];
       const managed = await linkAgencyPortfolio(principal, customerSite?.id, email);
-      const ct = await ensureConnectContact(site.id, email, name, false);   // record them in the CRM (no marker — already connected)
+      const ct = await ensureConnectContact(site.id, email, name);   // record them in the CRM
       await linkContactToCustomer(site.id, ct?.id, clientId);
       await markSubmissionConverted(site.id, b.source_submission_id);
       let projectId: string | null = null, bridged = false, ownedElsewhere = false;
@@ -3375,16 +3392,20 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
         const r = await bridgeCustomerToStudio({ agencySiteId: site.id, clientId, customerSiteId: customerSite?.id || null, label: businessName });
         projectId = r.projectId; bridged = r.bridged; ownedElsewhere = r.ownedElsewhere;
       }
-      await writeChangeEvent({ siteId: site.id, entityType: 'client', entityId: clientId, action: 'connect', summary: `Connected ${businessName} to your workspace`, principal, provenance: 'human' }).catch(() => {});
       return json({ data: { mode: 'connect', connected: true, created: false, client_id: clientId, site_id: customerSite?.id || null, project_id: projectId, managed, bridged, owned_elsewhere: ownedElsewhere, portal_url: portalUrl, message: 'Connected to their workspace.' } }, 200, cors);
     }
-    // No account yet → record the intent (tagged contact) so signup auto-connects.
-    const contact = await ensureConnectContact(site.id, email, name, true);
-    await writeChangeEvent({ siteId: site.id, entityType: 'contact', entityId: contact?.id || email, action: 'connect_pending', summary: `Saved ${email} to connect when they sign up`, principal, provenance: 'human' }).catch(() => {});
-    return json({ data: { mode: 'connect', pending: true, connected: false, email, contact_id: contact?.id || null, portal_url: portalUrl, message: `Saved. When ${email} signs up, they’ll connect to you automatically.` } }, 200, cors);
+    // No account yet → they're saved to the studio's contacts, and nothing else happens.
+    // Nobody signs up by themselves (builder item 199), so the studio sets them up from
+    // Add a customer when it's ready; no marker waits for a sign-up.
+    const contact = await ensureConnectContact(site.id, email, name);
+    return json({ data: { mode: 'connect', pending: true, connected: false, email, contact_id: contact?.id || null, message: `Saved ${email} to your contacts. Set them up from Add a customer when you’re ready.` } }, 200, cors);
   }
 
   // ── A) SET THEM UP NOW (existing behavior) ──────────────────────────────────
+  // item 198: a full plan is refused before anything is made (Home, Customers and
+  // Contacts all add here; the same rule as + New site)
+  const fullAt = await fullPlanFor(principal, email);
+  if (fullAt) return json({ error: 'client_limit', message: roomFullMessage(fullAt.limit, 'add'), room: { ...fullAt, full: true } }, 409, cors);
   const plan = pickPlan(b.edition);   // "what they get" (default presence); reuse the convert whitelist
   const existingWebsite = clean(b.website_url, 200);   // their OWN site, when we don't host it
 
@@ -3407,7 +3428,7 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   // address on file their established search presence syncs immediately — and
   // without it the analytics board can only say "we don't know where their site
   // is", which is what it now says instead of "publish it first".
-  const externalDomain = acct.siteId ? await recordExistingWebsite(acct.siteId, plan, existingWebsite, site.id, principal, businessName) : null;
+  const externalDomain = acct.siteId ? await recordExistingWebsite(acct.siteId, plan, existingWebsite, principal, businessName) : null;
 
   // Agency–Client Bridge via the shared helper (ensureBridge — one primary agency
   // per customer; idempotent; reuses an existing link; refuses a customer owned by
@@ -3420,7 +3441,7 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
 
   // Phase 2: the person is a contact who belongs to this customer, and the
   // enquiry that started it (when one did) is converted.
-  { const ct = await ensureConnectContact(site.id, email, name, false); await linkContactToCustomer(site.id, ct?.id, clientId); await markSubmissionConverted(site.id, b.source_submission_id); }
+  { const ct = await ensureConnectContact(site.id, email, name); await linkContactToCustomer(site.id, ct?.id, clientId); await markSubmissionConverted(site.id, b.source_submission_id); }
 
   // Already had a workspace → friendly "they're already set up" (with a link), no
   // duplicate, no fresh invite (they already have access).
@@ -3428,6 +3449,5 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
     return json({ data: { already_exists: true, created: false, client_id: clientId, site_id: acct.siteId, project_id: projectId, managed, external_domain: externalDomain, portal_url: portalUrl, message: 'They already have a workspace — nothing was duplicated.' } }, 200, cors);
   }
   const invited = await sendCustomerInvite(site.id, email, acct.isNewLogin);
-  await writeChangeEvent({ siteId: site.id, entityType: 'client', entityId: clientId, action: 'create', summary: `Added ${businessName} as a customer`, principal, provenance: 'human' }).catch(() => {});
   return json({ data: { created: true, client_id: clientId, site_id: acct.siteId, project_id: projectId, hosted: acct.hosted, invited, managed, bridged, owned_elsewhere: ownedElsewhere, plan, external_domain: externalDomain, portal_url: portalUrl } }, 201, cors);
 }

@@ -120,11 +120,16 @@ test.describe('Pipeline table view', () => {
   });
 });
 
-// ── SS5: pipeline to the roster standard — .lhead anatomy, soft ↻ refresh,
+// builder item 165: ↻ is in the page header; on a phone it waits behind the header's ⋯ (a sheet that stays open)
+async function tapRefresh(page: import('@playwright/test').Page) {
+  if (!(await page.locator('#refreshBtn').isVisible()) && await page.locator('.dds-ph-dots').isVisible()) await page.locator('.dds-ph-dots').click();
+  await page.locator('#refreshBtn').click();
+}
+// ── SS5: pipeline to the roster standard — the one page header (builder item 165), soft ↻ refresh,
 // client-side search across title/company/contact (caret-safe: the input is
 // static; only the list re-renders). Money meta uses the page's money0.
-test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
-  test('boots under the roster anatomy: .lhead, ONE h1, money meta — zero console errors', async ({ page }) => {
+test.describe('SS5 roster standard (the page header + search + soft refresh)', () => {
+  test('boots under the one page header: ONE h1, money meta — zero console errors', async ({ page }) => {
     await pinList(page);
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
@@ -133,10 +138,10 @@ test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
     await page.goto('/pipeline.html');
     await expect(page.getByRole('heading', { level: 1, name: 'Pipeline' })).toBeVisible();
     await expect(page.locator('h1')).toHaveCount(1);
-    await expect(page.locator('.lhead .obj-ic')).toBeVisible();
+    await expect(page.locator('header.dds-ph .dds-ph-ic[data-ic="pipeline"]')).toBeVisible();
     // 2 deals, $5,000 + $2,500 expected value
-    await expect(page.locator('.lhead .lmeta')).toContainText('2 deals · $7,500 total · Updated just now');
-    await expect(page.locator('#refreshBtn')).toBeVisible();
+    await expect(page.locator('#lmeta')).toContainText('2 deals · $7,500 total · Updated just now');
+    await expect(page.locator('#refreshBtn, .dds-ph-dots').locator('visible=true')).toHaveCount(1);   // ↻, or the header's ⋯ on a phone
     await expect(page.locator('#dealSearch')).toBeVisible();
     expect(errors).toEqual([]);
   });
@@ -149,13 +154,13 @@ test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
     // now the network sours — the soft refresh must NOT wipe the list
     await page.route(/\/functions\/v1\/presence\/sales\/deals(\?|$)/, (route) =>
       route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'boom' }) }));
-    await page.locator('#refreshBtn').click();
+    await tapRefresh(page);
     await expect(page.locator('.dds-toast')).toContainText('Couldn’t refresh just now.');
     await expect(page.locator('#list .card')).toHaveCount(2);          // last good render kept
     await expect(page.locator('.dds-error')).toHaveCount(0);           // no error screen on soft
     // the network heals — the same button refreshes in place
     await page.unroute(/\/functions\/v1\/presence\/sales\/deals(\?|$)/);
-    await page.locator('#refreshBtn').click();
+    await tapRefresh(page);
     await expect(page.locator('#list .card')).toHaveCount(2);
   });
 
@@ -173,7 +178,7 @@ test.describe('SS5 roster standard (.lhead + search + soft refresh)', () => {
     await s.pressSequentially('acme');
     await expect(page.locator('#list .card')).toHaveCount(1);
     await expect(page.locator('#list .card')).toContainText('Acme website');
-    await expect(page.locator('.lhead .lmeta')).toContainText('1 deal · $5,000 total');
+    await expect(page.locator('#lmeta')).toContainText('1 deal · $5,000 total');
     // the input survived every list re-render: same element, focused, caret at the end
     await expect(s).toBeFocused();
     expect(await s.evaluate((el: HTMLInputElement) => el.selectionStart)).toBe(4);
@@ -298,7 +303,7 @@ test.describe('SS5 stale-race guards + boot retry', () => {
     await page.evaluate(() => { (window as any).__HEALED = 1; });
     await retry.click();                                                    // recovers IN PLACE — no navigation
     await expect(page.locator('#list .card')).toHaveCount(2);
-    await expect(page.locator('.lhead .lmeta')).toContainText('2 deals');
+    await expect(page.locator('#lmeta')).toContainText('2 deals');
   });
 });
 
@@ -410,7 +415,7 @@ test.describe('SS5 ?stage=won landing (D1)', () => {
     await expect(page.locator('#list .card')).toHaveCount(1);
     await expect(page.locator('#list .card .stage.won')).toContainText('Won ✓');
     await expect(page.locator('#list .card .val')).toContainText('$9,990');
-    await expect(page.locator('.lhead .lmeta')).toContainText('1 deal · $9,990 total');
+    await expect(page.locator('#lmeta')).toContainText('1 deal · $9,990 total');
     expect(sentStage).toBe('won');
   });
 
@@ -479,13 +484,13 @@ test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
     expect(new URL(dealsUrl).searchParams.get('limit')).toBe('100');
     // (b) at the cap the meta scopes itself to what it actually has — never "total"
     //     99 × $1,000 + one $1,000.50 = $100,000.50 (the cents pair, never "$….5")
-    await expect(page.locator('.lhead .lmeta')).toContainText('Latest 100 deals · $100,000.50');
-    await expect(page.locator('.lhead .lmeta')).not.toContainText('total');
+    await expect(page.locator('#lmeta')).toContainText('Latest 100 deals · $100,000.50');
+    await expect(page.locator('#lmeta')).not.toContainText('total');
     // a search over a capped page stays scoped too ("N of the latest 100")
     await page.locator('#dealSearch').fill('Deal 1');   // Deal 1, Deal 10…19 → 11 matches
     await expect(page.locator('#list .card')).toHaveCount(11);
-    await expect(page.locator('.lhead .lmeta')).toContainText('11 of the latest 100 deals · $11,000');
-    await expect(page.locator('.lhead .lmeta')).not.toContainText('total');
+    await expect(page.locator('#lmeta')).toContainText('11 of the latest 100 deals · $11,000');
+    await expect(page.locator('#lmeta')).not.toContainText('total');
   });
 
   // SS5 item 2: the Board renders ONLY open, unconverted deals — so in Board
@@ -512,14 +517,14 @@ test.describe('SS5 honest meta (fetch cap + at-cap wording)', () => {
     await expect(page.locator('#board .bcard')).toHaveCount(2);
     expect(asked.some((q) => /(^|&)open=1(&|$)/.test(q))).toBe(true);
     // the meta reflects what the board shows: 2 open cards, $5,000 + $2,500
-    await expect(page.locator('.lhead .lmeta')).toContainText('2 open deals · $7,500 open');
-    await expect(page.locator('.lhead .lmeta')).not.toContainText('total');
+    await expect(page.locator('#lmeta')).toContainText('2 open deals · $7,500 open');
+    await expect(page.locator('#lmeta')).not.toContainText('total');
     // the board-foot still explains the hidden outcomes
     await expect(page.locator('.board-foot')).toContainText('2 won or not-a-fit deals — see them in List view.');   // batch C: "closed" retired
     // switching to List restores the full-fetched-set semantics (item 1)
     await page.locator('#viewList').click();
     await expect(page.locator('#list .card')).toHaveCount(4);
-    await expect(page.locator('.lhead .lmeta')).toContainText('4 deals · $18,490 total');
+    await expect(page.locator('#lmeta')).toContainText('4 deals · $18,490 total');
   });
 
   // SS5 item 3: creating a deal with a NEW contact invalidated only the Table's
@@ -939,16 +944,16 @@ const STARTER = [
   ['Site audit — Competitive Intelligence', '899'],
 ] as const;
 
-// final pass, batch C: on a phone "Manage services" lives under More in the toolbar
+// builder item 165: "Manage services" is in the page header; on a phone it waits behind the header's ⋯
 async function openServices(page: import('@playwright/test').Page) {
-  if (await page.locator('#moreBtn').isVisible()) { await page.locator('#moreBtn').click(); await page.getByRole('menuitem', { name: 'Manage services' }).click(); }
-  else await page.locator('#mngServicesTop').click();
+  if (await page.locator('.dds-ph-dots').isVisible()) await page.locator('.dds-ph-dots').click();
+  await page.locator('#mngServicesTop').click();
 }
 test.describe('services catalog — starter list (ask 1)', () => {
-  test('“Manage services” is reachable from the page toolbar, not just inside a deal', async ({ page }) => {
+  test('“Manage services” is reachable from the page header, not just inside a deal', async ({ page }) => {
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
-    await expect(page.locator('#mngServicesTop, #moreBtn').locator('visible=true')).toHaveCount(1);   // the button, or More on a phone
+    await expect(page.locator('#mngServicesTop, .dds-ph-dots').locator('visible=true')).toHaveCount(1);   // the button, or the header's ⋯ on a phone
     await openServices(page);
     await expect(page.locator('#svcDlg')).toBeVisible();
   });

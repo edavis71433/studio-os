@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // Bold redesign — Files, part 2 (Figma "11 · Files", Nov 2026): the open file.
 // On a computer it sits in a card beside the grid, not over it: the page makes
@@ -85,9 +86,11 @@ test.describe('Files — the open file (bold redesign, part 2)', () => {
       await page.goto('/files.html');
       await open(page, 'Shopfront at dusk');
       const panel = (await page.locator('#panel').boundingBox())!;
-      const [add, make, h1] = await Promise.all(['#add', '#makeImage', '#pagehead'].map((s) => page.locator(s).boundingBox()));
+      const [add, make, row] = await Promise.all(['#add', '#makeImage', 'header.dds-ph .dds-ph-row'].map((s) => page.locator(s).boundingBox()));
       expect(add!.height, `+ Add files on one line at ${width}`).toBeLessThan(50);
-      expect(Math.abs(add!.y + add!.height / 2 - (h1!.y + h1!.height / 2)), `+ Add files beside the title at ${width}`).toBeLessThan(12);
+      // builder item 165: the one page header keeps its actions on the right, beside the title where
+      // they fit and under it where they don't — never squeezed
+      expect(Math.abs(add!.x + add!.width - (row!.x + row!.width)), `+ Add files at the header's right at ${width}`).toBeLessThan(2);
       for (const b of [add!, make!]) expect(b.x + b.width, `clear of the panel at ${width}`).toBeLessThanOrEqual(panel.x);
       await page.keyboard.press('Escape');
     }
@@ -127,7 +130,7 @@ test.describe('Files — the open file (bold redesign, part 2)', () => {
     expect(reads).toBe(1);   // not twice (shell.js clicks role=button tiles on Enter too)
     await page.keyboard.press('Escape');
     await expect(tile).toBeFocused();
-    await page.locator('#selbtn').click();
+    await (await headerAction(page, '#selbtn')).click();
     const pick = page.locator(`.tile[data-pick="${TEAM.id}"]`);
     await pick.focus();
     await page.keyboard.press(' ');

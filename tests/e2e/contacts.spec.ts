@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 
 // ── Editing and removing a contact ───────────────────────────────────────────
 // Eric: "i should be able to edit or delete these contacts." His roster carried
@@ -435,11 +436,12 @@ test.describe('Contacts — Add-a-customer work-type dropdown', () => {
     await installApp(page);
     await mockContacts(page);
     await page.goto('/contacts.html');
-    await page.locator('#addCust').click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
     // the dialog moves focus to the name field a beat after it opens; wait for
     // that to land, or a fill() racing it can be redirected into the wrong field
     await expect(page.locator('#cu-name')).toBeFocused();
+    await page.locator('input[name="cumode"][value="provision"]').check();   // the work type comes with setting them up (saving is the default since Nov 15)
   };
 
   test('every dropdown value is distinct and the four real situations are all offered', async ({ page }) => {

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 import { installIosFocusSemantics } from './helpers/ios-focus';
 
 // Slice 8 — analytics.html is the Business dashboard. Visual refresh (2026-10):
@@ -153,7 +154,7 @@ test.describe('Analytics (Business dashboard)', () => {
     await page.goto('/analytics.html');
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
     expect(calls).toBe(1);
-    await page.getByRole('button', { name: 'Refresh' }).click();
+    await (await headerAction(page, '#refreshBtn')).click();   // builder item 165: behind the header’s ⋯ on a phone
     await expect.poll(() => calls).toBe(2);
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
   });
@@ -690,7 +691,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     // bold redesign: the studio's own numbers lead; the customers' chip and headline head their band
     await expect(page.locator('.bandsub .chip')).toHaveText('All customers');
     await expect(page.getByText(/^As of /)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
+    await expect(await headerAction(page, '#refreshBtn')).toBeVisible();   // builder item 165: in the header's row, behind ⋯ on a phone
     await expect(page.getByText('Across 3 customers, here’s what stands out.')).toBeVisible();
     // the stat strip — every number derived from the payload ('Needs attention'
     // is both a tile and an insight title, so tiles are looked up by strip)
@@ -791,7 +792,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     // and the destination is the scoped Business dashboard (no rollup, no "All clients"), scope carried
     await expect(page.getByText('$12,400', { exact: true })).toBeVisible();
     await expect(page.locator('.tscroll')).toHaveCount(0);
-    await expect(page.locator('.subline .chip')).toHaveCount(0);
+    await expect(page.locator('#phLine .chip')).toHaveCount(0);
   });
 
   test('a failed portfolio read is the TROUBLE state — never the all-quiet card', async ({ page }) => {
@@ -835,7 +836,7 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     // now the roster hiccups while the portfolio read stays fine — ↻ must NOT
     // trade three good rows for the couldn't-load line (loadDash discipline)
     rosterFails = true;
-    await page.getByRole('button', { name: 'Refresh' }).click();
+    await (await headerAction(page, '#refreshBtn')).click();   // builder item 165: behind the header’s ⋯ on a phone
     await expect(page.getByText('Couldn’t refresh the customer list just now.')).toBeVisible();
     await expect(page.locator('.tscroll tbody tr')).toHaveCount(3);   // last-good kept
     await expect(page.getByText('The customer-by-customer list wouldn’t load just now')).toHaveCount(0);

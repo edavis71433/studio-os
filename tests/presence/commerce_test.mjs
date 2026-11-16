@@ -1,10 +1,10 @@
-// ── L1 Self-Serve Signup & Commerce suite ───────────────────────────────────
+// ── L1 Commerce suite (plans, prices, subscriptions; sign-up closed in item 199) ──
 // Pure tiers (run anywhere): the commercial ladder (seven rungs, ranks, self-
 // serve honesty, founder rate-lock math, monthly/annual pricing, edition
 // mapping, upgrade/downgrade rules) and the Stripe-subscription → entitlement
 // translation across every lifecycle state (active, past-due grace, voluntary
-// pause, cancellation, trial). Integration (staging) tiers live at the bottom
-// and only run when SUPABASE_URL + keys are present.
+// pause, cancellation, trial). Integration tiers live at the bottom and only run
+// when SUPABASE_URL + keys are present.
 //
 //   deno run --allow-read --allow-net --allow-env tests/presence/commerce_test.mjs
 import {
@@ -122,8 +122,9 @@ console.log(`\n${passed}/${results.length} passed`);
 if (passed !== results.length) { console.log('FAILURES:'); for (const r of results) if (!r.p) console.log('  ✗ ' + r.n); }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Integration (staging) tiers run only with credentials present. They exercise
-// the live signup → provision → entitlement → subscription-sync path end to end.
+// Integration tiers run only with credentials present. Self-serve sign-up is closed
+// (builder item 199, Nov 15 2026): they check the closed reply is the same for an
+// email that has an account and one that doesn't, and that it makes nothing.
 const SB_URL = (globalThis.Deno && Deno.env.get('SUPABASE_URL')) || '';
 const SERVICE = (globalThis.Deno && (Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))) || '';
 const ANON = (globalThis.Deno && (Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY'))) || '';
@@ -139,13 +140,13 @@ async function runIntegration({ SB_URL, SERVICE, ANON }) {
   const FN = `${SB_URL}/functions/v1/presence`;
   const svcH = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' };
   // Public commerce calls still cross the functions gateway (verify_jwt on): the
-  // anon key is a valid JWT that satisfies it; the real identity (when any) rides
-  // in x-dds-user-jwt, exactly like the room's api() helper.
+  // anon key is a valid JWT that satisfies it.
   const authH = { apikey: ANON, Authorization: `Bearer ${ANON}`, 'Content-Type': 'application/json' };
   const stamp = Date.now();
-  const email = `l1-acceptance+${stamp}@example.com`;
+  const known = `l1-known+${stamp}@example.com`, unknown = `l1-unknown+${stamp}@example.com`;
   const password = 'meadow-lantern-4279-test';
-  let signupRow = null, siteId = null, clientId = null, authUserId = null, jwt = null;
+  let knownId = null;
+  const signup = async (email) => { const r = await fetch(`${FN}/commerce/signup`, { method: 'POST', headers: authH, body: JSON.stringify({ email, password, business_name: 'L1 Closed Co', plan: 'presence_monitor', trial: true }) }); return { status: r.status, text: await r.text() }; };
 
   try {
     // public: the catalog
@@ -153,85 +154,29 @@ async function runIntegration({ SB_URL, SERVICE, ANON }) {
     const plans = await plansR.json();
     iok('GET /commerce/plans is public and lists seven rungs', plansR.status === 200 && plans?.data?.plans?.length === 7);
 
-    // public: a Monitor trial signs up and provisions with no operator, no card
-    const suR = await fetch(`${FN}/commerce/signup`, { method: 'POST', headers: authH, body: JSON.stringify({ email, password, business_name: 'L1 Acceptance Co', plan: 'presence_monitor', trial: true }) });
-    const su = await suR.json();
-    iok('POST /commerce/signup (Monitor trial) provisions immediately', suR.status === 201 && su?.data?.mode === 'trial' && !!su?.data?.site_id, su?.error || '');
-    siteId = su?.data?.site_id || null;
+    // an email with an account and one without get the very same reply
+    const mk = await fetch(`${SB_URL}/auth/v1/admin/users`, { method: 'POST', headers: svcH, body: JSON.stringify({ email: known, password, email_confirm: true }) });
+    knownId = (await mk.json().catch(() => ({})))?.id || null;
+    iok('a throwaway account exists for the known-email check', !!knownId);
+    const a = await signup(known), b = await signup(unknown);
+    iok('POST /commerce/signup → 410 signup_closed', a.status === 410 && /"signup_closed"/.test(a.text), a.text.slice(0, 120));
+    iok('the reply is the same whether or not the email has an account', a.status === b.status && a.text === b.text);
+    const sgR = await fetch(`${SB_URL}/rest/v1/presence_signups?email=in.(${encodeURIComponent(known)},${encodeURIComponent(unknown)})&select=id&limit=5`, { headers: svcH });
+    const made = await sgR.json().catch(() => null);
+    iok('nothing was made: no sign-up rows for either email', Array.isArray(made) && made.length === 0, JSON.stringify(made).slice(0, 120));
 
-    // the funnel row exists and is marked provisioned
-    const sgR = await fetch(`${SB_URL}/rest/v1/presence_signups?email=eq.${encodeURIComponent(email)}&select=id,status,client_id,site_id,auth_user_id,verify_token&limit=1`, { headers: svcH });
-    signupRow = (await sgR.json())?.[0] || null;
-    iok('signup funnel row is provisioned', signupRow?.status === 'provisioned' && signupRow?.site_id === siteId);
-    clientId = signupRow?.client_id || null;
-    authUserId = signupRow?.auth_user_id || null;
+    // the email-confirm and checkout poll that served the sign-up pages answer the same way
+    const vR = await fetch(`${FN}/commerce/verify`, { method: 'POST', headers: authH, body: JSON.stringify({ token: 'anything' }) });
+    iok('POST /commerce/verify → 410', vR.status === 410);
+    const cR = await fetch(`${FN}/commerce/checkout-status?session_id=cs_test_${stamp}`, { headers: authH });
+    iok('GET /commerce/checkout-status → 410', cR.status === 410);
 
-    // the entitlement is a Monitor plan, active, trial clock set
-    const entR = await fetch(`${SB_URL}/rest/v1/presence_entitlements?client_id=eq.${clientId}&product=eq.presence&select=plan,status,trial_ends_at&limit=1`, { headers: svcH });
-    const ent = (await entR.json())?.[0];
-    iok('entitlement: plan=presence_monitor, status=active, trial clock set', ent?.plan === 'presence_monitor' && ent?.status === 'active' && !!ent?.trial_ends_at);
-
-    // the site is a Monitor edition (hosts nothing) with starter rows seeded
-    const siteR = await fetch(`${SB_URL}/rest/v1/presence_sites?id=eq.${siteId}&select=edition,status&limit=1`, { headers: svcH });
-    const siteRow = (await siteR.json())?.[0];
-    iok('site: Monitor edition, ready', siteRow?.edition === 'monitor' && siteRow?.status === 'ready');
-    const brandR = await fetch(`${SB_URL}/rest/v1/presence_brand_profile?site_id=eq.${siteId}&select=site_id&limit=1`, { headers: svcH });
-    const frR = await fetch(`${SB_URL}/rest/v1/presence_first_run?site_id=eq.${siteId}&select=site_id&limit=1`, { headers: svcH });
-    iok('provisioning seeded brand profile + first-run rows', (await brandR.json())?.length === 1 && (await frR.json())?.length === 1);
-
-    // duplicate signup is refused (never silently reuses an account)
-    const dupR = await fetch(`${FN}/commerce/signup`, { method: 'POST', headers: authH, body: JSON.stringify({ email, password, business_name: 'Dup', plan: 'presence_monitor', trial: true }) });
-    iok('duplicate signup → 409 account_exists', dupR.status === 409);
-
-    // email verify (non-blocking)
-    if (signupRow?.verify_token) {
-      const vR = await fetch(`${FN}/commerce/verify`, { method: 'POST', headers: authH, body: JSON.stringify({ token: signupRow.verify_token }) });
-      iok('POST /commerce/verify marks the signup verified', vR.status === 200);
-    }
-
-    // sign in as the new customer and read their own subscription + first-run
-    const signIn = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, { method: 'POST', headers: authH, body: JSON.stringify({ email, password }) });
-    jwt = (await signIn.json())?.access_token || null;
-    iok('the new account can sign in immediately', !!jwt);
-    if (jwt) {
-      const jH = { apikey: ANON, Authorization: `Bearer ${ANON}`, 'x-dds-user-jwt': jwt, 'Content-Type': 'application/json' };
-      const subR = await fetch(`${FN}/commerce/subscription`, { headers: jH });
-      const sub = await subR.json();
-      iok('GET /commerce/subscription (authed) returns their plan', subR.status === 200 && sub?.data?.plan === 'presence_monitor');
-      const frGet = await fetch(`${FN}/commerce/first-run`, { headers: jH });
-      const fr = await frGet.json();
-      iok('GET /commerce/first-run says whether the welcome is hidden', frGet.status === 200 && fr?.data?.dismissed === false);
-    }
-
-    // billing-sync: an upgrade to Presence via a subscription event flips edition + plan
-    if (clientId) {
-      const secret = (Deno.env.get('BILLING_SYNC_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '');
-      if (secret) {
-        const evt = { type: 'customer.subscription.updated', object: { id: `sub_test_${stamp}`, customer: `cus_test_${stamp}`, status: 'active', current_period_end: 1793000000, cancel_at_period_end: false, metadata: { client_id: clientId, plan: 'presence', term: 'monthly', founder: 'false' } } };
-        const bsR = await fetch(`${FN}/commerce/billing-sync`, { method: 'POST', headers: { ...authH, 'x-commerce-secret': secret }, body: JSON.stringify(evt) });
-        iok('POST /commerce/billing-sync (subscription.updated) syncs the entitlement', bsR.status === 200);
-        const ent2R = await fetch(`${SB_URL}/rest/v1/presence_entitlements?client_id=eq.${clientId}&product=eq.presence&select=plan,status,stripe_subscription_id&limit=1`, { headers: svcH });
-        const ent2 = (await ent2R.json())?.[0];
-        iok('entitlement now reflects the synced subscription', ent2?.plan === 'presence' && ent2?.stripe_subscription_id === `sub_test_${stamp}`);
-      } else {
-        iok('billing-sync tier skipped (no BILLING_SYNC_SECRET/SCHEDULER_SECRET)', true);
-      }
-    }
     // billing-sync rejects an unsigned caller
     const badBs = await fetch(`${FN}/commerce/billing-sync`, { method: 'POST', headers: authH, body: JSON.stringify({ type: 'noop', object: {} }) });
     iok('billing-sync without the shared secret → 403', badBs.status === 403);
-
   } finally {
     // teardown — leave the environment as clean as we found it
-    try {
-      if (siteId) await fetch(`${SB_URL}/rest/v1/presence_sites?id=eq.${siteId}`, { method: 'DELETE', headers: svcH });
-      if (clientId) {
-        await fetch(`${SB_URL}/rest/v1/presence_entitlements?client_id=eq.${clientId}`, { method: 'DELETE', headers: svcH });
-        await fetch(`${SB_URL}/rest/v1/clients?id=eq.${clientId}`, { method: 'DELETE', headers: svcH });
-      }
-      await fetch(`${SB_URL}/rest/v1/presence_signups?email=eq.${encodeURIComponent(email)}`, { method: 'DELETE', headers: svcH });
-      if (authUserId) await fetch(`${SB_URL}/auth/v1/admin/users/${authUserId}`, { method: 'DELETE', headers: svcH });
-    } catch (_) { /* best-effort */ }
+    try { if (knownId) await fetch(`${SB_URL}/auth/v1/admin/users/${knownId}`, { method: 'DELETE', headers: svcH }); } catch (_) { /* best-effort */ }
   }
 
   const ip = ires.filter((r) => r.p).length;

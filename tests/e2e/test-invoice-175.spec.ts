@@ -27,6 +27,7 @@ async function openInvoices(page: Page, answer: Answer, hold?: Promise<void>) {
   });
   await page.goto('/invoices.html');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Invoices');
+  if (await page.locator('.dds-ph-dots').isVisible()) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone the test waits behind the header's ⋯
   return Object.assign(sent, { answer });
 }
 
@@ -35,7 +36,8 @@ test.describe('Invoices: send a test to myself (builder list item 175)', () => {
     let release: () => void = () => {};
     const hold = new Promise<void>((r) => { release = r; });
     const sent = await openInvoices(page, { status: 200, body: { data: { sent_to: 'owner@studio.example', stripe: true } } }, hold);
-    await expect(page.locator('.head .tools button')).toHaveText(['Send a test to myself', 'Download CSV', 'For your bookkeeper', 'Send an invoice']);   // sales item 105 added the bookkeeper's export
+    // builder item 165: the page header's actions — the test first, Send an invoice the one filled; on a phone the first two wait behind ⋯
+    await expect(page.locator('header.dds-ph .dds-ph-acts button:not(.dds-ph-dots)')).toHaveText(['Send a test to myself', 'Download CSV', 'For your bookkeeper', 'Send an invoice']);   // sales item 105 added the bookkeeper's export
     const btn = page.getByRole('button', { name: 'Send a test to myself' });
     await btn.click();
     await expect(page.locator('#testInvBtn')).toHaveText('Sending…');
@@ -68,7 +70,9 @@ test.describe('Invoices: send a test to myself (builder list item 175)', () => {
     await openInvoices(page, { status: 200, body: { data: { sent_to: 'owner@studio.example', stripe: true } } });
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
     if ((page.viewportSize()?.width || 1280) < 768) {
-      for (const b of await page.locator('.head .tools button').all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      // builder item 165: Send an invoice is under the title; the other two wait behind ⋯ in a sheet (open now)
+      expect((await page.locator('#sendBtn').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      for (const b of await page.locator('#phMore button').all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     }
   });
 });

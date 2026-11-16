@@ -95,6 +95,10 @@ export function lifecycleEventsFor(e: EntitlementView, nowIso: string): Lifecycl
   return out;
 }
 
+// Where an owner picks or changes a plan: Settings → Your plan on the app (builder item
+// 199; the marketing site's old price page has no plans).
+const PLAN_URL = 'https://app.davisdigitalstudio.com/settings.html#billing';
+
 /** The calm copy — one voice for the notice card and the email. Pure. */
 export function lifecycleCopy(kind: LifecycleKind, businessName: string): { headline: string; body: string; subject: string; html: string } {
   const name = businessName || 'your business';
@@ -103,13 +107,13 @@ export function lifecycleCopy(kind: LifecycleKind, businessName: string): { head
       headline: 'Your trial ends in a few days',
       body: 'Everything you’ve built stays exactly as it is when you pick a plan. If you do nothing, editing pauses at the end of the trial — your work is kept and your data is always yours to download.',
       subject: 'Your Studio OS trial ends in a few days',
-      html: `<p>Your trial for <strong>${name}</strong> ends in a few days.</p><p>Pick a plan and everything continues exactly as-is. If you do nothing, editing pauses — nothing is deleted, and your data is always yours to download from the workspace.</p><p><a href="https://davisdigitalstudio.com/pricing.html">See plans</a></p>`,
+      html: `<p>Your trial for <strong>${name}</strong> ends in a few days.</p><p>Pick a plan and everything continues exactly as-is. If you do nothing, editing pauses — nothing is deleted, and your data is always yours to download from the workspace.</p><p><a href="${PLAN_URL}">Open Your plan</a></p>`,
     };
     case 'trial_ended': return {
       headline: 'Your trial has ended',
       body: 'Editing is paused, but nothing is lost — your site and everything you wrote are kept. Pick a plan to continue, or download everything you own any time.',
       subject: 'Your Studio OS trial has ended — your work is kept',
-      html: `<p>The trial for <strong>${name}</strong> has ended, so editing is paused.</p><p>Nothing was deleted: your site and everything you wrote are kept. Pick a plan to pick up where you left off — or download everything you own from the workspace, any time.</p><p><a href="https://davisdigitalstudio.com/pricing.html">See plans</a></p>`,
+      html: `<p>The trial for <strong>${name}</strong> has ended, so editing is paused.</p><p>Nothing was deleted: your site and everything you wrote are kept. Pick a plan to pick up where you left off — or download everything you own from the workspace, any time.</p><p><a href="${PLAN_URL}">Open Your plan</a></p>`,
     };
     case 'payment_trouble': return {
       headline: 'A payment didn’t go through',
@@ -133,7 +137,7 @@ export function lifecycleCopy(kind: LifecycleKind, businessName: string): { head
       headline: 'Your workspace is exactly where you left it',
       body: 'It’s been about a month. Nothing was deleted — your site, words, and photos are all kept. Restart whenever you like and pick up mid-sentence.',
       subject: 'Everything is where you left it',
-      html: `<p>It’s been about a month since your subscription for <strong>${name}</strong> ended.</p><p>No pressure — just a reminder that nothing was deleted. Your site, your words, and your photos are kept, and restarting brings it all back exactly as you left it.</p><p><a href="https://davisdigitalstudio.com/pricing.html">See plans</a></p>`,
+      html: `<p>It’s been about a month since your subscription for <strong>${name}</strong> ended.</p><p>No pressure — just a reminder that nothing was deleted. Your site, your words, and your photos are kept, and restarting brings it all back exactly as you left it.</p><p><a href="${PLAN_URL}">Open Your plan</a></p>`,
     };
     case 'welcome_back': return {
       headline: 'Welcome back — everything is just as you left it',

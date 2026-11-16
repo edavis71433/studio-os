@@ -40,6 +40,11 @@ const studioContext = { data: {
   capabilities: ['edit', 'publish', 'invite', 'configure', 'view_all'], landing: '/agency.html', attention_count: 0, nav: SITES_NAV, plan_key: 'agency', upsell: null,
 } };
 const THUMB_HTML = (name: string) => `<!doctype html><html><head><style>body{margin:0;font:48px Georgia;background:#f4efe6}</style></head><body><h1 id="thumb-mark">${name} home page</h1></body></html>`;
+/** Builder item 165: on a phone the header's other actions (Cards/Table, ↻) wait behind ⋯. */
+async function headerAction(page: Page, sel: string) {
+  if ((page.viewportSize()?.width || 0) < 761 && !(await page.locator(sel).isVisible())) await page.locator('header.dds-ph .dds-ph-dots').click();
+  await page.locator(sel).click();
+}
 const json = (body: unknown, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
 /** The app plus the Sites routes. The harness matches by prefix, so the routes under
@@ -100,8 +105,8 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('.scard')).toHaveCount(3);
     await expect(page.locator('.lmeta')).toContainText('3 sites · Pinned first, then the ones you opened last');
-    await expect(page.locator('.tabs a[aria-current="page"]')).toHaveText('Sites');
-    await expect(page.locator('.tabs a[href="/domains.html"]')).toHaveText('Domains');
+    await expect(page.locator('.dds-ph-tabs a[aria-current="page"]')).toHaveText('Sites');
+    await expect(page.locator('.dds-ph-tabs a[href="/domains.html"]')).toHaveText('Domains');
     const isMobile = (page.viewportSize()?.width || 1280) < 761;
     if (!isMobile) await expect(page.locator('.dds-nav .sec.active > a[data-href="/sites.html"]')).toHaveAttribute('aria-current', 'page');
     expect(errors).toEqual([]);
@@ -120,7 +125,8 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(dlg.locator('h3')).toHaveText('New site');
     await expect(dlg).toContainText('Nobody is emailed until you invite the owner.');
     await expect(dlg.locator('input[type="email"]')).toHaveCount(0);
-    await expect(dlg.locator('#new-from-wrap')).toBeHidden();        // no kits saved: just the business name
+    await expect(dlg.locator('#new-tpl-wrap')).toBeHidden();         // no kits saved: no templates…
+    await expect(dlg.locator('#new-kit-wrap')).toBeHidden();         // …and no starter kits
     await dlg.locator('#new-submit').click();                       // no name yet → nothing sent
     expect(t.writes).toHaveLength(0);
     await dlg.locator('#new-biz').fill('Juniper Floral Co.');
@@ -135,17 +141,18 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(dlg).toBeHidden();
   });
 
-  test('+ New site from a starter kit: a blank site first, the kits after; a kit that didn’t apply can be tried again', async ({ page }) => {
+  // item 198: a starter kit is picked under "Bring a starter kit too", beside the design
+  test('+ New site from a starter kit: none by default, then the kit; a kit that didn’t apply can be tried again', async ({ page }) => {
     const t = await openSites(page, [BISTRO, CAFE], {
       kits: { data: [{ id: 'k1', name: 'Florist starter', industry_key: 'florist', created_from_site: 's1', created_by: 'owner@studio.example', created_at: '2026-11-01T00:00:00Z' }] },
       made: { data: { site_id: 's-made', client_id: 'c-made', name: 'Willow Florist', kit: { id: 'k1', name: 'Florist starter', failed: true } } },
     });
     await page.getByRole('button', { name: '+ New site' }).click();
     const dlg = page.locator('#newDlg');
-    await expect(dlg.locator('#new-from .opt strong')).toHaveText(['A blank site', 'Florist starter']);
-    await expect(dlg.locator('#new-from input[value=""]')).toBeChecked();
+    await expect(dlg.locator('#new-kit option')).toHaveText(['None', 'Florist starter']);
+    await expect(dlg.locator('#new-kit')).toHaveValue('');
     await dlg.locator('#new-biz').fill('Willow Florist');
-    await dlg.locator('#new-from .opt', { hasText: 'Florist starter' }).click();
+    await dlg.locator('#new-kit').selectOption('k1');
     await dlg.locator('#new-submit').click();
     const done = dlg.locator('#new-done');
     await expect(done).toContainText('Willow Florist’s site is ready');
@@ -158,7 +165,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     expect(t.writes[1].body).toEqual({ site_id: 's-made' });
   });
 
-  // items 135 + 145 together: + New site lists templates beside starter kits, each saying what it brings
+  // items 135 + 145 together: + New site lists templates beside the designs, each saying what it brings (item 198)
   test('+ New site from a template: it says what a template brings, then the pages that came across', async ({ page }) => {
     const t = await openSites(page, [BISTRO, CAFE], {
       kits: { data: [
@@ -169,11 +176,11 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     });
     await page.getByRole('button', { name: '+ New site' }).click();
     const dlg = page.locator('#newDlg');
-    await expect(dlg.locator('#new-from .opt', { hasText: 'Realty — three pages' })).toContainText('Template: 3 pages with their sections and photos, the menu and the look, plus services, FAQs, voice and colors.');
-    await expect(dlg.locator('#new-from .opt', { hasText: 'Florist starter' })).toContainText('Starter kit: the services, FAQs, voice and colors it was saved with.');
-    await expect(dlg).toContainText('A template brings a saved site’s pages, sections, photos, menu and look');
+    await expect(dlg.locator('#new-tpls .tcard', { hasText: 'Realty — three pages' })).toContainText('Template: 3 pages with their sections and photos, the menu and the look, plus services, FAQs, voice and colors.');
+    await expect(dlg.locator('#new-kit option')).toHaveText(['None', 'Florist starter']);
     await dlg.locator('#new-biz').fill('Oak Lane Realty');
-    await dlg.locator('#new-from .opt', { hasText: 'Realty — three pages' }).click();
+    await dlg.locator('#new-tpls .tcard', { hasText: 'Realty — three pages' }).click();
+    await expect(dlg.locator('#new-kit-wrap')).toBeHidden();   // a template brings its own setup
     await dlg.locator('#new-submit').click();
     await expect(dlg.locator('#new-kit-line')).toHaveText('It starts from the Realty — three pages: 3 pages and 14 sections, 9 photos, 4 services, 2 FAQs, the voice, the colors.');
     expect(t.writes[0].body).toEqual({ business_name: 'Oak Lane Realty', kit_id: 't1' });
@@ -331,7 +338,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   // Published leave it (who can edit stays on each card); sites-numbers.spec.ts covers the numbers
   test('table: Site · Owner · Health · Visits · Search clicks · Plan · People · Last updated · Tags, sortable, and the choice is remembered', async ({ page }) => {
     await openSites(page);
-    await page.locator('#dispTable').click();
+    await headerAction(page, '#dispTable');
     const table = page.locator('#tableHost table');
     await expect(table.locator('thead .thb')).toHaveText(['Site', 'Owner', 'Health', 'Visits', 'Search clicks', 'Plan', 'People', 'Last updated', 'Tags']);   // builder item 53: Owner and People
     await expect(table.locator('tbody tr')).toHaveCount(3);
@@ -351,7 +358,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(page.locator('#dispTable')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#tableHost table')).toBeVisible();
     await expect(page.locator('#grid')).toBeHidden();               // …also when the page opens on the table
-    await page.locator('#dispCards').click();
+    await headerAction(page, '#dispCards');
     await expect(page.locator('#tableHost')).toBeHidden();
     await expect(page.locator('.scard:visible')).toHaveCount(3);
   });
@@ -388,7 +395,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await card.locator('[data-menu]').click();
     await expect(page.locator('#rowMenuHost [role="menuitem"]')).toHaveText(['Pin to top', 'View live site']);
     await page.keyboard.press('Escape');
-    await page.locator('#dispTable').click();
+    await headerAction(page, '#dispTable');
     await expect(page.locator('#tableHost tr[data-row]')).toHaveCount(0);           // rows don't open a client either
   });
 
@@ -509,21 +516,20 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   });
 
   // Nov 11 2026: on a phone the h1 gave its width up to the buttons beside it and "Sites"
-  // was drawn over the Cards/Table switch. The letters spill out of a squeezed h1, so its
-  // own box isn't enough: the words are measured too.
-  test('phone width: the title and the Cards/Table switch never overlap', async ({ page }) => {
+  // was drawn over the Cards/Table switch. Builder item 165: on a phone the switch waits behind
+  // ⋯ in the one page header; the title, its line, ⋯ and + New site never overlap.
+  test('phone width: the title never shares its room with the buttons', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await openSites(page);
-    await expect(page.locator('.lhead .seg')).toBeVisible();
+    await expect(page.locator('header.dds-ph h1')).toBeVisible();
     const b = await page.evaluate(() => {
       const box = (r: DOMRect) => ({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
-      const h1 = document.getElementById('pagehead')!, words = document.createRange();
-      words.selectNodeContents(h1);
-      return { h1: box(h1.getBoundingClientRect()), words: box(words.getBoundingClientRect()), seg: box(document.querySelector('.lhead .seg')!.getBoundingClientRect()) };
+      const words = document.createRange(); words.selectNodeContents(document.getElementById('pagehead')!);
+      return { words: box(words.getBoundingClientRect()), dots: box(document.querySelector('.dds-ph-dots')!.getBoundingClientRect()), add: box(document.getElementById('newSiteBtn')!.getBoundingClientRect()) };
     });
-    const apart = (a: typeof b.seg, z: typeof b.seg) => a.right <= z.left || z.right <= a.left || a.bottom <= z.top || z.bottom <= a.top;
-    expect(apart(b.h1, b.seg)).toBe(true);
-    expect(apart(b.words, b.seg)).toBe(true);
+    const apart = (a: typeof b.dots, z: typeof b.dots) => a.right <= z.left || z.right <= a.left || a.bottom <= z.top || z.bottom <= a.top;
+    expect(apart(b.words, b.dots)).toBe(true);
+    expect(apart(b.words, b.add)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   });
 });
@@ -615,6 +621,8 @@ test.describe('Sites: the pages travel (item 145)', () => {
     await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Duplicate site' }).click();
     const dlg = page.locator('#dupDlg');
     await expect(dlg).toContainText('this one’s pages and sections, with their words and photos, the menu and the look');
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));   // as below: let the dialog's own 20ms move to its first box land first
+    await expect(dlg.locator('#dup-biz')).toBeFocused();
     await dlg.locator('#dup-biz').fill('Bistro Twelve');
     await dlg.locator('#dup-email').fill('sam@bistrotwelve.example');
     await dlg.locator('#dup-submit').click();
@@ -688,7 +696,7 @@ test.describe('Domains (builder list item 52)', () => {
     await installApp(page, { api: { '/portal/context': studioContext, '/agency/domains': DOMAINS } });
     await page.goto('/domains.html');
     await expect(page.getByRole('heading', { level: 1, name: 'Domains' })).toBeVisible();
-    await expect(page.locator('.tabs a[aria-current="page"]')).toHaveText('Domains');
+    await expect(page.locator('.dds-ph-tabs a[aria-current="page"]')).toHaveText('Domains');
     await expect(page.locator('.lmeta')).toContainText('4 domains · 2 expiring or expired');
     const rows = page.locator('table[aria-label="Domains"] tbody tr');
     await expect(rows.locator('td:first-child .dom')).toHaveText(['gone.example', 'bistro.example', 'garage.example', 'mystudio.example']);
@@ -715,7 +723,7 @@ test.describe('Domains (builder list item 52)', () => {
     await expect(page.locator('table[aria-label="Domains"] tbody tr')).toHaveCount(1);
     await expect(page.locator('#search')).toBeFocused();
     await expect(page.locator('#search')).toHaveValue('registrar c');
-    await expect(page.locator('.tabs a[href="/sites.html"]')).toHaveText('Sites');
+    await expect(page.locator('.dds-ph-tabs a[href="/sites.html"]')).toHaveText('Sites');
   });
 
   test('no domains yet, a failed read, and a phone', async ({ page }) => {
@@ -736,7 +744,7 @@ test.describe('Sites: the bug hunt fixes (A1, A10)', () => {
   test('A1 — after Refresh, one click on a number or a pill turns its filter on, and one more turns it off', async ({ page }) => {
     await openSites(page);
     await expect(page.locator('.scard')).toHaveCount(3);
-    await page.locator('#refreshBtn').click();                     // one reload: two listeners used to cancel each other out
+    await headerAction(page, '#refreshBtn');                     // one reload: two listeners used to cancel each other out
     await expect(page.locator('.scard')).toHaveCount(3);
     const band = page.locator('.sband');
     await band.locator('[data-filter="live"]').click();
@@ -753,6 +761,10 @@ test.describe('Sites: the bug hunt fixes (A1, A10)', () => {
     await page.locator('.scard[data-site="s1"] [data-menu]').click();
     await page.locator('#rowMenuHost').getByRole('menuitem', { name: 'Duplicate site' }).click();
     const dlg = page.locator('#dupDlg');
+    // the dialog moves you to its first box 20ms after it opens (openDuplicate's timer); a page timer set now runs after it,
+    // so the typing below can't be pulled back into the first box halfway through
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));
+    await expect(dlg.locator('#dup-biz')).toBeFocused();
     await dlg.locator('#dup-biz').fill('Bistro Twelve');
     await dlg.locator('#dup-email').fill('sam@bistrotwelve.example');
     await dlg.locator('#dup-submit').click();
@@ -910,6 +922,7 @@ test.describe('Domains: the page does things (item 162)', () => {
 
   test('Download gives the list as a spreadsheet, in its order', async ({ page }) => {
     await openDomains(page);
+    if (await page.locator('.dds-ph-dots').isVisible()) await page.locator('.dds-ph-dots').click();   // builder item 165: on a phone Download waits behind ⋯
     const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('#dlBtn').click()]);
     expect(dl.suggestedFilename()).toBe('domains.csv');
     const text = await new Promise<string>(async (resolve, reject) => { const s = await dl.createReadStream(); let b = ''; s.on('data', (c) => { b += c; }); s.on('end', () => resolve(b)); s.on('error', reject); });

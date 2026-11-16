@@ -29,9 +29,7 @@
   .wrap{max-width:1040px;margin:0 auto;padding:var(--dds-s5,20px) var(--dds-s7,32px) 90px}
   svg{display:block}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
-  .toprow{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--dds-s4,16px);flex-wrap:wrap}
-  h1.title{font-family:var(--serif);font-weight:500;font-size:28px;letter-spacing:-.01em;margin:0;line-height:1.15}
-  .subline{color:var(--soft);font-size:13px;margin:var(--dds-s1,4px) 0 0;max-width:72ch}
+  /* the page header is the shared one (shell.css .dds-ph, builder item 165) */
   .btn{display:inline-flex;align-items:center;gap:var(--dds-s2,8px);height:32px;padding:0 var(--dds-s3,12px);border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;text-decoration:none;transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
   .btn:hover{border-color:var(--line-strong);background:var(--bg)}
   .btn.primary{background:var(--p);border-color:var(--p);color:#fff} .btn.primary:hover{background:var(--p-deep);border-color:var(--p-deep)}
@@ -95,17 +93,17 @@
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:var(--dds-r-lg,10px);font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none;max-width:90%;text-align:center}
   .toast.show{opacity:1}
   @media (max-width:900px){.setgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-  @media (max-width:640px){.wrap{padding:16px 16px 90px}.setgrid{grid-template-columns:minmax(0,1fr)}.askbox{flex-wrap:wrap}.askbox input{flex-basis:100%}h1.title{font-size:24px}}
+  @media (max-width:640px){.wrap{padding:16px 16px 90px}.setgrid{grid-template-columns:minmax(0,1fr)}.askbox{flex-wrap:wrap}.askbox input{flex-basis:100%}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
-  <header class="toprow">
-    <div>
-      <h1 class="title">How can we help?</h1>
-      <p class="subline">Ask how to do something, in your own words. The answer says where it’s done and takes you there.</p>
-    </div>
+  <!-- builder item 165: the one header; its title is the menu's name for the page, and builder item 202's
+       question is its one line -->
+  <header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" data-ic="help" aria-hidden="true"></span>
+    <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Help</h1></div>
+      <p class="dds-ph-line">How can we help?</p></div></div>
   </header>
 
   <form class="askbox" id="askForm">

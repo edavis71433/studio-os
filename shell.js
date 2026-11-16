@@ -981,6 +981,7 @@
     files: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',
     analytics: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 5-6"/>',
     website: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    sites: '<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 21h8"/>',   // builder item 165: the phone bar's Sites, as drawn
     studio: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
     client: '<path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4"/>',
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
@@ -1349,8 +1350,10 @@
       // The App Launcher waffle (the burger's successor at EVERY width): CLICK-
       // invoked only (§11.5 — the one nav element that never opens on hover);
       // its panel is the full grouped destination list the burger sheet held.
-      '<button class="dds-ic dds-waffle" id="dds-waffle" aria-label="App Launcher" aria-haspopup="true" aria-expanded="false" aria-controls="dds-drawer"><span class="wic" aria-hidden="true"></span></button>' +
-      brandHtml + roleCardHtml() +
+      // Builder item 165: its name is Menu, for screen readers too; on a phone the
+      // bottom bar's Menu is the one Menu (shell.css hides this there).
+      '<button class="dds-ic dds-waffle" id="dds-waffle" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="dds-drawer"><span class="wic" aria-hidden="true"></span></button>' +
+      brandHtml + roleCardHtml() +   // builder item 220: the role card beside the brand
       (canCreate() ? '<button type="button" class="dds-create" id="dds-create" aria-haspopup="dialog" aria-expanded="false" aria-keyshortcuts="c">' + icon('plus') + '<span class="lbl">Create</span><kbd aria-hidden="true">C</kbd></button>' : '') +
       '<nav class="dds-nav" aria-label="Workspace">' + navHtml + '</nav>' +
       '<div class="dds-search" id="dds-search" role="button" tabindex="0" aria-label="Search"><span>' + icon('search', 'nic') + '</span><span>Search</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K') + '</kbd></div>' +
@@ -1668,18 +1671,29 @@
   }
   document.addEventListener('click', function () { if (whichPop()) closeWhich(false); });
 
-  // ── mobile bottom bar (≤760px): the daily loop in one tap — Today · Inbox ·
-  //    Menu. presence.html keeps its own dock, so we stay out of its way. ──
+  // ── mobile bottom bar (≤760px). presence.html keeps its own dock, so we stay
+  //    out of its way. ──
+  // Builder item 165 (Nov 2026, drawn in Figma 296:29): websites are a third of the
+  // product and were two taps away, behind a nine-dot button screen readers called
+  // "App Launcher". The bar is now, everywhere it shows:
+  //   a studio at studio level   Home · Sites · + · Inbox · Menu
+  //   a studio inside a client   Overview · Website · Messages · Menu
+  //   an owner, their own site   Home · Website · Inbox · Menu (the + too, once owners may create)
+  //   a studio's client          Updates · Menu
+  // Menu opens the whole list as a sheet: the same places as the sidebar on a
+  // computer, Pipeline and Customers included. A place the menu doesn't draw (the
+  // studio hid it in Settings › Your menu) isn't on the bar either, and the + shows
+  // only for whoever may create.
   function mountMobileBar(nav, activeKey, att) {
     if (location.pathname.indexOf('/presence') === 0) return;
     var isReviewer = (CTX && CTX.site_role === 'client_reviewer') || (CTX && CTX.is_managed_client);
     var old = document.getElementById('dds-mbar'); if (old) old.remove();
     var bar = document.createElement('nav');
     bar.id = 'dds-mbar'; bar.setAttribute('aria-label', 'Quick navigation');
-    // Oct 2026 nav cut: the bar follows the same list as the menu. Inside a
-    // client the first item is the client's (Overview) and the second is their
+    // Inside a client the first item is the client's (Overview) and the inbox is their
     // Messages; at studio level / for an owner it is Home (the landing) · Inbox.
     var scopedNow = !!(CTX && CTX.scope && CTX.scope.name && CTX.is_agency);
+    var studioLevel = !!(CTX && CTX.is_agency) && !scopedNow;
     var firstPrimary = null, inboxItem = null, inboxHidden = false;
     (nav || []).forEach(function (s) {
       var vis = visibleItems(s);
@@ -1688,42 +1702,34 @@
       // bug hunt C17: the studio hid Inbox in Settings › Your menu (its items come ⌘K-only)
       ((s && s.items) || []).forEach(function (i) { if (i && i.hidden && i.key === 'inbox' && s.key === 'inbox') inboxHidden = true; });
     });
+    // the first drawn item of a section the menu draws (null when it is hidden or absent)
+    var first = function (key) { var f = null; (nav || []).forEach(function (s) { if (!f && s.key === key) f = visibleItems(s)[0] || null; }); return f; };
     var home = isReviewer ? { href: '/client.html', label: 'Updates' }
       : (scopedNow && firstPrimary) ? { href: firstPrimary.href, label: firstPrimary.label }
       : { href: (CTX && CTX.landing) || '/today.html', label: 'Home' };
     // the fallback stands in for a menu that names no Inbox at all, never for one the studio hid
     var inbox = isReviewer || window.ddsLacks('business') ? null : inboxItem ? { href: inboxItem.href, label: inboxItem.label } : inboxHidden ? null : { href: '/inbox.html', label: 'Inbox' };   // item 220: none for a Designer
+    // the websites: every client's site (Sites) for a studio, the one site (Website) for
+    // an owner or inside a client. A studio's own site is a utility, never this place.
+    var siteItem = isReviewer ? null : studioLevel ? first('sites') : first('website');
+    var site = siteItem ? { href: siteItem.href, label: studioLevel ? siteItem.label : 'Website', key: studioLevel ? 'sites' : 'website' } : null;
     var herePath = normalizePath(location.pathname);
     var cur = function (href) { return normalizePath(href) === herePath ? ' aria-current="page"' : ''; };
     // Look refresh E: an icon over each word (the words stay the names)
-    var homeA = '<a href="' + esc(withScope(home.href)) + '"' + cur(home.href) + '>' + icon(isReviewer ? 'messages' : 'home') + '<span class="mlbl">' + esc(home.label) + '</span></a>';
+    var homeA = '<a data-mbar="home" href="' + esc(withScope(home.href)) + '"' + cur(home.href) + '>' + icon(isReviewer ? 'messages' : 'home') + '<span class="mlbl">' + esc(home.label) + '</span></a>';
+    var siteA = site ? '<a data-mbar="' + site.key + '" href="' + esc(withScope(site.href)) + '"' + cur(site.href) + '>' + icon(site.key) + '<span class="mlbl">' + esc(site.label) + '</span></a>' : '';
     var inboxA = inbox ? '<a data-mbar="inbox" href="' + esc(withScope(inbox.href)) + '"' + cur(inbox.href) + '>' + icon('inbox') + '<span class="mlbl">' + esc(inbox.label) + (att > 0 ? ' <span class="mdot">' + (att > 9 ? '9+' : att) + '</span>' : '') + '</span></a>' : '';
-    // The bold redesign (item 70): a studio at studio level gets the sales loop,
-    // Home · Inbox · + · Pipeline · Customers. The + opens Create; the rest of
-    // the menu is the top bar's App Launcher, which opens the same drawer.
-    var first = function (key) { var f = null; (nav || []).forEach(function (s) { if (!f && s.key === key) f = visibleItems(s)[0] || null; }); return f; };
-    var pipe = canCreate() ? first('pipeline') : null, custs = pipe ? first('customers') : null;
-    if (pipe && custs) {
-      bar.className = 'sales';
-      bar.innerHTML = homeA + inboxA +
-        '<button type="button" id="dds-mbar-create" class="mplus" aria-label="Create" aria-haspopup="dialog" aria-expanded="false">' + icon('plus') + '</button>' +
-        '<a href="' + esc(withScope(pipe.href)) + '"' + cur(pipe.href) + '>' + icon('pipeline') + '<span class="mlbl">' + esc(pipe.label) + '</span></a>' +
-        '<a href="' + esc(withScope(custs.href)) + '"' + cur(custs.href) + '>' + icon('customers') + '<span class="mlbl">' + esc(custs.label) + '</span></a>';
-      document.body.appendChild(bar);
-      var plus = document.getElementById('dds-mbar-create');
-      plus.addEventListener('click', function (e) { e.stopPropagation(); openCreate('', plus, e.detail === 0); });
-      return;
-    }
-    // bug hunt A3: a studio that hid Pipeline or Customers in Your menu still creates;
-    // on a phone the + is the only Create button, so it stays (Home · Inbox · + · Menu)
+    // The + opens Create, in the middle; bug hunt A3: a studio that hid Pipeline or
+    // Customers in Your menu still creates, and on a phone the + is its only Create button
     var plusHere = canCreate();
+    var plusB = plusHere ? '<button type="button" id="dds-mbar-create" class="mplus" aria-label="Create" aria-haspopup="dialog" aria-expanded="false">' + icon('plus') + '</button>' : '';
+    // "Menu", the word, for screen readers too (never "App Launcher")
+    var menuB = '<button type="button" id="dds-mbar-menu" aria-expanded="false" aria-controls="dds-drawer" aria-haspopup="true">' + icon('menu') + '<span class="mlbl">Menu</span></button>';
     if (plusHere) bar.className = 'plus';
-    bar.innerHTML = homeA + inboxA +
-      (plusHere ? '<button type="button" id="dds-mbar-create" class="mplus" aria-label="Create" aria-haspopup="dialog" aria-expanded="false">' + icon('plus') + '</button>' : '') +
-      '<button type="button" id="dds-mbar-menu" aria-expanded="false" aria-controls="dds-drawer" aria-haspopup="true">' + icon('menu') + '<span class="mlbl">Menu</span></button>';
+    bar.innerHTML = homeA + siteA + plusB + inboxA + menuB;
     document.body.appendChild(bar);
-    var plus2 = document.getElementById('dds-mbar-create');
-    if (plus2) plus2.addEventListener('click', function (e) { e.stopPropagation(); openCreate('', plus2, e.detail === 0); });
+    var plus = document.getElementById('dds-mbar-create');
+    if (plus) plus.addEventListener('click', function (e) { e.stopPropagation(); openCreate('', plus, e.detail === 0); });
     var mb = document.getElementById('dds-mbar-menu');
     if (mb) mb.addEventListener('click', function (e) {
       e.stopPropagation(); toggleDrawer(nav, 'dds-mbar-menu');
@@ -2578,19 +2584,25 @@
     toggle: togglePush,
   };
 
-  // ── the App Launcher panel (also the mobile nav sheet) ──────────────────────
-  // ONE element serves both: ≥761px it is the waffle's click-invoked popover
-  // (every destination grouped by section — the burger's old mega-list, so the
-  // flat bar can show fewer top-level entries with nothing lost); ≤760px it is
-  // the same full-screen sheet the burger opened, now opened by the waffle or
-  // the bottom bar's Menu — a 1:1 capability replacement.
+  // ── Menu: the whole list of places (builder item 165, Figma 296:109) ─────────
+  // ONE element serves both: ≥761px it is the sidebar Menu button's click-invoked
+  // popover (every place grouped by section — the burger's old mega-list);
+  // ≤760px it is a sheet that rises from the bottom when the bottom bar's Menu is
+  // pressed: "Menu" over a row per place, each with its icon — the same places as
+  // the sidebar on a computer. The bar stays above the sheet, so Menu closes what it
+  // opened, and a tap on the dimmed page above it only closes it.
   var drawer, drawerOpener = '';
   function ensureDrawer() {
     if (drawer) return;
-    drawer = el('<div class="dds-drawer" id="dds-drawer" role="navigation" aria-label="Workspace menu"></div>');
+    drawer = el('<div class="dds-drawer" id="dds-drawer" role="navigation" aria-label="Menu"><div class="dsheet"><h2 class="dh">Menu</h2><div class="dlist"></div></div></div>');
     // clicks INSIDE the panel (links navigate) must not bubble to the
-    // document-level outside-click closer
-    drawer.addEventListener('click', function (e) { e.stopPropagation(); });
+    // document-level outside-click closer; the dimmed page around the phone's
+    // sheet is the panel's own box, and a tap there closes it without reaching
+    // whatever is underneath
+    drawer.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (e.target === drawer) { closeDrawer(); var b = document.getElementById(drawerOpener || 'dds-waffle'); if (b) b.focus(); }
+    });
     // slice-2 popup contract: arrows move between the panel's links
     drawer.addEventListener('keydown', function (e) {
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
@@ -2619,6 +2631,7 @@
   function closeDrawer() {
     if (drawer && drawer.classList.contains('open')) {
       drawer.classList.remove('open');
+      document.documentElement.classList.remove('dds-menu-on');
       setExpanded('dds-waffle', false); setExpanded('dds-mbar-menu', false);
     }
   }
@@ -2640,15 +2653,19 @@
     var secKey = activeSectionKey(nav, activeKey);
     // Oct 2026 nav cut: the drawer follows the menu's lists — hidden (⌘K-only)
     // items are not drawn, and a group with ONE item of the same name needs no
-    // heading over it (eight "Today / Today" pairs read as noise on a phone).
+    // heading over it (eight "Today / Today" pairs read as noise on a phone);
+    // such a row carries its place's icon, as the sidebar does.
     var html = (nav || []).map(function (s) {
       var vis = visibleItems(s);
       if (!vis.length) return '';
-      var heading = (vis.length === 1 && vis[0].label === s.label) ? '' : '<p class="t">' + esc(s.label) + '</p>';
-      return '<div class="g' + (s.key === secKey ? ' active' : '') + (s.utility ? ' util' : '') + '">' + heading + vis.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + esc(i.label) + '</a>'; }).join('') + '</div>';
+      var one = vis.length === 1 && vis[0].label === s.label;
+      var heading = one ? '' : '<p class="t">' + esc(s.label) + '</p>';
+      return '<div class="g' + (s.key === secKey ? ' active' : '') + (s.utility ? ' util' : '') + '">' + heading + vis.map(function (i) { return '<a href="' + esc(withScope(i.href)) + '" class="' + (i.key === activeKey ? 'here' : '') + '"' + (i.key === activeKey ? ' aria-current="page"' : '') + '>' + (one ? icon(s.key) : '') + '<span class="dl">' + esc(i.label) + '</span></a>'; }).join('') + '</div>';
     }).join('');
     ensureDrawer();
-    drawer.innerHTML = (sidebarMode() ? '' : roleCardHtml(true)) + html; drawer.classList.add('open');   // builder item 220: a phone's Menu says the role too
+    drawer.querySelector('.dlist').innerHTML = (sidebarMode() ? '' : roleCardHtml(true)) + html;   // builder item 220: a phone's Menu says the role too
+    drawer.classList.add('open');
+    document.documentElement.classList.add('dds-menu-on');
     setExpanded('dds-waffle', true); setExpanded('dds-mbar-menu', true);
     var f = drawer.querySelector('a'); if (f) f.focus();
   }
@@ -2837,11 +2854,13 @@
     return [
       { sel: ['.dds-nav .sec > [data-href^="/today"]', '.dds-nav .sec > [data-href^="/agency"]', '#dds-mbar a[href^="/today"]', '#dds-mbar a[href^="/agency"]'], title: 'Home', text: 'This is your home — the one page that tells you what’s changed and what needs you. Nothing here is urgent by surprise.' },
       { sel: ['#dds-create', '#dds-mbar-create'], title: 'Create', text: 'Log a call, add a deal, send an invoice or a proposal — from any page. You pick who inside the form, so there’s no hunting for their page first.' },
-      { sel: ['.dds-nav .sec > button[data-sec="website"]', '.dds-nav .sec > [data-href^="/presence"]', '#dds-mbar-menu'], title: 'Your website', text: 'Everything about your website lives behind this one door — edit pages, update business info, and publish. Nothing goes live without your OK.', mtext: 'On a phone, Menu holds the rest — your Website (edit and publish) and your Customers live in there. Nothing goes live without your OK.' },
+      // builder item 165: on a phone the website is on the bar (Website; a studio's Sites)
+      { sel: ['.dds-nav .sec > button[data-sec="website"]', '.dds-nav .sec > [data-href^="/presence"]', '#dds-mbar a[data-mbar="website"]'], title: 'Your website', text: 'Everything about your website lives behind this one door — edit pages, update business info, and publish. Nothing goes live without your OK.' },
       { sel: ['.dds-nav .sec > button[data-sec="customers"]', '.dds-nav .sec > [data-href^="/customers"]'], title: 'Customers', text: 'Your customers and the people behind them — their deal, billing, project, files and messages on one record.' },
-      // sales item 91: a studio's tour stops at Sites too
-      { sel: ['.dds-nav .sec > [data-href^="/sites"]'], title: 'Sites', text: 'Every client’s website is a card here. + New site starts one in private; nobody is emailed until you invite the owner.' },
-      { sel: ['#dds-waffle'], title: 'App Launcher', text: 'Every part of your studio, one tap — the full list of destinations, grouped and always within reach.' },
+      // sales item 91: a studio's tour stops at Sites too; on a phone, the bar's Sites (builder item 165)
+      { sel: ['.dds-nav .sec > [data-href^="/sites"]', '#dds-mbar a[data-mbar="sites"]'], title: 'Sites', text: 'Every client’s website is a card here. + New site starts one in private; nobody is emailed until you invite the owner.' },
+      // …and Menu is called Menu, here and for screen readers (it was "App Launcher")
+      { sel: ['#dds-waffle', '#dds-mbar-menu'], title: 'Menu', text: 'Menu opens the whole list of places in one go — the same list as the menu down the side.', mtext: 'Menu opens the whole list of places — the same list as the menu down the side on a computer.' },
       { sel: ['#dds-bell'], title: 'The bell', text: 'The bell gathers what needs you — approvals, new enquiries, anything worth a look. Quiet means you’re all caught up.' },
       { sel: ['#dds-profile'], title: 'Your account', text: 'Notifications, light or dark appearance, settings, and help live here — and you can take this tour again any time.' }
     ];

@@ -255,7 +255,9 @@ let MADE;
   ok('invite: the portfolio row names the owner now', T.presence_agency_clients.find((l) => l.site_id === made.site_id).owner_email === 'june@juniper.example');
   const mail = outside.filter((o) => o.to === 'resend');
   ok('invite: exactly one email, to them, with their sign-in link', mail.length === 1 && [].concat(mail[0].body.to).join(',') === 'june@juniper.example' && /magic-link/.test(mail[0].body.html || ''));
-  ok('invite: the studio\'s history says who was invited', (T.presence_change_events || []).some((e) => e.site_id === OWN && /Invited the owner of Juniper Floral Co\./.test(e.summary || '')));
+  // item 239: this line was refused by the real change log (no 'client' kind) and never showed; an
+  // invitation is no change to the studio's website, so it is no longer written
+  ok('invite: no customer line on the studio\'s website change log', !(T.presence_change_events || []).some((e) => e.site_id === OWN && /Invited the owner/.test(e.summary || '')));
   ok('invite: the site itself is untouched (nothing published, nothing changed)', !writes.some((w) => w.table === 'presence_sites' || w.table === 'presence_publishes'));
   const again = await call(asMember(), 'POST', `/agency/sites/${made.site_id}/invite`, { email: 'other@juniper.example' });
   ok('invite: a second invitation is refused — the site has its owner', again.status === 409 && again.body.error === 'has_owner');
@@ -275,9 +277,9 @@ let MADE;
   ok('page: + New site opens the New site box (it used to send you to Home\'s Add a customer)', !/href="\/agency\.html#add"/.test(page) && /id="newDlg"/.test(page) && /\['newSiteBtn','newSiteEmpty'\]\.forEach\(id=>\{const b=\$\(id\);if\(b\)b\.addEventListener\('click',openNewSite\);\}\)/.test(page));
   const box = page.slice(page.indexOf('<dialog id="newDlg"'), page.indexOf('</dialog>', page.indexOf('<dialog id="newDlg"')));
   ok('page: the New site box asks for a business name and nothing else — no email', /id="new-biz"/.test(box) && !/type="email"/.test(box) && /Nobody is emailed until you invite the owner/.test(box));
-  ok('page: it makes the site with POST /agency/sites, and invites with /agency/sites/:id/invite', /apiSend\('POST','\/agency\/sites',\{business_name,kit_id:kit_id\|\|undefined\}\)/.test(page) && /'\/agency\/sites\/'\+encodeURIComponent\(s\.site_id\)\+'\/invite'/.test(page));
+  ok('page: it makes the site with POST /agency/sites, and invites with /agency/sites/:id/invite', /apiSend\('POST','\/agency\/sites',\{business_name,kit_id:kit_id\|\|undefined,template_slug:template_slug\|\|undefined,industry_key:industry_key\|\|undefined\}\)/.test(page) && /'\/agency\/sites\/'\+encodeURIComponent\(s\.site_id\)\+'\/invite'/.test(page));
   ok('page: the card, the ⋯ menu and the table each say No owner yet', /<b>No owner yet<\/b>Nobody has been emailed\./.test(page) && /data-invite="\$\{esc\(s\.site_id\)\}">Invite the owner<\/button>`:''\}/.test(page) && /\$\{s\.no_owner\?' · No owner yet':''\}/.test(page));
-  ok('page: #new opens the box once the page knows you may make one', /function openNewFromHash\(\)\{\s*if\(location\.hash!=='#new'\)return;/.test(page) && /render\(\);\s*openNewFromHash\(\);/.test(page));
+  ok('page: #new (and #new=<design>, item 198) opens the box once the page knows you may make one', /function openNewFromHash\(\)\{\s*const m=\/\^#new\(\?:=\(\[a-z0-9-\]\{1,60\}\)\)\?\$\/\.exec\(location\.hash\);if\(!m\)return;/.test(page) && /render\(\);\s*openNewFromHash\(\);/.test(page));
   const nav = read('supabase/functions/presence/lib/navigation.ts');
   ok('⌘K: "New site" opens it, as a search-only entry under Sites', /hid\('new_site', 'New site', '\/sites\.html#new'/.test(nav));
   const sales = read('supabase/functions/presence/routes/sales.ts');

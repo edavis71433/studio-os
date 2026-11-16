@@ -172,16 +172,17 @@ test.describe('App shell', () => {
     await expect(page.locator('.dds-nav .sec.active > a[data-href="/agency.html"]')).toHaveAttribute('aria-current', 'page');
     await expect(page.locator('#dds-ctxbar')).toHaveCount(0);                                     // no client card at studio level
     if (testInfo.project.name === 'mobile') {
-      // item 70 (the bold redesign): a studio's phone bar is the sales loop,
-      // Home · Inbox · + · Pipeline · Customers; the rest is the App Launcher
+      // builder item 165: a studio's phone bar is Home · Sites · + · Inbox · Menu (this
+      // menu has no Sites, so neither does the bar), and Menu holds the whole list,
+      // Pipeline and Customers included (phone-bar-menu-165.spec.ts draws it with Sites)
       const mbar = page.locator('#dds-mbar');
       await expect(mbar.locator('a[href^="/agency"]')).toContainText('Home');
       await expect(mbar.locator('a[href^="/inbox"]')).toContainText('Inbox');
-      await expect(mbar.locator('a[href^="/pipeline"]')).toContainText('Pipeline');
-      await expect(mbar.locator('a[href^="/customers"]')).toContainText('Customers');
+      await expect(mbar.locator('a[href^="/pipeline"]')).toHaveCount(0);
+      await expect(mbar.locator('a[href^="/customers"]')).toHaveCount(0);
       await expect(mbar.locator('#dds-mbar-create')).toBeVisible();
-      await expect(mbar.locator('#dds-mbar-menu')).toHaveCount(0);
-      await page.locator('#dds-waffle').click();
+      await expect(page.locator('#dds-waffle')).toBeHidden();
+      await mbar.locator('#dds-mbar-menu').click();
       await expect(page.locator('#dds-drawer .g a')).toHaveText(['Home', 'Inbox', 'Customers', 'Pipeline', 'Projects', 'Files', 'Your website', 'Settings']);
     }
     // a hidden child page still lights its owner: Analytics lives under Home, Visual Studio under Files
@@ -221,6 +222,7 @@ test.describe('App shell', () => {
       const mbar = page.locator('#dds-mbar');
       await expect(mbar.locator('a').first()).toHaveText('Overview');
       await expect(mbar.locator('a').first()).toHaveAttribute('href', `/today.html?client=${CLIENT}`);
+      await expect(mbar.locator('a[data-mbar="website"]')).toHaveAttribute('href', `/presence.html?client=${CLIENT}`);   // item 165: their website, on the bar
       await expect(mbar.locator('a[href^="/inbox"]')).toContainText('Messages');
       await mbar.locator('#dds-mbar-menu').click();
       await expect(page.locator('#dds-drawer .g a')).toHaveText(['Overview', 'Website', 'Record', 'Project', 'Messages', 'Files']);
@@ -253,13 +255,13 @@ test.describe('App shell', () => {
     await expect(page.locator('#dds-shell .dds-brand')).toContainText('Studio OS');
     await expect(page.locator('.dds-nav')).toHaveCount(0);
     await expect(page.locator('#dds-search')).toHaveCount(0);
-    await expect(page.locator('#dds-waffle')).toHaveCount(0); // no App Launcher signed out
+    await expect(page.locator('#dds-waffle')).toHaveCount(0); // no Menu signed out
   });
 });
 
 // ── Slice 7 — the Lightning context bar ──────────────────────────────────────
 test.describe('Context bar (slice 7)', () => {
-  test('waffle App Launcher opens the full destination list, Escape/outside click close it', async ({ page }, testInfo) => {
+  test('the sidebar’s Menu opens the full destination list, Escape/outside click close it', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile', 'desktop popover behaviour; mobile covered below');
     await installApp(page);
     await page.goto('/today.html');
@@ -592,7 +594,7 @@ test.describe('Context bar (slice 7)', () => {
     }).toBeNull();
   });
 
-  test('layers are mutually exclusive: opening the bell closes the waffle panel and vice versa', async ({ page }, testInfo) => {
+  test('layers are mutually exclusive: opening the bell closes the Menu panel and vice versa', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile', 'desktop layer behaviour');
     await installApp(page);
     await page.goto('/today.html');
@@ -614,19 +616,20 @@ test.describe('Context bar (slice 7)', () => {
     await expect(waffle).toHaveAttribute('aria-expanded', 'true');
   });
 
-  test('mobile: the bottom bar is unchanged and the waffle panel is the mobile nav', async ({ page }, testInfo) => {
+  test('mobile: the bottom bar is an owner’s Home · Website · Inbox · Menu, and Menu is the mobile nav', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'phone-only behaviour');
     await installApp(page);
     await page.goto('/today.html');
-    // the bottom bar: Home · Inbox (badge) · Menu — exactly as before slice 7
+    // builder item 165: Home · Website · Inbox (badge) · Menu
     const mbar = page.locator('#dds-mbar');
     await expect(mbar).toBeVisible();
     await expect(mbar.locator('a[href^="/today"]')).toContainText('Home');
+    await expect(mbar.locator('a[href^="/presence"]')).toContainText('Website');
     await expect(mbar.locator('a[href^="/inbox"]')).toContainText('Inbox');
     await expect(mbar.locator('.mdot')).toHaveText('2');       // attention badge intact
-    // the flat items hide; the waffle stays in the top bar
+    // the flat items hide; on a phone the bar's Menu is the one Menu
     await expect(page.locator('.dds-nav')).toBeHidden();
-    await expect(page.locator('#dds-waffle')).toBeVisible();
+    await expect(page.locator('#dds-waffle')).toBeHidden();
     // Menu opens the SAME full-capability panel the burger sheet used to hold
     await mbar.locator('#dds-mbar-menu').click();
     const panel = page.locator('#dds-drawer');
@@ -645,9 +648,6 @@ test.describe('Context bar (slice 7)', () => {
     await expect(panel).toBeVisible();
     await mbar.locator('#dds-mbar-menu').click();
     await expect(panel).toBeHidden();
-    // the waffle opens the same panel too
-    await page.locator('#dds-waffle').click();
-    await expect(panel).toBeVisible();
   });
 });
 
@@ -662,7 +662,8 @@ test.describe('Context bar (slice 7)', () => {
 // blurs the focused element and focuses nothing, so panel `focusout` handlers
 // see a null relatedTarget mid-tap. See tests/e2e/helpers/ios-focus.ts.
 test.describe('iOS tap semantics — tapping a menu item navigates', { tag: '@touch' }, () => {
-  for (const opener of ['#dds-mbar-menu', '#dds-waffle']) {
+  // builder item 165: a phone has one Menu, the bottom bar's (the top bar's hides there)
+  for (const opener of ['#dds-mbar-menu']) {
     test(`mobile: the drawer opened by ${opener} navigates when an item is tapped`, async ({ page }, testInfo) => {
       test.skip(testInfo.project.name !== 'mobile', 'touch + the phone sheet');
       await installApp(page);

@@ -33,6 +33,21 @@
 /provision              /404.html   404!
 /provision.html         /404.html   404!
 
+# Builder item 199 (Nov 15 2026): nobody signs up by themselves (studios add their
+# clients and invite them), so the sign-up pages and two old stubs are gone and their
+# addresses forward: sign-up to the main site's contact page, its email-confirm and
+# checkout-return page to the client sign-in, the retired Growth workspace to the
+# client sign-in, the retired admin console to the studio sign-in. The partner set-up
+# pack (provision.html) is retired too: its file is gone and it answers 404 above.
+/signup                         https://davisdigitalstudio.com/contact   301!
+/signup.html                    https://davisdigitalstudio.com/contact   301!
+/welcome                        /portal.html                             301!
+/welcome.html                   /portal.html                             301!
+/portal-workspace               /portal.html                             301!
+/portal-workspace.html          /portal.html                             301!
+/dds-studio-manage-9k2p         /studio.html                             301!
+/dds-studio-manage-9k2p.html    /studio.html                             301!
+
 # Free Site Review maps to the real diagnostic tool specifically: one hop to
 # its new home, the same place /audit and the main site's own URL go
 /free-site-review  https://tools.davisdigitalstudio.com/site-review   301

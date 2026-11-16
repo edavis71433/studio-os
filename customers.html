@@ -27,35 +27,24 @@
   .wrap{max-width:var(--dds-w-data,1600px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 90px}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
-  /* ── list-view header (SLDS list-view anatomy, dds skin) — kept in sync with
-        inbox.html's list-pane header by hand (.lhead/.lrow1/#viewBtn/#viewMenu) ── */
-  .lhead{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px) 10px;margin-bottom:var(--dds-s4,16px)}
-  .lrow1{display:flex;align-items:center;gap:6px}
-  .obj-ic{width:34px;height:34px;border-radius:var(--dds-r,8px);background:var(--p);color:#fff;display:grid;place-items:center;font-size:16px;flex:0 0 auto}
-  .viewdd{position:relative;min-width:0;flex:1}
-  #viewBtn{font:inherit;font-family:var(--sans);font-weight:500;font-size:20px;color:var(--ink);background:none;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer;display:inline-flex;align-items:center;gap:var(--dds-s2,8px);max-width:100%}
-  #viewBtn:hover{background:var(--p-soft)}
+  /* ── builder item 165: the page header is the shared one (shell.css .dds-ph). The view
+        picker (#viewBtn, .dds-ph-pick) sits beside the title; its menu hangs under it ── */
+  .viewdd{position:relative;min-width:0;max-width:100%}
   /* Second walk (Nov 8, item 59): on a phone "All customers" broke onto two centred
      lines beside the icon. The view name stays on one line and trims with … */
   #viewBtn{max-width:100%;min-width:0}
   #viewBtn .vl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  @media (max-width:600px){#viewBtn{font-size:17px;padding-left:6px;padding-right:4px}}
-  #viewBtn .car{font-size:10px;color:var(--faint)}
   #viewMenu{position:absolute;top:calc(100% + 4px);left:0;min-width:230px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:6px;z-index:30}
   #viewMenu [role=option]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;border:none;background:none;color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) 10px;cursor:pointer}
   #viewMenu [role=option]:hover{background:var(--p-soft)}
   #viewMenu [role=option][aria-selected="true"]{color:var(--p);font-weight:700}
   .lbtn{flex:0 0 auto;font:inherit;border:none;background:none;color:var(--soft);font-size:15px;border-radius:var(--dds-r,8px);padding:var(--dds-s1,4px) var(--dds-s2,8px);cursor:pointer}
   .lbtn:hover{color:var(--p);background:var(--p-soft)}
-  .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;flex:0 0 auto}
   .seg button{border:none;border-radius:0;padding:6px var(--dds-s3,12px);font-size:12.5px;background:transparent;color:var(--soft);font-family:inherit;font-weight:500;cursor:pointer}
   .seg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
-  /* Phase 2: the Customers | People tab strip under the header */
-  .seg.tabs2{margin:0 0 var(--dds-s3,12px);background:var(--bg)}
-  .seg.tabs2 button{font-size:13.5px;padding:var(--dds-s2,8px) var(--dds-s4,16px)}
-  .seg.tabs2 button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line);font-weight:600}
-  .seg.tabs2 .n{font-size:11.5px;color:var(--faint);font-weight:500;margin-left:var(--dds-s1,4px)}
+  /* Phase 2: Customers | People are the header's tabs (shell.css .dds-ph-tabs); People's count beside it */
+  .dds-ph-tabs .n{font-size:11.5px;color:var(--faint);font-weight:500;margin-left:var(--dds-s1,4px)}
 
   .bar{display:flex;gap:var(--dds-s2,8px);margin-bottom:var(--dds-s4,16px);align-items:center;flex-wrap:wrap}
   /* sales review item 31: saved views in the view menu; the text buttons beside it */
@@ -86,6 +75,9 @@
   .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px);outline:none}
   .dbody input:focus,.dbody select:focus{border-color:var(--p)}
   .dbody .note{font-size:12.5px;color:var(--faint);margin:var(--dds-s3,12px) 0 0;line-height:1.5}
+  /* builder item 198: a full plan is said in the box, where the person is looking, not in a toast */
+  .dbody .cu-full{background:var(--dds-warn-soft,#f3ead9);color:var(--dds-warn,#775d31);border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.45}
+  .dbody .cu-full b{display:block}
   #cu-mode{display:flex;flex-direction:column;gap:var(--dds-s2,8px);margin:2px 0 var(--dds-s1,4px)}
   .modeopt{display:flex;align-items:flex-start;gap:var(--dds-s2,8px);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px var(--dds-s3,12px);cursor:pointer;font-size:14px;color:var(--ink)}
   .modeopt:has(input:checked){border-color:var(--p);background:var(--p-soft)}
@@ -179,14 +171,6 @@
   /* ══ Bold redesign, part 2 (Nov 2026): Customers and People. The title sits
      on the page, the views are chips with counts, rows carry an avatar, and a
      row opens a preview beside the list (a sheet on phones). ══ */
-  .lhead{background:none;border:0;box-shadow:none;padding:0;margin-bottom:var(--dds-s4,16px)}
-  .lrow1{gap:10px;flex-wrap:wrap}
-  .lrow1 .viewdd{flex:0 1 auto}
-  .lrow1 .sp{flex:1 1 0;align-self:stretch;min-height:36px}
-  .lrow1 .seg.tabs2{margin:0}
-  .ptitle{font-family:var(--serif);font-weight:600;font-size:28px;line-height:1.15;letter-spacing:-.015em;padding:4px 8px}
-  @media (max-width:760px){.ptitle{font-size:19px;line-height:1.2}}
-  .lmeta{margin:2px 0 0 var(--dds-s2,8px);font-size:13px;color:var(--soft)}
   .bar{margin-bottom:var(--dds-s3,12px)}
   .trow{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;margin:0 0 var(--dds-s3,12px)}
   .chips{display:flex;gap:6px;flex-wrap:wrap;flex:1 1 320px;min-width:0}
@@ -235,13 +219,6 @@
     body.cprev-open table[aria-label="Customers"] [data-col="email"],body.cprev-open table[aria-label="Customers"] [data-col="project_count"]{display:none}
     body.cprev-open table{min-width:0}
   }
-  /* a phone: the title and + Add on one line, Customers | People across the next */
-  @media (max-width:760px){
-    .lrow1 .seg.tabs2{order:3;flex:1 1 100%}
-    .lrow1 .seg.tabs2 button{flex:1}
-  }
-  /* "+ Add" up to a tablet's width, so the title line holds; the rest is still read out */
-  @media (max-width:1100px){#addCust .long{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}}
   a.btn{text-decoration:none}
   /* People: names read as names, not underlined links; a phone gets rows */
   table[aria-label="People"] thead th{padding:var(--dds-s3,12px) var(--dds-s4,16px)}
@@ -310,23 +287,23 @@
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
-<div class="wrap"><h1 class="sr-only">Customers</h1><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div></div>
+<div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div></div>
 <!-- C4: contacts.html's Add-a-customer dialog, ported wholesale — kept in sync by hand -->
 <dialog id="custDlg" aria-label="Add a customer">
   <form id="custForm" class="dbody">
     <div id="cust-fields">
       <h3>Add a customer</h3>
-      <div id="cu-mode" role="radiogroup" aria-label="How would you like to add them?">
-        <label class="modeopt"><input type="radio" name="cumode" value="provision" checked>
-          <span><strong>I’ll set them up now</strong><span class="modehint">Create their workspace and email them a sign-in link.</span></span></label>
-        <label class="modeopt"><input type="radio" name="cumode" value="connect">
-          <span><strong>They’ll sign up themselves — connect by email</strong><span class="modehint">Just record their email. You don’t set anything up.</span></span></label>
-      </div>
       <label for="cu-name">Their name</label>
       <input id="cu-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
       <label for="cu-email">Email</label>
       <input id="cu-email" type="email" maxlength="160" placeholder="jane@acmebakery.com" autocomplete="off">
-      <div id="cu-provision-only">
+      <div id="cu-mode" role="radiogroup" aria-label="What adding them does">
+        <label class="modeopt"><input type="radio" name="cumode" value="connect" checked>
+          <span><strong>Just save them for now</strong><span class="modehint">No website yet, and nothing is emailed. You can set up their website later.</span></span></label>
+        <label class="modeopt"><input type="radio" name="cumode" value="provision">
+          <span><strong>Set up their website and invite them</strong><span class="modehint">Makes their workspace and website now, and emails them a link to sign in.</span></span></label>
+      </div>
+      <div id="cu-provision-only" style="display:none">
         <label for="cu-biz">Business name</label>
         <input id="cu-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
         <label for="cu-edition">What kind of work is this?</label>
@@ -348,13 +325,8 @@
         </div>
         <p class="note">Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.</p>
       </div>
-      <div id="cu-connect-only" style="display:none">
-        <p class="note">Enter their email. If they already have an account, they connect to you now. If not, they’ll connect automatically the moment they sign up with that email.</p>
-        <!-- the pricing box belongs to CONNECT only: in provision mode nothing is
-             bought — the studio provisions the site and bills for its work -->
-        <div id="cu-signup" class="note" style="border:1px solid var(--line,#ddd);border-radius:8px;padding:10px">If they’ll host with you, they choose and pay for their plan themselves — send them this to sign up:<div class="row2" style="margin-top:6px"><input id="cu-signup-link" readonly style="flex:1;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit" aria-label="Sign-up link"><button type="button" class="btn ghost" id="cu-signup-copy">Copy</button></div></div>
-      </div>
-      <div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Set up + invite</button></div>
+      <p class="note cu-full" id="cu-full" role="alert" hidden></p>
+      <div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Save</button></div>
     </div>
     <div id="cust-done" style="display:none"></div>
   </form>
@@ -523,7 +495,7 @@ function importCustomers(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
   k.importPanel(z,{back:'#importCsv',
     title:'Import customers from a CSV',
-    help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has a Studio OS account gets a request to accept you the next time they sign in, and the rest connect when they sign up.',
+    help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has a Studio OS account gets a request to accept you the next time they sign in, and the rest are saved to your contacts, to set up with Add a customer when you’re ready.',
     noun:'customer',
     // item 97: "Business Phone" or "Business Street" is never the business's name, and "first"/"last"
     // are names only beside "name" ("Last activity" was glued onto names) — the Contacts rules
@@ -532,7 +504,7 @@ function importCustomers(){
     toItem:(o)=>{const email=String(o.email||'').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return null;return{email,name:o.name||[o.first,o.last].filter(Boolean).join(' '),business_name:o.business||''};},
     label:(it)=>it.business_name||it.name||it.email,
     send:async(it)=>{const r=await api('/sales/customers','POST',{mode:'connect',email:it.email,name:it.name,business_name:it.business_name});if(!r.ok)return'failed';const d=(r.body&&r.body.data)||{};return d.requested?'skipped':d.connected?'added':d.pending?'existed':'added';},
-    summary:(c)=>`${c.added} already yours · ${c.existed} saved to connect when they sign up${c.skipped?` · ${c.skipped} asked to accept you`:''}${c.failed?` · ${c.failed} couldn’t be imported`:''}.`,
+    summary:(c)=>`${c.added} already yours · ${c.existed} saved to your contacts to set up later${c.skipped?` · ${c.skipped} asked to accept you`:''}${c.failed?` · ${c.failed} couldn’t be imported`:''}.`,
     done:()=>load(),
   });
 }
@@ -574,22 +546,20 @@ const lmetaText=(list)=>{
   const sortCol=COLS.find(x=>x[0]===SORT.key)||COLS[0];
   return `${count} customer${count===1?'':'s'}${owed?` · ${fmtOwed(owed)} owed to you`:''} · ${updatedLabel()}${DISPLAY==='table'?` · Sorted by ${sortCol[1]} — ${SORT.dir>0?'ascending':'descending'}`:''}`;
 };
-// Bold redesign, part 2: the title sits on the page (the view menu IS the
-// title), with Customers | People and the add button beside it.
+// Builder item 165: the one page header (shell.css .dds-ph). The title is always
+// Customers; the view picker sits beside it (on the Customers tab), the line under
+// it counts what is listed, and Customers | People are the header's tabs.
 function headerHtml(list){
   const people=TAB==='people';
-  return `<div class="lhead">
-    <div class="lrow1">
-      ${people?'<p class="ptitle">People</p>':`<div class="viewdd">
-        <button id="viewBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Customers view: ${esc(viewLabel())}"><span class="vl">${esc(viewLabel())}</span> <span class="car" aria-hidden="true">▾</span></button>
+  return `<header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" data-ic="customers" aria-hidden="true"></span>
+    <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Customers</h1>${people?'':`<div class="viewdd">
+        <button id="viewBtn" class="dds-ph-pick" aria-haspopup="listbox" aria-expanded="false" aria-label="Customers view: ${esc(viewLabel())}"><span class="vl">${esc(viewLabel())}</span> <span class="car" aria-hidden="true">▾</span></button>
         <div id="viewMenu" role="listbox" aria-label="Customer views" hidden></div>
-      </div>`}
-      <span class="sp"></span>
-      ${tabsHtml()}
-      ${people?'<a class="btn ghost" href="/contacts.html">Add or edit people</a>':'<button class="btn" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add<span class="long"> a customer</span></button>'}
-    </div>
-    <div class="lmeta" id="lmeta">${esc(lmetaText(list))}</div>
-  </div>`;
+      </div>`}</div>
+      <p class="dds-ph-line" id="lmeta">${esc(lmetaText(list))}</p></div>
+    <div class="dds-ph-acts">${people?'<a class="btn ghost" href="/contacts.html">Add or edit people</a>':'<button class="btn primary dds-ph-fill" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button>'}</div>
+  </div>
+  ${tabsHtml()}</header>`;
 }
 // the views as chips with their counts — an empty one is noise (the view menu still lists every view)
 function chipsHtml(){
@@ -732,7 +702,7 @@ async function pSearchServer(){
   repaintPeople();
 }
 function tabsHtml(){
-  return `<div class="seg tabs2" role="tablist" aria-label="Customers or people"><button role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}" aria-pressed="${TAB==='customers'?'true':'false'}">Customers</button><button role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}" aria-pressed="${TAB==='people'?'true':'false'}">People${peopleTabCount()}</button></div>`;
+  return `<div class="dds-ph-tabs" role="tablist" aria-label="Customers or people"><button type="button" role="tab" id="tabCustomers" aria-selected="${TAB==='customers'?'true':'false'}">Customers</button><button type="button" role="tab" id="tabPeople" aria-selected="${TAB==='people'?'true':'false'}">People${peopleTabCount()}</button></div>`;
 }
 let PFILTER='all';
 function peopleChipsHtml(){
@@ -1063,8 +1033,9 @@ document.addEventListener('keydown',(e)=>{
 window.addEventListener('dds:created',()=>{if(!TOKEN)return;load().catch(()=>{});});
 
 // ── ADD A CUSTOMER (C4) — contacts.html's flow, ported wholesale and kept in
-// sync by hand: set up an existing customer with their own workspace + a
-// sign-in invitation, or just connect them by email. POST /sales/customers
+// sync by hand: save a customer for now, or set them up with their own workspace
+// and a sign-in invitation (builder item 199: nobody signs up by themselves, and
+// "Just save them for now" makes no website and sends no email). POST /sales/customers
 // (handleSalesAddCustomer) reads mode/name/business_name/email/edition. ──
 // The four dropdown answers map to THREE server plans (sales.ts CONVERT_PLANS):
 // 'business_os_no_site' is the same Business OS plan as the build-elsewhere
@@ -1083,20 +1054,19 @@ function cuAsksWebsite(){const v=$('cu-edition').value;return v==='business_os_o
 function syncCuSignup(){
   const w=$('cu-website-wrap');if(w)w.style.display=cuAsksWebsite()?'':'none';
 }
-// TWO options (owner's words): "set them up now" (provision) vs "they'll sign up
-// themselves — connect by email" (connect). The mode governs which fields show and
-// what the server does; connect provisions nothing.
-function cuMode(){const r=document.querySelector('input[name="cumode"]:checked');return r?r.value:'provision';}
+// Builder item 199, then Eric (Nov 15): adding a customer starts nothing unless asked.
+// "Just save them for now" (connect, the default) saves them to the contacts and emails
+// nobody; "Set up their website and invite them" (provision) makes their workspace and site.
+function cuMode(){const r=document.querySelector('input[name="cumode"]:checked');return r?r.value:'connect';}
 function syncCuMode(){
-  const connect=cuMode()==='connect';
-  const po=$('cu-provision-only');if(po)po.style.display=connect?'none':'';
-  const co=$('cu-connect-only');if(co)co.style.display=connect?'':'none';
-  const sb2=$('cu-submit');if(sb2)sb2.textContent=connect?'Save':'Set up + invite';
-  if(!connect)syncCuSignup();
+  const save=cuMode()==='connect';
+  const po=$('cu-provision-only');if(po)po.style.display=save?'none':'';
+  const sb2=$('cu-submit');if(sb2)sb2.textContent=save?'Save':'Set up + invite';
+  const cf=$('cu-full');if(cf)cf.hidden=true;   // item 198's full-plan words belong to the last set-up attempt
+  if(!save)syncCuSignup();
 }
 // Start from a kit (Oct 2026 studio audit, change 4): an agency's saved starter
-// kits, offered in provision mode only, applied to the NEW site once the provision
-// POST answers with its site_id. A studio without an agency never sees the field;
+// kits, applied to the NEW site once the POST answers with its site_id. A studio without an agency never sees the field;
 // no kits (or a failed read) hides it too — the dialog never offers what it can't do.
 // Bug hunt K7 (Nov 10): who you are and your kits are read once per page and reused each
 // time the dialog opens; neither changes between opens. A read that failed is asked again.
@@ -1125,44 +1095,47 @@ async function syncCuKits(){
 function openAddCustomer(){
   $('cu-name').value='';$('cu-biz').value='';$('cu-email').value='';$('cu-edition').value='presence';
   const wf=$('cu-website');if(wf)wf.value='';
-  const pr=document.querySelector('input[name="cumode"][value="provision"]');if(pr)pr.checked=true;
-  const lk=$('cu-signup-link');if(lk)lk.value=location.origin+'/pricing.html';syncCuMode();syncCuKits();
+  const sv=document.querySelector('input[name="cumode"][value="connect"]');if(sv)sv.checked=true;
+  syncCuMode();syncCuKits();
   $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
+  const cf=$('cu-full');if(cf){cf.hidden=true;cf.textContent='';}
   const sb2=$('cu-submit');if(sb2)sb2.disabled=false;
-  $('custDlg').showModal();setTimeout(()=>$('cu-name').focus(),20);
+  // Name is the dialog's first field, so showModal already focuses it; the late nudge
+  // never pulls focus back from a field someone has moved to
+  $('custDlg').showModal();setTimeout(()=>{const d=$('custDlg'),a=document.activeElement;if(!d.contains(a)||a===d)$('cu-name').focus();},20);
 }
 $('cu-cancel').onclick=()=>$('custDlg').close();
 $('cu-edition').onchange=syncCuSignup;
 document.querySelectorAll('input[name="cumode"]').forEach(r=>r.addEventListener('change',syncCuMode));
-$('cu-signup-copy').onclick=()=>{const el=$('cu-signup-link');if(el&&el.value&&navigator.clipboard){navigator.clipboard.writeText(el.value).then(()=>toast('Sign-up link copied')).catch(()=>{});}};
 $('custForm').onsubmit=async(e)=>{
   e.preventDefault();
   const mode=cuMode();
   const name=$('cu-name').value.trim(),business_name=$('cu-biz').value.trim(),email=$('cu-email').value.trim();
   const kitSel=$('cu-kit'),kitId=(mode==='provision'&&kitSel&&kitSel.value)||'',kitName=kitId?String((kitSel.options[kitSel.selectedIndex]||{}).textContent||'kit').trim():'';
-  if(!email){toast(mode==='connect'?'Enter their email to connect them.':'Enter their email — that’s where the sign-in invitation goes.');$('cu-email').focus();return;}
+  if(!email){toast(mode==='connect'?'Enter their email to save them.':'Enter their email — that’s where the sign-in invitation goes.');$('cu-email').focus();return;}
   const label=mode==='connect'?'Save':'Set up + invite';
   const btn=$('cu-submit');btn.disabled=true;btn.textContent=mode==='connect'?'Saving…':'Setting up…';
-  const body=mode==='connect'
-    ?{mode:'connect',name:name||undefined,email}
-    :{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:cuPlan(),
-       website_url:(cuAsksWebsite()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
+  const body=mode==='connect'?{mode:'connect',name:name||undefined,email}:{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:cuPlan(),
+    website_url:(cuAsksWebsite()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
   try{
     const r=await api('/sales/customers','POST',body);
     if(!r.ok){
-      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.'));
+      // builder item 198: the plan's sites are all in use; nothing was made, and the box says why
+      if(r.status===409&&r.body&&r.body.error==='client_limit'){const cf=$('cu-full'),t=String(r.body.message||''),cut=t.indexOf('. ');if(cf){cf.innerHTML=cut>0?'<b>'+esc(t.slice(0,cut+1))+'</b>'+esc(t.slice(cut+2)):esc(t);cf.hidden=false;}btn.disabled=false;btn.textContent=label;return;}
+      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||(mode==='connect'?'We couldn’t save them just now.':'We couldn’t set them up just now.'));
       toast(m);btn.disabled=false;btn.textContent=label;return;
     }
     const d=(r.body&&r.body.data)||{};
-    const who=esc(business_name||name||email);
+    const who=esc((mode==='provision'&&business_name)||name||email);
     let heading,line;
     if(d.requested){
       // final pass S1: an account that isn't yours yet is asked, never taken
       heading='Request sent';
       line=who+' already has a Studio OS account, so they need to say yes first. They’ll see your request the next time they sign in.';
     }else if(mode==='connect'){
-      if(d.connected){heading='Connected to their workspace';line=who+' was already your customer — they’re connected.';}
-      else{heading='Saved';line='When '+esc(email)+' signs up, they’ll connect to you automatically.';}
+      // saved, not set up: no website and no email (someone already yours is connected again)
+      if(d.connected){heading='Connected again';line=who+' was already your customer, so they’re connected again. Nothing was emailed and no website was made.';}
+      else{heading='Saved';line=who+' is saved to your contacts. No website yet, and nothing was emailed. To set up their website later, open Add a customer again and choose Set up their website and invite them.';}
     }else if(d.already_exists){
       heading='They already have a workspace';
       line=who+' already had an account — connected to their existing workspace. Nothing duplicated. Send them their sign-in link if they need it.';
@@ -1189,7 +1162,7 @@ $('custForm').onsubmit=async(e)=>{
         if(!kitOk)kitRetry=applyKit;
       }
     }
-    const showLink=d.portal_url&&(mode!=='connect'||d.connected);
+    const showLink=!!d.portal_url;
     const link=showLink?('<p style="margin-top:12px"><a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a></p>'):'';
     $('cust-fields').style.display='none';
     const done=$('cust-done');
@@ -1198,7 +1171,7 @@ $('custForm').onsubmit=async(e)=>{
     const cl=$('cu-close');if(cl){cl.focus();cl.onclick=()=>$('custDlg').close();}
     const ka=$('cu-kit-again');if(ka&&kitRetry)ka.onclick=async()=>{ka.disabled=true;ka.textContent='Applying…';const okNow=await kitRetry();const kl=$('cu-kit-line');
       if(okNow){if(kl)kl.textContent=kitName+' applied.';ka.remove();toast(kitName+' applied.');}else{ka.disabled=false;ka.textContent='Try the kit again';toast('The kit didn’t apply this time either.',true);}};
-  }catch(_){toast(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.');btn.disabled=false;btn.textContent=label;return;}
+  }catch(_){toast(mode==='connect'?'We couldn’t save them just now.':'We couldn’t set them up just now.');btn.disabled=false;btn.textContent=label;return;}
   // The creation SUCCEEDED — the roster refresh is best-effort and must never
   // repaint that success as a failure (SS6): its own failure gets the soft
   // couldn’t-refresh line, never the creation-failed toast.

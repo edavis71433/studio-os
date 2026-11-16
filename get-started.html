@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Let’s build your website — Studio OS</title>
+<title>Get started — Studio OS</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="Two quick questions and Studio OS drafts your website — for you to review, never published without your OK.">
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
-  :root{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-deep:#2a1b4a;--p-soft:#efeafa;--good:#33664b;--good-soft:#e7f1ea;--shadow:0 1px 2px rgba(27,21,37,.04),0 12px 34px rgba(27,21,37,.08);--serif:'Fraunces',"Iowan Old Style",Georgia,serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-  @media (prefers-color-scheme:dark){:root{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38;--good:#8bbf9f;--good-soft:#1f2a24;--shadow:0 1px 2px rgba(0,0,0,.2),0 12px 34px rgba(0,0,0,.4)}}
-  :root[data-theme="light"]{--bg:#faf8f5;--card:#fff;--ink:#1b1525;--soft:#6b6478;--faint:#6f677d;--line:#eee9e0;--p:#5b3fa0;--p-soft:#efeafa}
-  :root[data-theme="dark"]{--bg:#171320;--card:#1f1a2b;--ink:#efeaf7;--soft:#a79ebc;--faint:#948bad;--line:#2a2338;--p:#b79ceb;--p-soft:#241d38}
+  /* builder item 165 (Nov 2026): the shared look. This page wore the old cream of its own
+     (rgb 250,248,245, with a light and dark set to match); its names now point at the shell's
+     tokens, so it is the cool grey of every other page in both themes. */
+  :root{--bg:var(--dds-bg,#f3f3f8);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#171522);--soft:var(--dds-soft,#55526a);--faint:var(--dds-faint,#69667d);--line:var(--dds-line,#e7e6ef);--p:var(--dds-p,#6d3fd4);--p-deep:var(--dds-p-deep,#3d2185);--p-soft:var(--dds-p-soft,#f0ebfd);--good:var(--dds-good,#11744a);--good-soft:var(--dds-good-soft,#e2f4ea);--shadow:var(--dds-shadow,0 1px 2px rgba(23,21,34,.05),0 8px 24px -8px rgba(23,21,34,.10));--serif:var(--dds-serif,'Fraunces',Georgia,serif);--sans:var(--dds-sans,'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif);}
   /* dark mode: light fills need dark ink (#fff on the light accent/green fails contrast) */
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .step.done .dot{color:#171320}}
   :root[data-theme="dark"] .step.done .dot{color:#171320}
@@ -50,16 +50,13 @@
   .center{text-align:center;padding:var(--dds-s7,32px) 10px}
   .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s6,24px) auto}
   .big{font-family:var(--serif);font-size:24px;margin:0 0 var(--dds-s2,8px)}
-  footer{margin-top:36px;color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
-<div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
-  <footer>Studio OS drafts; you approve. Nothing goes live without your OK.</footer>
-</div>
+<div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div></div>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
@@ -114,8 +111,8 @@ function renderIntake(){
     <div class="card">
       <label>What kind of business is this?</label>
       <div class="chips" id="inds">${INDUSTRIES.map(i=>`<button class="chip ${i.key===INTAKE.industry?'on':''}" data-ind="${i.key}">${esc(i.label)}</button>`).join('')}</div>
-      <label>A few things you offer <span style="font-weight:400;color:var(--faint)">— edit or add your own</span></label>
-      <div id="svcs">${INTAKE.services.map((s,i)=>svcRow(s,i)).join('')}</div>
+      <label id="svcLbl">A few things you offer <span style="font-weight:400;color:var(--faint)">— edit or add your own</span></label>
+      <div id="svcs" role="group" aria-labelledby="svcLbl">${INTAKE.services.map((s,i)=>svcRow(s,i)).join('')}</div>
       <button class="addsvc" id="addsvc">+ Add another</button>
       <label for="desc">In a sentence, what should visitors know?</label>
       <textarea id="desc" placeholder="e.g. Family-owned since 1998, known for fast, friendly service.">${esc(INTAKE.description)}</textarea>
@@ -123,11 +120,16 @@ function renderIntake(){
         <button class="primary" id="build">Build my website →</button>
         <button class="plain" id="manual">I’ll set it up myself</button>
       </div>
+      <p class="hint" id="needMore" role="alert" hidden style="color:var(--ink);font-weight:600">Add one thing you offer, or a sentence about the business, so there’s something to draft from.</p>
       <p class="hint">We’ll draft your homepage, pages, and the words that help customers find you on Google — then you review and publish when it’s right.</p>
     </div>`;
   wireIntake();
 }
-function svcRow(v,i){return `<div class="svc"><input type="text" data-svc="${i}" value="${esc(v)}" placeholder="A service or offering"><button data-rm="${i}" aria-label="Remove">×</button></div>`;}
+// builder item 165: each box has a name a screen reader can read ("First thing you offer"); the
+// three used to be read as three unnamed boxes, and each × only as "Remove"
+const ORDINAL=['First','Second','Third','Fourth','Fifth','Sixth','Seventh','Eighth','Ninth','Tenth','Eleventh','Twelfth'];
+const svcName=(i)=>ORDINAL[i]?ORDINAL[i]+' thing you offer':'Thing you offer number '+(i+1);
+function svcRow(v,i){return `<div class="svc"><input type="text" data-svc="${i}" value="${esc(v)}" placeholder="A service or offering" aria-label="${esc(svcName(i))}"><button data-rm="${i}" aria-label="${esc('Remove the '+svcName(i).toLowerCase())}">×</button></div>`;}
 function readIntake(){
   INTAKE.services=[...document.querySelectorAll('[data-svc]')].map(x=>x.value);
   const d=$('desc'); if(d)INTAKE.description=d.value;
@@ -151,7 +153,8 @@ async function build(){
   // await: the draft's template reads industry_key for the right vocabulary/schema,
   // so the PUT must land before /writer/generate runs (else wrong-vocab drafts).
   await saveIndustry();
-  if(!INTAKE.services.some(s=>s.trim())&&INTAKE.description.trim().length<8){renderIntake();$('desc').focus();return;}
+  // file 06, finding 46: the button used to do nothing here and say nothing; it says what's missing
+  if(!INTAKE.services.some(s=>s.trim())&&INTAKE.description.trim().length<8){renderIntake();const nm=$('needMore');if(nm)nm.hidden=false;$('desc').focus();return;}
   $('main').innerHTML=`<div class="center"><div class="spin" role="status"></div><p class="big">Drafting your website…</p><p class="sub" style="margin:0 auto">Turning what you told us into real pages and homepage copy, written so customers can find you on Google. This takes a few seconds.</p></div>`;
   const req=buildStarterRequest(INTAKE);
   const gen=await api('/writer/generate','POST',req);

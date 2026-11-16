@@ -50,7 +50,7 @@ const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url)
 const sites = read('sites.html'), shell = read('shell.js'), css = read('shell.css'), create = read('create.js');
 const agency = read('agency.html'), contacts = read('contacts.html'), customers = read('customers.html'), today = read('today.html');
 ok('A1: the Sites filter click is wired once', /if\(mn&&!mn\.dataset\.filterWired\)\{mn\.dataset\.filterWired='1';mn\.addEventListener\('click'/.test(sites) && !/^\s*\$\('main'\)\.addEventListener\('click'/m.test(sites));
-ok('A3: the phone bar keeps a + when the sales bar can’t be drawn', /var plusHere = canCreate\(\);/.test(shell) && /#dds-mbar\.sales,#dds-mbar\.plus\{align-items:center\}/.test(css));
+ok('A3: the phone bar keeps a + when the sales bar can’t be drawn', /var plusHere = canCreate\(\);/.test(shell) && /#dds-mbar\.plus\{align-items:center\}/.test(css));
 ok('A4: no message sends anyone to the Starter kits card that left Home', ![sites, agency, contacts, customers].some((p) => /Starter kits card on your studio home|try a starter kit from Home|use a starter kit instead/.test(p)));
 ok('A4: a kit that didn’t apply offers it again, on all three add-a-customer forms', [agency, contacts, customers].every((p) => /id="cu-kit-again">Try the kit again</.test(p) && /kitRetry=applyKit/.test(p)));
 ok('A5: Go through them removes the saved row by key, and Skip waits while one saves', /const skip=\(\)=>\{if\(F\.busy\)return;/.test(agency) && /F\.list\.findIndex\(x=>x\.key===r\.key\)/.test(agency));

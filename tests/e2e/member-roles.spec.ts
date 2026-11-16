@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { headerAction } from './helpers/page-header';
 import { capabilitiesOf, type SiteRole } from '../../supabase/functions/presence/lib/site_roles';
 
 // An invited member's pages offer only what their role can use (MC-3). The server has
@@ -37,6 +38,7 @@ async function expectControls(page: Page, p: Person, controls: Array<[string, Ne
   for (const [sel, need] of controls) {
     const c = page.locator(sel).first();
     await expect(c, `${sel} was drawn`).toBeAttached();
+    if (await c.evaluate((el) => !!el.closest('.dds-ph-more'))) await headerAction(page, sel);   // builder item 165: a header action waits behind ⋯ on a phone
     if (p.lacks.includes(need)) await expect(c, `${sel} is gone for ${p.who}`).toBeHidden();
     else await expect(c, `${sel} is there for ${p.who}`).toBeVisible();
   }
@@ -75,7 +77,7 @@ test.describe('what a role lacks', () => {
     await installApp(page, { api: CONTACTS_API });
     await page.route('**/functions/v1/presence/portal/context', (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{}' }));
     await page.goto('/contacts.html');
-    await expect(page.locator('#manageFields')).toBeVisible();
+    await expect(await headerAction(page, '#manageFields')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-dds-lacks'))).toBeNull();
   });
 
@@ -83,7 +85,7 @@ test.describe('what a role lacks', () => {
     const { capabilities: _gone, ...rest } = contextOf('business_staff').data;
     await installApp(page, { api: { ...CONTACTS_API, '/portal/context': { data: rest } } });
     await page.goto('/contacts.html');
-    await expect(page.locator('#manageFields')).toBeVisible();
+    await expect(await headerAction(page, '#manageFields')).toBeVisible();
     await page.waitForFunction(() => (window as unknown as { __ddsContext?: unknown }).__ddsContext);
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-dds-lacks'))).toBeNull();
   });
@@ -97,7 +99,7 @@ test.describe('what a role lacks', () => {
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(STAFF.ctx) });
     });
     await page.goto('/contacts.html');
-    await expect(page.locator('#manageFields')).toBeVisible();   // no role yet: an owner must never see a gap here
+    await expect(await headerAction(page, '#manageFields')).toBeVisible();   // no role yet: an owner must never see a gap here
     release();
     await expect(page.locator('#manageFields')).toBeHidden();
   });
@@ -248,28 +250,39 @@ test.describe('Settings', () => {
   }
 
   // the select still reads "generic" for a site with no industry yet, which differs from
-  // the row, so Save used to send it: the name saved, the 403 came back, and the toast said
-  // nothing had changed.
+  // the row, so the old single Save sent it with the name: the name saved, the 403 came back,
+  // and the toast said nothing had changed. Since builder item 165 each box saves on its own
+  // when it's left, so a new name sends the name and nothing else, whoever you are; the kind
+  // of business saves when it is picked, for whoever may configure.
   const saving = async (page: Page, p: Person) => {
-    const sent: string[] = [];
+    const sent: string[] = [], bodies: unknown[] = [];
     await installApp(page, { api: { ...SETTINGS_API, '/settings': { data: {} }, '/portal/context': p.ctx } });
-    page.on('request', (r) => { if (r.method() === 'PUT') sent.push(new URL(r.url()).pathname.replace(/^.*\/functions\/v1\/presence/, '')); });
+    page.on('request', (r) => { if (r.method() === 'PUT') { sent.push(new URL(r.url()).pathname.replace(/^.*\/functions\/v1\/presence/, '')); bodies.push(r.postDataJSON()); } });
     await page.goto('/settings.html');
     await expect(page.locator('#f-name')).toHaveValue('Test Studio');
     await page.waitForFunction(() => (window as unknown as { __ddsContext?: unknown }).__ddsContext);
     await page.locator('#f-name').fill('Renamed Studio');
-    await page.locator('#profileSave').click();
-    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Saved.' }).first()).toBeVisible();
-    return sent.sort();
+    await page.locator('#f-name').press('Tab');
+    await expect(page.locator('#fs-f-name')).toHaveText('Saved');
+    return { sent: sent.sort(), bodies };
   };
-  test('a staff member saving the profile on a site with no industry sends only the name', async ({ page }) => {
-    expect(await saving(page, STAFF)).toEqual(['/identity']);
+  test('a staff member renaming the studio on a site with no industry sends only the name', async ({ page }) => {
+    expect((await saving(page, STAFF)).sent).toEqual(['/identity']);
+    await expect(page.locator('#f-industry')).toBeHidden();   // the kind of business isn't theirs to change
   });
-  test('a developer saving the same still sends the industry: configure is theirs', async ({ page }) => {
-    expect(await saving(page, DEVELOPER)).toEqual(['/identity', '/settings']);
+  test('a developer renaming sends only the name too; the kind of business saves when they pick it', async ({ page }) => {
+    const { sent, bodies } = await saving(page, DEVELOPER);
+    expect(sent).toEqual(['/identity']);
+    await page.locator('#f-industry').selectOption('plumber');
+    await expect(page.locator('#fs-f-industry')).toHaveText('Saved');
+    expect(bodies).toEqual([{ business_name: 'Renamed Studio' }, { industry_key: 'plumber' }]);
   });
-  test('the owner saving the same still sends the industry', async ({ page }) => {
-    expect(await saving(page, OWNER)).toEqual(['/identity', '/settings']);
+  test('the owner the same', async ({ page }) => {
+    const { sent, bodies } = await saving(page, OWNER);
+    expect(sent).toEqual(['/identity']);
+    await page.locator('#f-industry').selectOption('plumber');
+    await expect(page.locator('#fs-f-industry')).toHaveText('Saved');
+    expect(bodies).toEqual([{ business_name: 'Renamed Studio' }, { industry_key: 'plumber' }]);
   });
 });
 

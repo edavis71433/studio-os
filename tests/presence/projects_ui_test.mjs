@@ -27,13 +27,13 @@ ok('wires: approvals decide + messages thread', /\/approvals\/'\+.*\/decide','PO
 ok('a11y/ux: no prompt()/alert()/confirm() — uses dialogs + ddsToast', !/\bprompt\(/.test(h) && !/\balert\(/.test(h) && !/\bconfirm\(/.test(h) && /ddsToast/.test(h));
 ok('ux: valid next-stage buttons mirror the bounded ladders (no illegal jumps in UI)', /P_NEXT=\{active:\['on_hold','complete','archived'\]/.test(h) && /T_NEXT=\{todo:\['in_progress','blocked','done'\]/.test(h));
 ok('ux: shared/internal + client-action tags reflect visibility', /tag client/.test(h) && /needs the client/.test(h));
-ok('ux: write controls are hidden for the client view (STUDIO gate)', /STUDIO\?/.test(h) && /NEW_OK=STUDIO&&!LOADED_IN/.test(h) && /\$\{NEW_OK\?'<button class="btn" id="newProject"/.test(h));
+ok('ux: write controls are hidden for the client view (STUDIO gate)', /STUDIO\?/.test(h) && /NEW_OK=STUDIO&&!LOADED_IN/.test(h) && /\$\{NEW_OK\?'<button class="btn primary dds-ph-fill" id="newProject"/.test(h));
 ok('slice 9: record body is the two-column related-list layout (main + rail)', /class="dgrid/.test(h) && /class="dside"/.test(h) && /class="dmain"/.test(h) && /#detailWrap\{max-width/.test(h));
 ok('FIX B: a customer’s general (project-less) messages surface inside their view', /loadClientGeneral/.test(h) && /\/client-messages/.test(h) && /id="genList"/.test(h));
 ok('nav: Projects is a primary outcome, gated to the relationship area', /single\('projects', 'Projects', '\/projects\.html'\)/.test(nav) && /if \(f\.hasRelationship\) single\('projects'/.test(nav));
 
 // ── slice 9: the Lightning roster + record anatomy ──────────────────────────
-ok('slice 9: shared .lhead list-view header — 📁 object icon, #pagehead H1, refresh, meta', /class="lhead"/.test(h) && /class="obj-ic"/.test(h) && /id="pagehead" tabindex="-1"/.test(h) && /id="refreshBtn"/.test(h) && /updatedLabel\(\)/.test(h));
+ok('builder item 165: the one page header — the projects icon, #pagehead H1, refresh, the count line and the meta under it', /<header class="dds-ph">/.test(h) && /data-ic="projects"/.test(h) && /id="pagehead" tabindex="-1"/.test(h) && /id="refreshBtn"/.test(h) && /id="phLine"/.test(h) && /updatedLabel\(\)/.test(h));
 ok('slice 9: sortable roster table in its own scroll container (aria-sort + th buttons)', /class="tscroll"/.test(h) && /aria-sort=/.test(h) && /data-sort=/.test(h) && /table aria-label="Projects"/.test(h));
 ok('bold redesign: Board · List · Calendar, persisted (the old Cards choice opens the board)', /dds-display:projects/.test(h) && /id="dispBoard"/.test(h) && /id="dispTable"/.test(h) && /id="dispCal"/.test(h) && /if\(v==='cards'\)return 'board'/.test(h));
 ok('slice 9: roster enrichment uses EXISTING routes only (per-project /report + /studio/customers), no fake numbers', /ensureReports/.test(h) && /ensureCustomers/.test(h) && /\/studio\/customers/.test(h) && /if\(!\(r&&r\.progress\)\)return '<span class="mutcell">—<\/span>'/.test(h));
@@ -46,19 +46,23 @@ ok('slice 9: tasks are a checkbox list (done ⇄ todo) that keeps the other ladd
 ok('slice 9: friendly empty states (surveys check-in nudge)', /No surveys yet — /.test(h) && /send a check-in →/.test(h) && /No milestones yet/.test(h) && /No tasks yet/.test(h));
 
 // ── anti-drift: the shared list-view anatomy has TEETH ──────────────────────
-// customers.html / contacts.html / projects.html carry the SAME core
-// .lhead/.lrow1/.obj-ic/.lbtn/.lmeta block ("kept in sync by hand" — this pin
-// makes the hand honest). leads.html drifts intentionally (its .lhead margin
-// variant + wider .lrow1 gap) and inbox.html is a narrower pane header — both
-// excluded on purpose.
-const CORE_SELECTORS = ['.lhead', '.lrow1', '.obj-ic', '.lbtn', '.lbtn:hover', '.lmeta'];
+// customers.html / contacts.html carry the SAME core .lbtn block ("kept in sync
+// by hand" — this pin makes the hand honest). Builder item 165: their headers
+// are the one page header now (shell.css .dds-ph), so .lhead/.lrow1/.obj-ic/.lmeta
+// are gone from both — and must stay gone, rather than drift back in one of them.
+const CORE_SELECTORS = ['.lbtn', '.lbtn:hover'];
+for (const n of ['customers.html', 'contacts.html']) {
+  const src = read(n);
+  ok(`builder item 165: ${n} draws the one page header, not the old list header`, /<header class="dds-ph">/.test(src) && !/class="(lhead|lrow1|obj-ic|lmeta)"/.test(src) && !/^\s*\.(lhead|lrow1|obj-ic|lmeta)\{/m.test(src));
+}
 const coreBlock = (src) => CORE_SELECTORS.map((sel) => {
   const m = src.match(new RegExp('^\\s*' + sel.replace(/[.:]/g, '\\$&') + '\\{[^}]*\\}', 'm'));
   return m ? m[0].trim() : 'MISSING ' + sel;
 }).join('\n');
-const blocks = { 'customers.html': coreBlock(read('customers.html')), 'contacts.html': coreBlock(read('contacts.html')), 'projects.html': coreBlock(h) };
+// builder item 165: projects.html left the group for the one page header (shell.css .dds-ph)
+const blocks = { 'customers.html': coreBlock(read('customers.html')), 'contacts.html': coreBlock(read('contacts.html')) };
 const drifted = Object.entries(blocks).filter(([, b]) => b !== blocks['customers.html']).map(([n]) => n);
-ok('anti-drift: core .lhead/.lrow1/.obj-ic/.lbtn/.lmeta CSS identical across customers/contacts/projects', drifted.length === 0,
+ok('anti-drift: core .lbtn CSS identical across customers/contacts', drifted.length === 0,
   'drifted: ' + drifted.join(', ') + '\n' + Object.entries(blocks).map(([n, b]) => n + ':\n' + b).join('\n\n'));
 
 const passed = results.filter((r) => r.p).length;

@@ -29,15 +29,15 @@ const json = (body: unknown, status = 200) => ({ status, contentType: 'applicati
 const peopleCard = (page: import('@playwright/test').Page) => page.locator('#peopleCard');
 
 test.describe('Sharing & access', () => {
-  test('renders the board: breadcrumb · the People sheet with the owner · the eight surfaces with honest defaults and Visible/Hidden words', async ({ page }) => {
+  test('renders the board: trail · the People sheet with the owner · the eight surfaces with honest defaults and Visible/Hidden words', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
     await installApp(page, { api: { '/portal/members': people({ data: [DANA, JO] }), '/portal/shares': SHARES_NONE } });
     await page.goto('/sharing.html');
-    const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' });
-    await expect(crumbs.getByRole('link', { name: 'Website' })).toHaveAttribute('href', '/presence.html');
-    await expect(crumbs.locator('[aria-current="page"]')).toHaveText('Sharing & access');
+    // builder item 165: the shared header; the page opens from Settings (Team & access), so its trail says Settings
+    const trail = page.getByRole('navigation', { name: 'Where this page is' });
+    await expect(trail.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings.html');
     await expect(page.getByRole('heading', { level: 1, name: 'Sharing & access' })).toBeVisible();
     await expect(page.locator('h1')).toHaveCount(1);
     // builder item 53: who owns it, and the people with their roles
@@ -304,13 +304,13 @@ function spyScope(page: import('@playwright/test').Page): Array<[string, string]
 }
 
 test.describe('Sharing & access — client scope', () => {
-  test('opened with ?client=, every members/shares request carries x-dds-scope-site, the heading names the client, the breadcrumb keeps the client', async ({ page }) => {
+  test('opened with ?client=, every members/shares request carries x-dds-scope-site, the heading names the client, the trail keeps the client', async ({ page }) => {
     await installApp(page, { api: { '/portal/context': SCOPED_CTX, '/portal/members': people({ data: [REVIEWER], owner: { name: 'Marlow Chen', email: 'marlow@example.com', signed_in: true, me: false }, studio: { name: 'Bright Studio', role: 'Website manager', people: [{ email: 'owner@example.com', role: 'Studio owner', me: true }] }, can_transfer: 'studio' }), '/portal/shares': SHARES_NONE } });
     const seen = spyScope(page);
     await page.goto(`/sharing.html?client=${CLIENT}`);
     // the page says whose site it is, and the way back stays in scope
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sharing & access — Marlow’s Kitchen');
-    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Website' })).toHaveAttribute('href', `/presence.html?client=${CLIENT}`);
+    await expect(page.getByRole('navigation', { name: 'Where this page is' }).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', `/settings.html?client=${CLIENT}`);
     await expect(page.locator('#dds-ctxbar')).toContainText('Marlow’s Kitchen');
     // the reads
     expect(seen).toContainEqual(['GET /portal/members', CLIENT]);
@@ -335,12 +335,12 @@ test.describe('Sharing & access — client scope', () => {
     expect(seen.filter(([path, scope]) => scope !== CLIENT && !path.endsWith('/sales/my-tasks'))).toEqual([]);
   });
 
-  test('without ?client= no request carries a scope; the heading and the breadcrumb are the plain ones', async ({ page }) => {
+  test('without ?client= no request carries a scope; the heading and the trail are the plain ones', async ({ page }) => {
     await installApp(page, { api: { '/portal/members': people({ data: [REVIEWER] }), '/portal/shares': SHARES_NONE } });
     const seen = spyScope(page);
     await page.goto('/sharing.html');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sharing & access');
-    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Website' })).toHaveAttribute('href', '/presence.html');
+    await expect(page.getByRole('navigation', { name: 'Where this page is' }).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings.html');
     await expect(page.locator('#dds-ctxbar')).toHaveCount(0);
     await page.getByRole('button', { name: '+ Invite someone' }).click();
     await page.locator('#pp-email').fill('ana@example.com');
@@ -380,7 +380,8 @@ test.describe('Sharing & access — a studio picks the client first (item 136)',
     await expect(list.getByRole('listitem').first()).toHaveAttribute('href', '/sharing.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
     await expect(list).toContainText('Marlow’s Kitchen');
     await expect(page.locator('#peopleCard')).toHaveCount(0);
-    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings.html');
+    await expect(page.getByRole('navigation', { name: 'Where this page is' }).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings.html');
+    await expect(page.locator('header.dds-ph .dds-ph-line')).toHaveText('2 clients, each with their own people and their own switches for what they see. Choose one.');
     expect(asked).toEqual([]);                                                     // nothing read or written for the studio's own site
   });
 

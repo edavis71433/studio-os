@@ -45,7 +45,7 @@ test.describe('Accessibility', () => {
 
   // Slice 7 surfaces get scanned OPEN — a closed popover is display:none and
   // invisible to axe, so these are the only scans that actually cover them.
-  test('no serious/critical axe violations with the App Launcher panel open (inbox.html)', async ({ page }) => {
+  test('no serious/critical axe violations with the Menu panel open (inbox.html)', async ({ page }) => {
     await installApp(page);
     await page.goto('/inbox.html#enquiries');
     await page.waitForLoadState('networkidle');
@@ -93,10 +93,11 @@ test.describe('Accessibility', () => {
     await page.goto('/today.html');
     await expect(page.getByRole('button', { name: 'Notifications' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Account' })).toBeVisible();
-    // the App Launcher waffle (slice 7: the burger's successor) shows at every
-    // width and carries its accessible name.
-    await expect(page.locator('#dds-waffle')).toHaveAttribute('aria-label', 'App Launcher');
-    await expect(page.getByRole('button', { name: 'App Launcher' })).toBeVisible();
+    // the sidebar's Menu button (slice 7: the burger's successor) carries its name:
+    // Menu, the word (builder item 165; it was "App Launcher")
+    await expect(page.locator('#dds-waffle')).toHaveAttribute('aria-label', 'Menu');
+    await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'App Launcher' })).toHaveCount(0);
     await expect(page.getByLabel('Search')).toBeVisible();
   });
 
