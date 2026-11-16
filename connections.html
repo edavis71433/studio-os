@@ -136,13 +136,11 @@
   .center .sub{color:var(--soft);font-size:14px;max-width:52ch;margin:var(--dds-s2,8px) auto 0}
   a.link{color:var(--p);text-decoration:none;font-weight:500} a.link:hover{text-decoration:underline}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
-  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:var(--dds-r-lg,10px);font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none}
-  .toast.show{opacity:1}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
   @media (max-width:640px){.wrap{padding:16px 16px 90px}.row .acts{margin-left:0}}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -153,9 +151,8 @@
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // Consumes the EXISTING Connected Platform only: GET /connections and
 // POST /connections/:key/{connect,refresh,disconnect}. The OAuth return is
@@ -163,9 +160,8 @@
 // Calm language: never OAuth/API/tokens/scopes on screen.
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN = SUPABASE_URL + "/functions/v1/presence";
-const FN_REGION = 'us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN = "";
@@ -205,11 +201,13 @@ async function resolveClientName(){
   }
   catch(_e){ return ''; }
 }
-const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':SCOPE, 'x-region':FN_REGION });
-async function apiGet(p){ const r = await fetch(FN+p, { headers:H() }); return r.ok ? r.json() : Promise.reject(r.status); }
-async function apiPost(p, b){ try { const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{}, offline:true }; } }
+// the shell's one API helper (shell-kit.js), with this page's scope (?client=) on every call.
+// apiGet answers the body or rejects with the status (0: no answer at all); apiPost never throws
+// (no answer at all is { ok:false, status:0, offline:true }).
+const apiGet = (p) => ddsApi(p, { scope:SCOPE }).then((r) => r.ok ? r.body : Promise.reject(r.status));
+const apiPost = (p, b) => ddsApi(p, { method:'POST', body:b||{}, scope:SCOPE });
 
-function toast(msg){ if(window.ddsToast)return void ddsToast(msg);const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2600); }
+const toast = (m, kind, action) => ddsToast(m, kind, action);   // the shell's one toast: 'err' shows a failure as one
 
 // A failure that needs the OWNER to do something must not evaporate in 2.6
 // seconds. `problem()` writes the server's own message into the row, where it
@@ -219,7 +217,7 @@ function toast(msg){ if(window.ddsToast)return void ddsToast(msg);const t=$('toa
 // action. `extra` carries the activation detail (missing secrets, redirect URI)
 // the 503 now names.
 function problem(key, msg, extra){
-  const box = $('prob-'+key); if(!box) return void toast(msg);
+  const box = $('prob-'+key); if(!box) return void toast(msg, 'err');
   let h = `<b>${esc(msg)}</b>`;
   if(extra && Array.isArray(extra.missing) && extra.missing.length){
     h += `<p>Set these as Supabase Edge Function secrets:</p><ul>${extra.missing.map(m=>`<li><code>${esc(m)}</code></li>`).join('')}</ul>`;
@@ -230,27 +228,6 @@ function problem(key, msg, extra){
 function clearProblem(key){ const box=$('prob-'+key); if(box){ box.innerHTML=''; box.style.display='none'; } }
 // The server's own words, when it sent any. Never swallow a message we were given.
 const serverMsg = (r, fallback) => (r && r.body && typeof r.body.message === 'string' && r.body.message.trim()) ? r.body.message.trim() : fallback;
-
-// Small styled confirm — replaces native confirm(), matching the app's surfaces
-// (same pattern as presence.html's askText). Resolves true/false.
-function askConfirm(title, body, okLabel){
-  return new Promise((resolve)=>{
-    const dlg=document.createElement('dialog');
-    dlg.style.cssText='border:1px solid var(--line,#e6e6ec);border-radius:10px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(21,20,26,.22);background:var(--card,#fff);color:var(--ink,#15141a)';
-    const box=document.createElement('div'); box.style.cssText='padding:18px 20px';
-    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px;font-size:15px'; box.appendChild(h);
-    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#5c5a66);margin-bottom:10px'; box.appendChild(p); }
-    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
-    const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label; b.className='btn'+(primary?' primary':''); return b; };
-    const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
-    row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
-    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
-    cancel.addEventListener('click',()=>finish(false));
-    ok.addEventListener('click',()=>finish(true));
-    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(false); });
-    dlg.showModal(); setTimeout(()=>ok.focus(),20);
-  });
-}
 
 // connection state → a simple, human status (never technical)
 function statusOf(e){
@@ -289,14 +266,11 @@ const iconFor = (key) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[KE
 
 // the customer's own numbers, in plain words (from the read cache)
 // Item 95: "as of today", "as of yesterday", or the date in words, as the rest of the page says it.
+// (the data's own day, in the page's lowercase words around the shell's one date format)
 function asOfWords(iso){
-  const day=String(iso).slice(0,10), d=new Date(day+'T12:00:00');
-  if(isNaN(d))return day;
-  const ymd=(x)=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
-  const now=new Date(), y=new Date(now); y.setDate(now.getDate()-1);
-  if(day===ymd(now))return 'today';
-  if(day===ymd(y))return 'yesterday';
-  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const day=String(iso).slice(0,10), n=ddsDate.days(day);
+  if(n===null)return day;
+  return n===0?'today':n===-1?'yesterday':ddsDate.short(day);
 }
 function dataLine(d){
   if(!d) return '';
@@ -419,7 +393,7 @@ function alertBand(attention){
   </div>`;
 }
 // the rail — every line derived from the entries, never invented
-const when=(iso)=>{const d=new Date(iso||'');return Number.isNaN(d.getTime())?'':d.toLocaleDateString([],{month:'short',day:'numeric'});};
+const when=(iso)=>ddsDate.short(iso);   // "Oct 19" ("Oct 19, 2025" in another year): the shell's one date format
 function railWhat(entries){
   const on=entries.filter(e=>statusOf(e).connected);
   let h=`<div class="card"><div class="card-h"><h2>What connecting does</h2></div>
@@ -502,11 +476,9 @@ async function paintAdTags(){
   const save = $('adSave');
   save.addEventListener('click', async () => {
     save.disabled = true;
-    let r;
-    try { const res = await fetch(FN+'/settings', { method:'PUT', headers:H(), body:JSON.stringify({ google_tag_id: $('adGoogle').value.trim(), meta_pixel_id: $('adMeta').value.trim() }) }); r = { ok:res.ok, status:res.status, body: await res.json().catch(()=>({})) }; }
-    catch(_e){ r = { ok:false, status:0, body:{} }; }
+    const r = await ddsApi('/settings', { method:'PUT', scope:SCOPE, body:{ google_tag_id: $('adGoogle').value.trim(), meta_pixel_id: $('adMeta').value.trim() } });   // never throws: no answer at all is status 0
     save.disabled = false;
-    if(!r.ok){ toast(serverMsg(r, 'That didn’t save — please try again.')); return; }
+    if(!r.ok){ toast(serverMsg(r, 'That didn’t save — please try again.'), 'err'); return; }
     const d = (r.body && r.body.data) || {};
     $('adGoogle').value = d.google_tag_id || ''; $('adMeta').value = d.meta_pixel_id || '';
     toast(d.google_tag_id || d.meta_pixel_id ? 'Saved. Publish your website to put the tags and the cookie notice on it.' : 'Saved. Publish your website to take the tags off.');
@@ -519,7 +491,7 @@ async function paintAdTags(){
 // view — this is the studio's own calendar. An older server without the route
 // shows no card. Making or turning off the link is a setting (configure).
 let CAL = null, CAL_SHOWN = false;   // CAL_SHOWN: the #calSec deep link (Settings' Calendar row) scrolls here once
-async function calApi(method){ try { const r = await fetch(FN+'/calendar/link', { method, headers:H() }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{} }; } }
+const calApi = (method) => ddsApi('/calendar/link', { method, scope:SCOPE });   // never throws: no answer at all is status 0
 async function paintCalendar(){
   const host = $('calSec'); if(!host || IN_CLIENT) return;
   if(!CAL){ const r = await calApi('GET'); const d = r.ok && r.body && r.body.data; if(!d || typeof d.can_manage !== 'boolean') return; CAL = d; }   // only an answer that is about the link
@@ -542,19 +514,19 @@ async function paintCalendar(){
   const make = async (btn, method, okMsg) => {
     btn.disabled = true;
     const r = await calApi(method);
-    if(!r.ok){ btn.disabled = false; toast(serverMsg(r, 'That didn’t save — please try again.')); return; }
+    if(!r.ok){ btn.disabled = false; toast(serverMsg(r, 'That didn’t save — please try again.'), 'err'); return; }
     CAL = (r.body && r.body.data) || {}; toast(okMsg); paintCalendar();
   };
   const mk = $('calMake'); if(mk) mk.addEventListener('click', () => make(mk, 'POST', 'Your calendar link is ready.'));
   const cp = $('calCopy'); if(cp) cp.addEventListener('click', async () => {
-    const u = $('calUrl'); try { await navigator.clipboard.writeText(u.value); toast('Copied.'); } catch(_e){ u.select(); toast('Press ⌘C (Ctrl+C on Windows) to copy it.'); }
+    const u = $('calUrl'); try { await navigator.clipboard.writeText(u.value); toast('Copied.'); } catch(_e){ u.select(); toast('Press ⌘C (Ctrl+C on Windows) to copy it.', 'err'); }
   });
   const nw = $('calNew'); if(nw) nw.addEventListener('click', async () => {
-    if(!(await askConfirm('Make a new link?', 'The old link stops working, so calendars using it go quiet until you add the new one.', 'Make a new link'))) return;
+    if(!(await ddsConfirm('Make a new link?', 'The old link stops working, so calendars using it go quiet until you add the new one.', 'Make a new link', { danger:true }))) return;
     make(nw, 'POST', 'Your new calendar link is ready.');
   });
   const off = $('calOff'); if(off) off.addEventListener('click', async () => {
-    if(!(await askConfirm('Turn the calendar link off?', 'Calendars using it stop getting your bookings and tasks.', 'Turn it off'))) return;
+    if(!(await ddsConfirm('Turn the calendar link off?', 'Calendars using it stop getting your bookings and tasks.', 'Turn it off', { danger:true }))) return;
     make(off, 'DELETE', 'Your calendar link is off.');
   });
 }
@@ -563,7 +535,7 @@ async function paintCalendar(){
 // lands on the client's deal and record as "You logged an email". The studio's own
 // address (not while a client is in view); making or turning it off is a setting.
 let LOG = null;
-async function logApi(method){ try { const r = await fetch(FN+'/email/log-address', { method, headers:H() }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{} }; } }
+const logApi = (method) => ddsApi('/email/log-address', { method, scope:SCOPE });   // never throws: no answer at all is status 0
 async function paintEmailLog(){
   const host = $('logSec'); if(!host || IN_CLIENT) return;
   if(!LOG){ const r = await logApi('GET'); const d = r.ok && r.body && r.body.data; if(!d || typeof d.can_manage !== 'boolean') return; LOG = d; }   // an older server: no card
@@ -587,19 +559,19 @@ async function paintEmailLog(){
   const make = async (btn, method, okMsg) => {
     btn.disabled = true;
     const r = await logApi(method);
-    if(!r.ok){ btn.disabled = false; toast(serverMsg(r, 'That didn’t save — please try again.')); return; }
+    if(!r.ok){ btn.disabled = false; toast(serverMsg(r, 'That didn’t save — please try again.'), 'err'); return; }
     LOG = (r.body && r.body.data) || {}; toast(okMsg); paintEmailLog();
   };
   const mk = $('logMake'); if(mk) mk.addEventListener('click', () => make(mk, 'POST', 'Your log address is ready.'));
   const cp = $('logCopy'); if(cp) cp.addEventListener('click', async () => {
-    const u = $('logAddr'); try { await navigator.clipboard.writeText(u.value); toast('Copied.'); } catch(_e){ u.select(); toast('Press ⌘C (Ctrl+C on Windows) to copy it.'); }
+    const u = $('logAddr'); try { await navigator.clipboard.writeText(u.value); toast('Copied.'); } catch(_e){ u.select(); toast('Press ⌘C (Ctrl+C on Windows) to copy it.', 'err'); }
   });
   const nw = $('logNew'); if(nw) nw.addEventListener('click', async () => {
-    if(!(await askConfirm('Make a new address?', 'The old address stops working, so email sent to it isn’t logged any more.', 'Make a new address'))) return;
+    if(!(await ddsConfirm('Make a new address?', 'The old address stops working, so email sent to it isn’t logged any more.', 'Make a new address', { danger:true }))) return;
     make(nw, 'POST', 'Your new log address is ready.');
   });
   const off = $('logOff'); if(off) off.addEventListener('click', async () => {
-    if(!(await askConfirm('Turn the log address off?', 'Email sent to it stops being logged.', 'Turn it off'))) return;
+    if(!(await ddsConfirm('Turn the log address off?', 'Email sent to it stops being logged.', 'Turn it off', { danger:true }))) return;
     make(off, 'DELETE', 'Your log address is off.');
   });
 }
@@ -622,12 +594,12 @@ function paintAskClient(entries){
 async function askClient(){
   try{ const m=$('phMore'); if(m&&m.hidePopover) m.hidePopover(); }catch(_){}   // the phone's ⋯ sheet steps aside for the question
   const who = CLIENT_NAME || 'the client';
-  if(!(await askConfirm('Email ' + who + ' a link to connect their Google?', 'They sign in to their portal and approve it on Google’s own screen, with their own account — read-only, and theirs to disconnect any time. You can still connect it for them from here.', 'Send the email'))) return;
+  if(!(await ddsConfirm('Email ' + who + ' a link to connect their Google?', 'They sign in to their portal and approve it on Google’s own screen, with their own account — read-only, and theirs to disconnect any time. You can still connect it for them from here.', 'Send the email', { danger:true }))) return;
   const btn = $('askClient'); if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; }
   const r = await apiPost('/connections/ask', {});
   if(r.ok){ toast((r.body && r.body.data && r.body.data.message) || ('Asked — we emailed ' + who + ' a link.')); return reload(); }
   if(btn){ btn.disabled = false; btn.textContent = 'Ask ' + who + ' to connect their Google'; }
-  toast(serverMsg(r, 'That didn’t send, and nothing changed. Try again in a moment.'));
+  toast(serverMsg(r, 'That didn’t send, and nothing changed. Try again in a moment.'), 'err');
 }
 
 function wire(){
@@ -726,7 +698,7 @@ async function connectKey(key, label){
   problem(key, serverMsg(r, 'That key didn’t connect, and nothing changed. Please check it and try again.'), r.body);
 }
 async function disconnect(key, label, btn){
-  if(!(await askConfirm('Disconnect ' + label + '?', 'Studio OS stops reading it from here on. Your ' + label + ' account and everything in it stay exactly as they are — you can reconnect any time.', 'Disconnect'))) return;
+  if(!(await ddsConfirm('Disconnect ' + label + '?', 'Studio OS stops reading it from here on. Your ' + label + ' account and everything in it stay exactly as they are — you can reconnect any time.', 'Disconnect', { danger:true }))) return;
   btn.disabled = true; btn.textContent = 'Disconnecting…';
   clearProblem(key);
   const r = await apiPost('/connections/'+encodeURIComponent(key)+'/disconnect', {});

@@ -53,7 +53,7 @@ ok('the kit puts its helpers on the page', !!(ddsKit && ddsMoney && ddsDate && d
   // the Nov 12 review (file 06, finding 101): a 10pm enquiry read "today" in the Inbox the next morning
   NOW = at(17, 8).getTime();
   ok('a 10pm enquiry is "yesterday" the next morning, on every page', ddsDate.ago(at(16, 22).toISOString()) === 'yesterday');
-  ok('ago in days', ddsDate.ago(at(17, 1)) === 'today' && ddsDate.ago(at(14, 12)) === '3 days ago' && ddsDate.ago(at(9, 12)) === '1 week ago' && ddsDate.ago(at(1, 12)) === '2 weeks ago');
+  ok('ago in days', ddsDate.ago(at(17, 1)) === 'today' && ddsDate.ago(at(14, 12)) === '3 days ago' && ddsDate.ago(at(9, 12)) === 'last week' && ddsDate.ago(at(1, 12)) === '2 weeks ago');
   ok('ago in months past 60 days', ddsDate.ago(new RealDate(2026, 7, 1)) === '3 months ago');
   ok('a day still to come is "soon"', ddsDate.ago(at(20)) === 'soon');
   ok('since: to the minute today', ddsDate.since(new RealDate(NOW - 20000)) === 'just now' && ddsDate.since(new RealDate(NOW - 5 * 60000)) === '5 min ago' && ddsDate.since(new RealDate(NOW - 3 * 3600000)) === '3 hours ago' && ddsDate.since(new RealDate(NOW - 3600000)) === '1 hour ago');

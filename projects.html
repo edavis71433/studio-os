@@ -333,7 +333,7 @@ html.dds-embed #detailWrap{padding-top:0}
     .card.pc{padding:14px 16px}
   }
 </style>
-<script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
+<script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap" id="listWrap">
@@ -378,13 +378,12 @@ html.dds-embed #detailWrap{padding-top:0}
   </form>
 </dialog>
 
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // item 71: an emailed reply shows its words; the quoted earlier email folds behind "Show earlier email" (shell.js ddsQuote)
@@ -395,7 +394,7 @@ const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // are created on the AGENCY site; service_bridge ensureProjectForDeal takes
 // agencySiteId) — so the roster painted "Projects live at the studio level" and
 // a record 404'd. Once the scope resolves to a customer through the bridge
-// (resolveScopedClient below), AG_MODE drops the scope header: the roster, the
+// (resolveScopedClient below), AG_MODE drops the scope (api() below): the roster, the
 // record, its tasks, files and support all read the studio's own site, and the
 // list is filtered to that customer's projects. A scope that is NOT a bridged
 // customer keeps the old behaviour (the honest studio-level notice).
@@ -408,12 +407,11 @@ let AG_MODE=false,SCOPED_CLIENT=null,OPENED_ONCE=false;
 const inClient=()=>!!scope()&&(window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope())?!!window.ddsScopeInfo():true);
 let LOADED_IN=null;
 document.addEventListener('dds:context',()=>{if(LOADED_IN===null||LOADED_IN===inClient())return;AG_MODE=false;SCOPED_CLIENT=null;CUSTMAP=null;CUSTTRIED=false;load(true);});
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':AG_MODE?'':scope(),'x-region':FN_REGION});
 async function resolveScopedClient(){
   const site=scope(); if(!site)return null;
   try{
-    const r=await fetch(FN+'/studio/customers',{headers:{...H(),'x-dds-scope-site':''}});
-    const b=await r.json().catch(()=>({}));
+    const r=await ddsApi('/studio/customers',{scope:''});   // the studio's own roster: no client in the call
+    const b=r.body;
     const rows=Array.isArray(b&&b.data)?b.data:[];
     if(r.ok&&inClient())takeCustomers(rows);   // H9: the same roster names the customers, so it isn't asked for twice (unless the context said meanwhile it's your own business, item 83)
     const hit=rows.find(c=>c&&String(c.customer_site_id||'')===site&&c.client_id);
@@ -426,7 +424,7 @@ const T_NEXT={todo:['in_progress','blocked','done'],in_progress:['todo','blocked
 const STATUSES=['active','on_hold','complete','archived'];
 let TOKEN="",STUDIO=true,NEW_OK=false;
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
-const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+const toast=(m,bad,action)=>ddsToast(m,bad?'err':'ok',action);   // the shell's one toast; true is a failure
 // Server errors that read like a sentence still show; raw technical junk doesn't.
 const nice=(e)=>{const m=e&&e.message?String(e.message):'';return /^[A-Z]/.test(m)&&m.length<160&&!/[{}<>]|_|\bsql\b|\bpostgres|^(Cannot|Unexpected|Failed to fetch)\b|is not a function|of (undefined|null)|TypeError/i.test(m)?m:'Something went wrong on our side — please try again.';};
 // "2026-08-01" → "Aug 1, 2026" — people read dates, not database strings
@@ -436,12 +434,13 @@ const statusLabel=(s)=>String(s||'').replace('_',' ');
 // the same rule as the server's reminder sweep (lib/approvals.ts
 // approvalReminderDue: whole days to the due date < 0), on the studio's local
 // day, so the record agrees with the daily reminder the client is getting.
-const todayYmd=()=>{const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);};
+const todayYmd=()=>ddsDate.ymd();
 const approvalOverdue=(a,today)=>{if(!a||a.status!=='pending')return false;const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(a.due_date||''));return !!m&&m[0]<String(today||todayYmd());};
 
+// the body, or an Error carrying the server's sentence and status (0: no answer at all)
 async function api(path,method,body){
-  const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});
-  let b={}; try{b=await r.json();}catch(_){}
+  const r=await ddsApi(path,{method,body,scope:AG_MODE?'':scope()});
+  const b=r.body;
   if(!r.ok){const e=new Error((b&&b.message)||'That didn’t go through.');e.status=r.status;e.body=b;throw e;}
   return b;
 }
@@ -490,8 +489,8 @@ function stageOf(p){
   return (r&&STAGE_LABEL[r.stage])?r.stage:'none';
 }
 const dayOf=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?m[0]:'';};
-const daysTo=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));if(!m)return null;const t=new Date();return Math.round((new Date(+m[1],+m[2]-1,+m[3])-new Date(t.getFullYear(),t.getMonth(),t.getDate()))/86400000);};
-const shortDay=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';};
+const daysTo=(s)=>{const d=dayOf(s);return d?ddsDate.days(d):null;};
+const shortDay=(s)=>ddsDate.short(dayOf(s));   // "Aug 1" ("Aug 1, 2027" in another year)
 const weekday=(s)=>{const n=daysTo(s);if(n===0)return 'today';if(n===1)return 'tomorrow';const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{weekday:'short'}):'';};
 // late: past its target date, or a step past its own
 const isLate=(p)=>{if(!isRunning(p))return false;const d=daysTo(p.target_date);const r=REPORTS[p.id];return (d!=null&&d<0)||!!(r&&Number(r.overdue)>0);};
@@ -1011,7 +1010,7 @@ function stepPicker(host,id,steps){
   f.onsubmit=async(e)=>{
     e.preventDefault();
     const keys=[...f.querySelectorAll('input[data-step]:not([disabled])')].filter(cb=>cb.checked).map(cb=>cb.dataset.step);
-    if(!keys.length){toast('Tick at least one step to add.');return;}
+    if(!keys.length){toast('Tick at least one step to add.',true);return;}
     save.disabled=true;
     // A 409 means someone (another tab, or the SQL backfill) added one of these
     // between the page's read and this write. Say what happened and re-open the
@@ -1260,7 +1259,7 @@ async function openProject(id,opts){
       dt.innerHTML=`<input id="renInput" value="${esc(p.name||'')}" aria-label="Project name" style="font:inherit;font-family:var(--serif);font-size:24px;width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:4px 8px"><div class="row2" style="margin-top:8px"><button class="btn sm" id="renSave">Save</button><button class="btn ghost sm" id="renCancel">Cancel</button></div>`;
       const inp=$('renInput');if(inp)inp.focus();
       $('renCancel').onclick=()=>reopen();
-      $('renSave').onclick=once($('renSave'),async()=>{const v=($('renInput').value||'').trim();if(!v){toast('Give the project a name.');$('renSave').disabled=false;return;}await api('/projects/'+id,'PATCH',{name:v});toast('Renamed');reopen();});
+      $('renSave').onclick=once($('renSave'),async()=>{const v=($('renInput').value||'').trim();if(!v){toast('Give the project a name.',true);$('renSave').disabled=false;return;}await api('/projects/'+id,'PATCH',{name:v});toast('Renamed');reopen();});
     };
     // sales item 106: save this project as a template; the steps' dates are kept as days from its start
     if(STUDIO&&$('saveTpl'))$('saveTpl').onclick=()=>miniForm($('tplForm'),[{name:'name',label:'Template name',placeholder:'e.g. Website build, our way'}],async v=>{
@@ -1379,7 +1378,7 @@ async function loadSurveys(id){
     $('svList').querySelectorAll('[data-sv]').forEach(b=>b.onclick=async()=>{try{const r=await api('/surveys/'+b.dataset.sv);const resp=(r.data&&r.data.responses)||[];const box=b.closest('.item');const ex=box.querySelector('.resp');if(ex){ex.remove();return;}const d=document.createElement('div');d.className='resp mut';d.style.flexBasis='100%';d.innerHTML=resp.length?resp.map(x=>'<div>'+Object.values(x.answers||{}).map(esc).join(' · ')+'</div>').join(''):'No responses yet.';box.appendChild(d);}catch(e){toast(nice(e),true);}});
   }catch(e){ $('svList').innerHTML='<div class="empty">Couldn’t load surveys.</div>'; }
 }
-const when=(iso)=>{const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';const d=Math.floor(h/24);return d<7?d+'d ago':new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+const when=(iso)=>ddsDate.since(iso);   // "just now", "5 min ago", "3 hours ago", then calendar days ("1d ago" counted 24-hour blocks)
 async function loadSupport(id,focusRid){
   const seq=PROJ_SEQ;   // stale-guard: bail if another record took over meanwhile
   try{

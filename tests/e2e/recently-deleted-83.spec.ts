@@ -59,7 +59,10 @@ test.describe('Deleting a deal can be undone (item 83)', () => {
 });
 
 // ── the Recently deleted page (drawn in Figma, section 263:865) ──
-const ago = (d: number) => new Date(Date.now() - d * 86400000).toISOString();
+// The fixtures' days are fixed in 2026, and the list's test pins the page's clock there: from January
+// a day from another year carries its year ("was due Nov 6, 2026", the shell's ddsDate.short, item 101).
+const NOW = Date.parse('2026-11-16T18:00:00Z');
+const ago = (d: number) => new Date(NOW - d * 86400000).toISOString();
 const DELETED = { data: {
   days: 30, partial: [],
   deals: [
@@ -72,6 +75,7 @@ const DELETED = { data: {
 test.describe('The Recently deleted page (item 83)', () => {
   test('lists what was deleted, newest first; the chips narrow it; Restore brings each back and says where', async ({ page }) => {
     const sent: Sent[] = [];
+    await page.clock.setFixedTime(new Date(NOW));
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/deleted': DELETED } });
     await page.route((u) => /\/sales\/(deals\/[^/]+\/restore|contacts\/[^/]+\/restore|deal-tasks\/[^/]+)$/.test(u.pathname), (route) => {
       const r = route.request();

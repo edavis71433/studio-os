@@ -170,14 +170,14 @@
   .acc-cant{border-radius:12px;background:var(--warn-soft);color:var(--warn);padding:14px;font-size:13.5px}
   .acc-cant p{margin:6px 0 0}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
 <dialog class="dpanel" id="dpanel" aria-labelledby="dpTitle"><div id="dpBody"></div></dialog>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── Domains (builder list item 52, Nov 2026) ─────────────────────────────────
 // Every domain the studio's clients use, and the studio's own, in one list the
@@ -188,18 +188,16 @@
 // expiry come from the daily public-record check (commerce/lifecycle.ts).
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+const toast=(m,bad,action)=>ddsToast(m,bad?'err':'ok',action);   // the shell's one toast
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-region':FN_REGION});
-async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+const api=(path)=>ddsApi(path,{scope:''});   // the studio's own domains: no client goes with them
 const day=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});};
-const dayShort=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+const dayShort=(iso)=>ddsDate.short(iso);   // "Nov 3", with the year when it isn't this one
 // item 222: the key and the tick the access card, the sheet and the row's pill use
 const KEY_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>';
 const CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4.5 4.5L19 7"/></svg>';
@@ -216,8 +214,11 @@ const FILTERS={
   access:{label:'Waiting on access',test:(d)=>!!(d.access&&d.access.status==='asked')},   // item 222: shown only while one waits
   nodomain:{label:'No domain yet',test:()=>false},
 };
-const ago=(iso)=>{if(!iso)return'';const t=Date.parse(iso);if(!isFinite(t))return'';const m=Math.round((Date.now()-t)/60000);if(m<2)return'Just now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<24)return h+' hour'+(h===1?'':'s')+' ago';const d=Math.round(h/24);return d+' day'+(d===1?'':'s')+' ago';};
-async function apiSend(method,path,body,extra){const r=await fetch(FN+path,{method,headers:{...H(),...(extra||{})},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+// when it was last checked, to the minute: the shell's words (ddsDate.since: "5 min ago", then calendar days,
+// then the date), starting with a capital as a cell of its own ("Just now", "Yesterday")
+const ago=(iso)=>{const w=ddsDate.since(iso);return w&&w[0].toUpperCase()+w.slice(1);};
+// extra: headers of its own (scopeFor: the client's site the studio acts inside)
+const apiSend=(method,path,body,extra)=>ddsApi(path,{method,body,scope:'',headers:extra});
 const RANK={registry:0,expired:1,down:2,old_copy:3,other_site:4,expiring:5,padlock:6,partly:7,offline:8,checking:9,not_live:10,elsewhere:11,connected:12};   // the server's order (agency/sites.ts buildDomains)
 const COLS=[
   ['domain','Domain',(d)=>d.domain],
@@ -406,7 +407,7 @@ function paintPanel(){
       <label for="dpConf">Confirmed on</label><input id="dpConf" type="date" value="${esc(nt.renews_confirmed_at||'')}">
       <label for="dpNote">A note</label><textarea id="dpNote" rows="3" maxlength="600" placeholder="Anything the next person should know">${esc(nt.note||'')}</textarea>
       <div class="dp-acts"><button type="submit" class="btn">Save notes</button><span class="muted" id="dpSaved" role="status"></span></div></form>
-      ${nt.updated_at?`<p class="muted" style="font-size:12px;margin-top:8px">Last saved ${esc(ago(nt.updated_at).replace(/^Just now$/,'just now'))}${nt.updated_by?' by '+esc(nt.updated_by):''}.</p>`:''}</section>`;
+      ${nt.updated_at?`<p class="muted" style="font-size:12px;margin-top:8px">Last saved ${esc(ddsDate.since(nt.updated_at))}${nt.updated_by?' by '+esc(nt.updated_by):''}.</p>`:''}</section>`;
   $('dpClose').addEventListener('click',closePanel);
   $('dpCheck').addEventListener('click',checkNow);
   $('dpNotes').addEventListener('submit',saveNotes);

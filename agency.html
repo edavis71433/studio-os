@@ -512,7 +512,7 @@
   }
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .need a.rowact.primary,:root:not([data-theme="light"]) .facts .fgo{color:var(--dds-on-p,#171320)}}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -596,7 +596,7 @@
   </form>
 </dialog>
 
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // Agency roster (A7.2 → standards sweep SS2): the studio's portfolio as a real
 // list view — its own small bar (the page header is .dds-ph), fixed-view chips, sortable typed columns behind a
@@ -606,26 +606,25 @@
 // /agency/me + /agency/portfolio (role x scope enforced server-side).
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-// styled toast via the shared shell (replaces native alert()); bad→error styling
-const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+// the shell's one toast (shell-kit.js); bad→error styling
+const toast=(m,bad,action)=>ddsToast(m,bad?'err':'ok',action);
 let TOKEN="",ME=null,CLIENTS=[],PROJECT_BY_SITE={},CUST_FAILED=false,LOADED_ONCE=false,LOADED_AT=0;
-const money=(c)=>{const v=(c||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});};   // final pass, batch C: one money format (whole dollars, or with cents)
+const money=(c)=>ddsMoney(c||0);   // the shell's one money format (shell-kit.js): whole dollars, or with cents
 let REQ_SEQ=0;   // request-generation guard: a slow response that resolves after a newer request started is DISCARDED
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-region':FN_REGION});
 // Speed (Nov 10 2026): Home's reads used to wait for /agency/me (which studio this is) before
 // they started. boot() now starts them with it (early); each answer goes to the first api()
 // call for that same path, and whatever is left is dropped when boot ends.
 const EARLY=new Map();
 function early(paths){for(const p of paths){const pr=apiNow(p);pr.catch(()=>{});EARLY.set(p,pr);}}
-async function apiNow(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+// the shell's one API helper (shell-kit.js): Home reads at studio level, so no client goes with a read
+const apiNow=(path)=>ddsApi(path,{scope:''});
 function api(path){const e=EARLY.get(path);if(e){EARLY.delete(path);return e;}return apiNow(path);}
-async function apiSend(method,path,payload,site){const h=H();if(site)h['x-dds-scope-site']=site;const r=await fetch(FN+path,{method,headers:h,body:payload?JSON.stringify(payload):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}   // site: act inside that client's account, as the shell's ?client= does
+const apiSend=(method,path,payload,site)=>ddsApi(path,{method,body:payload||undefined,scope:site||''});   // site: act inside that client's account, as the shell's ?client= does
 const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 
@@ -1168,9 +1167,9 @@ function paintToday(){
 //    here, on the page the agency lands on. Every read is best-effort: a failed
 //    or forbidden read drops its piece, never fake zeros; nothing at all → hidden. ──
 const OPEN_STAGES=['lead','qualified','proposal','contract'];
-function localYmd(){const d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function localYmd(){return ddsDate.ymd();}   // the shell's one day (shell-kit.js)
 // the local day an instant falls on (YYYY-MM-DD), '' when it can't be read
-function localDayOf(iso){const t=Date.parse(String(iso||''));if(!Number.isFinite(t))return '';const d=new Date(t);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function localDayOf(iso){return iso?ddsDate.ymd(iso):'';}
 function daysBetween(fromYmd,toYmd){const a=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(fromYmd||'')),b=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(toYmd||''));if(!a||!b)return null;return Math.round((Date.UTC(+b[1],+b[2]-1,+b[3])-Date.UTC(+a[1],+a[2]-1,+a[3]))/86400000);}
 function dueLabel(ymd){const d=daysBetween(localYmd(),ymd);if(d==null)return'No date';const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd));const when=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12)).toLocaleDateString('en-US',{month:'short',day:'numeric'});if(d<0)return'Overdue · '+when;if(d===0)return'Today';if(d===1)return'Tomorrow';return when;}
 function weekTodos(list){

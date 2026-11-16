@@ -103,7 +103,7 @@ test.describe('Admin Health Center — family chrome', () => {
     await page.route(HEALTH_GLOB, (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{}' }));
     await openMore(page);
     await page.locator('#refreshBtn').click();
-    await expect(page.locator('.toast')).toContainText('Couldn’t refresh');
+    await expect(page.locator('.dds-toast.err')).toContainText('Couldn’t refresh');   // the shell's toast, shown as a failure (builder item 101)
     await expect(page.locator('.card.area')).toHaveCount(10); // kept, not wiped
   });
 });

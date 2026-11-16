@@ -418,7 +418,7 @@
   @media (max-width:767px){.ftile{min-height:52px;padding:8px 14px 8px 10px}.ftile[aria-pressed="true"]{padding:7px 13px 7px 9px}.ftile .fg{width:32px;height:32px}.vbtn,.fmanage,.pbar button,.tsug button,.mrow .ib{min-height:44px}.mrow .ib{width:44px}.stags .tagchip,.stags .fchip,.stags .addtag{min-height:32px}.vdiv{display:none}.frow .vbtn{flex:1 1 auto}}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -582,7 +582,7 @@
   </form>
 </dialog>
 
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script src="/sites-tools.js?v=176b"></script>
 <script src="/people.js?v=451"></script>
 <script>
@@ -604,19 +604,18 @@
 // them, order moves them with CSS), so a drawn picture is never drawn twice.
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+const toast=(m,bad,action)=>ddsToast(m,bad?'err':'ok',action);   // the shell's one toast; true is a failure
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-region':FN_REGION});
-async function api(path){const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-async function apiSend(method,path,payload){const r=await fetch(FN+path,{method,headers:H(),body:payload?JSON.stringify(payload):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+// the studio's own list: no client in these calls (scope ''). No answer at all is status 0, never a throw.
+const api=(path)=>ddsApi(path,{scope:''});
+const apiSend=(method,path,payload)=>ddsApi(path,{method,body:payload,scope:''});
 const initial=(s)=>String(s||'?').trim().charAt(0).toUpperCase();
-const day=(iso)=>{if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:d.getFullYear()===new Date().getFullYear()?undefined:'numeric'});};
+const day=(iso)=>ddsDate.short(iso);   // "Nov 3", "Nov 3, 2025" in another year
 const hostOf=(u)=>String(u||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'');
 const scoped=(path,id)=>path+'?client='+encodeURIComponent(id);
 
@@ -1501,7 +1500,8 @@ $('dup-cancel').onclick=()=>$('dupDlg').close();
 // The copy step on its own. A dropped connection here is a failed COPY, never a failed
 // set-up: the customer already exists, so the answer says so and offers the copy again.
 async function dupCopy(src,made){
-  let k=null;try{k=await apiSend('POST','/agency/sites/'+encodeURIComponent(src.site_id)+'/duplicate',{site_id:made.site_id});}catch(_){k=null;}
+  let k=await apiSend('POST','/agency/sites/'+encodeURIComponent(src.site_id)+'/duplicate',{site_id:made.site_id});
+  if(k.status===0)k=null;   // no answer at all: "we lost the connection while copying"
   const invite=made.invited===false?'The invitation email to '+esc(made.email)+' didn’t go out — share their sign-in page instead.':'Invitation sent to '+esc(made.email)+'.';
   if(k&&k.ok){const a=(k.body&&k.body.data)||{},pg=a.pages||null;const n=(c,w)=>c+' '+w+(c===1?'':'s');
     const got=[pg?(pg.pages?n(pg.pages,'page')+' and ':'')+n(pg.sections,'section'):'',pg&&pg.photos?n(pg.photos,'photo'):'',pg&&pg.menu?'the menu':'',a.look?'the '+a.look+' look':'',a.applied&&a.applied.offerings?n(a.applied.offerings,'service'):'',a.applied&&a.applied.faqs?n(a.applied.faqs,'FAQ'):'',a.applied&&a.applied.voice?'the voice':'',a.applied&&a.applied.colors?'the colors':''].filter(Boolean);
@@ -1529,9 +1529,9 @@ $('dupForm').onsubmit=async(e)=>{
   DUP_BUSY=true;const btn=$('dup-submit');btn.disabled=true;btn.textContent='Setting up…';
   let res=null;
   try{
-    let r;
-    try{r=await apiSend('POST','/sales/customers',{mode:'provision',name:name||undefined,business_name,email,edition:'presence'});}
-    catch(_){toast('We lost the connection, so we can’t tell whether they were set up. Look for them on Customers before trying again.',true);return;}
+    const r=await apiSend('POST','/sales/customers',{mode:'provision',name:name||undefined,business_name,email,edition:'presence'});
+    // no answer at all: they may or may not have been set up
+    if(r.status===0){toast('We lost the connection, so we can’t tell whether they were set up. Look for them on Customers before trying again.',true);return;}
     const d=(r.body&&r.body.data)||{};
     if(!r.ok){toast((r.body&&r.body.message)||'We couldn’t set them up just now.',true);return;}
     if(d.requested||d.already_exists)res={heading:'Nothing was copied',line:esc(business_name)+' already has a Studio OS account, so their site isn’t new. Duplicate only starts a new site.'};
@@ -1546,7 +1546,7 @@ $('dupForm').onsubmit=async(e)=>{
 // ── Move to trash (item 154): offline at once, out of every list, back with one press for
 //    90 days, then deleted for good (POST /agency/sites/:id/trash; ops/site_trash.ts). ──
 let TRASH_SITE=null,TRASH_BUSY=false;
-const longDay=(d)=>d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:d.getFullYear()===new Date().getFullYear()?undefined:'numeric'});
+const longDay=(d)=>ddsDate.short(d);
 function openTrash(id){
   const s=SITES.find(x=>x.site_id===id);if(!s)return;
   TRASH_SITE=id;$('trashHead').textContent='Move '+(s.name||'this site')+' to the trash?';
@@ -1565,7 +1565,8 @@ $('trashForm').onsubmit=async(e)=>{
   e.preventDefault();if(TRASH_BUSY)return;
   const s=SITES.find(x=>x.site_id===TRASH_SITE);if(!s)return;
   TRASH_BUSY=true;const b=$('trash-go');b.disabled=true;b.textContent='Moving…';
-  let r=null;try{r=await apiSend('POST','/agency/sites/'+encodeURIComponent(s.site_id)+'/trash');}catch(_){r=null;}
+  let r=await apiSend('POST','/agency/sites/'+encodeURIComponent(s.site_id)+'/trash');
+  if(r.status===0)r=null;   // no answer at all: we can't tell whether it moved
   TRASH_BUSY=false;
   if(!r||!r.ok){toast((r&&r.body&&r.body.message)||'We lost the connection, so we can’t tell whether it moved. Refresh to see.',true);b.disabled=false;b.textContent='Move to trash';return;}
   $('trashDlg').close();
@@ -1606,8 +1607,9 @@ $('tplForm').onsubmit=async(e)=>{
   TPL_BUSY=true;const btn=$('tpl-save');btn.disabled=true;btn.textContent='Saving…';
   let r=null;
   try{r=await apiSend('POST','/agency/kits',{site_id:TPL_SITE,name,with_pages:true});}
-  catch(_){toast('We lost the connection, so we can’t tell whether it saved. Look under Start from before saving it again.',true);}
   finally{TPL_BUSY=false;}
+  // no answer at all: it may or may not have saved
+  if(r&&r.status===0){r=null;toast('We lost the connection, so we can’t tell whether it saved. Look under Start from before saving it again.',true);}
   if(!r||!r.ok){if(r)toast((r.body&&r.body.message)||'That didn’t save.',true);btn.disabled=false;btn.textContent='Save template';return;}
   const d=(r.body&&r.body.data)||{},sm=d.summary||{};const n=(c,w)=>(c||0)+' '+w+(c===1?'':'s');
   $('tpl-fields').style.display='none';
@@ -1779,8 +1781,9 @@ $('newForm').onsubmit=async(e)=>{
   NEW_BUSY=true;const btn=$('new-submit');btn.disabled=true;btn.textContent='Making the site…';
   let r=null;
   try{r=await apiSend('POST','/agency/sites',{business_name,kit_id:kit_id||undefined,template_slug:template_slug||undefined,industry_key:industry_key||undefined});}
-  catch(_){toast('We lost the connection, so we can’t tell whether the site was made. Refresh Sites before trying again.',true);}
   finally{NEW_BUSY=false;}
+  // no answer at all: the site may or may not have been made
+  if(r&&r.status===0){r=null;toast('We lost the connection, so we can’t tell whether the site was made. Refresh Sites before trying again.',true);}
   if(!r||!r.ok){
     btn.textContent='Create site';
     // item 198: the plan filled up since the page loaded; say so where Create site is
@@ -1820,8 +1823,9 @@ $('invForm').onsubmit=async(e)=>{
   INV_BUSY=true;const btn=$('inv-submit');btn.disabled=true;btn.textContent='Sending…';
   let r=null;
   try{r=await apiSend('POST','/agency/sites/'+encodeURIComponent(s.site_id)+'/invite',{email,name:name||undefined});}
-  catch(_){toast('We lost the connection, so we can’t tell whether the invitation went out. Refresh Sites: if the card no longer says “No owner yet”, it did.',true);}
   finally{INV_BUSY=false;}
+  // no answer at all: the invitation may or may not have gone
+  if(r&&r.status===0){r=null;toast('We lost the connection, so we can’t tell whether the invitation went out. Refresh Sites: if the card no longer says “No owner yet”, it did.',true);}
   if(!r||!r.ok){
     if(r)toast((r.body&&r.body.message)||'We couldn’t send the invitation just now.',true);
     btn.disabled=false;btn.textContent='Send invitation';
@@ -1881,7 +1885,7 @@ function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to you
 // (x-dds-scope-site), as the client's own pages do; a change re-reads the list so the
 // card's owner line and any waiting handover follow at once.
 function scopedApi(siteId){
-  return async(path,method,body)=>{try{const r=await fetch(FN+path,{method:method||'GET',headers:{...H(),'x-dds-scope-site':siteId},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}catch(_){return{ok:false,status:0,body:{}};}};
+  return (path,method,body)=>ddsApi(path,{method,body,scope:siteId});
 }
 let PEOPLE_DIRTY=false,PEOPLE_FOR='';
 function openPeople(id,view){

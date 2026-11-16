@@ -1051,10 +1051,11 @@ test.describe('Projects — a client context lists that client’s projects', ()
     await expect(page.locator('#dtitle')).toHaveText('Acme website build');
     await expect(page).toHaveURL(/project=p1/);
     await expect(page).toHaveURL(/client=site-acme/);
-    // the bridge read itself is unscoped, and so is everything after it resolved
-    expect(scopes['/studio/customers']).toBe('');
-    expect(scopes['/projects']).toBe('');
-    expect(scopes['/projects/p1']).toBe('');
+    // the bridge read itself is unscoped, and so is everything after it resolved: no scope header at all
+    // (builder item 101: the shell's API helper sends none for the studio's own book, never an empty one)
+    expect(scopes['/studio/customers']).toBe('(none)');
+    expect(scopes['/projects']).toBe('(none)');
+    expect(scopes['/projects/p1']).toBe('(none)');
     // the roster behind the record carries only Acme's project
     await page.locator('.crumbs .crumb').click();
     await expect(page.locator('tbody tr')).toHaveCount(1);

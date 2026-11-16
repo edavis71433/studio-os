@@ -83,13 +83,11 @@
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:50px auto}
   @media (prefers-reduced-motion:no-preference){.spin{animation:sp .8s linear infinite}}
   @keyframes sp{to{transform:rotate(360deg)}}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:999px;font-size:14px;opacity:0;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none;z-index:40}
-  .toast.show{opacity:1}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
   /* mobile: KPI tiles pair up, area cards stack — a 1fr grid never scrolls sideways */
   @media (max-width:900px){.c3{grid-column:span 6}.c4{grid-column:span 12}}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -101,14 +99,12 @@
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 // builder item 165: on a phone the header's other actions sit in a sheet behind ⋯; picking one puts the sheet away
 document.addEventListener('click',(e)=>{const m=e.target&&e.target.closest?e.target.closest('.dds-ph-more'):null;if(!m||!e.target.closest('button,a'))return;try{if(m.matches(':popover-open'))m.hidePopover();}catch(_){/* no popover support: there is no sheet */}});
@@ -118,13 +114,9 @@ sb.auth.onAuthStateChange(function(_e,s){ if(s&&s.access_token) TOKEN=s.access_t
 
 // SS8 family api(): never throws — {ok:false,status:0} on a network hiccup, so
 // every failure routes through ONE honest state switch (401/403/404/other).
-async function api(path){
-  try{
-    const r=await fetch(FN+path,{headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-region':FN_REGION}});
-    return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};
-  }catch(_){return{ok:false,status:0,body:{}};}
-}
-function toast(m){ const t=$('toast'); if(!t) return; t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
+// The shell's one API helper (shell-kit.js); the platform's own read: no client goes with it.
+const api=(path)=>ddsApi(path,{scope:''});
+const toast=(m,kind,action)=>ddsToast(m,kind,action);   // the shell's one toast: 'err' shows a failure as one
 // No server timestamp in the payload — the "as of" honestly reflects the CLIENT
 // read time (stated absolutely, so it can never quietly go stale).
 function asOf(d){const t=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});const sameDay=d.toDateString()===new Date().toDateString();return 'As of '+(sameDay?'today, ':d.toLocaleDateString([],{month:'short',day:'numeric'})+', ')+t;}
@@ -220,14 +212,14 @@ async function load(soft){
   const r=await api('/admin/health-center');
   if(seq!==REQ_SEQ) return;
   if(!r.ok){
-    if(soft&&HC_DATA){ toast('Couldn’t refresh just now.'); return; }
+    if(soft&&HC_DATA){ toast('Couldn’t refresh just now.','err'); return; }
     if(r.status===401){ signedOut(); return; }
     if(r.status===403){ notOperator(); return; }
     if(r.status===404){ notFound(); return; }
     trouble(); return;
   }
   const d=r.body&&r.body.data;
-  if(!d||!Array.isArray(d.areas)){ if(soft&&HC_DATA){ toast('Couldn’t refresh just now.'); return; } emptyState(); return; }
+  if(!d||!Array.isArray(d.areas)){ if(soft&&HC_DATA){ toast('Couldn’t refresh just now.','err'); return; } emptyState(); return; }
   HC_DATA=d;
   render(d);
 }

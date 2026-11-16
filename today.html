@@ -270,7 +270,7 @@
   .cn{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cs{font-size:12px;color:var(--faint)}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -284,7 +284,7 @@
 <!-- PT-5: one-time contextual tip, taught where it's relevant, then gone forever -->
 <div class="dds-hint" data-hint="today-bell" hidden>The 🔔 at the top shows everything that needs you — from any page in Studio&nbsp;OS.</div>
 
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── consumes the EXISTING platform only: /moments, /concierge/ask, /marketplace/features,
 //    /portal/context|feed, /analytics/dashboard, /bookings/appointments, /projects,
@@ -292,16 +292,17 @@
 //    No engine, no new system. Calm, plain language; nothing technical.
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN = SUPABASE_URL + "/functions/v1/presence";
-const FN_REGION = 'us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN = "";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 
-async function apiGet(path){ const r = await fetch(FN + path, { headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''), 'x-region':FN_REGION } }); return r.ok ? r.json() : Promise.reject(r.status); }
-async function apiPost(path, body){ const r = await fetch(FN + path, { method:'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''), 'x-region':FN_REGION }, body: JSON.stringify(body||{}) }); return r.ok ? r.json() : Promise.reject(r.status); }
+const qClient=()=>new URLSearchParams(location.search).get('client')||'';   // this page sends the address's client as it is
+// the shell's one API helper (shell-kit.js); these read the body, or fail with the status (or the body) as before
+const apiGet=(path)=>ddsApi(path,{scope:qClient()}).then(r=>r.ok?r.body:Promise.reject(r.status));
+const apiPost=(path,body)=>ddsApi(path,{method:'POST',body:body||{},scope:qClient()}).then(r=>r.ok?r.body:Promise.reject(r.status));
 
 function greet(h){h=h==null?new Date().getHours():h;return h<12?'Good morning.':h<18?'Good afternoon.':'Good evening.';}
 
@@ -329,7 +330,7 @@ function studioInClient(c){
 // ── slice 10 pure helpers (mirrored 1:1 in tests/presence/today_home_test.mjs) ──
 // The greeting's date line — "Friday, July 18".
 function dateLine(nowMs){return new Date(nowMs==null?Date.now():nowMs).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});}
-const money=(c)=>{const v=(c||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});};   // final pass, batch C: one money format (whole dollars, or with cents)
+const money=(c)=>ddsMoney(c||0);   // the shell's one money format (shell-kit.js): "$1,250", "$1,234.50", "$0"
 // "This month" tiles from GET /analytics/dashboard — a tile exists only when its
 // section does (slice-8 has_data discipline: a null section or has_data:false
 // traffic read never becomes a fake zero; no sections → no card at all).
@@ -357,7 +358,7 @@ function monthTrend(s){
 function siteYmd(tz,nowMs){if(tz){try{return new Intl.DateTimeFormat('en-CA',{timeZone:String(tz)}).format(new Date(nowMs==null?Date.now():nowMs));}catch(_){/* unknown zone → browser-local */}}return localYmd(nowMs);}
 function todaySlots(list,nowMs){return(Array.isArray(list)?list:[]).filter(a=>a&&String(a.slot_start_local||'').slice(0,10)===siteYmd(a.timezone,nowMs)&&(a.status==='pending'||a.status==='confirmed')).sort((a,b)=>String(a.slot_start_local).localeCompare(String(b.slot_start_local))).slice(0,6);}
 function slotTime(s){const m=/T(\d\d):(\d\d)/.exec(String(s||''));if(!m)return'';let h=+m[1];const ap=h>=12?'pm':'am';h=h%12||12;return h+':'+m[2]+' '+ap;}
-function localYmd(nowMs){const d=new Date(nowMs==null?Date.now():nowMs);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function localYmd(nowMs){return ddsDate.ymd(nowMs==null?undefined:nowMs);}
 // Recent records — the slice-7 localStorage cache, read with the SAME strict
 // same-origin-path guard shell.js applies (localStorage is user-tamperable).
 function safeRecents(a){return Array.isArray(a)?a.filter(function(r){return r&&r.label&&typeof r.href==='string'&&/^\/(?![/\\])/.test(r.href);}).slice(0,5):[];}
@@ -562,7 +563,7 @@ async function mountSiteDeck(){
 // client's scope (exactly as crm.html reads it) and the project at studio level
 // (no scope header), as the record's Project tab does. Each tile exists only
 // when its read came back; a failed record read leaves the page as it was.
-async function apiPostStudio(path, body){ const r = await fetch(FN + path, { method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':'', 'x-region':FN_REGION }, body: JSON.stringify(body) }); const j = await r.json().catch(() => ({})); return r.ok ? j : Promise.reject(j); }
+const apiPostStudio=(path,body)=>ddsApi(path,{method:'POST',body,scope:''}).then(r=>r.ok?r.body:Promise.reject(r.body));
 // ── builder list item 184: one Do next list per client (GET /agency/sites/:id/do-next) ──
 // Needs you, the health check, Search, reviews, AI answers and the coach's ideas for this
 // client, in that order. Most items leave on their own when the thing is done; Done puts one
@@ -608,7 +609,7 @@ async function decideDoNext(btn,id){
     if(window.ddsToast)ddsToast(decision==='done'?'Done. It’s off the list for 30 days.':decision==='not_relevant'?'Off the list for good.':'Back on the list.');
   }catch(e){btn.disabled=false;if(window.ddsToast)ddsToast((e&&e.message)||'That didn’t save. Nothing changed; try again.','err');}
 }
-async function apiGetStudio(path){ const r = await fetch(FN + path, { headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':'', 'x-region':FN_REGION } }); return r.ok ? r.json() : Promise.reject(r.status); }
+const apiGetStudio=(path)=>ddsApi(path,{scope:''}).then(r=>r.ok?r.body:Promise.reject(r.status));
 function clientFacts(rec,proj,ctx){
   if(!rec||!rec.identity)return null;
   const id=rec.identity; const site=new URLSearchParams(location.search).get('client')||id.customer_site_id||'';
@@ -1049,7 +1050,7 @@ async function dismissNotice(id, btn){
 // field crm.html's inline editor saves) — no new endpoint. The row leaves only
 // AFTER the write succeeds; on failure the button comes back. An emptied list
 // takes its section with it (no empty card).
-async function apiSend(path, method, body){ const r = await fetch(FN + path, { method, headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''), 'x-region':FN_REGION }, body: JSON.stringify(body||{}) }); return r.ok ? r.json() : Promise.reject(r.status); }
+const apiSend=(path,method,body)=>ddsApi(path,{method,body:body||{},scope:qClient()}).then(r=>r.ok?r.body:Promise.reject(r.status));
 async function todoDone(id, btn){
   const row = btn.closest('.trow'); btn.disabled = true;
   try{

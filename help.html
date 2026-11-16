@@ -90,12 +90,10 @@
   .card .fine{font-size:12.5px;color:var(--faint);margin-top:10px}
   .card .fine a{color:var(--faint)}
   footer{margin-top:44px;padding-top:var(--dds-s5,20px);border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
-  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:var(--dds-r-lg,10px);font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none;max-width:90%;text-align:center}
-  .toast.show{opacity:1}
   @media (max-width:900px){.setgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media (max-width:640px){.wrap{padding:16px 16px 90px}.setgrid{grid-template-columns:minmax(0,1fr)}.askbox{flex-wrap:wrap}.askbox input{flex-basis:100%}}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -178,9 +176,8 @@
 
   <footer>Studio OS · by Davis Digital Studio — calm software, real people.</footer>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // Item 96: "Getting around" describes the menu this reader has. Builder item 202: the Getting
 // started card opens that answer, which also lists the first things to do. A studio's menu starts
@@ -206,16 +203,15 @@ document.addEventListener('DOMContentLoaded', () => {
 // Signed out, it says so and points at support; it never guesses an answer.
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN = SUPABASE_URL + "/functions/v1/presence";
-const FN_REGION = 'us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $ = (id) => document.getElementById(id);
 let TOKEN = "", BUSY = false;
 sb.auth.onAuthStateChange(function(_e,s){ if(s&&s.access_token) TOKEN=s.access_token; });
 const SCOPE = (new URLSearchParams(location.search).get('client')||'');
-const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN, 'x-dds-scope-site':SCOPE, 'x-region':FN_REGION });
-async function apiPost(p, b){ try { const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); const j = await r.json().catch(()=>({})); return { ok:r.ok, status:r.status, body:j }; } catch(_e){ return { ok:false, status:0, body:{}, offline:true }; } }
-function toast(m){ if(window.ddsToast) return void ddsToast(m); const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2600); }
+// the shell's one API helper (shell-kit.js), with this page's scope: never a throw (no answer at all is { ok:false, status:0, offline:true })
+const apiPost = (p, b) => ddsApi(p, { method:'POST', body:b||{}, scope:SCOPE });
+const toast = (m, kind, action) => ddsToast(m, kind, action);   // the shell's one toast: 'err' shows a failure as one
 
 async function ensureToken(){
   if(TOKEN) return TOKEN;
@@ -245,7 +241,7 @@ $('askForm').addEventListener('submit', (e)=>{ e.preventDefault(); ask($('q').va
 $('suggest').querySelectorAll('[data-q]').forEach(b=>b.addEventListener('click', ()=>{ $('q').value=b.getAttribute('data-q'); ask($('q').value); }));
 // the shell's own tour (window.ddsTour) — it only exists once the shell has
 // rendered, and only shows steps whose targets are on screen
-$('startTour').addEventListener('click', ()=>{ if(typeof window.ddsTour==='function'){ window.ddsTour(); } else { toast('The tour starts from the signed-in app — sign in and press this again.'); } });
+$('startTour').addEventListener('click', ()=>{ if(typeof window.ddsTour==='function'){ window.ddsTour(); } else { toast('The tour starts from the signed-in app — sign in and press this again.', 'err'); } });
 // #a-publish etc.: a deep link opens its answer
 function openHash(){ const id=(location.hash||'').slice(1); const d=id&&document.getElementById(id); if(d&&d.tagName==='DETAILS'){ d.open=true; d.scrollIntoView({block:'start'}); } }
 window.addEventListener('hashchange', openHash); openHash();

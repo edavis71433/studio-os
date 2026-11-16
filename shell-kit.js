@@ -7,10 +7,12 @@
    the pay page and "$1,200" in the portal, and the browser's own pop-up for
    eighteen questions in the back office.
 
-   This file is part of the shell. It loads WITHOUT defer, before the page's own
-   script, so a page can use it anywhere, even while it parses:
-       <link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
-   shell.js (deferred: the menu, the bell, search) uses it too. Nothing here
+   This file is part of the shell. It loads WITHOUT defer, in the body, right
+   before the sign-in library and the page's own script, so the page can use it
+   anywhere, and nothing in the head holds up the first paint (page_speed_test):
+       <script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script><script>…the page…</script>
+   shell.js (deferred in the head: the menu, the bell, search) runs after it and
+   uses it too. Nothing here
    touches the page until it is called; the toast and the dialogs wait for
    <body> if a page asks before it exists. Styles live in shell.css. */
 (function () {
@@ -107,13 +109,17 @@
     });
   }
   // A download (a CSV, a PDF, a zip): the same call, answered with the browser's own Response
-  // for the page to read as a file. No answer at all rejects, as fetch does.
+  // for the page to read as a file. No answer at all rejects, as fetch does, but with the
+  // connection sentence as its message (never "Failed to fetch").
   api.raw = function (path, opts) {
     opts = opts || {};
     return token().then(function (jwt) {
       return request(path, opts, jwt).then(function (r) {
         if (r.status === 401 && jwt) ranOut({ body: {} });
         return r;
+      }, function (e) {
+        if (e && e.name === 'AbortError') throw e;
+        var x = new Error(OFFLINE_MSG); x.offline = true; throw x;
       });
     });
   };
@@ -180,6 +186,8 @@
   // ── The one styled confirm, and its small prompt ────────────────────────────
   //   ddsConfirm({ title, text, yes, no, danger }) → Promise<true | false>
   //   ddsConfirm(title, text, yes, { danger })     (the same, in a line)
+  //   ddsConfirm('Void this invoice? It stops being payable.', null, 'Void invoice', { danger: true })
+  //     (a one-sentence question: up to the first "? " is the title, the rest the words under it)
   // The browser's own box can't be styled, reads like a system warning and, on a
   // phone, shows the site's address over the question. This one is the builder's
   // (item 33): a question that removes, sends or replaces something (danger)
@@ -199,6 +207,10 @@
         d.innerHTML = '<form method="dialog"><div class="ask-msg"></div><div class="dlg-row"><button type="button" class="ask-cancel"></button><button type="submit" class="ask-ok"></button></div></form>';
         var msg = d.querySelector('.ask-msg');
         var title = String(o.title == null ? '' : o.title).trim(), text = String(o.text == null ? '' : o.text).trim();
+        // a question written as one sentence ("Void this invoice? It stops being payable."): the
+        // question is the title, the rest the words under it, and together they read as before
+        var cut = (!field && title && !text) ? title.indexOf('? ') : -1;
+        if (cut > 0) { text = title.slice(cut + 2).trim(); title = title.slice(0, cut + 1); }
         if (title) {
           var h = document.createElement('h2'); h.className = 'dlg-t'; h.id = id + 't'; h.textContent = title; msg.appendChild(h);
           d.setAttribute('aria-labelledby', h.id);
@@ -310,8 +322,9 @@
     var h = d.getHours(), m = d.getMinutes();
     return ((h % 12) || 12) + ':' + pad(m) + ' ' + (h < 12 ? 'AM' : 'PM');
   }
-  // How long ago, in days: "today", "yesterday", "3 days ago", "1 week ago",
-  // "3 weeks ago", "2 months ago"; a day still to come is "soon"
+  // How long ago, in days: "today", "yesterday", "3 days ago", "last week",
+  // "3 weeks ago", "2 months ago" (the server's own words: crm/contract.ts
+  // humanWhen); a day still to come is "soon"
   function ago(x) {
     var n = days(x); if (n === null) return '';
     var d = -n;
@@ -319,7 +332,8 @@
     if (d === 0) return 'today';
     if (d === 1) return 'yesterday';
     if (d < 7) return d + ' days ago';
-    if (d < 60) { var w = Math.floor(d / 7); return w + (w === 1 ? ' week ago' : ' weeks ago'); }
+    if (d < 14) return 'last week';
+    if (d < 60) return Math.floor(d / 7) + ' weeks ago';
     return Math.floor(d / 30) + ' months ago';
   }
   // How long ago, to the minute: "just now", "5 min ago", "3 hours ago", then

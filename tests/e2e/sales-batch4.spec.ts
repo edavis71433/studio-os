@@ -49,7 +49,7 @@ test.describe('item 24 — a client\'s Overview leads with the client\'s facts',
     page.on('request', (r) => {
       const p = new URL(r.url()).pathname;
       if (p.endsWith('/crm/record')) scopes.record = r.headers()['x-dds-scope-site'] ?? 'none';
-      if (p.endsWith(`/projects/${PROJECT}`)) scopes.project = r.headers()['x-dds-scope-site'] ?? 'none';
+      if (p.endsWith(`/projects/${PROJECT}`)) scopes.project = r.headers()['x-dds-scope-site'] ?? '';   // no client at all: none sent (item 101's helper) or an empty one
     });
     await installApp(page, { api: { '/portal/context': scopedCtx(), '/crm/record': RECORD(), [`/projects/${PROJECT}`]: PROJ, '/sales/summary': QUIET_SUMMARY } });
     await page.goto(`/today.html?client=${CLIENT}`);

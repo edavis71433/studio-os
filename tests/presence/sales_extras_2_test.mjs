@@ -234,7 +234,7 @@ const unzip = (bytes) => {
   ok('the record shows it on the details card and edits it with the person', /'Found you through '\+esc\(hd\.found_via\)/.test(crm) && /<select id="ec-found" class="dds-pick">/.test(crm) && /found_via:\$\('ec-found'\)\.value[,}]/.test(crm) && /select=name,company,email,phone,found_via&limit=1/.test(crmTs));
   ok('Analytics: Won, by how they found you', /<h4>Won, by how they found you<\/h4>'\+grp\(d\.won_by_found_via,'Found you through'\)/.test(an));
   ok('one picker style that sizes properly on an iPhone', /\.dds-pick\{-webkit-appearance:none;appearance:none;/.test(css) && /@media \(max-width:767px\)\{\.dds-pick\{min-height:44px\}\}/.test(css));
-  ok('Settings › Plan & billing: Download my data fetches the zip as a file', /id="dlData">Download my data</.test(st) && /fetch\(FN \+ '\/sales\/export', \{ headers: H\(\) \}\)/.test(st) && /a\.download = 'studio-data-'/.test(st));
+  ok('Settings › Plan & billing: Download my data fetches the zip as a file', /id="dlData">Download my data</.test(st) && /ddsApi\.raw\('\/sales\/export', \{ scope: SCOPE \}\)/.test(st) && /a\.download = 'studio-data-'/.test(st));   // builder item 101: the shell's API helper, answered as the browser's Response
   ok('the route is wired: GET /sales/export', /route === '\/sales\/export' && method === 'GET'\) return handleSalesExport\(site, principal, cors\)/.test(idx));
   ok('the database step ships with an apply pack and a check', /add column if not exists found_via text not null default ''/.test(read('../../docs/presence/APPLY-0143-prod.sql')) && /information_schema\.columns/.test(read('../../docs/presence/APPLY-0143-prod.sql')));
 }

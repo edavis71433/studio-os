@@ -254,8 +254,8 @@ const row = (bucket, id) => world[bucket].find((r) => r.id === id);
   ok('deal page: the proposal delete is gated on status===\'draft\'', /p\.status===.draft.\?`<button[^`]*data-del-prop/.test(propRow));
   ok('deal page: the agreement delete is gated on status===\'draft\'', /k\.status===.draft.\?`<button[^`]*data-del-con/.test(conRow));
   // Destructive → confirm first, matching this page's existing idiom (delDeal / data-del-tpl).
-  ok('deal page: deleting a proposal confirms first', /data-del-prop\]/.test(pipeline) && /\[data-del-prop\][\s\S]{0,240}confirm\(/.test(pipeline));
-  ok('deal page: deleting an agreement confirms first', /\[data-del-con\][\s\S]{0,240}confirm\(/.test(pipeline));
+  ok('deal page: deleting a proposal confirms first', /data-del-prop\]/.test(pipeline) && /\[data-del-prop\][\s\S]{0,240}ddsConfirm\(/.test(pipeline));
+  ok('deal page: deleting an agreement confirms first', /\[data-del-con\][\s\S]{0,240}ddsConfirm\(/.test(pipeline));
   ok('deal page: both call DELETE on the right route and re-render the deal', /api\('\/sales\/proposals\/'\+[^,]+,'DELETE'\)/.test(pipeline) && /api\('\/sales\/contracts\/'\+[^,]+,'DELETE'\)/.test(pipeline));
 }
 

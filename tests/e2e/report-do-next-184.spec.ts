@@ -155,7 +155,7 @@ test.describe('The client’s Overview: one Do next list (builder list item 184)
     await page.route(/\/functions\/v1\/presence\/agency\/sites(\/|$|\?)/, (route) => route.fulfill(json({ data: [SITE_ROW], partial: false, can_open: true, can_pin: true, can_duplicate: true })));
     // registered after the sites list, so it answers first
     await page.route(/\/functions\/v1\/presence\/agency\/sites\/[^/]+\/do-next(\/decide)?$/, async (route) => {
-      scopes.push(route.request().headers()['x-dds-scope-site'] ?? 'none');
+      scopes.push(route.request().headers()['x-dds-scope-site'] ?? '');   // no client at all: an empty header or none (item 101's helper sends none)
       if (doNext) return doNext(route);
       if (route.request().method() === 'POST') {
         const b = route.request().postDataJSON(); posts.push(b);

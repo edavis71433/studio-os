@@ -155,13 +155,13 @@
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── Changes (builder list item 215, Nov 2026 review, file 03 finding 4) ────────────
 // Netlify keeps an audit log in sentences; Studio OS recorded every save, publish, invite
@@ -175,21 +175,16 @@
 // live opens what went live (…/went-live). The sentences come from what is already kept.
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+const toast=(m,bad,action)=>ddsToast(m,bad?'err':'ok',action);   // the shell's one toast
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 // ?client= opens one site: a studio inside a client, or a second business of one's own; the server tells them apart
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope(),'x-region':FN_REGION});
-async function api(path){
-  try{const r=await fetch(FN+path,{headers:H()});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-  catch(_){return{ok:false,status:0,body:{}};}
-}
+const api=(path)=>ddsApi(path,{scope:scope()});   // the site in the address goes with every read
 const TZ=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';}catch(_){return'UTC';}})();
 const n1=(n)=>Number(n||0).toLocaleString('en-US');
 const plural=(n,w,ws)=>n1(n)+' '+(n===1?w:(ws||w+'s'));
@@ -204,7 +199,7 @@ let MODE='studio',SITES=[],META={},D=null,ITEMS=[],NEXT=null,BUSY=false,READ=nul
 const F={who:'',area:'',site:''};
 
 // "4:32 PM"; a day heading: "Today · Saturday, Nov 15"
-const timeOf=(iso)=>new Date(iso).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+const timeOf=(iso)=>ddsDate.time(iso);
 function dayKey(iso){const d=new Date(iso);return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();}
 function dayHead(iso){
   const d=new Date(iso),now=new Date(),y=new Date(now);y.setDate(now.getDate()-1);

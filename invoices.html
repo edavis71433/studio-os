@@ -131,7 +131,7 @@
     .dots{width:44px;height:44px}
   }
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -169,13 +169,12 @@
     <div class="row2"><button type="button" class="pill" id="expCancel">Cancel</button><button type="submit" class="pill go" id="expGo">Download the zip</button></div>
   </form>
 </dialog>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="",DATA=null,SHOW='all',Q='',MONTH='',LIMIT=50,PAYING=null;
@@ -186,14 +185,13 @@ const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // (ddsScopeInfo, once its context is in); without it, the address decides, as before.
 const SHELL_READY=document.readyState==='loading'?new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true})):Promise.resolve();   // shell.js (deferred) is in by DOMContentLoaded. Made now, while the page parses: after an await, readyState can already say 'interactive' with shell.js still on its way
 async function inClientNow(){const id=scope();if(!id)return false;await SHELL_READY;if(window.ddsContext)await window.ddsContext().catch(()=>null);return window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)?!!window.ddsScopeInfo():true;}
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope(),'x-region':FN_REGION});
-async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,body:{}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m,bad,action){if(window.ddsToast)return void ddsToast(m,bad?'err':'ok',action);}
-function ymd(ms){const d=ms==null?new Date():new Date(ms);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+const api=(path,method,body)=>ddsApi(path,{method,body,scope:scope()});   // every read and save carries the address's business
+const toast=(m,bad,action)=>ddsToast(m,bad?'err':'ok',action);   // the shell's one toast
+const ymd=(ms)=>ddsDate.ymd(ms==null?undefined:ms);   // the local day; no argument is today
 const localDay=(iso)=>{const t=Date.parse(iso||'');return isFinite(t)?ymd(t):String(iso||'').slice(0,10);};
 const dayDiff=(a,b)=>Math.round((Date.UTC(+a.slice(0,4),+a.slice(5,7)-1,+a.slice(8,10))-Date.UTC(+b.slice(0,4),+b.slice(5,7)-1,+b.slice(8,10)))/86400000);
-const niceDay=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';};
-const money=(c)=>'$'+((Number(c)||0)/100).toLocaleString('en-US',{minimumFractionDigits:(Number(c)||0)%100?2:0,maximumFractionDigits:2});
+const niceDay=(s)=>{const m=/^\d{4}-\d{2}-\d{2}/.exec(String(s||''));return m?ddsDate.short(m[0]):'';};   // the shell's day words: "Nov 3", with the year when it isn't this one
+const money=(c)=>ddsMoney(c||0);   // the shell's one money format; no amount reads $0
 const METHOD={check:'check',cash:'cash',bank_transfer:'bank transfer',zelle:'Zelle',other:'another way',stripe:'card'};
 const isPart=(i)=>!!i.payment_for;
 const kindOf=(i)=>i.status==='void'||i.status==='canceled'?'void':i.status==='paid'?'paid':'unpaid';
@@ -403,7 +401,7 @@ $('expForm').addEventListener('submit',async(e)=>{
   go.disabled=true;go.textContent='Getting it ready…';$('expErr').hidden=true;
   try{
     const q='from='+encodeURIComponent(r.from)+'&to='+encodeURIComponent(r.to)+'&tzo='+new Date().getTimezoneOffset()+'&today='+ymd();
-    const res=await fetch(FN+'/sales/export/accounting?'+q,{headers:H()});
+    const res=await ddsApi.raw('/sales/export/accounting?'+q,{scope:scope()});   // a download: the browser's own answer, read as a file
     if(!res.ok||!/zip/.test(res.headers.get('Content-Type')||'')){const b=await res.json().catch(()=>({}));throw new Error((b&&b.message)||(res.status===404?'This export arrives with the next update. Try again after it.':'The export didn’t download. Try again.'));}
     const blob=await res.blob();
     const name=(/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition')||'')||[])[1]||('for-your-bookkeeper-'+r.from+'-to-'+r.to+'.zip');

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, onAsk } from './helpers/app';
 import { installIosFocusSemantics } from './helpers/ios-focus';
 
 // Pipeline (redesign slice 3): a 3-way List · Board · Table display (persisted),
@@ -1167,12 +1167,12 @@ test.describe('deal page — remove an unsent draft', () => {
     await expect(rowFor(page, '[data-link-proposal="p-sent"]')).not.toContainText('Delete');
 
     // destructive → confirm first; dismissing does nothing at all
-    page.once('dialog', (d) => d.dismiss());
+    await onAsk(page, () => false);
     await page.locator('[data-del-prop="p-dup"]').click();
     expect(calls.filter((c) => c.method === 'DELETE')).toHaveLength(0);
 
     // accepting sends the DELETE, then re-renders the deal and says so plainly
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator('[data-del-prop="p-dup"]').click();
     await expect(page.locator('.dds-toast')).toContainText('Draft removed');
     expect(calls).toContainEqual({ path: '/sales/proposals/p-dup', method: 'DELETE' });
@@ -1195,7 +1195,7 @@ test.describe('deal page — remove an unsent draft', () => {
     await expect(rowFor(page, '[data-doc-con="k-signed"]')).toContainText('Signed');
     await expect(rowFor(page, '[data-doc-con="k-signed"]')).not.toContainText('Delete');
 
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator('[data-del-con="k-draft"]').click();
     await expect(page.locator('.dds-toast')).toContainText('Draft removed');
     expect(calls).toContainEqual({ path: '/sales/contracts/k-draft', method: 'DELETE' });
@@ -1208,7 +1208,7 @@ test.describe('deal page — remove an unsent draft', () => {
       return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }) });
     });
     await page.goto(`/pipeline.html?deal=${DEAL4}&dtab=billing`);
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator('[data-del-prop="p-dup"]').click();
     await expect(page.locator('.dds-toast')).toContainText('already sent');
     await expect(page.locator('[data-del-prop="p-dup"]')).toBeVisible();        // still there to try again
@@ -1324,10 +1324,12 @@ test.describe('agreement — one per package', () => {
     await page.locator('#addCon').click();
     await seeded(page);
     await conBody(page).fill('MY OWN WORDING, typed by hand.');
-    page.once('dialog', (d) => { expect(d.message()).toContain('Custom + Photography'); d.dismiss(); });
+    let asked = '';
+    await onAsk(page, (q) => { asked = q; return false; });
     await page.locator('#conPkg').selectOption('custom_photography');
-    await expect(conBody(page)).toHaveValue('MY OWN WORDING, typed by hand.');   // untouched
     await expect(page.locator('#conPkg')).toHaveValue('growth');                 // …and the select snapped back
+    await expect(conBody(page)).toHaveValue('MY OWN WORDING, typed by hand.');   // untouched
+    expect(asked).toContain('Custom + Photography');
   });
 });
 
@@ -1352,7 +1354,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     await page.locator('#addCon').click();
     await seeded(page);
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await onAsk(page, (q) => { msg = q; return false; });
     await page.locator('#conForm .row2 .btn:not(.ghost)').click();               // Save & send for signature →
     await expect(page.locator('.dds-toast')).toContainText('Not sent — fill in the blanks');
     expect(msg).toContain('26 fill-in blanks');
@@ -1368,7 +1370,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     await seeded(page);
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator('#conForm .row2 .btn:not(.ghost)').click();
     await expect.poll(() => calls).toContain(`/sales/deals/${DEAL5}/contracts`);
     await expect.poll(() => calls).toContain('/sales/contracts/k-new/send');
@@ -1379,7 +1381,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     let dialogs = 0;
     await installApp(page, { api: PKG_API });
     await postsTo(page, calls);
-    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await onAsk(page, () => { dialogs++; return false; });
     await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     const text = await seeded(page);
@@ -1398,7 +1400,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     await postsTo(page, calls);
     await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await onAsk(page, (q) => { msg = q; return false; });
     await page.locator('[data-send-contract="k-blank"]').first().click();
     await expect(page.locator('.dds-toast')).toContainText('Not sent — fill in the blanks');
     expect(msg).toContain('2 fill-in blanks');
@@ -1413,7 +1415,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     let dialogs = 0;
     await installApp(page, { api: { ...PKG_API, [`/sales/deals/${DEAL5}`]: done } });
     await postsTo(page, calls);
-    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await onAsk(page, () => { dialogs++; return false; });
     await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('[data-send-contract="k-done"]').first().click();
     await expect.poll(() => calls).toContain('/sales/contracts/k-done/send');
@@ -1495,7 +1497,7 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
     const draft = { ...SIGNED_NO_TERM, id: 'k-dr', status: 'draft', signer_name: null, signed_at: null };
     let dialogs = 0;
     await installApp(page, { api: conApi(draft) });
-    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await onAsk(page, () => { dialogs++; return false; });
     await page.route('**/functions/v1/presence/sales/contracts/k-dr/send', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'k-dr', status: 'sent' }, url: 'https://example.test/sign/x', emailed: true, deposit: { minted: true, amount_cents: 250000, invoice_id: 'inv-1' } }) }));
     await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
@@ -1516,7 +1518,7 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
     });
     await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await onAsk(page, (q) => { msg = q; return false; });
     await page.locator('[data-send-contract="k-bl"]').first().click();
     await expect(page.locator('.dds-toast')).toContainText('Not sent — set the deal value in Details first.');
     expect(msg).toContain('the deal has no value set');
@@ -1576,7 +1578,7 @@ test.describe('deal drawer — one "Send proposal & agreement"', () => {
   test('the one button POSTs /sales/deals/:id/send with both ids; the toast names the client and the minted deposit', async ({ page }) => {
     let dialogs = 0;
     await installApp(page, { api: bothApi() });
-    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await onAsk(page, () => { dialogs++; return false; });
     await page.route(`**/functions/v1/presence/sales/deals/${DEAL8}/send`, (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { proposal: { id: 'p-b', status: 'sent' }, contract: { id: 'k-b', status: 'sent' }, deposit: { minted: true, amount_cents: 250000, invoice_id: 'inv-1' } }, url: 'https://example.test/sign.html?t=flow', emailed: true, sent: { proposal: true, contract: true } }) }));
     await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
@@ -1598,7 +1600,7 @@ test.describe('deal drawer — one "Send proposal & agreement"', () => {
     });
     await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await onAsk(page, (q) => { msg = q; return false; });
     await page.locator('#sendBothBtn').click();
     await expect(page.locator('.dds-toast')).toContainText('Not sent — fill in the blanks, then send it.');
     expect(msg).toContain('[LIST THE FIVE CORE PAGES]');
@@ -1709,13 +1711,13 @@ test.describe('invoice — the Void control', () => {
     await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeVisible();
 
     // Destructive → confirms first, and declining sends nothing.
-    page.once('dialog', (d) => d.dismiss());
+    await onAsk(page, () => false);
     await page.locator(`[data-void-inv="${INV_SENT}"]`).click();
     await expect.poll(() => calls.length).toBe(0);
     await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeVisible();
 
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.accept(); });
+    await onAsk(page, (q) => { msg = q; return true; });
     await page.locator(`[data-void-inv="${INV_SENT}"]`).click();
     await expect(page.locator('.dds-toast')).toContainText('Invoice voided');
     expect(msg).toContain('Void this invoice?');
@@ -1734,7 +1736,7 @@ test.describe('invoice — the Void control', () => {
       return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_paid', message: 'That payment landed while you were voiding — a paid invoice is a financial record and stays.' }) });
     });
     await page.goto(`/pipeline.html?deal=${DEAL6}&dtab=billing`);
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator(`[data-void-inv="${INV_SENT}"]`).click();
     await expect(page.locator('.dds-toast')).toContainText('financial record');
     // Nothing was hidden on a refusal — the invoice is still there, still waiting
@@ -1816,13 +1818,13 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
     await openList(page);
 
     // Declining the confirm sends nothing and the row stays.
-    page.once('dialog', (d) => d.dismiss());
+    await onAsk(page, () => false);
     await page.locator(`[data-void-inv="${RINV1}"]`).click();
     await expect.poll(() => calls.length).toBe(0);
     await expect(page.locator('.rcv-row').filter({ hasText: 'Foreign Code' })).toBeVisible();
 
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.accept(); });
+    await onAsk(page, (q) => { msg = q; return true; });
     await page.locator(`[data-void-inv="${RINV1}"]`).click();
     await expect(page.locator('.dds-toast')).toContainText('Invoice voided');
     expect(msg).toContain('Void this invoice?');   // the drawer's exact confirm — shared wiring, not a copy
@@ -1849,7 +1851,7 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
       return route.fallback();
     });
     await openList(page);
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator(`[data-void-inv="${RINV2}"]`).click();
     await expect(page.locator('#detailInner')).toContainText('Nobody owes you anything');
     await expect(page.locator('.rcv-row')).toHaveCount(0);
@@ -1862,7 +1864,7 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
       return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_paid', message: 'That payment landed while you were voiding — a paid invoice is a financial record and stays.' }) });
     });
     await openList(page);
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator(`[data-void-inv="${RINV1}"]`).click();
     await expect(page.locator('.dds-toast')).toContainText('financial record');
     // Nothing was hidden on a refusal — both rows and the total are untouched.

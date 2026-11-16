@@ -131,7 +131,7 @@ test.describe('Contacts inside a client (item 110, K3)', () => {
 });
 
 test.describe('Contacts: Send an update always ends with a message (item 110, K5)', () => {
-  test('a dropped connection says nothing was sent and gives the button back', async ({ page }, info) => {
+  test('a dropped connection says so, as a failure, and gives the button back', async ({ page }, info) => {
     test.skip(info.project.name !== 'desktop-chromium', 'picking rows is the table display');
     await installApp(page);
     await serveContacts(page, PEOPLE.slice(0, 3));
@@ -139,7 +139,8 @@ test.describe('Contacts: Send an update always ends with a message (item 110, K5
     await page.goto('/contacts.html');
     await page.locator('#pickAll').check();
     await page.locator('#bulkSend').click();
-    await expect(page.getByText('nothing was sent', { exact: false })).toBeVisible();
+    // builder item 101: no answer at all is the shell's one sentence, in a failure toast (the page's own catch said "nothing was sent")
+    await expect(page.locator('.dds-toast.err', { hasText: 'We couldn’t reach Studio OS' })).toBeVisible();
     await expect(page.locator('#bulkSend')).toBeEnabled();
   });
 });

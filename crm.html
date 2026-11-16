@@ -254,8 +254,6 @@
   .center{text-align:center;padding:56px var(--dds-s5,20px)}
   .center h2{display:block;font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 var(--dds-s2,8px)}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:999px;font-size:14px;opacity:0;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none;z-index:50}
-  .toast.show{opacity:1}
   footer{margin-top:44px;padding-top:var(--dds-s5,20px);border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}*{transition:none !important}}
@@ -450,17 +448,16 @@
   #handoverDlg .hofoot .abtn{height:44px;border-radius:999px;padding:0 18px;font-size:14px}
   #handoverDlg .hoerr{color:var(--bad,#b32929);font-size:13.5px;margin:12px 0 0}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script><script src="/sales-ai.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script><script src="/sales-ai.js" defer></script>
 </head>
 <body>
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
   <footer>Studio OS · One client record — the whole relationship in one place. It reflects real activity; it never sells or scores.</footer>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="dds-hint" data-hint="crm-notes" hidden>Notes here stay private to you unless you mark one “shared” — then the client sees it too.</div>
 
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── The unified Client Record — the Lightning record page (dds skin) ─────────
 // ONE relationship, one page. /crm/record resolves whatever key the URL carries
@@ -473,9 +470,8 @@
 // server enforces audience + tenant scope; this page just presents what it's given.
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // item 71: an emailed reply shows its words; the quoted earlier email folds behind "Show earlier email" (shell.js ddsQuote)
@@ -491,18 +487,16 @@ const scopeParam=()=>QP().get('client')||'';
 // (shell.js HELD_KEY), else the address, as before.
 const studioScoped=()=>{const id=scopeParam();if(!id)return false;if(window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return !!window.ddsScopeInfo();try{const held=JSON.parse(localStorage.getItem('dds-held-businesses')||'[]');if(Array.isArray(held)&&held.indexOf(id)>=0)return false;}catch(_){/* storage may be denied */}return true;};
 const ownBusiness=()=>studioScoped()?'':scopeParam();   // the business ?client= picked, when it is no client of a studio
-const H=(scoped)=>{const h={'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-region':FN_REGION};if(scoped)h['x-dds-scope-site']=scopeParam();else if(ownBusiness())h['x-dds-scope-site']=ownBusiness();return h;};
 // api() = scoped to the record's customer site (/crm/*, the reply routes).
 // apiAg() = UNSCOPED on purpose: deal/contact/project rows live on the operator's
 // own agency site, so /sales/* + /projects/* must resolve against that site (the
 // same reason the old Deal/Delivery iframes ran unscoped — no ?client=, which
 // would mis-scope them to the customer's own site where the deal doesn't exist).
 // item 99 (B17): no connection is an answer like any other — "not ok", with words — so every
-// caller's own failure path runs: the button comes back and the toast says why. The failed
-// fetch used to throw past them, and a pressed button stayed grey with nothing said.
-const offline=()=>({ok:false,status:0,body:{error:'offline',message:'We couldn’t reach the server — check your connection and try again.'}});
-async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(true),body:body?JSON.stringify(body):undefined});}catch(_){return offline();}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-async function apiAg(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(false),body:body?JSON.stringify(body):undefined});}catch(_){return offline();}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+// caller's own failure path runs: the button comes back and the toast says why. The shell's one
+// API helper (shell-kit.js ddsApi) answers that way on every page now.
+const api=(path,method,body)=>ddsApi(path,{method,body,scope:scopeParam()});
+const apiAg=(path,method,body)=>ddsApi(path,{method,body,scope:ownBusiness()});
 // Same doctrine for the outbound pipeline/projects links: the trailing `client=`
 // is deliberate — it pins these links UNSCOPED so shell.js's scope-carry
 // (carryScopeGlobally) doesn't rewrite them onto the customer's site.
@@ -511,12 +505,12 @@ const agHref=(page,params)=>'/'+page+'?'+params+'&client='+encodeURIComponent(ow
 // pin any pipeline/projects target the same way agHref does at RENDER time, so
 // carryScopeGlobally can't rewrite it onto the customer's own site.
 const pinHref=(h)=>{h=String(h||'');return (/^\/(pipeline|projects)\.html/.test(h)&&h.indexOf('client=')<0)?h+(h.indexOf('?')>=0?'&':'?')+'client='+encodeURIComponent(ownBusiness()):h;};
-function toast(m,k){if(window.ddsToast)return void ddsToast(m,k);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+const toast=(m,k,action)=>ddsToast(m,k,action);   // the shell's one toast (shell-kit.js): 'err' is a failure
 // item 65: "today" / "yesterday" are local calendar days, not 24-hour spans (a call
 // at 10pm read "today" until 10pm the next day)
-function when(iso){if(!iso)return'';const t=Date.parse(iso);if(!isFinite(t))return'';const d=Math.round((Date.parse(recTodayYmd()+'T00:00:00Z')-Date.parse(recTodayYmd(t)+'T00:00:00Z'))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<14)return'last week';if(d<60)return Math.floor(d/7)+' weeks ago';return Math.floor(d/30)+' months ago';}
-const fmtC=(c)=>{const v=(Number(c)||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});}   // batch C: one money format;
-const dueLabel=(iso)=>{if(!iso)return'';const t=new Date(String(iso).slice(0,10)+'T12:00:00Z');if(isNaN(t))return'';return t.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+function when(iso){return ddsDate.ago(iso);}   // the shell's one set of day words (shell-kit.js)
+const fmtC=(c)=>ddsMoney(Number(c)||0);   // batch C: one money format;
+const dueLabel=(iso)=>iso?ddsDate.short(String(iso).slice(0,10)):'';   // that day here: "Nov 3
 // ── Oct 2026 benchmark (item 2): money in four states — ONE formula. A VERBATIM
 // mirror of supabase/functions/presence/lib/money_state.ts (the Deno pin runs
 // one case table against the module and every page's copy). The record runs
@@ -539,7 +533,7 @@ function moneyBuckets(list,todayYmd,pending){
   return b;
 }
 // item 65: EVERY "today" on the record is this one (a moment in ms → its local day)
-function recTodayYmd(ms){const d=ms==null?new Date():new Date(ms);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function recTodayYmd(ms){return ddsDate.ymd(ms==null?undefined:ms);}   // the shell's one day (shell-kit.js)
 // item 98 (B15): a MOMENT (paid_at, signed_at) shows on the local day it happened; dueLabel reads
 // the first ten characters as the day, which is right for a plain date (a due date) and gave a
 // payment at 6pm in Los Angeles the next day's date
@@ -1036,7 +1030,7 @@ function renderHighlights(){
     const inp=tile.querySelector('input'); inp.focus();
     const close=()=>{HL_EDIT=false;renderHighlights();};
     tile.querySelector('[data-cancel]').addEventListener('click',close);
-    const save=async()=>{const v=inp.value.trim();const r=await apiAg('/sales/deals/'+encodeURIComponent(DEAL.deal.id),'PATCH',{next_step:v});if(r.ok){DEAL.deal=r.body.data||DEAL.deal;toast('Saved.');}else toast((r.body&&r.body.message)||'Couldn’t save.');close();};
+    const save=async()=>{const v=inp.value.trim();const r=await apiAg('/sales/deals/'+encodeURIComponent(DEAL.deal.id),'PATCH',{next_step:v});if(r.ok){DEAL.deal=r.body.data||DEAL.deal;toast('Saved.');}else toast((r.body&&r.body.message)||'Couldn’t save.','err');close();};
     tile.querySelector('[data-save]').addEventListener('click',save);
     inp.addEventListener('keydown',(e)=>{if(e.key==='Enter')save();if(e.key==='Escape')close();});
   });
@@ -1077,7 +1071,7 @@ function stageNoteHtml(stage,d,signed){
 async function saveStageNote(stage,text,btn){
   if(btn)btn.disabled=true;
   const r=await apiAg('/sales/stages','PUT',{note:{stage,text}});
-  if(!r.ok){if(btn)btn.disabled=false;toast((r.body&&r.body.message)||'That note didn’t save — please try again.');return;}
+  if(!r.ok){if(btn)btn.disabled=false;toast((r.body&&r.body.message)||'That note didn’t save — please try again.','err');return;}
   const dd=(r.body&&r.body.data)||{};
   if(dd.notes){STAGE_NOTES=dd.notes;STAGE_NOTES_CUSTOM=dd.notes_custom||{};}
   NOTE_EDIT=false;renderPath();
@@ -1186,7 +1180,7 @@ async function moveStage(to,btn){
     if(TAB==='deal')showTab(TAB,true);   // the Deal pane shows stage/next-step — keep it honest
     loadActivity();
   }
-  else{toast((r.body&&r.body.message)||'Couldn’t move the stage.');if(btn)btn.disabled=false;renderPath();}
+  else{toast((r.body&&r.body.message)||'Couldn’t move the stage.','err');if(btn)btn.disabled=false;renderPath();}
 }
 
 function setTabUrl(tab){ const q=QP(); q.set('tab',tab); history.replaceState(null,'', '/crm.html?'+q.toString()); }
@@ -1261,7 +1255,7 @@ async function loadDetails(host){
   host.innerHTML=html;
   const eb=$('editContact'); if(eb)eb.onclick=()=>editContact(host);
   if(WANT_EDIT&&eb){const f=WANT_EDIT;WANT_EDIT='';editContact(host);const box=$(f);if(box)box.focus();}
-  const na=$('notifyapprove');if(na)na.addEventListener('click',async()=>{na.disabled=true;na.textContent='Sending…';const r=await api('/approve/send','POST');na.disabled=false;na.textContent='Email the client to approve';toast(r.ok?(r.body.data&&r.body.data.message||'Sent.'):(r.body.message||'Couldn’t send just now.'));});
+  const na=$('notifyapprove');if(na)na.addEventListener('click',async()=>{na.disabled=true;na.textContent='Sending…';const r=await api('/approve/send','POST');na.disabled=false;na.textContent='Email the client to approve';toast(r.ok?(r.body.data&&r.body.data.message||'Sent.'):(r.body.message||'Couldn’t send just now.'),r.ok?'ok':'err');});
 }
 // Edit the contact inline (PATCH /sales/contacts/:id — the existing path, kept).
 // The owner's CUSTOM FIELDS edit here too: the Details tab has always DISPLAYED
@@ -1305,7 +1299,7 @@ function editContact(host){
     // Every failure names itself — a 409 (two contacts, one address) is the one
     // an operator can act on, so it keeps the server's own wording.
     if(r.ok){CONTACT_CACHE=null;toast(r.body&&(r.body.warning==='custom_unavailable'||r.body.warning==='found_via_unavailable'||r.body.warning==='fields_unavailable')?((r.body.message)||'Saved.'):'Saved.');loadDetails(host);refreshWho();}
-    else{toast((r.body&&r.body.message)||(r.status?('Couldn’t save — the server answered '+r.status+'.'):'Couldn’t save — we couldn’t reach the server.'));btn.disabled=false;}
+    else{toast((r.body&&r.body.message)||(r.status?('Couldn’t save — the server answered '+r.status+'.'):'Couldn’t save — we couldn’t reach the server.'),'err');btn.disabled=false;}
   };
   // Two-step delete, same contract as contacts.html: the unconfirmed DELETE is a
   // dry run that writes nothing and returns what's attached; the confirm names it.
@@ -1315,11 +1309,11 @@ function editContact(host){
     const pre=await apiAg('/sales/contacts/'+cid,'DELETE');
     btn.disabled=false;
     if(pre.ok&&pre.body&&pre.body.data&&pre.body.data.already){toast(who+' was already removed.');location.href='/contacts.html';return;}
-    if(pre.status!==409){toast((pre.body&&pre.body.message)||(pre.status?('We couldn’t check what’s attached to '+who+' — the server answered '+pre.status+'. Nothing was deleted.'):'We couldn’t reach the server. Nothing was deleted.'));return;}
-    if(!confirm('Remove '+(pre.body.name||who)+'?\n\n'+(pre.body.message||'')))return;
+    if(pre.status!==409){toast((pre.body&&pre.body.message)||(pre.status?('We couldn’t check what’s attached to '+who+' — the server answered '+pre.status+'. Nothing was deleted.'):'We couldn’t reach the server. Nothing was deleted.'),'err');return;}
+    if(!(await ddsConfirm({title:'Remove '+(pre.body.name||who)+'?',text:pre.body.message||'',yes:'Remove',danger:true})))return;
     btn.disabled=true;
     const d=await apiAg('/sales/contacts/'+cid+'?confirm=1','DELETE');
-    if(!d.ok){toast((d.body&&d.body.message)||((pre.body.name||who)+' was NOT removed — the server answered '+(d.status||'nothing')+'.'));btn.disabled=false;return;}
+    if(!d.ok){toast((d.body&&d.body.message)||((pre.body.name||who)+' was NOT removed — the server answered '+(d.status||'nothing')+'.'),'err');btn.disabled=false;return;}
     const kept=(d.body&&d.body.data&&d.body.data.kept_items)||[];
     toast(kept.length?((pre.body.name||who)+' removed — their '+kept.join(', ')+' stayed.'):((pre.body.name||who)+' removed.'));
     setTimeout(()=>{location.href='/contacts.html';},900);
@@ -1547,7 +1541,7 @@ function renderBillingTab(host){
 // one send path per document kind — same routes pipeline.html uses
 async function billingSend(path,okLabel,body){
   const r=await apiAg(path,'POST',body||{});
-  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');return null;}
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.','err');return null;}
   const b=r.body||{}; const url=b.url||(b.data&&b.data.url)||'';
   if(url&&navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});
   // item 107 (J5): sending an agreement can add the deposit request it promises — say so, as the deal page does
@@ -1576,33 +1570,33 @@ window.addEventListener('dds:created',()=>{
 });
 function wireBilling(host,d){
   host.querySelectorAll('[data-bform]').forEach(b=>b.addEventListener('click',()=>billingForm(b.getAttribute('data-bform'))));
-  host.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{const u=b.getAttribute('data-copy');if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Link copied')).catch(()=>toast('Couldn’t copy on this device.'));}));
-  host.querySelectorAll('[data-doc]').forEach(b=>b.addEventListener('click',async()=>{const [t,id]=b.getAttribute('data-doc').split(':');b.disabled=true;const r=await apiAg('/sales/'+t+'/'+id+'/document');b.disabled=false;if(r.ok&&r.body.url)window.open(r.body.url,'_blank','noopener');else toast('Couldn’t open the document just now.');}));
+  host.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{const u=b.getAttribute('data-copy');if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Link copied')).catch(()=>toast('Couldn’t copy on this device.','err'));}));
+  host.querySelectorAll('[data-doc]').forEach(b=>b.addEventListener('click',async()=>{const [t,id]=b.getAttribute('data-doc').split(':');b.disabled=true;const r=await apiAg('/sales/'+t+'/'+id+'/document');b.disabled=false;if(r.ok&&r.body.url)window.open(r.body.url,'_blank','noopener');else toast('Couldn’t open the document just now.','err');}));
   host.querySelectorAll('[data-pdf]').forEach(b=>b.addEventListener('click',()=>downloadPdf(b)));   // item 82
   // item 77: Record a payment opens under its row; Undo takes back one recorded by mistake
   host.querySelectorAll('[data-pay-inv]').forEach(b=>b.addEventListener('click',()=>{const v=((DEAL&&DEAL.invoices)||[]).find(x=>x.id===b.getAttribute('data-pay-inv'));const row=b.closest('tr');if(v&&row)payForm(row,v);}));
   host.querySelectorAll('[data-undo-pay]').forEach(b=>b.addEventListener('click',async()=>{
     const id=b.getAttribute('data-undo-pay'); const v=((DEAL&&DEAL.invoices)||[]).find(x=>x.id===id)||{}; const no=invNo(v.number)||'the invoice';
-    if(!confirm(v.payment_for?`Undo this ${fmtC(v.amount_cents)} part payment? Its amount goes back on the invoice as due.`:`Undo this payment? ${no} goes back to unpaid (${fmtC(v.amount_cents)} due) and its reminders can start again. Use this only for a payment recorded by mistake.`))return;
+    if(!(await ddsConfirm(v.payment_for?`Undo this ${fmtC(v.amount_cents)} part payment? Its amount goes back on the invoice as due.`:`Undo this payment? ${no} goes back to unpaid (${fmtC(v.amount_cents)} due) and its reminders can start again. Use this only for a payment recorded by mistake.`,null,v.payment_for?'Undo part payment':'Undo payment',{danger:true})))return;
     b.disabled=true; const r=await apiAg('/sales/invoices/'+encodeURIComponent(id)+'/payment/undo','POST',{});
     if(r.ok){const x=(r.body&&r.body.data)||{};const link=x.fresh_link===false?' A new payment link couldn’t be made just now: press Send on the invoice to make one.':' It has a fresh payment link, so its reminders carry on.';
       toast((v.payment_for?'Part payment undone. Its amount is due again.':`Payment undone. ${no} is open again.`)+link+(x.moved_back?' The deal is back where it was.':''));reloadDeal();}
-    else{toast((r.body&&r.body.message)||'Couldn’t undo it.');b.disabled=false;}}));
+    else{toast((r.body&&r.body.message)||'Couldn’t undo it.','err');b.disabled=false;}}));
   const ea=host.querySelector('[data-edit-address]'); if(ea)ea.addEventListener('click',()=>{WANT_EDIT='ec-address';showTab('details');});   // item 81
   host.querySelectorAll('[data-send-inv]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await billingSend('/sales/invoices/'+b.getAttribute('data-send-inv')+'/send',(b.textContent==='Resend'?'Invoice re-sent':'Invoice sent'));if(r)reloadDeal();else b.disabled=false;}));
   // item 107 (J1): Stripe may not have switched the link off (link_deactivated:false) — then the
   // client can still pay the withdrawn amount, and "Invoice voided" alone would say otherwise
-  host.querySelectorAll('[data-void-inv]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Void this invoice? It stops being payable and the unpaid reminder clears. It stays on the record, marked Voided.'))return;b.disabled=true;const r=await apiAg('/sales/invoices/'+b.getAttribute('data-void-inv')+'/void','POST',{});if(r.ok){const linkLive=!r.body.already&&!!r.body.data&&r.body.data.link_deactivated===false;toast(linkLive?'Invoice voided, but its payment link may still be live. Open the invoice in Stripe and switch the link off there.':r.body.already?'Already voided':'Invoice voided',linkLive?'err':undefined);reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t void it.');b.disabled=false;}}));
+  host.querySelectorAll('[data-void-inv]').forEach(b=>b.addEventListener('click',async()=>{if(!(await ddsConfirm('Void this invoice? It stops being payable and the unpaid reminder clears. It stays on the record, marked Voided.',null,'Void invoice',{danger:true})))return;b.disabled=true;const r=await apiAg('/sales/invoices/'+b.getAttribute('data-void-inv')+'/void','POST',{});if(r.ok){const linkLive=!r.body.already&&!!r.body.data&&r.body.data.link_deactivated===false;toast(linkLive?'Invoice voided, but its payment link may still be live. Open the invoice in Stripe and switch the link off there.':r.body.already?'Already voided':'Invoice voided',linkLive?'err':undefined);reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t void it.','err');b.disabled=false;}}));
   host.querySelectorAll('[data-send-prop]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await billingSend('/sales/proposals/'+b.getAttribute('data-send-prop')+'/send',b.hasAttribute('data-resend')?'Proposal link copied':'Proposal sent');if(r)reloadDeal();else b.disabled=false;}));
   host.querySelectorAll('[data-send-con]').forEach(b=>b.addEventListener('click',async()=>{
     const k=(DEAL.contracts||[]).find(x=>x.id===b.getAttribute('data-send-con'));
-    if(k&&k.status==='draft'&&typeof k.body==='string'&&/\[[^\]]{1,40}\]/.test(k.body)&&!confirm('This agreement still has fill-in blanks in square brackets. Send it as it stands?'))return;
+    if(k&&k.status==='draft'&&typeof k.body==='string'&&/\[[^\]]{1,40}\]/.test(k.body)&&!(await ddsConfirm({title:'Send it as it stands?',text:'This agreement still has fill-in blanks in square brackets.',yes:'Send as it stands',danger:true})))return;
     b.disabled=true;const r=await billingSend('/sales/contracts/'+b.getAttribute('data-send-con')+'/send',b.hasAttribute('data-resend')?'Signing link copied':'Agreement sent');if(r)reloadDeal();else b.disabled=false;}));
   // ONE LINK: both drafts in one go (POST /sales/deals/:id/send) — the same
   // blanks confirm the agreement's own Send runs, then one email, one page.
   const sb=host.querySelector('[data-send-both]'); if(sb)sb.addEventListener('click',async()=>{
     const k=(DEAL.contracts||[]).find(x=>x.id===sb.getAttribute('data-con'));
-    if(k&&typeof k.body==='string'&&/\[[^\]]{1,40}\]/.test(k.body)&&!confirm('This agreement still has fill-in blanks in square brackets. Send it as it stands?'))return;
+    if(k&&typeof k.body==='string'&&/\[[^\]]{1,40}\]/.test(k.body)&&!(await ddsConfirm({title:'Send it as it stands?',text:'This agreement still has fill-in blanks in square brackets.',yes:'Send as it stands',danger:true})))return;
     sb.disabled=true;const r=await billingSend('/sales/deals/'+d.id+'/send','Proposal and agreement sent',{proposal_id:sb.getAttribute('data-prop'),contract_id:sb.getAttribute('data-con')});if(r)reloadDeal();else sb.disabled=false;});
   const sm=host.querySelector('#sendMore'); if(sm){const menu=host.querySelector('#sendMoreMenu');
     sm.addEventListener('click',(e)=>{e.stopPropagation();const open=menu.hidden;menu.hidden=!open;sm.setAttribute('aria-expanded',open?'true':'false');if(open){const f=menu.querySelector('button');if(f)f.focus();}});
@@ -1611,20 +1605,20 @@ function wireBilling(host,d){
     if(window.__sendMoreClose)document.removeEventListener('click',window.__sendMoreClose);
     window.__sendMoreClose=close;document.addEventListener('click',close);
     menu.addEventListener('keydown',(e)=>{if(e.key==='Escape'){close();sm.focus();}});}
-  const rc=host.querySelector('[data-ret-cancel]'); if(rc)rc.addEventListener('click',async()=>{if(!confirm('Cancel this retainer? Future charges stop. Past payments are unaffected.'))return;rc.disabled=true;const r=await apiAg('/sales/deals/'+d.id+'/retainer/cancel','POST',{});if(r.ok){toast('Retainer canceled');reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t cancel it.');rc.disabled=false;}});
+  const rc=host.querySelector('[data-ret-cancel]'); if(rc)rc.addEventListener('click',async()=>{if(!(await ddsConfirm({title:'Cancel this retainer?',text:'Future charges stop. Past payments are unaffected.',yes:'Cancel the retainer',no:'Keep it',danger:true})))return;rc.disabled=true;const r=await apiAg('/sales/deals/'+d.id+'/retainer/cancel','POST',{});if(r.ok){toast('Retainer canceled');reloadDeal();}else{toast((r.body&&r.body.message)||'Couldn’t cancel it.','err');rc.disabled=false;}});
   // item 108 (J6): estimates and the recurring invoice — the same routes and words as the deal page
   const run=(sel,fn)=>host.querySelectorAll(sel).forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;try{if(await fn(b)===false)b.disabled=false;}catch(_){b.disabled=false;}}));
   run('[data-send-est]',async(b)=>{const r=await billingSend('/sales/estimates/'+b.getAttribute('data-send-est')+'/send','Estimate sent');if(!r)return false;reloadDeal();});
-  run('[data-link-est]',async(b)=>{const r=await apiAg('/sales/estimates/'+b.getAttribute('data-link-est')+'/send','POST',{});const url=r.ok&&r.body&&r.body.url;b.disabled=false;if(!url){toast((r.body&&r.body.message)||'No link is available just now.');return;}if(navigator.clipboard)navigator.clipboard.writeText(url).then(()=>toast('Link copied'),()=>toast('Couldn’t copy on this device.'));});
-  run('[data-est-prop]',async(b)=>{const r=await apiAg('/sales/estimates/'+b.getAttribute('data-est-prop')+'/proposal','POST',{});if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');return false;}toast('Proposal drafted from the estimate — check it, then send it the usual way.');reloadDeal();});
-  run('[data-est-inv]',async(b)=>{const r=await apiAg('/sales/estimates/'+b.getAttribute('data-est-inv')+'/invoice','POST',{});if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');return false;}toast('Invoice ready under Invoices — press Send on it when you’re ready.');reloadDeal();});
-  run('[data-del-est]',async(b)=>{if(!confirm('Remove this draft estimate? It was never sent, so nothing the client saw changes.'))return false;const r=await apiAg('/sales/estimates/'+b.getAttribute('data-del-est'),'DELETE');if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t remove it.');return false;}toast('Draft removed');reloadDeal();});
+  run('[data-link-est]',async(b)=>{const r=await apiAg('/sales/estimates/'+b.getAttribute('data-link-est')+'/send','POST',{});const url=r.ok&&r.body&&r.body.url;b.disabled=false;if(!url){toast((r.body&&r.body.message)||'No link is available just now.','err');return;}if(navigator.clipboard)navigator.clipboard.writeText(url).then(()=>toast('Link copied'),()=>toast('Couldn’t copy on this device.','err'));});
+  run('[data-est-prop]',async(b)=>{const r=await apiAg('/sales/estimates/'+b.getAttribute('data-est-prop')+'/proposal','POST',{});if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.','err');return false;}toast('Proposal drafted from the estimate — check it, then send it the usual way.');reloadDeal();});
+  run('[data-est-inv]',async(b)=>{const r=await apiAg('/sales/estimates/'+b.getAttribute('data-est-inv')+'/invoice','POST',{});if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.','err');return false;}toast('Invoice ready under Invoices — press Send on it when you’re ready.');reloadDeal();});
+  run('[data-del-est]',async(b)=>{if(!(await ddsConfirm('Remove this draft estimate? It was never sent, so nothing the client saw changes.',null,'Remove draft',{danger:true})))return false;const r=await apiAg('/sales/estimates/'+b.getAttribute('data-del-est'),'DELETE');if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t remove it.','err');return false;}toast('Draft removed');reloadDeal();});
   const recOf=(id)=>((DEAL&&DEAL.recurring)||[]).find(s=>s.id===id)||{};
-  const recAct=(attr,verb,ask,done)=>run('['+attr+']',async(b)=>{const id=b.getAttribute(attr);const s=recOf(id);const q=ask&&ask(s);if(q&&!confirm(q))return false;const r=await apiAg('/sales/recurring/'+id+'/'+verb,'POST',{});if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');return false;}toast(done(s,(r.body&&r.body.data)||{}));reloadDeal();});
-  recAct('data-rec-skip','skip',(s)=>s.next_on?`Skip the ${dueLabel(s.next_on)} invoice? Nothing goes out that day — the one after goes out as usual.`:'',(s,x)=>x.next_on?'Skipped — the next one goes out '+dueLabel(x.next_on):'Skipped');
+  const recAct=(attr,verb,ask,done,yes)=>run('['+attr+']',async(b)=>{const id=b.getAttribute(attr);const s=recOf(id);const q=ask&&ask(s);if(q&&!(await ddsConfirm(q,null,yes||'Yes',{danger:verb==='stop'})))return false;const r=await apiAg('/sales/recurring/'+id+'/'+verb,'POST',{});if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.','err');return false;}toast(done(s,(r.body&&r.body.data)||{}));reloadDeal();});
+  recAct('data-rec-skip','skip',(s)=>s.next_on?`Skip the ${dueLabel(s.next_on)} invoice? Nothing goes out that day — the one after goes out as usual.`:'',(s,x)=>x.next_on?'Skipped — the next one goes out '+dueLabel(x.next_on):'Skipped','Skip it');
   recAct('data-rec-pause','pause',null,()=>'Paused — nothing goes out until you resume it.');
-  recAct('data-rec-resume','resume',(s)=>'Resume this recurring invoice? The next one goes out '+(s.next_on&&s.next_on>=recTodayYmd()?dueLabel(s.next_on):'today')+'.',(s,x)=>'Resumed — the next one goes out '+(x.next_on?dueLabel(x.next_on):'on its usual day'));
-  recAct('data-rec-stop','stop',()=>'Stop this recurring invoice? No more invoices go out. The ones already sent stay as they are.',()=>'Stopped — no more invoices will go out.');
+  recAct('data-rec-resume','resume',(s)=>'Resume this recurring invoice? The next one goes out '+(s.next_on&&s.next_on>=recTodayYmd()?dueLabel(s.next_on):'today')+'.',(s,x)=>'Resumed — the next one goes out '+(x.next_on?dueLabel(x.next_on):'on its usual day'),'Resume');
+  recAct('data-rec-stop','stop',()=>'Stop this recurring invoice? No more invoices go out. The ones already sent stay as they are.',()=>'Stopped — no more invoices will go out.','Stop it');
 }
 // item 107 (J2): what the accepted proposal still has to bill — its total less every invoice
 // already raised on the deal (open or paid, a deposit included; recurring ones are their own
@@ -1657,14 +1651,14 @@ async function downloadPdf(b){
   const [t,id]=b.getAttribute('data-pdf').split(':'); b.disabled=true;
   try{
     const r=await apiAg('/sales/'+t+'/'+id+'/document'); const u=r.ok&&r.body&&r.body.pdf_url;
-    if(!u){toast('Couldn’t make the PDF just now.');return;}
+    if(!u){toast('Couldn’t make the PDF just now.','err');return;}
     const f=await fetch(u); if(!f.ok)throw new Error(String(f.status));
     const blob=new Blob([await f.arrayBuffer()],{type:'application/pdf'});
     const v=t==='invoices'?((DEAL&&DEAL.invoices)||[]).find(x=>x.id===id):null;
     const name=v?((v.status==='paid'?'Receipt':v.purpose==='deposit'?'Deposit-request':'Invoice')+'-'+(invNo(v.number).slice(1)||'copy')+'.pdf'):(t==='contracts'?'Agreement':t==='estimates'?'Estimate':'Proposal')+'.pdf';
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
     setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},5000);
-  }catch(_){toast('Couldn’t download the PDF just now.');}
+  }catch(_){toast('Couldn’t download the PDF just now.','err');}
   finally{b.disabled=false;}
 }
 // item 77: Record a payment — opens under its invoice. All of it marks it paid; less is a part
@@ -1697,14 +1691,14 @@ function payForm(row,v){
   box.scrollIntoView({block:'nearest',behavior:'smooth'});
   go.addEventListener('click',async()=>{
     const a=cents(); const on=$('pf-on').value; const how=(box.querySelector('input[name="pf-how"]:checked')||{}).value||'';
-    if(!(a>0)){toast('Enter the amount you received.');amt.focus();return;}
+    if(!(a>0)){toast('Enter the amount you received.','err');amt.focus();return;}
     if(a>due){toast('That’s more than the '+fmtC(due)+' due. Record what’s due here.');amt.focus();return;}
-    if(!on){toast('Enter the day you were paid.');$('pf-on').focus();return;}
-    if(on>today){toast('The day you were paid can’t be in the future.');$('pf-on').focus();return;}
+    if(!on){toast('Enter the day you were paid.','err');$('pf-on').focus();return;}
+    if(on>today){toast('The day you were paid can’t be in the future.','err');$('pf-on').focus();return;}
     go.disabled=true;
     const rc=$('pf-rcpt');
     const r=await apiAg('/sales/invoices/'+encodeURIComponent(v.id)+'/payment?today='+today,'POST',{amount_cents:a,paid_on:on,method:how,note:$('pf-note').value.trim(),private_note:$('pf-private').value.trim(),email_receipt:!!(rc&&rc.checked)});
-    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.');go.disabled=false;return;}
+    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.','err');go.disabled=false;return;}
     const x=(r.body&&r.body.data)||{}; const live=x.link_deactivated===false;
     let m=x.part?`Recorded a ${fmtC(a)} part payment. ${fmtC(x.left_cents)} is still due on ${no}.`:`Marked ${no} paid, ${(PAY_WORDS[how]||'paid').replace(/^Paid /,'')}.`;
     if(x.receipt_emailed)m+=` Receipt emailed to ${first||'them'}.`;
@@ -1743,7 +1737,7 @@ function billingForm(kind){
     const go=$('bf-go'); go.disabled=true;
     const amt=parseFloat(($('bf-amt').value||'').trim());
     if(kind==='retainer'){
-      if(!amt||amt<1){toast('Enter a retainer amount of at least $1.');go.disabled=false;return;}
+      if(!amt||amt<1){toast('Enter a retainer amount of at least $1.','err');go.disabled=false;return;}
       const r=await apiAg('/sales/deals/'+d.id+'/retainer','POST',{amount_cents:Math.round(amt*100),interval:$('bf-int').value||'month'});
       // B21: "copied" only once the link IS on the clipboard — it said so before trying, and a refused copy stayed quiet
       if(r.ok){const x=r.body.data||{},noCopy='Retainer set up — copy its authorization link from Invoices.';
@@ -1751,11 +1745,11 @@ function billingForm(kind){
         else if(x.url&&navigator.clipboard)navigator.clipboard.writeText(x.url).then(()=>toast('Retainer set up — authorization link copied'),()=>toast(noCopy));
         else toast(noCopy);
         reloadDeal();}
-      else{toast((r.body&&r.body.message)||'Couldn’t set that up.');go.disabled=false;}
+      else{toast((r.body&&r.body.message)||'Couldn’t set that up.','err');go.disabled=false;}
       return;
     }
     const dep=kind==='deposit';
-    if(dep&&(!amt||amt<1)){toast('Enter a deposit amount.');go.disabled=false;return;}
+    if(dep&&(!amt||amt<1)){toast('Enter a deposit amount.','err');go.disabled=false;return;}
     const body={purpose:dep?'deposit':'service'};
     if(amt)body.amount_cents=Math.round(amt*100);
     const title=($('bf-title').value||'').trim(); if(title)body.title=title; else if(dep)body.title='Deposit';
@@ -1768,7 +1762,7 @@ async function sendMoney(body,host){
   const r=await apiAg('/sales/deals/'+d.id+'/invoice','POST',body);
   if(r.ok){
     const b=r.body||{}; const url=b.url||'';
-    if(b.warning==='link_failed'){toast(b.message||'Invoice saved, but the payment link didn’t generate — tap Send again.');if(host)host.innerHTML='';reloadDeal();return;}
+    if(b.warning==='link_failed'){toast(b.message||'Invoice saved, but the payment link didn’t generate — tap Send again.','err');if(host)host.innerHTML='';reloadDeal();return;}
     if(url&&navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});
     toast(b.double_tap?label+' already sent a moment ago'+(url?' — link copied':''):b.emailed?label+(b.reused?' re-sent':' sent')+' — emailed to the client':(url?label+' prepared — payment link copied, nothing was emailed':label+' sent'));
     if(host)host.innerHTML='';
@@ -1788,7 +1782,7 @@ async function sendMoney(body,host){
     arm('bf-force',()=>sendMoney({...body,...(want&&!body.amount_cents?{amount_cents:want}:{}),force:true},host));
     return;
   }
-  toast((r.body&&r.body.message)||'That didn’t go through.');
+  toast((r.body&&r.body.message)||'That didn’t go through.','err');
   const go=$('bf-go'); if(go)go.disabled=false;
 }
 
@@ -1852,12 +1846,12 @@ function renderFilesTab(host){
     b.disabled=true;
     const r=await apiAg('/projects/'+encodeURIComponent(ids.project)+'/deliverables/'+b.getAttribute('data-dl')+'/download');
     b.disabled=false;
-    if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener'); else toast('Couldn’t open that file just now.');
+    if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener'); else toast('Couldn’t open that file just now.','err');
   }));
   host.querySelectorAll('[data-doc]').forEach(b=>b.addEventListener('click',async()=>{
     const [table,id]=b.getAttribute('data-doc').split(':'); b.disabled=true;
     const r=await apiAg('/sales/'+table+'/'+id+'/document'); b.disabled=false;
-    if(r.ok&&r.body.url)window.open(r.body.url,'_blank','noopener'); else toast('Couldn’t open the document just now.');
+    if(r.ok&&r.body.url)window.open(r.body.url,'_blank','noopener'); else toast('Couldn’t open the document just now.','err');
   }));
 }
 
@@ -2156,13 +2150,13 @@ async function sendMessage(e){
   try{
     const rr=await api(replyPath,'POST',ACT.reply_to?{body,audience:'client'}:{body});
     if(rr.ok){clearDraft('msgBody');toast('Sent.');await loadActivity();}
-    else{toast((rr.body&&rr.body.message)||'Couldn’t send.');btn.disabled=false;}
-  }catch(_){toast('Couldn’t send.');btn.disabled=false;}
+    else{toast((rr.body&&rr.body.message)||'Couldn’t send.','err');btn.disabled=false;}
+  }catch(_){toast('Couldn’t send.','err');btn.disabled=false;}
 }
 async function logActivity(){
   const deal=idParams().deal; if(!deal&&!hasPerson())return;
   const body=($('logBody')&&$('logBody').value||'').trim();
-  if(LOGKIND==='note'&&!body){toast('Write a short note.');return;}
+  if(LOGKIND==='note'&&!body){toast('Write a short note.','err');return;}
   const btn=$('logGo'); btn.disabled=true;
   // item 85: on the deal when there is one, else on the person (or the customer) themselves; "Follow up on" adds a to-do for them
   const fu=($('logFollow')&&$('logFollow').value)||'',who=(REC&&REC.header&&(REC.header.person||REC.header.name))||'';
@@ -2170,31 +2164,31 @@ async function logActivity(){
   const r=deal?await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/activity','POST',base):await apiAg('/sales/people/activity','POST',{...base,...personIds()});
   const f=r.ok&&r.body&&r.body.data&&r.body.data.follow_up;
   if(!deal&&r.status===404){toast(NOT_YET);btn.disabled=false;return;}   // an older server: pages go live before the server's update
-  if(r.ok){clearDraft('logBody');clearDraft('logDate');clearDraft('logFollow');toast(fu?(f&&f.id?'Logged, and a to-do to follow up on '+dueLabel(fu)+'.':'Logged. The follow-up to-do didn’t save: add it from the To-do tab.'):'Logged.');
+  if(r.ok){clearDraft('logBody');clearDraft('logDate');clearDraft('logFollow');toast(fu?(f&&f.id?'Logged, and a to-do to follow up on '+dueLabel(fu)+'.':'Logged. The follow-up to-do didn’t save: add it from the To-do tab.'):'Logged.',fu&&!(f&&f.id)?'err':'ok');
     // B4: "Last talked" moves at once (the server answers with the day just logged; an older day doesn't win)
     const at=r.body&&r.body.data&&r.body.data.last_contacted_at;if(at&&DEAL&&!DEAL.error&&!(Date.parse(DEAL.last_contacted_at)>Date.parse(at))){DEAL.last_contacted_at=at;renderHighlights();if(TAB==='deal')showTab(TAB,true);}
     await loadActivity();}
-  else{toast((r.body&&r.body.message)||'That didn’t save.');btn.disabled=false;}
+  else{toast((r.body&&r.body.message)||'That didn’t save.','err');btn.disabled=false;}
 }
 async function addTask(){
   const deal=idParams().deal; if(!deal&&!hasPerson())return;
   const title=($('taskTitle')&&$('taskTitle').value||'').trim();
-  if(!title){toast('Give the to-do a title.');return;}
+  if(!title){toast('Give the to-do a title.','err');return;}
   const btn=$('taskGo'); btn.disabled=true;
   const due=($('taskDue')&&$('taskDue').value)||'';
   // item 85: on the deal when there is one, else a to-do for the person (or the customer) themselves
   const r=deal?await apiAg('/sales/deals/'+encodeURIComponent(deal)+'/tasks','POST',due?{title,due_date:due}:{title}):await apiAg('/sales/tasks','POST',{title,...(due?{due_date:due}:{}),...personIds()});
   if(!deal&&r.status===404){toast(NOT_YET);btn.disabled=false;return;}
   if(r.ok){clearDraft('taskTitle');clearDraft('taskDue');toast('Added.');await loadActivity();}
-  else{toast((r.body&&r.body.message)||'That didn’t save.');btn.disabled=false;}
+  else{toast((r.body&&r.body.message)||'That didn’t save.','err');btn.disabled=false;}
 }
 async function addNote(){
   const body=($('noteBody')&&$('noteBody').value||'').trim();
-  if(!body){toast('Write a little something first.');return;}
+  if(!body){toast('Write a little something first.','err');return;}
   const btn=$('noteGo'); btn.disabled=true;
   const r=await api('/crm/notes','POST',{audience:NEWAUD,body});
   if(r.ok){clearDraft('noteBody');toast(r.body.data&&r.body.data.message||'Saved.');await loadActivity();}
-  else{toast((r.body&&r.body.message)||'That didn’t save.');btn.disabled=false;}
+  else{toast((r.body&&r.body.message)||'That didn’t save.','err');btn.disabled=false;}
 }
 
 function renderFilters(){
@@ -2223,7 +2217,7 @@ function renderUpcoming(){
     cb.disabled=true;
     const r=await apiAg('/sales/deal-tasks/'+cb.getAttribute('data-updone'),'PATCH',{status:'done'});
     if(r.ok){toast('Done.');await loadActivity();}
-    else{toast('Couldn’t update that to-do.');cb.checked=false;cb.disabled=false;}
+    else{toast('Couldn’t update that to-do.','err');cb.checked=false;cb.disabled=false;}
   }));
 }
 
@@ -2255,7 +2249,7 @@ async function renderNotesView(host){
     b.disabled=true;
     const pr=await api('/crm/notes/'+b.getAttribute('data-pin')+'/pin','POST',{pinned:b.getAttribute('data-on')==='1'});
     if(pr.ok)renderNotesView(host);   // re-fetch: pinned-first order is the server's
-    else{toast('Couldn’t update that note.');b.disabled=false;}
+    else{toast('Couldn’t update that note.','err');b.disabled=false;}
   }));
   host.querySelectorAll('[data-delnote]').forEach(b=>b.addEventListener('click',()=>removeNote(b)));   // the merged All view changes too
 }
@@ -2264,11 +2258,11 @@ async function renderNotesView(host){
 async function removeNote(b){
   const k=window.ddsListKit,q='Remove this note? It can’t be undone.';
   if(k&&k.confirmIn){if(!(await k.confirmIn(b,{text:q,yes:'Yes, remove it'})))return;}
-  else if(!confirm(q))return;
+  else if(!(await ddsConfirm(q,null,'Yes, remove it',{danger:true})))return;
   b.disabled=true;
   const r=await api('/crm/notes/'+b.getAttribute('data-delnote'),'DELETE');
   if(r.ok){toast('Removed.');await loadActivity();}
-  else{toast('Couldn’t remove that note.');b.disabled=false;}
+  else{toast('Couldn’t remove that note.','err');b.disabled=false;}
 }
 // Phase 3 (timeline filters): website system events — publish notices, "changes
 // are waiting", connected-service pings — buried the human events (a payment, a
@@ -2351,7 +2345,7 @@ function openHandover(){
   $('hoGet').addEventListener('click',async()=>{
     const b=$('hoGet');b.disabled=true;b.textContent='Gathering everything…';$('hoErr').hidden=true;
     try{
-      const r=await fetch(FN+'/handover/pack',{headers:H(true)});
+      const r=await ddsApi.raw('/handover/pack',{scope:scopeParam()});
       if(!r.ok||!/zip/.test(r.headers.get('Content-Type')||'')){const j=await r.json().catch(()=>({}));throw new Error((j&&j.message)||(r.status===404?'The hand-over pack arrives with the next update.':'The pack didn’t download. Try again.'));}
       const blob=await r.blob();const fname=(/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition')||'')||[])[1]||('hand-over-pack-'+(String(name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'customer')+'.zip');
       const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);

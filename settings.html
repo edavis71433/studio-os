@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Settings — Studio OS</title>
 <meta name="description" content="Your studio's settings in one place — profile, team, billing, invoices, connections, domains and developer tools.">
-<link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 <link rel="stylesheet" href="/fonts/brand.css">
 <style>
   /* ── Oct 2026 review: Settings is its own page. It used to be a deep link into
@@ -783,13 +783,12 @@
   </div>
 </div>
 <script src="/fresh-code.js?v=191"></script>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN = SUPABASE_URL + "/functions/v1/presence";
-const FN_REGION = 'us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -816,17 +815,10 @@ let ctxIn = null;
 const CTX_IN = new Promise((r) => { ctxIn = r; });   // settles once the page has its context, or knows it has none
 let TOKEN = "";
 sb.auth.onAuthStateChange(function (_e, s) { if (s && s.access_token) TOKEN = s.access_token; });
-const H = () => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': SCOPE, 'x-region': FN_REGION });
-// a dropped connection answers like a refusal (status 0) instead of throwing, so a
-// flipped switch flips back and says why (bug hunt C4/C6)
-const NET_MSG = 'That didn’t go through — check your connection and try again.';
-async function api(path, method, body) {
-  let r;
-  try { r = await fetch(FN + path, { method: method || 'GET', headers: H(), body: body === undefined ? undefined : JSON.stringify(body) }); }
-  catch (_) { return { ok: false, status: 0, body: { message: NET_MSG } }; }
-  return { ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) };
-}
-const toast = (m, bad) => { if (window.ddsToast) window.ddsToast(m, bad ? 'err' : 'ok'); };
+// the shell's one API helper (shell-kit.js), with the address's business (SCOPE) on every call. A dropped
+// connection answers like a refusal (status 0) instead of throwing, so a flipped switch flips back and says why (bug hunt C4/C6)
+function api(path, method, body) { return ddsApi(path, { method, body, scope: SCOPE }); }
+const toast = (m, bad, action) => ddsToast(m, bad ? 'err' : 'ok', action);   // the shell's one toast: bad shows a failure as one
 // ── Builder item 165 (Nov 2026, Figma 295:100): one way to save. A box saves when you leave
 //    it, a pick when you make it, a switch when you flip it; the small "Saved" tick shows in the
 //    place beside what changed (an element with class fs), and a save that doesn't go says
@@ -857,12 +849,12 @@ function saidRefused(slot, r, again, field) {
   const why = own && typeof own.message === 'string' ? own.message : (st >= 400 && st < 500 && st !== 408 && st !== 429 ? nice(b, '') : '');
   if (why) saidFailed(slot, null, 'Couldn’t save. ' + why); else saidFailed(slot, again);
 }
-// sales review item 69: "Download my data" — the zip arrives as a file, so this one fetch reads bytes, not JSON
+// sales review item 69: "Download my data" — the zip arrives as a file, so this one call reads bytes, not JSON (ddsApi.raw)
 async function downloadMyData() {
   const b = $('dlData'); if (!b) return;
   const was = b.textContent; b.disabled = true; b.textContent = 'Preparing…';
   try {
-    const r = await fetch(FN + '/sales/export', { headers: H() });
+    const r = await ddsApi.raw('/sales/export', { scope: SCOPE });
     if (!r.ok) { const j = await r.json().catch(() => null); toast(nice(j, 'The download didn’t start — try again in a moment.'), true); return; }
     const url = URL.createObjectURL(await r.blob());
     const a = document.createElement('a'); a.href = url; a.download = 'studio-data-' + new Date().toISOString().slice(0, 10) + '.zip';
@@ -1148,7 +1140,7 @@ let RESTORE_T = 0;
 function disarmRestore() { const b = $('inviteBtn'); if (!b) return; clearTimeout(RESTORE_T); if (b.dataset.restore === undefined) return; delete b.dataset.restore; b.textContent = 'Invite'; }
 function armRestore(email, role) {
   const b = $('inviteBtn'); b.dataset.restore = email; b.textContent = 'Bring them back';
-  toast(`${email} was removed from the team. Press “Bring them back” to let them in again as ${ROLE_WORD[role] || role}.`);
+  toast(`${email} was removed from the team. Press “Bring them back” to let them in again as ${ROLE_WORD[role] || role}.`, true);   // the invite didn't go: it waits for the second press
   clearTimeout(RESTORE_T); RESTORE_T = setTimeout(disarmRestore, 8000);
 }
 function onTeamAlready(m, email) {
@@ -1180,7 +1172,7 @@ if (inviteForm) {
   const row = { id: d.id, email: d.email || email, role: d.role || role, status: d.status || 'active', created_at: new Date().toISOString() };
   const i = TEAM.findIndex((m) => String(m.email || '').toLowerCase() === row.email); if (i >= 0) TEAM[i] = { ...TEAM[i], ...row, created_at: TEAM[i].created_at }; else TEAM.push(row);
   $('inv-email').value = '';
-  toast(d.restored ? `${row.email} is back on the team as ${ROLE_WORD[row.role] || row.role}.` : d.emailed === false ? 'Added — the invite email didn’t send; share the sign-in page with them.' : 'Invited — they get an email with a sign-in link.');
+  toast(d.restored ? `${row.email} is back on the team as ${ROLE_WORD[row.role] || row.role}.` : d.emailed === false ? 'Added — the invite email didn’t send; share the sign-in page with them.' : 'Invited — they get an email with a sign-in link.', !d.restored && d.emailed === false);
   const active = TEAM.filter((m) => m.status !== 'revoked').length; setStatus('agency_team', { text: `${active} on the team` });
   renderTeam();
   });
@@ -1234,7 +1226,7 @@ $('setFind').addEventListener('keydown', (e) => {
 //    self-serve, else the honest sentence — Agency/Enterprise changes go through us. ──
 const STATUS_WORD = { active: 'Active', paused: 'Paused — payment needs attention', lapsed: 'Ended — update payment to reactivate', deleted: 'Closed' };
 const SUPPORT = 'mailto:support@davisdigitalstudio.com';
-const shortDate = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); };
+const shortDate = (iso) => ddsDate.short(iso);   // "Nov 3" ("Nov 3, 2025" in another year): the shell's one date format
 // The honest next rung: what upgrading adds, and what it would switch off.
 function paintUpsell(host) {
   const up = CTX && CTX.upsell; if (!up || !up.name) return;
@@ -1695,8 +1687,8 @@ function paintParts(d) {
 async function togglePart(k) {
   if (REPORT_BUSY || !REPORT_READ) return;
   const d = REPORT || {};
-  if (k === 'ai' && !d.ai_checks) { toast('Switch on “Check AI answers every month” below to put AI answers in the report.'); return; }
-  if (k === 'maps' && !d.maps_on) { toast('Switch the map rank grid on from this client’s Search tab to put it in the report.'); return; }
+  if (k === 'ai' && !d.ai_checks) { toast('Switch on “Check AI answers every month” below to put AI answers in the report.', true); return; }
+  if (k === 'maps' && !d.maps_on) { toast('Switch the map rank grid on from this client’s Search tab to put it in the report.', true); return; }
   const off = new Set(d.parts_off || []);
   const words = (Array.isArray(d.parts) && d.parts.length ? d.parts.map((p) => p.key) : REPORT_PARTS.map((p) => p[0]));
   if (off.has(k)) off.delete(k); else off.add(k);
@@ -1880,7 +1872,7 @@ function wireReport() {
   $('reportPdf').addEventListener('click', async () => {
     const b = $('reportPdf'); b.disabled = true; $('reportMsg').textContent = 'Making the PDF…';
     try {
-      const r = await fetch(FN + '/report/monthly/pdf', { headers: H() });
+      const r = await ddsApi.raw('/report/monthly/pdf', { scope: SCOPE });
       if (!r.ok) throw new Error('pdf');
       const blob = await r.blob();
       const name = (/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || 'monthly-report.pdf';
@@ -1958,12 +1950,7 @@ function paintReports() {
   $('reportsNote').textContent = locked ? 'Your role can see the reports but not switch them. Your studio’s owner, an admin or an account manager can.' : 'A switch here is the same switch as on the client’s own card. A client who can’t be emailed can’t be switched on; the row says why, and Fix opens their record.';
 }
 // one client's own switch, with that client in scope
-async function putAs(siteId, body) {
-  let r;
-  try { r = await fetch(FN + '/report/monthly', { method: 'PUT', headers: { ...H(), 'x-dds-scope-site': siteId }, body: JSON.stringify(body) }); }
-  catch (_) { return { ok: false, status: 0, body: { message: NET_MSG } }; }
-  return { ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) };
-}
+function putAs(siteId, body) { return ddsApi('/report/monthly', { method: 'PUT', body, scope: siteId }); }   // never throws: no answer at all is status 0
 async function flipClientReport(siteId) {
   const row = REPORTS && (REPORTS.rows || []).find((x) => x.site_id === siteId);
   if (!row || REPORTS_BUSY || (REPORTS && REPORTS.can_change === false)) return;
@@ -1995,8 +1982,8 @@ let MENU_ASKED = false;   // finding C19: once per open, not again after every a
 // switch turns AI help on for the whole studio (about 1 cent a press, 50 a day at most);
 // only the owner may flip it, so anyone else sees it greyed with the reason.
 let GOALAI = null, GOAL_MONTH = null, GOAL_BUSY = false;
-const usd0 = (c) => '$' + Math.round((Number(c) || 0) / 100).toLocaleString('en-US');
-const localDay = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const usd0 = (c) => ddsMoney(Math.round((Number(c) || 0) / 100) * 100);   // whole dollars on purpose (a summary line), in the shell's one money format
+const localDay = () => ddsDate.ymd();   // today, on this device: 'YYYY-MM-DD'
 function goalCentsOf(v) {   // "$8,000" or "8000.50" → cents; empty → null; anything else → NaN
   const t = String(v || '').replace(/[$,\s]/g, '');
   if (!t) return null;
@@ -2019,7 +2006,7 @@ function paintGoalAi() {
   $('aiOwner').hidden = !!d.can_switch;
   const u = d.usage;
   const at = u && u.last_at ? new Date(u.last_at) : null;
-  const when = at ? (at.toDateString() === new Date().toDateString() ? 'today at ' + at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) : '';
+  const when = at ? (ddsDate.days(at) === 0 ? 'today at ' + ddsDate.time(at) : ddsDate.short(at)) : '';
   $('aiUse').textContent = !u ? '' : u.month_uses
     ? `This month: ${u.month_uses} use${u.month_uses === 1 ? '' : 's'}, about ${Math.max(1, Math.round(u.month_cents))}¢${when ? ' · last used ' + when : ''}`
     : (d.ai_on ? 'Not used yet this month.' : '');
@@ -2263,10 +2250,11 @@ async function savePortalPart(k, show) {
 }
 // ── item 232: the client's card opens their portal as they see it (client.html?preview=, read
 //    only) and sends them a sign-in link: "Send a new invite" once the last one ran out ──
-const dayWords = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''; };
+const dayWords = (iso) => ddsDate.short(iso);   // "Nov 3" ("Nov 3, 2025" in another year): the shell's one date format
+// the page's own words (no weeks), counted in calendar days as everywhere (it counted 24-hour blocks)
 function agoWords(iso) {
-  const t = Date.parse(iso || ''); if (!Number.isFinite(t)) return '';
-  const days = Math.floor((Date.now() - t) / 86400000);
+  const n = ddsDate.days(iso); if (n === null) return '';
+  const days = -n;
   return days <= 0 ? 'today' : days === 1 ? 'yesterday' : days < 30 ? `${days} days ago` : `on ${dayWords(iso)}`;
 }
 function portalWhoWords(p) {
@@ -2416,7 +2404,7 @@ function whoWords(p) {
 const placeWords = (to) => to === 'book' ? 'Your booking page' : to === 'messages' ? 'Messages, in the portal' : to === 'documents' ? 'Documents, in the portal' : String(to || '').replace(/^https:\/\//, '').replace(/\/$/, '');
 function paintPortalPages() {
   const locked = pagesLocked(), lim = PAGESET.limits || {};
-  const day = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''; };
+  const day = (iso) => ddsDate.short(iso);
   $('portalPageRows').innerHTML = (PAGESET.pages || []).map((p) => `<div class="swrow pgrow" data-page-row="${esc(p.id)}"><div class="t"><b>${esc(p.title)}</b><div class="how">${esc(whoWords(p))}${p.updated_at ? ' · changed ' + esc(day(p.updated_at)) : ''}</div></div><button type="button" class="btn sm" data-edit-page="${esc(p.id)}" aria-label="${locked ? 'Open' : 'Edit'} ${esc(p.title)}">${locked ? 'Open' : 'Edit'}</button></div>`).join('')
     || '<p class="how">No pages yet. A welcome guide is a good first one.</p>';
   $('portalLinkRows').innerHTML = (PAGESET.links || []).map((l) => `<div class="swrow pgrow" data-link-row="${esc(l.id)}"><div class="t"><b>${esc(l.label)}</b><div class="how">${esc(placeWords(l.to))}</div></div>${locked ? '' : `<button type="button" class="btn sm" data-edit-link="${esc(l.id)}" aria-label="Edit ${esc(l.label)}">Edit</button>`}</div>`).join('')

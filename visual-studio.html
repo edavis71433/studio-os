@@ -108,14 +108,12 @@
   .muted{color:var(--soft);font-size:14px}
   a.link{color:var(--p);text-decoration:none;font-weight:500} a.link:hover{text-decoration:underline}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s7,32px) auto}
-  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:var(--dds-r-lg,10px);font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transition:opacity var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none;max-width:90%;text-align:center}
-  .toast.show{opacity:1}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
   @media (max-width:900px){.setgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.opts{grid-template-columns:minmax(0,1fr)}}
   @media (max-width:640px){.wrap{padding:16px 16px 90px}.setgrid,.form2{grid-template-columns:minmax(0,1fr)}}
 </style>
-<link rel="stylesheet" href="/shell.css"><script src="/shell-kit.js"></script><script src="/shell.js" defer></script>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -130,75 +128,25 @@
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // Consumes the EXISTING Visual Studio backend only: /visual/kinds, /visual/generate,
 // /visual/plans, /visual/plans/:id/{vary,edit,decide} (+ the read-only
 // /brand/profile for the Brand line). No engine logic here.
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN = SUPABASE_URL + "/functions/v1/presence";
-const FN_REGION = 'us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN = "", KINDS = [], CHOSEN = null, CURRENT = null, LAST_SUBJECT = "", BRAND = null;
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 
-const H = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPABASE_KEY, 'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''), 'x-region':FN_REGION });
-async function apiGet(p){ try { const r = await fetch(FN+p, { headers:H() }); return { ok:r.ok, status:r.status, body: await r.json().catch(()=>({})) }; } catch(_e){ return { ok:false, status:0, body:{}, offline:true }; } }
-async function apiPost(p, b){ try { const r = await fetch(FN+p, { method:'POST', headers:H(), body:JSON.stringify(b||{}) }); return { ok:r.ok, status:r.status, body: await r.json().catch(()=>({})) }; } catch(_e){ return { ok:false, status:0, body:{}, offline:true }; } }
-function toast(m){ if(window.ddsToast)return void ddsToast(m);const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 3000); }
-
-// Small styled dialogs — replace native prompt()/confirm(), matching the app's
-// surfaces (same pattern as presence.html's askText). askText resolves the
-// entered value or null on cancel; askConfirm resolves true/false.
-function dlgShell(){
-  const dlg=document.createElement('dialog');
-  dlg.style.cssText='border:1px solid var(--line,#e6e6ec);border-radius:10px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(21,20,26,.22);background:var(--card,#fff);color:var(--ink,#15141a)';
-  return dlg;
-}
-function dlgBtn(label,primary){
-  const b=document.createElement('button'); b.type='button'; b.textContent=label; b.className='btn'+(primary?' primary':'');
-  return b;
-}
-function askText(title, opts){
-  opts=opts||{};
-  return new Promise((resolve)=>{
-    const dlg=dlgShell();
-    const form=document.createElement('form'); form.style.cssText='padding:18px 20px';
-    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px;font-size:15px'; form.appendChild(h);
-    if(opts.hint){ const hh=document.createElement('div'); hh.textContent=opts.hint; hh.style.cssText='font-size:13px;color:var(--soft,#5c5a66);margin-bottom:10px'; form.appendChild(hh); }
-    const inp=document.createElement('input'); inp.type='text'; if(opts.value)inp.value=opts.value; if(opts.placeholder)inp.placeholder=opts.placeholder;
-    inp.style.cssText='width:100%;font:inherit;font-size:15px;padding:8px 11px;border:1px solid var(--line,#e6e6ec);border-radius:8px;outline:none;box-sizing:border-box;background:var(--card,#fff);color:inherit'; form.appendChild(inp);
-    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
-    const cancel=dlgBtn('Cancel',false); const ok=dlgBtn(opts.ok||'Save',true); ok.type='submit';
-    row.appendChild(cancel); row.appendChild(ok); form.appendChild(row); dlg.appendChild(form); document.body.appendChild(dlg);
-    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
-    cancel.addEventListener('click',()=>finish(null));
-    form.addEventListener('submit',(e)=>{ e.preventDefault(); finish(inp.value); });
-    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(null); });
-    dlg.showModal(); // showModal focuses the first field; no timer (WebKit races a test's next fill())
-  });
-}
-function askConfirm(title, body, okLabel){
-  return new Promise((resolve)=>{
-    const dlg=dlgShell();
-    const box=document.createElement('div'); box.style.cssText='padding:18px 20px';
-    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px;font-size:15px'; box.appendChild(h);
-    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#5c5a66);margin-bottom:10px'; box.appendChild(p); }
-    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
-    const cancel=dlgBtn('Cancel',false); const ok=dlgBtn(okLabel||'OK',true);
-    row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
-    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
-    cancel.addEventListener('click',()=>finish(false));
-    ok.addEventListener('click',()=>finish(true));
-    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(false); });
-    dlg.showModal(); setTimeout(()=>ok.focus(),20);
-  });
-}
+// the shell's one API helper (shell-kit.js): { ok, status, body }, never a throw (no answer at all is status 0)
+const apiGet = (p) => ddsApi(p);
+const apiPost = (p, b) => ddsApi(p, { method:'POST', body:b||{} });
+const toast = (m, kind, action) => ddsToast(m, kind, action);   // the shell's one toast: 'err' shows a failure as one
 
 // ── the pick cards: one icon per kind the server offers (unknown kinds get the general one) ──
 const ICON = {
@@ -317,7 +265,7 @@ function planThumb(p){
   const w=Math.max(30,Math.min(56,Math.round(30*ratio)));
   return `<img class="thumb" src="${esc(v.preview_url)}" alt="" width="${w}" height="30" loading="lazy" style="width:${w}px">`;
 }
-const when=(iso)=>{const d=new Date(iso||'');return Number.isNaN(d.getTime())?'':d.toLocaleDateString([],{month:'short',day:'numeric'});};
+const when=(iso)=>ddsDate.short(iso);   // "Sep 28" ("Sep 28, 2025" in another year): the shell's one date format
 async function loadHistory(){
   const host=$('history'); if(!host)return;
   let plans=[];try{const r=await apiGet('/visual/plans');plans=(r&&r.ok&&r.body&&r.body.data)||[];}catch(_){}
@@ -340,7 +288,7 @@ async function reopenPlan(id){
   $('planhost').innerHTML='<div class="spin" role="status" aria-label="Working"></div>';
   try{window.scrollTo({top:0,behavior:'smooth'});}catch(_){}
   try{const r=await apiGet('/visual/plans/'+id);if(r&&r.ok&&r.body&&r.body.data){showPlan(r.body.data);return;}}catch(_){}
-  $('planhost').innerHTML='';toast('Couldn’t reopen that one.');
+  $('planhost').innerHTML='';toast('Couldn’t reopen that one.','err');
 }
 
 // "Help me describe it": a starter sentence for the kind you picked — a prompt
@@ -355,7 +303,7 @@ const STARTER = {
 };
 function helpDescribe(){
   const ta=$('subject'); if(!ta)return;
-  if(!CHOSEN){ toast('Pick what you need first — then I’ll suggest a start.'); const f=document.querySelector('[data-kind]'); if(f)f.focus(); return; }
+  if(!CHOSEN){ toast('Pick what you need first — then I’ll suggest a start.','err'); const f=document.querySelector('[data-kind]'); if(f)f.focus(); return; }
   if((ta.value||'').trim().length){ ta.focus(); toast('Say what’s in the picture, where it goes, and the mood — change anything that isn’t true of you.'); return; }
   ta.value = STARTER[CHOSEN] || STARTER.general;
   ta.focus(); try{ ta.setSelectionRange(0, ta.value.length); }catch(_){}
@@ -374,15 +322,15 @@ function wireComposer(){
 
 async function generate(){
   const subject = ($('subject').value||'').trim();
-  if(!CHOSEN){ toast('Pick what you need first — a banner, a post, or a link preview.'); return; }
-  if(subject.length < 3){ toast('Tell us in a few words what the image should show.'); return; }
+  if(!CHOSEN){ toast('Pick what you need first — a banner, a post, or a link preview.','err'); return; }
+  if(subject.length < 3){ toast('Tell us in a few words what the image should show.','err'); return; }
   LAST_SUBJECT = subject;   // A7: seeds the alt-text so you accept/edit rather than retype
   const go = $('go'); go.disabled = true; go.textContent = 'Making 3 options…';
   $('planhost').innerHTML = '<div class="spin" role="status" aria-label="Working"></div>';
   const r = await apiPost('/visual/generate', { kind: CHOSEN, subject, count: 3 });
   go.disabled = false; go.textContent = 'Make 3 options';
-  if(r.status === 503){ $('planhost').innerHTML=''; toast('Making images isn’t switched on for your studio yet.'); return; }
-  if(!r.ok){ $('planhost').innerHTML=''; toast((r.body&&r.body.message) || 'That didn’t come through — nothing was saved.'); return; }
+  if(r.status === 503){ $('planhost').innerHTML=''; toast('Making images isn’t switched on for your studio yet.','err'); return; }
+  if(!r.ok){ $('planhost').innerHTML=''; toast((r.body&&r.body.message) || 'That didn’t come through — nothing was saved.','err'); return; }
   showPlan(r.body.data);
 }
 
@@ -399,27 +347,28 @@ function wirePlan(){
 }
 
 async function use(varId){
-  const alt = await askText('Describe this image in a few words', { hint:'It helps customers and search engines.', value: LAST_SUBJECT || '', ok:'Save' });
+  // an empty answer closes it too, and the toast below says why it wasn't saved (as before)
+  const alt = await ddsAsk({ title:'Describe this image in a few words', text:'It helps customers and search engines.', value: LAST_SUBJECT || '', yes:'Save', required:false });
   if(alt === null) return;
-  if((alt||'').trim().length < 3){ toast('A few words, please — it makes the image accessible.'); return; }
+  if((alt||'').trim().length < 3){ toast('A few words, please — it makes the image accessible.','err'); return; }
   const r = await apiPost('/visual/plans/'+CURRENT.id+'/decide', { decision:'approve', variation_id:varId, alt_text:alt.trim() });
   if(r.ok && r.body.data && r.body.data.status==='stored'){ toast('Saved to your library.'); showPlan({ ...CURRENT, status:'stored' }); loadHistory(); return; }
-  toast((r.body&&r.body.message) || 'That didn’t save — nothing changed. Try again.');
+  toast((r.body&&r.body.message) || 'That didn’t save — nothing changed. Try again.','err');
 }
 async function doVary(){
   const host=$('planhost'); host.innerHTML = '<div class="spin" role="status"></div>';
   const r = await apiPost('/visual/plans/'+CURRENT.id+'/vary', { count: 2 });
-  if(r.ok){ showPlan(r.body.data); } else { showPlan(CURRENT); toast((r.body&&r.body.message)||'Couldn’t make more just now.'); }
+  if(r.ok){ showPlan(r.body.data); } else { showPlan(CURRENT); toast((r.body&&r.body.message)||'Couldn’t make more just now.','err'); }
 }
 async function doEdit(){
   const instruction = ($('editin').value||'').trim();
-  if(instruction.length < 2){ toast('Tell us what to change.'); return; }
+  if(instruction.length < 2){ toast('Tell us what to change.','err'); return; }
   const host=$('planhost'); host.innerHTML = '<div class="spin" role="status"></div>';
   const r = await apiPost('/visual/plans/'+CURRENT.id+'/edit', { instruction, count: 2 });
-  if(r.ok){ showPlan(r.body.data); } else { showPlan(CURRENT); toast((r.body&&r.body.message)||'Couldn’t apply that just now.'); }
+  if(r.ok){ showPlan(r.body.data); } else { showPlan(CURRENT); toast((r.body&&r.body.message)||'Couldn’t apply that just now.','err'); }
 }
 async function discard(){
-  if(!(await askConfirm('Discard these options?', 'Nothing was saved, so there’s nothing to lose.', 'Discard'))) return;
+  if(!(await ddsConfirm('Discard these options?', 'Nothing was saved, so there’s nothing to lose.', 'Discard', { danger:true }))) return;
   await apiPost('/visual/plans/'+CURRENT.id+'/decide', { decision:'abandon' });
   $('planhost').innerHTML=''; CURRENT=null; toast('Discarded.'); loadHistory();
 }
