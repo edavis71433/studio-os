@@ -54,10 +54,10 @@ ok('helper: isUniqueViolation reads the Postgres code', E.isUniqueViolation({ st
 }
 {
   db.reset({ presence_contacts: [contact(JANE, 'Jane@Example.com', { name: 'Jane', notes: '' })] });
-  const c = await S.ensureConnectContact(SITE, 'jane@example.com', 'Jane', false);
+  const c = await S.ensureConnectContact(SITE, 'jane@example.com', 'Jane');
   ok('K1: "Make customer" / "Add a customer" finds Jane whatever the capitals (so her contact gets linked)', c?.id === JANE && db.writes('presence_contacts').length === 0, JSON.stringify(c));
   db.reset({ presence_contacts: [] });
-  const n = await S.ensureConnectContact(SITE, 'New@Person.com', 'New', false);
+  const n = await S.ensureConnectContact(SITE, 'New@Person.com', 'New');
   ok('K1: a new connect contact is stored lower-cased', n?.email === 'new@person.com', JSON.stringify(n));
 }
 

@@ -335,7 +335,8 @@ const exampleRowsOn = (site) => ({
 // PR 433 (builder item 199) rewrites this check; left as text until it lands
 const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url));
 const commerce = read('supabase/functions/presence/routes/commerce.ts');
-ok('12: the seed runs only on a just-created site — trial and webhook paths alike — and never blocks', (commerce.match(/if \(prov\.created && prov\.siteId\) await seedExampleData\(prov\.siteId\)\.catch\(\(\) => \{\}\);/g) || []).length === 2);
+// builder item 199: self-serve sign-up (the trial path) is closed, so the paid webhook path is the one left
+ok('12: the seed runs only on a just-created site, and never blocks', (commerce.match(/if \(prov\.created && prov\.siteId\) await seedExampleData\(prov\.siteId\)\.catch\(\(\) => \{\}\);/g) || []).length === 1);
 
 const exampleWorld = () => {
   const ex = (site, n) => [

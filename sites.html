@@ -248,6 +248,79 @@
   .rowmenu .danger{color:var(--bad)}
   .dbody ul.points{margin:4px 0 0;padding-left:18px;font-size:13.5px;color:var(--soft);line-height:1.5}
   .dbody ul.points li{margin:6px 0}
+  /* ── + New site as a sheet (builder item 198, Figma "New site gallery" A and B): who the
+     business is on the left, the eight designs on the right, Create site in a bar below ── */
+  dialog.sheet{max-width:1240px;width:calc(100% - 48px);height:92vh;max-height:1040px;margin:4vh auto;border-radius:22px;overflow:hidden}
+  dialog.sheet[open]{display:flex;flex-direction:column}
+  .sform{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+  .stop{display:flex;align-items:center;gap:16px;padding:24px 32px 20px;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .stop h3{font-family:var(--serif);font-weight:600;font-size:30px;line-height:1.15;margin:0;letter-spacing:-.01em}
+  .stop p{margin:2px 0 0;color:var(--soft);font-size:14px}
+  .sx{margin-left:auto;flex:0 0 auto;width:44px;height:44px;border:1px solid var(--line);border-radius:12px;background:transparent;color:var(--soft);font:inherit;font-size:22px;line-height:1;cursor:pointer}
+  .sx:hover{color:var(--p);border-color:var(--p)}
+  .sfields{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+  .nbody{flex:1 1 auto;min-height:0;overflow:auto;display:grid;grid-template-columns:352px minmax(0,1fr);gap:36px;padding:24px 32px 28px;align-items:start}
+  .sleft,.sright{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .sform label.fl,.sform .fl{display:block;font-size:13px;font-weight:600;color:var(--soft);margin:0 0 6px}
+  .sform input[type="text"],.sform select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:11px 14px;outline:none}
+  .sform input[type="text"]:focus,.sform select:focus{border-color:var(--p)}
+  .sform fieldset{border:none;padding:0;margin:0;min-width:0}
+  .sform legend{padding:0;font-size:13px;font-weight:600;color:var(--soft)}
+  .shint{font-size:12.5px;color:var(--faint);line-height:1.4;margin:4px 0 10px}
+  .kinds{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kind{position:relative;display:block;border:1px solid var(--line);border-radius:12px;padding:10px 14px 11px;cursor:pointer;background:var(--card)}
+  .kind input,.dcard input,.tcard input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+  .kind b{display:block;font-size:14px;font-weight:600;line-height:1.3}
+  .kind span{display:block;font-size:12px;color:var(--faint);margin-top:2px;line-height:1.35}
+  .kind:has(input:checked){border:2px solid var(--p);padding:9px 13px 10px;background:var(--p-soft)}
+  .kind:has(input:checked) b,.kind:has(input:checked) span{color:var(--p-deep)}
+  .kind:has(input:focus-visible),.dcard:has(input:focus-visible),.tcard:has(input:focus-visible){outline:2px solid var(--p);outline-offset:2px}
+  .srule{border:none;border-top:1px solid var(--line);margin:4px 0}
+  .sright h4{font-family:var(--serif);font-weight:600;font-size:24px;margin:0;letter-spacing:-.01em}
+  .sright .lookline{font-size:13.5px;color:var(--soft);line-height:1.45;margin:4px 0 0}
+  .designs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+  .dcard{position:relative;display:flex;flex-direction:column;gap:10px;padding:10px 10px 16px;border:1px solid var(--line);border-radius:16px;background:var(--card);cursor:pointer;box-shadow:0 6px 18px -6px rgba(23,21,34,.08)}
+  .dcard:hover{border-color:var(--p)}
+  .dpic{position:relative;display:block;aspect-ratio:640/440;border-radius:10px;overflow:hidden;background:var(--p-soft);border:1px solid var(--line)}
+  .dpic img{display:block;width:100%;height:100%;object-fit:cover}
+  .dbadge{position:absolute;left:10px;top:10px;display:inline-flex;align-items:center;gap:6px;background:#fff;color:#3d2185;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+  .dbadge span{color:#6d3fd4}
+  .dtick{position:absolute;right:10px;top:10px;width:30px;height:30px;border-radius:50%;background:var(--p);color:#fff;display:none;place-items:center;font-size:15px;font-weight:700}
+  .dcard:has(input:checked){border:3px solid var(--p);padding:8px 8px 14px}
+  .dcard:has(input:checked) .dtick{display:grid}
+  .dcard b{font-size:15px;font-weight:600}
+  .dline{font-size:13px;color:var(--soft);line-height:1.4}
+  .tpls{display:flex;flex-wrap:wrap;gap:14px}
+  .tcard{position:relative;display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--card);cursor:pointer;min-width:0;flex:1 1 300px}
+  .tcard:has(input:checked){border:3px solid var(--p);padding:10px}
+  .ttile{flex:0 0 auto;width:64px;height:44px;border-radius:8px;background:var(--p-soft);color:var(--p);display:grid;place-items:center;font-size:20px}
+  .tcard .tw b{display:block;font-size:14px;font-weight:600}
+  .tcard .tw span{display:block;font-size:12.5px;color:var(--soft);line-height:1.35}
+  .sfootbar{flex:0 0 auto;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:16px 32px;border-top:1px solid var(--line);background:var(--bg)}
+  .ssum{display:flex;align-items:center;gap:12px;flex:1 1 280px;min-width:0}
+  .ssum .spic{flex:0 0 auto;width:64px;height:44px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:var(--p-soft);color:var(--p);display:grid;place-items:center;font-size:18px}
+  .ssum .spic img{display:block;width:100%;height:100%;object-fit:cover}
+  .ssum b{display:block;font-size:14px;font-weight:600;overflow-wrap:anywhere}
+  .ssum span{display:block;font-size:12.5px;color:var(--soft)}
+  .sfull{flex:1 1 100%;display:flex;align-items:flex-start;gap:12px;background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:14px 16px;font-size:13.5px;line-height:1.45}
+  .sfull p{margin:0;flex:1 1 auto} .sfull b{display:block;font-size:14px}
+  .sfull .btn.ghost{flex:0 0 auto;background:var(--card)}
+  .sdone{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;max-width:560px;width:100%;margin:0 auto;max-height:none}
+  .sform .btn{min-height:44px;padding:10px 18px;border-radius:10px;font-weight:600}
+  /* a phone: the sheet is the whole screen, one column, and Create site stays in reach at the foot */
+  @media (max-width:760px){
+    dialog.sheet{width:100%;max-width:none;height:100vh;height:100dvh;max-height:none;margin:0;border-radius:0}
+    .stop{padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top))}
+    .stop h3{font-size:26px}
+    .nbody{grid-template-columns:minmax(0,1fr);gap:20px;padding:12px 16px 20px}
+    .designs{grid-template-columns:minmax(0,1fr)}
+    .sfootbar{padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+    .sfootbar #new-submit{flex:1 1 100%}
+    #new-cancel{display:none}
+  }
+  @media (min-width:761px) and (max-width:1100px){.designs{grid-template-columns:repeat(2,minmax(0,1fr))}.nbody{grid-template-columns:300px minmax(0,1fr);gap:28px}}
+  /* item 198: "8 of 25 sites" in the header's line; a full plan says so in the warning colour */
+  .room{font-weight:600;color:var(--ink)} .room.full{color:var(--warn)}
   .trash{margin-top:var(--dds-s7,32px)}
   .trash .nhead span.hint{font-size:12.5px;color:var(--faint)}
   .tlist{background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);box-shadow:var(--shadow);overflow:hidden}
@@ -396,23 +469,47 @@
     <div id="tpl-done" style="display:none"></div>
   </form>
 </dialog>
-<!-- + New site (item 135): a business name and, if you like, a starter kit. Nobody
-     is emailed; the card then offers Invite the owner (POST /agency/sites) -->
-<dialog id="newDlg" aria-labelledby="newHead">
-  <form id="newForm" class="dbody">
-    <div id="new-fields">
-      <h3 id="newHead">New site</h3>
-      <p class="note" style="margin-top:0">Build it in private. Nobody is emailed until you invite the owner.</p>
-      <label for="new-biz">Business name</label>
-      <input id="new-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
-      <div id="new-from-wrap" hidden>
-        <span class="lab" id="new-from-l">Start from</span>
-        <div class="opts" id="new-from" role="radiogroup" aria-labelledby="new-from-l"></div>
-        <p class="note">A template brings a saved site’s pages, sections, photos, menu and look; a starter kit brings services, FAQs, the voice and colors. Business details and reviews are never copied: those are theirs to fill in.</p>
-      </div>
-      <div class="row2"><button type="button" class="btn ghost" id="new-cancel">Cancel</button><button type="submit" class="btn" id="new-submit">Create site</button></div>
+<!-- + New site (item 135; the gallery, item 198): the business's name and kind, one of the eight
+     built-in designs or a saved template, and a starter kit if you like. Nobody is emailed; the
+     card then offers Invite the owner (POST /agency/sites). Drawn in Figma, "New site gallery". -->
+<dialog id="newDlg" class="sheet" aria-labelledby="newHead">
+  <form id="newForm" class="sform" novalidate>
+    <div class="stop">
+      <div><h3 id="newHead">New site</h3><p>Build it in private. Nobody is emailed until you invite the owner.</p></div>
+      <button type="button" class="sx" id="new-x" aria-label="Close">×</button>
     </div>
-    <div id="new-done" style="display:none"></div>
+    <div id="new-fields" class="sfields">
+      <div class="nbody">
+        <div class="sleft">
+          <div><label class="fl" for="new-biz">Business name</label>
+          <input type="text" id="new-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off"></div>
+          <fieldset id="new-kind-wrap" hidden>
+            <legend>What kind of business is it?</legend>
+            <p class="shint">It sets the words the site uses, like Menu or Services, and which designs come first.</p>
+            <div class="kinds" id="new-kinds"></div>
+          </fieldset>
+          <div id="new-exact-wrap" hidden><label class="fl" for="new-exact">More exactly (optional)</label><select id="new-exact"></select></div>
+          <div id="new-kit-wrap" hidden>
+            <hr class="srule">
+            <label class="fl" for="new-kit">Bring a starter kit too (optional)</label>
+            <select id="new-kit"></select>
+            <p class="shint" style="margin-bottom:0">A starter kit adds saved services, FAQs, the voice and colors. The look stays the one you pick.</p>
+          </div>
+        </div>
+        <div class="sright">
+          <div><h4>Pick a look</h4><p class="lookline" id="new-lookline">Pick the kind of business and the designs that suit it come first. Your words stay yours; a look can be changed any time in the editor, under Styles.</p></div>
+          <p class="shint" id="new-nodesigns" hidden>The designs couldn’t load just now. The site starts on the usual look, and you can change it in the editor, under Styles.</p>
+          <fieldset id="new-look-wrap" hidden><legend class="sr-only">Pick a look</legend><div class="designs" id="new-designs"></div></fieldset>
+          <fieldset id="new-tpl-wrap" hidden><legend class="fl" style="font-size:14px;color:var(--ink)">Or start from one of your templates</legend><div class="tpls" id="new-tpls" style="margin-top:10px"></div></fieldset>
+        </div>
+      </div>
+      <div class="sfootbar">
+        <div class="sfull" id="new-full" role="alert" hidden><p id="new-full-t"></p><button type="button" class="btn ghost" id="new-back">Back to my sites</button></div>
+        <div class="ssum"><span class="spic" id="new-sum-pic" aria-hidden="true"></span><span><b id="new-sum-a">Your new site</b><span id="new-sum-b">The usual look · starts private, nothing published</span></span></div>
+        <button type="button" class="btn ghost" id="new-cancel">Cancel</button><button type="submit" class="btn" id="new-submit">Create site</button>
+      </div>
+    </div>
+    <div id="new-done" class="dbody sdone" style="display:none"></div>
   </form>
 </dialog>
 <!-- Invite the owner (item 135): the later, separate step for a site with no owner
@@ -839,10 +936,19 @@ function paintFilters(){
   const fp=$('fpills');if(fp)fp.innerHTML=pillsHtml();
 }
 function setFilter(k){if(!FILTERS[k])return;FILTER=FILTER===k&&k!=='all'?'all':k;MENU_OPEN=null;paintFilters();applyView();}
+// item 198: the plan's count, "8 of 25 sites" (every site but the Trash, archived ones too);
+// a full plan says so. Nothing when the server sent no count.
+function roomHtml(){
+  const r=META.room;if(!r||typeof r.limit!=='number')return '';
+  const full=r.used>=r.limit,archived=Math.max(0,r.used-SITES.length);
+  return `<b class="room${full?' full':''}" id="roomLine">${r.used} of ${r.limit} site${r.limit===1?'':'s'}${full?' · your plan is full':''}</b>${archived?` · ${archived} archived on Home`:''}`;
+}
 function lmetaText(shown){
   const m=Math.floor((Date.now()-LOADED_AT)/60000);
   const sorted=SORT?(SORT.key==='drop'?'Biggest drop first':`Sorted by ${(COLS.find(c=>c[0]===SORT.key)||COLS[0])[1]}`):'Pinned first, then the ones you opened last';
-  return `${shown} site${shown===1?'':'s'}${FOLDER==='none'?' in no folder':FOLDER?' in '+esc(folderName()):''}${TAG?' tagged '+esc(TAG):''} · ${esc(sorted)} · ${m<1?'Updated just now':'Updated '+m+' min ago'}`;
+  const where=`${FOLDER==='none'?' in no folder':FOLDER?' in '+esc(folderName()):''}${TAG?' tagged '+esc(TAG):''}`;
+  const room=roomHtml(),count=!room||where||shown!==SITES.length?`${shown} site${shown===1?'':'s'}${where}`:'';
+  return [room,count,esc(sorted),m<1?'Updated just now':'Updated '+m+' min ago'].filter(Boolean).join(' · ');
 }
 
 // render: the frame (header, search, the two views) once per load; after that
@@ -1526,30 +1632,113 @@ async function keepCopied(b){
   toast('Kept. '+(s.name||'The site')+' can publish with what was copied.');
 }
 
-// ── + New site (item 135): a site from a business name and, if picked, one of your
-//    starter kits (GET /agency/kits). POST /agency/sites makes it with nobody emailed;
-//    the card then says "No owner yet" and offers Invite the owner. ──
-let NEW_BUSY=false,NEW_MADE=null,KITS=[];
+// ── + New site (item 135; the gallery, item 198): the business's name and kind, then one of
+//    the eight built-in designs (GET /agency/designs: their pictures, words and the three each
+//    kind sees first) or one of your saved templates (GET /agency/kits), and a starter kit if
+//    you like. POST /agency/sites makes it with nobody emailed; the card then says "No owner
+//    yet" and offers Invite the owner. A full plan says so here before anything is sent. ──
+let NEW_BUSY=false,NEW_MADE=null,KITS=[],DESIGNS=null;
+// what's picked: the kind (a chip), the closer kind, the design, and a kit or a saved template.
+// chosen: the studio picked a kind or a design, so the design is sent; the untouched sheet
+// sends none and the site keeps the usual look.
+let NEWS={kind:'',industry:'',look:'',chosen:false,byHand:false,kit:'',tpl:false};
 // a template (item 145) also brings a saved site's pages, sections, photos, menu and look
 const kitHintOf=(k)=>k&&k.kind==='template'
   ?'Template: '+(k.summary&&k.summary.pages?k.summary.pages+' page'+(k.summary.pages===1?'':'s')+' with their sections and photos':'its pages, sections and photos')+', the menu and the look, plus services, FAQs, voice and colors.'
   :'Starter kit: the services, FAQs, voice and colors it was saved with.';
-async function openNewSite(){
-  if(!META.can_create||$('newDlg').open)return;
-  NEW_MADE=null;$('new-biz').value='';
-  $('new-fields').style.display='';$('new-done').style.display='none';$('new-done').innerHTML='';
-  const b=$('new-submit');b.disabled=false;b.textContent='Create site';
-  $('new-from-wrap').hidden=true;$('new-from').innerHTML='';
-  $('newDlg').showModal();$('new-biz').focus();   // at once: a later focus could catch typing already under way
-  // the kits are a nicety: none (or a failed read) leaves just the business name
-  let kits=[];try{const r=await api('/agency/kits');kits=(r.ok&&r.body&&Array.isArray(r.body.data))?r.body.data:[];}catch(_){kits=[];}
-  KITS=kits;
-  if(!kits.length||!$('newDlg').open||NEW_MADE)return;
-  $('new-from').innerHTML=`<label class="opt"><input type="radio" name="newfrom" value="" checked><span><strong>A blank site</strong><span class="hint">The look’s pages, with sample words to write over.</span></span></label>`
-    +kits.map(k=>`<label class="opt"><input type="radio" name="newfrom" value="${esc(k.id)}"><span><strong>${esc(k.name)}</strong><span class="hint">${esc(kitHintOf(k))}</span></span></label>`).join('');
-  $('new-from-wrap').hidden=false;
+const kindOf=(key)=>((DESIGNS&&DESIGNS.kinds)||[]).find(k=>k.key===key)||null;
+const designOf=(slug)=>((DESIGNS&&DESIGNS.designs)||[]).find(d=>d.slug===slug)||null;
+function newSuggested(){const k=kindOf(NEWS.kind);return k&&DESIGNS&&DESIGNS.suggested?(DESIGNS.suggested[k.family]||[]):[];}
+function roomFull(){const r=META.room;return !!(r&&typeof r.limit==='number'&&r.used>=r.limit);}
+async function loadDesigns(){
+  if(DESIGNS)return DESIGNS;
+  try{const r=await api('/agency/designs');const d=r.ok&&r.body&&r.body.data;if(d&&Array.isArray(d.designs)&&d.designs.length)DESIGNS=d;}catch(_){/* a nicety: without it the site keeps the usual look */}
+  return DESIGNS;
 }
+function paintKinds(){
+  const kinds=(DESIGNS&&DESIGNS.kinds)||[];
+  $('new-kind-wrap').hidden=!kinds.length;
+  $('new-kinds').innerHTML=kinds.map(k=>`<label class="kind"><input type="radio" name="newkind" value="${esc(k.key)}"${NEWS.kind===k.key?' checked':''}><b>${esc(k.label)}</b><span>${esc(k.hint)}</span></label>`).join('');
+}
+function paintExact(){
+  const k=kindOf(NEWS.kind);
+  if(!k||!(k.exact||[]).length){$('new-exact-wrap').hidden=true;return;}
+  $('new-exact').innerHTML=k.exact.map(e=>`<option value="${esc(e.key)}"${NEWS.industry===e.key?' selected':''}>${esc(e.label)}</option>`).join('');
+  $('new-exact-wrap').hidden=false;
+}
+function paintDesigns(){
+  const all=(DESIGNS&&DESIGNS.designs)||[];
+  $('new-look-wrap').hidden=!all.length;
+  const sug=newSuggested(),k=kindOf(NEWS.kind),badge=k&&DESIGNS.badges?DESIGNS.badges[k.family]||'':'';
+  const order=[...sug.map(designOf).filter(Boolean),...all.filter(d=>!sug.includes(d.slug))];
+  $('new-designs').innerHTML=order.map(d=>{const on=!NEWS.tpl&&NEWS.look===d.slug;
+    return `<label class="dcard" data-design="${esc(d.slug)}"><input type="radio" name="newlook" value="${esc(d.slug)}"${on?' checked':''}><span class="dpic"><img src="${esc(d.picture)}" alt="" loading="lazy" width="640" height="440">${badge&&sug.includes(d.slug)?`<span class="dbadge"><span aria-hidden="true">★</span>${esc(badge)}</span>`:''}<span class="dtick" aria-hidden="true">✓</span></span><b>${esc(d.name)}</b><span class="dline">${esc(d.line)}</span></label>`;}).join('');
+  const good=badge.replace(/^Good for /,'');
+  $('new-lookline').textContent=(k?(k.family==='other'?'Three good places to start come first.':`The three that suit ${good} come first.`):'Pick the kind of business and the designs that suit it come first.')+' Your words stay yours; a look can be changed any time in the editor, under Styles.';
+}
+function paintTemplates(){
+  const tpls=KITS.filter(k=>k.kind==='template');
+  $('new-tpl-wrap').hidden=!tpls.length;
+  $('new-tpls').innerHTML=tpls.map(k=>`<label class="tcard" data-template="${esc(k.id)}"><input type="radio" name="newlook" value="kit:${esc(k.id)}"${NEWS.tpl&&NEWS.kit===k.id?' checked':''}><span class="ttile" aria-hidden="true">▤</span><span class="tw"><b>${esc(k.name)}</b><span>${esc(kitHintOf(k))}</span></span></label>`).join('');
+}
+function paintStarter(){
+  const kits=KITS.filter(k=>k.kind!=='template');
+  $('new-kit-wrap').hidden=!kits.length||NEWS.tpl;   // a template brings its own setup
+  $('new-kit').innerHTML='<option value="">None</option>'+kits.map(k=>`<option value="${esc(k.id)}"${!NEWS.tpl&&NEWS.kit===k.id?' selected':''}>${esc(k.name)}</option>`).join('');
+}
+function paintNewSum(){
+  const name=$('new-biz').value.trim()||'Your new site';
+  const k=kindOf(NEWS.kind),ex=k&&(k.exact||[]).find(e=>e.key===NEWS.industry);
+  const word=ex?ex.label:k?k.label:'';
+  const tpl=NEWS.tpl?KITS.find(x=>x.id===NEWS.kit):null,d=tpl?null:designOf(NEWS.look);
+  $('new-sum-pic').innerHTML=d?`<img src="${esc(d.picture)}" alt="" width="640" height="440">`:'▤';
+  $('new-sum-a').textContent=name+(word?' · '+word:'');
+  $('new-sum-b').textContent=(tpl?'From your “'+tpl.name+'” template':d?d.name+' look':'The usual look')+' · starts private, nothing published';
+}
+// a full plan (item 198): the server's own words when it said so, else the same words from the count
+function paintNewFull(msg){
+  const full=!!msg||roomFull(),r=META.room||{};
+  const text=msg||(full?`Your plan covers ${r.limit} site${r.limit===1?'':'s'}, and all ${r.limit} ${r.limit===1?'is':'are'} in use. Sites in the Trash don’t count, so moving one you no longer need there makes room.`:'');
+  const cut=text.indexOf('. ');
+  $('new-full-t').innerHTML=cut>0?`<b>${esc(text.slice(0,cut+1))}</b>${esc(text.slice(cut+2))}`:esc(text);
+  $('new-full').hidden=!full;
+  $('new-submit').disabled=full;
+}
+async function openNewSite(preset){
+  if(!META.can_create||$('newDlg').open)return;
+  const want=typeof preset==='string'?preset:'';   // the Templates tab's "New site with this" (#new=<design>)
+  NEW_MADE=null;$('new-biz').value='';
+  NEWS={kind:'',industry:'',look:'',chosen:false,byHand:false,kit:'',tpl:false};
+  $('new-fields').style.display='';$('new-done').style.display='none';$('new-done').innerHTML='';
+  const b=$('new-submit');b.textContent='Create site';
+  paintNewFull('');paintNewSum();
+  $('newDlg').showModal();$('new-biz').focus();   // at once: a later focus could catch typing already under way
+  // the designs and your kits are niceties: none (or a failed read) leaves the name and the usual look
+  const [designs,kits]=await Promise.all([loadDesigns(),api('/agency/kits').then(r=>(r.ok&&r.body&&Array.isArray(r.body.data))?r.body.data:[]).catch(()=>[])]);
+  KITS=kits;
+  if(!$('newDlg').open||NEW_MADE)return;
+  $('new-nodesigns').hidden=!!designs;
+  if(designs){
+    if(want&&designOf(want)){NEWS.look=want;NEWS.chosen=true;NEWS.byHand=true;}
+    else NEWS.look=((designs.suggested&&designs.suggested.other)||[])[0]||designs.designs[0].slug;   // the usual look, shown picked
+  }
+  paintKinds();paintExact();paintDesigns();paintTemplates();paintStarter();paintNewSum();
+}
+$('new-x').onclick=()=>$('newDlg').close();
 $('new-cancel').onclick=()=>$('newDlg').close();
+$('new-back').onclick=()=>{$('newDlg').close();const h=$('pagehead');if(h)h.focus();};   // back to the list, to move one to the Trash
+$('new-biz').addEventListener('input',paintNewSum);
+$('new-kinds').addEventListener('change',(e)=>{
+  const i=e.target.closest('input[name="newkind"]');if(!i)return;
+  NEWS.kind=i.value;NEWS.industry=i.value;NEWS.chosen=true;
+  if(!NEWS.byHand&&!NEWS.tpl){const s=newSuggested();if(s[0])NEWS.look=s[0];}   // a design picked by hand stays picked
+  paintExact();paintDesigns();paintNewSum();
+});
+$('new-exact').addEventListener('change',()=>{NEWS.industry=$('new-exact').value;paintNewSum();});
+// the designs and your templates are one choice: a template brings its own look
+$('new-designs').addEventListener('change',(e)=>{const i=e.target.closest('input[name="newlook"]');if(!i)return;NEWS.look=i.value;NEWS.chosen=true;NEWS.byHand=true;if(NEWS.tpl){NEWS.tpl=false;NEWS.kit='';}paintStarter();paintNewSum();});
+$('new-tpls').addEventListener('change',(e)=>{const i=e.target.closest('input[name="newlook"]');if(!i)return;NEWS.kit=i.value.slice(4);NEWS.tpl=true;paintStarter();paintNewSum();});
+$('new-kit').addEventListener('change',()=>{if(!NEWS.tpl)NEWS.kit=$('new-kit').value;paintNewSum();});
 function newKitLine(k){
   if(!k)return'';
   const tpl=(KITS.find(x=>x.id===k.id)||{}).kind==='template';
@@ -1558,11 +1747,16 @@ function newKitLine(k){
   const got=[pg?(pg.pages?n(pg.pages,'page')+' and ':'')+n(pg.sections,'section'):'',pg&&pg.photos?n(pg.photos,'photo'):'',a.offerings?n(a.offerings,'service'):'',a.faqs?n(a.faqs,'FAQ'):'',a.voice?'the voice':'',a.colors?'the colors':''].filter(Boolean);
   return 'It starts from the '+esc(k.name)+(got.length?': '+esc(got.join(', ')):'')+'.';
 }
+// item 198: what the design and the kind came to
+function newLookLine(d){
+  const l=d.look;if(!l)return'';
+  return l.applied?'It starts with the '+esc(l.name)+' design. You can change it any time in the editor, under Styles.':'The '+esc(l.name)+' design didn’t save, so it has the usual look. You can change it in the editor, under Styles.';
+}
 function paintNewDone(d,name){
   $('new-fields').style.display='none';
-  const done=$('new-done'),kit=d.kit||null;
+  const done=$('new-done'),kit=d.kit||null,look=newLookLine(d);
   const open=META.can_open?`<a class="btn" id="new-open" href="${esc(scoped('/presence.html',d.site_id))}" style="text-decoration:none;display:inline-flex;align-items:center">Open the editor</a>`:'';
-  done.innerHTML=`<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">${esc(name)}’s site is ready</h3>${kit?`<p id="new-kit-line">${newKitLine(kit)}</p>`:''}<p>Nobody has been emailed. Invite the owner from its card when you’re ready to show them.</p></div>`
+  done.innerHTML=`<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">${esc(name)}’s site is ready</h3>${look?`<p id="new-look-line">${look}</p>`:''}${kit?`<p id="new-kit-line">${newKitLine(kit)}</p>`:''}<p>Nobody has been emailed. Invite the owner from its card when you’re ready to show them.</p></div>`
     +`<div class="row2">${kit&&kit.failed?'<button type="button" class="btn ghost" id="new-kit-again">Try the kit again</button>':''}<button type="button" class="btn${open?' ghost':''}" id="new-close">Done</button>${open}</div>`;
   done.style.display='';
   const cl=$('new-close');cl.onclick=()=>$('newDlg').close();
@@ -1580,22 +1774,29 @@ $('newForm').onsubmit=async(e)=>{
   e.preventDefault();if(NEW_BUSY||NEW_MADE)return;
   const business_name=$('new-biz').value.trim();
   if(!business_name){toast('Name the business.',true);$('new-biz').focus();return;}
-  const pick=document.querySelector('#new-from input[name="newfrom"]:checked'),kit_id=pick?pick.value:'';
+  if(roomFull()){paintNewFull('');return;}
+  const kit_id=NEWS.kit||'',template_slug=!NEWS.tpl&&NEWS.chosen&&NEWS.look?NEWS.look:'',industry_key=NEWS.industry||'';
   NEW_BUSY=true;const btn=$('new-submit');btn.disabled=true;btn.textContent='Making the site…';
   let r=null;
-  try{r=await apiSend('POST','/agency/sites',{business_name,kit_id:kit_id||undefined});}
+  try{r=await apiSend('POST','/agency/sites',{business_name,kit_id:kit_id||undefined,template_slug:template_slug||undefined,industry_key:industry_key||undefined});}
   catch(_){toast('We lost the connection, so we can’t tell whether the site was made. Refresh Sites before trying again.',true);}
   finally{NEW_BUSY=false;}
-  if(!r||!r.ok){if(r)toast((r.body&&r.body.message)||'We couldn’t make the site just now.',true);btn.disabled=false;btn.textContent='Create site';return;}
+  if(!r||!r.ok){
+    btn.textContent='Create site';
+    // item 198: the plan filled up since the page loaded; say so where Create site is
+    if(r&&r.status===409&&r.body&&r.body.error==='client_limit'){if(r.body.room)META.room=r.body.room;paintNewFull(r.body.message||'');return;}
+    if(r)toast((r.body&&r.body.message)||'We couldn’t make the site just now.',true);btn.disabled=false;return;
+  }
   NEW_MADE=(r.body&&r.body.data)||{};
   paintNewDone(NEW_MADE,NEW_MADE.name||business_name);
   load(true);
 };
-// ⌘K "New site" lands here as /sites.html#new: open the box once the page knows who you are
+// ⌘K "New site" lands here as /sites.html#new, and the Templates tab's "New site with this" as
+// #new=<design>: open the sheet once the page knows who you are
 function openNewFromHash(){
-  if(location.hash!=='#new')return;
+  const m=/^#new(?:=([a-z0-9-]{1,60}))?$/.exec(location.hash);if(!m)return;
   try{history.replaceState(null,'',location.pathname+location.search);}catch(_){/* */}
-  if(META.can_create)openNewSite();
+  if(META.can_create)openNewSite(m[1]||'');
 }
 window.addEventListener('hashchange',openNewFromHash);
 
@@ -1719,7 +1920,8 @@ async function load(soft){
   }
   SITES=Array.isArray(r.body.data)?r.body.data:[];
   META={can_open:r.body.can_open!==false,can_pin:!!r.body.can_pin,can_duplicate:!!r.body.can_duplicate,can_create:!!r.body.can_create,can_trash:!!r.body.can_trash,partial:!!r.body.partial,
-    can_people:!!r.body.can_people,studio_role:String(r.body.studio_role||'Website manager'),studio_name:String(r.body.studio_name||'')};   // item 53
+    can_people:!!r.body.can_people,studio_role:String(r.body.studio_role||'Website manager'),studio_name:String(r.body.studio_name||''),   // item 53
+    room:r.body.room&&typeof r.body.room.used==='number'?r.body.room:null};   // item 198: "8 of 25 sites"
   TRASH=Array.isArray(r.body.trash)?r.body.trash:[];TRASH_DAYS=Number(r.body.trash_days)||90;
   LOADED_AT=Date.now();MENU_OPEN=null;
   render();

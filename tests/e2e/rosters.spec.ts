@@ -230,6 +230,7 @@ test.describe('Customers — SS6 quick wins', () => {
     await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog focuses Name a beat after opening — a fill() racing it lands in the wrong field
+    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
     await page.locator('#cu-name').fill('Jane Doe');
     await page.locator('#cu-biz').fill('Acme Bakery');
     await page.locator('#cu-email').fill('jane@acmebakery.com');
@@ -241,23 +242,22 @@ test.describe('Customers — SS6 quick wins', () => {
     await expect(page.locator('#cust-done')).toContainText('jane@acmebakery.com');
   });
 
-  test('C4 — the connect-by-email mode saves without provisioning', async ({ page }) => {
+  test('C4 — builder item 199: "Just save them for now" is the default; setting them up is the other choice', async ({ page }) => {
     await pinTable('dds-display:customers')(page);
-    await installApp(page, { api: {
-      '/studio/customers': CUSTOMERS,
-      '/sales/customers': { data: { mode: 'connect', pending: true, connected: false } },
-    } });
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS } });
     await page.goto('/customers.html');
     await (await headerAction(page, '#addCust')).click();
-    await page.locator('input[name="cumode"][value="connect"]').check();
-    // provision-only fields hide; the submit relabels honestly
-    await expect(page.locator('#cu-provision-only')).toBeHidden();
+    const dlg = page.locator('#custDlg');
+    await expect(dlg).toBeVisible();
+    await expect(dlg.locator('input[name="cumode"]')).toHaveCount(2);
+    await expect(dlg.getByRole('radio', { name: /Just save them for now/ })).toBeChecked();   // Eric (Nov 15): no website unless asked
+    await expect(dlg).not.toContainText('sign up themselves');
+    await expect(dlg.locator('a[href*="pricing"], #cu-signup')).toHaveCount(0);
+    await expect(dlg.locator('#cu-biz')).toBeHidden();   // saving needs only who they are
     await expect(page.locator('#cu-submit')).toHaveText('Save');
-    await page.locator('#cu-email').fill('jane@acmebakery.com');
-    const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/sales/customers'));
-    await page.locator('#cu-submit').click();
-    expect((await post).postDataJSON()).toEqual({ mode: 'connect', email: 'jane@acmebakery.com' });
-    await expect(page.locator('#cust-done')).toContainText('Saved');
+    await dlg.getByRole('radio', { name: /Set up their website and invite them/ }).check();
+    await expect(dlg.locator('#cu-biz')).toBeVisible();
+    await expect(page.locator('#cu-submit')).toHaveText('Set up + invite');
   });
 
   test('D7 — a stray ?client= cannot blank the roster: /studio/customers is asked UNSCOPED', async ({ page }) => {
@@ -433,6 +433,7 @@ test.describe('Contacts — the Add-a-customer dialog on phones (SS6 pin)', { ta
     await page.goto('/contacts.html');
     await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
+    await page.locator('input[name="cumode"][value="provision"]').check();   // the taller choice: it must still fit
     // the open dialog must fit the DEVICE viewport — the broken geometry sized
     // it against the widened layout viewport, pushing Save out of reach
     const vp = page.viewportSize()!;
@@ -480,6 +481,7 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
     await expect(page.locator('tbody tr')).toHaveCount(3);
     await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
+    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
     await page.locator('#cu-email').fill('jane@acmebakery.com');
     await page.locator('#cu-submit').click();
     // the provision SUCCEEDED — the panel says so, and the refresh failure
@@ -497,6 +499,7 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
     await expect(page.locator('tbody tr')).toHaveCount(2);
     await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
+    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
     await page.locator('#cu-email').fill('jane@acmebakery.com');
     await page.locator('#cu-submit').click();
     await expect(page.locator('#cust-done')).toContainText('Invitation sent');
@@ -510,6 +513,7 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
     await page.goto('/customers.html');
     await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
+    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
     await page.locator('#cu-name').fill('Jane Doe');
     await page.locator('#cu-email').fill('jane@acmebakery.com');
     await page.locator('#cu-submit').click();
@@ -526,6 +530,7 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
     await page.goto('/contacts.html');
     await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
+    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
     await page.locator('#cu-name').fill('Jane Doe');
     await page.locator('#cu-email').fill('jane@acmebakery.com');
     await page.locator('#cu-submit').click();
@@ -564,14 +569,16 @@ test.describe('Customers — the agency member gets the roster (no forward since
     await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/agency/kits': KITS, '/portal/context': agencyCtx({ site_id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'Acme Bakery' }) } });
     await page.goto('/customers.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
     await (await headerAction(page, '#addCust')).click();
+    await page.locator('input[name="cumode"][value="provision"]').check();   // the kit comes with setting them up
     await expect(page.locator('#cu-kit-wrap')).toBeVisible();
     await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
-    await expect(page.locator('#cu-signup')).toBeHidden();      // provision mode: no pricing box
+    await expect(page.locator('#cu-signup')).toHaveCount(0);    // builder item 199: no sign-up link at all
     // the owner's copy: no agency, no field — even with kits fixtured
     await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/agency/kits': KITS } });
     await page.goto('/customers.html');
     await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
+    await page.locator('input[name="cumode"][value="provision"]').check();
     await expect(page.locator('#cu-kit-wrap')).toBeHidden();
   });
   test('contacts — the same gate on its copy: agency sees the kit field, owner does not', async ({ page }) => {
@@ -579,12 +586,14 @@ test.describe('Customers — the agency member gets the roster (no forward since
     await installApp(page, { api: { '/sales/contacts': CONTACTS, '/agency/kits': KITS, '/portal/context': agencyCtx() } });
     await page.goto('/contacts.html');
     await (await headerAction(page, '#addCust')).click();
+    await page.locator('input[name="cumode"][value="provision"]').check();   // the kit comes with setting them up
     await expect(page.locator('#cu-kit-wrap')).toBeVisible();
     await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
     await installApp(page, { api: { '/sales/contacts': CONTACTS, '/agency/kits': KITS } });
     await page.goto('/contacts.html');
     await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
+    await page.locator('input[name="cumode"][value="provision"]').check();
     await expect(page.locator('#cu-kit-wrap')).toBeHidden();
   });
   test('drilled into a client (?client=) it stays, as the way UP to the roster', async ({ page }) => {

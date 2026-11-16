@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp, ALL_FEATURES, STUDIO_NAV } from './helpers/app';
+import { headerAction } from './helpers/page-header';   // builder item 165: on a phone the header's other actions wait behind ⋯
 
 // ── The page halves of tests/presence/sales_routes_test.mjs (builder item 212) ──
 // That suite used to read these pages' source and match its text. These are the same
@@ -65,10 +66,11 @@ test.describe('Add a customer on Contacts (sales routes, item 212)', () => {
     await page.goto('/contacts.html');
     const add = page.locator('#addCust');
     await expect(add).toContainText('Add a customer');
-    await add.click();
+    await (await headerAction(page, '#addCust')).click();
     const dlg = page.locator('#custDlg');
     await expect(dlg).toBeVisible();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's own focus lands a beat after it opens
+    await page.locator('#custDlg').getByRole('radio', { name: /Set up their website and invite them/ }).check();   // builder item 199: saving is the default, setting up is chosen
     await expect(dlg).toContainText('What kind of work is this?');
     await expect(dlg).toContainText('they never pay for software here');
     expect((await dlg.textContent()) || '').not.toMatch(/subscription|SaaS|per month|\/mo\b/i);
@@ -84,8 +86,9 @@ test.describe('Add a customer on Contacts (sales routes, item 212)', () => {
     await expect(done).toContainText('Invitation sent to jane@acmebakery.example.');
     // the same person again: the server says they are already set up, and so does the dialog
     await page.locator('#cu-close').click();
-    await add.click();
+    await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#cu-name')).toBeFocused();
+    await page.locator('#custDlg').getByRole('radio', { name: /Set up their website and invite them/ }).check();   // builder item 199: saving is the default, setting up is chosen
     await dlg.getByLabel('Email', { exact: true }).fill('sam@example.com');
     await page.locator('#cu-submit').click();
     await expect(done.locator('h3')).toHaveText('They already have a workspace');
@@ -115,9 +118,10 @@ test.describe('Add a customer on Contacts (sales routes, item 212)', () => {
         return route.fulfill(kit === KIT_R ? answer(200, { data: { applied: { offerings: 6, faqs: 4 }, skipped: [] } }) : answer(500, { error: 'boom' }));
       });
       await page.goto('/' + file);
-      await page.locator('#addCust').click();
+      await (await headerAction(page, '#addCust')).click();
       await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter', 'Trades starter']);
       await expect(page.locator('#cu-name')).toBeFocused();
+      await page.locator('#custDlg').getByRole('radio', { name: /Set up their website and invite them/ }).check();   // builder item 199: saving is the default, setting up is chosen
       await page.locator('#cu-email').fill('ana@marlows.example');
       await page.locator('#cu-kit').selectOption({ label: 'Restaurant starter' });
       await page.locator('#cu-submit').click();
@@ -128,8 +132,9 @@ test.describe('Add a customer on Contacts (sales routes, item 212)', () => {
       expect(applies).toEqual([{ kit: KIT_R, body: { site_id: NEW_SITE } }]);   // to the site the set-up answered with
       // a kit that won't apply: the set-up still reads as done, and the kit says so on its own line
       await page.locator('#cu-close').click();
-      await page.locator('#addCust').click();
+      await (await headerAction(page, '#addCust')).click();
       await expect(page.locator('#cu-name')).toBeFocused();
+      await page.locator('#custDlg').getByRole('radio', { name: /Set up their website and invite them/ }).check();   // builder item 199: saving is the default, setting up is chosen
       await page.locator('#cu-email').fill('jo@parkflorist.example');
       await page.locator('#cu-kit').selectOption({ label: 'Trades starter' });
       await page.locator('#cu-submit').click();

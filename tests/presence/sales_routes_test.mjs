@@ -926,45 +926,34 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   ok('migration: rollback block present', /^--   drop table if exists public\.presence_contracts;/m.test(mig));
 }
 
-// ═══ 12. PR 433 (builder item 199) rewrites this block; left as text until it lands ═══
-// The sign-up hook, CONNECT_INTENT_TAG, the connect-mode chooser (cumode, cu-signup,
-// cu-connect-only, cu-provision-only) and its copy, exactly as they were.
+// ═══ 12. Sign-up closed (builder item 199, PR 433): its checks, as PR 433 wrote them ═══
+// PR 433 rewrote these as this suite was being rewritten; they stay text here, for now.
 {
   const ROOT = new URL('../../', import.meta.url);
   const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
   const sales = read('supabase/functions/presence/routes/sales.ts');
   const add = sales.slice(sales.indexOf('export async function handleSalesAddCustomer'));
-  ok('connect: no account → records the pending contact (ensureConnectContact, tagged) + pending:true', /ensureConnectContact\(site\.id, email, name, true\)[\s\S]*?pending: true/.test(add) && /async function ensureConnectContact/.test(sales));
-  // the pending record is a presence_contacts row (site-scoped = the studio), tagged
-  // with the shared marker — NO new table.
-  ok('connect: pending record reuses presence_contacts (site-scoped) + the shared CONNECT_INTENT_TAG (no new table)', /export const CONNECT_INTENT_TAG =/.test(sales) && /svc\('presence_contacts', \{ method: 'POST'/.test(sales) && /notes: mark \? CONNECT_INTENT_TAG/.test(sales));
+  ok('connect: no account → a contact in the studio\'s list (ensureConnectContact) + pending:true, and nothing else', /ensureConnectContact\(site\.id, email, name\)[\s\S]*?pending: true/.test(add) && /async function ensureConnectContact/.test(sales));
+  // builder item 199: no marker waits for a sign-up any more (sign-up is closed)
+  ok('connect: the contact reuses presence_contacts (site-scoped, no new table) and writes no sign-up marker', /svc\('presence_contacts', \{ method: 'POST'/.test(sales) && /notes: ''/.test(sales) && !/notes: mark \? CONNECT_INTENT_TAG/.test(sales) && !/\+ CONNECT_INTENT_TAG/.test(sales));
 
-  // ── SIGNUP AUTO-CONNECT HOOK (commerce/handleSignup) ──────────────────────────
-  // When a pre-listed email self-serve signs up, they auto-connect to that studio —
-  // reusing the SAME bridge (bridgeCustomerToStudio → ensureBridge), best-effort.
+  // ── SIGN-UP IS CLOSED (builder item 199) — nothing joins a studio by signing up ──
+  // The old hook joined a brand-new self-serve account to the studio that pre-listed its
+  // email, before anyone proved the email was theirs (file 06, finding 96). It went with
+  // sign-up: the routes answer one fixed reply and look nothing up.
   {
     const commerce = read('supabase/functions/presence/routes/commerce.ts');
-    ok('signup-hook: commerce imports the SHARED bridge + tag from sales (no parallel bridge)', /import \{ bridgeCustomerToStudio, CONNECT_INTENT_TAG \} from '\.\/sales\.ts'/.test(commerce));
-    // finds the tagged pending contact by email, resolves its site_id (= the studio)
-    ok('signup-hook: resolves the pre-listing studio via the tagged presence_contacts (site_id)', /presence_contacts\?\$\{emailMatch\(email\)\}&notes=ilike\.\*\$\{needle\}\*/.test(commerce) && /CONNECT_INTENT_TAG\.replace\(/.test(commerce));
-    // calls the shared bridge — never a second bridge implementation in commerce
-    ok('signup-hook: bridges via the shared bridgeCustomerToStudio (single bridge path)', /bridgeCustomerToStudio\(\{ agencySiteId, clientId, customerSiteId/.test(commerce) && !/ensureBridge\(/.test(commerce) && !/presence_service_links/.test(commerce));
-    // wired into handleSignup for BOTH the trial and the paid path, best-effort
-    ok('signup-hook: called from handleSignup (trial + paid), best-effort (never blocks signup)', (commerce.match(/autoConnectPreListedStudio\(chain\.clientId/g) || []).length >= 2 && /async function autoConnectPreListedStudio[\s\S]*?try \{[\s\S]*?\} catch/.test(commerce));
-    // masked logging (no raw email in logs)
-    ok('signup-hook: logs are email-masked', /maskEmail\(email\)/.test(commerce));
+    ok('signup-closed: commerce has no auto-connect hook and no bridge or marker import', !/autoConnectPreListedStudio/.test(commerce) && !/bridgeCustomerToStudio|CONNECT_INTENT_TAG/.test(commerce));
+    ok('signup-closed: signup and verify answer the fixed reply', /\(route === '\/commerce\/signup' \|\| route === '\/commerce\/verify'\) && method === 'POST'\) return signupClosed\(cors\)/.test(commerce));
+    ok('signup-closed: the reply reads nothing (no body, no email lookup, no account made)', /function signupClosed\(cors: Record<string, string>\) \{\n  return json\(SIGNUP_CLOSED, 410, cors\);\n\}/.test(commerce) && !/createAuthUser\(|findClientByEmail\(/.test(commerce));
   }
 
-  // ── UI: contacts.html "Add a customer": the two-option chooser and its copy ──
+  // ── UI: contacts.html "Add a customer": no sign-up choice; saving is the default (builder item 199) ──
   {
     const contacts = read('contacts.html');
-    // TWO-OPTION chooser (owner's words): "set them up now" vs "connect by email".
-    ok('ui: a two-option chooser (radiogroup) precedes the work-type field', /role="radiogroup"/.test(contacts) && /name="cumode" value="provision"/.test(contacts) && /name="cumode" value="connect"/.test(contacts) && contacts.indexOf('name="cumode"') < contacts.indexOf('id="cu-edition"'));
-    ok('ui: option copy — set-up-now (default) + sign-up-themselves', /I’ll set them up now/.test(contacts) && /They’ll sign up themselves — connect by email/.test(contacts) && /value="provision" checked/.test(contacts));
-    ok('ui: connect copy explains existing-vs-later auto-connect', /If they already have an account, they connect to you now\. If not, they’ll connect automatically the moment they sign up/.test(contacts));
-    ok('ui: mode drives the POST body (provision vs connect) to /sales/customers', /mode:'connect',name:name\|\|undefined,email/.test(contacts) && /mode:'provision'/.test(contacts) && /const mode=cuMode\(\)/.test(contacts));
-    ok('ui: distinct success states — connected / saved-for-later / invitation-sent', /When '\+esc\(email\)\+' signs up, they’ll connect to you automatically/.test(contacts) && /Connected to their workspace/.test(contacts));
-    ok('ui: connect mode hides provision-only fields (no workspace set-up)', /id="cu-provision-only"/.test(contacts) && /po\.style\.display=connect\?'none':''/.test(contacts));
+    ok('ui: no sign-up wording, sign-up link or price page in the dialog', !/cu-signup|sign up themselves|pricing\.html/.test(contacts));
+    ok('ui: saving is the default (mode connect, name and email only); setting up sends mode provision', /value="connect" checked/.test(contacts) && /const body=mode==='connect'\?\{mode:'connect',name:name\|\|undefined,email\}:\{mode:'provision',/.test(contacts));
+    ok('ui: distinct success states — request sent / already set up / invitation sent', /heading='Request sent'/.test(contacts) && /already have a workspace/.test(contacts) && /Invitation sent to/.test(contacts));
   }
 
   // ── Oct 2026 studio audit, change 4 — the dialog is honest and needs no password,
@@ -972,13 +961,12 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   for (const p of ['agency.html', 'customers.html', 'contacts.html']) {
     const h = read(p);
     const di = h.indexOf('<dialog id="custDlg"'), dlg = h.slice(di, h.indexOf('</dialog>', di) + 9);
-    const prov = dlg.slice(dlg.indexOf('id="cu-provision-only"'), dlg.indexOf('id="cu-connect-only"'));
-    const conn = dlg.slice(dlg.indexOf('id="cu-connect-only"'));
-    ok(`${p}: no "set their password" anywhere in the dialog or its done screen`, !/set their password/.test(h) && /Create their workspace and email them a sign-in link\./.test(dlg) && /They’ll sign in from the email and land in their client portal\./.test(h));
-    ok(`${p}: provision mode says what provisioning does (workspace + site + sign-in link, never pay for software)`, /Adding them creates their client workspace and their site, and emails them a sign-in link\. You bill them for your work the usual way — they never pay for software here\./.test(prov));
-    ok(`${p}: the pricing box lives in CONNECT mode only (nothing is bought when the studio provisions)`, !/id="cu-signup"/.test(prov) && /id="cu-signup"/.test(conn) && /send them this to sign up/.test(conn));
-    ok(`${p}: "Start from" kit select in provision mode (default "No kit — start empty")`, /id="cu-kit-wrap"/.test(prov) && /<select id="cu-kit"><option value="">No kit — start empty<\/option><\/select>/.test(prov));
+    ok(`${p}: no "set their password" anywhere in the dialog or its done screen`, !/set their password/.test(h) && /Adding them creates their client workspace and their site, and emails them a sign-in link\./.test(dlg) && /They’ll sign in from the email and land in their client portal\./.test(h));
+    ok(`${p}: the dialog says what adding does (workspace + site + sign-in link, never pay for software)`, /Adding them creates their client workspace and their site, and emails them a sign-in link\. You bill them for your work the usual way — they never pay for software here\./.test(dlg));
+    ok(`${p}: no sign-up wording, sign-up link or price page (builder item 199)`, !/cu-signup|cu-connect-only|sign up themselves|pricing\.html/.test(h));
+    ok(`${p}: "Start from" kit select (default "No kit — start empty")`, /id="cu-kit-wrap"/.test(dlg) && /<select id="cu-kit"><option value="">No kit — start empty<\/option><\/select>/.test(dlg));
   }
+
 }
 
 // ═══ Covered in the browser by: ═══

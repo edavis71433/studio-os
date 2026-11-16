@@ -38,6 +38,8 @@ cp ./*.js dist/ 2>/dev/null || true
 # Pinned by tests/e2e/marketing.spec.ts (MS6), which runs this script and
 # inspects dist/. provision.html joined the list in Oct 2026 (studio audit
 # change 12): an unlinked, unauthenticated provisioning form is not public site.
+# Builder item 199 retired that partner pack and deleted the file (Nov 15 2026); its
+# name stays on the list so it can never ship again if it comes back.
 for f in email-signature.html styleguide.html a11y.html provision.html; do
   rm -f "dist/$f"
 done

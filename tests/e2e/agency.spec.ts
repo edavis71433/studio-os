@@ -598,6 +598,7 @@ test.describe('Agency home — one home, one roster', () => {
     await page.locator('#top').getByRole('button', { name: '+ Add a customer' }).click();
     await expect(page.locator('#custDlg')).toBeVisible();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling (under load a fill() racing it lands in the wrong field)
+    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
     await page.locator('#cu-name').fill('Jo Park');
     await page.locator('#cu-email').fill('jo@parkflorist.example');
     await page.locator('#cu-biz').fill('Park Florist');
@@ -631,11 +632,12 @@ test.describe('Agency home — one home, one roster', () => {
       '/agency/kits/aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa/apply': { data: { applied: { offerings: 6, faqs: 4, voice: true, colors: true, industry: 'restaurant' }, skipped: [] } } } });
     await page.goto('/agency.html');
     await page.locator('#top').getByRole('button', { name: '+ Add a customer' }).click();
+    await expect(page.locator('#cu-name')).toBeFocused();
+    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; a kit only comes with setting up
     const kit = page.locator('#cu-kit');
     await expect(page.locator('#cu-kit-wrap')).toBeVisible();
     await expect(kit.locator('option')).toHaveText(['No kit — start empty', 'Restaurant starter', 'Trades starter']);
     await expect(kit).toHaveValue('');                                                     // empty is the default
-    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling (under load a fill() racing it lands in the wrong field)
     await page.locator('#cu-email').fill('ana@marlows.example');
     await page.locator('#cu-biz').fill('Marlow’s Kitchen');
     await kit.selectOption({ label: 'Restaurant starter' });
@@ -656,6 +658,7 @@ test.describe('Agency home — one home, one roster', () => {
     await page.goto('/agency.html');
     await page.locator('#top').getByRole('button', { name: '+ Add a customer' }).click();
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling (under load a fill() racing it lands in the wrong field)
+    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
     await page.locator('#cu-email').fill('ana@marlows.example');
     await page.locator('#cu-kit').selectOption({ label: 'Trades starter' });
     await page.locator('#cu-submit').click();
@@ -669,6 +672,7 @@ test.describe('Agency home — one home, one roster', () => {
     await page.locator('#top').getByRole('button', { name: '+ Add a customer' }).click();
     await expect(page.locator('#cu-kit')).toHaveValue('');
     await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling (under load a fill() racing it lands in the wrong field)
+    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
     await page.locator('#cu-email').fill('jo@parkflorist.example');
     await page.locator('#cu-submit').click();
     await expect(page.locator('#cust-done')).toContainText('Invitation sent');
@@ -679,23 +683,25 @@ test.describe('Agency home — one home, one roster', () => {
     await page.goto('/agency.html');
     await page.locator('#top').getByRole('button', { name: '+ Add a customer' }).click();
     await expect(page.locator('#custDlg')).toBeVisible();
+    await page.locator('input[name="cumode"][value="provision"]').check();
     await expect(page.locator('#cu-kit-wrap')).toBeHidden();
   });
 
-  test('honest money copy: provision mode never shows the pricing box; connect mode does', async ({ page }) => {
+  test('honest copy: saving is the default and makes no website; setting up says what it does; no sign-up or price page (item 199)', async ({ page }) => {
     await installApp(page, { api: homeApi });
     await page.goto('/agency.html');
     await page.locator('#top').getByRole('button', { name: '+ Add a customer' }).click();
     const dlg = page.locator('#custDlg');
-    await expect(dlg.locator('#cu-signup')).toBeHidden();                              // the pricing box is not on the page the operator sees
-    expect(await dlg.locator('#cust-fields').innerText()).not.toContain('pay for their plan');   // innerText = rendered text only (toContainText reads hidden copy too)
-    await expect(dlg.locator('#cu-provision-only')).toContainText('Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.');
-    await expect(dlg.locator('#cu-mode')).toContainText('Create their workspace and email them a sign-in link.');
+    await expect(dlg.locator('#cu-signup, a[href*="pricing"]')).toHaveCount(0);   // no sign-up link, no price page
+    await expect(dlg.getByRole('radio', { name: /Just save them for now/ })).toBeChecked();   // Eric (Nov 15): adding a customer starts no website unless asked
+    await expect(dlg.locator('#cust-fields')).toContainText('No website yet, and nothing is emailed.');
+    await expect(dlg.locator('#cu-submit')).toHaveText('Save');
+    await dlg.getByRole('radio', { name: /Set up their website and invite them/ }).check();
+    await expect(dlg.locator('#cu-submit')).toHaveText('Set up + invite');
+    expect(await dlg.locator('#cust-fields').innerText()).not.toContain('pay for their plan');   // innerText = rendered text only
+    await expect(dlg.locator('#cust-fields')).toContainText('Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.');
+    await expect(dlg).not.toContainText('sign up themselves');
     await expect(dlg).not.toContainText('set their password');
-    await page.locator('input[name="cumode"][value="connect"]').check();
-    await expect(dlg.locator('#cu-signup')).toBeVisible();
-    await expect(dlg.locator('#cu-signup-link')).toHaveValue(/\/pricing\.html$/);
-    await expect(dlg.locator('#cu-kit-wrap')).toBeHidden();                            // nothing is provisioned, so nothing to start from
   });
 
   test('the home is never scoped: a stray ?client= is dropped before the shell reads it', async ({ page }) => {
@@ -969,6 +975,7 @@ test.describe('Agency home — the Health Center door and the kits anchor', () =
     await installApp(page, { api: { ...homeApi, '/agency/kits': { data: [{ id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', name: 'Restaurant starter', industry_key: 'restaurant' }] } } });
     await page.goto('/agency.html#kits');
     await expect(page.locator('#custDlg')).toBeVisible();
+    await expect(page.getByRole('radio', { name: /Set up their website and invite them/ })).toBeChecked();   // a kit only comes with setting them up
     await expect(page.locator('#cu-kit-wrap')).toBeVisible();
     await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
     expect(new URL(page.url()).hash).toBe('');

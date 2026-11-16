@@ -75,6 +75,9 @@
   .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px);outline:none}
   .dbody input:focus,.dbody select:focus{border-color:var(--p)}
   .dbody .note{font-size:12.5px;color:var(--faint);margin:var(--dds-s3,12px) 0 0;line-height:1.5}
+  /* builder item 198: a full plan is said in the box, where the person is looking, not in a toast */
+  .dbody .cu-full{background:var(--dds-warn-soft,#f3ead9);color:var(--dds-warn,#775d31);border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.45}
+  .dbody .cu-full b{display:block}
   #cu-mode{display:flex;flex-direction:column;gap:var(--dds-s2,8px);margin:2px 0 var(--dds-s1,4px)}
   .modeopt{display:flex;align-items:flex-start;gap:var(--dds-s2,8px);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px var(--dds-s3,12px);cursor:pointer;font-size:14px;color:var(--ink)}
   .modeopt:has(input:checked){border-color:var(--p);background:var(--p-soft)}
@@ -290,17 +293,17 @@
   <form id="custForm" class="dbody">
     <div id="cust-fields">
       <h3>Add a customer</h3>
-      <div id="cu-mode" role="radiogroup" aria-label="How would you like to add them?">
-        <label class="modeopt"><input type="radio" name="cumode" value="provision" checked>
-          <span><strong>I’ll set them up now</strong><span class="modehint">Create their workspace and email them a sign-in link.</span></span></label>
-        <label class="modeopt"><input type="radio" name="cumode" value="connect">
-          <span><strong>They’ll sign up themselves — connect by email</strong><span class="modehint">Just record their email. You don’t set anything up.</span></span></label>
-      </div>
       <label for="cu-name">Their name</label>
       <input id="cu-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
       <label for="cu-email">Email</label>
       <input id="cu-email" type="email" maxlength="160" placeholder="jane@acmebakery.com" autocomplete="off">
-      <div id="cu-provision-only">
+      <div id="cu-mode" role="radiogroup" aria-label="What adding them does">
+        <label class="modeopt"><input type="radio" name="cumode" value="connect" checked>
+          <span><strong>Just save them for now</strong><span class="modehint">No website yet, and nothing is emailed. You can set up their website later.</span></span></label>
+        <label class="modeopt"><input type="radio" name="cumode" value="provision">
+          <span><strong>Set up their website and invite them</strong><span class="modehint">Makes their workspace and website now, and emails them a link to sign in.</span></span></label>
+      </div>
+      <div id="cu-provision-only" style="display:none">
         <label for="cu-biz">Business name</label>
         <input id="cu-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
         <label for="cu-edition">What kind of work is this?</label>
@@ -322,13 +325,8 @@
         </div>
         <p class="note">Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.</p>
       </div>
-      <div id="cu-connect-only" style="display:none">
-        <p class="note">Enter their email. If they already have an account, they connect to you now. If not, they’ll connect automatically the moment they sign up with that email.</p>
-        <!-- the pricing box belongs to CONNECT only: in provision mode nothing is
-             bought — the studio provisions the site and bills for its work -->
-        <div id="cu-signup" class="note" style="border:1px solid var(--line,#ddd);border-radius:8px;padding:10px">If they’ll host with you, they choose and pay for their plan themselves — send them this to sign up:<div class="row2" style="margin-top:6px"><input id="cu-signup-link" readonly style="flex:1;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit" aria-label="Sign-up link"><button type="button" class="btn ghost" id="cu-signup-copy">Copy</button></div></div>
-      </div>
-      <div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Set up + invite</button></div>
+      <p class="note cu-full" id="cu-full" role="alert" hidden></p>
+      <div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Save</button></div>
     </div>
     <div id="cust-done" style="display:none"></div>
   </form>
@@ -497,7 +495,7 @@ function importCustomers(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
   k.importPanel(z,{back:'#importCsv',
     title:'Import customers from a CSV',
-    help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has a Studio OS account gets a request to accept you the next time they sign in, and the rest connect when they sign up.',
+    help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has a Studio OS account gets a request to accept you the next time they sign in, and the rest are saved to your contacts, to set up with Add a customer when you’re ready.',
     noun:'customer',
     // item 97: "Business Phone" or "Business Street" is never the business's name, and "first"/"last"
     // are names only beside "name" ("Last activity" was glued onto names) — the Contacts rules
@@ -506,7 +504,7 @@ function importCustomers(){
     toItem:(o)=>{const email=String(o.email||'').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return null;return{email,name:o.name||[o.first,o.last].filter(Boolean).join(' '),business_name:o.business||''};},
     label:(it)=>it.business_name||it.name||it.email,
     send:async(it)=>{const r=await api('/sales/customers','POST',{mode:'connect',email:it.email,name:it.name,business_name:it.business_name});if(!r.ok)return'failed';const d=(r.body&&r.body.data)||{};return d.requested?'skipped':d.connected?'added':d.pending?'existed':'added';},
-    summary:(c)=>`${c.added} already yours · ${c.existed} saved to connect when they sign up${c.skipped?` · ${c.skipped} asked to accept you`:''}${c.failed?` · ${c.failed} couldn’t be imported`:''}.`,
+    summary:(c)=>`${c.added} already yours · ${c.existed} saved to your contacts to set up later${c.skipped?` · ${c.skipped} asked to accept you`:''}${c.failed?` · ${c.failed} couldn’t be imported`:''}.`,
     done:()=>load(),
   });
 }
@@ -1035,8 +1033,9 @@ document.addEventListener('keydown',(e)=>{
 window.addEventListener('dds:created',()=>{if(!TOKEN)return;load().catch(()=>{});});
 
 // ── ADD A CUSTOMER (C4) — contacts.html's flow, ported wholesale and kept in
-// sync by hand: set up an existing customer with their own workspace + a
-// sign-in invitation, or just connect them by email. POST /sales/customers
+// sync by hand: save a customer for now, or set them up with their own workspace
+// and a sign-in invitation (builder item 199: nobody signs up by themselves, and
+// "Just save them for now" makes no website and sends no email). POST /sales/customers
 // (handleSalesAddCustomer) reads mode/name/business_name/email/edition. ──
 // The four dropdown answers map to THREE server plans (sales.ts CONVERT_PLANS):
 // 'business_os_no_site' is the same Business OS plan as the build-elsewhere
@@ -1055,20 +1054,19 @@ function cuAsksWebsite(){const v=$('cu-edition').value;return v==='business_os_o
 function syncCuSignup(){
   const w=$('cu-website-wrap');if(w)w.style.display=cuAsksWebsite()?'':'none';
 }
-// TWO options (owner's words): "set them up now" (provision) vs "they'll sign up
-// themselves — connect by email" (connect). The mode governs which fields show and
-// what the server does; connect provisions nothing.
-function cuMode(){const r=document.querySelector('input[name="cumode"]:checked');return r?r.value:'provision';}
+// Builder item 199, then Eric (Nov 15): adding a customer starts nothing unless asked.
+// "Just save them for now" (connect, the default) saves them to the contacts and emails
+// nobody; "Set up their website and invite them" (provision) makes their workspace and site.
+function cuMode(){const r=document.querySelector('input[name="cumode"]:checked');return r?r.value:'connect';}
 function syncCuMode(){
-  const connect=cuMode()==='connect';
-  const po=$('cu-provision-only');if(po)po.style.display=connect?'none':'';
-  const co=$('cu-connect-only');if(co)co.style.display=connect?'':'none';
-  const sb2=$('cu-submit');if(sb2)sb2.textContent=connect?'Save':'Set up + invite';
-  if(!connect)syncCuSignup();
+  const save=cuMode()==='connect';
+  const po=$('cu-provision-only');if(po)po.style.display=save?'none':'';
+  const sb2=$('cu-submit');if(sb2)sb2.textContent=save?'Save':'Set up + invite';
+  const cf=$('cu-full');if(cf)cf.hidden=true;   // item 198's full-plan words belong to the last set-up attempt
+  if(!save)syncCuSignup();
 }
 // Start from a kit (Oct 2026 studio audit, change 4): an agency's saved starter
-// kits, offered in provision mode only, applied to the NEW site once the provision
-// POST answers with its site_id. A studio without an agency never sees the field;
+// kits, applied to the NEW site once the POST answers with its site_id. A studio without an agency never sees the field;
 // no kits (or a failed read) hides it too — the dialog never offers what it can't do.
 // Bug hunt K7 (Nov 10): who you are and your kits are read once per page and reused each
 // time the dialog opens; neither changes between opens. A read that failed is asked again.
@@ -1097,44 +1095,47 @@ async function syncCuKits(){
 function openAddCustomer(){
   $('cu-name').value='';$('cu-biz').value='';$('cu-email').value='';$('cu-edition').value='presence';
   const wf=$('cu-website');if(wf)wf.value='';
-  const pr=document.querySelector('input[name="cumode"][value="provision"]');if(pr)pr.checked=true;
-  const lk=$('cu-signup-link');if(lk)lk.value=location.origin+'/pricing.html';syncCuMode();syncCuKits();
+  const sv=document.querySelector('input[name="cumode"][value="connect"]');if(sv)sv.checked=true;
+  syncCuMode();syncCuKits();
   $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
+  const cf=$('cu-full');if(cf){cf.hidden=true;cf.textContent='';}
   const sb2=$('cu-submit');if(sb2)sb2.disabled=false;
-  $('custDlg').showModal();setTimeout(()=>$('cu-name').focus(),20);
+  // Name is the dialog's first field, so showModal already focuses it; the late nudge
+  // never pulls focus back from a field someone has moved to
+  $('custDlg').showModal();setTimeout(()=>{const d=$('custDlg'),a=document.activeElement;if(!d.contains(a)||a===d)$('cu-name').focus();},20);
 }
 $('cu-cancel').onclick=()=>$('custDlg').close();
 $('cu-edition').onchange=syncCuSignup;
 document.querySelectorAll('input[name="cumode"]').forEach(r=>r.addEventListener('change',syncCuMode));
-$('cu-signup-copy').onclick=()=>{const el=$('cu-signup-link');if(el&&el.value&&navigator.clipboard){navigator.clipboard.writeText(el.value).then(()=>toast('Sign-up link copied')).catch(()=>{});}};
 $('custForm').onsubmit=async(e)=>{
   e.preventDefault();
   const mode=cuMode();
   const name=$('cu-name').value.trim(),business_name=$('cu-biz').value.trim(),email=$('cu-email').value.trim();
   const kitSel=$('cu-kit'),kitId=(mode==='provision'&&kitSel&&kitSel.value)||'',kitName=kitId?String((kitSel.options[kitSel.selectedIndex]||{}).textContent||'kit').trim():'';
-  if(!email){toast(mode==='connect'?'Enter their email to connect them.':'Enter their email — that’s where the sign-in invitation goes.');$('cu-email').focus();return;}
+  if(!email){toast(mode==='connect'?'Enter their email to save them.':'Enter their email — that’s where the sign-in invitation goes.');$('cu-email').focus();return;}
   const label=mode==='connect'?'Save':'Set up + invite';
   const btn=$('cu-submit');btn.disabled=true;btn.textContent=mode==='connect'?'Saving…':'Setting up…';
-  const body=mode==='connect'
-    ?{mode:'connect',name:name||undefined,email}
-    :{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:cuPlan(),
-       website_url:(cuAsksWebsite()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
+  const body=mode==='connect'?{mode:'connect',name:name||undefined,email}:{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:cuPlan(),
+    website_url:(cuAsksWebsite()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
   try{
     const r=await api('/sales/customers','POST',body);
     if(!r.ok){
-      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.'));
+      // builder item 198: the plan's sites are all in use; nothing was made, and the box says why
+      if(r.status===409&&r.body&&r.body.error==='client_limit'){const cf=$('cu-full'),t=String(r.body.message||''),cut=t.indexOf('. ');if(cf){cf.innerHTML=cut>0?'<b>'+esc(t.slice(0,cut+1))+'</b>'+esc(t.slice(cut+2)):esc(t);cf.hidden=false;}btn.disabled=false;btn.textContent=label;return;}
+      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||(mode==='connect'?'We couldn’t save them just now.':'We couldn’t set them up just now.'));
       toast(m);btn.disabled=false;btn.textContent=label;return;
     }
     const d=(r.body&&r.body.data)||{};
-    const who=esc(business_name||name||email);
+    const who=esc((mode==='provision'&&business_name)||name||email);
     let heading,line;
     if(d.requested){
       // final pass S1: an account that isn't yours yet is asked, never taken
       heading='Request sent';
       line=who+' already has a Studio OS account, so they need to say yes first. They’ll see your request the next time they sign in.';
     }else if(mode==='connect'){
-      if(d.connected){heading='Connected to their workspace';line=who+' was already your customer — they’re connected.';}
-      else{heading='Saved';line='When '+esc(email)+' signs up, they’ll connect to you automatically.';}
+      // saved, not set up: no website and no email (someone already yours is connected again)
+      if(d.connected){heading='Connected again';line=who+' was already your customer, so they’re connected again. Nothing was emailed and no website was made.';}
+      else{heading='Saved';line=who+' is saved to your contacts. No website yet, and nothing was emailed. To set up their website later, open Add a customer again and choose Set up their website and invite them.';}
     }else if(d.already_exists){
       heading='They already have a workspace';
       line=who+' already had an account — connected to their existing workspace. Nothing duplicated. Send them their sign-in link if they need it.';
@@ -1161,7 +1162,7 @@ $('custForm').onsubmit=async(e)=>{
         if(!kitOk)kitRetry=applyKit;
       }
     }
-    const showLink=d.portal_url&&(mode!=='connect'||d.connected);
+    const showLink=!!d.portal_url;
     const link=showLink?('<p style="margin-top:12px"><a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a></p>'):'';
     $('cust-fields').style.display='none';
     const done=$('cust-done');
@@ -1170,7 +1171,7 @@ $('custForm').onsubmit=async(e)=>{
     const cl=$('cu-close');if(cl){cl.focus();cl.onclick=()=>$('custDlg').close();}
     const ka=$('cu-kit-again');if(ka&&kitRetry)ka.onclick=async()=>{ka.disabled=true;ka.textContent='Applying…';const okNow=await kitRetry();const kl=$('cu-kit-line');
       if(okNow){if(kl)kl.textContent=kitName+' applied.';ka.remove();toast(kitName+' applied.');}else{ka.disabled=false;ka.textContent='Try the kit again';toast('The kit didn’t apply this time either.',true);}};
-  }catch(_){toast(mode==='connect'?'We couldn’t save that just now.':'We couldn’t set them up just now.');btn.disabled=false;btn.textContent=label;return;}
+  }catch(_){toast(mode==='connect'?'We couldn’t save them just now.':'We couldn’t set them up just now.');btn.disabled=false;btn.textContent=label;return;}
   // The creation SUCCEEDED — the roster refresh is best-effort and must never
   // repaint that success as a failure (SS6): its own failure gets the soft
   // couldn’t-refresh line, never the creation-failed toast.
