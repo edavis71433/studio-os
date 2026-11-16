@@ -250,7 +250,8 @@
       }
     ],
     "settings": {
-      "category_order": []
+      "category_order": [],
+      "industry": "restaurant"
     }
   },
   "content_contract_version": 1,
