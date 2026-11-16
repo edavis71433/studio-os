@@ -31,8 +31,9 @@ export async function handleSalesInvoicesList(req: Request, site: SiteRow, cors:
  *  (part of the book is not the book). */
 export async function readInvoiceBook(site: SiteRow, today: string, more = false): Promise<{ items: any[]; partial: boolean } | null> {
   const base = 'id,title,amount_cents,purpose,status,due_date,paid_at,created_at,deal_id,customer_client_id,stripe_url';
-  // number, how it was paid and part payments land with APPLY-0167; processing_since with 0132
-  const shapes = [`${base},processing_since,number,paid_method,paid_note,payment_for${more ? ',lines' : ''}`, `${base},processing_since`, base];
+  // number, how it was paid and part payments land with APPLY-0167; processing_since with 0132;
+  // what came back through Stripe with APPLY-0233 (sales items 126, 127)
+  const shapes = [`${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status${more ? ',lines' : ''}`, `${base},processing_since,number,paid_method,paid_note,payment_for${more ? ',lines' : ''}`, `${base},processing_since`, base];
   const page = (sel: string, off: number) => svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&select=${sel}&order=created_at.desc,id.desc&limit=${PAGE}&offset=${off}`);
   let sel = shapes[0], r = await page(sel, 0);
   for (let i = 1; !r.ok && i < shapes.length; i++) { sel = shapes[i]; r = await page(sel, 0); }
@@ -64,6 +65,7 @@ export async function readInvoiceBook(site: SiteRow, today: string, more = false
       amount_cents: Number(i.amount_cents) || 0, status: String(i.status || 'open'), state: moneyState(i, today),
       due_date: i.due_date || null, issued_at: i.created_at, paid_at: i.paid_at || null, paid_method: i.paid_method || '',
       processing: !!i.processing_since, payment_for: i.payment_for || null, has_link: !!i.stripe_url,
+      refunded_cents: Number(i.refunded_cents) || 0, dispute_status: i.dispute_status || null,
       deal_id: i.deal_id || null, deal_title: d ? String(d.title || '') : '',
       business: k ? String(k.name || k.email || '') : (p && p.company ? String(p.company) : ''),
       person: p ? String(p.name || p.email || '') : '',

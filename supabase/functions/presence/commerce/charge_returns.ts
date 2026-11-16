@@ -539,6 +539,24 @@ export async function syncDispute(disputeId: string): Promise<ReturnSync> {
   return { ...out, ok: true };
 }
 
+/** The deal's refunds and disputes as its page shows them: which invoice (none for a
+ *  retainer charge), how much, what it came to, Stripe's fee, the deadline, and where to
+ *  answer a dispute that can still be answered (never a bank payment's, which is final).
+ *  [] when they can't be read (before APPLY-0233): the invoices still carry their own
+ *  refunded_cents and dispute_status. */
+export async function returnsForDeal(siteId: string, dealId: string): Promise<Array<Record<string, unknown>>> {
+  if (!UUID_RE.test(siteId) || !UUID_RE.test(dealId)) return [];
+  const r = await svc(`presence_money_returns?site_id=eq.${siteId}&deal_id=eq.${dealId}&select=id,invoice_id,kind,applies_to,stripe_id,amount_cents,counted_cents,fee_cents,status,stripe_status,method,due_by,happened_at,closed_at,client_emailed,livemode&order=happened_at.asc&limit=200`);
+  if (!r.ok) return [];
+  return rows(r).map((x: any) => ({
+    id: x.id, invoice_id: x.invoice_id || null, kind: x.kind, applies_to: x.applies_to,
+    amount_cents: n(x.amount_cents), counted_cents: n(x.counted_cents), fee_cents: n(x.fee_cents), status: x.status,
+    inquiry: isInquiry(x.stripe_status), bank: x.method === 'bank', due_by: x.due_by || null, happened_at: x.happened_at, closed_at: x.closed_at || null,
+    client_emailed: x.client_emailed === true,
+    answer_url: x.kind === 'dispute' && x.status === 'open' && !(x.method === 'bank' && !x.due_by) ? stripeDisputeUrl(String(x.stripe_id), x.livemode) : null,
+  }));
+}
+
 /** Both, for one charge: its refunds, and the dispute on it if there is one. For the
  *  daily check (sales item 130), which finds a paid invoice Stripe says was refunded
  *  or disputed. */

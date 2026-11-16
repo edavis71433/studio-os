@@ -58,14 +58,24 @@ const CASES = [
   ['junk due_date → upcoming, never overdue', [{ status: 'open', due_date: 'soon' }, T], 'upcoming'],
   ['no today → never overdue (the caller forgot its calendar)', [{ status: 'open', due_date: '2020-01-01' }, ''], 'upcoming'],
   ['the caller\'s calendar decides: due 2026-10-20 is overdue only once today is the 21st', [{ status: 'open', due_date: '2026-10-20' }, '2026-10-21'], 'overdue'],
+  // sales items 126, 127: money that came back through Stripe
+  ['paid, refunded in full → refunded', [{ status: 'paid', amount_cents: 100000, refunded_cents: 100000 }, T], 'refunded'],
+  ['paid, part refunded → still paid (the row names what was refunded)', [{ status: 'paid', amount_cents: 100000, refunded_cents: 20000 }, T], 'paid'],
+  ['paid in dollars (/client/billing), refunded in full in cents → refunded', [{ status: 'paid', amount: 1000, refunded_cents: 100000 }, T], 'refunded'],
+  ['paid, nothing refunded, a $0 invoice → paid', [{ status: 'paid', amount_cents: 0, refunded_cents: 0 }, T], 'paid'],
+  ['paid, a dispute open → disputed', [{ status: 'paid', amount_cents: 100000, dispute_status: 'open' }, T], 'disputed'],
+  ['paid, the dispute lost → lost', [{ status: 'paid', amount_cents: 100000, dispute_status: 'lost' }, T], 'lost'],
+  ['paid, the dispute won → paid again', [{ status: 'paid', amount_cents: 100000, dispute_status: 'won' }, T], 'paid'],
+  ['an open dispute outranks a refund', [{ status: 'paid', amount_cents: 100000, refunded_cents: 100000, dispute_status: 'open' }, T], 'disputed'],
+  ['refunded words never touch an unpaid invoice', [{ status: 'open', due_date: '2026-10-19', refunded_cents: 5000, dispute_status: 'open' }, T], 'overdue'],
 ];
 for (const [name, args, want] of CASES) {
   const got = [moneyState(...args), ...Object.values(pages).map((p) => p.fns.moneyState(...args))];
   ok(`moneyState: ${name}`, got.every((g) => g === want), `want ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
 }
-ok('MONEY_WORD: the four words, exactly', JSON.stringify(MONEY_WORD) === JSON.stringify({ paid: 'Paid', processing: 'Processing', upcoming: 'Upcoming', overdue: 'Overdue' })
+ok('MONEY_WORD: the four words, and the three for money that came back, exactly', JSON.stringify(MONEY_WORD) === JSON.stringify({ paid: 'Paid', processing: 'Processing', upcoming: 'Upcoming', overdue: 'Overdue', refunded: 'Refunded', disputed: 'Disputed', lost: 'Dispute lost' })
   && Object.values(pages).every((p) => JSON.stringify(p.fns.MONEY_WORD) === JSON.stringify(MONEY_WORD)));
-ok('MONEY_TONE: one colour family per state — good · info · neutral · bad', JSON.stringify(MONEY_TONE) === JSON.stringify({ paid: 'good', processing: 'info', upcoming: '', overdue: 'bad' })
+ok('MONEY_TONE: one colour family per state — good · info · neutral · bad', JSON.stringify(MONEY_TONE) === JSON.stringify({ paid: 'good', processing: 'info', upcoming: '', overdue: 'bad', refunded: '', disputed: 'bad', lost: 'bad' })
   && Object.values(pages).every((p) => JSON.stringify(p.fns.MONEY_TONE) === JSON.stringify(MONEY_TONE)));
 
 // buckets: cents or dollars in, counts + cents out; voided rows count nowhere
@@ -81,6 +91,19 @@ const WANT = { paid: { count: 1, cents: 120000 }, processing: { count: 1, cents:
 ok('moneyBuckets: counts + cents per state, dollars converted, void counted nowhere — identical in the module and every page',
   JSON.stringify(moneyBuckets(LIST, T)) === JSON.stringify(WANT) && Object.values(pages).every((p) => JSON.stringify(p.fns.moneyBuckets(LIST, T)) === JSON.stringify(WANT)));
 ok('moneyBuckets: the pending ids move a row to processing', moneyBuckets(LIST, T, ['b']).processing.cents === 140000 && moneyBuckets(LIST, T, ['b']).overdue.count === 0);
+{
+  // sales items 126, 127: part refunded counts what was kept; refunded, disputed and lost count nowhere
+  const BACK = [
+    { id: 'p', status: 'paid', amount_cents: 100000, refunded_cents: 20000 },
+    { id: 'r', status: 'paid', amount_cents: 50000, refunded_cents: 50000 },
+    { id: 'd', status: 'paid', amount_cents: 70000, dispute_status: 'open' },
+    { id: 'l', status: 'paid', amount_cents: 30000, dispute_status: 'lost' },
+    { id: 'w', status: 'paid', amount: 400, dispute_status: 'won' },
+  ];
+  const want = JSON.stringify({ paid: { count: 2, cents: 120000 }, processing: { count: 0, cents: 0 }, upcoming: { count: 0, cents: 0 }, overdue: { count: 0, cents: 0 } });
+  ok('moneyBuckets: a part refund counts only what was kept, a won dispute counts again, and refunded, disputed and lost rows count nowhere, in the module and every page',
+    JSON.stringify(moneyBuckets(BACK, T)) === want && Object.values(pages).every((p) => JSON.stringify(p.fns.moneyBuckets(BACK, T)) === want));
+}
 ok('moneyBuckets: junk in → four empty buckets', JSON.stringify(moneyBuckets(null, T)) === JSON.stringify({ paid: { count: 0, cents: 0 }, processing: { count: 0, cents: 0 }, upcoming: { count: 0, cents: 0 }, overdue: { count: 0, cents: 0 } }));
 
 // ── structural pins: the wiring ──
@@ -128,7 +151,7 @@ ok('the unpaid reminder skips a settling payment (processing_since=is.null, with
 ok('client.html: the shelf’s invoice row (item 179 part four), the to-pay/Needs-you filter and the Needs-you word all run moneyState', /const st=moneyState\(i,todayYmd,pending\);/.test(client) && /shelfRows\(\(d\.b&&d\.b\.invoices\)\|\|\[\],docs,d\.snaps,reports,today,PAID_PENDING,now\)/.test(client) && /function unpaidInvoices\(b\)\{return \(\(b&&b\.invoices\)\|\|\[\]\)\.filter\(i=>\{const s=invState\(i\);return s==='upcoming'\|\|s==='overdue';\}\);\}/.test(client) && /const stWord=\(MONEY_WORD\[moneyState\(i,nyToday,PAID_PENDING\)\]\|\|''\)\.toLowerCase\(\);/.test(client) && !/function invOverdue/.test(client));
 ok('client.html: the chip prints MONEY_WORD in its one tone, and a processing row never offers Pay', /chip:st\?MONEY_WORD\[st\]:'Voided'/.test(client) && /const pay=\(st==='upcoming'\|\|st==='overdue'\)&&/.test(client) && /\.fst\.pr\{/.test(client));
 ok('client.html item 1: ?paid= → remembered, Invoices tab, thank-you toast, polling every 5s for a minute, then the still-confirming line; signed-out → payment-success.html?paid=', /const PAID_POLL_MS=5000, PAID_POLL_LIMIT_MS=60000/.test(client) && /toast\('Thank you — we’re confirming your payment\.'\)/.test(client) && /Still confirming — it can take a few minutes, you don’t need to do anything\./.test(client) && /Paid — confirming your payment\./.test(client) && /if\(row&&row\.status==='paid'\)\{PAID_PENDING=\[\];/.test(client) && /location\.replace\('\/payment-success\.html\?paid='\+encodeURIComponent\(pp\)\)/.test(client));
-ok('client.html item 1: "Paid" only when the server says so — the pending id alone never renders the paid state', !/pending[^\n]*return'paid'/.test(srcs[0]) && /if\(s==='paid'\)return'paid';/.test(srcs[0]));
+ok('client.html item 1: "Paid" only when the server says so — the pending id alone never renders the paid state', Object.values(pages).every((p) => p.fns.moneyState({ id: 'z', status: 'open', due_date: '2026-10-25' }, T, ['z']) === 'processing' && p.fns.moneyState({ id: 'z', status: 'paid' }, T, []) === 'paid'));
 ok('today.html: the band derives its sentence AND the four buckets from the one formula over the one list', /const b=moneyBuckets\(items\.concat\(paidRows\|\|\[\]\),today\);/.test(today) && /data-bucket="\$\{k\}"/.test(today) && /filter\(k=>k!=='paid'\|\|paidRows\)/.test(today));
 ok('crm/activity.ts: the server-composed record band runs the one formula (processing/void/paid excluded, overdue is its word)', /const st = iv \? moneyState\(iv, today\) : '';\s*if \(st !== 'upcoming' && st !== 'overdue'\) continue;/.test(read('supabase/functions/presence/crm/activity.ts')) && /overdue: st === 'overdue'/.test(read('supabase/functions/presence/crm/activity.ts')) && /select=id,title,amount_cents,due_date,status,deal_id,processing_since&limit=100`\);\s*if \(!ir\.ok\) ir = await svc/.test(read('supabase/functions/presence/routes/crm.ts')));
 ok('pipeline.html: the drawer rows, the "Who owes you" list and the Money card run the one formula on the studio\'s local day; only a waiting row (upcoming/overdue) offers Record payment · Send · Copy link · Void (item 77)', /const invState=\(v\)=>moneyState\(v,localYmd\(\)\);/.test(pipe) && /const invWaits=\(v\)=>\{const st=invState\(v\);return st==='upcoming'\|\|st==='overdue';\};/.test(pipe) && /const moneyChip=\(v\)=>\{const st=invState\(v\);return st\?`<span class="stage \$\{MONEY_TONE\[st\]\}" data-money="\$\{st\}">\$\{MONEY_WORD\[st\]\}<\/span>`/.test(pipe) && /const acts=waits\?`<button class="btn ghost sm" data-pay-inv=[^\n]*?<button class="btn ghost sm" data-send-inv=/.test(pipe) && /const payBtn=waits\?/.test(pipe) && /const acts=undoBtn\+payBtn\+\(waits\?` <button class="btn ghost" data-send-inv=/.test(pipe) && /const openInv=invs\.filter\(invWaits\);/.test(pipe) && /\.stage\.info\{/.test(pipe) && !/Awaiting payment/.test(pipe) && !/class="pill"/.test(pipe));
