@@ -48,7 +48,8 @@ function ddsStub(part, name, args, door) {
     return g(...args);
   }, (err) => { toast("Part of the editor didn’t load. Check your connection and try again.", true); throw err; });
 }
-// the stand-ins, until presence-edit.js replaces them
+// ┌ the stand-ins, until presence-edit.js replaces them (tests/presence/editor_source.mjs leaves
+//   them out: the suites read the code as it was, one function to a name)
 function mountEditCards(...a) { return ddsStub("edit", "mountEditCards", a, true); }
 function mountDesignCard(...a) { return ddsStub("edit", "mountDesignCard", a, true); }
 function linkPick(...a) { return ddsStub("edit", "linkPick", a, true); }
@@ -91,6 +92,7 @@ function formsLoad(...a) { return ddsStub("edit", "formsLoad", a, false); }
 function remountSectionsCard(...a) { return ddsStub("edit", "remountSectionsCard", a, false); }
 function renderBlockTray(...a) { return ddsStub("edit", "renderBlockTray", a, false); }
 function mountTemplateGallery(...a) { return ddsStub("edit", "mountTemplateGallery", a, false); }
+// └ the stand-ins
 // ── the page's own script, as it was ──
 
 /* ════ The Client Room · Direction A dress over the frozen M7 movement ════

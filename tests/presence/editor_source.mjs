@@ -5,7 +5,8 @@
 // wanted). A suite that reads the editor's code reads it from here, put back together the way
 // the page loads it: the styles where presence.css is linked, and the two scripts, core first,
 // where presence-core.js is loaded. So a check written against the one file still finds its
-// code, and a check that found code in the page still finds it where the page runs it.
+// code, and a check that found code in the page still finds it where the page runs it. The core's
+// stand-ins for Edit mode's functions are left out, so each function is found once: its own.
 //
 //   import { editorSource } from './editor_source.mjs';
 //   const src = editorSource();
@@ -18,6 +19,8 @@ export function editorSource(root = new URL('../../', import.meta.url)) {
   const js = /<script src="\/presence-core\.js(?:\?v=\d+)?"><\/script>/;
   if (!css.test(html) || !js.test(html)) throw new Error('editor_source: presence.html no longer loads presence.css and presence-core.js the way this helper expects');
   html = html.replace(css, () => '<style>\n' + read('presence.css') + '</style>');
-  html = html.replace(js, () => '<script>\n' + read('presence-core.js') + '\n' + read('presence-edit.js') + '</script>');
+  // the core's stand-ins for Edit mode's functions stay out: a suite finds each function once, its own
+  const core = read('presence-core.js').replace(/\/\/ ┌ the stand-ins[\s\S]*?\/\/ └ the stand-ins\n/, '');
+  html = html.replace(js, () => '<script>\n' + core + '\n' + read('presence-edit.js') + '</script>');
   return html;
 }
