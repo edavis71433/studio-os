@@ -52,7 +52,7 @@ test.describe('the packed site (item 142)', () => {
     // the tools host's pages keep the plain names that host serves (list item 139)
     expect(readFileSync(join(OUT, 'site-review.html'), 'utf8')).toMatch(/src="\/site-review\.js\?v=\d+"/);
     // the editor's styles are written into its page (data-inline), so it draws without a second request
-    expect(page).toMatch(/<style>[^<]{1000,}<\/style>/);
+    expect((page.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1].length, 'presence.css written in').toBeGreaterThan(100_000);
     expect(page, 'no request for presence.css').not.toMatch(/presence\.css/);
   });
 
