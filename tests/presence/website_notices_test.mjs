@@ -2,6 +2,7 @@
 //   deno run --allow-read tests/presence/website_notices_test.mjs
 // Website-attention events must ride the ONE notice model (presence_plan_notices),
 // idempotent, with a deep link — no second notification system, no storms.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const results = [];
@@ -9,7 +10,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 
 const notice = read('supabase/functions/presence/lib/notice.ts');
 const publish = read('supabase/functions/presence/routes/publish.ts');
-const presence = read('presence.html');
+const presence = editorSource();
 
 // one model, idempotent, best-effort
 ok('helper: raiseNotice writes the ONE model (plan_notices, unique client/kind/period)', /presence_plan_notices\?on_conflict=client_id,kind,period/.test(notice) && /resolution=ignore-duplicates,return=representation/.test(notice));

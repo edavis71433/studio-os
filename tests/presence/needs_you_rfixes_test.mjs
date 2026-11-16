@@ -24,6 +24,7 @@
 //       clear (`support:<id>:%`) can never match the pre-change exact period.
 //   F7  the money guard failed OPEN on a missing period — it depended on a DB
 //       not-null constraint holding.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const results = [];
 const ok = (n, p, note = '') => { results.push(p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
 
@@ -215,7 +216,7 @@ function teardownFor(kind) {
 // and called card.remove() unconditionally, so the operator clicked Dismiss on a
 // protected notice, watched it disappear, and found it back on reload.
 {
-  const pres = read('presence.html');
+  const pres = editorSource();
   const fn = (pres.match(/async function renderPlanNotice\(\)[\s\S]*?\n\}/) || [''])[0];
   ok('F3: renderPlanNotice was found', fn.length > 300, `${fn.length} bytes`);
   ok('F3: the card is removed ONLY when the server actually dismissed it',

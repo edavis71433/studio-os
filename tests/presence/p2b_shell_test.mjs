@@ -3,6 +3,7 @@
 // Structural verification of the consolidation: presence.html on the shared
 // shell, the shared-state adoption, the reversible portal-workspace retirement,
 // and buildNav as the ONE surface-separating nav. No network.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const results = [];
@@ -10,7 +11,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 
 // ── presence.html adopts the shared shell (Client App) ──
 {
-  const h = read('presence.html');
+  const h = editorSource();
   ok('presence.html includes the shared shell (css + js)', /<link[^>]+href="\/shell\.css"/.test(h) && /<script[^>]+src="\/shell\.js"/.test(h));
   ok('presence.html routes toasts through the shared ddsToast (shared success/error/conflict state)', /typeof window\.ddsToast === "function"/.test(h) && /window\.ddsToast\(msg, bad \? "err" : "ok"\)/.test(h));
   // PR #16: the page's own rail + wordmark are gone; it pre-stamps html.dds-side so the

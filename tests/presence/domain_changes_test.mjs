@@ -5,6 +5,7 @@
 // email records; a name already on another of our sites failed later in the hosting
 // company's words. The pure rules first, then the routes and the daily check against
 // stubbed hosting, DNS, database and email. No outside call leaves.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL: 'https://app.example', RESEND_KEY: 're_test_unused', NETLIFY_AUTH_TOKEN: 'nf-test' })) Deno.env.set(k, v);
 
 const results = [];
@@ -195,7 +196,7 @@ world({ reserved: null });
   const pub = read('supabase/functions/presence/routes/publish.ts');
   const at = (s) => pub.indexOf(s);
   ok('publishing puts the forwarding rules on top of _redirects, from the host’s own list, before the deploy', at('withForwarding(') > 0 && at('getSite(site.netlify_site_id)') > 0 && at('withForwarding(') < at('const dep = await deployFileMap('));
-  const page = read('presence.html');
+  const page = editorSource();
   ok('the sheet asks for the domain typed back before removing it', /askText\("Remove " \+ dstat\.custom_domain/.test(page) && /api\("DELETE", "\/foundations\/domain", \{ confirm(, \.\.\.extra)? \}\)/.test(page));
   ok('the sheet can change the domain, keeping the old one working by default', /function askDomainChange\(old\)/.test(page) && /cb\.checked = true/.test(page) && /keep_old: ans\.keepOld/.test(page));
   ok('the steps protect the email records, and the card shows recent changes', /Leave anything marked MX or Mail alone/.test(page) && /ch\.dataset\.changes = "domain"/.test(page));

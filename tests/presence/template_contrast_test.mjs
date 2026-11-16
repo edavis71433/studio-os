@@ -5,6 +5,7 @@
 // back to the light bronze: 3.8:1 against the 4.5:1 the accessibility page promises.
 // This renders each template's own sample and measures that colour on its page colour.
 import { renderSnapshot, listTemplates } from '../../supabase/functions/presence/lib/render.ts';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); if (!p) console.log(`FAIL  ${n}${note ? ' — ' + note : ''}`); };
@@ -30,7 +31,7 @@ for (const { slug } of listTemplates()) {
 // same (3.06:1). This works out the colour each template gives the day names in both
 // places and the colour behind them, from the template's own rules, under its own
 // colours and under every palette and look an owner can pick in the editor.
-const PAGE = Deno.readTextFileSync(new URL('../../presence.html', import.meta.url));
+const PAGE = editorSource();
 const pageArray = (name) => new Function(`return ${PAGE.match(new RegExp(`\\nconst ${name} = (\\[[\\s\\S]*?\\n\\]);`))[1]};`)();
 const FIXED = new Set(JSON.parse(/const FIXED_COLOR_TEMPLATES = new Set\((\[[^\]]*\])\)/.exec(PAGE)[1]));
 const CHOICES = [...pageArray('PALETTES'), ...pageArray('STYLE_LOOKS')].filter((p) => p.tokens && p.tokens.ink)

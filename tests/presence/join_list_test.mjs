@@ -9,6 +9,7 @@
 // "People who joined your list" reaches exactly them. Part D: the editor's two choices,
 // the database step, and the forward guard the hostile drawing pass asked for.
 import { installFakePostgrest } from './fake_pgrst.mjs';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
 const ok = (n, p, note = '') => { results.push(!!p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
@@ -161,7 +162,7 @@ const yes = async (email) => {
 
 // ═══ D · the editor, the database step, the forward guard ═══
 {
-  const ed = read('presence.html');
+  const ed = editorSource();
   ok('editor: a new Newsletter box collects by default', ed.includes('if (def.newsletterSimple) { b.url = ""; b.collect = true; return b; }'));
   ok('editor: two choices, and the link field only for the second', ed.includes('<option value="collect">Collect emails here, into your own list</option><option value="link">Send people to another sign-up page</option>') && ed.includes('u.hidden = !link;') && ed.includes('url: link ? u.value.trim() : "", collect: !link'));
   const mig = read('supabase/migrations/0157_join_our_list.sql'), pack = read('docs/presence/APPLY-0157-prod.sql');

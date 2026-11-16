@@ -8,6 +8,7 @@
 import { SAMPLE_BLOCKS } from '../../scripts/thumbnails/samples.ts';
 import { allPages, pictureSources, drew, TEMPLATES } from '../../scripts/thumbnails/pages.ts';
 import { listReadyPages } from '../../supabase/functions/presence/lib/page_layouts.ts';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -15,7 +16,7 @@ const ROOT = new URL('../../', import.meta.url);
 const jpeg = (path) => { try { const b = Deno.readFileSync(new URL(path, ROOT)); return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff && b.length > 1500; } catch { return false; } };
 
 // the types the builder offers, read from its own list
-const html = Deno.readTextFileSync(new URL('presence.html', ROOT));
+const html = editorSource();
 const defs = html.slice(html.indexOf('const BLOCK_DEFS = ['), html.indexOf('\n];', html.indexOf('const BLOCK_DEFS = [')));
 const offered = [...defs.matchAll(/\{ type: "([a-z_]+)", name: "/g)].map((m) => m[1]);
 ok('the builder offers the section types it always has', offered.length >= 37, String(offered.length));

@@ -11,6 +11,7 @@
 // refreshed, a broken one failing open, private addresses refused unread. Part E: the
 // reminder carries the links too, and the change link only while it still works.
 import { installFakePostgrest } from './fake_pgrst.mjs';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
 const ok = (n, p, note = '') => { results.push(!!p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
@@ -390,7 +391,7 @@ for (const [name, addr, answer, error] of [
   const page = Deno.readTextFileSync(new URL('booking.html', ROOT));
   ok('booking.html: hidden from search, sends no address on, and only acts on a press', page.includes('<meta name="robots" content="noindex,nofollow">') && page.includes('<meta name="referrer" content="no-referrer">') && (page.match(/call\('POST'/g) || []).length === 2 && !/load\(\);[\s\S]*call\('POST'/.test(page.split("if(!/^[0-9a-f-]{36}")[1] || ''));
   const cards = Deno.readTextFileSync(new URL('booking-extras.js', ROOT));
-  const builder = Deno.readTextFileSync(new URL('presence.html', ROOT));
+  const builder = editorSource();
   ok('editor: the cards save through the Bookings view’s own settings call, marked for those who may configure', builder.includes('loadBookingExtras().then((m) => m.mount(c2, { settings: s, save: (body) => api("PUT", "/bookings/settings", body)') && builder.includes('.forEach((c) => { c.dataset.needs = "configure"; })') && builder.includes('"/booking-extras.js?v=1"') && !/data-needs|dataset\.needs/.test(cards));
 }
 

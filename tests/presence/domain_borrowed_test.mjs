@@ -4,6 +4,7 @@
 // Gmail, a plain form for another domain that sends its visitors here, and "Use www" with
 // the main name said. The rules first, then the routes against stubbed hosting, DNS,
 // database and email. No outside call leaves.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL: 'https://app.example', RESEND_KEY: 're_test_unused', NETLIFY_AUTH_TOKEN: 'nf-test' })) Deno.env.set(k, v);
 
 const results = [];
@@ -113,7 +114,7 @@ ok('stopping one that isn’t forwarding says so, nothing written', (await fwd('
   const dp = read('domains.html');
   ok('each row has its renews-by-itself switch, saved straight to the notes', /function renewsSwitch\(d\)/.test(dp) && /\$\{renewsSwitch\(d\)\}/.test(dp) && /apiSend\('PUT','\/agency\/domains\/'\+encodeURIComponent\(id\)\+'\/notes',\{renews:v,/.test(dp));
   ok('the panel offers Gmail’s records, and says which other domains send visitors here', /\['email_setup','Gmail on this domain'\]/.test(dp) && /'Also sends visitors here'/.test(dp));
-  const page = read('presence.html');
+  const page = editorSource();
   ok('the sheet names the main name and can switch it to www.', /pm\.dataset\.main = "name"/.test(page) && /api\("POST", "\/foundations\/domain", \{ domain: twin \}\)/.test(page));
   ok('the forwarding block makes its own lines (renderFoundations’ stepLine is local to it)', /function forwardsBlock\(dstat\) \{\n[^\n]*\n  const stepLine = /.test(page));
   ok('the sheet has the plain forwarding form', /function forwardsBlock\(dstat\)/.test(page) && /api\("POST", "\/foundations\/domain\/forward", \{ domain: d \}\)/.test(page) && /api\("DELETE", "\/foundations\/domain\/forward", \{ domain: n \}\)/.test(page));

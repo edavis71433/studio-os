@@ -5,6 +5,7 @@
 // "I need to get one" was three lines and a goodbye, and the hosting company's words
 // ("netlify.app address", "Detail (operator)") reached clients. The rules first, then the
 // routes and the daily check against stubs. No outside call leaves.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL: 'https://app.example', RESEND_KEY: 're_test_unused', NETLIFY_AUTH_TOKEN: 'nf-test' })) Deno.env.set(k, v);
 
 const results = [];
@@ -117,7 +118,7 @@ world();
 
 // ═══ the wiring ═══
 {
-  const page = read('presence.html');
+  const page = editorSource();
   ok('the waiting card shows its steps with times and the honest wait', /function waitSteps\(dstat, dom\)/.test(page) && /domCard\.appendChild\(waitSteps\(dstat, dom\)\)/.test(page) && /const DOMAIN_WAIT = "Usually within an hour of adding the records, sometimes a day or two\."/.test(page) && /stepLine\(String\(dstat\.wait \|\| DOMAIN_WAIT\)\)/.test(page));   // builder item 194: one wait, said one way
   ok('the waiting steps make their own lines (renderFoundations’ stepLine is local to it; without this the whole sheet failed to draw)', /function waitSteps\(dstat, dom\) \{\n[^\n]*\n  const stepLine = /.test(page));
   ok('the main name is said plainly', /"Visitors who type " \+ bareName \+ " or www\." \+ bareName \+ " end up on "/.test(page));

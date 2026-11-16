@@ -2,13 +2,14 @@
 //   deno run --allow-read tests/presence/notice_dismiss_test.mjs
 // Dismissing the visible card must dismiss ONLY that notice — never silently
 // clear unseen lifecycle notices (trial/lapse) whose send-once already fired.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
 
 const commerce = read('supabase/functions/presence/routes/commerce.ts');
-const presence = read('presence.html');
+const presence = editorSource();
 
 ok('dismiss: handler reads the request body for {id}', /async function handleNoticeDismiss\(req: Request, jwt: string/.test(commerce) && /body\.id === 'string'/.test(commerce));
 ok('dismiss: scopes the PATCH to id AND the caller client_id (svc bypasses RLS)', commerce.includes('id=eq.${encodeURIComponent(id)}&client_id=eq.${encodeURIComponent(site.client_id)}&status=eq.active'));

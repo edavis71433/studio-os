@@ -6,8 +6,9 @@
 // silently regress. Pure filesystem; no network.
 //
 //   deno run --allow-read tests/presence/design_canvas_test.mjs
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
-const html = await Deno.readTextFile(new URL('presence.html', ROOT));
+const html = await editorSource();
 
 // Pull `function NAME(...) { ... }` out of the page by brace-matching from its start.
 function extractFn(src, name) {

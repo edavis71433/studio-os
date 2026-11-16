@@ -7,6 +7,7 @@
 // while it's off. Part C: a "#form-<id>" link opens that form in a dialog, or goes to it on
 // its own page. Part D: the publish summary, the saved setting, the editor's card, the
 // database step. The browser half is tests/e2e/popup.spec.ts.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 Deno.env.set('SUPABASE_URL', 'https://db.test');
 
 const results = [];
@@ -103,7 +104,7 @@ const parses = (code) => { try { new Function(code); return true; } catch { retu
   ok('the publish summary says when the pop-up arrives, changes or goes', JSON.stringify(said(withP, fx.content)) === '["Your site gets its pop-up."]' && JSON.stringify(said(changed, withP)) === '["The pop-up is changed."]' && JSON.stringify(said(fx.content, withP)) === '["The pop-up comes off your site."]' && said(withP, withP).length === 0);
   const ser = read('supabase/functions/presence/lib/serializer.ts'), content = read('supabase/functions/presence/routes/content.ts');
   ok('the saved setting: a small object, read only when the database has it, made safe at publish', content.includes("popup: { kind: 'json', json: { bytes: 8 * KB, shape: 'object' } }") && /const OPTIONAL_SETTINGS_COLS = \[(?:[A-Z_]+_SETTINGS_COLS, )*POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS,/.test(content) && ser.includes('...(normalizePopup(settings.popup) ? { popup: normalizePopup(settings.popup)! } : {}),'));
-  const ed = read('presence.html'), card = read('popup-card.js');
+  const ed = editorSource(), card = read('popup-card.js');
   ok('editor: the pop-up card under the announcement bar’s, saving with the rest of Settings', ed.includes('s.src = "/popup-card.js?v=1"') && ed.includes('save: (popup) => settingsPut({ popup })') && card.includes('window.DDSPopupCard = { mount }') && card.includes('Show a pop-up on your website'));
   ok('editor: each form says the link that opens it from a button', ed.includes('"To open this form from any button or banner, give it the link #form-" + form.id'));
   const mig = read('supabase/migrations/0161_popup.sql'), pack = read('docs/presence/APPLY-0161-prod.sql');

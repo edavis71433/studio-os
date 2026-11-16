@@ -5,6 +5,7 @@
 // parking page, an old host or a caching proxy read as healthy; and the client sheet
 // said "both names work" without checking the second one. The rules first, then the
 // live checks and the daily watch against stubbed DNS, Netlify, pages and database.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL: 'https://app.example', RESEND_KEY: 're_test_unused', NETLIFY_AUTH_TOKEN: 'nf-test' })) Deno.env.set(k, v);
 
 const results = [];
@@ -74,7 +75,7 @@ const NOW = '2026-11-11T12:00:00.000Z';
   const mig = read('supabase/migrations/0153_domain_shows_our_site.sql'), pack = read('docs/presence/APPLY-0153-prod.sql');
   const cols = ['domain_serving', 'domain_checks', 'domain_serving_checked_at', 'domain_registered_name'];
   ok('the migration and its production pack add the same four columns and check', cols.every((c) => mig.includes(`add column if not exists ${c}`) && pack.includes(`add column if not exists ${c}`)) && [mig, pack].every((x) => /domain_serving in \('latest','old_copy','other','unreachable'\)/.test(x)));
-  const page = read('presence.html');
+  const page = editorSource();
   ok('the client’s sheet no longer claims both names work without checking', !/either way works/.test(page) && /dstat\.all_ok === true/.test(page) && /lines\.forEach\(\(c\) => \{ const l = stepLine/.test(page));
   ok('the Search tab card follows the same rule', /const left = checked \? d\.checklist\.filter/.test(page));   // item 193: and with no checklist it claims nothing
   const admin = read('supabase/functions/presence/routes/admin.ts');

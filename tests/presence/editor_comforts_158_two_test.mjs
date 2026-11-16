@@ -3,6 +3,7 @@
 // The right-click menu and its keys, the code to open the draft on a phone, and a Coming soon
 // page before the first publish. (The code itself is checked in qr_test.mjs; the menu, the keys
 // and the cards in a browser in tests/e2e/editor-comforts-158-two.spec.ts.)
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', NETLIFY_AUTH_TOKEN: 'fake' })) Deno.env.set(k, v);
 const P = '../../supabase/functions/presence';
 const { normalizeComingSoon, comingSoonSince, renderComingSoonPage, comingSoonFileMap, COMING_SOON_LINE_MAX } = await import(`${P}/lib/coming_soon.ts`);
@@ -19,7 +20,7 @@ const SITE = { id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', status: 'ready', edit
 
 // ═══ the right-click menu and the keys (presence.html) ═══
 {
-  const src = read('presence.html');
+  const src = editorSource();
   const fn = (name) => { const at = src.indexOf(`function ${name}(`); return at < 0 ? '' : src.slice(at, src.indexOf('\n}\n', at) + 2); };
   const acts = fn('dcSectionActions');
   ok('one list of a section’s actions feeds the menu and the keys', !!acts && /dcSectionActions\(el2\)\.forEach/.test(src) && /dcSectionActions\(el2\)\.find\(\(a\) => a && a\.id === id\)/.test(src));
@@ -41,7 +42,7 @@ const SITE = { id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', status: 'ready', edit
 
 // ═══ the draft on your phone (presence.html) ═══
 {
-  const src = read('presence.html');
+  const src = editorSource();
   ok('the code is the same private link Share a draft link makes: read-only, 7 days', /async function mintDraftLink\(\)[\s\S]{0,200}api\("POST", "\/preview\/share-link", \{ capture: true, ttl_seconds: 7 \* 86400 \}\)/.test(src) && /const \{ url, until \} = await mintDraftLink\(\);/.test(src));
   ok('Preview’s bar has the button beside the device buttons', /<button data-dev="mobile">Phone<\/button>\s*<\/div>\s*<button type="button" class="stage-phone" id="btnOnPhone"><\/button>/.test(src));
   ok('the Page menu has Open on my phone… right after Share a draft link…', /mi\("Share a draft link…"[^\n]*\n  mi\(onAPhone\(\) \? "Open in my browser…" : "Open on my phone…"/.test(src));
