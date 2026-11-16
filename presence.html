@@ -15635,19 +15635,19 @@ function dcGuardNav(doc) {
 // Item 244: a page written to the canvas can be pressed before its load event, which waits for
 // its pictures, and the guard used to come only at load: every save draws the canvas again, so
 // on a slow connection a press on the business name while a photo was still coming loaded
-// another page into the canvas. From each write until the frame loads, every frame (before the
-// browser paints it) guards whatever document is in the canvas, so a page is guarded before
-// anyone can see it, let alone press it. It stops a few frames after the load: a write that
-// lands just as an older page finishes loading still has its own page guarded.
+// another page into the canvas. For 300 frames after each write (a few seconds; the new page is
+// in the canvas within a few), every frame guards whatever document is there before the browser
+// paints it, so a page is guarded before anyone can see it, let alone press it. The load guards
+// it too. Counting from the write, not the load, means a page whose photos never come doesn't
+// keep the watch running, and an older page's load landing just after a write can't cut short
+// the watch for the new one.
 function dcWatchNav(frame) {
-  let watch = 0, left = -1;   // frames still to watch once the frame has loaded; -1 while a write is on its way
+  let watch = 0, left = 0;   // frames still to watch since the last write
   const look = () => {
     try { dcGuardNav(frame.contentDocument); } catch (_) {}
-    watch = left === 0 ? 0 : requestAnimationFrame(look);
-    if (left > 0) left--;
+    watch = --left > 0 ? requestAnimationFrame(look) : 0;
   };
-  new MutationObserver(() => { left = -1; if (!watch) watch = requestAnimationFrame(look); }).observe(frame, { attributes: true, attributeFilter: ["srcdoc"] });
-  frame.addEventListener("load", () => { if (watch) left = 15; });
+  new MutationObserver(() => { left = 300; if (!watch) watch = requestAnimationFrame(look); }).observe(frame, { attributes: true, attributeFilter: ["srcdoc"] });
 }
 // Timewarp: picking a date calls the EXISTING route History's version tools use
 // (renderVersionTools — identical fetch shape), then renders that kept version
