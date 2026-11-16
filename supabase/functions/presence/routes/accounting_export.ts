@@ -1,7 +1,9 @@
 // ── GET /sales/export/accounting?from=YYYY-MM-DD&to=YYYY-MM-DD&tzo=&today= ───────
 // Export for your bookkeeper (sales item 105): one zip with invoices.csv (the columns
 // QuickBooks Online's invoice import maps), payments.csv (every payment that came in,
-// retainer charges too) and READ-ME.txt. The invoices are the Invoices page's own book
+// retainer charges too) and READ-ME.txt. For the platform's own studio (sales item 133)
+// payments.csv also shows Stripe's fee on each payment and the day it was paid out, and
+// payouts.csv lists each deposit from Stripe. The invoices are the Invoices page's own book
 // (routes/invoices_list.ts readInvoiceBook); the shaping is lib/accounting_export.ts.
 // A read that fails downloads nothing and says so: a short file at tax time is worse
 // than none.
@@ -12,12 +14,43 @@ import { siteCan, isSiteRole } from '../lib/site_roles.ts';
 import { callerToday } from '../lib/sales_lifecycle.ts';
 import { retainerPayments } from '../lib/invoice_billing.ts';
 import { UUID_RE } from '../lib/uuid.ts';
-import { exportPeriod, invoiceExportRows, paymentExportRows, exportReadMe, INVOICE_HEAD, PAYMENT_HEAD, type RetainerCharge } from '../lib/accounting_export.ts';
+import { exportPeriod, invoiceExportRows, paymentExportRows, exportReadMe, INVOICE_HEAD, PAYMENT_HEAD, type RetainerCharge, type ExportPeriod } from '../lib/accounting_export.ts';
+import { indexPayments, attachPayouts, stripeSide, payoutExportRows, PAYOUT_HEAD } from '../lib/stripe_ledger.ts';
+import { stripeConfigured, listPaymentBalanceTransactions, listPayouts, listPayoutTransactions, paymentIntentForInvoice } from '../commerce/stripe.ts';
+import { fewAtATime } from '../lib/few_at_a_time.ts';
 import { readInvoiceBook } from './invoices_list.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any)?.json) ? (r as any).json : []) as any[];
+
+// ── Sales item 133: what reached the bank ─────────────────────────────────────
+// Stripe's fee on each payment it took, the day the payout carrying it arrived, and
+// payouts.csv. Every pay link is made with the platform's own Stripe key, so the payouts
+// are the platform studio's: they're read for platform staff signed in as themselves,
+// never for a studio drilled into a client, a seat on someone's business, or anyone else.
+export const seesStripeBooks = (p: Principal) => p.kind === 'staff' && !p.scope && !p.member;
+const PAYOUTS_DETAILED = 120;   // payouts whose contents are listed in one export (one Stripe read each)
+const DAY = 86400;
+const unixDay = (ymd: string) => Date.parse(ymd + 'T00:00:00Z') / 1000;
+
+/** Read Stripe's side of the days asked for. Throws when Stripe can't be read. A payment
+ *  is looked for from ten days before (a bank payment starts days before it settles) to
+ *  three after, and payouts due up to ten days after the last day are read so a payment
+ *  late in the stretch still finds the deposit it went out in. */
+async function readStripeBooks(p: ExportPeriod, retainerInvoices: string[]) {
+  const [pays, pos] = await Promise.all([
+    listPaymentBalanceTransactions(unixDay(p.from) - 10 * DAY, unixDay(p.to) + 4 * DAY, 20),
+    listPayouts(unixDay(p.from), unixDay(p.to) + 11 * DAY, 5),
+  ]);
+  const ledger = indexPayments(pays.data);
+  const detailable = pos.data.filter((po: any) => po && po.automatic !== false && po.reconciliation_status !== 'not_applicable' && po.status !== 'canceled' && po.status !== 'failed');
+  const listed = await fewAtATime(detailable.slice(0, PAYOUTS_DETAILED), 4, async (po: any) => [String(po.id), (await listPayoutTransactions(String(po.id), 5)).data] as [string, unknown[]]);
+  const carried = new Map<string, unknown[]>(listed);
+  attachPayouts(ledger, pos.data, carried);
+  const intents = new Map<string, string>(await fewAtATime([...new Set(retainerInvoices.filter(Boolean))].slice(0, 200), 4, async (id) => [id, await paymentIntentForInvoice(id)] as [string, string]));
+  return { lookup: stripeSide(ledger, intents), payouts: pos.data, carried, capped: pays.more || pos.more || detailable.length > PAYOUTS_DETAILED };
+}
 
 export async function handleAccountingExport(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   // owners always; a team seat only when its role may see everything and download it
@@ -58,15 +91,21 @@ export async function handleAccountingExport(req: Request, site: SiteRow, princi
     const [pay] = retainerPayments([e]);
     if (!pay) return;
     const d = deals.get(String(e.deal_id || ''));
-    charges.push({ ...pay, customer: (d && (clientOf.get(String(d.converted_client_id || '')) || personOf.get(String(d.contact_id || '')))) || '', deal_title: d ? String(d.title || '') : '' });
+    const stripeInvoice = e.detail && typeof e.detail === 'object' ? String(e.detail.stripe_invoice || '') : '';
+    charges.push({ ...pay, customer: (d && (clientOf.get(String(d.converted_client_id || '')) || personOf.get(String(d.contact_id || '')))) || '', deal_title: d ? String(d.title || '') : '', ...(stripeInvoice ? { stripe_invoice: stripeInvoice } : {}) });
   });
+  // sales item 133: Stripe's fees and payouts; a Stripe that can't be read downloads nothing, like the rest
+  const books = seesStripeBooks(principal) && stripeConfigured() ? await readStripeBooks(p, charges.map((c) => c.stripe_invoice || '')).catch(() => null) : undefined;
+  if (books === null) return json({ error: 'read_failed', message: 'Stripe’s fees and payouts couldn’t load just now, so nothing was downloaded. Try again in a moment.' }, 502, cors);
   const inv = invoiceExportRows(book.items, p, tzo);
-  const pay = paymentExportRows(book.items, charges, p, tzo);
+  const pay = paymentExportRows(book.items, charges, p, tzo, books ? books.lookup : null);
+  const outs = books ? payoutExportRows(books.payouts, books.carried, p) : null;
   const enc = new TextEncoder();
   const zip = zipStore([
     { name: 'invoices.csv', data: enc.encode(toCsv(INVOICE_HEAD, inv.rows)) },
     { name: 'payments.csv', data: enc.encode(toCsv(PAYMENT_HEAD, pay.rows)) },
-    { name: 'READ-ME.txt', data: enc.encode(exportReadMe(p, inv, pay, book.partial)) },
+    ...(outs ? [{ name: 'payouts.csv', data: enc.encode(toCsv(PAYOUT_HEAD, outs.rows)) }] : []),
+    { name: 'READ-ME.txt', data: enc.encode(exportReadMe(p, inv, pay, book.partial, books && outs ? { payouts: outs.payouts, cents: outs.cents, capped: books.capped } : null)) },
   ]);
   return new Response(zip.buffer as ArrayBuffer, { status: 200, headers: { ...cors, 'Access-Control-Expose-Headers': 'Content-Disposition', 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="for-your-bookkeeper-${p.from}-to-${p.to}.zip"`, 'Cache-Control': 'no-store' } });
 }
