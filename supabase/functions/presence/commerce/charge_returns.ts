@@ -236,7 +236,7 @@ const dealHref = (dealId: string | null) => {
 
 /** What the studio reads about one refund. Says what happened to the money and what
  *  was, or wasn't, done about it, so nothing is claimed that didn't happen. Pure. */
-export function refundLineCopy(p: { applies: Applies; what: string; who: string; amount: number; counted: number; full: boolean; month: string; emailed: boolean; hasEmail: boolean; bank: boolean; pending: boolean; partLeft: number }): { headline: string; body: string } {
+export function refundLineCopy(p: { applies: Applies; what: string; who: string; amount: number; counted: number; full: boolean; whole?: boolean; month: string; emailed: boolean; hasEmail: boolean; bank: boolean; pending: boolean; partLeft: number }): { headline: string; body: string } {
   const money = usd(p.amount);
   const told = p.emailed ? `We emailed ${p.who || 'them'} to say so.` : p.hasEmail ? 'Our email to them didn’t go out, so a quick note from you helps.' : 'There’s no email for them on the deal, so let them know yourself.';
   const way = p.bank ? (p.pending ? ' It takes a few business days to reach their bank.' : '') : '';
@@ -246,7 +246,7 @@ export function refundLineCopy(p: { applies: Applies; what: string; who: string;
   if (p.applies === 'void') return { headline: `Refunded the payment on a withdrawn invoice: ${p.what} (${money})`, body: `${money} went back to ${p.who || 'them'}. The invoice stays withdrawn.${way} ${told}` };
   const reads = p.applies === 'retainer' ? '' : p.full ? ' The invoice now reads Refunded,' : ` The invoice now reads Paid with ${usd(p.partLeft)} refunded,`;
   return {
-    headline: p.full && p.applies === 'invoice' ? `Refunded in full: ${p.what} (${money})` : `Refunded ${money}: ${p.what}`,
+    headline: (p.whole ?? p.full) && p.applies === 'invoice' ? `Refunded in full: ${p.what} (${money})` : `Refunded ${money}: ${p.what}`,
     body: `${money} went back to ${p.who || 'them'} through Stripe.${reads}${reads ? ' and' : ''} ${reads ? 'it' : 'It'} comes off ${p.month}’s revenue.${way} ${told}`.replace(/\s+/g, ' ').trim(),
   };
 }
@@ -409,12 +409,15 @@ async function tellRefunds(m: Match, charge: any, fresh: any[], failedNow: any[]
   for (const row of fresh) {
     const amount = n(row.amount_cents);
     if (!refundLive(String(row.status))) { failedNow.push(row); continue; }
-    const full = m.applies === 'invoice' ? n(m.inv?.refunded_cents) >= n(m.inv?.amount_cents) && n(m.inv?.amount_cents) > 0 : m.applies === 'retainer' ? n(row.counted_cents) >= m.countedCents : amount >= paid;
-    const emailed = await emailRefund(m, p, { amount, full }, bank, paid);
+    // whole: this refund alone sent the whole payment back ("in full" in the email, the headline and the
+    // history); full: the invoice now reads Refunded, which two part refunds can add up to
+    const whole = paid > 0 && amount >= paid;
+    const full = m.applies === 'invoice' ? n(m.inv?.refunded_cents) >= n(m.inv?.amount_cents) && n(m.inv?.amount_cents) > 0 : whole;
+    const emailed = await emailRefund(m, p, { amount, full: whole }, bank, paid);
     if (emailed) await svc(`presence_money_returns?id=eq.${row.id}`, { method: 'PATCH', body: JSON.stringify({ client_emailed: true }) }).catch(() => {});
-    const copy = refundLineCopy({ applies: m.applies, what, who: p.who, amount, counted: n(row.counted_cents), full, month: monthOf(row.counted_at), emailed, hasEmail: !!p.email, bank, pending: row.status === 'pending', partLeft: n(m.inv?.refunded_cents) });
+    const copy = refundLineCopy({ applies: m.applies, what, who: p.who, amount, counted: n(row.counted_cents), full, whole, month: monthOf(row.counted_at), emailed, hasEmail: !!p.email, bank, pending: row.status === 'pending', partLeft: n(m.inv?.refunded_cents) });
     await raiseNoticeDetailed({ siteId: m.siteId, clientId: p.studioClientId, kind: 'invoice_paid', period: returnPeriod('refund', m.dealId, String(row.stripe_id)), headline: copy.headline, body: copy.body });
-    await historyLine(m, { refund: true, stripe_refund: String(row.stripe_id), amount_cents: amount, full, applies_to: m.applies });
+    await historyLine(m, { refund: true, stripe_refund: String(row.stripe_id), amount_cents: amount, full: whole, applies_to: m.applies });
   }
   for (const row of failedNow) {
     const amount = n(row.amount_cents);

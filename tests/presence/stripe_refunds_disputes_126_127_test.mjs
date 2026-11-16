@@ -171,6 +171,18 @@ const stateOf = (n) => moneyState(inv(n), TODAY);
   ok('a refund that failed: a Needs you line says the money is back in Stripe and what to do', !!fl && fl.kind === 'invoice_void_paid' && noticeTier(fl.kind) === 'needs_you' && fl.headline === 'A refund didn’t go through: Website build ($300.00)' && /in your Stripe balance again/.test(fl.body) && mail.length === 2, JSON.stringify(fl));
 }
 
+// two part refunds Stripe reports at once (a message was lost): each says its own amount, and the invoice reads Refunded
+{
+  seed();
+  stripe.charges.ch_test1aaaa = charge(1, { amount_refunded: 100000, refunded: true });
+  stripe.refunds.ch_test1aaaa = [refund(1, 1, 30000), refund(1, 2, 70000)];
+  await stripeEvent('charge.refunded', stripe.charges.ch_test1aaaa);
+  const heads = lines(/^refund:/).map((x) => x.headline).sort();
+  ok('two part refunds at once: the invoice reads Refunded, and neither line nor email says "in full"',
+    stateOf(1) === 'refunded' && JSON.stringify(heads) === JSON.stringify(['Refunded $300.00: Website build', 'Refunded $700.00: Website build'])
+    && lines(/^refund:/).every((x) => /The invoice now reads Refunded/.test(x.body)) && mail.length === 2 && mail.every((x) => !/in full/.test(x.html)) && history().every((e) => e.detail.full === false), JSON.stringify(heads));
+}
+
 // ═══ 3. what was never counted never comes off ═══
 {
   // they paid $1,200.00 for a $1,000.00 invoice, and the studio sends the $200.00 back
