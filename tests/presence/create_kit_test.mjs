@@ -195,7 +195,11 @@ const bRows = () => JSON.stringify(['presence_deals', 'presence_contacts', 'pres
   ok('a to-do needs a title (422)', r.status === 422, short(r));
   const theirs = bRows();
   const theirList = (await asB('GET', `/sales/deals/${D_B}/tasks`)).body?.data;
-  await asA('POST', `/sales/deals/${D_B}/tasks`, { title: 'Slipped in' });
+  const tasksBefore = JSON.stringify(T('presence_deal_tasks'));
+  r = await asA('POST', `/sales/deals/${D_B}/tasks`, { title: 'Slipped in' });
+  // sales item 135: refused with the deal page's own 404 (not the router's "No route for…"), and no
+  // to-do lands anywhere: before the fix it answered 201 and filed one in the caller's own studio
+  ok('a to-do aimed at another studio’s deal is a 404 like the deal’s other routes, and no to-do is written in either studio', r.status === 404 && r.body?.error === 'not_found' && r.body?.message === 'That deal is no longer here.' && JSON.stringify(T('presence_deal_tasks')) === tasksBefore, short(r));
   ok('a to-do aimed at another studio’s deal never reaches them: their rows and their list are as they were', bRows() === theirs && JSON.stringify((await asB('GET', `/sales/deals/${D_B}/tasks`)).body?.data) === JSON.stringify(theirList));
   r = await anon('GET', `/sales/deals/${D_A}/tasks`);
   ok('not signed in: 401', r.status === 401, short(r));
