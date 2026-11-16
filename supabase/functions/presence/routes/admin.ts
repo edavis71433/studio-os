@@ -792,8 +792,16 @@ export async function handleAdmin(req: Request, route: string, method: string, p
     if (!site?.netlify_site_id) return json({ error: 'not_found', message: 'Site not found or not connected to hosting.' }, 404, cors);
     const r = await restoreDeploy(site.netlify_site_id, deployId);
     if (!r.ok) return json({ error: 'restore_failed', message: CALM + ' Detail (operator): ' + (r.error || 'unknown') }, 502, cors);
-    await writeChangeEvent({ siteId: site.id, entityType: 'restore', entityId: null, action: 'restore', summary: 'Instant restore of a previous deploy (operator)', principal, provenance: 'human' });
-    return json({ data: { ok: true } }, 200, cors);
+    // G10: visitors now get that deploy. When a live publish of this site went up with it, they
+    // see a real version, so the site is online and its offline mark goes; left alone, the next
+    // Bring back online found that version up already, sent nothing and kept the mark for good.
+    // Any other deploy (a holding page, one we have no record of) leaves the mark as it was.
+    const real = await svc(`presence_publishes?site_id=eq.${site.id}&netlify_deploy_id=eq.${encodeURIComponent(deployId)}&status=eq.live&select=id&limit=1`);
+    const online = real.ok && Array.isArray(real.json) && real.json.length > 0;
+    const lifted = online ? await svc(`presence_sites?id=eq.${site.id}&offline_at=not.is.null`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ offline_at: null }) })
+      .then((w) => w.ok && Array.isArray(w.json) && w.json.length > 0).catch(() => false) : false;   // best-effort: before 0111 there is no column
+    await writeChangeEvent({ siteId: site.id, entityType: 'restore', entityId: null, action: 'restore', summary: `Instant restore of a previous deploy (operator)${lifted ? ': the site is online again' : ''}`, principal, provenance: 'human', ...(lifted ? { fields: ['offline_at'] } : {}) });
+    return json({ data: { ok: true, online } }, 200, cors);
   }
 
   const m = route.match(/^\/admin\/sites\/([0-9a-f-]{36})(\/[a-z0-9-]+(?:\/[a-z0-9-]+){0,2})?$/);

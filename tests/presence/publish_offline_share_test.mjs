@@ -8,6 +8,10 @@
 //     0111; a paused site is platform staff's to take offline, not its owner's
 //   · Bring back online puts the last live version back up through the one publish pipeline and
 //     clears the mark; any publish that goes live clears it too, and a failed one leaves it
+//   · the mark follows the host: a site marked offline while visitors already get its live
+//     version (a staff rollback, a holding page the host gave up on after Take offline stopped
+//     waiting, a Bring back online the host finished after its request) has the mark lifted at
+//     once or by the next press, and publishes wait for a holding page still on its way
 //   · Scheduling offline (routes/commercial.ts) freezes no snapshot, and the cron
 //     (ops/scheduler.ts) fires it through the same take-offline core, drawing the page then
 //   · Share a draft link (routes/preview_env.ts) captures the draft into the one preview slot
@@ -41,13 +45,15 @@ const users = {}, ownSite = {};
 for (const id of ORDER) { users[BIZ[id].jwt] = { id: U[id], email: BIZ[id].owner }; ownSite[BIZ[id].jwt] = id; }
 const db = installFakePostgrest({ users, ownSite });
 
-// ── the host (Netlify), stubbed: deploys by digest, uploads, the deploy visitors see ──
+// ── the host (Netlify), stubbed: deploys by digest, uploads, the deploy visitors see, the site's
+//    deploy list (newest first) and a staff rollback. A deploy is unfinished until it is asked for
+//    and finished then, unless a test settles it first (the host failing it, or finishing it late) ──
 const sha1 =async (bytes) => [...new Uint8Array(await crypto.subtle.digest('SHA-1', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 let host;
 const hostSite = (id) => (host.sites[id] ||= { live: null, has: new Set() });
 function newHost(from) {
-  host = { sites: {}, deploys: from ? [...from.deploys] : [], uploads: [], calls: [], failCreate: new Set(), next: from ? from.next : 1 };
+  host = { sites: {}, deploys: from ? from.deploys.map((d) => ({ ...d })) : [], uploads: [], calls: [], failCreate: new Set(), next: from ? from.next : 1 };
   if (from) for (const [id, s] of Object.entries(from.sites)) host.sites[id] = { live: s.live, has: new Set(s.has) };
 }
 newHost();
@@ -64,8 +70,19 @@ async function netlify(u, init) {
     const site = decodeURIComponent(m[1]);
     if (host.failCreate.has(site)) return reply({ message: 'the host is down' }, 500);
     const b = JSON.parse(String(init.body)), s = hostSite(site), id = `dep-${host.next++}`;
-    host.deploys.push({ id, site, files: b.files, title: b.title });
+    host.deploys.push({ id, site, files: b.files, title: b.title, state: 'processing', created_at: new Date().toISOString() });
     return reply({ id, required: [...new Set(Object.values(b.files))].filter((d) => !s.has.has(d)) });
+  }
+  if (method === 'GET' && (m = /^\/sites\/([^/]+)\/deploys$/.exec(p))) {
+    const site = decodeURIComponent(m[1]), n = Number(u.searchParams.get('per_page')) || 20;
+    return reply(host.deploys.filter((d) => d.site === site).reverse().slice(0, n).map((d) => ({ id: d.id, state: d.state, created_at: d.created_at, title: d.title })));
+  }
+  if (method === 'POST' && (m = /^\/sites\/([^/]+)\/deploys\/([^/]+)\/restore$/.exec(p))) {
+    const site = decodeURIComponent(m[1]);
+    const dep = host.deploys.find((d) => d.id === decodeURIComponent(m[2]) && d.site === site && d.state === 'ready');
+    if (!dep) return reply({ message: 'Not Found' }, 404);   // a deploy of another site, or one that never finished
+    hostSite(site).live = dep.id;
+    return reply({ id: dep.id, state: dep.state });
   }
   if (method === 'PUT' && (m = /^\/deploys\/([^/]+)\/files(\/.*)$/.exec(p))) {
     const dep = host.deploys.find((d) => d.id === m[1]);
@@ -76,8 +93,8 @@ async function netlify(u, init) {
   }
   if (method === 'GET' && (m = /^\/deploys\/([^/]+)$/.exec(p))) {
     const dep = host.deploys.find((d) => d.id === m[1]);
-    if (dep) hostSite(dep.site).live = dep.id;   // ready: visitors now get this deploy
-    return reply({ id: m[1], state: 'ready' });
+    if (dep?.state === 'processing') { dep.state = 'ready'; hostSite(dep.site).live = dep.id; }   // ready: visitors now get this deploy
+    return reply({ id: m[1], state: dep ? dep.state : 'ready' });
   }
   return reply({ message: 'no such host route' }, 404);
 }
@@ -126,6 +143,7 @@ const { signPreviewToken, verifyPreviewToken, clampTtlSeconds, PREVIEW_LINK_MAX_
 const PUB = await import(`${P}/routes/publish.ts`);
 const PENV = await import(`${P}/routes/preview_env.ts`);
 const COM = await import(`${P}/routes/commercial.ts`);
+const ADMIN = await import(`${P}/routes/admin.ts`);
 const { runDuePublishes } = await import(`${P}/ops/scheduler.ts`);
 const { digestFiles, sameFiles } = await import(`${P}/lib/netlify.ts`);
 const { brandFromKit } = await import(`${P}/lib/email_brand.ts`);
@@ -612,6 +630,127 @@ async function call(jwt, method, route, body) {
   ok('migration 0111: additive, nothing dropped but the old kind check, no rows changed', !/drop table|drop column|delete from|update public/i.test(sql(migText)) && (sql(migText).match(/drop constraint/g) || []).length === 1);
   // pin: the pack is what gets run on production; it must be the migration, in one transaction, under the house header
   ok('apply pack: APPLY-0111 is the house pack for 0111 and runs exactly the migration, in one transaction', /APPLY PACK · migration 0111/.test(packText) && sql(packText) === `begin; ${sql(migText)} commit;`);
+}
+
+// ═══ 16. the offline mark follows the host ═══
+// A site marked offline while its host already showed the live version used to stay marked for
+// good: Bring back online and Publish found nothing to send, answered "live, unchanged" and left
+// the mark, so the panel kept saying Offline and each press kept one more version. Each way in is
+// driven here, and the race the fix must not open: a holding page still on its way to the host
+// would land on top of anything sent before it.
+const shows = (id) => host.sites[BIZ[id].nf]?.live;   // the deploy that site's visitors get now
+const pubsOf = (id) => db.tables.presence_publishes.filter((p) => p.site_id === id);
+const settle = (dep, state) => { dep.state = state; if (state === 'ready') hostSite(dep.site).live = dep.id; };   // the host finishes a deploy after its request
+// the host takes longer than the request waits: a negative DEPLOY_POLL_MS stops the wait at once
+const slowHost = async (fn) => { Deno.env.set('DEPLOY_POLL_MS', '-1'); try { return await fn(); } finally { Deno.env.delete('DEPLOY_POLL_MS'); } };
+const rollBack = (id, deployId) => run(() => ADMIN.handleAdmin(req('POST', '/admin/restore-deploy', { site_id: id, deploy_id: deployId }), '/admin/restore-deploy', 'POST', STAFF, {}));
+const HOLDING_WAIT = 15 * 60_000;   // the longest a holding page the host never finishes holds a site up
+{
+  // way in 1: platform staff roll the host back (POST /admin/restore-deploy) while the site is offline
+  restore();
+  await run(() => PUB.handleTakeOffline(siteOf(SITE_A), OWNER[SITE_A], {}));
+  await run(() => PUB.handleTakeOffline(siteOf(SITE_B), OWNER[SITE_B], {}));
+  const holdingA = shows(SITE_A), holdingB = shows(SITE_B), markB = offlineAt(SITE_B), bBefore = rowsOf(SITE_B);
+  const theirs = await rollBack(SITE_A, LIVE_B.netlify_deploy_id);
+  ok('staff rollback: a deploy of the other studio’s site is refused by the host, and neither site nor mark changes', theirs.status === 502 && shows(SITE_A) === holdingA && !!offlineAt(SITE_A) && shows(SITE_B) === holdingB && offlineAt(SITE_B) === markB, `${theirs.status} ${theirs.text.slice(0, 120)}`);
+  const same = await rollBack(SITE_A, holdingA);
+  ok('staff rollback: put back to a deploy that is no version of the site (its holding page), visitors still get that page and the mark stays', same.status === 200 && same.body?.data?.online === false && shows(SITE_A) === holdingA && !!offlineAt(SITE_A), `${same.status} ${same.text.slice(0, 160)}`);
+  const m = mark();
+  const r = await rollBack(SITE_A, LIVE_A.netlify_deploy_id);
+  ok('staff rollback: put back to the live version, visitors get it again and the offline mark goes', r.status === 200 && r.body?.data?.online === true && shows(SITE_A) === LIVE_A.netlify_deploy_id && offlineAt(SITE_A) === null, `${r.status} ${r.text.slice(0, 160)} mark ${offlineAt(SITE_A)}`);
+  const ev = db.tables.presence_change_events.filter((e) => e.site_id === SITE_A && e.entity_type === 'restore').at(-1);
+  ok('staff rollback: the history says the site is online again, by staff, field and all', ev?.summary === 'Instant restore of a previous deploy (operator): the site is online again' && JSON.stringify(ev?.detail) === '{"fields":["offline_at"]}' && ev?.actor_user_id === STAFF.userId, JSON.stringify(ev));
+  const alone = leftAlone(SITE_B, m);
+  ok('staff rollback: the other studio, offline beside it, keeps its holding page and its mark; nothing of theirs is read or changed', shows(SITE_B) === holdingB && offlineAt(SITE_B) === markB && !!markB && rowsOf(SITE_B) === bBefore && alone.ok, alone.note);
+  const pubs = pubsOf(SITE_A).length, m2 = mark();
+  const back = await run(() => PUB.handleBackOnline(siteOf(SITE_A), OWNER[SITE_A], {}));
+  ok('staff rollback: Bring back online is then told the site is online already: nothing deploys and no version is kept', back.status === 409 && back.body?.error === 'not_offline' && deploysSince(m2).length === 0 && pubsOf(SITE_A).length === pubs, `${back.status} ${back.text.slice(0, 160)}`);
+}
+{
+  // way in 2: Take offline stops waiting before the host has the holding page up, and the host
+  // then gives up on it: visitors keep the live version under an Offline mark
+  restore();
+  await slowHost(() => run(() => PUB.handleTakeOffline(siteOf(SITE_B), OWNER[SITE_B], {})));   // the other studio goes offline slowly too
+  const holdingB = host.deploys.at(-1), bBefore = rowsOf(SITE_B);
+  const m = mark();
+  const off = await slowHost(() => run(() => PUB.handleTakeOffline(siteOf(SITE_A), OWNER[SITE_A], {})));
+  const holding = deploysSince(m)[0];
+  ok('slow take offline: the holding page is sent and the site marked, and the answer says the host is still putting the page up', off.status === 200 && off.body?.data?.offline === true && off.body?.data?.pending === true && /still putting up/.test(off.body?.data?.message || '') && /Nothing was deleted/.test(off.body?.data?.message || '') && holding?.title === 'offline holding page' && holding?.site === BIZ[SITE_A].nf && shows(SITE_A) === LIVE_A.netlify_deploy_id && !!offlineAt(SITE_A), `${off.status} ${off.text.slice(0, 200)}`);
+  const pubs = pubsOf(SITE_A).length, snaps = db.tables.presence_snapshots.length, m1 = mark();
+  const early = await run(() => PUB.handleBackOnline(siteOf(SITE_A), OWNER[SITE_A], {}));
+  const earlyPub = await run(() => PUB.handlePublish(null, siteOf(SITE_A), OWNER[SITE_A], {}));
+  ok('slow take offline: until the host is done with the holding page, Bring back online and Publish wait with a calm 409: nothing sent, no version kept, the mark kept', early.status === 409 && early.body?.error === 'offline_in_progress' && /still going offline/.test(early.body?.message || '') && earlyPub.status === 409 && earlyPub.body?.error === 'offline_in_progress' && deploysSince(m1).length === 0 && pubsOf(SITE_A).length === pubs && db.tables.presence_snapshots.length === snaps && !!offlineAt(SITE_A), `${early.status} ${early.text.slice(0, 120)} | ${earlyPub.status} ${earlyPub.text.slice(0, 120)}`);
+  settle(holding, 'error');   // the host gives up on the holding page: visitors keep getting the live version
+  const m2 = mark();
+  const back = await run(() => PUB.handleBackOnline(siteOf(SITE_A), OWNER[SITE_A], {}));
+  ok('holding page given up: Bring back online finds the live version up, sends nothing, answers live, and the mark goes', back.status === 200 && back.body?.data?.status === 'live' && back.body?.data?.unchanged === true && deploysSince(m2).length === 0 && shows(SITE_A) === LIVE_A.netlify_deploy_id && offlineAt(SITE_A) === null, `${back.status} ${back.text.slice(0, 160)} mark ${offlineAt(SITE_A)}`);
+  const kept = pubsOf(SITE_A).slice(pubs);
+  ok('holding page given up: that press is kept as one version, live on the deploy visitors already had', kept.length === 1 && kept[0].kind === 'restore' && kept[0].status === 'live' && kept[0].netlify_deploy_id === LIVE_A.netlify_deploy_id && kept[0].change_summary === 'Brought the website back online', JSON.stringify(kept.map((p) => [p.kind, p.status, p.netlify_deploy_id])));
+  const m3 = mark();
+  const again = await run(() => PUB.handleBackOnline(siteOf(SITE_A), OWNER[SITE_A], {}));
+  ok('holding page given up: a second press is told the site is online, with nothing sent and no version added', again.status === 409 && again.body?.error === 'not_offline' && deploysSince(m3).length === 0 && pubsOf(SITE_A).length === pubs + 1, `${again.status} ${again.text.slice(0, 120)}`);
+  const alone = leftAlone(SITE_B, m);
+  ok('slow take offline: the other studio’s holding page, still on its way, held nothing of this site up, and nothing of theirs is read or changed', holdingB.state === 'processing' && rowsOf(SITE_B) === bBefore && alone.ok, alone.note);
+  const theirs = await run(() => PUB.handleBackOnline(siteOf(SITE_B), OWNER[SITE_B], {}));
+  ok('slow take offline: the other studio’s own Bring back online still waits for its own holding page', theirs.status === 409 && theirs.body?.error === 'offline_in_progress' && !!offlineAt(SITE_B), `${theirs.status} ${theirs.text.slice(0, 120)}`);
+}
+{
+  // the same slow Take offline, but the host finishes the holding page after the request. A press
+  // meanwhile must not lift the mark, or the page would land with the site reading online
+  restore();
+  const m = mark();
+  await slowHost(() => run(() => PUB.handleTakeOffline(siteOf(SITE_A), OWNER[SITE_A], {})));
+  const holding = deploysSince(m)[0];
+  const early = await run(() => PUB.handleBackOnline(siteOf(SITE_A), OWNER[SITE_A], {}));
+  settle(holding, 'ready');
+  ok('holding page up late: a press while it was on its way waited, so visitors get it under the Offline mark, never under an online one', early.status === 409 && early.body?.error === 'offline_in_progress' && shows(SITE_A) === holding.id && !!offlineAt(SITE_A), `${early.status} shows ${shows(SITE_A)} mark ${offlineAt(SITE_A)}`);
+  const m2 = mark();
+  const back = await run(() => PUB.handleBackOnline(siteOf(SITE_A), OWNER[SITE_A], {}));
+  const dep = deploysSince(m2)[0];
+  ok('holding page up late: Bring back online then sends the live version over it and lifts the mark', back.status === 200 && back.body?.data?.status === 'live' && deploysSince(m2).length === 1 && sameFiles(dep?.files, LIVE_A.deploy_files) && shows(SITE_A) === dep?.id && offlineAt(SITE_A) === null, `${back.status} ${back.text.slice(0, 160)}`);
+}
+{
+  // a holding page the host never finishes holds the site up for fifteen minutes at most
+  restore();
+  const m = mark();
+  await slowHost(() => run(() => PUB.handleTakeOffline(siteOf(SITE_A), OWNER[SITE_A], {})));
+  const holding = deploysSince(m)[0];
+  holding.created_at = new Date(Date.now() - HOLDING_WAIT + 60_000).toISOString();   // sent fourteen minutes ago, still unfinished
+  const still = await run(() => PUB.handleBackOnline(siteOf(SITE_A), OWNER[SITE_A], {}));
+  holding.created_at = new Date(Date.now() - HOLDING_WAIT - 60_000).toISOString();   // sixteen: taken as stuck for good
+  const m2 = mark();
+  const back = await run(() => PUB.handleBackOnline(siteOf(SITE_A), OWNER[SITE_A], {}));
+  ok('holding page never finished: it holds Bring back online up to fifteen minutes, then the live version is found up and the mark goes', still.status === 409 && still.body?.error === 'offline_in_progress' && back.status === 200 && back.body?.data?.status === 'live' && deploysSince(m2).length === 0 && offlineAt(SITE_A) === null, `${still.status} ${back.status} ${back.text.slice(0, 120)}`);
+}
+{
+  // way in 3: Bring back online sends the live version, the host finishes it after the request,
+  // and reading Versions (the lazy reconcile) marks it live, as the cron's reconcile would
+  restore();
+  await run(() => PUB.handleTakeOffline(siteOf(SITE_A), OWNER[SITE_A], {}));
+  await run(() => PUB.handleTakeOffline(siteOf(SITE_B), OWNER[SITE_B], {}));
+  const markB = offlineAt(SITE_B), holdingB = shows(SITE_B), bBefore = rowsOf(SITE_B);
+  const m = mark();
+  const r = await slowHost(() => run(() => PUB.handleBackOnline(siteOf(SITE_A), OWNER[SITE_A], {})));
+  const rec = pubsOf(SITE_A).at(-1), dep = deploysSince(m)[0];
+  ok('slow bring back: the live version is sent and the answer says it is on its way; until the host is done the site stays marked offline', r.status === 200 && r.body?.data?.status === 'publishing' && rec?.kind === 'restore' && rec?.status === 'deploying' && !!dep && rec?.netlify_deploy_id === dep.id && shows(SITE_A) !== dep.id && !!offlineAt(SITE_A), `${r.status} ${r.text.slice(0, 160)} ${JSON.stringify(rec)}`);
+  const h = await run(() => PUB.handlePublishHistory(siteOf(SITE_A), {}));
+  ok('slow bring back: once the host is done, opening Versions marks that version live and lifts the offline mark', h.status === 200 && pubsOf(SITE_A).find((p) => p.id === rec?.id)?.status === 'live' && shows(SITE_A) === dep?.id && offlineAt(SITE_A) === null, `${h.status} mark ${offlineAt(SITE_A)}`);
+  const alone = leftAlone(SITE_B, m);
+  ok('slow bring back: the other studio stays offline behind its own holding page; nothing of theirs is read or changed', offlineAt(SITE_B) === markB && !!markB && shows(SITE_B) === holdingB && rowsOf(SITE_B) === bBefore && alone.ok, alone.note);
+}
+{
+  // a site the old code already left stuck: marked offline, visitors get the live version, nothing on its way
+  const STUCK = '2026-11-14T09:00:00.000Z';
+  restore((t) => { siteRow(t, SITE_A).offline_at = STUCK; siteRow(t, SITE_B).offline_at = STUCK; });
+  const bBefore = rowsOf(SITE_B), m = mark();
+  const r = await call(BIZ[SITE_A].jwt, 'POST', '/site/online');
+  ok('already stuck: the owner’s Bring back online, through the router, answers live, sends nothing and lifts the mark', r.status === 200 && r.body?.data?.status === 'live' && r.body?.data?.unchanged === true && deploysSince(m).length === 0 && shows(SITE_A) === LIVE_A.netlify_deploy_id && offlineAt(SITE_A) === null, `${r.status} ${r.text.slice(0, 160)}`);
+  const alone = leftAlone(SITE_B, m);
+  ok('already stuck: the other studio’s mark is theirs to lift: it stays, and nothing of theirs is read or changed', offlineAt(SITE_B) === STUCK && rowsOf(SITE_B) === bBefore && alone.ok, alone.note);
+  restore((t) => { siteRow(t, SITE_A).offline_at = STUCK; });
+  const p = await run(() => PUB.handlePublish(null, siteOf(SITE_A), OWNER[SITE_A], {}));
+  // nothing new to publish, so nothing goes up (unless the run crosses midnight: the privacy page carries the day)
+  ok('already stuck: a Publish lifts the mark too, and visitors get a live version', p.status === 200 && p.body?.data?.status === 'live' && offlineAt(SITE_A) === null && pubsOf(SITE_A).some((x) => x.status === 'live' && x.netlify_deploy_id === shows(SITE_A)), `${p.status} ${p.text.slice(0, 160)}`);
 }
 
 // Covered in the browser by (the page checks this suite used to make on presence.html's text):
