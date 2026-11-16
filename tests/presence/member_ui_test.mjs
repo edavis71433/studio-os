@@ -92,8 +92,9 @@ const CONTROLS = [
   ['PUT /sales/goal-ai', 'settings.html', `api('/sales/goal-ai', 'PUT', patch)`, ['id="goal" aria-labelledby="goalHead" hidden data-needs="configure"']],   // sales item 94: the month's goal and the AI help switch (the switch is the owner's alone: the route says so)
   // sales item 124: a stage's "what to do now" note, from Settings and from the note under the stage bar
   ['PUT /sales/stages', 'settings.html', `api('/sales/stages', 'PUT', { note })`, ['id="stages" aria-labelledby="stagesHead" hidden data-needs="configure"']],
-  ['PUT /sales/stages', 'crm.html', `apiAg('/sales/stages','PUT',{note:{stage,text}})`, ['id="snEdit" data-needs="configure"']],
-  ['PUT /sales/stages', 'pipeline.html', `api('/sales/stages','PUT',{note:{stage,text}})`, ['id="snEdit" data-needs="configure"']],
+  // builder item 102: the record and the Pipeline draw the note's Edit note from the one stage bar (deal-path.js)
+  ['PUT /sales/stages', 'crm.html', `apiAg('/sales/stages','PUT',{note:{stage,text}})`, [['deal-path.js', 'id="snEdit" data-needs="configure"']]],
+  ['PUT /sales/stages', 'pipeline.html', `api('/sales/stages','PUT',{note:{stage,text}})`, [['deal-path.js', 'id="snEdit" data-needs="configure"']]],
   ['PUT /report/monthly', 'settings.html', `api('/report/monthly', 'PUT', patch)`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],   // builder list item 58
   ['POST /report/monthly/preview', 'settings.html', `api('/report/monthly/preview', 'POST', {})`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],
   ['DELETE /broadcasts/lists/:id', 'broadcasts.html', `api('/broadcasts/lists/'+encodeURIComponent(SEL.slice(5)),'DELETE')`, ['id="dropList" data-needs="delete"']],
@@ -127,7 +128,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     const need = needOf(route);
     ok(`${route} on ${page}: staff can't, so it needs its control marked`, (need === 'delete' || need === 'configure') && !siteCan('business_staff', need), String(need));
     ok(`${route} on ${page}: the page makes this call`, SOURCE[page].includes(call), call);
-    for (const m of marks) ok(`${route} on ${page}: its control is marked`, SOURCE[page].includes(m), m);
+    // a mark may live in a shared script the page loads (builder item 102: deal-path.js)
+    for (const m of marks) { const [where, mark] = Array.isArray(m) ? m : [page, m]; ok(`${route} on ${page}: its control is marked${where === page ? '' : ' (in ' + where + ', which the page loads)'}`, SOURCE[where].includes(mark) && (where === page || SOURCE[page].includes(`<script src="/${where}"></script>`)), mark); }
   }
   ok('the row delete and the card delete on Contacts both carry the mark', count(SOURCE['contacts.html'], 'data-needs="delete" data-del=') === 2);
   ok('the three builder "Remove for good" buttons all carry the mark', count(SOURCE['presence.html'], 'data-act="del" data-needs="delete"') === 3 && !SOURCE['presence.html'].includes('data-act="del">'));
@@ -237,7 +239,9 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   ok('css: it beats a page that shows the control itself', /\[data-needs="owner"\]\{display:none!important\}/.test(css));
   ok('css: a note beats the builder\'s [hidden] rule only for someone lacking it', css.includes('html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:block!important}'));
   ok('builder: a note starts hidden, so nobody else ever sees it', SOURCE['presence.html'].includes('n.hidden = true; n.dataset.ifLacks = "configure"'));
-  const marked = PAGES.filter((p) => /data-needs|dataset\.needs|needs: '/.test(SOURCE[p]) && p !== 'shell.js');
+  const SHARED = ['deal-path.js'];   // builder item 102: drawn into pages that load it (crm.html, pipeline.html, which load the shell)
+  const marked = PAGES.filter((p) => /data-needs|dataset\.needs|needs: '/.test(SOURCE[p]) && p !== 'shell.js' && !SHARED.includes(p));
+  for (const sh of SHARED) ok(`${sh} is drawn only into pages that load the shell`, PAGES.filter((p) => SOURCE[p].includes(`<script src="/${sh}"></script>`)).every((p) => SOURCE[p].includes('src="/shell.js"')));
   ok('the twelve pages with marked controls are the ones expected', JSON.stringify(marked.sort()) === JSON.stringify(['agency.html', 'broadcasts.html', 'connections.html', 'contacts.html', 'crm.html', 'files.html', 'inbox.html', 'pipeline.html', 'presence.html', 'projects.html', 'prospects.html', 'settings.html']), marked.join(', '));   // projects.html: Remove a project template (sales item 106)   // prospects.html: Remove (sales review item 112)   // connections.html: the calendar link (sales review item 46)   // broadcasts.html: Remove this list (sales review items 31 + 39)
   for (const p of marked) ok(`${p} loads the shell script and its stylesheet`, SOURCE[p].includes('src="/shell.js"') && SOURCE[p].includes('href="/shell.css"'));
 }
