@@ -723,6 +723,26 @@ const HOLDING_WAIT = 15 * 60_000;   // the longest a holding page the host never
   ok('holding page never finished: it holds Bring back online up to fifteen minutes, then the live version is found up and the mark goes', still.status === 409 && still.body?.error === 'offline_in_progress' && back.status === 200 && back.body?.data?.status === 'live' && deploysSince(m2).length === 0 && offlineAt(SITE_A) === null, `${still.status} ${back.status} ${back.text.slice(0, 120)}`);
 }
 {
+  // a scheduled publish that comes due while the holding page is on its way waits for it, unclaimed,
+  // as a locked site's row does: a refused row is failed for good, and its change never goes up
+  restore();
+  const m = mark();
+  await slowHost(() => run(() => PUB.handleTakeOffline(siteOf(SITE_A), OWNER[SITE_A], {})));
+  const holding = deploysSince(m)[0];
+  const due = soon(-30_000);   // half a minute ago: the schedule route still takes it
+  await run(() => COM.handleScheduleCreate(req('POST', '/schedule', { kind: 'publish', scheduled_for: due, note: 'Weekend specials' }), siteOf(SITE_A), OWNER[SITE_A], {}));
+  await run(() => COM.handleScheduleCreate(req('POST', '/schedule', { kind: 'publish', scheduled_for: due, note: 'Spring bouquets' }), siteOf(SITE_B), OWNER[SITE_B], {}));
+  const rowOf = (id) => db.tables.presence_scheduled_publishes.find((s) => s.site_id === id);
+  const m1 = mark();
+  const cyc = await quiet(() => runDuePublishes());
+  ok('scheduled publish due while the holding page is on its way: the row waits, unclaimed and not failed, nothing goes up for it, and no failure is counted', !!rowOf(SITE_A) && rowOf(SITE_A).status === 'pending' && rowOf(SITE_A).fired_at === null && !deploysSince(m1).some((d) => d.site === BIZ[SITE_A].nf) && !!offlineAt(SITE_A) && cyc.failures === 0 && !cyc.results.some((x) => x.site_id === SITE_A), `${JSON.stringify(rowOf(SITE_A))} failures ${cyc.failures}`);
+  ok('scheduled publish due while the holding page is on its way: the other studio’s due row goes in the same tick', rowOf(SITE_B)?.status === 'done' && cyc.results.some((x) => x.site_id === SITE_B && x.ok), JSON.stringify(rowOf(SITE_B)));
+  settle(holding, 'error');   // the host gives up on the holding page: visitors keep the live version
+  const cyc2 = await quiet(() => runDuePublishes());
+  const last = pubsOf(SITE_A).at(-1);
+  ok('scheduled publish due while the holding page is on its way: the first tick after the host is done sends it, live, and the mark goes', rowOf(SITE_A)?.status === 'done' && !!rowOf(SITE_A)?.fired_at && cyc2.results.some((x) => x.site_id === SITE_A && x.ok) && last?.status === 'live' && last?.change_summary === 'Weekend specials' && offlineAt(SITE_A) === null, `${JSON.stringify(rowOf(SITE_A))} ${JSON.stringify(last && [last.kind, last.status, last.change_summary])}`);
+}
+{
   // way in 3: Bring back online sends the live version, the host finishes it after the request,
   // and reading Versions (the lazy reconcile) marks it live, as the cron's reconcile would
   restore();

@@ -80,12 +80,13 @@ export const OFFLINE_IN_PROGRESS = 'Your site is still going offline. Give it a 
  *  is sent, even when the host hasn't finished it by the time the request stops waiting
  *  (lib/netlify.ts, DEPLOY_POLL_MS), so only a site marked offline can have one. A deploy sent
  *  now would race it: if the holding page landed last, visitors would get it while the site
- *  read online. Any doubt (no mark, no column before 0111, the host's list unreadable) is a no. */
-export async function holdingPageOnItsWay(site: SiteRow, nowMs = Date.now()): Promise<boolean> {
-  if (!site.netlify_site_id) return false;
-  const cur = await svc(`presence_sites?id=eq.${site.id}&select=offline_at&limit=1`).catch(() => null);
-  if (!(cur?.ok && Array.isArray(cur.json) && cur.json[0]?.offline_at)) return false;
-  const list = await listDeploys(site.netlify_site_id, 10).catch(() => null);
+ *  read online. Any doubt (no mark, no column before 0111, the host's list unreadable) is a no.
+ *  By site id, so the scheduler can ask before it claims a due row (ops/scheduler.ts). */
+export async function holdingPageOnItsWay(siteId: string, nowMs = Date.now()): Promise<boolean> {
+  const cur = await svc(`presence_sites?id=eq.${siteId}&select=offline_at,netlify_site_id&limit=1`).catch(() => null);
+  const row = cur?.ok && Array.isArray(cur.json) ? cur.json[0] : null;
+  if (!row?.offline_at || !row.netlify_site_id) return false;
+  const list = await listDeploys(String(row.netlify_site_id), 10).catch(() => null);
   const page = list?.ok ? list.deploys.find((d) => d.title === OFFLINE_PAGE_TITLE) : undefined;   // the newest: the host lists newest first
   return !!page && UNFINISHED_DEPLOY.has(page.state) && nowMs - Date.parse(page.created_at) < HOLDING_PAGE_WAIT_MS;
 }
@@ -126,7 +127,7 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   const locked = await lockStop(site.id, publishActorKind(principal));
   if (locked) return json(locked.body, locked.status, cors);
   // G10: wait for a holding page still on its way, as Take offline waits for a publish in flight
-  if (await holdingPageOnItsWay(site)) return json({ error: 'offline_in_progress', message: OFFLINE_IN_PROGRESS }, 409, cors);
+  if (await holdingPageOnItsWay(site.id)) return json({ error: 'offline_in_progress', message: OFFLINE_IN_PROGRESS }, 409, cors);
 
   // ── M5: per-stage telemetry via structured logging (reuses the logging floor —
   //    no new monitoring system, no DB migration). `st` holds cumulative ms from
