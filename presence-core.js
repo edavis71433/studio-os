@@ -34,7 +34,7 @@ function ddsPart(name) {
 // Run now if the part is in; otherwise once it is (a failed load says so once).
 function ddsWith(name, fn) {
   if (ddsPartIn(name)) { fn(); return; }
-  ddsPart(name).then(fn, () => toast("Part of the editor didn't load. Check your connection, then try again.", true));
+  ddsPart(name).then(fn, () => toast("Part of the editor didn’t load. Check your connection and try again.", true));
 }
 // A stand-in's call: the part's own function once it is in; before that a door loads it first,
 // and anything else does nothing.
@@ -46,7 +46,7 @@ function ddsStub(part, name, args, door) {
     const g = window[name];
     if (DDS_STANDINS.has(g)) throw new Error("The editor's " + part + " part has no " + name);
     return g(...args);
-  }, (err) => { toast("Part of the editor didn't load. Check your connection, then try again.", true); throw err; });
+  }, (err) => { toast("Part of the editor didn’t load. Check your connection and try again.", true); throw err; });
 }
 // the stand-ins, until presence-edit.js replaces them
 function mountEditCards(...a) { return ddsStub("edit", "mountEditCards", a, true); }
