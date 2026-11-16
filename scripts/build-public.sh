@@ -23,13 +23,16 @@ node scripts/sync-marketing-chrome.mjs --check
 # class, same defense.
 node scripts/sync-industry-shell.mjs --check
 
-rm -rf dist
-mkdir -p dist
+# Where to stage: dist/ (what netlify.toml publishes), or BUILD_OUT, so a test can build its
+# own copy without racing the one marketing.spec.ts inspects (tests/e2e/packed-site.spec.ts).
+OUT="${BUILD_OUT:-dist}"
+rm -rf "$OUT"
+mkdir -p "$OUT"
 
 # pages + styles + scripts (all root-level; server code lives under supabase/)
-cp ./*.html dist/ 2>/dev/null || true
-cp ./*.css dist/ 2>/dev/null || true
-cp ./*.js dist/ 2>/dev/null || true
+cp ./*.html "$OUT"/ 2>/dev/null || true
+cp ./*.css "$OUT"/ 2>/dev/null || true
+cp ./*.js "$OUT"/ 2>/dev/null || true
 
 # MS6 (overhaul doc §MS7.2): carve INTERNAL pages back out of the *.html glob —
 # email-signature (mail-provider setup steps), styleguide (internal design
@@ -41,7 +44,7 @@ cp ./*.js dist/ 2>/dev/null || true
 # Builder item 199 retired that partner pack and deleted the file (Nov 15 2026); its
 # name stays on the list so it can never ship again if it comes back.
 for f in email-signature.html styleguide.html a11y.html provision.html; do
-  rm -f "dist/$f"
+  rm -f "$OUT/$f"
 done
 
 # List item 139: the retired tools stay out too. Each address forwards (_redirects,
@@ -49,28 +52,33 @@ done
 # to the main site's audits page, the resources hub to its free tools page. Pinned by
 # tests/e2e/marketing.spec.ts, which runs this script and inspects dist/.
 for f in audit.html ai-critique.html report-card.html roi-calculator.html pricing-estimator.html local-visibility.html tools.html buy-audit.html; do
-  rm -f "dist/$f"
+  rm -f "$OUT/$f"
 done
 
 # platform files (exact names — package.json/deno.json are NOT public). whats-new.json is the
 # What's new panel's entries (builder item 128): public words and picture paths, nothing else.
 for f in _redirects _headers robots.txt tools-robots.txt security.txt sitemap.xml tools-sitemap.xml manifest.json manifest-app.json whats-new.json; do
-  [ -f "$f" ] && cp "$f" dist/
+  [ -f "$f" ] && cp "$f" "$OUT"/
 done
 
 # images at root (og-image, favicons, marketing screenshots)
-cp ./*.png ./*.jpg ./*.jpeg ./*.webp ./*.svg ./*.ico dist/ 2>/dev/null || true
+cp ./*.png ./*.jpg ./*.jpeg ./*.webp ./*.svg ./*.ico "$OUT"/ 2>/dev/null || true
 
 # public asset directories (marketing photos / case studies / vendored libs / the builder's
 # picker pictures, made by scripts/thumbnails)
 for d in life case-studies vendor fonts thumbs; do
-  [ -d "$d" ] && cp -r "$d" dist/
+  [ -d "$d" ] && cp -r "$d" "$OUT"/
 done
 
-echo "build-public: $(find dist -type f | wc -l) files staged"
+echo "build-public: $(find "$OUT" -type f | wc -l) files staged"
+
+# Builder item 142 (review file 06, finding 3): pack the code down and give the app's scripts
+# and styles an address that changes with their contents, kept a year (/v/* in _headers).
+# Only dist/ changes: the repo keeps the readable files, and the tests read those.
+node scripts/pack-public.mjs "$OUT"
 # tripwire: server code or docs in dist = the allowlist grew a hole
-if find dist -name "*.ts" -o -name "*.sql" -o -name "*.md" | grep -q .; then
+if find "$OUT" -name "*.ts" -o -name "*.sql" -o -name "*.md" | grep -q .; then
   echo "build-public: REFUSING — server/doc file matched the allowlist" >&2
-  find dist -name "*.ts" -o -name "*.sql" -o -name "*.md" >&2
+  find "$OUT" -name "*.ts" -o -name "*.sql" -o -name "*.md" >&2
   exit 1
 fi

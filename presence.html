@@ -9918,8 +9918,8 @@ $("btnAgainGo").addEventListener("click", async () => {
   } catch (err) { toast(nice(err), true); }
   btn.disabled = false; btn.textContent = "Publish this version";
 });
-async function readPublishLock() {
-  try { S.publishLock = (await api("GET", "/site/publish-lock")).data || null; }
+async function readPublishLock(known) {   // known: the lock the start-up read brought (item 37)
+  try { S.publishLock = known !== undefined ? known : (await api("GET", "/site/publish-lock")).data || null; }
   catch (_) { /* a hiccup, or a server from before: no lock is shown, and the server still refuses */ }
   renderPublishButton(); renderPublishLock();
   if (S.publishesRead) renderVersionList();
@@ -10029,6 +10029,30 @@ function fillSingles() {
   paintBizShort();
   renderSearchPreview();
 }
+// Item 37: the site and the editor's six lists, and whether publishing is locked, in ONE read
+// (GET /site?with=…); each part is what its own read answers, refused where that read would be.
+// A server from before answers the site alone, with no parts: then each is read on its own, as
+// before, and so is a part the answer leaves out. OPENED_LOCK: the lock that read brought, if any.
+const OPEN_PARTS = ["offerings", "faqs", "testimonials", "posts", "media", "settings", "publish_lock"];
+let OPENED_LOCK;
+async function openReads(soft, tagged) {
+  OPENED_LOCK = undefined;
+  const one = await api("GET", "/site?with=" + OPEN_PARTS.join(",")).catch(() => null);
+  const parts = one && one.parts;
+  const part = (name, path) => {
+    const p = parts && parts[name];
+    if (!p) return soft(api("GET", path));
+    if ("data" in p) return Promise.resolve({ data: p.data });
+    const err = new Error(p.error || "read_failed"); err.status = p.status;
+    return soft(Promise.reject(err));
+  };
+  if (parts && parts.publish_lock && "data" in parts.publish_lock) OPENED_LOCK = parts.publish_lock.data || null;
+  return Promise.all([
+    parts ? Promise.resolve(one) : tagged("site", api("GET", "/site")),
+    part("offerings", "/offerings"), part("faqs", "/faqs"), part("testimonials", "/testimonials"), part("posts", "/posts"),
+    part("media", "/media"), part("settings", "/settings"),
+  ]);
+}
 const SHELL_LOADED = document.readyState === "loading" ? new Promise((r) => document.addEventListener("DOMContentLoaded", r, { once: true })) : Promise.resolve();
 async function refreshAll() {
   // The website-content reads are TOLERANT: a plan without the website feature
@@ -10044,16 +10068,12 @@ async function refreshAll() {
   // Item 84: the Overview's own two reads go out with the first wave, not after it.
   const todayFirst = Promise.all([api("GET", "/health"), readChanges()]);
   todayFirst.catch(() => {});   // loadToday reports a failure
-  const [siteR, off, faq, tes, pos, med, set, ctxR] = await Promise.all([
-    tagged("site", api("GET", "/site")),
-    soft(api("GET", "/offerings")), soft(api("GET", "/faqs")), soft(api("GET", "/testimonials")), soft(api("GET", "/posts")),
-    soft(api("GET", "/media")), soft(api("GET", "/settings")),
-    // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
-    // Item 84: this script runs before the deferred shell.js, so window.ddsContext usually
-    // didn't exist yet and the page read the context a second time. The shell has run by
-    // DOMContentLoaded; its handoff waits for its own read, or gives up after 2.5 s.
-    SHELL_LOADED.then(() => (window.ddsContext ? window.ddsContext().then((d) => ({ data: d })) : Promise.reject())).catch(() => api("GET", "/portal/context").catch(() => null)),
-  ]);
+  // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
+  // Item 84: this script runs before the deferred shell.js, so window.ddsContext usually
+  // didn't exist yet and the page read the context a second time. The shell has run by
+  // DOMContentLoaded; its handoff waits for its own read, or gives up after 2.5 s.
+  const ctxP = SHELL_LOADED.then(() => (window.ddsContext ? window.ddsContext().then((d) => ({ data: d })) : Promise.reject())).catch(() => api("GET", "/portal/context").catch(() => null));
+  const [[siteR, off, faq, tes, pos, med, set], ctxR] = await Promise.all([openReads(soft, tagged), ctxP]);
   S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
   S.offerings = off.data || []; S.faqs = faq.data || []; S.testimonials = tes.data || []; S.posts = pos.data || [];
   S.media = med.data || []; S.settings = set.data || {};
@@ -10067,7 +10087,7 @@ async function refreshAll() {
   applyEditionGating();
   carryScopeOnLinks();
   applyVocab();
-  readPublishLock();   // item 214: the bar's Publish says Locked while publishing is locked
+  readPublishLock(OPENED_LOCK);   // item 214: the bar's Publish says Locked while publishing is locked
   fillSingles(); await loadToday(todayFirst);
  
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
