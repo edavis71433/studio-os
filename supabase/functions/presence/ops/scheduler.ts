@@ -93,6 +93,12 @@ export async function reapStaleRuns(): Promise<{ ok: boolean }> {
   return { ok: !!(r as { ok?: boolean }).ok };
 }
 
+/** Is the site marked offline (G10)? A read that fails is a no: the row goes as before. */
+async function markedOffline(siteId: string): Promise<boolean> {
+  const r = await svc(`presence_sites?id=eq.${siteId}&select=offline_at&limit=1`).catch(() => null);
+  return !!(r?.ok && Array.isArray(r.json) && r.json[0]?.offline_at);
+}
+
 // ── FD-1: fire due scheduled publishes/reverts through the ONE publish pipeline.
 // A due row loads its frozen snapshot and runs runPipeline (publish or restore),
 // exactly as a manual publish would — no second publish path. Each row's outcome
@@ -123,6 +129,11 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
     // good. Like a lock, the row waits unclaimed and goes on the first tick after the host has
     // finished or given up on that page. An offline row needs no wait: the site is marked already.
     if (row.kind !== 'offline' && await holdingPageOnItsWay(String(row.site_id))) continue;
+    // Builder item 246: the timed-section sweep's own re-send, queued before the site was taken
+    // offline, waits too. It would go live over the holding page and bring the site back by itself.
+    // Once the site is back, it goes and draws the sections as of then. A publish someone scheduled
+    // still goes: that's an ordinary publish, and it brings the site back on purpose.
+    if (String(row.created_by || '').startsWith('scheduler:rewindow') && await markedOffline(String(row.site_id))) continue;
     // claim it (pending → running-ish) so a concurrent cycle can't double-fire.
     // fired_at=is.null makes the claim ATOMIC: two overlapping ticks both match
     // status=pending, but only the first PATCH finds fired_at still null.
@@ -188,10 +199,13 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
 export async function runWindowExpiries(limit = 40): Promise<{ ok: true; run_type: 'window_expiry'; scanned: number; enqueued: number; site_ids: string[] }> {
   const nowIso = new Date().toISOString();
   // Live sites only — a window can only be stale on a site that's actually published.
+  // Builder item 246: and never one taken offline. A re-send would go live over its holding page
+  // and bring the site back by itself. Bring back online, or any publish, resets next_window_at,
+  // so the first tick after the site is back looks at it again.
   const cap = Math.max(1, Math.min(200, limit));
-  const flagged = await svc(`presence_sites?status=eq.live&or=(next_window_at.is.null,next_window_at.lte.${nowIso})&select=id&order=next_window_at.asc.nullsfirst&limit=${cap}`);
+  const flagged = await svc(`presence_sites?status=eq.live&offline_at=is.null&or=(next_window_at.is.null,next_window_at.lte.${nowIso})&select=id&order=next_window_at.asc.nullsfirst&limit=${cap}`);
   const flags = flagged.ok;
-  const sr = flags ? flagged : await svc(`presence_sites?status=eq.live&select=id&order=last_published_at.asc.nullsfirst&limit=${cap}`);
+  const sr = flags ? flagged : await svc(`presence_sites?status=eq.live&offline_at=is.null&select=id&order=last_published_at.asc.nullsfirst&limit=${cap}`);
   const sites = (sr.ok && Array.isArray(sr.json)) ? sr.json as Array<{ id: string }> : [];
   const setNext = async (siteId: string, at: string | null) => {
     if (!flags) return;

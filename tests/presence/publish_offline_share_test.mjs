@@ -12,6 +12,8 @@
 //     version (a staff rollback, a holding page the host gave up on after Take offline stopped
 //     waiting, a Bring back online the host finished after its request) has the mark lifted at
 //     once or by the next press, and publishes wait for a holding page still on its way
+//   · the timed-section sweep leaves a site taken offline offline (builder item 246): it queues
+//     no re-send for it, and one queued before the site went offline waits until it is back
 //   · Scheduling offline (routes/commercial.ts) freezes no snapshot, and the cron
 //     (ops/scheduler.ts) fires it through the same take-offline core, drawing the page then
 //   · Share a draft link (routes/preview_env.ts) captures the draft into the one preview slot
@@ -144,7 +146,7 @@ const PUB = await import(`${P}/routes/publish.ts`);
 const PENV = await import(`${P}/routes/preview_env.ts`);
 const COM = await import(`${P}/routes/commercial.ts`);
 const ADMIN = await import(`${P}/routes/admin.ts`);
-const { runDuePublishes } = await import(`${P}/ops/scheduler.ts`);
+const { runDuePublishes, runWindowExpiries } = await import(`${P}/ops/scheduler.ts`);
 const { digestFiles, sameFiles } = await import(`${P}/lib/netlify.ts`);
 const { brandFromKit } = await import(`${P}/lib/email_brand.ts`);
 
@@ -771,6 +773,49 @@ const HOLDING_WAIT = 15 * 60_000;   // the longest a holding page the host never
   const p = await run(() => PUB.handlePublish(null, siteOf(SITE_A), OWNER[SITE_A], {}));
   // nothing new to publish, so nothing goes up (unless the run crosses midnight: the privacy page carries the day)
   ok('already stuck: a Publish lifts the mark too, and visitors get a live version', p.status === 200 && p.body?.data?.status === 'live' && offlineAt(SITE_A) === null && pubsOf(SITE_A).some((x) => x.status === 'live' && x.netlify_deploy_id === shows(SITE_A)), `${p.status} ${p.text.slice(0, 160)}`);
+}
+
+// ═══ 17. the timed-section sweep leaves a site taken offline offline (builder item 246) ═══
+// When a timed section starts or ends on a live site, the sweep (ops/scheduler.ts
+// runWindowExpiries) queues the live version to go up again, drawn as of then, and
+// runDuePublishes sends it. On a site taken offline, that send went live over the holding page
+// and brought the site back by itself.
+const DRAWN = new Date(Date.now() - 2 * 3600_000).toISOString();     // the live version went up two hours ago
+const CAME_DOWN = new Date(Date.now() - 3600_000).toISOString();     // and one of its sections came down an hour ago
+function timedSection(t) {   // both studios' live versions carry that section
+  for (const id of [SITE_A, SITE_B]) {
+    const live = t.presence_publishes.filter((p) => p.site_id === id && p.status === 'live').at(-1);
+    live.created_at = DRAWN; live.completed_at = DRAWN;
+    const snap = t.presence_snapshots.find((s) => s.id === live.snapshot_id);
+    const settings = snap.content.settings || {};
+    snap.content = { ...snap.content, settings: { ...settings, blocks: [...(settings.blocks || []), { type: 'features', title: 'Holiday hours', items: [{ title: 'Closed on the 24th' }], show_until: CAME_DOWN }] } };
+  }
+}
+const resendsFor = (id) => db.tables.presence_scheduled_publishes.filter((s) => s.site_id === id && String(s.created_by).startsWith('scheduler:rewindow'));
+{
+  restore(timedSection);
+  await run(() => PUB.handleTakeOffline(siteOf(SITE_A), OWNER[SITE_A], {}));   // this site goes offline; the other studio's stays live
+  const holding = shows(SITE_A), markA = offlineAt(SITE_A);
+  const sw = await quiet(() => runWindowExpiries());
+  ok('timed-section sweep: a site taken offline gets no re-send queued, while the other studio’s live site with the same section does', resendsFor(SITE_A).length === 0 && resendsFor(SITE_B).length === 1 && sw.site_ids.includes(SITE_B) && !sw.site_ids.includes(SITE_A), JSON.stringify({ ids: sw.site_ids, a: resendsFor(SITE_A).length, b: resendsFor(SITE_B).length }));
+  const m = mark();
+  const cyc = await quiet(() => runDuePublishes());
+  ok('timed-section sweep: after the tick the site is still offline: its holding page up, its mark kept, nothing sent to its host', !!markA && shows(SITE_A) === holding && offlineAt(SITE_A) === markA && !deploysSince(m).some((d) => d.site === BIZ[SITE_A].nf) && cyc.results.some((x) => x.site_id === SITE_B && x.ok), `shows ${shows(SITE_A)} mark ${offlineAt(SITE_A)} ${JSON.stringify(cyc.results)}`);
+}
+{
+  // a re-send queued while the site was live, the site then taken offline before it went
+  restore(timedSection);
+  await quiet(() => runWindowExpiries());
+  const resend = () => resendsFor(SITE_A)[0];
+  const queued = !!resend() && resend().status === 'pending';
+  await run(() => PUB.handleTakeOffline(siteOf(SITE_A), OWNER[SITE_A], {}));
+  const holding = shows(SITE_A);
+  const m = mark();
+  const cyc = await quiet(() => runDuePublishes());
+  ok('queued re-send: taken offline before it went, it waits unclaimed and the site stays offline, while the other studio’s goes', queued && resend()?.status === 'pending' && resend()?.fired_at === null && shows(SITE_A) === holding && !!offlineAt(SITE_A) && !deploysSince(m).some((d) => d.site === BIZ[SITE_A].nf) && cyc.failures === 0 && cyc.results.some((x) => x.site_id === SITE_B && x.ok), `${queued} ${JSON.stringify(resend())} shows ${shows(SITE_A)} mark ${offlineAt(SITE_A)}`);
+  const back = await run(() => PUB.handleBackOnline(siteOf(SITE_A), OWNER[SITE_A], {}));
+  const cyc2 = await quiet(() => runDuePublishes());
+  ok('queued re-send: once the owner brings the site back it goes on the next tick, and the site stays online', back.status === 200 && resend()?.status === 'done' && !!resend()?.fired_at && cyc2.results.some((x) => x.site_id === SITE_A && x.ok) && offlineAt(SITE_A) === null, `${back.status} ${JSON.stringify(resend())} ${JSON.stringify(cyc2.results)}`);
 }
 
 // Covered in the browser by (the page checks this suite used to make on presence.html's text):
