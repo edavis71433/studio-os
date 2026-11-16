@@ -349,11 +349,12 @@ test.describe('Agency portfolio', () => {
     await expect(page.locator('#dispCards')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('small screens default to Cards; large screens to Table', async ({ page }) => {
+  test('small screens and touch tablets default to Cards; a computer to Table (builder item 98)', async ({ page }) => {
     await installApp(page, { api: agencyApi });
     await page.goto('/agency.html');
-    const small = (page.viewportSize()?.width || 1280) < 760;
-    await expect(page.locator(small ? '.client' : '.tscroll').first()).toBeVisible();
+    const w = page.viewportSize()?.width || 1280;
+    const cards = w < 760 || (!!test.info().project.use.hasTouch && w <= 1100);
+    await expect(page.locator(cards ? '.client' : '.tscroll').first()).toBeVisible();
   });
 
   test('row drill-ins carry the client scope (SC-1): delivery project + plain record', async ({ page }) => {
