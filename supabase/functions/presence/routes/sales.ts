@@ -3173,7 +3173,7 @@ export async function provisionCustomerAccount(opts: {
  *
  *  Idempotent (site_id is the PK, on_conflict merge). Best-effort: a customer is
  *  still successfully added if this write fails. Returns the stored host. */
-async function recordExistingWebsite(
+export async function recordExistingWebsite(
   siteId: string, plan: PlanKey, websiteUrl: string, principal: Principal, label: string,
 ): Promise<string | null> {
   try {

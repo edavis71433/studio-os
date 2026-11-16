@@ -160,6 +160,27 @@ ok('save: someone with their own account elsewhere is asked, never taken', asked
   delete users.taken;
 }
 
+// ═══ 4b. Their site lives somewhere else: watch it (Eric's external-client case) ═══
+{
+  const s6 = await add({ mode: 'save', name: 'Rae', business_name: 'Acme Bakery', email: 'rae@acme.example' });
+  const C6 = s6.body?.data?.client_id;
+  const bad = await route('POST', `/sales/customers/${C6}/website`, { address: 'not an address' });
+  ok('elsewhere: an address that isn’t one is refused, nothing made', bad.status === 422 && !T().presence_sites.some((x) => x.client_id === C6));
+  const hosts = outside.hosts.length, mails = outside.mails.length;
+  const r = await route('POST', `/sales/customers/${C6}/website`, { address: 'https://www.acmebakery.example/menu' });
+  const ws = T().presence_sites.find((x) => x.client_id === C6);
+  ok('elsewhere: a workspace with no website of ours, the address on file where Search Console reads it', r.status === 200 && r.body?.data?.address === 'www.acmebakery.example' && ws?.edition === 'monitor' && T().presence_monitor_connections.some((m) => m.site_id === ws.id && m.domain === 'www.acmebakery.example'), JSON.stringify(r.body));
+  ok('elsewhere: on Sites and linked to their profile; no hosting, nobody emailed', T().presence_agency_clients.some((p) => p.site_id === ws.id) && T().presence_service_links.find((l) => l.customer_client_id === C6).customer_site_id === ws.id && outside.hosts.length === hosts && outside.mails.length === mails);
+  const prof = await route('GET', `/sales/customers/${C6}`);
+  ok('elsewhere: their profile says their website lives on its own host, and no longer offers Create website', prof.body?.data?.website?.state === 'elsewhere' && prof.body?.data?.website?.address === 'www.acmebakery.example' && prof.body?.data?.offers?.create_website === false);
+  const again = await route('POST', `/sales/customers/${C6}/website`, { address: 'other.example' });
+  ok('elsewhere: an address already on file is changed on their website page, not here', again.status === 409 && again.body?.error === 'has_address');
+  const hosted = await route('POST', `/sales/customers/${CID}/website`, { address: 'other.example' });
+  ok('elsewhere: a customer with a website of ours is left alone', hosted.status === 409 && hosted.body?.error === 'has_website');
+  const notMine = await route('POST', `/sales/customers/${OTHER_STUDIO}/website`, { address: 'x.example' });
+  ok('elsewhere: never for someone who isn’t your customer', notMine.status === 404);
+}
+
 // ═══ 5. Delete and Restore ═══
 {
   const siteId = T().presence_sites.find((s) => s.client_id === CID).id;
@@ -221,7 +242,7 @@ ok('save: someone with their own account elsewhere is asked, never taken', asked
 
 // ═══ 7. Who may ═══
 ok('gate: deleting a customer needs delete', memberWriteNeeds(`/sales/customers/${STUDIO}/delete`, 'POST') === 'delete');
-ok('gate: restoring and inviting are everyday edits', memberWriteNeeds(`/sales/customers/${STUDIO}/restore`, 'POST') === 'edit' && memberWriteNeeds(`/sales/customers/${STUDIO}/invite`, 'POST') === 'edit');
+ok('gate: restoring, inviting and keeping the address of a site elsewhere are everyday edits', ['restore', 'invite', 'website'].every((w) => memberWriteNeeds(`/sales/customers/${STUDIO}/${w}`, 'POST') === 'edit'));
 
 console.log(`\n════ CUSTOMERS, ONE STEP AT A TIME (builder item 241): ${pass}/${pass + fail} ${fail ? 'FAILED' : 'PASSED'} ════`);
 if (fail) { console.log('Failed:\n  ' + failed.join('\n  ')); Deno.exit(1); }

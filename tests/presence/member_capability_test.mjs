@@ -221,7 +221,7 @@ const DECIDED = {
     'POST /redirects', 'POST /restore-to-draft', 'POST /review/reports/:id/dismiss', 'POST /review/run',
     'POST /reviews/:id/approve', 'POST /reviews/:id/hide', 'POST /reviews/:id/reply', 'POST /sales/contacts',
     'POST /sales/contacts/:id/restore', 'POST /sales/deals/:id/restore', 'POST /sales/contracts/:id/send', 'POST /sales/contracts/:id/term',
-    'POST /sales/customers/:id/restore', 'POST /sales/customers/:id/invite',   // builder list item 241: a deleted customer back; their portal invite, like a deal's resend-invite
+    'POST /sales/customers/:id/restore', 'POST /sales/customers/:id/invite', 'POST /sales/customers/:id/website',   // builder list item 241: a deleted customer back; their portal invite, like a deal's resend-invite; a site they keep elsewhere
     'POST /sales/customers', 'POST /sales/deals', 'POST /sales/deals/:id/activity',
     'POST /sales/tasks', 'POST /sales/people/activity',   // sales items 85 and 106: to-dos and calls for anyone
     'POST /sales/email',   // sales item 80: an email from the record, like the reply to an enquiry

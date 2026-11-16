@@ -181,6 +181,44 @@ export async function websiteForCustomer(clientId: string, businessName: string,
   return { ok: true, siteId: prov.siteId, clientId, created: !had };
 }
 
+// ═══ Their site lives somewhere else: watch it ══════════════════════════════════════
+/** POST /sales/customers/:id/website {address}: a customer whose website is on another
+ *  platform (Eric's external-client case, the old "they host it elsewhere"). Their
+ *  workspace without a website of ours, the address recorded where Search Console and the
+ *  checks read it (presence_monitor_connections, via recordExistingWebsite). Nothing is
+ *  published and nobody is emailed. */
+export async function handleCustomerElsewhere(req: Request, site: SiteRow, principal: Principal, clientId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(clientId)) return notYours(cors);
+  let b: { address?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+  const raw = clean(b.address, 200);
+  let host = '';
+  try { const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`); if (/^https?:$/.test(u.protocol) && u.hostname.includes('.')) host = u.hostname; } catch { host = ''; }
+  if (!host) return json({ error: 'validation', message: 'Enter the address of their website, like acmebakery.com.' }, 422, cors);
+  if (!(await studioLinks(site.id, clientId)).length) return notYours(cors);
+  const client = one(await svc(`clients?id=eq.${clientId}&select=id,name&limit=1`));
+  if (!client) return notYours(cors);
+  let ws = await siteOfClient(clientId);
+  if (ws && ws.edition !== 'monitor') return json({ error: 'has_website', message: 'They already have a website here. Open it from their profile.' }, 409, cors);
+  if (ws && await elsewhereAddress(ws.id)) return json({ error: 'has_address', message: 'Their website’s address is already on file. Change it on their website page.' }, 409, cors);
+  const am = principal.jwt ? await resolveAgencyMember(principal.jwt).catch(() => null) : null;
+  if (!ws) {
+    if (am) {
+      const list = await studioList(am.agency_id);
+      if (list) { const room = roomOf(list.map((l) => l.status), am.client_limit); if (room.full) return json({ error: 'client_limit', message: roomFullMessage(room.limit, 'add'), room }, 409, cors); }
+    }
+    const prov = await provisionForSignup({ clientId, businessName: String(client.name || host), plan: 'business_os_only', patch: { status: 'active' } as any, actorEmail: principal.email });
+    if (!prov.ok || !prov.siteId) return json({ error: prov.error || 'provision_incomplete', message: 'We couldn’t record it just now — please try again.' }, 502, cors);
+    if (am) await claimPortfolioSite(am.agency_id, prov.siteId, '').catch(() => 'failed');
+    await svc(`presence_service_links?agency_site_id=eq.${site.id}&customer_client_id=eq.${clientId}&status=eq.active&customer_site_id=is.null`, { method: 'PATCH', body: JSON.stringify({ customer_site_id: prov.siteId }) }).catch(() => null);
+    ws = await siteOfClient(clientId);
+  }
+  if (!ws) return json({ error: 'write_failed', message: 'We couldn’t record it just now — please try again.' }, 502, cors);
+  const { recordExistingWebsite } = await import('./sales.ts');
+  const kept = await recordExistingWebsite(ws.id, 'business_os_only', raw, principal, String(client.name || host));
+  if (!kept) return json({ error: 'write_failed', message: 'We couldn’t record the address just now — please try again.' }, 502, cors);
+  return json({ data: { site_id: ws.id, address: kept } }, 200, cors);
+}
+
 // ═══ Invite to their portal ═════════════════════════════════════════════════════════
 const INVITE_REFUSED: Record<AttachOwnerError, [number, string]> = {
   account_exists: [409, 'That email already has a Studio OS account, so it can’t sign in to this one. Use another address for them.'],
@@ -350,12 +388,13 @@ export async function deletedCustomers(studioSiteId: string): Promise<any[] | nu
 
 /** The /sales/customers/:id routes. */
 export async function handleCustomerRoute(req: Request, route: string, method: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response | null> {
-  const m = route.match(/^\/sales\/customers\/([0-9a-f-]{36})(?:\/(invite|delete|restore))?$/);
+  const m = route.match(/^\/sales\/customers\/([0-9a-f-]{36})(?:\/(invite|delete|restore|website))?$/);
   if (!m) return null;
   const [, id, what] = m;
   if (!what && method === 'GET') return handleCustomerRead(site, principal, id, cors);
   if (what === 'invite' && method === 'POST') return handleCustomerInvite(req, site, principal, id, cors);
   if (what === 'delete' && method === 'POST') return handleCustomerDelete(req, site, principal, id, cors);
   if (what === 'restore' && method === 'POST') return handleCustomerRestore(site, principal, id, cors);
+  if (what === 'website' && method === 'POST') return handleCustomerElsewhere(req, site, principal, id, cors);
   return json({ error: 'method_not_allowed' }, 405, cors);
 }

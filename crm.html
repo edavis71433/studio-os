@@ -120,6 +120,10 @@
   .cs-form input{font:inherit;font-size:16px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg);color:var(--ink);min-width:0}
   .cs-form input:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
   .cs-msg{font-size:13px;color:var(--soft);margin:2px 0 0}
+  .cs-else{align-self:flex-start;font:inherit;font-size:13.5px;font-weight:600;color:#fff;background:none;border:0;padding:6px 0;text-decoration:underline;text-underline-offset:3px;cursor:pointer;min-height:36px}
+  .cs-card.bold .cs-form label,.cs-card.bold .cs-msg{color:#fff}
+  .cs-card.bold .cs-form input{background:#fff;color:#171522;border-color:#fff}
+  .cs-card.bold .cs-msg.bad{color:#fff;font-weight:600}
   .cs-msg.bad{color:var(--dds-bad,#b42318)}
   .cs-gone{max-width:620px;margin:48px auto;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
   .cs-gone h2{font-family:var(--serif);font-weight:600;font-size:26px;margin:0}
@@ -763,14 +767,14 @@ function renderShell(){
 // Create website (+ New site's sheet, opened for them on Sites) and Invite to their portal.
 // Each card says where that step stands once it has happened. Drawn in Figma first.
 const fmtDay=(iso)=>{const t=Date.parse(iso||'');return isFinite(t)?new Date(t).toLocaleDateString([], {month:'short',day:'numeric'}):'';};
-let INVITE_OPEN=false;
+let INVITE_OPEN=false,ELSE_OPEN=false;
 function renderCustSteps(){
   const host=$('custsteps'); if(!host)return;
   if(!CUST||!CUST.website||!CUST.portal){host.innerHTML='';return;}
   const w=CUST.website, p=CUST.portal, o=CUST.offers||{}, biz=CUST.business_name||(REC&&REC.header&&REC.header.name)||'them';
   let web='';
   if(w.in_trash)web=`<section class="cs-card plain" aria-labelledby="csWebT"><span class="cs-k">Their website</span><h2 class="cs-t" id="csWebT">In the Trash</h2><p class="cs-p">It’s in the Trash on Sites, where it can be restored for 90 days.</p><div class="cs-acts"><a class="cs-go" href="/sites.html#trash">Open the Trash</a></div></section>`;
-  else if(o.create_website)web=`<section class="cs-card bold" aria-labelledby="csWebT"><div class="cs-words"><span class="cs-k">Their website</span><h2 class="cs-t" id="csWebT">No website yet</h2><p class="cs-p">Pick a look for ${esc(biz)}. Their name and business are already filled in. Nothing is published, and nobody is emailed.</p>${o.can_manage_sites?`<div class="cs-acts"><a class="cs-go" id="csCreate" href="/sites.html?for=${encodeURIComponent(CUST.client_id)}">Create website <span aria-hidden="true">→</span></a></div>`:'<p class="cs-p">Someone who looks after your clients’ sites can make it.</p>'}</div><div class="cs-pic" aria-hidden="true"><b><span></span></b><i class="big"></i><i class="w80"></i><i></i><i class="w64"></i></div></section>`;
+  else if(o.create_website)web=`<section class="cs-card bold" aria-labelledby="csWebT"><div class="cs-words"><span class="cs-k">Their website</span><h2 class="cs-t" id="csWebT">No website yet</h2><p class="cs-p">Pick a look for ${esc(biz)}. Their name and business are already filled in. Nothing is published, and nobody is emailed.</p>${o.can_manage_sites?`<div class="cs-acts"><a class="cs-go" id="csCreate" href="/sites.html?for=${encodeURIComponent(CUST.client_id)}">Create website <span aria-hidden="true">→</span></a></div>`:'<p class="cs-p">Someone who looks after your clients’ sites can make it.</p>'}${ELSE_OPEN?`<form class="cs-form" id="csElseForm"><label for="csAddr">Their website address</label><input id="csAddr" type="text" inputmode="url" maxlength="200" autocomplete="off" placeholder="acmebakery.com"><div class="cs-acts"><button type="submit" class="cs-go" id="csWatch">Watch it</button><button type="button" class="cs-go" id="csElseNo">Cancel</button></div><p class="cs-msg" id="csElseMsg" role="status">We keep the address so their search numbers can arrive. Nothing is published, and nobody is emailed.</p></form>`:'<button type="button" class="cs-else" id="csElse">Their site lives somewhere else?</button>'}</div><div class="cs-pic" aria-hidden="true"><b><span></span></b><i class="big"></i><i class="w80"></i><i></i><i class="w64"></i></div></section>`;
   else if(w.state==='elsewhere')web=`<section class="cs-card plain" aria-labelledby="csWebT"><span class="cs-k">Their website</span><h2 class="cs-t" id="csWebT">On their own host</h2><p class="cs-p">${esc(w.address||'')}</p>${w.site_id?`<div class="cs-acts"><a class="cs-go" href="/presence.html?client=${encodeURIComponent(w.site_id)}">Open their website page</a></div>`:''}</section>`;
   else web=`<section class="cs-card plain" aria-labelledby="csWebT"><span class="cs-k">Their website</span><h2 class="cs-t" id="csWebT">${w.live?'Live':'Not live yet'}</h2><p class="cs-p">${w.live&&w.address?`At ${esc(String(w.address).replace(/^https?:\/\//,''))}${w.last_published_at?' · published '+esc(fmtDay(w.last_published_at)):''}`:'Made, and private until it’s published.'}</p>${w.site_id?`<div class="cs-acts"><a class="cs-go" href="/presence.html?client=${encodeURIComponent(w.site_id)}">Edit website <span aria-hidden="true">→</span></a></div>`:''}</section>`;
   let por='';
@@ -790,6 +794,22 @@ function renderCustSteps(){
   const cn=$('csCancel');if(cn)cn.addEventListener('click',()=>{INVITE_OPEN=false;renderCustSteps();const b=$('csInviteBtn');if(b)b.focus();});
   const fm=$('csInvite');if(fm)fm.addEventListener('submit',(e)=>{e.preventDefault();sendInvite($('csSend'),($('csEmail').value||'').trim());});
   const ag=$('csAgain');if(ag)ag.addEventListener('click',()=>sendInvite(ag,''));
+  // their site lives on another platform: keep its address and watch it (the old "they host it elsewhere")
+  const el=$('csElse');if(el)el.addEventListener('click',()=>{ELSE_OPEN=true;renderCustSteps();const a=$('csAddr');if(a)a.focus();});
+  const en=$('csElseNo');if(en)en.addEventListener('click',()=>{ELSE_OPEN=false;renderCustSteps();const b=$('csElse');if(b)b.focus();});
+  const ef=$('csElseForm');if(ef)ef.addEventListener('submit',(e)=>{e.preventDefault();watchElsewhere($('csWatch'),($('csAddr').value||'').trim());});
+}
+async function watchElsewhere(btn,address){
+  const msg=$('csElseMsg');
+  if(!/^[^\s/]+\.[^\s]+$/.test(address.replace(/^https?:\/\//i,''))){if(msg){msg.textContent='Enter the address of their website, like acmebakery.com.';msg.className='cs-msg bad';}$('csAddr').focus();return;}
+  btn.disabled=true;btn.textContent='Saving…';
+  const r=await apiAg('/sales/customers/'+encodeURIComponent(CUST.client_id)+'/website','POST',{address});
+  if(!r.ok){btn.disabled=false;btn.textContent='Watch it';if(msg){msg.textContent=(r.body&&r.body.message)||'That didn’t save just now. Please try again.';msg.className='cs-msg bad';}return;}
+  ELSE_OPEN=false;
+  toast('Their website’s address is on file: '+((r.body&&r.body.data&&r.body.data.address)||address)+'.');
+  const again=await apiAg('/sales/customers/'+encodeURIComponent(CUST.client_id));
+  if(again.ok&&again.body&&again.body.data)CUST=again.body.data;
+  renderCustSteps();
 }
 async function sendInvite(btn,email){
   if(!CUST)return;

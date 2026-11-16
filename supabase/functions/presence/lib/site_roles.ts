@@ -268,7 +268,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `PATCH /sales/prospects/${ID}`,
     `PATCH /sales/(contacts|deals|deal-tasks)/${ID}`,
     `POST /sales/(contacts|deals)/${ID}/restore`,   // sales item 83: bringing back a deleted deal loses nothing, like a contact
-    `POST /sales/customers/${ID}/(restore|invite)`,   // builder item 241: a deleted customer comes back; inviting one to their portal, like the deal's resend-invite
+    `POST /sales/customers/${ID}/(restore|invite|website)`,   // builder item 241: a deleted customer comes back; their portal invite, like the deal's resend-invite; the address of a site they keep elsewhere
     'PUT /sales/services',
     `POST /sales/deals/${ID}/(stage|activity|tasks|proposals|contracts|convert|resend-invite|invoice|schedule|retainer|send|estimates|recurring)`,
     `POST /sales/estimates/${ID}/(send|proposal|invoice)`,   // sales review item 47: send an estimate, or turn it into a proposal or an invoice (drafts)
