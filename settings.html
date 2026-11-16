@@ -379,6 +379,11 @@
   .tsnote{font-size:12.5px;color:var(--faint)}
   .tsalerts{margin-top:var(--dds-s4,16px);padding-top:var(--dds-s4,16px);border-top:1px solid var(--line)}
   .tsalerts p{margin:0;font-size:13.5px} .tsalerts .tsline{margin-top:4px} .tsalerts .tsto b{font-weight:600;margin-right:6px} .tsalerts .tsto span{color:var(--soft);overflow-wrap:anywhere}
+  /* builder item 98: a switch is a 44px tap on a touch screen; the track keeps its size (the rest is clear border) */
+  @media (pointer:coarse){
+    .sw{border:11px solid transparent;border-left-width:2px;border-right-width:2px;background-clip:padding-box;box-sizing:content-box}
+    .closeacct summary{padding:13px 0}
+  }
 </style>
 </head>
 <body>

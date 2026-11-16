@@ -197,6 +197,7 @@
     .up-who #segs .seg .n{margin-left:6px}
     .up-acts{position:sticky;bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:5;background:var(--card);margin:var(--dds-s4,16px) calc(-1 * var(--dds-s5,20px)) calc(-1 * var(--dds-s5,20px));padding:10px var(--dds-s5,20px);border-top:1px solid var(--line);border-radius:0 0 var(--dds-r-lg,10px) var(--dds-r-lg,10px)}
     .up-acts .grow{display:none}
+    .up-acts.unpinned{position:static}
     #sendUpdate{flex:1 1 100%;order:-1;height:44px}
     .up-acts button.ghost{flex:1;height:40px}
   }
@@ -291,6 +292,12 @@
   footer{margin-top:var(--dds-s8,40px);padding-top:var(--dds-s5,20px);border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  /* builder item 98: on a touch screen every one of these is a 44px tap (last, so it wins) */
+  @media (pointer:coarse){
+    .fmt button{width:44px;height:44px}
+    .var,.tplbtn,button.ghost,button.ghost.sm{min-height:44px}
+    .wel-sw .sw{border:8px solid transparent;border-left-width:0;border-right-width:0;background-clip:padding-box;box-sizing:content-box}
+  }
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -405,7 +412,17 @@ function render(){
       ${histBody()}
     </div>`;
   $('main').innerHTML=h;PV=null;wire();paintWelcome();   // the stage is rebuilt empty
+  pinSendBar();
 }
+// Builder item 98: on a phone the send bar sticks above the tab bar, but a sticky bar can't rise above
+// the top of its own card. On the first screen the message card starts low, so the bar sat under the
+// tab bar and over the card's first lines. It waits at the card's end until the card is up the screen.
+function pinSendBar(){
+  const a=document.querySelector('.up-acts'),c=a&&a.closest('.card');if(!a||!c)return;
+  const room=innerHeight-72-a.offsetHeight;   // where its top goes when it sticks (the tab bar is 72px)
+  a.classList.toggle('unpinned',c.getBoundingClientRect().top>room-8);
+}
+addEventListener('scroll',pinSendBar,{passive:true});addEventListener('resize',pinSendBar);
 // Bold redesign (Nov 2026): the send button says how many it goes to, and the
 // last update sent sits under the lists (from the history this page reads).
 function sendLabel(){

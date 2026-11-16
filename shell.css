@@ -516,6 +516,39 @@ dialog.dds-dlg::backdrop{background:rgba(23,21,34,.45)}
     background-repeat:no-repeat; background-position:right 11px center; background-size:10px 6px; }
 }
 
+/* 4c) Builder item 98 (Nov 16): the rest of the floor, found by pressing around every control
+      on a touch screen (tests/e2e/tap-targets-98.spec.ts): the shell's brand mark, an icon
+      button as wide as it is tall, a field as tall as a button, and a link that stands on its
+      own (a link inside a sentence may stay the size of its words). */
+@media (pointer:coarse){
+  .dds-brand{ min-height:44px; }
+  html.dds-app .lbtn,html.dds-app .cardmenu button{ min-width:44px; text-align:center; }
+  html.dds-app input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  html.dds-app textarea{ min-height:44px; }
+  html.dds-app .rfoot a,html.dds-app .allc,html.dds-app .linkish,html.dds-app .dds-ph-trail a{ display:inline-flex; align-items:center; min-height:44px; }
+  html.dds-app .fchips button,html.dds-app .link-btn,html.dds-app .dds-ph-trail a{ min-width:44px; justify-content:center; }
+  #dds-mbar a,#dds-mbar button{ min-height:44px; }
+  html .dds-ph-pick{ min-height:44px; }
+  /* a page's filled button, its link-buttons, Home's Snooze and This week rows, the header's overflow items */
+  html.dds-app button.primary,html.dds-app .qlink,html.dds-app .dds-ph-more > *{ min-height:44px; }
+  html.dds-app .linkbtn{ display:inline-flex; align-items:center; min-height:44px; }
+  html.dds-app .todaycard a{ min-height:44px; align-items:center; }
+}
+
+/* 4d) Builder item 98: a row that scrolls sideways shows it (shell.js scrollCues). The row fades
+      out at the edge that has more; a row of chips also gets a round arrow at its end, which
+      stays in place while the row moves, and goes once the end is in view. */
+.dds-cue-r{ -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 56px),transparent); mask-image:linear-gradient(to right,#000 calc(100% - 56px),transparent); }
+.dds-cue-l{ -webkit-mask-image:linear-gradient(to left,#000 calc(100% - 56px),transparent); mask-image:linear-gradient(to left,#000 calc(100% - 56px),transparent); }
+.dds-cue-l.dds-cue-r{ -webkit-mask-image:linear-gradient(to right,transparent,#000 56px,#000 calc(100% - 56px),transparent); mask-image:linear-gradient(to right,transparent,#000 56px,#000 calc(100% - 56px),transparent); }
+/* a chip row keeps its arrow solid: the fade stops where the arrow starts */
+.dds-cue-r:has(> .dds-cue-more){ -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 96px),transparent calc(100% - 48px),#000 calc(100% - 48px)); mask-image:linear-gradient(to right,#000 calc(100% - 96px),transparent calc(100% - 48px),#000 calc(100% - 48px)); }
+.dds-cue-l.dds-cue-r:has(> .dds-cue-more){ -webkit-mask-image:linear-gradient(to right,transparent,#000 56px,#000 calc(100% - 96px),transparent calc(100% - 48px),#000 calc(100% - 48px)); mask-image:linear-gradient(to right,transparent,#000 56px,#000 calc(100% - 96px),transparent calc(100% - 48px),#000 calc(100% - 48px)); }
+.dds-cue-more{ display:none; }
+.dds-cue-r > .dds-cue-more{ display:grid; place-items:center; position:sticky; right:0; flex:0 0 44px; width:44px; height:44px; margin-left:auto; align-self:center;
+  border-radius:999px; background:var(--dds-card,#fff); color:var(--dds-p); box-shadow:0 2px 8px rgba(23,21,34,.16); cursor:pointer; z-index:1; }
+.dds-cue-r > .dds-cue-more::before{ content:""; width:9px; height:9px; border:solid currentColor; border-width:2.4px 2.4px 0 0; transform:translateX(-2px) rotate(45deg); border-radius:1px; }
+
 /* 5) Page-local toasts sit behind the mobile bar; lift them centrally (shell.css
       loads only on app pages, so this is scoped to the app). */
 @media (max-width:760.98px){
