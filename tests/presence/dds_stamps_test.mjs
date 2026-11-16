@@ -217,9 +217,18 @@ const stampedSids = (r) => r.map((b) => (b.html.match(/ data-dds-sid="([^"]+)"/)
   ok('composeBlocks is EXPORTED and serializeDraft delegates to it (no inline copy left for §6\'s pins to miss)',
     /export function composeBlocks\(/.test(ser) && /const compose = \(raw: unknown\[\]\) => composeBlocks\(/.test(ser)
     && /const homeBlocks = compose\(/.test(ser) && /const pc = compose\(/.test(ser));
-  const tmpls = TEMPLATES.map((t) => read(`supabase/functions/presence/templates/${t}/1.0.0/render.ts`));
-  ok('all 8 templates thread src into renderSiteBlocks (home blocks + custom pages)',
-    tmpls.every((s) => s.includes('src: c.settings?.blocks_src') && s.includes('src: cp.blocks_src')));
+  // Drawn, every template's sections carry the indices they were stored at: on the home page
+  // (settings.blocks_src) and on an owner's own page (its blocks_src), never their draw order.
+  const blocks = validateBlocks([{ type: 'richtext', body: 'One' }, { type: 'cta', text: 'Two', button: 'Go', url: 'https://ex.com' }]);
+  const srcs = (html) => [...String(html || '').matchAll(/ data-dds-src="(\d+)"/g)].map((m) => m[1]).join(',');
+  const unthreaded = [];
+  for (const slug of TEMPLATES) {
+    const fx = JSON.parse(read(`supabase/functions/presence/templates/${slug}/1.0.0/fixture.json`));
+    fx.content.settings = { ...(fx.content.settings || {}), blocks, blocks_src: [4, 9], pages: [{ slug: 'more', title: 'More', blocks, blocks_src: [2, 6] }] };
+    const out = await renderSnapshot(fx, SITE);
+    if (srcs(out['index.html']) !== '4,9' || srcs(out['more/index.html']) !== '2,6') unthreaded.push(`${slug} (${srcs(out['index.html'])} / ${srcs(out['more/index.html'])})`);
+  }
+  ok('all 8 templates thread src into renderSiteBlocks (home blocks + custom pages)', blocks.length === 2 && unthreaded.length === 0, unthreaded.join(', '));
 }
 
 const failed = results.filter((r) => !r.p);
