@@ -434,7 +434,7 @@ test.describe('Context bar (slice 7)', () => {
     ];
     const scopes: string[] = [];
     await installApp(page, { api: { '/portal/context': { data: { ...crmCtx().data, is_agency: true, scope: { site_id: CLIENT, name: 'Joe’s Plumbing' } } } } });
-    await page.route(/\/functions\/v1\/presence\/agency\/sites$/, (route) => { scopes.push(route.request().headers()['x-dds-scope-site'] ?? '');   // no client at all: an empty header or none (item 101's helper sends none) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: rows, partial: false, can_open: true }) }); });
+    await page.route(/\/functions\/v1\/presence\/agency\/sites$/, (route) => { scopes.push(route.request().headers()['x-dds-scope-site'] ?? ''); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: rows, partial: false, can_open: true }) }); });
     await page.goto(`/today.html?client=${CLIENT}`);
     const bar = page.locator('#dds-ctxbar');
     const sw = bar.locator('#dds-site-switch');
