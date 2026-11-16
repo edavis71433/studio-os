@@ -10,7 +10,7 @@
 // SiteRow, exactly as the agency bulk runner already does.
 
 import { svc } from '../lib/db.ts';
-import { runPipeline, takeSiteOffline } from '../routes/publish.ts';
+import { runPipeline, takeSiteOffline, holdingPageOnItsWay } from '../routes/publish.ts';
 import { reconcileOnePublish, RECONCILE_STALE_MS, type InflightPublish } from '../lib/deploy_reconcile.ts';
 import { blocksNeedRewindow, nextWindowBoundary, windowedBlocks } from '../lib/content_window.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -118,6 +118,11 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
     // Item 214: on a site whose publishing is locked, the row waits unclaimed and goes on the first
     // tick after the lock comes off (a lock that can't be read keeps it waiting too)
     if (await lockStop(String(row.site_id), 'staff')) continue;
+    // G10: while a Take offline's holding page is still on its way to the host, a publish would
+    // race it, and runPipeline refuses (409 offline_in_progress), which would fail the row for
+    // good. Like a lock, the row waits unclaimed and goes on the first tick after the host has
+    // finished or given up on that page. An offline row needs no wait: the site is marked already.
+    if (row.kind !== 'offline' && await holdingPageOnItsWay(String(row.site_id))) continue;
     // claim it (pending → running-ish) so a concurrent cycle can't double-fire.
     // fired_at=is.null makes the claim ATOMIC: two overlapping ticks both match
     // status=pending, but only the first PATCH finds fired_at still null.

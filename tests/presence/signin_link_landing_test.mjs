@@ -12,7 +12,7 @@
 //   · no caller of generate_link nests the redirect again
 //
 //   deno run --allow-read --allow-env --allow-net tests/presence/signin_link_landing_test.mjs
-import { editorSource } from './editor_source.mjs';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const SITE_URL = 'https://app.davisdigitalstudio.com';
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL, RESEND_API_KEY: 'fake', RESEND_KEY: 'fake' })) Deno.env.set(k, v);
 

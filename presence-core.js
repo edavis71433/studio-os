@@ -4055,6 +4055,7 @@ function pgOpenSettings(startRef) {
   const paint = () => {
     const m = pgModel(), e = pgEntry(m, ref); if (!e || !e.pg) { close(); return; }
     const pg = e.pg, slug = pg.slug || "", custom = !!slug;
+    const putBack = pgTyping(box);   // item 245: drawn again when a save lands, it keeps what's being typed
     box.textContent = "";
     box.appendChild(el("h3", "dc-modal-h", pg.title + " settings"));
     box.appendChild(el("p", "pg-where", seoHost() + pg.path));
@@ -4123,9 +4124,39 @@ function pgOpenSettings(startRef) {
     const done = el("button", "dc-modal-cancel pg-done", "Done"); done.type = "button"; done.addEventListener("click", close);
     foot.appendChild(done);
     box.appendChild(foot);
+    putBack();
   };
   paint();
   pgFocusFirst(box);
+}
+// Item 245: a settings panel drawn again while someone is in it (a read or a save landing) used
+// to drop what they were typing and their place. pgTyping(host), called just before the panel is
+// drawn again, notes each field whose words were changed since it was drawn and the field with
+// the focus, by the name on the field. The function it returns, called once the panel is drawn,
+// puts the words and the focus (caret and all) back; a field given its words back that way saves
+// them when it's left, as typing would have, and one that isn't drawn again saves them at once.
+function pgTyping(host) {
+  const nameOf = (f) => { const l = (f.id && host.querySelector('label[for="' + f.id + '"]')) || f.closest("label"); return String((l && l.textContent) || f.getAttribute("aria-label") || "").trim(); };
+  const fields = () => Array.from(host.querySelectorAll("input,textarea,select")).filter((f) => !/^(hidden|button|submit|file|radio)$/.test(f.type) && nameOf(f));
+  const words = (f) => f.tagName === "TEXTAREA" || (f.tagName === "INPUT" && f.type !== "checkbox");
+  const act = document.activeElement;
+  const kept = fields().map((f) => {
+    let sel = null; if (f === act && words(f)) { try { sel = [f.selectionStart, f.selectionEnd]; } catch (_) {} }
+    return { el: f, name: nameOf(f), value: f.value, typed: words(f) && f.__pgDrawn !== undefined && f.value !== f.__pgDrawn, focus: f === act, sel };
+  }).filter((k) => k.typed || k.focus);
+  return () => {
+    const now = fields(); now.forEach((f) => { f.__pgDrawn = f.value; });
+    kept.forEach((k) => {
+      const f = now.find((x) => nameOf(x) === k.name);
+      if (!f) { if (k.typed) k.el.dispatchEvent(new Event("change")); return; }
+      if (k.typed && f.value !== k.value) {
+        f.value = k.value;
+        f.dispatchEvent(new Event("input", { bubbles: true }));   // what reads it as it's typed (a count, the Google preview) follows
+        f.addEventListener("blur", () => { if (f.value !== f.__pgDrawn) f.dispatchEvent(new Event("change")); }, { once: true });
+      }
+      if (k.focus) { try { f.focus({ preventScroll: true }); if (k.sel && k.sel[0] != null) f.setSelectionRange(k.sel[0], k.sel[1]); } catch (_) {} }
+    });
+  };
 }
 // ── Items 48 and 120: who can see an own page, and its header and footer ──
 // Who can see it is three cards and one sentence. Password asks for the password first and
@@ -4169,13 +4200,15 @@ function pgSetPage(slug, patch, okMsg) {
 function pgAccessGroup(slug) {
   const g = el("div", "pg-group"); g.dataset.group = "access";
   let asking = false, msg = "";   // the password field is open; why the last try didn't save
+  // Item 196 (review finding 30): a page copied from another site keeps its setting, never its
+  // password, so it said "Password saved" and was quietly left off the live site. It asks for one.
+  const unsetOf = (page) => page.access === "password" && (!page.lock || !!(PG_LOCKS && !PG_LOCKS.has(String(page.lock))));
+  let drawnUnset = null;   // item 245: what the last draw showed, so a read that changes nothing redraws nothing
   const draw = (focusOn) => {
     const page = dcPageObj(slug); if (!page) return;
     const now = page.access === "password" || page.access === "private" ? page.access : "everyone";
     const shown = asking ? "password" : now;
-    // Item 196 (review finding 30): a page copied from another site keeps its setting, never its
-    // password, so it said "Password saved" and was quietly left off the live site. It asks for one.
-    const unset = now === "password" && (!page.lock || (PG_LOCKS && !PG_LOCKS.has(String(page.lock))));
+    const unset = unsetOf(page); drawnUnset = unset;
     g.textContent = "";
     g.appendChild(el("h4", "pg-h", "Who can see it"));
     const row = el("div", "pg-access"); row.setAttribute("role", "group"); row.setAttribute("aria-label", "Who can see it");
@@ -4229,6 +4262,7 @@ function pgAccessGroup(slug) {
       if (focusOn === "pw") setTimeout(() => { try { pw.focus({ preventScroll: true }); box.scrollIntoView({ block: "nearest" }); } catch (_) {} }, 0);
     }
     if (focusOn === "cards") { const b = row.querySelector('[aria-pressed="true"]'); if (b) { try { b.focus({ preventScroll: true }); } catch (_) {} } }
+    g.querySelectorAll("input,textarea").forEach((f) => { f.__pgDrawn = f.value; });   // item 245: as drawn, so a redraw can tell what's typed since
   };
   const pick = async (key) => {
     const page = dcPageObj(slug); if (!page) return;
@@ -4259,7 +4293,16 @@ function pgAccessGroup(slug) {
   };
   draw();
   const first = dcPageObj(slug);
-  if (!PG_LOCKS && first && first.access === "password") pgLocksRead().then(() => { if (g.isConnected && !asking) draw(); });   // item 196: is its password this site's?
+  if (!PG_LOCKS && first && first.access === "password") pgLocksRead().then(() => {   // item 196: is its password this site's?
+    // Item 245: the answer used to draw the group again under someone typing in it: the words in
+    // Heading went unsaved and the Password field lost its focus. It redraws only when it changes
+    // what's shown (the password isn't this site's), keeping what's being typed and where.
+    const page = dcPageObj(slug);
+    if (!g.isConnected || asking || !page || unsetOf(page) === drawnUnset) return;
+    const was = g.contains(document.activeElement), putBack = pgTyping(g);
+    draw(); putBack();
+    if (was && !g.contains(document.activeElement)) { const pw = g.querySelector('input[type="password"]'); if (pw) { try { pw.focus({ preventScroll: true }); } catch (_) {} } }   // their field went: the one it now asks for
+  });
   return g;
 }
 function pgChromeGroup(slug) {
@@ -4282,6 +4325,9 @@ function pgChromeGroup(slug) {
 // The first field takes the cursor, as it always has (a pane with none: All pages).
 function pgFocusFirst(box) {
   setTimeout(() => {
+    // item 245: someone already pressing or typing in the panel keeps their place (a quick press on
+    // Password lost its field to the page name, put here a moment later)
+    if (box.contains(document.activeElement)) return;
     const f = box.querySelector("input,select") || (PAGES_OPEN && $("pcBack"));
     if (f) { try { f.focus({ preventScroll: true }); } catch (_) {} }
   }, 30);

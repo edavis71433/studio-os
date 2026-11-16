@@ -2082,7 +2082,7 @@ body.pd-dragging *{cursor:grabbing !important}
 .dpdevseg button:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
 /* Preview / Timewarp: the same frame with ALL editing chrome withheld — the
    injector is never called, the FAB hides, and the page scrolls like a visitor's
-   (link/submit navigation is guarded inside the document, dcGuardViewNav). */
+   (link/submit navigation is guarded inside the document in every mode, dcGuardNav). */
 .dp-frame.dc-view iframe{pointer-events:auto}
 #designCanvas.dc-mode-view .dc-fab{display:none}
 /* …and the toolbar's editing actions withdraw too (Undo/Redo, Content tree,

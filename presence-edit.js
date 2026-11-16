@@ -3744,9 +3744,11 @@ async function dcSetMode(mode) {
   // or when leaving a landed Timewarp, whose past render must give way to the draft.
   if (wasView !== isView || twWasLoaded) refreshDesignPreview();
 }
-// View modes read like a visitor: the page scrolls freely, but links and forms
-// never navigate the canvas away (the same spirit as the stage's link guard).
-function dcGuardViewNav(doc) {
+// Links and forms never navigate the canvas away, in any mode (the same spirit as the stage's
+// link guard): view modes read like a visitor and the page scrolls freely; in Edit mode a press
+// keeps its editing meaning (the menu opens the Pages card, a tap picks a section) and the
+// browser never follows the link. Item 244: Edit mode had no guard of its own.
+function dcGuardNav(doc) {
   try {
     doc.addEventListener("click", (e) => { const a = e.target && e.target.closest && e.target.closest("a"); if (a) e.preventDefault(); }, true);
     doc.addEventListener("submit", (e) => e.preventDefault(), true);
@@ -8456,13 +8458,15 @@ function dcTreeSelect(el2, row) {
     frame.inert = false;
     const wrap = frame.closest(".dp-frame");
     frame.removeAttribute("aria-hidden");   // the canvas is interactive (Edit) or readable (view modes), not decorative
+    // Item 244: in every mode a link or a form on the page leaves the canvas on the draft. In
+    // Edit mode the business name in the header (a section's buttons, the footer's links) loaded
+    // the editor's own address into the frame, on every device. This runs BEFORE the #main
+    // check: even a document without the landmark (an error page, an old kept version) gets it.
+    dcGuardNav(doc);
     // Slice D: Preview / Timewarp withhold ALL editing chrome — the injector is
     // simply never called; the page scrolls, links/forms are guarded read-only.
-    // This runs BEFORE the #main check: even a document without the landmark (an
-    // error page, an old kept version) must get the nav guard and the right class.
     if (DC_MODE === "timewarp") {
       if (wrap) { wrap.classList.remove("dc-live"); wrap.classList.add("dc-view"); }
-      dcGuardViewNav(doc);
       return;
     }
     if (wrap) { wrap.classList.remove("dc-view"); wrap.classList.add("dc-live"); }

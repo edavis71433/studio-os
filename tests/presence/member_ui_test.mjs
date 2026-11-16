@@ -7,7 +7,7 @@
 // in a browser for each kind of person.
 //
 //   deno run --allow-read tests/presence/member_ui_test.mjs
-import { editorSource, EDITOR_FILES } from './editor_source.mjs';
+import { editorSource, EDITOR_FILES } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const P = '../../supabase/functions/presence';
 const { memberWriteNeeds, contentWriteNeeds, siteCan } = await import(`${P}/lib/site_roles.ts`);
 
