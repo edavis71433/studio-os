@@ -274,7 +274,12 @@ export async function installApp(page: Page, opts: AppOptions = {}): Promise<voi
     if (key) {
       const answer = fixtures[key];
       const sent = () => { try { return route.request().postDataJSON(); } catch { return null; } };
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(typeof answer === 'function' ? answer(sent()) : answer) });
+      let body = typeof answer === 'function' ? answer(sent()) : answer;
+      // builder item 37: GET /site?with=… brings the editor's lists beside the site. The pretend
+      // server brings none, so the page reads each list on its own, through whatever answers a
+      // test set up for it; a test of the one read answers /site with its own `parts`.
+      if (method === 'GET' && path === '/site' && url.searchParams.has('with') && body && typeof body === 'object' && !Array.isArray(body) && !('parts' in body)) body = { ...body, parts: {} };
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     }
     if (SAVES.has(method)) {
       const save = `${method} ${path}`;

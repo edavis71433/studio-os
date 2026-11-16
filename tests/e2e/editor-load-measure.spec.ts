@@ -39,7 +39,7 @@ async function watchNetwork(cdp: CDPSession) {
   const reqs = new Map<string, Req>();
   await cdp.send('Network.enable');
   cdp.on('Network.requestWillBeSent', (e) => { if (!/^(data|blob):/.test(e.request.url)) reqs.set(e.requestId, { url: e.request.url, method: e.request.method, type: e.type || '', t0: e.timestamp, bytes: 0, raw: 0 }); });
-  cdp.on('Network.responseReceived', (e) => { const r = reqs.get(e.requestId); if (r) { r.status = e.response.status; r.cached = !!(e.response.fromDiskCache || e.response.fromServiceWorker || (e.response as { fromPrefetchCache?: boolean }).fromPrefetchCache); } });
+  cdp.on('Network.responseReceived', (e) => { const r = reqs.get(e.requestId); if (r) { r.status = e.response.status; r.cached = r.cached || !!(e.response.fromDiskCache || e.response.fromServiceWorker || (e.response as { fromPrefetchCache?: boolean }).fromPrefetchCache); } });
   cdp.on('Network.requestServedFromCache', (e) => { const r = reqs.get(e.requestId); if (r) r.cached = true; });
   cdp.on('Network.dataReceived', (e) => { const r = reqs.get(e.requestId); if (r) r.raw += e.dataLength; });
   cdp.on('Network.loadingFinished', (e) => { const r = reqs.get(e.requestId); if (r) { r.t1 = e.timestamp; r.bytes = e.encodedDataLength; } });
