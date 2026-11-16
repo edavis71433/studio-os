@@ -597,6 +597,9 @@ function showGate(title, msg, showBtn, retry) {
   b.hidden = !showBtn;
   if (forReviewer) { b.href = "/client.html"; b.textContent = "Go to your view"; }
 }
+
+/* ── navigation ── */
+let EDIT_RETURN = "today";   // where Exit goes: the view you came to Edit mode from
 // The Overview is the site: the title row steps aside and its buttons join the
 // stage's one bar. They're the same buttons, so every other way to them still works.
 function syncSiteHome(view) {
@@ -8423,6 +8426,7 @@ const BLOCK_DEFS = [
   { type: "spotlight", name: "Spotlight", spotlightSimple: true, hint: "A prominent highlight band — an eyebrow, a heading, a line or two, and a button." },
 ];
 let BLOCKS_WORK = null;
+let BLOCK_FOCUS = null;      // FD-T-LIB: index of a just-added block to scroll to + focus
 // One-per-page in the builder (mirrors site_blocks.ts SINGLETON). EVERY other block
 // type may be added more than once — stack as many text boxes, image+text rows,
 // feature grids etc. as you like; the server keeps them all.
@@ -8712,6 +8716,10 @@ function blocksSaveSoon(ms) {
 // edit to one or two sections: an add, a delete or a move leaves the stamps on the other
 // sections stale, so it waits for the full redraw.
 let LIVE_T = null, LIVE_SEQ = 0, LIVE_PROBE = false, LIVE_TYPING = null;
+let LIVE_WANTED = false;   // the panel has edits the canvas should show; a list save clears it
+// Item 85: each section as the live redraw last drew it, by index. Null: the canvas shows the
+// saved list, as after a full redraw.
+let LIVE_DRAWN = null;
 const LIVE_TYPE_OK = new Set(["stack", "title", "richtext", "cta", "booking", "appointment", "newsletter", "spotlight", "table", "image_text", "video", "map",
   "features", "stats", "process", "pricing", "certifications", "events", "social", "link_list", "service_areas"]);
 async function blocksSaveNow() {
@@ -8862,6 +8870,7 @@ let FORMS_BASE = "[]";    // FORMS_WORK as last loaded or saved, to spot unsaved
 // G11 toggle memory: clicking it while on returns to Edit (the OFF path).
 let DC_MODE = "edit";
 let PANEL_MODE = "styles";   // what the settings panel is showing right now
+let BLOCK_SOLO = null;       // the one section being edited (an index into BLOCKS_WORK)
 // Anything that shifts the section list on the canvas invalidates BLOCK_SOLO's index.
 function dcSoloEnd() { if (PANEL_MODE === "section") closeSettingsPanel(); }
 // ── Item 122: the phone bar, Call, Directions, Hours and Email along the bottom of every page
@@ -8870,6 +8879,9 @@ function dcSoloEnd() { if (PANEL_MODE === "section") closeSettingsPanel(); }
 // business details have something behind it, worked out here the same way, so the card says
 // which ones the bar will have and what's missing.
 function pbNow() { const t = DESIGN_TOKENS && DESIGN_TOKENS.phone_bar; return t === "light" || t === "dark" ? t : ""; }
+// ── the inspector (the floating studio, part two): one section, four tabs. Content holds the
+// fields; Style its colours and type; Layout its arrangement; When its dates and where it shows.
+let INS_TAB = "content";
 const EDGE_PATHS = { wave: "M0 0H100V5C87.5 11 62.5 -1 50 5C37.5 11 12.5 -1 0 5Z", slant: "M0 0H100L0 10Z", curve: "M0 0H100Q50 20 0 0Z", peak: "M0 0H100L50 10Z",
   zigzag: "M0 0H100V3" + Array.from({ length: 20 }, (_, i) => "L" + (100 - 5 * (i + 1)) + " " + (i % 2 ? 3 : 10)).join("") + "Z" };
 // ── the floating studio: the Pages card, the Live chip, the phone's More ──
@@ -9017,6 +9029,22 @@ function uiIcon(name, size) {
 const PF_S = { col: "all", seq: 0, key: null, allow: null, stock: { state: null, results: [] } };
 function pdReducedMotion() { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (_) { return false; } }
 let DC_DRAWN = false;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AEM-STYLE LIVE CANVAS — the design preview IS the editor
+// ─────────────────────────────────────────────────────────────────────────────
+// #designPreview is a SAME-ORIGIN srcdoc of the real render engine (draft). We
+// reach into its document and layer editing chrome ON the live page, so building
+// is WYSIWYG: drag a section from the tray onto the page (drop-lines appear
+// between sections), grab a section to reorder it in place, and edit / duplicate /
+// hide / delete right where it lives. Columns get a 2↔3 responsive-grid switch.
+//
+// THE MOAT: every action mutates the SAME BLOCKS_WORK list + saveBlocks() the
+// side rail uses — a single list index or a column count, NEVER an x/y coordinate,
+// z-index, or overlap. The served render (site_blocks.ts) is untouched: columns
+// still stack to one column below 620px, order is still the list order. Structured
+// blocks, always auto-responsive, always accessible. Nothing here changes output.
+let DC_SCROLL = null;   // preserve the canvas scroll position across the save→reload cycle
 function dcFrameDoc() { const f = $("designPreview"); try { return f && !f.inert ? f.contentDocument : null; } catch (_) { return null; } }   // none while the page just left is still up (dcOpenPage)
 function dcCaptureScroll() { const d = dcFrameDoc(); DC_SCROLL = (d && d.defaultView) ? d.defaultView.scrollY : null; }
 // ── Item 158: right-click on a section, a few keys, and the list of them ──
@@ -9039,6 +9067,7 @@ function dcBlockSections(main) {
 }
 const STK_TURNS = new Set(["richtext", "title", "image", "buttons", "video", "divider"]);   // the simple sections Add block turns into blocks
 const STK_FILL = new Set(["image", "video", "map"]);   // a new one waits for its card: it draws nothing until then
+let STK_ITEM = null;    // the block whose card is open, in BLOCK_SOLO's Blocks section
 // ── Phase Z: search-engine verification codes — a field, not a technical task ──
 [["f-gsv", "google_site_verification"], ["f-bsv", "bing_site_verification"]].forEach(([id, key]) => {
   $(id).addEventListener("change", async () => {

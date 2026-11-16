@@ -4,7 +4,7 @@
 // the page has settled. The two scripts share one global scope, so a name of presence-edit.js's
 // exists only once that part has loaded. This parses both scripts and holds what keeps that safe:
 //   • every name declared in both is one of the core's stand-ins, a function in both;
-//   • presence-core.js uses nothing of presence-edit.js's except through a stand-in;
+//   • presence-core.js uses nothing of presence-edit.js's, reading or writing, except through a stand-in;
 //   • a stand-in's answer is never used straight away where it's called (before the part is in, a
 //     door answers a promise and any other stand-in answers nothing), except where SAFE says why;
 //   • presence-edit.js marks itself in only with its last statement, after all of it has run.
@@ -64,7 +64,13 @@ const SAFE = [
 ];
 for (const st of C.body) {
   if (st.type === 'FunctionDeclaration' && STANDINS.has(st.id.name)) continue;
-  walk.ancestor(st, { Identifier(n, _s, anc) {
+  // a name written to (x = …, x += …, for (x of …)) is visited as a VariablePattern; a write from the
+  // core to a name of the part's would land on a stray global before the part is in, and the part's
+  // own `let` would then hide it (item 38: the tab Exit goes back to, found on the tablet)
+  walk.ancestor(st, { VariablePattern(n, _s, anc) {
+    if (shadowed(anc, n.name) || anc.some((a) => a.type === 'VariableDeclarator' && idsIn(a.id).includes(n.name))) return;
+    if (editOnly.has(n.name)) reached.push(`${n.name} (written) at presence-core.js:${n.loc.start.line}`);
+  }, Identifier(n, _s, anc) {
     const p = anc[anc.length - 2], pp = anc[anc.length - 3];
     if (p && p.type === 'MemberExpression' && p.property === n && !p.computed) return;
     if (p && p.type === 'Property' && p.key === n && !p.computed && !p.shorthand) return;

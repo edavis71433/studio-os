@@ -3,9 +3,6 @@
 // It runs in the same global scope as presence-core.js, after it: everything there is already
 // defined. Its functions replace the stand-ins presence-core.js keeps for them, and its own
 // set-up below (the canvas's frame, the panels' buttons, the keys) runs as it loads.
-
-/* ── navigation ── */
-let EDIT_RETURN = "today";   // where Exit goes: the view you came to Edit mode from
 // Item 78: the hours and the closed note wait 0.6s before saving too, so they count.
 const detailsPending = () => Object.keys(debounceFns).some((k) => /^(identity|location):|^(hours|closednote)$/.test(k));
 // One own page's stored settings, changed in one write (undefined takes a setting off).
@@ -1112,7 +1109,6 @@ function mediaThumb(id) {
   if (m && m.thumb) { const img = el("img"); img.src = m.thumb; img.alt = m.alt_text || ""; img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block"; wrap.appendChild(img); }
   return wrap;
 }
-let BLOCK_FOCUS = null;      // FD-T-LIB: index of a just-added block to scroll to + focus
 let BLOCK_SUGGEST = null;   // FD-T4: { blocks:[type…], note } from the server (no client-side preset map)
 let CL_ITEMS = null;        // CL-1: saved content-library items (null = not loaded)
 let CL_SHOW = false;
@@ -1889,10 +1885,6 @@ function emptyBlock(def) {
   return b;
 }
 function dcHistoryInit() { if (DC_HIST_LAST == null) { DC_HIST_LAST = histSnap(); updateUndoButtons(); } }
-let LIVE_WANTED = false;   // the panel has edits the canvas should show; a list save clears it
-// Item 85: each section as the live redraw last drew it, by index. Null: the canvas shows the
-// saved list, as after a full redraw.
-let LIVE_DRAWN = null;
 function dcLiveFromPanel() { LIVE_WANTED = true; dcLiveSoon(); }
 function dcLiveSoon() { clearTimeout(LIVE_T); LIVE_T = setTimeout(dcLiveNow, 200); }   // only the section panel asks (dcLiveFromPanel)
 async function dcLiveNow() {
@@ -3804,7 +3796,6 @@ async function dcTimewarpGo() {
 // dragging a section onto it); the settings panel dims behind a scrim.
 let PANEL_LASTFOCUS = null;
 let DC_RAIL_TAB = "contents";
-let BLOCK_SOLO = null;       // the one section being edited (an index into BLOCKS_WORK)
 function closeTrayPanel() {
   const p = $("trayPanel"); if (!p) return;
   p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
@@ -4066,9 +4057,6 @@ function stylesTab(name) {
   if (STYLES_TAB === "buttons") buttonSetPaint();   // item 217: in the colours the canvas has drawn by now
   dcColourAids();
 }
-// ── the inspector (the floating studio, part two): one section, four tabs. Content holds the
-// fields; Style its colours and type; Layout its arrangement; When its dates and where it shows.
-let INS_TAB = "content";
 function insSyncSeg() {
   const seg = $("inspectorSeg"); if (!seg) return;
   seg.querySelectorAll("[data-itab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.itab === INS_TAB)));
@@ -5822,22 +5810,6 @@ function refreshDesignPreview() {
     }
   }, 350);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AEM-STYLE LIVE CANVAS — the design preview IS the editor
-// ─────────────────────────────────────────────────────────────────────────────
-// #designPreview is a SAME-ORIGIN srcdoc of the real render engine (draft). We
-// reach into its document and layer editing chrome ON the live page, so building
-// is WYSIWYG: drag a section from the tray onto the page (drop-lines appear
-// between sections), grab a section to reorder it in place, and edit / duplicate /
-// hide / delete right where it lives. Columns get a 2↔3 responsive-grid switch.
-//
-// THE MOAT: every action mutates the SAME BLOCKS_WORK list + saveBlocks() the
-// side rail uses — a single list index or a column count, NEVER an x/y coordinate,
-// z-index, or overlap. The served render (site_blocks.ts) is untouched: columns
-// still stack to one column below 620px, order is still the list order. Structured
-// blocks, always auto-responsive, always accessible. Nothing here changes output.
-let DC_SCROLL = null;   // preserve the canvas scroll position across the save→reload cycle
 let DC_FOCUS_BI = null; // a just-added/dropped block index → scroll the canvas to it + flash it after reload
 
 // ── canvas block ops — all REUSE the existing list model, then persist + redraw ──
@@ -7609,7 +7581,6 @@ const STK_GROUPS = ["Words", "Photos and video", "Get in touch", "Space", "Find 
 const STK_AWAY = /\b(embed|iframe|html|code|script|widget|instagram|facebook|tiktok|calendly|opentable|spotify)\b/i;
 const stkKind = (k) => STK_KINDS.find((x) => x.kind === k) || { kind: k, name: "Block", icon: "section", hint: "", words: "" };
 const STK_MAX = 20;   // the server keeps up to 20 blocks in one section
-let STK_ITEM = null;    // the block whose card is open, in BLOCK_SOLO's Blocks section
 let STK_PICK = null;    // the block picked on the page: { bi, j }
 let STK_FOCUS = null;   // a block just added, moved or copied: picked again once the page redraws
 let STK_ADD = null;     // where Add a block puts the new one: { bi, at }
