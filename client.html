@@ -211,6 +211,12 @@
   .retcard a.fbtn.pay{background:var(--p);border-color:var(--p);color:#fff}
   .retact .fbtn{min-height:40px}
   .retsure{margin:0 0 10px;font-size:13.5px;color:var(--ink)}
+  /* sales item 129: a failed charge says so, and Update your card sits beside Cancel */
+  .retfail{margin:12px 0 0;font-size:13.5px;line-height:1.5;color:var(--ink)}
+  .retrow{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;margin-top:14px}
+  .retrow .retact{margin-top:0}
+  .retrow>.fbtn{min-height:40px}
+  .retcard .fbtn.pay{background:var(--p);border-color:var(--p);color:#fff}
   /* ── item 179 part four: the papers shelf. On a phone each paper is one row with a
      line under its name and the filters are chips; from 1000px the filters become a
      rail with counts and the row splits into columns: what it is · amount or state ·
@@ -2302,14 +2308,25 @@ function retainerCardHtml(r){
   const word=st==='active'?'Active':st==='past_due'?'Payment didn’t go through':st==='pending'?'Waiting for you to approve':'Cancelled';
   const cls=st==='active'?' sig':st==='past_due'?' od':'';
   const day=(v)=>v?invDueLabel(String(v).slice(0,10)):'';
-  const when=st==='active'&&r.next_charge?'Next charge '+day(r.next_charge):st==='canceled'&&r.canceled_at?'Cancelled '+day(r.canceled_at)+'. It won’t charge again.':st==='past_due'?'Stripe will try the card again. Message your studio if the card has changed.':'';
+  const when=st==='active'&&r.next_charge?'Next charge '+day(r.next_charge):st==='canceled'&&r.canceled_at?'Cancelled '+day(r.canceled_at)+'. It won’t charge again.':'';
+  // sales item 129: a charge that failed says so, and what fixes it: a new card on Stripe's own page
+  const failed=st==='past_due'?`<p class="retfail">${r.can_update_card?'Your card didn’t go through. Stripe tries it again over the next few days. Put in a new card and Stripe uses that instead.':'Your card didn’t go through. Stripe tries it again over the next few days. Message your studio if the card has changed.'}</p>`:'';
   const charges=Array.isArray(r.charges)?r.charges:[];
   const list=charges.length?`<ul class="retcharges" aria-label="Charges so far">${charges.slice(0,12).map(c=>`<li><span>${esc(day(c.at))}</span><span>${esc(fmtMoney(c.amount))}</span></li>`).join('')}</ul>`+(charges.length>12?`<p class="muted" style="margin:6px 0 0">And ${charges.length-12} earlier.</p>`:''):(st==='pending'?'':'<p class="muted" style="margin:8px 0 0">No charges yet.</p>');
   const approve=st==='pending'&&r.approve_url&&/^https:\/\//.test(r.approve_url)?`<a class="fbtn pay" href="${esc(r.approve_url)}">Set it up →</a>`:'';
+  const card=r.can_update_card?`<button type="button" class="fbtn${st==='past_due'?' pay':''}" data-ret-card="${esc(r.id)}">Update your card</button>`:'';
   const cancel=r.can_cancel?`<div class="retact" data-ret="${esc(r.id)}"><button type="button" class="fbtn" data-ret-ask>Cancel retainer</button></div>`:'';
-  return `<div class="card retcard"><div class="rethead"><div><h3 class="fname">${esc(r.name||'Retainer')}</h3><span class="fmeta">${esc(fmtMoney(r.amount))} every ${per}${when?' · '+esc(when):''}</span></div><span class="fst${cls}">${esc(word)}</span></div>${list}${approve}${cancel}</div>`;
+  return `<div class="card retcard"><div class="rethead"><div><h3 class="fname">${esc(r.name||'Retainer')}</h3><span class="fmeta">${esc(fmtMoney(r.amount))} every ${per}${when?' · '+esc(when):''}</span></div><span class="fst${cls}">${esc(word)}</span></div>${failed}${list}${approve}${card||cancel?`<div class="retrow">${card}${cancel}</div>`:''}</div>`;
 }
 function wireRetainers(){
+  // sales item 129: Update your card opens Stripe's own page for a new card (a fresh one each press)
+  document.querySelectorAll('#main [data-ret-card]').forEach(b=>b.addEventListener('click',async()=>{
+    b.disabled=true;
+    const r=await api('/client/retainers/'+encodeURIComponent(b.getAttribute('data-ret-card'))+'/card','POST',{});
+    const url=r.ok&&r.body&&r.body.data&&r.body.data.url;
+    if(url&&/^https:\/\//.test(url)){location.assign(url);return;}
+    toast((r.body&&r.body.message)||'We couldn’t open the card page just now. Please try again.');b.disabled=false;
+  }));
   document.querySelectorAll('#main .retact').forEach(box=>{
     const id=box.getAttribute('data-ret');
     const ask=()=>{box.innerHTML='<button type="button" class="fbtn" data-ret-ask>Cancel retainer</button>';box.querySelector('[data-ret-ask]').addEventListener('click',sure);};
@@ -3931,6 +3948,9 @@ async function load(){
   // reload on the way back: the row stays Processing, quietly)
   const remembered=paidId?null:paidStored();
   if(paidId){paidBegin(paidId,Date.now());showTab('invoices');toast('Thank you — we’re confirming your payment.');return;}
+  // sales item 129: back from Stripe's card page (?card=saved#invoices): the shelf with the
+  // retainer on it, and one line saying the card is saved (a reload doesn't say it again)
+  if(first&&params.get('card')==='saved'){try{history.replaceState(null,'','/client.html#invoices');}catch(_){}showTab('invoices');toast('Your new card is saved. Stripe uses it for the next charge.');return;}
   if(remembered)paidBegin(remembered.id,+remembered.at||Date.now());
   if(wantTab){if(hashTab){try{history.replaceState(null,'','/client.html'+location.search);}catch(_){}}showTab(wantTab);return;}
   showTab(CURRENT_TAB||'home');
