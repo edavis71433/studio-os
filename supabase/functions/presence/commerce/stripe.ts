@@ -24,14 +24,20 @@ export function stripeConfigured(): boolean { return !!STRIPE_SECRET; }
  *  The key itself stays in this file. */
 export const heldKeyKind = () => stripeKeyKind(STRIPE_SECRET);
 
-async function stripeReq(path: string, params: Record<string, string>, idem?: string, method: 'POST' | 'GET' | 'DELETE' = 'POST'): Promise<any> {
+/** The one place this file talks to Stripe, so every call names the version (sales
+ *  item 128). Answers the status and Stripe's JSON; a network failure throws. */
+async function stripeFetch(path: string, params: Record<string, string>, method: 'POST' | 'GET' | 'DELETE', idem?: string, timeoutMs?: number): Promise<{ status: number; body: any }> {
   const h: Record<string, string> = { Authorization: `Bearer ${STRIPE_SECRET}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Stripe-Version': STRIPE_API_VERSION };
   if (idem) h['Idempotency-Key'] = idem;
   const qs = (method === 'GET' || method === 'DELETE') && Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
-  const url = `https://api.stripe.com/v1/${path}${qs}`;
-  const r = await fetch(url, { method, headers: h, body: method === 'POST' ? new URLSearchParams(params).toString() : undefined });
-  const j = await r.json();
-  if (!r.ok) throw new Error((j && j.error && j.error.message) || `stripe ${r.status}`);
+  const r = await fetch(`https://api.stripe.com/v1/${path}${qs}`, { method, headers: h, body: method === 'POST' ? new URLSearchParams(params).toString() : undefined, ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}) });
+  return { status: r.status, body: await r.json().catch(() => null) };
+}
+
+async function stripeReq(path: string, params: Record<string, string>, idem?: string, method: 'POST' | 'GET' | 'DELETE' = 'POST'): Promise<any> {
+  const { status, body: j } = await stripeFetch(path, params, method, idem);
+  if (status < 200 || status >= 300) throw new Error((j && j.error && j.error.message) || `stripe ${status}`);
+  if (!j) throw new Error(`stripe ${status}: an answer that couldn’t be read`);
   return j;
 }
 
@@ -44,17 +50,10 @@ async function stripeReq(path: string, params: Record<string, string>, idem?: st
 export async function stripeProbe(method: 'GET' | 'POST' | 'DELETE', path: string, params: Record<string, string> = {}): Promise<{ status: number; lacks: string | null }> {
   if (!STRIPE_SECRET) return { status: 0, lacks: null };
   try {
-    const qs = method !== 'POST' && Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
-    const r = await fetch(`https://api.stripe.com/v1/${path}${qs}`, {
-      method,
-      headers: { Authorization: `Bearer ${STRIPE_SECRET}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Stripe-Version': STRIPE_API_VERSION },
-      body: method === 'POST' ? new URLSearchParams(params).toString() : undefined,
-      signal: AbortSignal.timeout(10_000),
-    });
-    const j = await r.json().catch(() => null);
-    const said = String((j && j.error && j.error.message) || '');
-    const m = r.status === 403 ? said.match(/'(rak_[a-z_]+)'/) : null;
-    return { status: r.status, lacks: m ? m[1] : null };
+    const { status, body } = await stripeFetch(path, params, method, undefined, 10_000);
+    const said = String((body && body.error && body.error.message) || '');
+    const m = status === 403 ? said.match(/'(rak_[a-z_]+)'/) : null;
+    return { status, lacks: m ? m[1] : null };
   } catch { return { status: 0, lacks: null }; }
 }
 
