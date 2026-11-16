@@ -99,6 +99,13 @@ ok('131: the key may not refund, pay out, charge a card, change a client, move t
 ok('131: a write question names an object that can\'t exist, so a key that may write still makes nothing',
   [...KEY_NEEDS, ...KEY_MUST_NOT].filter((k) => k.probe.method !== 'GET').every((k) => /StudioOSKeyCheck/.test(k.probe.path + JSON.stringify(k.probe.params || {}))));
 ok('131: a read question asks for one item', KEY_NEEDS.filter((k) => k.probe.method === 'GET').every((k) => k.probe.params?.limit === '1'));
+// Eric made the key from docs/presence/STRIPE-KEY.md: its table and this list are two
+// hand-kept copies, so the table must hold exactly these rows (text_checks_allowed.json)
+{
+  const doc = Deno.readTextFileSync(new URL('../../docs/presence/STRIPE-KEY.md', import.meta.url));
+  const rows = [...doc.matchAll(/^\| ([^|]+) \| (Read|Write) \| ([^|]+) \|$/gm)].map((m) => `${m[1].trim()}|${m[2]}|${m[3].trim()}`);
+  ok('131: Eric\'s steps list exactly the permissions the code needs, worded the same', JSON.stringify(rows) === JSON.stringify(KEY_NEEDS.map((k) => `${k.resource}|${k.level}|${k.why}`)), JSON.stringify(rows));
+}
 
 // the kind of key, from its prefix alone
 {

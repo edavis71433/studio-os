@@ -189,7 +189,8 @@ function keyLines(list,can){
     const said=can
       ?(x.ok?'':x.verdict==='refused'?' Missing, so this would fail.':' Stripe didn’t say.')
       :(x.ok?'':x.verdict==='allowed'?' This key can do it.':' Stripe didn’t say.');
-    return '<li class="'+cls+'">'+(can?'<b>'+esc(x.resource)+'</b> '+esc(x.level)+': ':'')+esc(x.why)+'.'+esc(said)+'</li>';
+    const why=String(x.why||'');
+    return '<li class="'+cls+'">'+(can?'<b>'+esc(x.resource)+'</b> '+esc(x.level)+': '+esc(why):esc(why.charAt(0).toUpperCase()+why.slice(1)))+'.'+esc(said)+'</li>';
   }).join('')+'</ul>';
 }
 function renderKey(d){

@@ -26,7 +26,7 @@ export type ProbeMethod = 'GET' | 'POST' | 'DELETE';
 export interface Probe { method: ProbeMethod; path: string; params?: Record<string, string> }
 export interface KeyPermission {
   id: string;          // Stripe's permission, e.g. plan_write ('rak_' + this in a 403)
-  resource: string;    // the row in Stripe's "Create restricted key" form
+  resource: string;    // the row in Stripe's "Create restricted API key" form, word for word (seen Nov 16 2026)
   level: 'Read' | 'Write';
   why: string;         // what Studio OS uses it for, in plain words
   calls: string[];     // every call it covers: METHOD /v1/path, ids as {id}
@@ -44,15 +44,15 @@ export const KEY_NEEDS: readonly KeyPermission[] = [
     calls: ['POST /v1/payment_links', 'POST /v1/payment_links/{id}'], probe: { method: 'POST', path: `payment_links/plink_${NO}` } },
   { id: 'subscription_write', resource: 'Subscriptions', level: 'Write', why: 'cancel a retainer or a plan, and read one back',
     calls: ['DELETE /v1/subscriptions/{id}', 'GET /v1/subscriptions/{id}', 'GET /v1/subscriptions'], probe: { method: 'POST', path: `subscriptions/sub_${NO}` } },
-  { id: 'customer_portal_write', resource: 'Customer portal', level: 'Write', why: 'open Stripe’s page where a client manages a plan or puts in a new card',
+  { id: 'customer_portal_write', resource: 'Customer Portal', level: 'Write', why: 'open Stripe’s page where a client manages a plan or puts in a new card',
     calls: ['POST /v1/billing_portal/sessions'], probe: { method: 'POST', path: 'billing_portal/sessions', params: { customer: `cus_${NO}` } } },
   { id: 'checkout_session_read', resource: 'Checkout Sessions', level: 'Read', why: 'read back a payment page a client finished',
     calls: ['GET /v1/checkout/sessions/{id}', 'GET /v1/checkout/sessions'], probe: { method: 'GET', path: 'checkout/sessions', params: { limit: '1' } } },
-  { id: 'payment_intent_read', resource: 'PaymentIntents', level: 'Read', why: 'find which invoice a payment, refund or dispute belongs to',
+  { id: 'payment_intent_read', resource: 'Payment Intents', level: 'Read', why: 'find which invoice a payment, refund or dispute belongs to',
     calls: ['GET /v1/payment_intents/{id}', 'GET /v1/payment_intents', 'GET /v1/payment_intents/search'], probe: { method: 'GET', path: 'payment_intents', params: { limit: '1' } } },
-  { id: 'charge_read', resource: 'Charges', level: 'Read', why: 'read a payment, its refunds and which invoice it paid',
+  { id: 'charge_read', resource: 'Charges and Refunds', level: 'Read', why: 'read a payment, its refunds and which invoice it paid',
     calls: ['GET /v1/charges/{id}', 'GET /v1/charges', 'GET /v1/refunds', 'GET /v1/refunds/{id}'], probe: { method: 'GET', path: 'charges', params: { limit: '1' } } },
-  { id: 'dispute_read', resource: 'Disputes', level: 'Read', why: 'read a dispute, its deadline and how it ended',
+  { id: 'dispute_read', resource: 'Payment Disputes', level: 'Read', why: 'read a dispute, its deadline and how it ended',
     calls: ['GET /v1/disputes/{id}', 'GET /v1/disputes'], probe: { method: 'GET', path: 'disputes', params: { limit: '1' } } },
   { id: 'invoice_read', resource: 'Invoices', level: 'Read', why: 'read each monthly retainer charge',
     calls: ['GET /v1/invoices/{id}', 'GET /v1/invoices', 'GET /v1/invoice_payments'], probe: { method: 'GET', path: 'invoices', params: { limit: '1' } } },
@@ -63,11 +63,11 @@ export const KEY_NEEDS: readonly KeyPermission[] = [
 ];
 
 export const KEY_MUST_NOT: readonly KeyPermission[] = [
-  { id: 'charge_write', resource: 'Charges', level: 'Write', why: 'refund a payment', calls: [], probe: { method: 'POST', path: `refunds/re_${NO}` } },
+  { id: 'charge_write', resource: 'Charges and Refunds', level: 'Write', why: 'refund a payment', calls: [], probe: { method: 'POST', path: `refunds/re_${NO}` } },
   { id: 'payout_write', resource: 'Payouts', level: 'Write', why: 'send money out of Stripe', calls: [], probe: { method: 'POST', path: `payouts/po_${NO}` } },
-  { id: 'payment_intent_write', resource: 'PaymentIntents', level: 'Write', why: 'charge a card', calls: [], probe: { method: 'POST', path: `payment_intents/pi_${NO}/capture` } },
+  { id: 'payment_intent_write', resource: 'Payment Intents', level: 'Write', why: 'charge a card', calls: [], probe: { method: 'POST', path: `payment_intents/pi_${NO}/capture` } },
   { id: 'customer_write', resource: 'Customers', level: 'Write', why: 'change a client’s details or saved cards', calls: [], probe: { method: 'POST', path: `customers/cus_${NO}` } },
-  { id: 'webhook_write', resource: 'Webhook Endpoints', level: 'Write', why: 'change where Stripe sends its messages', calls: [], probe: { method: 'POST', path: `webhook_endpoints/we_${NO}` } },
+  { id: 'webhook_write', resource: 'Webhook Endpoints, Event Destinations', level: 'Write', why: 'change where Stripe sends its messages', calls: [], probe: { method: 'POST', path: `webhook_endpoints/we_${NO}` } },
   { id: 'payment_method_configurations_write', resource: 'Payment Method Configurations', level: 'Write', why: 'change which ways to pay are switched on', calls: [], probe: { method: 'POST', path: `payment_method_configurations/pmc_${NO}` } },
 ];
 
