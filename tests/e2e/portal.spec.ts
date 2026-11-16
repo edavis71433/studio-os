@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, OWNER_SESSION, spyRequestBodies, sentBodies } from './helpers/app';
+import { settled } from './helpers/app';
 
 // The client portal (client.html) — a reviewer's calm world: mirror of "needs
 // you" (Phase PP Section 4), then approve what's theirs to approve.
@@ -100,6 +101,7 @@ test.describe('Client portal', () => {
 
   test('approving a change confirms and reloads', async ({ page }) => {
     await installApp(page, { api: {
+      'POST /foundations/plans/p1/decide': { data: { id: 'p1', status: 'approved' } },
       '/portal/context': REVIEWER_CTX,
       '/portal/feed': { data: { role: 'client_reviewer', moments: [],
         pending_approvals: [{ id: 'p1', kind: 'infrastructure', title: 'Protect your email', summary: '', decide_path: '/foundations/plans/p1/decide' }],
@@ -141,6 +143,8 @@ const CLIENT_CTX = { data: {
   landing: '/client.html', attention_count: 1, nav: [{ key: 'client', label: 'Your updates', items: [{ key: 'feed', label: 'Updates', href: '/client.html' }] }],
 } };
 const CLIENT_API = {
+  // the client's decision on an approval, answered as the server answers it (builder item 212)
+  'POST /client/approvals/a1/decide': (sent: { decision?: string }) => ({ data: { status: sent?.decision === 'approve' ? 'approved' : (sent?.decision || 'approved') } }),
   '/portal/context': CLIENT_CTX,
   '/portal/feed': { data: { role: 'business_owner', moments: [], notices: [], pending_approvals: [], last_published: null } },
   '/client/notifications': { data: [
@@ -1180,6 +1184,8 @@ test.describe('Client portal — the "Your website" card', () => {
 const SVC_OFFER = '44444444-4444-4444-8444-444444444444'; // a real offering id (uuid-shaped)
 const SUP_PROG = '55555555-5555-4555-8555-555555555555';  // an in_progress request
 const REQ_API = {
+  // a booking made from Messages, answered as the server answers it (builder item 212)
+  'POST /book/site-1': { data: { ok: true, message: 'You’re booked. A confirmation is on its way.', status: 'confirmed', when: 'Saturday, Aug 1 at 10:00 AM', service: 'A call', links: { google: 'https://calendar.google.com/calendar/render?action=TEMPLATE', outlook: 'https://outlook.live.com/calendar/0/deeplink/compose?rru=addevent', ics: '', manage: '' } } },
   ...MSG_API,
   '/client/services': { data: [
     { id: SVC_OFFER, name: 'Brand refresh', category: 'Design', description: 'A light refresh of your logo and colors.', price: 'From $800' },
@@ -1508,6 +1514,7 @@ const SHARE_FILE = { name: 'Team photos.png', mimeType: 'image/png', buffer: Buf
 
 test.describe('Client portal — Documents shelf: files and documents (slice 12, item 179 part four)', () => {
   test('proposals and agreements sit on the shelf newest first, each with its state and the one thing to do', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
     await installApp(page, { api: { ...FILES_API, '/client/billing': { data: { invoices: [] } } } });
     await page.goto('/client.html');
     await openFilesTab(page);
@@ -1544,6 +1551,7 @@ test.describe('Client portal — Documents shelf: files and documents (slice 12,
   });
 
   test('project files are shelf rows: type icon, honest meta, You-shared chip on client uploads, Save round-trip', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
     await installApp(page, { api: FILES_API });
     await page.addInitScript(() => { (window as any).open = (u: string) => { (window as any).__opened = u; return null; }; });
     await page.route('**/functions/v1/presence/client/deliverables/d1/download', (route) =>
@@ -2338,7 +2346,7 @@ test.describe('PS2 — Invoices on the Documents shelf (B1, item 179 part four)'
     // paid: green chip, formatted amount, the day it was paid (portal walk, Nov 8) — and NO pay link
     const paid = rows.filter({ hasText: 'Kickoff deposit' });
     await expect(paid.locator('.fst.sig')).toHaveText('Paid');
-    await expect(paid.locator('.fmeta')).toHaveText('Invoice · $1,200 · paid Jun 20');
+    await expect(paid.locator('.fmeta')).toHaveText(`Invoice · $1,200 · paid ${new Date().getFullYear() === 2026 ? 'Jun 20' : 'Jun 20, 2026'}`);   // the year only when it isn't this one (builder item 108)
     await expect(paid.locator('a')).toHaveCount(0);   // no receipt link in this payload, and never Pay
     // due-yesterday unpaid: the DERIVED Overdue chip (decision D2) + cents kept
     const over = rows.filter({ hasText: 'Design phase' });
@@ -2962,7 +2970,7 @@ test.describe('PS4 — Help tab (B2)', () => {
     // move on before the read lands
     await page.locator('#tabnav [data-tab="messages"]').click();
     await expect(page.locator('#mrows')).toBeVisible();
-    await page.waitForTimeout(1100);   // let the stale response arrive
+    await settled(page);   // let the stale response arrive
     await expect(page.locator('#mrows')).toBeVisible();   // Messages still owns #main
     await expect(page.locator('#main').getByRole('heading', { name: 'Help', exact: true })).toHaveCount(0);
     await expect(page.locator('#faqSearch')).toHaveCount(0);
@@ -3072,7 +3080,7 @@ test.describe('PS5 — booking flow honesty (B4)', () => {
     await openBookingFlow(page);
     await page.locator('#tabnav [data-tab="messages"]').click();
     await expect(page.locator('#mrows')).toBeVisible();
-    await page.waitForTimeout(1100);
+    await settled(page);
     await expect(page.locator('#mrows')).toBeVisible();   // Messages still owns #main
     await expect(page.getByRole('heading', { name: 'Book a call' })).toHaveCount(0);
     await expect(page.getByText('Online booking isn’t set up yet', { exact: false })).toHaveCount(0);
@@ -3094,7 +3102,7 @@ test.describe('PS5 — booking flow honesty (B4)', () => {
     // move on while the POST is in flight
     await page.locator('#tabnav [data-tab="messages"]').click();
     await expect(page.locator('#mrows')).toBeVisible();
-    await page.waitForTimeout(1100);
+    await settled(page);
     await expect(page.locator('#mrows')).toBeVisible();
     await expect(page.getByRole('heading', { name: /You’re booked/ })).toHaveCount(0);
   });
@@ -3674,7 +3682,7 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     await page.locator('[data-survey]').click();          // survey read in flight
     await page.locator('#tabnav [data-tab="messages"]').click();   // …but the client moves on
     await expect(page.locator('#mrows')).toBeVisible();
-    await page.waitForTimeout(900);
+    await settled(page);
     await expect(page.locator('#mrows')).toBeVisible();   // Messages still owns #main
     await expect(page.getByRole('heading', { name: 'How did we do?' })).toHaveCount(0);
   });
@@ -3952,7 +3960,7 @@ test.describe('Client portal — connect your Google (the studio asked)', () => 
     await expect(card).toContainText('Your studio (eric@davisdigitalstudio.com) asked to read these from your own Google account.');
     await expect(card.locator('[data-ask-connect]')).toHaveCount(2);
     expect(asks[0]).toContain('/connections/ask?token=tok-abc.iv');
-    expect(new URL(page.url()).search).toBe('');
+    await expect.poll(() => new URL(page.url()).search).toBe('');
     // not the filled button: the portal's one filled action stays the approval
     await expect(card.locator('button.approve')).toHaveCount(0);
   });

@@ -17,6 +17,8 @@ const PATIO = file(2, { name: 'Patio', metadata: { title: 'Patio' }, alt_text: '
 const SIGNED = file(3, { name: 'Signed plan', metadata: { title: 'Signed plan' }, alt_text: 'IMG_4032' });
 const STORAGE = { used_bytes: 125 * 1048576, files: 42, max_bytes: 1073741824, max_files: 100, level: 'ok' };
 const api = (extra: Record<string, unknown> = {}) => ({
+  // an upload is given its file's name, answered as routes/assets.ts answers it (builder item 212)
+  'PATCH /assets': (sent: Record<string, unknown>) => ({ data: { ok: true, asset: { id: 'uploaded', kind: 'image', state: 'approved', ...sent } } }),
   '/assets/collections': { data: [{ name: 'Outside', count: 2 }, { name: 'Templates', count: 1 }, { name: 'stock', count: 3 }] },
   '/assets/health': { data: { findings: [] } },
   '/assets': { data: { assets: [STOREFRONT, PATIO, SIGNED], total: 3, shown: 3, live_count: 1, policy: 'immediate', storage: STORAGE } },

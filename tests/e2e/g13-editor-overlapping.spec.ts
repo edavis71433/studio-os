@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
 import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave, openPages, addBlankPage } from './helpers/editor';
+import { settled } from './helpers/app';
 
 // ── G13 in-place canvas text editor — writes to /settings that overlap, and reads landing out of order ──
 // Split from g13-editor.spec.ts (builder list item 109, Nov 2026): the fixtures and
@@ -95,7 +96,7 @@ test.describe('G13 in-place canvas text editor — writes to /settings that over
     await expect.poll(() => sent.length, { timeout: 6000 }).toBeGreaterThanOrEqual(2);
     expect(aboutIn(sent[1])?.hideNav).toBe(true);
     expect(aboutIn(sent[1])?.blocks.length).toBe(3);
-    await page.waitForTimeout(1800);                               // and nothing is left to save
+    await settled(page);   // and nothing is left to save
     expect(sent.length).toBe(2);
   });
 
@@ -228,7 +229,7 @@ test.describe('G13 in-place canvas text editor — writes to /settings that over
     const saved = aboutIn(sent[1])?.blocks as unknown as FormBlocks;
     expect(saved[0].subtitle).toBe('Edit while the form saves');
     expect(saved[1].title).toBe('Write to us');
-    await page.waitForTimeout(1000);                               // the list is rebuilt from what came back
+    await settled(page);   // the list is rebuilt from what came back
     expect(await page.evaluate(() => (0, eval)('BLOCKS_WORK[0].subtitle'))).toBe('Edit while the form saves');
     expect((aboutIn(stored(draft))?.blocks as unknown as FormBlocks)[0].subtitle).toBe('Edit while the form saves');
     expect(sent.length).toBe(2);
@@ -248,7 +249,7 @@ test.describe('G13 in-place canvas text editor — writes to /settings that over
     await expect(frame.locator('#dds-dc-bar')).toBeAttached();
     await markCanvas(frame);
     releases[0]();                                                 // the older read, last
-    await page.waitForTimeout(800);
+    await settled(page);
     await expect(homeLine(frame)).toHaveText('Second edit');
     await expect(frame.locator('body[data-e2e-old]')).toHaveCount(1);
   });

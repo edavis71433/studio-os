@@ -1,5 +1,6 @@
 import { test, expect, devices, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks } from './helpers/app';
+import { pointAt, pressButton, touchScreen, showTips, settled } from './helpers/app';
 
 // The Website page, Squarespace style (Nov 2026): the Overview is the site itself, with
 // one bar and one to-do line, and the menu lives in the sidebar, grouped by job.
@@ -138,7 +139,7 @@ test.describe('the Overview is the site', () => {
     await page.route('**/functions/v1/presence/preview**', async (r: Route) => { reads++; await r.fallback(); });
     await mount(page, '/presence.html#faqs');
     await expect(page.locator('#view-faqs')).toBeVisible();
-    await page.waitForTimeout(600);
+    await settled(page);
     expect(reads).toBe(0);
     await page.evaluate(() => (window as any).go('today'));
     await expect(page.frameLocator('#siteFrame').locator('h1').first()).toBeVisible();
@@ -171,11 +172,11 @@ test.describe('where everything else went', () => {
     await expect(page.locator('#pagesList .hb-row').first()).toContainText('Home');
     await page.goto('/presence.html#health');
     await expect(page.locator('#view-search')).toBeVisible();
-    await page.waitForTimeout(700);   // and it stays there: it used to jump to the Overview after 0.2 s
+    await settled(page);   // and it stays there: it used to jump to the Overview after 0.2 s
     await expect(page.locator('#view-search')).toBeVisible();
     await page.goto('/presence.html#activity');
     await expect(page.locator('#view-history')).toBeVisible();
-    await page.waitForTimeout(700);
+    await settled(page);
     await expect(page.locator('#view-history')).toBeVisible();
     await expect(page.locator('#view-history h1.doc')).toHaveText('Versions');
     // the versions come first; what happened to the site follows them
@@ -293,7 +294,7 @@ const touchChecks = () => {
     await expect(bar).toHaveClass(/\bon\b/);
     await expect(frame.locator('section#a')).toHaveClass(/dc-hot/);
     await expect(bar.getByRole('button', { name: 'Duplicate this section' })).toBeVisible();
-    await page.waitForTimeout(600);   // the pretend mouse-leave after a tap must not put it away
+    await settled(page);   // the pretend mouse-leave after a tap must not put it away
     await expect(bar).toHaveClass(/\bon\b/);
     await expect(frame.locator('[contenteditable]')).toHaveCount(0);   // the first tap selects, it doesn't edit
   });
@@ -344,6 +345,7 @@ const touchChecks = () => {
     await expect(frame.locator('#dds-dc-bar')).not.toHaveClass(/\bon\b/);   // the toolbar steps aside while you type
   });
   test('the editor’s tip says to tap, not double-click', async ({ page }) => {
+    await showTips(page);
     await touchCanvas(page);
     await expect(page.locator('.dds-hint.dds-live')).toContainText('Tap a section to select it, then tap its words');
   });
@@ -376,6 +378,7 @@ test.describe('editing with a mouse is unchanged', () => {
     await expect(bar).not.toHaveClass(/\bon\b/);
   });
   test('the editor’s tip still says double-click', async ({ page }) => {
+    await showTips(page);
     await touchCanvas(page);
     await expect(page.locator('.dds-hint.dds-live')).toContainText('Double-click the words in a section');
   });
@@ -982,6 +985,8 @@ test.describe('a section edited in its panel redraws at once (item 26)', () => {
     const edited = frame.locator('#main > section[data-dds-src="0"]');
     await expect(edited.locator('h2')).toHaveText('Typed live');           // while the field still has focus
     await expect(title).toBeFocused();                                      // nothing rebuilt the panel under the cursor
+    // a real wait: while the field holds the focus the page keeps its 700 ms save timer going,
+    // so the page never settles; this is past one full turn of it
     await page.waitForTimeout(900);
     expect(writes.filter((w) => w.path === '/settings' && w.method === 'PUT')).toHaveLength(0);
     await title.blur();
@@ -1002,7 +1007,7 @@ test.describe('a section edited in its panel redraws at once (item 26)', () => {
     await page.waitForTimeout(400);   // the last keystroke's drawing is in
     const drawn = asked.length;
     await title.blur();
-    await page.waitForTimeout(600);   // past the 200 ms a drawing waits, before the save leaves at 700
+    await settled(page);   // the drawing's 200 ms and the save at 700 are done
     expect(asked.length).toBe(drawn);
   });
   // Each live drawing used to rebuild the whole Contents list and every add-section line.
@@ -1024,7 +1029,7 @@ test.describe('a section edited in its panel redraws at once (item 26)', () => {
   test('a section added or removed waits for the full redraw instead', async ({ page }) => {
     const { asked } = await setup(page);
     await page.evaluate(() => (window as any).dcDuplicate(0));
-    await page.waitForTimeout(700);
+    await settled(page);
     expect(asked).toHaveLength(0);
   });
 });
@@ -1055,7 +1060,7 @@ test.describe('one preview screen', () => {
     const frame = page.frameLocator('#previewFrame');
     const sec = frame.locator('#main > section').first();
     await expect(sec).toBeVisible();   // the draft draws into the frame after the screen opens
-    await sec.hover();
+    await pointAt(sec, { position: { x: 4, y: 4 } });   // a plain spot, never a link
     await page.waitForTimeout(300);
     await expect(frame.locator('#dds-ee-bar')).toHaveCount(0);
     await expect(frame.locator('[data-dds-ee], .dds-ee-on')).toHaveCount(0);
@@ -1142,7 +1147,7 @@ test.describe('type into the welcome section and About on the canvas', () => {
     await page.keyboard.type(' and more');
     await page.keyboard.press('Escape');
     await expect(p).toHaveText('Hello');
-    await page.waitForTimeout(900);
+    await settled(page);
     expect(identityWrites(writes)).toHaveLength(0);
   });
 
@@ -1165,7 +1170,7 @@ test.describe('type into the welcome section and About on the canvas', () => {
     await page.keyboard.press('Enter');
     await expect(h1).toHaveText('Marlow’s Kitchen');
     await expect(page.getByText('Your business needs a name')).toBeVisible();
-    await page.waitForTimeout(900);
+    await settled(page);
     expect(identityWrites(writes)).toHaveLength(0);
   });
 
@@ -1204,7 +1209,7 @@ test.describe('type into the welcome section and About on the canvas', () => {
     await tag.dblclick();
     await page.keyboard.type('Fresh');
     await page.evaluate(() => (window as any).refreshDesignPreview());   // as when a panel's save lands mid-word
-    await page.waitForTimeout(700);
+    await settled(page);
     await expect(tag).toHaveAttribute('contenteditable', /true|plaintext-only/);
     await page.keyboard.type(' pasta');
     await page.keyboard.press('Enter');
@@ -1296,11 +1301,15 @@ test.describe('Styles show on the page at once, and save behind', () => {
 
   test('a colour shows on the canvas before its save answers, saves once, and the page isn’t redrawn', async ({ page }) => {
     const { log, pick, cssVar, saves } = await styles(page);
+    let release = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    await page.route('**/functions/v1/presence/dev/customization', async (route: Route) => { if (route.request().method() === 'PUT') await held; return route.fallback(); });
     await pick('Evergreen');
     await expect.poll(() => cssVar('--accent')).toBe('#23635a');
-    expect(log).not.toContain('save answered');                  // shown before the save came back
+    expect(log).not.toContain('save answered');                  // shown before the save came back: it waits at the door until now
+    release();
     await expect.poll(saves).toEqual([{ accent: '#23635a', accent_dark: '#17453f', ink: '#1c2430', soft: '#5b6572' }]);
-    await page.waitForTimeout(800);                               // past the redraw's own pause
+    await settled(page);                               // the redraw's own pause is over
     expect(log.filter((x) => x === 'drawing')).toHaveLength(0);
     expect(await cssVar('--accent-dark')).toBe('#17453f');        // the dashed name the templates read, as the server writes it
     await expect(page.locator('#designCard').getByRole('button', { name: 'Evergreen ✓' })).toBeVisible();
@@ -1473,8 +1482,8 @@ test.describe('a save that fails says so', () => {
   test('a section field still being typed in says “Unsaved changes”, and the save says it saved', async ({ page }) => {
     await mount(page, '/presence.html#design');
     const frame = page.frameLocator('#designPreview');
-    await frame.locator('#a').hover();
-    await frame.locator('#dds-dc-bar button[aria-label="Edit this section"]').click();
+    await pointAt(frame.locator('#a'));
+    await pressButton(frame.locator('#dds-dc-bar button[aria-label="Edit this section"]'));
     const field = page.locator('#blocksCard input[type=text]').first();
     await field.click();
     await field.pressSequentially(' more');
@@ -1520,7 +1529,7 @@ test.describe('no drawing nobody asked for (item 85)', () => {
     const on = (r: any) => { const u = new URL(r.url()); if (/\/functions\/v1\/presence\/preview$/.test(u.pathname)) seen.push(u.search); };
     page.on('request', on);
     await act();
-    await page.waitForTimeout(900);                                   // past the 350 ms the old redraw waited
+    await settled(page);                                   // the 350 ms the old redraw waited is over
     page.off('request', on);
     return seen;
   };
@@ -1529,22 +1538,21 @@ test.describe('no drawing nobody asked for (item 85)', () => {
     const frame = page.frameLocator('#designPreview');
     await frame.locator('#a h2').waitFor();
     const draws = await drawsAfter(page, async () => {
-      await frame.locator('#a').hover();
-      await frame.locator('#dds-dc-bar button[aria-label="Edit this section"]').click();
+      await pointAt(frame.locator('#a'));
+      await pressButton(frame.locator('#dds-dc-bar button[aria-label="Edit this section"]'));
     });
     expect(draws).toEqual([]);
     expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
   });
   test('Hide from the canvas draws the canvas once, and not the hidden Preview', async ({ page }) => {
-    test.skip(isPhone(page), 'a phone selects by tap, with no hover');
     await mount(page, '/presence.html#design');
     const frame = page.frameLocator('#designPreview');
     await frame.locator('#a h2').waitFor();
     const previewBefore = await page.evaluate(() => (document.getElementById('previewFrame') as HTMLIFrameElement).srcdoc);
     const draws = await drawsAfter(page, async () => {
-      await frame.locator('#a').hover();
-      await frame.locator('#dds-dc-bar button[aria-label="More"]').click();   // Hide waits behind the pill's More
-      await frame.locator('#dds-dc-more button[aria-label="Hide this section"]').click();
+      await pointAt(frame.locator('#a'));
+      await pressButton(frame.locator('#dds-dc-bar button[aria-label="More"]'));   // Hide waits behind the pill's More
+      await pressButton(frame.locator('#dds-dc-more button[aria-label="Hide this section"]'));
     });
     expect(draws.length).toBeLessThanOrEqual(1);                        // the canvas's own redraw, no second one
     expect(await page.evaluate(() => (document.getElementById('previewFrame') as HTMLIFrameElement).srcdoc)).toBe(previewBefore);
@@ -1619,11 +1627,12 @@ test.describe('the website editor reads what it shows, when it shows it (item 84
       await expect.poll(() => own.filter((p) => !reads.slice(before).includes(p)), { message: hash }).toEqual([]);
     }
     // A second round of every tab. Not a wait for a quiet network: the tablet keeps a font
-    // request open in Edit mode, so the network never goes quiet there.
-    await page.waitForTimeout(500);
+    // request open in Edit mode, so the network never goes quiet there. settled() counts only
+    // the page's own timers and fetches.
+    await settled(page);
     const before = reads.length;
     for (const hash of Object.keys(EXTRAS)) { await go(page, hash); await page.waitForTimeout(150); }
-    await page.waitForTimeout(800);
+    await settled(page);
     for (const p of Object.values(EXTRAS).flat()) expect(reads.slice(before), p).not.toContain(p);
   });
 
@@ -1633,12 +1642,12 @@ test.describe('the website editor reads what it shows, when it shows it (item 84
     await page.waitForLoadState('networkidle');
     const healthReads = () => reads.filter((p) => p === '/health').length;
     expect(healthReads()).toBe(1);
-    // A wait for a quiet network returns at once after the first load, so these give a read
-    // the time it would take to go out.
+    // A wait for a quiet network returns at once after the first load, so these wait for any
+    // timer that would send a read, and the read itself (settled).
     await go(page, '#pages');
-    await page.waitForTimeout(400);
+    await settled(page);
     await go(page, '#today');
-    await page.waitForTimeout(800);
+    await settled(page);
     expect(healthReads()).toBe(1);   // nothing saved since, so nothing new to read
     await go(page, '#business');
     await page.locator('#f-business_name').fill('Marlow’s Bistro');
@@ -1776,13 +1785,13 @@ test.describe('the section panel’s arrows keep the canvas pointing at the righ
     });
     const frame = page.frameLocator('#designPreview');
     const editOn = async (id: string) => {
-      await frame.locator('#b' === id ? '#a' : '#b').hover();
-      await frame.locator(id).hover();
-      await frame.locator('#dds-dc-bar button[aria-label="Edit this section"]').click();
+      await pointAt(frame.locator('#b' === id ? '#a' : '#b'));
+      await pointAt(frame.locator(id));
+      await pressButton(frame.locator('#dds-dc-bar button[aria-label="Edit this section"]'));
     };
     await editOn('#a');
     expect(await page.evaluate('BLOCKS_WORK[BLOCK_SOLO].type')).toBe('title');
-    await page.waitForLoadState('networkidle');           // Edit's own redraw (item 85) has landed
+    await settled(page);                                  // Edit's own redraw (item 85) has landed
     await page.locator('#inspectorSeg [data-itab="layout"]').click();   // the inspector keeps the arrows on its Layout tab (part two)
     await page.locator('#blkSub-0').getByRole('button', { name: /^Move (this section )?down$/ }).click();   // item 34: an icon, by its name
     expect(await page.evaluate('BLOCKS_WORK.map((b) => b.type).join()')).toBe('richtext,title');
@@ -1810,9 +1819,9 @@ test.describe('move the welcome section among the others', () => {
 
   test('the welcome section’s own toolbar moves it below About: one write, in the order the site reads', async ({ page }) => {
     const { writes, frame } = await canvas(page, true);
-    await frame.locator('section[data-dds-core="hero"]').hover();
+    await pointAt(frame.locator('section[data-dds-core="hero"]'));
     await expect(barButton(frame, 'Move this section up')).toHaveClass(/dc-off/);   // already at the top
-    await barButton(frame, 'Move this section down').click();
+    await pressButton(barButton(frame, 'Move this section down'));
     await expect.poll(() => orders(writes)).toEqual([['about', 'hero', 'offerings', 'testimonials', 'faqs']]);
     await page.locator('#btnUndo').click();
     await expect.poll(() => orders(writes).at(-1)).toEqual([]);   // back to the usual order on a site that had none saved
@@ -1820,23 +1829,23 @@ test.describe('move the welcome section among the others', () => {
 
   test('a built-in section moves past its visible neighbour, and the last one can’t go further down', async ({ page }) => {
     const { writes, frame } = await canvas(page, true);
-    await frame.locator('section[data-dds-core="about"]').hover();
+    await pointAt(frame.locator('section[data-dds-core="about"]'));
     await frame.locator('body').evaluate((b) => b.setAttribute('data-e2e-old', ''));
-    await barButton(frame, 'Move this section down').click();
+    await pressButton(barButton(frame, 'Move this section down'));
     await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs']]);
     // the move draws the page again; a hover on the page about to go leaves no bar on the new one
     await expect(frame.locator('body[data-e2e-old]')).toHaveCount(0);
     await expect(frame.locator('#dds-dc-bar')).toBeAttached();
-    await frame.locator('section[data-dds-core="offerings"]').hover();
+    await pointAt(frame.locator('section[data-dds-core="offerings"]'));
     await expect(barButton(frame, 'Move this section down')).toHaveClass(/dc-off/);   // added sections follow the built-in ones
   });
 
   test('on a template that keeps the welcome section on top, it has no arrows and nothing goes above it', async ({ page }) => {
     const { writes, frame } = await canvas(page, false);
-    await frame.locator('section[data-dds-core="hero"]').hover();
+    await pointAt(frame.locator('section[data-dds-core="hero"]'));
     await expect(frame.locator('#dds-dc-bar')).toHaveClass(/\bon\b/);
     await expect(barButton(frame, 'Move this section down')).toHaveCount(0);
-    await frame.locator('section[data-dds-core="about"]').hover();
+    await pointAt(frame.locator('section[data-dds-core="about"]'));
     await expect(barButton(frame, 'Move this section up')).toHaveClass(/dc-off/);
     // the Styles list says the same
     const row = (name: string) => page.locator('#sectionsCard > div').filter({ hasText: name });
@@ -1852,8 +1861,8 @@ test.describe('move the welcome section among the others', () => {
     const { writes } = await canvas(page, true);
     await page.evaluate(() => (window as any).openTrayPanel('contents'));   // the list's panel starts closed
     const row = page.locator('#designTreeList .dc-tree-row[data-core="about"]');
-    await row.hover();
-    await row.locator('button[aria-label="Move down"]').click();
+    if (!touchScreen()) await row.hover();   // a mouse brings the row's arrows; a finger sees them already
+    await pressButton(row.locator('button[aria-label="Move down"]'));
     await expect.poll(() => orders(writes)).toEqual([['hero', 'offerings', 'about', 'testimonials', 'faqs']]);
     await expect(page.locator('#designTreeList .dc-tree-row[data-core="about"] button[aria-label="Move down"]')).toBeFocused();
   });
@@ -1868,10 +1877,10 @@ test.describe('move the welcome section among the others', () => {
   test('two quick presses on a built-in section’s arrow make two moves', async ({ page }) => {
     const { writes, frame } = await canvas(page, true);
     await slowSaves(page);
-    await frame.locator('section[data-dds-core="hero"]').hover();
+    await pointAt(frame.locator('section[data-dds-core="hero"]'));
     const down = barButton(frame, 'Move this section down');
-    await down.click();
-    await down.click();
+    await pressButton(down);
+    await pressButton(down);
     await expect.poll(() => orders(writes)).toEqual([['about', 'hero', 'offerings', 'testimonials', 'faqs'], ['about', 'offerings', 'hero', 'testimonials', 'faqs']]);
   });
   test('two quick presses on the Styles list’s arrow make two moves too', async ({ page }) => {

@@ -2,6 +2,7 @@ import { test, expect, Page, Route } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { installApp } from './helpers/app';
+import { settled } from './helpers/app';
 
 // ── List items 143 and 144: pages draw sooner, fetch nothing from Google, and keep
 // working under the app host's tighter content rule ───────────────────────────
@@ -110,7 +111,7 @@ test.describe("the app host's content rule breaks nothing (item 144)", () => {
       await page.goto(path);
       await expect(page.locator(ready).first()).toBeAttached();
       await page.waitForLoadState('load');
-      await page.waitForTimeout(500);
+      await settled(page);
       // fixture pictures point at made-up addresses; only those may be refused
       expect((await blocked()).filter((v) => !/^img-src https:\/\/(example\.(com|org)|[\w.-]+\.example)\b/.test(v))).toEqual([]);
     });

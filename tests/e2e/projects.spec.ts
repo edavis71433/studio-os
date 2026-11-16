@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp } from './helpers/app';
+import { settled } from './helpers/app';
 
 // Projects as a Lightning surface (redesign slice 9): the roster is a list view
 // on the one page header (builder item 165: icon + #pagehead + refresh + line) with the
@@ -103,6 +104,11 @@ const API = {
   '/projects/p9/surveys': { data: [] },
   '/projects/p9/client-messages': { data: [], customer: null },
   '/support': { data: [] },
+  // the saves these tests make, answered as the server answers them (builder item 212)
+  'PATCH /projects/p1/milestones': (sent: Record<string, unknown>) => ({ data: { id: 'm2', project_id: 'p1', site_id: 's1', client_visible: true, ...sent, updated_at: '2026-07-15T01:00:00Z' } }),
+  'POST /approvals/a1/decide': (sent: { decision?: string }) => ({ data: { status: sent?.decision === 'approve' ? 'approved' : (sent?.decision || 'approved') } }),
+  'POST /support/sr1/messages': (sent: { body?: string }) => ({ data: { id: 'srm-new', request_id: 'sr1', body: sent?.body || '', author_kind: 'client', created_at: '2026-07-15T01:00:00Z' } }),
+  'POST /projects/p1/approvals': (sent: Record<string, unknown>) => ({ data: { id: 'ap-new', project_id: 'p1', subject_type: 'custom', subject_id: null, summary: '', content_hash: 'h', requested_by: 'owner@example.com', requested_by_kind: 'client', decided_at: null, client_visible: true, due_date: null, last_reminded_at: null, ...sent, status: 'pending' } }),
 };
 
 // ── The studio's ten standard delivery steps ────────────────────────────────
@@ -291,7 +297,7 @@ test.describe('Projects list view', () => {
     await page.locator('[data-open="p2"]').click();           // open a DIFFERENT record
     await expect(page.locator('#dtitle')).toContainText('Beta brand refresh');
     await expect(page.locator('#msgList')).toContainText('No messages yet');
-    await page.waitForTimeout(1100);                          // p1's stale response lands
+    await settled(page);                          // p1's stale response lands
     await expect(page.locator('#detailInner')).not.toContainText('STALE P1 MESSAGE');
     await expect(page.locator('#dtitle')).toContainText('Beta brand refresh');
   });

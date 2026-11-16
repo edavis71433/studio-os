@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { test, expect, Page } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, showTips } from './helpers/app';
+import { settled } from './helpers/app';
 
 // Website builder, Phase 0 (Nov 2026): what a client hit in production.
 const API = {
@@ -109,12 +110,13 @@ test.describe('a watch plan', () => {
   }));
 
   test('Design says the plan doesn’t include it, with no building tools and no dead buttons', async ({ page }) => {
+    await showTips(page);   // the editor's tip is what must stay away here
     await installApp(page, { api: WATCH }); await refuse(page);
     await page.goto('/presence.html#design');
     await expect(page.locator('#dpEmptyTitle')).toHaveText('Editing isn’t part of this plan.');
     await expect(page.getByText('The preview couldn’t load just now.')).toHaveCount(0);
     for (const sel of ['#pagesBar', '.dc-bar', '#btnAddFab', '#designPreviewEmpty .ea']) await expect(page.locator(sel)).toBeHidden();
-    await page.waitForTimeout(600);   // past the tip's delay: "pick a look" means nothing here
+    await settled(page);   // the tip's delay is over: "pick a look" means nothing here
     await expect(page.locator('.dds-hint.dds-live')).toHaveCount(0);
   });
 
@@ -169,7 +171,7 @@ test.describe('one tip at a time', () => {
     await expect(tip).toContainText('How people find you on Google');   // item 95: the tip says what is on the tab
     await page.evaluate(() => (window as any).go('media'));
     await expect(tip).toHaveCount(0);
-    await page.waitForTimeout(700);        // past the tip's own delay
+    await settled(page);        // the tip's own delay is over
     await expect(tip).toHaveCount(0);      // Files has a tip too, but not on this visit
     await expect(page.locator('#view-media')).toBeVisible();
   });

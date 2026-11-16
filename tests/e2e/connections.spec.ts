@@ -178,7 +178,7 @@ test.describe('Connections — failures say what went wrong, and stay said', () 
     await expect(prob).toContainText('CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET');
     await expect(prob).toContainText('CONNECTION_ENC_KEY');
     await expect(prob).toContainText('https://davisdigitalstudio.com/connections-callback.html');
-    // a toast would have been gone by now; an action item must not be
+    // a toast would have been gone by now; an action item must not be (a real wait: a toast lasts up to 3.2 s)
     await page.waitForTimeout(3200);
     await expect(prob).toBeVisible();
     // and the button is usable again, not stuck on "One moment…"
@@ -273,7 +273,7 @@ test.describe('Connections — Google Analytics chooses its property', () => {
     await page.goto('/connections.html');
     const box = page.locator('#pick-google_analytics');
     await expect(box).toContainText('We couldn’t list that account’s Analytics properties just now');
-    await page.waitForTimeout(3200);   // a toast would be gone; this must not be
+    await page.waitForTimeout(3200);   // a real wait: a toast (up to 3.2 s) would be gone; this must not be
     await expect(box).toContainText('Nothing changed');
   });
 

@@ -258,6 +258,7 @@ test.describe('The client’s Overview: one Do next list (builder list item 184)
 
 test.describe('A coach idea opens the plan in the editor (builder list item 184)', () => {
   const PAGE_API = {
+    'POST /coach/run': { data: { ok: true, opportunities: 1, deterministic_only: true, model: '', ms: 5 } },   // opening the plan asks the coach for a fresh run
     '/changes': { data: { count: 0, first_publish: false, changes: [], blockers: 0, warnings: 0, draft_hash: 'h' } },
     '/settings': { data: { blocks: [], section_meta: {}, pages: [] } },
     '/media': { data: [] }, '/offerings': { data: [] }, '/faqs': { data: [] }, '/testimonials': { data: [] }, '/posts': { data: [] },

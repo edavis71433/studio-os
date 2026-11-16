@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
 import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave } from './helpers/editor';
+import { pointAt, pressButton, settled } from './helpers/app';
 
 // ── G13 in-place canvas text editor — editing in place: enter, commit, cancel, the mini-bar, caps and modes ──
 // Split from g13-editor.spec.ts (builder list item 109, Nov 2026): the fixtures and
@@ -52,7 +53,7 @@ test.describe('G13 in-place canvas text editor — editing in place: enter, comm
     await h2.dblclick();
     await expect(h2).toHaveAttribute('contenteditable', /.+/);
     await frame.locator('section.block-cta').click();      // click away = commit (unchanged)
-    await page.waitForTimeout(1800);                       // longer than the 1.2s debounce
+    await settled(page);   // the 1.2s debounce, if anything set it, has fired
     expect(puts.length).toBe(0);
   });
 
@@ -115,7 +116,7 @@ test.describe('G13 in-place canvas text editor — editing in place: enter, comm
     await page.keyboard.press('ControlOrMeta+b');
     await expect(page.getByText(/crosses a paragraph break/)).toBeVisible();
     await page.keyboard.press('Escape');           // leave without committing anything
-    await page.waitForTimeout(1500);
+    await settled(page);
     expect(puts.length).toBe(0);
   });
 
@@ -218,7 +219,7 @@ test.describe('G13 in-place canvas text editor — editing in place: enter, comm
     await page.keyboard.press('Enter');
     await expect(h2).toHaveAttribute('contenteditable', /.+/);
     await frame.locator('section.block-titleonly').click();   // blur commits
-    await page.waitForTimeout(1800);                          // past the 1.2s debounce
+    await settled(page);   // the 1.2s debounce, if anything set it, has fired
     expect(puts.length).toBe(0);
   });
 
@@ -231,7 +232,7 @@ test.describe('G13 in-place canvas text editor — editing in place: enter, comm
     await prose.dblclick();
     await expect(prose).toHaveAttribute('contenteditable', 'true');
     await frame.locator('section.block-titleonly').click();
-    await page.waitForTimeout(1800);
+    await settled(page);
     expect(puts.length).toBe(0);   // '- star one…1. seven' ≠ stored, but the USER changed nothing
   });
 
@@ -265,7 +266,7 @@ test.describe('G13 in-place canvas text editor — editing in place: enter, comm
     await frame.locator('section.block-titleonly h2').dblclick();
     await expect(frame.locator('[contenteditable]')).toHaveCount(0); // feature-detect: no editor
     await expect(page.locator('#settingsPanel')).toHaveClass(/on/);  // …but the panel path still opens
-    await page.waitForTimeout(1500);
+    await settled(page);
     expect(puts.length).toBe(0);
   });
 
@@ -292,10 +293,10 @@ test.describe('G13 in-place canvas text editor — editing in place: enter, comm
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     // the canvas reloaded after the save — the toolbar still drives section ops
     await canvasReplaced(frame);
-    await frame.locator('section.block-richtext').hover();
+    await pointAt(frame.locator('section.block-richtext'));
     const dup = frame.locator('#dds-dc-bar button', { hasText: 'Duplicate' });
     await expect(dup).toBeVisible();
-    await dup.click();
+    await pressButton(dup);
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(2);
     const last = puts[puts.length - 1].blocks as typeof BLOCKS;
     expect(last.length).toBe(5);                            // duplicated in place

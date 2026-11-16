@@ -215,7 +215,8 @@ test.describe('Usable by everyone: the fix list (builder item 150)', () => {
       expect(list.violations.filter((v) => ['serious', 'critical'].includes(v.impact || '')).map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ') + ' ' + (n.any[0]?.message || '')).join(' | ')}`)).toEqual([]);
       await sheet(page).getByRole('button', { name: /^Pick colours/ }).click();
       await expect(page.locator('.ue-faint')).toBeVisible();
-      await page.waitForTimeout(600);   // the panel fades in; a scan mid-fade reads blended colours
+      // the panel fades in; a scan mid-fade reads blended colours, so it waits for the fade to end
+      await page.evaluate(() => Promise.allSettled(document.getAnimations().filter((a) => a.effect?.getTiming().iterations !== Infinity).map((a) => a.finished)));
       const tab = await new AxeBuilder({ page }).include('.ue-faint').include('.ins-swatches.ue-rated').withTags(['wcag2a', 'wcag2aa']).analyze();
       expect(tab.violations.filter((v) => ['serious', 'critical'].includes(v.impact || '')).map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ') + ' ' + (n.any[0]?.message || '')).join(' | ')}`)).toEqual([]);
     });

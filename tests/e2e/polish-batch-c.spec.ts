@@ -55,6 +55,8 @@ const HOME = {
     { kind: 'deal_task', id: '22222222-2222-4222-8222-222222222222', parent_id: '11111111-1111-4111-8111-111111111111', title: 'Price the add-ons', due: day(0), context: 'Harbor Lane Bakery', href: '/pipeline.html', blocked: false },
     { kind: 'deal_task', id: '33333333-3333-4333-8333-333333333333', parent_id: '11111111-1111-4111-8111-111111111111', title: 'Send the photos', due: day(1), context: 'Harbor Lane Bakery', href: '/pipeline.html', blocked: false },
   ] } },
+  // Done on a to-do, answered as routes/sales.ts answers it (builder item 212)
+  'PATCH /sales/deal-tasks': { data: { ok: true } },
 };
 
 test.describe('batch C — colours', () => {

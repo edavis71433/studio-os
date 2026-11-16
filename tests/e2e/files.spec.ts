@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { settled } from './helpers/app';
 import { headerAction } from './helpers/page-header';
 
 // DAM-1 / Architecture v1.0 + SS1 (standards sweep) — the DAM presents as
@@ -30,6 +31,8 @@ const byClientApi = (extra: Record<string, unknown> = {}) => ({
 });
 
 const filesApi = {
+  // an upload is given its file's name, answered as routes/assets.ts answers it (builder item 212)
+  'PATCH /assets': (sent: Record<string, unknown>) => ({ data: { ok: true, asset: { id: 'uploaded', kind: 'image', state: 'approved', ...sent } } }),
   '/assets/collections': { data: [{ name: 'Brand', count: 1 }] },
   '/assets/health': { data: { findings: [] } },
   '/assets': { data: { assets: [LOGO, CONTRACT], total: 3, shown: 2, live_count: 1, policy: 'immediate' } },
@@ -444,10 +447,10 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await page.goto('/files.html');
     await expect(page.locator('#root')).toContainText('Logo');
     await page.locator('#q').fill('slow');           // debounced load #1 — the server answers SLOWLY
-    await page.waitForTimeout(450);                  // let request #1 depart
+    await settled(page, { requests: false });                  // let request #1 depart
     await page.locator('#q').fill('slowly');         // load #2 — answers fast
     await expect(page.locator('#root')).toContainText('FreshResult');
-    await page.waitForTimeout(1400);                 // request #1 resolves late — it must be DROPPED
+    await settled(page);                 // request #1 resolves late — it must be DROPPED
     await expect(page.locator('#root')).toContainText('FreshResult');
     await expect(page.locator('#root')).not.toContainText('StaleResult');
     expect(qs).toContain('slow');                    // the search really went to the server as ?q=
@@ -466,7 +469,7 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await page.locator('[data-col="stock"]').click();     // the stock read departs (slow)
     await page.locator('[data-col="all"]').click();       // the user changes their mind
     await expect(page.locator('#root')).toContainText('Logo');
-    await page.waitForTimeout(1600);                      // the stock response lands late — it must be DROPPED
+    await settled(page);                      // the stock response lands late — it must be DROPPED
     await expect(page.locator('#root')).toContainText('Logo');
     await expect(page.locator('#root')).not.toContainText('Add to my files');
   });
@@ -649,7 +652,7 @@ test.describe('Files (the DAM, customer-facing)', () => {
     await q.pressSequentially('logo', { delay: 30 });
     await page.keyboard.press('ArrowLeft');   // park the caret INSIDE the value…
     await page.keyboard.press('ArrowLeft');   // …at index 2 (a collapsed selection)
-    await page.waitForTimeout(600);   // debounce + reload + re-render behind it
+    await settled(page);   // debounce + reload + re-render behind it
     await expect(q).toBeFocused();    // the SAME control still holds focus…
     await expect(q).toHaveValue('logo');   // …the typed value survived the swap…
     // …and so did the caret POSITION — a naive focus()+value restore leaves the

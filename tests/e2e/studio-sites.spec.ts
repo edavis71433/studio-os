@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
+import { settled } from './helpers/app';
 
 // Builder list items 43, 45 and 52 (Nov 2026): the studio's Sites page (every client
 // site as a card with a live picture, or a table), Pin and Duplicate on each site's
@@ -306,7 +307,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     const many = Array.from({ length: 14 }, (_, i) => site({ site_id: `m${i}`, name: `Client ${String(i).padStart(2, '0')}`, address: `https://c${i}.example` }));
     const t = await openSites(page, many, { thumbDelay: 250 });
     await expect(page.locator('.scard')).toHaveCount(14);
-    await page.waitForTimeout(900);
+    await settled(page);
     expect(t.thumbs.length).toBeGreaterThan(0);
     expect(t.thumbs.length).toBeLessThan(14);                     // the cards far below are not asked for yet
     // a card jumped past is never asked for; scrolled through, each one is
@@ -576,6 +577,7 @@ test.describe('Sites: the trash (item 154)', () => {
   });
 
   test('the Trash at the foot of the page: newest first, the day each goes, and Restore', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
     const t = await openSites(page, [BISTRO], { body: { trash: TRASHED } });
     const trash = page.locator('section.trash');
     await expect(trash.locator('h2')).toHaveText('Trash');

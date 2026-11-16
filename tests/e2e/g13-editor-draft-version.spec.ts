@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
 import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave } from './helpers/editor';
+import { settled } from './helpers/app';
 
 // ── G13 in-place canvas text editor — the draft version a write names, and another person’s change ──
 // Split from g13-editor.spec.ts (builder list item 109, Nov 2026): the fixtures and
@@ -105,7 +106,7 @@ test.describe('G13 in-place canvas text editor — the draft version a write nam
     await expect.poll(() => v.reads, { timeout: 6000 }).toBe(reads + 1);
     await pageMenu(page, 'About', 'Hide from menu');               // a write that doesn't ask for a read of its own
     await expect.poll(() => v.landed.length, { timeout: 6000 }).toBe(2);
-    await page.waitForTimeout(1500);                               // nothing else is coming to read the draft
+    await settled(page, { requests: false });   // nothing else is coming to read the draft
     expect(v.reads).toBe(reads + 1);
     release();
     await expect.poll(() => v.reads, { timeout: 6000 }).toBe(reads + 2);
@@ -276,7 +277,7 @@ test.describe('G13 in-place canvas text editor — the draft version a write nam
     await expect.poll(() => v.landed.length, { timeout: 6000 }).toBe(1);
     await duplicate(page);
     await expect.poll(() => v.landed.length, { timeout: 6000 }).toBe(2);
-    await page.waitForTimeout(1500);                               // the read after them finds the version
+    await settled(page);   // the read after them finds the version
     await duplicate(page);
     await expect.poll(() => v.landed.length + v.refused.length, { timeout: 6000 }).toBe(3);
     expect(v.refused).toEqual([]);

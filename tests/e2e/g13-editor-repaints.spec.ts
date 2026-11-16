@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
 import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave } from './helpers/editor';
+import { settled } from './helpers/app';
 
 // ── G13 in-place canvas text editor — repaints and saves that overlap an open edit ──
 // Split from g13-editor.spec.ts (builder list item 109, Nov 2026): the fixtures and
@@ -29,7 +30,7 @@ test.describe('G13 in-place canvas text editor — repaints and saves that overl
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.insertText('typed before');
     releaseRead();                                                 // …and comes back now
-    await page.waitForTimeout(500);
+    await settled(page);
     await expect(sub).toHaveAttribute('contenteditable', /.+/);
     await page.keyboard.insertText(' and after');
     await expect(sub).toHaveText('typed before and after');
@@ -59,7 +60,7 @@ test.describe('G13 in-place canvas text editor — repaints and saves that overl
     await expect(sub).toHaveAttribute('contenteditable', /.+/);
     await markCanvas(frame);
     releaseRead();
-    await page.waitForTimeout(500);
+    await settled(page);
     await expect(frame.locator('body[data-e2e-old]')).toHaveCount(1);   // held
     await page.keyboard.press('Escape');
     await canvasReplaced(frame);                                         // the canvas still catches up
@@ -77,7 +78,7 @@ test.describe('G13 in-place canvas text editor — repaints and saves that overl
     // every render of the list arms that 700ms timer, so a commit soon after one meets it
     await page.evaluate(() => (window as unknown as { blocksSaveSoon: (ms: number) => void }).blocksSaveSoon(0));
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
-    await page.waitForTimeout(1800);                                     // past the 1.2s debounce
+    await settled(page);   // the 1.2s debounce, if anything set it, has fired
     expect(puts.length).toBe(1);
     expect((puts[0].blocks as typeof BLOCKS)[0].title).toBe('Once');
   });
@@ -90,7 +91,7 @@ test.describe('G13 in-place canvas text editor — repaints and saves that overl
     } });
     await markCanvas(frame);
     await expect(page.locator('#sectionsCard')).toBeAttached();          // the mount that used to ask for a second paint
-    await page.waitForTimeout(800);                                      // past the 350ms debounce and the read
+    await settled(page);   // the 350ms debounce and the read are done
     expect(reads).toBe(1);
     await expect(frame.locator('body[data-e2e-old]')).toHaveCount(1);
   });

@@ -60,11 +60,13 @@ test.describe('Today', () => {
   });
 
   test('dismissing a moment removes its card', async ({ page }) => {
-    await installApp(page);
+    await installApp(page, { api: { 'POST /moments/m1/dismiss': { data: { ok: true } } } });
     await page.goto('/today.html');
     const card = page.locator('article.moment', { hasText: 'Add your holiday hours' });
     await expect(card).toBeVisible();
+    const sent = page.waitForRequest((r) => r.method() === 'POST' && /\/moments\/m1\/dismiss$/.test(new URL(r.url()).pathname));
     await card.getByRole('button', { name: 'Not now' }).click();
+    await sent;
     await expect(card).toHaveCount(0);
   });
 

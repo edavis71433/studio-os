@@ -1,6 +1,11 @@
 import { test, expect, Page } from '@playwright/test';
 import { installApp } from './helpers/app';
 
+// The fixtures' dates are fixed in 2026, and the relative ones count from the same moment, so the
+// clock is pinned there: from January a page adds the year, and the checks say "Nov 6" (builder item 108).
+const PINNED = Date.parse('2026-11-15T18:00:00Z');
+test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date(PINNED)); });
+
 // Builder list item 179, part four: the papers shelf. Files and Invoices fold into
 // Documents: invoices, proposals and estimates, agreements and files on one shelf,
 // newest first by month, each with the one thing to do, and what you owe on top.
@@ -16,7 +21,7 @@ const CTX = { data: {
   nav: [], studio: STUDIO, client_first_name: 'Maria',
 } };
 const ymd = (offsetDays: number) => {
-  const t = new Date(Date.now() + offsetDays * 86400000);
+  const t = new Date(PINNED + offsetDays * 86400000);
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 };
 const DELIVERABLES = [
@@ -170,7 +175,7 @@ test.describe('Client portal part four — the papers shelf (item 179)', () => {
     let recorded = false;
     await start(page);
     await page.route(`**/functions/v1/presence/client/projects/${PID}`, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: {
-      ...bundle.data, deliverables: recorded ? [{ id: 'n1', title: 'Team photo.png', note: 'Uploaded by the client.', created_at: new Date().toISOString() }, ...DELIVERABLES] : DELIVERABLES,
+      ...bundle.data, deliverables: recorded ? [{ id: 'n1', title: 'Team photo.png', note: 'Uploaded by the client.', created_at: new Date(PINNED).toISOString() }, ...DELIVERABLES] : DELIVERABLES,
     } }) }));
     await page.route('**/functions/v1/presence/client/projects/*/upload-url', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { media_id: 'm1', upload_url: 'https://storage.example/up/1' } }) }));
     await page.route('https://storage.example/**', (route) => route.fulfill({ status: 200, body: '' }));

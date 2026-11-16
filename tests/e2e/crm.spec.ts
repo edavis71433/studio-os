@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { settled } from './helpers/app';
 import { headerAction } from './helpers/page-header';
 
 // CRM surfaces: website enquiries (the Inbox's Enquiries view) and the
@@ -91,7 +92,7 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
   });
 
   test('marking an enquiry read POSTs the status and confirms with a toast', async ({ page }) => {
-    await installApp(page);
+    await installApp(page, { api: { 'POST /forms/inbox/l1': { data: { ok: true } } } });
     await page.goto(ENQ);
     const pane = await pick(page, 'Sam Rivera');
     const req = page.waitForRequest((r) => r.method() === 'POST' && /\/forms\/inbox\/l1$/.test(new URL(r.url()).pathname));
@@ -268,7 +269,7 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
     await (await headerAction(page, '#refreshBtn')).click();
     await (await headerAction(page, '#refreshBtn')).click();
     await expect(queue(page)).toContainText(['Fresh Lead']);
-    await page.waitForTimeout(900);   // let the stale response land
+    await settled(page);   // let the stale response land
     await expect(queue(page)).toContainText(['Fresh Lead']);
     await expect(page.locator('#rows')).not.toContainText('Stale Lead');
   });
@@ -313,7 +314,7 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
   });
 
   test('Not a fit POSTs not_a_fit: the enquiry leaves Open, and All still shows where it went', async ({ page }) => {
-    await installApp(page);
+    await installApp(page, { api: { 'POST /forms/inbox/l1': { data: { ok: true } } } });
     await page.goto(ENQ);
     const pane = await pick(page, 'Sam Rivera');
     const req = page.waitForRequest((r) => r.method() === 'POST' && /\/forms\/inbox\/l1$/.test(new URL(r.url()).pathname));
@@ -327,7 +328,7 @@ test.describe('Website enquiries (the Inbox’s Enquiries view)', () => {
   });
 
   test('Spam POSTs spam:true and the enquiry leaves every list but Spam', async ({ page }) => {
-    await installApp(page);
+    await installApp(page, { api: { 'POST /forms/inbox/l2': { data: { ok: true } } } });
     await page.goto(ENQ);
     const pane = await pick(page, 'Dana Lee');
     const req = page.waitForRequest((r) => r.method() === 'POST' && /\/forms\/inbox\/l2$/.test(new URL(r.url()).pathname));
@@ -425,6 +426,14 @@ test.describe('Relationship view', () => {
   // ── the SERVER path: GET /crm/activity actually deployed ──────────────────
   const DEAL = 'dddddddd-4444-4444-8444-dddddddddddd';
   const PROJECT = 'eeeeeeee-5555-4555-8555-eeeeeeeeeeee';
+  // the saves the record sends, answered as the server answers them (builder item 212)
+  const SAVES = {
+    [`POST /projects/${PROJECT}/messages`]: (sent: { body?: string; audience?: string }) => ({ data: { id: 'pm-new', project_id: PROJECT, audience: sent?.audience || 'client', body: sent?.body || '', author_kind: 'client', created_at: '2026-07-15T01:00:00Z' } }),
+    'POST /support/s1/messages': (sent: { body?: string }) => ({ data: { id: 'sm-new', request_id: 's1', body: sent?.body || '', author_kind: 'client', created_at: '2026-07-15T01:00:00Z' } }),
+    'PATCH /sales/deal-tasks': { data: { ok: true } },
+    [`POST /sales/deals/${DEAL}/invoice`]: (sent: { amount_cents?: number; purpose?: string }) => ({ data: { id: 'inv-new', deal_id: DEAL, title: 'Invoice', amount_cents: sent?.amount_cents ?? 0, currency: 'usd', purpose: sent?.purpose || 'service', status: 'open', stripe_url: 'https://buy.stripe.com/test_abc123', number: 12, due_date: null }, url: 'https://buy.stripe.com/test_abc123', emailed: true, reused: false, double_tap: false, amount_cents: sent?.amount_cents ?? 0 }),
+    'POST /sales/proposals/p-1/send': { data: { id: 'p-1', deal_id: DEAL, title: 'Proposal', status: 'sent', version: 1, sent_at: '2026-07-15T01:00:00Z', expires_at: null }, url: 'https://studio.example/sign.html?t=tok-p1', emailed: true },
+  };
   const RECORD = { data: {
     identity: { contact_id: null, deal_id: DEAL, client_id: null, customer_site_id: CLIENT, project_id: PROJECT },
     header: { name: 'Marlow’s Kitchen', company: '', email: '', phone: '', status: 'customer' },
@@ -439,7 +448,7 @@ test.describe('Relationship view', () => {
 
   test('server /crm/activity feeds the timeline, the Upcoming band, and an enabled composer', async ({ page }) => {
     await installApp(page, { api: {
-      '/crm/record': RECORD,
+      '/crm/record': RECORD, ...SAVES,
       '/crm/activity': activityFx({
         items: [
           { id: 'conv:message:m1', kind: 'message', type: 'message', title: 'The client sent a message', body: 'Hello there', at: '2026-07-10T00:00:00Z', meta: null, href: null },
@@ -485,7 +494,7 @@ test.describe('Relationship view', () => {
     ],
   } };
   test('P1 — the action bar sends an invoice from the record in two clicks (POST /sales/deals/:id/invoice)', async ({ page }) => {
-    await installApp(page, { api: { '/crm/record': HUB_RECORD, [`/sales/deals/${DEAL}`]: HUB_DEAL, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } } });
+    await installApp(page, { api: { '/crm/record': HUB_RECORD, ...SAVES, [`/sales/deals/${DEAL}`]: HUB_DEAL, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } } });
     await page.goto(`/crm.html?client=${CLIENT}`);
     await expect(page.getByRole('tab', { name: 'Invoices' })).toBeVisible();
     await page.locator('#act-invoice').click();                         // 1: the action bar
@@ -530,7 +539,7 @@ test.describe('Relationship view', () => {
     contracts: [{ id: 'k-1', title: 'Service agreement', status: 'draft', body: 'A deposit of 50% is due at signing.' }],
     invoices: [],
   } };
-  const bothApi = (deal = BOTH_DEAL) => ({ '/crm/record': BOTH_RECORD, [`/sales/deals/${DEAL}`]: deal, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } });
+  const bothApi = (deal = BOTH_DEAL) => ({ ...SAVES, '/crm/record': BOTH_RECORD, [`/sales/deals/${DEAL}`]: deal, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } });
   test('ONE LINK — both drafted: the action bar headlines "Send proposal & agreement"; Billing shows it once, the row sends go under More', async ({ page }) => {
     await installApp(page, { api: bothApi() });
     await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
@@ -652,7 +661,7 @@ test.describe('Relationship view', () => {
   // into the PROJECT thread, not a fresh support request.
   test('an email-landed client message renders in the ONE record timeline beside support — reply goes to the project', async ({ page }) => {
     await installApp(page, { api: {
-      '/crm/record': RECORD,
+      '/crm/record': RECORD, ...SAVES,
       '/crm/activity': activityFx({
         items: [
           { id: 'conv:message:m2', kind: 'message', type: 'message', title: 'The client sent a message', body: 'Replying by email — new hours attached.', at: '2026-07-12T00:00:00Z', meta: null, href: null },
@@ -677,7 +686,7 @@ test.describe('Relationship view', () => {
 
   test('with only an open support thread, the reply POSTs {body} with no audience', async ({ page }) => {
     await installApp(page, { api: {
-      '/crm/record': RECORD,
+      '/crm/record': RECORD, ...SAVES,
       '/crm/activity': activityFx({ reply_support_to: '/support/s1/messages' }),
     } });
     await page.goto(`/crm.html?client=${CLIENT}`);
@@ -691,7 +700,7 @@ test.describe('Relationship view', () => {
 
   test('the Upcoming checkbox PATCHes the to-do done', async ({ page }) => {
     await installApp(page, { api: {
-      '/crm/record': RECORD,
+      '/crm/record': RECORD, ...SAVES,
       '/crm/activity': activityFx({ upcoming: [{ kind: 'task', id: 'task-1', title: 'Chase signature', due: null, overdue: false, href: null }] }),
     } });
     await page.goto(`/crm.html?client=${CLIENT}`);
@@ -734,7 +743,7 @@ test.describe('Relationship view', () => {
   });
 
   test('ACT_SEQ — a slow superseded activity load never repaints the rail', async ({ page }) => {
-    await installApp(page, { api: { '/crm/record': RECORD } });
+    await installApp(page, { api: { '/crm/record': RECORD, ...SAVES } });
     const fx = (items: unknown[], upcoming: unknown[]) => JSON.stringify({ data: {
       items, upcoming, project_id: PROJECT, deal_id: DEAL, reply_to: null, reply_support_to: null,
     } });
@@ -754,7 +763,7 @@ test.describe('Relationship view', () => {
     await page.locator('[data-updone="t1"]').click();       // → activity call 2 (slow)
     await page.locator('[data-updone="t2"]').click();       // → activity call 3 (fast)
     await expect(page.locator('#timeline')).toContainText('Fresh item');
-    await page.waitForTimeout(900);                          // the stale response lands
+    await settled(page);                          // the stale response lands
     await expect(page.locator('#timeline')).toContainText('Fresh item');
     await expect(page.locator('#acard')).not.toContainText('Stale item');
   });

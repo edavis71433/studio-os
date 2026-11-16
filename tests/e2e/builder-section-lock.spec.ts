@@ -1,5 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { touchScreen } from './helpers/app';
 
 // Locked sections (builder list item 155, Nov 2026; Figma "A · Locked sections"): the studio locks
 // a section from its More menu so the client can't move, restyle, copy or delete it by accident.
@@ -55,11 +56,11 @@ async function mount(page: Page, { studio, lock }: { studio: boolean; lock?: unk
   };
   return { frame, puts, draws: () => draws, redrawn, lastBlocks: () => (puts.filter((p) => p && Array.isArray(p.blocks)).at(-1) || {}).blocks };
 }
-// a phone brings the toolbar with a tap, a mouse with a hover
+// a finger brings the toolbar with a tap, a mouse with a hover (the tablet is a touch screen too)
 async function pick(page: Page, frame: ReturnType<Page['frameLocator']>, sel: string) {
-  const phone = (page.viewportSize()?.width || 1200) < 768;
+  const phone = touchScreen();
   const sec = frame.locator(sel);
-  if (phone) await sec.tap({ position: { x: 40, y: 20 } }); else await sec.locator('h2').hover();
+  if (phone) await sec.tap({ position: { x: (page.viewportSize()?.width || 0) < 768 ? 40 : 200, y: 20 } }); else await sec.locator('h2').hover();   // on a tablet the dock covers the page's left edge
   await expect(frame.locator('#dds-dc-bar')).toHaveClass(/\bon\b/);
 }
 const tools = (frame: ReturnType<Page['frameLocator']>) => frame.locator('#dds-dc-bar .dc-b .dc-sr').allTextContents();

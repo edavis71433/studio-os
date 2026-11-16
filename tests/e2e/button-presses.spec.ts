@@ -25,7 +25,7 @@ test.describe('the visit counter on a published page', () => {
     expect(beacons.find((b) => b.k === 'button')).toMatchObject({ p: '/', l: 'See the menu' });
     expect(beacons.find((b) => b.k === 'phone')).toMatchObject({ l: 'Call us' });
     expect(beacons.find((b) => b.k === 'outbound')).toMatchObject({ l: '' });
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(1200);   // a real wait: leaving reports the time spent on the page, a second or more here
     await page.evaluate(() => { window.dispatchEvent(new Event('pagehide')); window.dispatchEvent(new Event('pagehide')); });
     await expect.poll(() => beacons.filter((b) => b.k === 'leave').length).toBe(1);
     const leave = beacons.find((b) => b.k === 'leave');

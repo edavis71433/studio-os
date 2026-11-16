@@ -68,11 +68,15 @@ test.describe('sales item 105 — setup strip, empty lists, the export for a boo
   });
 
   test('Invoices: the export for a bookkeeper asks for the days picked and downloads the zip', async ({ page }) => {
+    // last month, from today: it was written down as October, which stops being last month in December
+    const t = new Date(), last = new Date(t.getFullYear(), t.getMonth(), 0), first = new Date(t.getFullYear(), t.getMonth() - 1, 1);
+    const ymd = (d: Date) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const zip = `for-your-bookkeeper-${ymd(first)}-to-${ymd(last)}.zip`;
     let asked = '';
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/invoices': { data: { items: [], today: '2026-11-12', partial: false } } } });
     await page.route(/\/functions\/v1\/presence\/sales\/export\/accounting/, (route: Route) => {
       asked = new URL(route.request().url()).search;
-      return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="for-your-bookkeeper-2026-10-01-to-2026-10-31.zip"' }, body: 'PK' });
+      return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${zip}"` }, body: 'PK' });
     });
     await page.goto('/invoices.html');
     // an empty list offers its one thing to do
@@ -90,10 +94,8 @@ test.describe('sales item 105 — setup strip, empty lists, the export for a boo
     await expect(dlg.getByRole('button', { name: 'Download the zip' })).toBeInViewport();
     const dl = page.waitForEvent('download');
     await dlg.getByRole('button', { name: 'Download the zip' }).click();
-    expect((await dl).suggestedFilename()).toBe('for-your-bookkeeper-2026-10-01-to-2026-10-31.zip');
+    expect((await dl).suggestedFilename()).toBe(zip);
     const q = new URLSearchParams(asked);
-    const t = new Date(), last = new Date(t.getFullYear(), t.getMonth(), 0), first = new Date(t.getFullYear(), t.getMonth() - 1, 1);
-    const ymd = (d: Date) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     expect([q.get('from'), q.get('to'), q.get('tzo')]).toEqual([ymd(first), ymd(last), String(new Date().getTimezoneOffset())]);
     await expect(dlg).toBeHidden();
     await noOverflow(page);
@@ -122,7 +124,7 @@ test.describe('sales item 105 — setup strip, empty lists, the export for a boo
     await expect(page.locator('#newDlg')).toBeVisible();
     await page.goto('/contacts.html?add=1');
     await expect(page.locator('#newDlg')).toBeVisible();
-    expect(new URL(page.url()).search).toBe('');   // the address loses ?add=1, so a reload doesn't open it again
+    await expect.poll(() => new URL(page.url()).search).toBe('');   // the address loses ?add=1, so a reload doesn't open it again
   });
 
   test('empty lists: a board with no open deals offers + New deal; an empty People list offers + Add a person', async ({ page }) => {

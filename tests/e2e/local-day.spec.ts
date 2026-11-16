@@ -39,6 +39,8 @@ const API = {
   '/sales/templates': { data: [] },
   '/sales/services': { data: [] },
   '/identity': { data: { business_name: 'Test Studio' } },
+  // the quick log, answered as routes/sales.ts answers it (builder item 212)
+  [`POST /sales/deals/${DEAL}/activity`]: (sent: { kind?: string; body?: string; occurred_at?: string }) => ({ data: { item: { id: 'act-new', deal_id: DEAL, kind: 'note', from_stage: '', to_stage: '', detail: { activity_kind: sent?.kind || 'call', body: sent?.body || '', occurred_at: sent?.occurred_at || null }, actor: 'owner@example.com', actor_kind: 'client', created_at: '2026-11-10T07:30:00Z' }, last_contacted_at: sent?.occurred_at || null } }),
 };
 const display = (page: Page, v: 'list' | 'table' | 'board') =>
   page.addInitScript((val) => { try { localStorage.setItem('dds-display:pipeline', val); } catch { /* denied */ } }, v);
@@ -134,6 +136,7 @@ test.describe('Los Angeles, 11:30pm: the local day is still Nov 9', () => {
     const CLIENT = 'cccccccc-3333-4333-8333-cccccccccccc';
     const PROJECT = 'eeeeeeee-5555-4555-8555-eeeeeeeeeeee';
     await installApp(page, { api: {
+      [`POST /sales/deals/${DEAL}/activity`]: (sent: { kind?: string; body?: string; occurred_at?: string }) => ({ data: { item: { id: 'act-new', deal_id: DEAL, kind: 'note', from_stage: '', to_stage: '', detail: { activity_kind: sent?.kind || 'call', body: sent?.body || '', occurred_at: sent?.occurred_at || null }, actor: 'owner@example.com', actor_kind: 'client', created_at: '2026-11-10T07:30:00Z' }, last_contacted_at: sent?.occurred_at || null } }),
       '/crm/record': { data: {
         identity: { contact_id: null, deal_id: DEAL, client_id: null, customer_site_id: CLIENT, project_id: PROJECT },
         header: { name: 'Marlow’s Kitchen', company: '', email: '', phone: '', status: 'customer' },

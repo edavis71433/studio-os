@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
 import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave, openPages, addBlankPage } from './helpers/editor';
+import { pointAt, touchScreen, settled } from './helpers/app';
 
 // ── G13 in-place canvas text editor — the same page changes on a slow connection ──
 // Split from g13-editor.spec.ts (builder list item 109, Nov 2026): the fixtures and
@@ -18,7 +19,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     release();
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
     expect(sent[1].blocks?.[0]).toMatchObject({ title: 'Second edit', subtitle: 'First edit' });
-    await page.waitForTimeout(1800);                               // and nothing is left to save
+    await settled(page);   // and nothing is left to save
     expect(sent.length).toBe(2);
   });
 
@@ -88,13 +89,13 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     const title = page.locator('#formsCard input[placeholder="Form title"]').first();
     await title.fill('Write to us');
     await title.blur();
-    await page.waitForTimeout(1000);                               // past the form's 700ms timer
+    await settled(page, { requests: false });   // the form's 700ms timer has fired
     release();
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
     const saved = aboutIn(sent[1])?.blocks as unknown as Array<{ subtitle?: string; title?: string }>;
     expect(saved[0].subtitle).toBe('Edit on about');
     expect(saved[1].title).toBe('Write to us');
-    await page.waitForTimeout(1000);                               // the list is rebuilt from what came back
+    await settled(page);   // the list is rebuilt from what came back
     expect(await page.evaluate(() => (0, eval)('BLOCKS_WORK[0].subtitle'))).toBe('Edit on about');
     expect(sent.length).toBe(2);
   });
@@ -133,7 +134,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     await openAbout(page, frame);
     await markCanvas(frame);
     read.release();
-    await page.waitForTimeout(800);
+    await settled(page);
     await expect(onPill(page)).toHaveText('About');
     await expect(frame.locator('#about-us')).toBeAttached();
     await expect(frame.locator('#our-story')).toHaveCount(0);
@@ -173,7 +174,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     await page.keyboard.insertText('Typed on the old document');
     await page.keyboard.press('Enter');
     await expect(frame.locator('[contenteditable]')).toHaveCount(0);
-    await page.waitForTimeout(1800);                               // past the 1.2s debounce
+    await settled(page, { requests: false });   // the 1.2s debounce, if anything set it, has fired
     expect(puts).toEqual([]);
     read.release();
     await expect(frame.locator('#about-us')).toBeAttached();
@@ -192,7 +193,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     await openPages(page); await pill(page, 'About').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('About');
     await expect(rows).toHaveCount(0);                             // their buttons act by index on the open page's list
-    await frame.locator('section.block-richtext').hover({ force: true });
+    await pointAt(frame.locator('section.block-richtext'), { force: true });
     await page.waitForTimeout(100);
     await expect(frame.locator('#dds-dc-bar')).not.toHaveClass(/\bon\b/);
     read.release();
@@ -243,7 +244,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     await page.keyboard.press('Enter');                            // a session carried across would commit here
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     expect((puts[0] as Paged).blocks?.[0].subtitle).toBe('Typed during the copy');
-    await page.waitForTimeout(1800);
+    await settled(page);
     expect(puts.length).toBe(1);
   });
 
@@ -258,7 +259,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     await page.keyboard.press('Enter');                            // a session carried across would commit here
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(2);
     expect((puts[1] as Paged).blocks?.[0].subtitle).toBe('Typed during the add');
-    await page.waitForTimeout(1800);
+    await settled(page);
     expect(puts.length).toBe(2);
   });
 
@@ -273,7 +274,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     release();
     await expect(onPill(page)).toHaveText('Home');
     await page.keyboard.press('Enter');                            // a session carried across would commit here
-    await page.waitForTimeout(1800);
+    await settled(page);
     expect(puts.filter((p) => (p as Paged).blocks)).toEqual([]);
   });
 
@@ -287,7 +288,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     await canvasReplaced(frame);
     await expect.poll(() => canvasScrollY(frame)).toBeGreaterThan(before - 50);
-    await page.waitForTimeout(800);                                // a second repaint would show here
+    await settled(page);   // a second repaint would show here
     // read it once it settles: a read during a redraw sees the new page before its scroll is put back
     await expect.poll(() => canvasScrollY(frame)).toBeGreaterThan(before - 50);
   });
@@ -301,7 +302,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     await expect(frame.locator('#about-us')).toBeAttached();
     await expect(frame.locator('#dds-dc-bar')).toBeAttached();
-    await page.waitForTimeout(600);                                // a restored scroll lands at load
+    await settled(page);   // a restored scroll lands at load
     expect(await canvasScrollY(frame)).toBe(0);
   });
 
@@ -318,11 +319,12 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     read.release();
     await expect(frame.locator('#about-us')).toBeAttached();
     await expect(frame.locator('#dds-dc-bar')).toBeAttached();
-    await page.waitForTimeout(600);
+    await settled(page);
     expect(await canvasScrollY(frame)).toBe(0);
   });
 
   test('a section drag under way when the page changes is dropped, not landed on the new page', async ({ page }) => {
+    test.skip(touchScreen(), 'a section is dragged by its grip with a mouse; a finger moves it with the arrows');
     const { frame, puts } = await mountPages(page, '', [{ ...PAGED.pages[0], blocks: [...ABOUT_BLOCKS, { type: 'title', title: 'Second', subtitle: 'Second line' }] }]);
     await frame.locator('section.block-richtext').hover();
     const grip = await frame.locator('#dds-dc-bar .dc-grip').boundingBox();
@@ -333,7 +335,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     await page.evaluate(() => (window as unknown as { dcSwitchPage: (s: string) => void }).dcSwitchPage('about'));
     await expect(onPill(page)).toHaveText('About');
     await page.mouse.up();
-    await page.waitForTimeout(1200);
+    await settled(page);
     expect(puts).toEqual([]);
   });
 
@@ -343,7 +345,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     await page.evaluate(() => (window as unknown as { dcSwitchPage: (s: string) => void }).dcSwitchPage('about'));
     await expect(frame.locator('#about-us')).toBeAttached();
     await expect(frame.locator('#dds-dc-bar')).toBeAttached();
-    await page.waitForTimeout(800);                                // a smooth scroll to the section would be under way
+    await page.waitForTimeout(800);                                // a real wait: a smooth scroll to the section would be under way, and the browser runs it, not a timer
     expect(await canvasScrollY(frame)).toBe(0);
   });
 

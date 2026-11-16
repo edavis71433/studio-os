@@ -236,7 +236,7 @@ test.describe('Send an update — a photo from Files (bold redesign, part 2)', (
     await expect(page.locator('#bodytx')).toHaveValue(`![The shopfront at dusk](media:${P})\n`);
     await expect(page.locator('#livePv .mail-img img')).toHaveAttribute('alt', 'The shopfront at dusk');
     await expect(page.getByText('Your photo is in the message')).toBeVisible();
-    expect(new URL(page.url()).searchParams.get('photo')).toBeNull();
+    await expect.poll(() => new URL(page.url()).searchParams.get('photo')).toBeNull();
   });
   test('a photo that isn’t a shared one of yours says so and adds nothing', async ({ page }) => {
     await installApp(page, { api: BAPI });

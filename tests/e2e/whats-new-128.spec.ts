@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
+import { settled } from './helpers/app';
 
 // ── What's new (builder list item 128, Nov 2026) ──
 // A sparkle beside the bell opens each week's changes to the tools, a picture and a
@@ -91,7 +92,7 @@ test.describe('What’s new', () => {
     await expect(page.locator('#dds-new .wn-dot')).toHaveCount(0);
     await page.reload();
     await expect(page.locator('#dds-new')).toBeVisible();
-    await page.waitForTimeout(1600);   // the dot is drawn once the page has settled
+    await settled(page);   // the dot is drawn once the page has settled
     await expect(page.locator('#dds-new .wn-dot')).toHaveCount(0);
     await expect(page.locator('#dds-new')).toHaveAttribute('aria-label', 'What’s new');
   });
@@ -104,7 +105,7 @@ test.describe('What’s new', () => {
 
   test('nothing opens by itself', async ({ page }) => {
     await openOwner(page);
-    await page.waitForTimeout(1600);
+    await settled(page);
     await expect(panel(page)).toHaveCount(0);
   });
 

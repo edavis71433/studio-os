@@ -1,5 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, settled } from './helpers/app';
 import { newPageLock, gatePage, sealPage } from '../../supabase/functions/presence/lib/page_gate';
 
 // The owner's own "not found" page and the password page's own words (builder list item 121,
@@ -94,6 +94,9 @@ test.describe('the password page’s own words (builder item 121)', () => {
     await page.locator('#pagesCard .pc-row').filter({ has: page.locator('.pp-name', { hasText: /^Members$/ }) }).locator('.pg-gear').click();
     const panel = page.locator('#pagesCard #pageSettings');
     await expect(panel.getByText('What the password page says')).toBeVisible();
+    // the panel draws itself again once its reads land, and what was typed (or focused) before that is lost:
+    // a person on a slow connection meets that too (reported); the test acts on the panel once it has settled
+    await settled(page);
     const heading = panel.locator('#pgLock-lockTitle'), note = panel.locator('#pgLock-lockNote');
     await expect(heading).toHaveAttribute('placeholder', 'This page needs a password');
     await expect(note).toHaveAttribute('placeholder', 'Type the password you were given to see Members.');

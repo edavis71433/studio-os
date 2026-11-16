@@ -2,6 +2,7 @@ import { test, expect, Page, Route } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mountCanvas, PAGE_HTML, markCanvas, canvasReplaced } from './helpers/editor';
+import { pointAt } from './helpers/app';
 
 // Builder list item 57, the editor half: blocks inside a section (Figma node 324:789). The canvas
 // is a Blocks section and a Text section as the real renderer stamps them (tests/presence/
@@ -95,7 +96,7 @@ test.describe('Blocks inside a section, in the editor', { tag: '@touch' }, () =>
   test('Add block on the section: “embed” says why not, and a spacer joins the end', async ({ page }) => {
     const { frame, puts } = await open(page);
     const sec = frame.locator('section.block-stack');
-    if (phone(page)) await sec.tap({ position: { x: 6, y: 6 } }); else await sec.hover({ position: { x: 6, y: 6 } });
+    await pointAt(sec, { position: { x: 6, y: 6 } });
     const add = frame.locator('#dds-dc-bar').getByRole('button', { name: 'Add a block to this section' });
     await expect(add).toBeVisible();
     await expect(add).toContainText('Add block');
@@ -136,7 +137,7 @@ test.describe('Blocks inside a section, in the editor', { tag: '@touch' }, () =>
     const { frame, puts } = await open(page);
     const sec = frame.locator('section.block-richtext');
     await sec.scrollIntoViewIfNeeded();
-    if (phone(page)) await sec.tap({ position: { x: 6, y: 6 } }); else await sec.hover({ position: { x: 6, y: 6 } });
+    await pointAt(sec, { position: { x: 6, y: 6 } });
     await frame.locator('#dds-dc-bar').getByRole('button', { name: /^Add a block: this section becomes a Blocks section/ }).click();
     await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
     const turned = (puts[0].blocks as Block[])[1];

@@ -46,6 +46,12 @@ const API = {
     messages: [{ id: 'sm1', body: 'Can we make it bigger?', author_kind: 'client', created_at: '2026-07-14T01:00:00Z' }],
     is_studio_view: true,
   } },
+  // the saves these tests make, answered as the server answers them (builder item 212)
+  'POST /projects/aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa/messages': { data: { id: 'pm-new', project_id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', audience: 'client', body: 'On it — draft coming today.', author_kind: 'client', created_at: '2026-07-15T01:00:00Z' } },
+  'POST /support/s-1/messages': { data: { id: 'sm-new', request_id: 's-1', body: 'Done — take a look.', author_kind: 'client', created_at: '2026-07-15T01:00:00Z' } },
+  'PATCH /support/s-1': { data: { id: 's-1', subject: 'Logo tweak', status: 'resolved', resolved_at: '2026-07-15T01:00:00Z' } },
+  'POST /foundations/plans/p1/decide': { data: { id: 'p1', status: 'approved' } },
+  'POST /forms/inbox/l-9': { data: { ok: true } },
 };
 
 test.describe('Inbox — split-view console', () => {
@@ -702,11 +708,11 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await expect(page.locator('#fProject')).toHaveValue(P2);
     // OUT: changing a lens rewrites the URL (pipeline.html's listUrl idiom)
     await page.locator('#fProject').selectOption(P1);
-    expect(new URL(page.url()).searchParams.get('project')).toBe(P1);
-    expect(new URL(page.url()).searchParams.get('client_id')).toBe('c-1');
+    await expect.poll(() => new URL(page.url()).searchParams.get('project')).toBe(P1);
+    await expect.poll(() => new URL(page.url()).searchParams.get('client_id')).toBe('c-1');
     // clearing a lens drops its param entirely rather than leaving an empty one
     await page.locator('#fClient').selectOption('');
-    expect(new URL(page.url()).searchParams.has('client_id')).toBe(false);
+    await expect.poll(() => new URL(page.url()).searchParams.has('client_id')).toBe(false);
     // and that URL, reloaded, is the same view
     await page.reload();
     await expect(page.locator('#fProject')).toHaveValue(P1);
@@ -735,8 +741,8 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await expect(page.locator('#fClient')).toHaveValue('');
     await expect(page.locator('#fProject')).toHaveValue('');
     await expect(page.locator('#q')).toHaveValue('');
-    expect(new URL(page.url()).searchParams.has('client_id')).toBe(false);
-    expect(new URL(page.url()).searchParams.has('project')).toBe(false);
+    await expect.poll(() => new URL(page.url()).searchParams.has('client_id')).toBe(false);
+    await expect.poll(() => new URL(page.url()).searchParams.has('project')).toBe(false);
     await expect(page.locator('#rows [role=option]')).toHaveCount(5);   // no worklog row (item 18)
   });
 
@@ -841,9 +847,9 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     await page.goto('/inbox.html?client=site-77');
     // the lens writes its own params and leaves the scope param first and intact
     await page.locator('#fClient').selectOption('c-1');
+    await expect.poll(() => new URL(page.url()).searchParams.get('client_id')).toBe('c-1');
     let u = new URL(page.url());
     expect(u.searchParams.get('client')).toBe('site-77');
-    expect(u.searchParams.get('client_id')).toBe('c-1');
     // the scoped read header still goes out with the scope on it
     const req = page.waitForRequest((r) => r.url().includes('/portal/feed'));
     await (await headerAction(page, '#refreshBtn')).click();
@@ -851,9 +857,9 @@ test.describe('Inbox lenses — filter by client and by project without a profil
     // clearing the lenses does not clear the tenant
     await page.locator('#fProject').selectOption(P1);
     await page.locator('#fClient').selectOption('');
+    await expect.poll(() => new URL(page.url()).searchParams.has('client_id')).toBe(false);
     u = new URL(page.url());
     expect(u.searchParams.get('client')).toBe('site-77');
-    expect(u.searchParams.has('client_id')).toBe(false);
   });
 
   test('mobile: the lenses sit in the list header, narrow in one tap, and never strand the pane', async ({ page }, testInfo) => {

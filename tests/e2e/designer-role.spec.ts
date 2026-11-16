@@ -145,7 +145,9 @@ test.describe('A Designer in Files', () => {
     const GONE = { id: 'cccccccc-0000-4000-8000-000000000011', name: 'Waiting room', kind: 'image', bytes: 605000, folder: '', trashed_at: new Date().toISOString(), goes_at: new Date(Date.now() + 30 * 86400000).toISOString(), days_left: 30, by: 'Sam', live: false, kept_live: false, thumb: null };
     const refused = await asDesigner(page, false, { ...SITE_API,
       '/assets': { data: { assets: [PHOTO], total: 1, shown: 1, live_count: 0, policy: 'immediate', trash: 1 } },
-      '/assets/trash': { data: { files: [GONE], days: 30, available: true } } });
+      '/assets/trash': { data: { files: [GONE], days: 30, available: true } },
+      // putting it back, answered as routes/assets.ts answers it (builder item 212)
+      [`POST /assets/${GONE.id}/put-back`]: { data: { ok: true, asset: { id: GONE.id, name: GONE.name, kind: 'image', state: 'approved' } } } });
     const sent: string[] = [];
     page.on('request', (r) => { if (/\/assets\/[0-9a-f-]{36}\/put-back$/.test(r.url())) sent.push(r.method()); });
     await page.goto('/files.html');

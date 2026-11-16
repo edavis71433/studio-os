@@ -73,7 +73,7 @@ test.describe('item 37 — Pipeline: owners, and Everyone / Mine', () => {
   });
 
   test('the quick view of a deal shows its owner too', async ({ page }) => {
-    await installApp(page, { api: { ...PIPE_API, ...TEAM_API } });
+    await installApp(page, { api: { ...PIPE_API, ...TEAM_API, [`PATCH /sales/deals/${D1}`]: (sent: Record<string, unknown>) => ({ data: { id: D1, title: 'A deal', stage: 'lead', ...sent } }) } });
     const sent = spy(page, 'PATCH', `/sales/deals/${D1}`);
     await page.goto('/pipeline.html');
     await page.locator('#board .bcard').filter({ hasText: 'Acme website' }).click();

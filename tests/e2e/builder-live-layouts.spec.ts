@@ -1,5 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { settled } from './helpers/app';
 
 // A section's Layout tab shows the section itself in each arrangement it can take (builder list
 // item 224, Nov 2026; Figma "A · Saved pages, button sets, live layouts and section links",
@@ -158,7 +159,7 @@ test.describe('a section’s Layout tab draws the section itself each way (build
     await openSection(page, 1, 'layout');
     await expect(tiles(page)).toHaveCount(3);
     expect(await items(page).locator('.ins-pic').evaluateAll((n) => n.map((x) => (x as HTMLElement).dataset.pic))).toEqual(['reviews_wall:default', 'reviews_wall:quotes', 'reviews_wall:strip']);
-    await page.waitForTimeout(600);   // the failed asks have come back
+    await settled(page);   // the failed asks have come back
     await expect(page.locator('#settingsPanel .ins-live-win.on')).toHaveCount(0);
     await expect(item(page, 'Compact strip').locator('.ins-pic')).toBeVisible();
     await tile(page, 'Compact strip').click();

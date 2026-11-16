@@ -367,7 +367,7 @@ test.describe('SS4 — broadcasts console', () => {
 
   test('styled dialog on Cancel — a <dialog>, never native confirm()', async ({ page }) => {
     await trapNativeDialogs(page);
-    await installApp(page, { api: API });
+    await installApp(page, { api: { ...API, [`POST /broadcasts/${S_ID}/cancel`]: { data: { ok: true, status: 'canceled' } } } });
     await page.goto('/broadcasts.html');
     const row = page.locator('.bc').filter({ hasText: 'Weekend tasting event' });
     await row.getByRole('button', { name: 'Cancel', exact: true }).click();

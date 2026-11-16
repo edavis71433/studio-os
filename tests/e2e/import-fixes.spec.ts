@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { settled } from './helpers/app';
 import { headerAction } from './helpers/page-header';
 
 // List item 97 (Nov 10 bug hunt, B2 · B5 · B6 and two small ones): the CSV importers.
@@ -22,6 +23,10 @@ const openContactsImport = async (page: Page) => {
 };
 // POST /sales/contacts → a new contact each time (deduped:false). With a gate, every answer waits
 // until the gate opens, so a run can be caught mid-way however fast or slow the machine is.
+// A server from before imports (migration 0168) answers with no import and no counts, so the page
+// sends the rows one by one, untagged: the path these tests check row by row (builder item 212:
+// planned, not a blanket "ok"). A current server takes every row in that one request.
+const OLDER_SERVER = { data: { id: null, undo: false } };
 const contactPosts = async (page: Page, gate?: Promise<void>) => {
   const sent: Array<Record<string, unknown>> = [];
   await page.route('**/functions/v1/presence/sales/contacts', async (route) => {
@@ -35,7 +40,7 @@ const contactPosts = async (page: Page, gate?: Promise<void>) => {
 
 test.describe('item 97 — Google and Outlook files map the right columns (B2)', () => {
   test('Contacts: a Google Contacts export keeps its emails, phones, names and business', async ({ page }) => {
-    await installApp(page, { api: { '/sales/contacts': { data: [] } } });
+    await installApp(page, { api: { '/sales/contacts': { data: [] }, 'POST /sales/contacts/imports': OLDER_SERVER } });
     const sent = await contactPosts(page);
     await openContactsImport(page);
     // the headings a Google Contacts export writes: a label column beside every value, the
@@ -91,7 +96,7 @@ test.describe('item 97 — Google and Outlook files map the right columns (B2)',
 test.describe('item 97 — past 500 rows it says so (B5)', () => {
   test('503 contacts: the preview and the summary both name the 3 left out', async ({ page }) => {
     test.setTimeout(90_000);
-    await installApp(page, { api: { '/sales/contacts': { data: [] } } });
+    await installApp(page, { api: { '/sales/contacts': { data: [] }, 'POST /sales/contacts/imports': OLDER_SERVER } });
     const sent = await contactPosts(page);
     await openContactsImport(page);
     const rows = Array.from({ length: 503 }, (_, i) => `Person ${i + 1},p${i + 1}@example.com`).join('\n');
@@ -134,7 +139,7 @@ test.describe('item 97 — Close stops a running import (B6)', () => {
     await expect(page.locator('#importCsv')).toBeFocused();
     open();                                                                                      // the five on their way land
     await expect(toastWith(page, 'Stopped after 5 of 40 — 5 already yours')).toBeVisible();
-    await page.waitForTimeout(600);                                                              // a running import would have sent its next five by now
+    await settled(page);                                                              // a running import would have sent its next five by now
     expect(sent.length).toBe(5);
   });
 });

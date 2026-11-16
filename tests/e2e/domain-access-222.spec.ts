@@ -39,7 +39,9 @@ async function openDomains(page: Page, opts: { preview?: (body: any) => { status
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   const list = opts.oldServer ? { ...DOMAINS, data: { ...DOMAINS.data, domains: DOMAINS.data.domains.map(before222) } } : DOMAINS;
-  await installApp(page, { api: { '/portal/context': studioContext, '/agency/domains': list } });
+  await installApp(page, { api: { '/portal/context': studioContext, '/agency/domains': list,
+    // the records plan offered when a company can't share, answered as routes/foundations.ts answers it (builder item 212)
+    'POST /foundations/prepare': (sent: { kind?: string; preview?: boolean }) => ({ data: { id: 'plan-1', kind: sent?.kind || 'dns_records', title: 'Add the records', summary: '', steps: [], risk: '', reversible: true, rollback_note: '', requires_approval: true, status: 'proposed', extra: {}, decided_at: null, applied_at: null, created_at: '2026-11-15T12:00:00Z', ...(sent?.preview ? { preview: true } : {}) } }) } });
   await page.route(/\/functions\/v1\/presence\/agency\/domains\/[^/]+(\/(notes|check|access))?$/, async (route: Route) => {
     const path = new URL(route.request().url()).pathname.replace(/^.*\/presence/, '');
     const method = route.request().method();
