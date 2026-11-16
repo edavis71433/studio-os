@@ -144,6 +144,7 @@ test.describe('a page’s settings keep what’s being typed (builder item 245)'
     await expect(panel.locator('.dc-modal-h')).toHaveText('Photos settings');   // the panel was drawn again
     await expect(headline).toHaveValue('Our photos of the bakery');
     await expect(headline).toBeFocused();
+    await expect(panel.locator('.srp-page')).toContainText('Our photos of the bakery');   // the Google preview reads them too
     await headline.blur();
     await expect.poll(() => writes.filter((w) => w.path === '/settings' && w.body.page_seo).at(-1)?.body.page_seo['page:gallery']?.title).toBe('Our photos of the bakery');
   });
