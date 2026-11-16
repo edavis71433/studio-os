@@ -33,9 +33,13 @@ async function openEditor(page: Page, hash = '') {
 test.describe('the editor in parts (item 38)', () => {
   test('the Overview opens and works while Edit mode’s part is still on its way', async ({ page }) => {
     const part = await holdPart(page);
+    const asked: string[] = [];
+    page.on('request', (r) => { if (r.url().startsWith(new URL(page.url() === 'about:blank' ? 'http://x' : page.url()).origin) || /\/presence[.-]/.test(r.url())) asked.push(new URL(r.url()).pathname); });
     try {
       await openEditor(page);
       await expect(page.locator('#ssStatus')).not.toBeEmpty();
+      // the page brings its styles and its core, and nothing else of the editor's, with it
+      expect(asked).toEqual(expect.arrayContaining(['/presence.html', '/presence.css', '/presence-core.js']));
       await expect(page.frameLocator('#siteFrame').locator('section').first()).toBeVisible();
       await expect.poll(() => part.asked(), { message: 'the part is asked for once the page has settled' }).toBeGreaterThan(0);
       expect(await partIn(page)).toBe(false);

@@ -22,7 +22,7 @@ const { SITE_ROLES, capabilitiesOf, seesSite } = await import(`${P}/lib/site_rol
 const { landingFor } = await import(`${P}/lib/navigation.ts`);
 
 const ROOT = new URL('../../', import.meta.url);
-const read = (p) => (p === 'presence.html' ? editorSource() : Deno.readTextFileSync(new URL(p, ROOT)));   // builder item 38: the editor is four files now
+const read = (p) => { if (p === 'presence.html') return editorSource(); return Deno.readTextFileSync(new URL(p, ROOT)); };   // builder item 38: the editor is four files now
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
 

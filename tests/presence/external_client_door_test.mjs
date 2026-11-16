@@ -29,7 +29,7 @@ import { editorSource } from './editor_source.mjs';   // builder item 38: the ed
 const results = [];
 const ok = (n, p) => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}`); };
 const src = (p) => Deno.readTextFileSync(new URL(`../../supabase/functions/presence/${p}`, import.meta.url));
-const page = (p) => (p === 'presence.html' ? editorSource() : Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)));   // builder item 38: the editor is four files now
+const page = (p) => { if (p === 'presence.html') return editorSource(); return Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)); };   // builder item 38: the editor is four files now
 
 // ═══ 1. the pure chain: record a domain → readiness flips → sync finds it ════
 // The whole end-to-end, in the pure layer: an existing hosted-edition client
