@@ -7,7 +7,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc, svcCount, svcPages } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
-import { sendEmail, findClientByEmail, createAuthUser, createContactAndClient, deleteAuthUser, generateSetPasswordLink, validEmail } from '../commerce/account.ts';
+import { sendEmail, findClientByEmail, createAuthUser, createContactAndClient, deleteAuthUser, generateSetPasswordLink, validEmail, undoCustomerAccount } from '../commerce/account.ts';
 import { mintSignInLink } from '../lib/workspace.ts';
 import { provisionForSignup } from '../commerce/provision.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
@@ -963,6 +963,10 @@ export async function handleDealTasksList(_req: Request, site: SiteRow, _princip
 }
 export async function handleDealTaskCreate(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
+  // sales item 135: a to-do goes only on one of this studio's own deals. Another studio's
+  // deal id, or a deleted deal, is refused the way every other deal route refuses it.
+  const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&deleted_at=is.null&select=id&limit=1`))[0];
+  if (!deal) return json({ error: 'not_found', message: 'That deal is no longer here.' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const title = clean(b.title, 200);
   if (!title) return json({ error: 'validation', message: 'Give the to-do a title.' }, 422, cors);
@@ -3008,7 +3012,7 @@ export async function handleSalesConvert(req: Request, site: SiteRow, principal:
   if (!up.ok || !rows(up)[0]) {
     // stamp failed (e.g. this customer is already linked to another deal). Roll back
     // ONLY what WE created (never a reused existing customer); release the claim.
-    if (createdClient) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId);
+    if (createdClient) { await undoCustomerAccount(clientId, createdAuthId);   // sales item 137: its old contacts row too
       // K6: the contact was linked to that customer a moment ago; a link to a customer that
       // no longer exists showed "Customer ↗" on People and opened nothing
       await svc(`presence_contacts?site_id=eq.${site.id}&client_id=eq.${clientId}`, { method: 'PATCH', body: JSON.stringify({ client_id: null }) }).catch(() => {}); }
@@ -3143,7 +3147,7 @@ export async function provisionCustomerAccount(opts: {
   // reuse the ONE idempotent provisioning path (entitlement + site + hosting + seeds + first-run)
   const prov = await provisionForSignup({ clientId, businessName, plan, patch: { status: 'active' } as any, actorEmail: opts.actorEmail });
   if (!prov.ok) {
-    if (createdClient) { await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {}); if (createdAuthId) await deleteAuthUser(createdAuthId); } // roll back only what WE created (cascade drops site+entitlement)
+    if (createdClient) await undoCustomerAccount(clientId, createdAuthId);   // roll back only what WE created (cascade drops site+entitlement); item 137: and its old contacts row
     const msg = prov.error === 'hosting_unconfigured' ? 'The account was created but hosting isn’t available in this environment.' : 'We created the account but hit a snag provisioning the workspace.';
     return { ok: false, error: 'provision_incomplete', message: msg, httpStatus: 502, isNewLogin, alreadyExisted, createdClient, createdAuthId };
   }

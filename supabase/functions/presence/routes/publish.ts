@@ -268,6 +268,14 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
       // separate and best-effort: a database without 0205 never fails the status write above
       await svc(`presence_publishes?id=eq.${pubId}`, { method: 'PATCH', body: JSON.stringify({ unchanged: true, deploy_files: digests }) }).catch(() => {});
       await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', last_published_at: done }) });
+      // Item 243: the host is showing the last live version, so the site isn't Offline, even when
+      // it was marked so (an offline page that never went up, or a deploy put back by hand).
+      // Before, Bring back online and Publish answered "live" here and left the mark for good.
+      // And the timed-section sweep works out this version's next instant, as after any live
+      // publish: a section timed to appear later renders the same files today. Both separate
+      // and best-effort, like the same writes below.
+      await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ offline_at: null }) }).catch(() => {});
+      await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ next_window_at: null }) }).catch(() => {});
       if (site.client_id) await clearNotice(site.client_id, 'publish_failed');
       await tickChecklistForCustomerSite(site.id, 'site_live', 'publish', 'system').catch(() => false)
         .then((fresh) => fresh ? emailCustomerSiteLive(site.id) : false).catch(() => false);
