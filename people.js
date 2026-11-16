@@ -33,10 +33,12 @@
   var roleLine = function (k, owner) { var r = roleOf(k); if (!r) return ''; var d = personal(r.desc, owner); return (k === 'business_staff' ? 'Staff' : 'A ' + r.name) + ' ' + d.charAt(0).toLowerCase() + d.slice(1); };
   var seesChips = function (r) { return '<span class="pp-can">' + (r.also ? '<span class="y">✓ ' + esc(r.also) + '</span>' : '') + SEES.map(function (c, i) { return '<span class="' + (r.sees[i] ? 'y' : '') + '">' + (r.sees[i] ? '✓ ' : '✕ ') + esc(c) + '</span>'; }).join('') + '</span>'; };
   var roleName = function (k) { var r = ROLES.filter(function (x) { return x.key === k; })[0]; return r ? r.name : k; };
-  // Developer is paused (Nov 12 2026, lib/workspace.ts DEVELOPER_PAUSED): never offered,
-  // but a seat that already holds it still reads Developer in its list.
-  var OFFERED = ROLES.filter(function (r) { return r.key !== 'developer'; });
-  var choicesFor = function (current) { return ROLES.filter(function (r) { return r.key !== 'developer' || r.key === current; }); };
+  // lib/workspace.ts DEVELOPER_PAUSED, mirrored (site_people_transfer_test keeps the two equal).
+  // Off since Nov 15 2026, so Developer is offered again. While it is on, Developer is never
+  // offered, but a seat that already holds it still reads Developer in its list.
+  var DEVELOPER_PAUSED = false;
+  var OFFERED = ROLES.filter(function (r) { return !DEVELOPER_PAUSED || r.key !== 'developer'; });
+  var choicesFor = function (current) { return ROLES.filter(function (r) { return !DEVELOPER_PAUSED || r.key !== 'developer' || r.key === current; }); };
   var TONES = ['#e3f0fb|#285f95', '#fdf0dc|#8a5a10', '#e6f5ec|#1f6b43', '#fbe7ee|#9b2c55', '#efeafa|#5b3fa0'];
   var tone = function (s) { var n = 0; String(s || '').split('').forEach(function (c) { n = (n * 31 + c.charCodeAt(0)) % 997; }); return TONES[n % TONES.length].split('|'); };
 
@@ -214,7 +216,7 @@
     }).join('') + '</fieldset>';
     if (me.err) h += '<div class="pp-err" role="alert"><span class="t">' + esc(me.err.message) + '</span>' + (me.err.action ? '<button type="button" class="pp-btn" data-pp="' + esc(me.err.action) + '">' + esc(me.err.label) + '</button>' : '') + '</div>';
     h += '<div class="pp-foot"><button type="button" class="pp-btn pri" data-pp="send"' + (me.busy ? ' disabled' : '') + '>' + (me.busy ? 'Sending…' : 'Send invite') + '</button><button type="button" class="pp-btn" data-pp="back">Cancel</button></div>';
-    h += '<p class="pp-faint">The server checks every request against the role, so a Designer can’t reach customers or messages by typing an address either. Developer is paused while custom code gets a stronger safety check. Nobody but ' + esc(owner) + ' can hand the site to someone else.</p></div>';
+    h += '<p class="pp-faint">The server checks every request against the role, so a Designer can’t reach customers or messages by typing an address either. Nobody but ' + esc(owner) + ' can hand the site to someone else.</p></div>';
     me.host.innerHTML = h; me.wire();
     var f = me.host.querySelector('#pp-email'); if (f) f.focus();
   };
