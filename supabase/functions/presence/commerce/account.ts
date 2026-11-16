@@ -118,6 +118,19 @@ export async function createContactAndClient(
   return { contactId, clientId };
 }
 
+// Sales item 137: undo a customer account this request made, all of it: the client, the old
+// contacts row that ties the login to it (createContactAndClient's), then the login. Deleting the
+// login alone left that row behind for good: contacts.auth_user_id is ON DELETE SET NULL, so it
+// only lost its link. The contacts row goes after the client (which points at it) and before the
+// login (while it can still be found by it). Best-effort like every rollback, and only ever
+// called for what this request created, so a reused customer is never touched.
+export async function undoCustomerAccount(clientId: string, authId: string | null): Promise<void> {
+  await svc(`clients?id=eq.${clientId}`, { method: 'DELETE' }).catch(() => {});
+  if (!authId) return;
+  await svc(`contacts?auth_user_id=eq.${authId}`, { method: 'DELETE' }).catch(() => {});
+  await deleteAuthUser(authId);
+}
+
 // Builder list item 135: a client made with no owner (a studio's "+ New site")
 // gets its owner's login later, the same chain createContactAndClient builds:
 // auth.users → contacts(auth_user_id) → clients.contact_id, plus the email on

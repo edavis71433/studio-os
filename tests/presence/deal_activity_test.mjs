@@ -60,6 +60,12 @@ const NUL = String.fromCharCode(0), BEL = String.fromCharCode(7), DEL = String.f
 {
   ok('stage_change label', describeSystemEvent({ kind: 'stage_change', to_stage: 'proposal' }) === 'Moved to Proposal sent');
   ok('proposal accepted', describeSystemEvent({ kind: 'proposal_decided', detail: { decision: 'accepted' } }) === 'Proposal accepted');
+  // sales item 136: an accept or an approved estimate that filled in the deal's value says so
+  ok('proposal accepted that filled the deal value names it', describeSystemEvent({ kind: 'proposal_decided', detail: { decision: 'accepted', value_backfilled_cents: 291600 } }) === 'Proposal accepted — deal value set to $2,916');
+  ok('a filled value with cents prints them both', describeSystemEvent({ kind: 'proposal_decided', detail: { decision: 'accepted', value_backfilled_cents: 125050 } }) === 'Proposal accepted — deal value set to $1,250.50');
+  ok('an approved estimate that filled the deal value names it', describeSystemEvent({ kind: 'estimate_decided', detail: { decision: 'approved', total_cents: 480000, value_backfilled_cents: 480000 } }) === 'Estimate approved — $4,800 (deal value set to $4,800)');
+  ok('an approved estimate that filled nothing reads as before', describeSystemEvent({ kind: 'estimate_decided', detail: { decision: 'approved', total_cents: 480000 } }) === 'Estimate approved — $4,800');
+  ok('a decline never names a value', describeSystemEvent({ kind: 'proposal_decided', detail: { decision: 'declined', value_backfilled_cents: 291600 } }) === 'Proposal declined');
   ok('invoice sent with amount', describeSystemEvent({ kind: 'invoice_sent', detail: { amount_cents: 50000, purpose: 'deposit' } }) === 'Deposit requested — $500');
   ok('created fallback label', describeSystemEvent({ kind: 'created' }) === 'Deal created');
 }
