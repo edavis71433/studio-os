@@ -59,6 +59,7 @@ const { handleStudioCustomers } = await import('../../supabase/functions/presenc
 const { runCustomerTrashSweep, bareCustomer } = await import('../../supabase/functions/presence/ops/customer_trash.ts');
 const { memberWriteNeeds } = await import('../../supabase/functions/presence/lib/site_roles.ts');
 const { sweepIssues } = await import('../../supabase/functions/presence/routes/system.ts');
+const CRM = await import('../../supabase/functions/presence/routes/crm.ts');
 
 let pass = 0, fail = 0; const failed = [];
 const ok = (n, c, note = '') => { if (c) { pass++; console.log('PASS ', n); } else { fail++; failed.push(n); console.log('FAIL ', n, note); } };
@@ -114,6 +115,8 @@ ok('save: someone with their own account elsewhere is asked, never taken', asked
   ok('profile: it names the business and the person to invite', r.body?.data?.business_name === 'Willow & Ash Bakery' && r.body?.data?.person?.email === 'maya@willowash.example' && r.body?.data?.portal?.email === 'maya@willowash.example');
   const stranger = await route('GET', `/sales/customers/${OTHER_STUDIO}`);
   ok('profile: another studio’s customer is not yours', stranger.status === 404);
+  const rec = await res(await CRM.handleCrmRecord(req('GET', `/crm/record?client_id=${CID}`), 'jwt-owner', site, owner, cors));
+  ok('their record names the business and the person, and their email from their contact (nobody owns the record yet)', rec.status === 200 && rec.body?.data?.header?.name === 'Willow & Ash Bakery' && rec.body?.data?.header?.email === 'maya@willowash.example' && rec.body?.data?.header?.status === 'customer', JSON.stringify(rec.body?.data?.header));
   ok('pure: what a website is', C.websiteState(null, '') === 'none' && C.websiteState({ edition: 'presence' }, '') === 'ours' && C.websiteState({ edition: 'monitor' }, 'theirs.example') === 'elsewhere' && C.websiteState({ edition: 'monitor' }, '') === 'workspace');
   ok('pure: what the profile offers', JSON.stringify(C.customerOffers('workspace', 'waiting')) === JSON.stringify({ create_website: true, invite: false, invite_again: true }) && C.customerOffers('ours', 'joined').create_website === false && C.customerOffers('elsewhere', 'none').invite === true);
 }
