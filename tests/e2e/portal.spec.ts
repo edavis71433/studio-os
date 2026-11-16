@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { installApp, OWNER_SESSION, spyRequestBodies, sentBodies } from './helpers/app';
+import { installApp, OWNER_SESSION, spyRequestBodies, sentBodies, pressButton } from './helpers/app';
 import { settled } from './helpers/app';
 
 // The client portal (client.html) — a reviewer's calm world: mirror of "needs
@@ -2332,6 +2332,64 @@ test.describe('PS2 — Invoices on the Documents shelf (B1, item 179 part four)'
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'We couldn’t cancel it just now, so nothing changed.' }).first()).toBeVisible();
     await expect(live.locator('.fst')).toHaveText('Active');
     await expect(live.getByRole('button', { name: 'Yes, cancel it' })).toBeEnabled();
+  });
+
+  // Sales item 129 (Stripe review, finding 3): a card that failed used to say "message your
+  // studio" with no way to put in a new one. Update your card opens Stripe's own page.
+  const FAILED = { ...RETAINER, status: 'past_due', next_charge: null, can_update_card: true };
+  test('a card that didn’t go through says so, and Update your card opens Stripe’s page for a new one', async ({ page }) => {
+    const sent: string[] = [];
+    await installApp(page, { api: { ...retApi([FAILED]), [`POST /client/retainers/${RETAINER.id}/card`]: () => { sent.push('card'); return { data: { url: 'https://billing.stripe.com/p/session/test_e2e' } }; } } });
+    await page.route('https://billing.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Stripe</title><h1>Update your payment method</h1>' }));
+    await page.goto('/client.html');
+    await openInvoices(page);
+    const card = page.locator('#main .retcard');
+    await expect(card.locator('.fst')).toHaveText('Payment didn’t go through');
+    await expect(card.locator('.retfail')).toHaveText('Your card didn’t go through. Stripe tries it again over the next few days. Put in a new card and Stripe uses that instead.');
+    await expect(card).not.toContainText('Message your studio');
+    const update = card.getByRole('button', { name: 'Update your card' });
+    await expect(update).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Cancel retainer' })).toBeVisible();   // still there, beside it
+    const box = await update.boundingBox();
+    expect(box && box.height).toBeGreaterThanOrEqual(40);   // a finger-sized button
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    await pressButton(update);
+    await expect(page).toHaveURL('https://billing.stripe.com/p/session/test_e2e');
+    expect(sent).toEqual(['card']);
+  });
+
+  test('a live retainer offers Update your card too; a card page Stripe won’t open says so and the button works again', async ({ page }) => {
+    await installApp(page, { api: retApi([{ ...RETAINER, can_update_card: true }]) });
+    await page.route(`**/functions/v1/presence/client/retainers/${RETAINER.id}/card`, (route) => route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'card_page_failed', message: 'We couldn’t open Stripe’s card page just now. Please try again in a minute, or message your studio.' }) }));
+    await page.goto('/client.html');
+    await openInvoices(page);
+    const card = page.locator('#main .retcard');
+    await expect(card.locator('.fst')).toHaveText('Active');
+    await expect(card.locator('.retfail')).toHaveCount(0);
+    const update = card.getByRole('button', { name: 'Update your card' });
+    await pressButton(update);
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'We couldn’t open Stripe’s card page just now.' }).first()).toBeVisible();
+    await expect(update).toBeEnabled();
+    await expect(page).toHaveURL(/\/client\.html/);
+  });
+
+  test('a retainer with no card to change offers none: waiting for approval, ended, or from a server that doesn’t say', async ({ page }) => {
+    await installApp(page, { api: retApi([{ ...RETAINER, status: 'pending', can_cancel: false, next_charge: null, charges: [], approve_url: 'https://pay.example/retainer' }, { ...RETAINER, id: '7a000000-0000-4000-8000-000000000003', name: 'Old plan', status: 'canceled', can_cancel: false, next_charge: null, canceled_at: '2026-11-01T00:00:00Z' }, { ...FAILED, id: '7a000000-0000-4000-8000-000000000004', name: 'Older server', can_update_card: undefined }]) });
+    await page.goto('/client.html');
+    await openInvoices(page);
+    await expect(page.locator('#main .retcard')).toHaveCount(3);
+    await expect(page.locator('#main [data-ret-card]')).toHaveCount(0);
+    // a failed card on a server before this change still says so, with the old way out
+    await expect(page.locator('#main .retcard').filter({ hasText: 'Older server' }).locator('.retfail')).toContainText('Message your studio if the card has changed.');
+  });
+
+  test('back from Stripe with a new card: the shelf, and one line saying it’s saved', async ({ page }) => {
+    await installApp(page, { api: retApi([{ ...RETAINER, can_update_card: true }]) });
+    await page.goto('/client.html?card=saved#invoices');
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Your new card is saved. Stripe uses it for the next charge.' }).first()).toBeVisible();
+    await expect(page.locator('#main .retcard')).toHaveCount(1);
+    await expect(page).toHaveURL(/\/client\.html#invoices$/);   // the address forgets it, so a reload doesn't say it again
   });
 
   test('rows are shelf anatomy — receipt icon, name heading, "Invoice · amount · due <date>" meta — with Paid / Overdue (due-yesterday) / Upcoming (due-tomorrow) chips', async ({ page }) => {
