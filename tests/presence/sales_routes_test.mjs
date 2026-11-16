@@ -954,13 +954,12 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
     const box = read('customer-add.js');
     const dlg = box.slice(box.indexOf("'<dialog id=\"custDlg\""), box.indexOf("'</dialog>'"));   // the box's own markup
     ok('ui: no sign-up wording, sign-up link or price page in the box', !/cu-signup|sign up themselves|pricing\.html/.test(box));
-    ok('ui: saving is the default (mode connect, name and email only); setting up sends mode provision', /value="connect" checked/.test(box) && /var body = mode === 'connect' \? \{ mode: 'connect', name: name \|\| undefined, email: email \}\s*:\s*\{ mode: 'provision',/.test(box));
-    ok('ui: distinct success states — request sent / already set up / invitation sent', /heading = 'Request sent'/.test(box) && /already have a workspace/.test(box) && /Invitation sent to/.test(box));
-    // ── Oct 2026 studio audit, change 4 — the box is honest and needs no password
-    ok('the box: no "set their password" anywhere in it or its done screen', !/set their password/.test(box) && /Adding them creates their client workspace and their site, and emails them a sign-in link\./.test(box) && /They’ll sign in from the email and land in their client portal\./.test(box));
-    ok('the box says what adding does (workspace + site + sign-in link, never pay for software)', /Adding them creates their client workspace and their site, and emails them a sign-in link\. You bill them for your work the usual way — they never pay for software here\./.test(dlg));
+    ok('ui: saving sends who they are, as mode save (builder item 241: the customer and nothing else)', /var body = \{ mode: 'save', name: name \|\| undefined, business_name: business_name \|\| undefined, email: email \};/.test(box) && !/mode: 'provision'/.test(box));
+    ok('ui: distinct outcomes — request sent / connected again / already yours / saved', /heading = 'Request sent'/.test(box) && /heading = 'Connected again'/.test(box) && /heading = 'Already your customer'/.test(box) && /heading = 'Saved to your customers'/.test(box));
+    ok('the box: no "set their password" and no set-up or plan anywhere in it', !/set their password|Set up \+ invite|never pay for software/.test(dlg));
+    ok('the box says what saving does', /Saves them to your customers\. No website is made and nobody is emailed\. Their profile has Create website and Invite to their portal for when you’re ready\./.test(dlg));
     for (const p of ['agency.html', 'customers.html', 'contacts.html']) ok(`${p}: no sign-up wording, sign-up link or price page (builder item 199)`, !/cu-signup|cu-connect-only|sign up themselves|pricing\.html/.test(read(p)));
-    ok('the box: "Start from" kit select (default "No kit — start empty")', /id="cu-kit-wrap"/.test(dlg) && /<select id="cu-kit"><option value="">No kit — start empty<\/option><\/select>/.test(dlg));
+    ok('the box: no starter kit (a kit starts a website, from New site)', !/cu-kit/.test(dlg));
   }
 }
 

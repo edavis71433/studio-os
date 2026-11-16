@@ -128,19 +128,10 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
 {
   const box = page('customer-add.js');
   const dlg = box.slice(box.indexOf("'<dialog id=\"custDlg\""), box.indexOf("'</dialog>'") + 12);
-  const values = [...dlg.matchAll(/<option value="([^"]+)"/g)].map((m2) => m2[1]);
-  ok('the box: every dropdown value is distinct (two options shared "business_os_only")',
-    new Set(values).size === values.length);
-  ok('the box: the four answers are the four real situations',
-    JSON.stringify(values) === JSON.stringify(['presence', 'business_os_only', 'business_os_no_site', 'presence_monitor']));
-  ok('the box: build-elsewhere keeps the server\'s real plan key (no translation needed)',
-    /value="business_os_only">Building or redoing their site on another platform/.test(dlg));
-  ok('the box: the no-site answer maps back to the Business OS plan before submit',
-    /function cuPlan\(\) \{ var v = \$\('cu-edition'\)\.value; return v === 'business_os_no_site' \? 'business_os_only' : v; \}/.test(box));
-  ok('the box: the submit body sends the MAPPED plan, never the raw option value',
-    /edition: cuPlan\(\),/.test(box) && !/edition: \$\('cu-edition'\)\.value/.test(box));
-  ok('the box: build-elsewhere and monitor ask for the address; no-site-work does not',
-    /return v === 'business_os_only' \|\| v === 'presence_monitor';/.test(box));
+  // builder item 241: adding a customer saves them and nothing else, so the box asks no kind of work;
+  // the external case (their site lives somewhere else) is its own step on their profile
+  ok('the box asks no kind of work (it saves the customer and nothing else)', !/<option value=|cu-edition|cuPlan/.test(dlg));
+  // (their profile's "Their site lives somewhere else?" is driven in tests/e2e/customers-241.spec.ts; the route in customers_241_test.mjs)
 
   // an unknown edition key would silently become the HOSTED plan server-side
   // (pickPlan defaults to 'presence') — so the raw option value must never
