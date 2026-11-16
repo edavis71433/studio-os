@@ -219,10 +219,15 @@ test.describe('sales item 94 — AI help and the month’s goal', () => {
   });
 
   test('Settings: the goal saves, the owner flips AI help, and it says what it costs and what it used', async ({ page }) => {
+    // "last used today at …" needs the last use and now on the same day: an hour before now fell on
+    // yesterday for the first hour after midnight, every day. So the clock stops at midday, and the
+    // last use is an hour before that.
+    const NOON = Date.parse('2026-11-15T12:00:00Z');
+    await page.clock.setFixedTime(new Date(NOON));
     const puts: Array<Record<string, unknown>> = [];
     await installApp(page, { api: {
       '/portal/context': STUDIO_CTX,
-      '/sales/goal-ai': { data: { goal_cents: null, ai_on: false, ai_on_at: null, can_switch: true, from_studio: false, ready: true, usage: { month_uses: 23, month_cents: 21.6, last_at: ago(1), today_uses: 2, day_limit: 50, cents_each: 1 } } },
+      '/sales/goal-ai': { data: { goal_cents: null, ai_on: false, ai_on_at: null, can_switch: true, from_studio: false, ready: true, usage: { month_uses: 23, month_cents: 21.6, last_at: new Date(NOON - HOUR).toISOString(), today_uses: 2, day_limit: 50, cents_each: 1 } } },
       '/sales/summary': { data: { total: 4, open: { count: 3, value_cents: 975000 }, won_month: { count: 1, value_cents: 195000 }, expected: { value_cents: 418000 }, win_rate: { pct: null, won: 0, lost: 0 }, by_stage: [], goal: null } },
     } });
     await page.route((u) => u.pathname.endsWith('/functions/v1/presence/sales/goal-ai'), (route: Route) => {
