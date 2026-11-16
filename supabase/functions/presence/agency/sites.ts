@@ -708,7 +708,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
   //    provisionCustomerAccount, no email: "a studio-managed workspace"). ──
   if (route === '/agency/sites' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
-    let b: { business_name?: unknown; kit_id?: unknown; template_slug?: unknown; industry_key?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+    let b: { business_name?: unknown; kit_id?: unknown; template_slug?: unknown; industry_key?: unknown; client_id?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
     const name = String(b.business_name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
     if (!name) return json({ error: 'bad_request', message: 'Name the business.' }, 400, cors);
     const kitId = b.kit_id == null || b.kit_id === '' ? '' : String(b.kit_id);
@@ -720,19 +720,31 @@ export async function handleAgencySites(req: Request, route: string, method: str
     if (look && !lookVersion) return json({ error: 'bad_template', message: 'That design isn’t one of the built-in ones.' }, 400, cors);
     const industry = b.industry_key == null || b.industry_key === '' ? '' : String(b.industry_key);
     if (industry && !isKnownIndustry(industry)) return json({ error: 'bad_industry', message: 'Pick the kind of business from the list.' }, 400, cors);
-    // item 198: one rule at every door, the Trash doesn't count (lib/site_room.ts)
-    const list = await studioList(member.agency_id);
+    // item 241: Create website on a customer's profile makes the site for THAT customer's record
+    const forClient = b.client_id == null || b.client_id === '' ? '' : String(b.client_id);
+    if (forClient && !UUID_RE.test(forClient)) return json({ error: 'not_found', message: 'That customer isn’t one of yours.' }, 404, cors);
+    // item 198: one rule at every door, the Trash doesn't count (lib/site_room.ts); for a customer, websiteForCustomer asks it
+    const list = forClient ? null : await studioList(member.agency_id);
     const room = list ? roomOf(list.map((l) => l.status), member.client_limit) : null;
     if (room?.full) return json({ error: 'client_limit', message: roomFullMessage(room.limit, 'new'), room }, 409, cors);
     // the kit is checked before anything is made, so a wrong one makes nothing
     const kit = kitId ? rowsOf<{ name: string; payload: KitPayload }>(await svc(`presence_starter_kits?id=eq.${kitId}&agency_id=eq.${member.agency_id}&select=name,payload&limit=1`))[0] : null;
     if (kitId && !kit) return json({ error: 'not_found', message: 'That starter kit isn’t one of yours.' }, 404, cors);
-    const acct = await provisionCustomerAccount({ email: '', businessName: name, plan: 'presence', actorEmail: member.email });
-    if (!acct.ok || !acct.clientId || !acct.siteId) return json({ error: acct.error || 'provision_incomplete', message: acct.message || 'We couldn’t make the site just now — please try again.' }, acct.httpStatus || 502, cors);
-    const claim = await claimPortfolioSite(member.agency_id, acct.siteId, '');
-    if (claim !== 'linked' && claim !== 'already') {
-      await svc(`clients?id=eq.${acct.clientId}`, { method: 'DELETE' }).catch(() => {});   // nothing lingers: the site and its plan go with the client
-      return json({ error: 'write_failed', message: 'The site didn’t save — please try again.' }, 502, cors);
+    let acct: { clientId: string; siteId: string };
+    if (forClient) {
+      const { websiteForCustomer } = await import('../routes/customers.ts');
+      const made = await websiteForCustomer(forClient, name, member, await deps.ownSite().catch(() => null));
+      if (!made.ok) return json({ error: made.error, message: made.message, ...(made.room ? { room: made.room } : {}) }, made.status, cors);
+      acct = { clientId: made.clientId, siteId: made.siteId };
+    } else {
+      const made = await provisionCustomerAccount({ email: '', businessName: name, plan: 'presence', actorEmail: member.email });
+      if (!made.ok || !made.clientId || !made.siteId) return json({ error: made.error || 'provision_incomplete', message: made.message || 'We couldn’t make the site just now — please try again.' }, made.httpStatus || 502, cors);
+      const claim = await claimPortfolioSite(member.agency_id, made.siteId, '');
+      if (claim !== 'linked' && claim !== 'already') {
+        await svc(`clients?id=eq.${made.clientId}`, { method: 'DELETE' }).catch(() => {});   // nothing lingers: the site and its plan go with the client
+        return json({ error: 'write_failed', message: 'The site didn’t save — please try again.' }, 502, cors);
+      }
+      acct = { clientId: made.clientId, siteId: made.siteId };
     }
     // item 198: the kind of business is the site's industry_key (Settings → Kind of business),
     // and the design its look, the way Styles sets it. A saved template brings its own look,
@@ -757,7 +769,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
       try { kitOut = { id: kitId, name: kit.name, ...(await applyKitTo(kit.payload, acct.siteId, principal, `Started from the “${kit.name}” ${tpl ? 'template' : 'starter kit'}`, tpl ? { label: `your “${kit.name}” template` } : {})) }; }
       catch { kitOut = { id: kitId, name: kit.name, failed: true }; }
     }
-    return json({ data: { site_id: acct.siteId, client_id: acct.clientId, name, kit: kitOut, look: lookOut, industry: industryOut } }, 201, cors);
+    return json({ data: { site_id: acct.siteId, client_id: acct.clientId, name, kit: kitOut, look: lookOut, industry: industryOut, for_customer: !!forClient } }, 201, cors);
   }
 
   // ── every domain: the clients' and the studio's own ──
@@ -970,57 +982,78 @@ export async function handleAgencySites(req: Request, route: string, method: str
   //    database without migration 0154 refuses before anything goes offline. ──
   if (what === 'trash' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
-    if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notYours(cors);
-    const site = rowsOf<SiteRow & { offline_at?: string | null }>(await svc(`presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`))[0];
-    if (!site) return notYours(cors);
-    const wasLive = site.edition !== 'monitor' && !!(site.status === 'live' || site.last_published_at);
-    const at = new Date().toISOString();
-    const w = await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}&status=eq.active&select=site_id`, {
-      method: 'PATCH', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ status: 'trashed', trashed_at: at, trashed_by: member.email, trashed_was_live: wasLive }),
-    });
-    if (!w.ok) {
-      const missing = w.status === 400 || /trashed|status_check/.test(String(w.text || ''));
-      return json({ error: missing ? 'unavailable' : 'write_failed', message: missing ? 'The trash needs one database step first.' : 'That didn’t save — please try again.' }, missing ? 503 : 502, cors);
-    }
-    if (!rowsOf(w).length) return notYours(cors);
-    let offline = false;
-    if (wasLive) {
-      const off = await takeSiteOffline(site, principal);
-      offline = off.ok || off.error === 'already_offline' || off.error === 'not_live';
-      if (!off.ok && !offline) {
-        // it stays where it was: back in the list, live, and the answer says why
-        await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`, { method: 'PATCH', body: JSON.stringify({ status: 'active', trashed_at: null, trashed_by: null, trashed_was_live: false }) }).catch(() => null);
-        return json({ error: 'offline_failed', message: `It couldn’t be taken offline (${off.message}), so it stays where it was.` }, 502, cors);
-      }
-    }
     const own = await deps.ownSite().catch(() => null);
-    if (own) await writeChangeEvent({ siteId: own.id, entityType: 'site', entityId: siteId, action: 'update', summary: `Moved a client site to the trash${wasLive ? ' and took it offline' : ''}`, principal, provenance: 'human' }).catch(() => {});
-    // item 204: a site with an owner is theirs, so they hear it from us, and it shows in their history too
-    const owner_told = await tellOwnerTrashed(siteId, studioWord(member), wasLive, at, principal, own?.id || null).catch(() => false);
-    return json({ data: { site_id: siteId, trashed_at: at, goes_at: goesAt(at, TRASH_DAYS), was_live: wasLive, offline, owner_told } }, 200, cors);
+    return moveAnswer(await trashClientSite(siteId, member, principal, own), cors);
   }
 
   // ── Restore from the trash (item 154): back in every list. A site that was
   //    taken offline stays offline until it is published or brought back online. ──
   if (what === 'restore' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
-    // item 198: a site back from the Trash counts again, so a full plan says so first
-    const list = await studioList(member.agency_id);
-    const inTrash = list?.some((l) => l.site_id === siteId && l.status === 'trashed');
-    const room = list ? roomOf(list.map((l) => l.status), member.client_limit) : null;
-    if (inTrash && room?.full) return json({ error: 'client_limit', message: roomFullMessage(room.limit, 'restore'), room }, 409, cors);
-    const w = await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}&status=eq.trashed&select=site_id,trashed_was_live`, {
-      method: 'PATCH', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ status: 'active', trashed_at: null, trashed_by: null, trashed_was_live: false }),
-    });
-    const row = rowsOf<{ site_id: string; trashed_was_live?: boolean }>(w)[0];
-    if (!w.ok || !row) return json({ error: 'not_found', message: 'That site isn’t in your trash.' }, 404, cors);
     const own = await deps.ownSite().catch(() => null);
-    if (own) await writeChangeEvent({ siteId: own.id, entityType: 'site', entityId: siteId, action: 'update', summary: 'Restored a client site from the trash', principal, provenance: 'human' }).catch(() => {});
-    return json({ data: { site_id: siteId, restored: true } }, 200, cors);
+    return moveAnswer(await restoreClientSite(siteId, member, principal, own), cors);
   }
   return null;
+}
+
+// ── Move to trash and Restore, as functions (item 154; item 241: Delete customer sends a
+//    customer's website to the Trash, and Restore brings it back, the same way) ──
+export type SiteMove = { ok: true; data: Record<string, unknown> } | { ok: false; status: number; error: string; message: string; room?: unknown };
+const moveAnswer = (m: SiteMove, cors: Record<string, string>) => m.ok ? json({ data: m.data }, 200, cors) : json({ error: m.error, message: m.message, ...(m.room ? { room: m.room } : {}) }, m.status, cors);
+
+/** Move to trash (item 154): the site goes offline (the short "temporarily offline" page;
+ *  nothing is deleted) and out of every list, into the Trash at the foot of Sites. For
+ *  TRASH_DAYS one press restores it; then the daily job deletes it for good
+ *  (ops/site_trash.ts). The state is written first, so a database without migration 0154
+ *  refuses before anything goes offline. The caller has checked the member may manage clients. */
+export async function trashClientSite(siteId: string, member: AgencyMember, principal: Principal, own: { id: string } | null): Promise<SiteMove> {
+  const notOurs: SiteMove = { ok: false, status: 404, error: 'not_found', message: 'Not one of your clients.' };
+  if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notOurs;
+  const site = rowsOf<SiteRow & { offline_at?: string | null }>(await svc(`presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`))[0];
+  if (!site) return notOurs;
+  const wasLive = site.edition !== 'monitor' && !!(site.status === 'live' || site.last_published_at);
+  const at = new Date().toISOString();
+  const w = await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}&status=eq.active&select=site_id`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ status: 'trashed', trashed_at: at, trashed_by: member.email, trashed_was_live: wasLive }),
+  });
+  if (!w.ok) {
+    const missing = w.status === 400 || /trashed|status_check/.test(String(w.text || ''));
+    return { ok: false, status: missing ? 503 : 502, error: missing ? 'unavailable' : 'write_failed', message: missing ? 'The trash needs one database step first.' : 'That didn’t save — please try again.' };
+  }
+  if (!rowsOf(w).length) return notOurs;
+  let offline = false;
+  if (wasLive) {
+    const off = await takeSiteOffline(site, principal);
+    offline = off.ok || off.error === 'already_offline' || off.error === 'not_live';
+    if (!off.ok && !offline) {
+      // it stays where it was: back in the list, live, and the answer says why
+      await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`, { method: 'PATCH', body: JSON.stringify({ status: 'active', trashed_at: null, trashed_by: null, trashed_was_live: false }) }).catch(() => null);
+      return { ok: false, status: 502, error: 'offline_failed', message: `It couldn’t be taken offline (${off.message}), so it stays where it was.` };
+    }
+  }
+  if (own) await writeChangeEvent({ siteId: own.id, entityType: 'site', entityId: siteId, action: 'update', summary: `Moved a client site to the trash${wasLive ? ' and took it offline' : ''}`, principal, provenance: 'human' }).catch(() => {});
+  // item 204: a site with an owner is theirs, so they hear it from us, and it shows in their history too
+  const owner_told = await tellOwnerTrashed(siteId, studioWord(member), wasLive, at, principal, own?.id || null).catch(() => false);
+  return { ok: true, data: { site_id: siteId, trashed_at: at, goes_at: goesAt(at, TRASH_DAYS), was_live: wasLive, offline, owner_told } };
+}
+
+/** Restore from the trash (item 154): back in every list. A site that was taken offline
+ *  stays offline until it is published or brought back online. Item 198: a site back from
+ *  the Trash counts again, so a full plan says so first. */
+export async function restoreClientSite(siteId: string, member: AgencyMember, principal: Principal, own: { id: string } | null): Promise<SiteMove> {
+  const list = await studioList(member.agency_id);
+  const inTrash = list?.some((l) => l.site_id === siteId && l.status === 'trashed');
+  const room = list ? roomOf(list.map((l) => l.status), member.client_limit) : null;
+  if (inTrash && room?.full) return { ok: false, status: 409, error: 'client_limit', message: roomFullMessage(room.limit, 'restore'), room };
+  const w = await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}&status=eq.trashed&select=site_id,trashed_was_live`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ status: 'active', trashed_at: null, trashed_by: null, trashed_was_live: false }),
+  });
+  const row = rowsOf<{ site_id: string; trashed_was_live?: boolean }>(w)[0];
+  if (!w.ok || !row) return { ok: false, status: 404, error: 'not_found', message: 'That site isn’t in your trash.' };
+  if (own) await writeChangeEvent({ siteId: own.id, entityType: 'site', entityId: siteId, action: 'update', summary: 'Restored a client site from the trash', principal, provenance: 'human' }).catch(() => {});
+  return { ok: true, data: { site_id: siteId, restored: true } };
 }
 
 /** The studio as its clients know it. */
