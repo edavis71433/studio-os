@@ -6,7 +6,8 @@ import { installApp, STUDIO_NAV, ALL_FEATURES, settled, pressButton } from './he
 // open, and when that read landed the "Who can see it" part was drawn again, so words typed into
 // the password page's Heading vanished unsaved and the Password field lost its focus. A save
 // landing (a new page name) drew the whole panel again under the next field being typed in, and
-// a quick press on Password lost its field to the page name, focused a moment after opening.
+// closed a Password field just opened, with the password being typed in it; a quick press on
+// Password lost its field to the page name, focused a moment after opening.
 // Each test holds the read or the save on purpose, types, then lets it land.
 const BLOCKS = [{ type: 'title', title: 'Your heading', subtitle: 'A quiet sub line' }];
 const META = { blocks: [{ sid: 'title', key: 'block_title', src_index: 0 }], pages: {} };
@@ -147,5 +148,27 @@ test.describe('a page’s settings keep what’s being typed (builder item 245)'
     await expect(panel.locator('.srp-page')).toContainText('Our photos of the bakery');   // the Google preview reads them too
     await headline.blur();
     await expect.poll(() => writes.filter((w) => w.path === '/settings' && w.body.page_seo).at(-1)?.body.page_seo['page:gallery']?.title).toBe('Our photos of the bakery');
+  });
+
+  test('choosing Password while a new page name is still saving keeps the Password field and what’s typed in it, and it saves', async ({ page }) => {
+    const { writes, held } = await mount(page);
+    const panel = await openSettings(page, 'Gallery');
+    await settled(page);
+    held.saves = door();
+    await panel.getByLabel('Page name', { exact: true }).fill('Photos');
+    await pressButton(panel.locator('.pg-acc[data-access="password"]'));   // leaving the name sends it; its save is held
+    const pw = panel.getByLabel('Password', { exact: true });
+    await expect(pw).toBeFocused();
+    await pw.fill('open sesame');
+    await expect.poll(() => writes.filter((w) => w.path === '/settings').length).toBe(1);
+    held.saves.open();
+    await settled(page);
+    await expect(panel.locator('.dc-modal-h')).toHaveText('Photos settings');   // the panel was drawn again
+    await expect(pw).toHaveValue('open sesame');   // the field it opened is still open, with the words in it
+    await expect(pw).toBeFocused();
+    await pw.press('Enter');
+    await expect.poll(() => lastPage(writes, 'gallery')).toMatchObject({ title: 'Photos', access: 'password', lock: LOCK });
+    expect(writes.filter((w) => w.path === '/page-locks')).toEqual([{ method: 'POST', path: '/page-locks', body: { password: 'open sesame' } }]);
+    await expect(panel.locator('.pg-saved .hb-chip')).toHaveText('Password saved');
   });
 });
