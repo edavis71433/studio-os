@@ -77,7 +77,7 @@ const list = data.entries;
   ok('…and the account menu has it too, for the narrowest phones', /id="dds-new-row">What’s new/.test(shell) && /#dds-new\{display:none\}|#dds-new{display:none}|,#dds-new\{display:none\}/.test(read('shell.css').replace(/\s/g, '')));
   // the site is published from an allowlist (scripts/build-public.sh): the entries and their pictures must be on it
   const build = read('scripts/build-public.sh');
-  ok('the published site carries the entries and their pictures', /^for f in [^\n]*\bwhats-new\.json\b[^\n]*; do$/m.test(build) && /for d in [^\n]*\bthumbs\b/.test(build) && /cp \.\/\*\.js dist\//.test(build));
+  ok('the published site carries the entries and their pictures', /^for f in [^\n]*\bwhats-new\.json\b[^\n]*; do$/m.test(build) && /for d in [^\n]*\bthumbs\b/.test(build) && /cp \.\/\*\.js (dist|"\$OUT")\//.test(build));   // "$OUT": dist/, or a test's own folder (builder item 142)
   const portal = read('client.html');
   ok('the portal: New in your portal tops the Help tab, between its heading and the kit', /portalHeader\('Help',answers\?'Quick answers from your studio\.':'[^']+'\)\+whatsNewDoorHtml\(\)\+portalPagesHtml\(\)\+\(answers\?kitHtml\(kr\):''\)/.test(portal)
     && /W\.open\(\{who:'client'/.test(portal));

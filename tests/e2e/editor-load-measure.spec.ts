@@ -76,7 +76,10 @@ async function openOnce(context: BrowserContext, profile: Profile) {
   const reqs = await watchNetwork(cdp);
   await cdp.send('Network.emulateNetworkConditions', { offline: false, ...PROFILES[profile].net });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: PROFILES[profile].cpu });
-  await installApp(page, { api: { ...API, '/settings': { data: SETTINGS } } });
+  // the server since item 37 answers the start-up reads with the site (an older page never asks)
+  const site = (API['/site'] as { data: unknown }).data;
+  const parts = { offerings: { data: [] }, faqs: { data: [] }, testimonials: { data: [] }, posts: { data: [] }, media: { data: [] }, settings: { data: SETTINGS }, publish_lock: { data: null } };
+  await installApp(page, { api: { ...API, '/settings': { data: SETTINGS }, '/site': { data: site, parts } } });
   await page.route('**/functions/v1/presence/preview**', (route: Route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: PAGE_HTML(SECTIONS) }));
   // every read takes as long as a live one (registered last, so it runs first)
   await page.route('**/functions/v1/presence/**', async (route: Route) => { await new Promise((r) => setTimeout(r, API_MS)); return route.fallback(); });
