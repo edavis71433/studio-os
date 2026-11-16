@@ -15,7 +15,7 @@ export const EDITOR_FILES = ['presence.html', 'presence.css', 'presence-core.js'
 export function editorSource(root = new URL('../../', import.meta.url)) {
   const read = (p) => Deno.readTextFileSync(new URL(p, root));
   let html = read('presence.html');
-  const css = /<link rel="stylesheet" href="\/presence\.css(?:\?v=\d+)?">/;
+  const css = /<link rel="stylesheet" href="\/presence\.css(?:\?v=\d+)?"(?: data-inline)?>/;
   const js = /<script src="\/presence-core\.js(?:\?v=\d+)?"><\/script>/;
   if (!css.test(html) || !js.test(html)) throw new Error('editor_source: presence.html no longer loads presence.css and presence-core.js the way this helper expects');
   html = html.replace(css, () => '<style>\n' + read('presence.css') + '</style>');

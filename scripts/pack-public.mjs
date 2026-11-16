@@ -64,6 +64,17 @@ for (const f of pages) {
   writeFileSync(join(DIST, f), out);
 }
 
+// ── 1b. a style sheet a page asks to have written in ─────────────────────────
+// <link rel="stylesheet" href="/x.css" data-inline> becomes <style>…x.css, packed…</style>. The repo
+// keeps the file apart, and the page draws without waiting for a second request (builder item 38:
+// the editor's styles, presence.css, measured 0.5 s sooner on a slow phone written in).
+const INLINE = /<link rel="stylesheet" href="\/([\w-]+\.css)(?:\?v=[\w.-]*)?" data-inline>/g;
+for (const f of pages) {
+  const src = readFileSync(join(DIST, f), 'utf8');
+  const out = src.replace(INLINE, (_all, name) => `<style>${readFileSync(join(DIST, name), 'utf8')}</style>`);
+  if (out !== src) writeFileSync(join(DIST, f), out);
+}
+
 // ── 2. fingerprinted copies ──────────────────────────────────────────────────
 const named = assets.filter((f) => !KEEP_NAME.has(f));
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

@@ -51,8 +51,9 @@ test.describe('the packed site (item 142)', () => {
     expect(packed.length).toBeLessThan(readFileSync(join(ROOT, 'shell.js'), 'utf8').length * 0.7);
     // the tools host's pages keep the plain names that host serves (list item 139)
     expect(readFileSync(join(OUT, 'site-review.html'), 'utf8')).toMatch(/src="\/site-review\.js\?v=\d+"/);
-    // the editor's own page is packed too
-    expect(page.length).toBeLessThan(readFileSync(join(ROOT, 'presence.html'), 'utf8').length * 0.8);
+    // the editor's styles are written into its page (data-inline), so it draws without a second request
+    expect(page).toMatch(/<style>[^<]{1000,}<\/style>/);
+    expect(page, 'no request for presence.css').not.toMatch(/presence\.css/);
   });
 
   for (const name of APP_PAGES()) {
