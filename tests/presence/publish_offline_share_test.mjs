@@ -695,17 +695,19 @@ const HOLDING_WAIT = 15 * 60_000;   // the longest a holding page the host never
   ok('slow take offline: the other studio’s own Bring back online still waits for its own holding page', theirs.status === 409 && theirs.body?.error === 'offline_in_progress' && !!offlineAt(SITE_B), `${theirs.status} ${theirs.text.slice(0, 120)}`);
 }
 {
-  // the same slow Take offline, but the host finishes the holding page after the request: the mark was right
+  // the same slow Take offline, but the host finishes the holding page after the request. A press
+  // meanwhile must not lift the mark, or the page would land with the site reading online
   restore();
   const m = mark();
   await slowHost(() => run(() => PUB.handleTakeOffline(siteOf(SITE_A), OWNER[SITE_A], {})));
   const holding = deploysSince(m)[0];
+  const early = await run(() => PUB.handleBackOnline(siteOf(SITE_A), OWNER[SITE_A], {}));
   settle(holding, 'ready');
-  const before = shows(SITE_A) === holding.id && !!offlineAt(SITE_A);
+  ok('holding page up late: a press while it was on its way waited, so visitors get it under the Offline mark, never under an online one', early.status === 409 && early.body?.error === 'offline_in_progress' && shows(SITE_A) === holding.id && !!offlineAt(SITE_A), `${early.status} shows ${shows(SITE_A)} mark ${offlineAt(SITE_A)}`);
   const m2 = mark();
   const back = await run(() => PUB.handleBackOnline(siteOf(SITE_A), OWNER[SITE_A], {}));
   const dep = deploysSince(m2)[0];
-  ok('holding page up late: visitors got it under the mark, and Bring back online then sends the live version over it and lifts the mark', before && back.status === 200 && back.body?.data?.status === 'live' && deploysSince(m2).length === 1 && sameFiles(dep?.files, LIVE_A.deploy_files) && shows(SITE_A) === dep?.id && offlineAt(SITE_A) === null, `${before} ${back.status} ${back.text.slice(0, 160)}`);
+  ok('holding page up late: Bring back online then sends the live version over it and lifts the mark', back.status === 200 && back.body?.data?.status === 'live' && deploysSince(m2).length === 1 && sameFiles(dep?.files, LIVE_A.deploy_files) && shows(SITE_A) === dep?.id && offlineAt(SITE_A) === null, `${back.status} ${back.text.slice(0, 160)}`);
 }
 {
   // a holding page the host never finishes holds the site up for fifteen minutes at most
