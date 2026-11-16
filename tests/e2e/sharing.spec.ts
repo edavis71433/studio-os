@@ -107,16 +107,16 @@ test.describe('Sharing & access', () => {
     await expect(drafts.locator('.state')).toHaveText('Visible');
   });
 
-  test('invite by role: four roles, each said in one sentence of what it sees, Staff picked first; an empty email asks for one and posts nothing; the pick is what is sent', async ({ page }) => {
+  test('invite by role: five roles, each said in one sentence of what it sees, Staff picked first; an empty email asks for one and posts nothing; the pick is what is sent', async ({ page }) => {
     await installApp(page, { api: { '/portal/members': MEMBERS_NONE, '/portal/shares': SHARES_NONE } });
     await page.goto('/sharing.html');
     const card = peopleCard(page);
     await card.getByRole('button', { name: '+ Invite someone' }).click();
     await expect(card.getByRole('heading', { name: 'Invite someone' })).toBeVisible();
     const roles = card.getByRole('radio');
-    await expect(roles).toHaveCount(4);   // Co-owner, Staff, Designer (builder item 220), Reviewer; Developer is paused while custom code gets a stronger safety check
-    await expect(card.getByRole('radio', { name: /Developer/ })).toHaveCount(0);
-    await expect(card.getByRole('radio', { name: /Staff/ })).toBeChecked();
+    await expect(roles).toHaveCount(5);   // Co-owner, Staff, Designer (builder item 220), Developer (back since Nov 15 2026: DEVELOPER_PAUSED is off), Reviewer
+    await expect(card.locator('.pp-role').filter({ hasText: 'Developer' })).toContainText('Sees what Staff sees plus settings and the code tools, but can’t delete anything.');
+    await expect(card.getByRole('radio', { name: /^Staff/ })).toBeChecked();   // anchored: Developer's sentence says "what Staff sees"
     await expect(card.locator('[data-role-card="business_owner"]')).toContainText('Sees everything you see, customers, messages and money included, and can do anything except hand the site over.');
     await expect(card.locator('[data-role-card="client_reviewer"] .pp-can')).toContainText('✓ What you share');
     const tile = (key: string) => card.locator('[data-role-card="' + key + '"]');
@@ -173,7 +173,7 @@ test.describe('Sharing & access', () => {
     const card = peopleCard(page);
     const role = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/portal/members/m-1/role'));
     const pick = card.getByRole('combobox', { name: 'Role for dana@example.com' });
-    await expect(pick.locator('option')).toHaveText(['Co-owner', 'Staff', 'Designer', 'Reviewer']);   // Developer is paused: not a choice (builder item 220 added Designer)
+    await expect(pick.locator('option')).toHaveText(['Co-owner', 'Staff', 'Designer', 'Developer', 'Reviewer']);   // Developer is a choice again (builder item 220 added Designer)
     await pick.selectOption('client_reviewer');
     expect((await role).postDataJSON()).toEqual({ role: 'client_reviewer' });
     let revokes = 0;
