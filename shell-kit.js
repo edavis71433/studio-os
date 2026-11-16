@@ -80,16 +80,21 @@
   // in the address (?client=) goes with it.
   var OFFLINE_MSG = 'We couldn’t reach Studio OS. Check your connection and try again.';
   var RAN_OUT_MSG = 'Your sign-in has run out. Sign in again to carry on.';
+  function request(path, opts, jwt) {
+    var h = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': jwt, 'x-region': FN_REGION };
+    var site = opts.scope !== undefined ? (opts.scope || '') : scopeId();
+    if (site) h['x-dds-scope-site'] = site;   // none at all, not an empty one, for the studio's own book
+    if (opts.headers) for (var k in opts.headers) if (opts.headers[k] != null) h[k] = opts.headers[k];
+    var init = { method: opts.method || 'GET', headers: h };
+    if (opts.body !== undefined && opts.body !== null) init.body = typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
+    if (opts.signal) init.signal = opts.signal;
+    if (opts.keepalive) init.keepalive = true;
+    return fetch(FN + path, init);
+  }
   function api(path, opts) {
     opts = opts || {};
     return token().then(function (jwt) {
-      var h = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': jwt, 'x-dds-scope-site': opts.scope !== undefined ? (opts.scope || '') : scopeId(), 'x-region': FN_REGION };
-      if (opts.headers) for (var k in opts.headers) if (opts.headers[k] != null) h[k] = opts.headers[k];
-      var init = { method: opts.method || 'GET', headers: h };
-      if (opts.body !== undefined && opts.body !== null) init.body = typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
-      if (opts.signal) init.signal = opts.signal;
-      if (opts.keepalive) init.keepalive = true;
-      return fetch(FN + path, init).then(function (r) {
+      return request(path, opts, jwt).then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (b) {
           var out = { ok: r.ok, status: r.status, body: (b && typeof b === 'object') ? b : {} };
           if (r.status === 401 && jwt && (!out.body.error || out.body.error === 'unauthorized')) ranOut(out);
@@ -101,6 +106,17 @@
       });
     });
   }
+  // A download (a CSV, a PDF, a zip): the same call, answered with the browser's own Response
+  // for the page to read as a file. No answer at all rejects, as fetch does.
+  api.raw = function (path, opts) {
+    opts = opts || {};
+    return token().then(function (jwt) {
+      return request(path, opts, jwt).then(function (r) {
+        if (r.status === 401 && jwt) ranOut({ body: {} });
+        return r;
+      });
+    });
+  };
   // the page's own sign-in: ddsApi.use(sb), or ddsApi.use(sb, { signIn: '/portal.html' }) for a client's page
   api.use = function (c, o) { if (c && c.auth) { CLIENT = c; watch(c); } if (o && o.signIn) SIGN_IN = o.signIn; return api; };
   // The sentence for a call that didn't work: what the server said, else the

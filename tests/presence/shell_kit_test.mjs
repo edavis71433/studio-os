@@ -78,7 +78,7 @@ ok('the kit puts its helpers on the page', !!(ddsKit && ddsMoney && ddsDate && d
   ok('a read carries the page\'s sign-in and the region', r.ok && r.status === 200 && r.body.data.ok === true && h['x-dds-user-jwt'] === 'tok-1' && h['x-region'] === 'us-west-2' && sent[0].url.endsWith('/functions/v1/presence/studio/customers'));
   ok('a read sends no body and says GET', sent[0].init.method === 'GET' && sent[0].init.body === undefined);
   await ddsApi('/x', { method: 'POST', body: { a: 1 }, scope: '', headers: { 'x-dds-preview': '1' } });
-  ok('a save sends its body as JSON, the scope it was given and any extra header', sent[1].init.method === 'POST' && sent[1].init.body === '{"a":1}' && sent[1].init.headers['x-dds-scope-site'] === '' && sent[1].init.headers['x-dds-preview'] === '1');
+  ok('a save sends its body as JSON, the scope it was given and any extra header', sent[1].init.method === 'POST' && sent[1].init.body === '{"a":1}' && !('x-dds-scope-site' in sent[1].init.headers) && sent[1].init.headers['x-dds-preview'] === '1');
   ok('the session is read once while it is fresh', reads === 1);
 
   session = { access_token: 'tok-2', expires_at: Math.floor(NOW / 1000) + 30 };

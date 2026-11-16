@@ -343,19 +343,17 @@
 // secondary website action.
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // D7 (customers half): this page IS the agency-portfolio roster. /studio/customers
 // is keyed on the AGENCY site (agency_site_id) and /sales/customers provisions on
 // it too — a stray drill-in ?client= riding the scope header would resolve the
-// roster against a LEAF site and blank it. So the scope header is deliberately
+// roster against a LEAF site and blank it. So the scope is deliberately
 // NOT sent here; scope() survives only for outbound links (scoped()).
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-region':FN_REGION});
-async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+const api=(path,method,body)=>ddsApi(path,{method,body,scope:''});
 // item 89: a phone number is a tap to call (People showed it as text)
 const telOf=(p)=>{const d=String(p||'').trim().replace(/[^\d+]/g,'').replace(/(?!^)\+/g,'');return d.replace(/\D/g,'').length>=3?'tel:'+d:'';};
 const initial=(s)=>{const ch=Array.from(String(s||'?').trim())[0]||'?';const up=ch.toUpperCase();return up.length===1?up:ch;};
@@ -365,7 +363,7 @@ let TOKEN="",CUSTOMERS=[],LOADED_AT=0;
 // item 99 (B3): the sign-in pass is renewed every hour; pick up the new one as Contacts, Pipeline
 // and the record do. This page kept the first pass and said "sign in" an hour after it opened.
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
-function toast(m){if(window.ddsToast)ddsToast(m);}
+const toast=(m,kind,action)=>ddsToast(m,kind,action);   // the shell's one toast: 'err' shows a failure as one
 // SS6 shared ~150ms debounce — kept in sync by hand with inbox.html/contacts.html
 const debounce=(fn,ms)=>{let t;return function(){clearTimeout(t);t=setTimeout(fn,ms||150);};};
 
@@ -438,7 +436,7 @@ async function saveView(){
   const same=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());
   const view={id:(same&&same.id)||(cur&&cur.name.toLowerCase()===name.toLowerCase()?cur.id:undefined),name,base:VIEWNAME,q:Q,cols:shownCols().map(c=>c[0]),sort:SORT};
   const out=await k.saveViews('customers',SAVED.filter(x=>x.id!==view.id&&x.name.toLowerCase()!==name.toLowerCase()).concat(view));
-  if(!out){toast('That view didn’t save — try again in a moment.');return;}
+  if(!out){toast('That view didn’t save — try again in a moment.','err');return;}
   SAVED=out;const now=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());CURVIEW=now?now.id:'';
   render();toast('View saved — it’s in the view menu.');
   const f=$('saveView');if(f)f.focus();   // batch C: the re-draw had left focus on <body>
@@ -448,7 +446,7 @@ async function dropView(){
   // batch C: a saved view is the whole team's — ask in place first
   if(!(await k.confirmIn($('dropView'),{text:`Remove “${cur.name}” for everyone?`,yes:'Yes, remove it'})))return;
   const out=await k.saveViews('customers',SAVED.filter(x=>x.id!==cur.id));
-  if(!out){toast('That didn’t save — try again in a moment.');return;}
+  if(!out){toast('That didn’t save — try again in a moment.','err');return;}
   SAVED=out;CURVIEW='';render();toast('View removed.');
   const f=$('saveView');if(f)f.focus();   // batch C: focus was left on <body> when the button went
 }
@@ -459,10 +457,10 @@ function bulkHtml(){
 async function bulkSend(){
   const k=KIT();if(!k)return;
   const people=CUSTOMERS.filter(c=>PICKED.has(String(c.client_id))&&c.email).map(c=>({email:c.email,name:c.name||''}));
-  if(!people.length){toast('None of the customers you picked has an email address.');return;}
+  if(!people.length){toast('None of the customers you picked has an email address.','err');return;}
   const b=$('bulkSend');if(b)b.disabled=true;
   // item 110 (K5): a dropped connection left the button grey with no word
-  let ok=false;try{ok=await k.sendTo(people);}catch(_){toast('We couldn’t reach the server — nothing was sent. Try again in a moment.');}
+  let ok=false;try{ok=await k.sendTo(people);}catch(_){toast('We couldn’t reach the server — nothing was sent. Try again in a moment.','err');}
   if(!ok){const nb=$('bulkSend');if(nb)nb.disabled=false;}
 }
 // "Mark as" sets each picked customer's main project to Active or On hold.
@@ -485,11 +483,11 @@ async function bulkMark(to,reason){
   const k=KIT();
   if(moved.length&&k&&k.undoToast)k.undoToast(msg,async()=>{
     let bad=0;for(const m of moved){let r;try{r=await api('/projects/'+encodeURIComponent(m.id)+'/status','POST',{to:m.was});}catch(_){r={ok:false};}if(!r.ok)bad++;}
-    toast(bad?`${bad} couldn’t be put back.`:'Put back as they were.');await load().catch(()=>{});
+    toast(bad?`${bad} couldn’t be put back.`:'Put back as they were.',bad?'err':'ok');await load().catch(()=>{});
   });
-  else toast(msg);
+  else toast(msg,fail&&!moved.length?'err':'ok');
   // item 110 (K5): a list that couldn't refresh says so (it stayed stale, with an unhandled error)
-  await load().catch(()=>toast('Marked — but we couldn’t refresh the list. Refresh will catch it up.'));
+  await load().catch(()=>toast('Marked — but we couldn’t refresh the list. Refresh will catch it up.','err'));
 }
 function importCustomers(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
@@ -681,7 +679,7 @@ async function showMorePeople(){
   PBUSY=true;repaintPeople();
   let r;try{r=await pRead(s?s.rows.length:PNEXT,s?s.q:'');}catch(_){r={ok:false,body:{}};}
   PBUSY=false;
-  if(!r.ok){repaintPeople();toast('We couldn’t load more people just now.');return;}
+  if(!r.ok){repaintPeople();toast('We couldn’t load more people just now.','err');return;}
   const page=(r.body&&r.body.data)||[],tot=pTotalOf(r);
   if(s){if(PSRCH!==s){repaintPeople();return;}const have=new Set(s.rows.map(c=>String(c.id)));s.rows=s.rows.concat(page.filter(c=>!have.has(String(c.id))));s.total=tot;s.more=tot!=null?s.rows.length<tot:page.length>=PPAGE;}
   else{const have=new Set(PEOPLE.map(c=>String(c.id)));PEOPLE=PEOPLE.concat(page.filter(c=>!have.has(String(c.id))));PNEXT+=page.length;PTOTAL=tot;PFULL=page.length>=PPAGE;}
@@ -858,7 +856,7 @@ function wireList(){
     // builder item 75: it asks first and takes a reason (optional; only your team sees it)
     const reason=k?await k.askIn(bm,{text:`Mark ${n} customer${n===1?'':'s'} ${word}?`,field:{kind:'text',label:'Why (optional, only your team sees it)',placeholder:'Why? (optional)',max:300},yes:'Yes, mark them'}):'';
     if(reason===null){bm.value='';return;}
-    bulkMark(to,reason).catch(()=>toast('We couldn’t finish marking them — Refresh shows where each one is.'));   // K5: never a silent stop
+    bulkMark(to,reason).catch(()=>toast('We couldn’t finish marking them — Refresh shows where each one is.','err'));   // K5: never a silent stop
   });
   const bc=$('bulkClear');if(bc)bc.addEventListener('click',()=>{PICKED.clear();renderListZone();refocus('#pickAll');});
 }
@@ -894,11 +892,7 @@ function pvSubject(kind,x){
   const href=site?'/crm.html?client='+encodeURIComponent(site):c.client_id?'/crm.html?client_id='+encodeURIComponent(c.client_id):'/crm.html?project='+encodeURIComponent(c.project_id||'')+'&tab=delivery';
   return {key:'c:'+c.client_id,row:String(c.client_id),name:c.name||'Customer',sub:[c.person_name,c.email].filter(Boolean).join(' · '),q:site?'?client='+encodeURIComponent(site):'?client_id='+encodeURIComponent(c.client_id),site,href,cust:c,person:null};
 }
-async function pvGet(path,site){
-  const h=H(); if(site)h['x-dds-scope-site']=site;
-  const r=await fetch(FN+path,{headers:h});
-  return {ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};
-}
+const pvGet=(path,site)=>ddsApi(path,{scope:site||''});
 async function pvLoad(s){
   if(PV_CACHE[s.key])return PV_CACHE[s.key];
   const r=await pvGet('/crm/record'+s.q,s.site).catch(()=>null);
@@ -1196,7 +1190,8 @@ async function load(){
     const f=OWED_INFO[k]||(OWED_INFO[k]={late:0,due:''});if(i.state==='overdue')f.late+=Number(i.amount_cents)||0;else if(i.due_date&&(!f.due||i.due_date<f.due))f.due=String(i.due_date);}}
   if(r.status===401){signedOut();return;}
   if(r.status===403){notStudio();return;}
-  if(!r.ok){trouble();return;}
+  // no answer at all on a refresh keeps the list on screen; the caller says it couldn't refresh
+  if(!r.ok){if(r.status===0&&LOADED_AT)throw new Error('offline');trouble();return;}
   CUSTOMERS=Array.isArray(r.body.data)?r.body.data:[];
   LOADED_AT=Date.now();
   { const live=new Set(CUSTOMERS.map(c=>String(c.client_id))); for(const id of [...PICKED])if(!live.has(id))PICKED.delete(id); }
