@@ -69,6 +69,7 @@
   .cf .kbtn{border:0;background:none;padding:0;color:var(--p);font:600 12.5px var(--sans);cursor:pointer;min-height:24px}
   .cf .kbtn:hover{text-decoration:underline}
   .cf .kbtn[disabled]{color:var(--faint);cursor:default;text-decoration:none}
+  @media (pointer:coarse){.cf .kbtn{min-height:44px;min-width:44px}}   /* big enough for a finger */
   .kres{margin-top:var(--dds-s3,12px);font-size:13px;color:var(--soft)}
   .kres .ks{font-weight:600;color:var(--ink);margin-bottom:var(--dds-s2,8px)}
   .kres .ks.bad{color:var(--attn)}

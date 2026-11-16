@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installApp, pressButton } from './helpers/app';
+import { installApp, pressButton, touchScreen } from './helpers/app';
 
 // ── SS12 — Admin-health ops chrome ───────────────────────────────────────────
 // The operator's ONE operational read (/admin/health-center). SS12 gives it the
@@ -104,7 +104,9 @@ test.describe('Admin Health Center — the Stripe key (sales item 131)', () => {
     await expect(card).toContainText('Studio OS holds a full-power Stripe key');
     await expect(card.locator('.pill')).toHaveText('Needs a look');
     expect(asked).toBe(0);   // opening the page asks Stripe nothing
-    await pressButton(card.getByRole('button', { name: 'Check its permissions' }));
+    const check = card.getByRole('button', { name: 'Check its permissions' });
+    if (touchScreen()) expect((await check.boundingBox())!.height).toBeGreaterThanOrEqual(44);   // big enough for a finger
+    await pressButton(check);
     await expect(card.locator('#keyRes')).toContainText('can do 2 things Studio OS never needs');
     await expect(card.locator('li.bad')).toHaveCount(2);
     await expect(card.locator('li.bad').first()).toContainText('Refund a payment. This key can do it.');
