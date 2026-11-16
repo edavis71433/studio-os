@@ -71,7 +71,8 @@ export async function cancelSubscription(subId: string): Promise<{ ok: boolean; 
  *  A link that names none offers whatever is switched on in Stripe's settings, which on
  *  a dollar invoice was card, Link, bank, Klarna, Cash App Pay and Amazon Pay. Klarna
  *  costs about twice a card and no client has used it, so every link now names exactly:
- *    card             a card, with Apple Pay and Google Pay (Stripe offers both under card)
+ *    card             a card, and the wallets switched on in Stripe's settings, which come
+ *                     under card (Apple Pay is on; Google Pay was off when this was written, Nov 16 2026)
  *    link             Link, Stripe's saved-details checkout
  *    us_bank_account  a US bank payment (ACH); dollars only, so it is left off any other currency
  *  A method switched on in Stripe for something else can't appear on an invoice by

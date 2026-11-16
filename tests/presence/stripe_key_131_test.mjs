@@ -8,8 +8,8 @@
 // can make against a fake Stripe and fails when one reaches a path the list doesn't
 // cover: a restricted key would refuse that call in production.
 // 132: a pay link named no ways to pay, so it offered whatever Stripe's settings had on,
-// Klarna, Cash App Pay and Amazon Pay included. Every link now names card (with Apple Pay
-// and Google Pay), Link and US bank payment.
+// Klarna, Cash App Pay and Amazon Pay included. Every link now names card (with the wallets
+// switched on in Stripe, Apple Pay today), Link and US bank payment.
 // Stripe and the database are fakes; every name and number is made up.
 Deno.env.set('SUPABASE_URL', 'https://example.supabase.co');
 Deno.env.set('SERVICE_ROLE_KEY', 'svc-key');
