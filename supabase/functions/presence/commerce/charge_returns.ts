@@ -531,7 +531,9 @@ export async function syncDispute(disputeId: string): Promise<ReturnSync> {
         const lost = outcome === 'lost';
         if (!lost) await clearNotice(p.studioClientId, 'invoice_void_paid', returnPeriod('disputelost', m.dealId, disputeId));   // turned round after all
         const copy = disputeClosedCopy({ what, who: p.who, amount, fee, outcome: lost ? 'lost' : 'won', inquiry: String(d.status) === 'warning_closed', month: monthOf(now), counted: counted > 0 });
-        await raiseNoticeDetailed({ siteId: m.siteId, clientId: p.studioClientId, kind: lost ? 'invoice_void_paid' : 'invoice_paid', period: returnPeriod(lost ? 'disputelost' : 'disputewon', m.dealId, disputeId, again), headline: copy.headline, body: copy.body });
+        // lost is money gone and a Needs you line; won (or a question closed) is an update
+        if (lost) await raiseNoticeDetailed({ siteId: m.siteId, clientId: p.studioClientId, kind: 'invoice_void_paid', period: returnPeriod('disputelost', m.dealId, disputeId, again), headline: copy.headline, body: copy.body });
+        else await raiseNoticeDetailed({ siteId: m.siteId, clientId: p.studioClientId, kind: 'invoice_paid', period: returnPeriod('disputewon', m.dealId, disputeId, again), headline: copy.headline, body: copy.body });
         await historyLine(m, { dispute: lost ? 'lost' : String(d.status) === 'warning_closed' ? 'closed' : 'won', stripe_dispute: disputeId, amount_cents: amount, fee_cents: fee });
       }
     }

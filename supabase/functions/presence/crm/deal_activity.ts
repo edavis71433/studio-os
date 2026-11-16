@@ -109,7 +109,21 @@ export function describeSystemEvent(row: any): string {
   if (k === 'doc_opened') return openedLine(d.what);
   if (k === 'estimate_sent' || k === 'estimate_decided' || k === 'estimate_deleted') return estimateEventLine(k, d);   // item 47
   if (k === 'recurring_invoice') return recurringEventLine(d);
+  // sales items 126, 127 (and item 118's Undo): money given back rides payment_undone; its detail says which
+  if (k === 'payment_undone') return moneyBackLine(d);
   return SYS_LABEL[k] || String(k || '').replace(/_/g, ' ');
+}
+
+/** A payment_undone event in words: a refund made in Stripe, a dispute opening or closing,
+ *  or a payment recorded by hand and undone. pipeline.html's evtLabel carries a copy. Pure. */
+export function moneyBackLine(d: any): string {
+  const a = usd(d?.amount_cents) ? ' — ' + usd(d.amount_cents) : '';
+  if (d?.refund) return (d.applies_to === 'extra' ? 'Extra payment refunded' : d.applies_to === 'void' ? 'Payment on a withdrawn invoice refunded' : d.full ? 'Refunded in full' : 'Refunded') + a;
+  if (d?.dispute === 'opened' || d?.dispute === 'reopened') return (d.inquiry ? 'Card company asked about the payment' : d.bank ? 'Bank payment disputed' : d.dispute === 'reopened' ? 'Dispute reopened' : 'Payment disputed') + a;
+  if (d?.dispute === 'won') return 'Dispute won' + a;
+  if (d?.dispute === 'closed') return 'Card company’s question closed';
+  if (d?.dispute === 'lost') return 'Dispute lost' + a;
+  return 'Payment undone' + a;
 }
 
 export interface DealTimelineItem {

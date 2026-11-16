@@ -2221,9 +2221,11 @@ function shelfRows(invoices,docs,snaps,reports,todayYmd,pending,now){
     const amt=whole?(st==='paid'?fmtMoney(whole):st?fmtMoney(i.amount)+' left of '+fmtMoney(whole):fmtMoney(i.amount)):i.amount?fmtMoney(i.amount):'';
     const pay=(st==='upcoming'||st==='overdue')&&/^https:\/\//.test(String(i.pay_url||''))?i.pay_url:'';
     const view=shelfUrl(i.view_url);
-    const info=[amt,st==='paid'?(i.paid_at?'paid '+shelfDay(i.paid_at,now):'paid'):st==='processing'?'':st?(i.due_date?'due '+shelfDay(i.due_date,now):''):'withdrawn'].filter(Boolean).join(' · ');
+    // sales items 126, 127: a payment that came back keeps its paid day; a part refund says how much went back
+    const back=st==='refunded'||st==='disputed'||st==='lost';
+    const info=[amt,(st==='paid'||back)?(i.paid_at?'paid '+shelfDay(i.paid_at,now):'paid')+(st==='paid'&&Number(i.refunded_cents)>0?' · '+fmtMoney(Number(i.refunded_cents)/100)+' refunded':''):st==='processing'?'':st?(i.due_date?'due '+shelfDay(i.due_date,now):''):'withdrawn'].filter(Boolean).join(' · ');
     const act=st==='paid'?(view?{verb:'Receipt',href:view}:null):st==='processing'?{note:'processing',inv:i}:!st?null:pay?{verb:'Pay',href:pay,pay:true}:view?{verb:'View',href:view}:{note:'details'};
-    rows.push({cat:'invoices',kind:i.number?'Invoice '+i.number:'Invoice',title:i.name||'Invoice',info,when:String(i.created_at||i.due_date||''),chip:st?MONEY_WORD[st]:'Voided',tone:st==='paid'?'sig':st==='overdue'?'od':st==='processing'?'pr':st?'':'mute',act,
+    rows.push({cat:'invoices',kind:i.number?'Invoice '+i.number:'Invoice',title:i.name||'Invoice',info,when:String(i.created_at||i.due_date||''),chip:st?(st==='lost'?'Returned':MONEY_WORD[st]):'Voided',tone:st==='paid'?'sig':st==='overdue'?'od':st==='processing'?'pr':st?'':'mute',act,
       parts:parts.map(p=>({amount:Number(p.amount)||0,paid_at:p.paid_at,method:String(p.method||''),view:shelfUrl(p.view_url)}))});
   }
   for(const d of (docs||[])){
