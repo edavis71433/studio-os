@@ -264,6 +264,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   });
 
   test('a card: address, status, plan and renewal, domain renewal, what you are on it, and the three doors into that client', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed (the domain renews Nov 20, the plan Dec 1), so the clock is too
     await openSites(page);
     const card = page.locator('.scard[data-site="s1"]');
     await expect(card.locator('.sname')).toHaveText('Bistro Nine');
@@ -490,6 +491,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   });
 
   test('like Squarespace’s dashboard, the name and the picture open the site’s own home; the status sits on the picture', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed (the domain renews Nov 20, the plan Dec 1), so the clock is too
     await openSites(page);
     const card = page.locator('.scard[data-site="s1"]');
     await expect(card.locator('.sname a')).toHaveAttribute('href', '/today.html?client=s1');
