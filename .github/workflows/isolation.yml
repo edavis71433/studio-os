@@ -8,9 +8,9 @@ name: Walls between studios (scratch database)
 # what runs and what doesn't yet.
 #
 # deploy.yml calls this on every production deploy, beside the other checks; it takes a
-# few minutes. Its result, the date and the commit go in the run's summary. It doesn't
-# hold up a deploy yet: it joins deploy-production's needs once it has passed on several
-# deploys in a row. It runs on a pull request only when one of its own files changes.
+# few minutes. Its result, the date and the commit go in the run's summary. Since Nov 15
+# 2026 a deploy waits for it and stops if it fails. It runs on a pull request only when one
+# of its own files changes.
 #
 # No repository secret, on purpose. Any signed-in GitHub account can read this public
 # repository's logs, and nothing here needs more than the scratch database's own keys.

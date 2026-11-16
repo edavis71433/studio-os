@@ -102,15 +102,16 @@ jobs:
   # Builder item 212: the walls between studios, checked on a scratch database made for
   # this run, with this commit's migrations and servers and two studios (isolation.yml).
   # It runs on every deploy, beside the two jobs above, and writes its result, the date and
-  # the commit to the run's summary. It doesn't hold up the deploy yet: it joins
-  # deploy-production's needs once it has passed on several deploys in a row, as the last
-  # step of item 212. Until then a red result here means look before the next deploy.
+  # the commit to the run's summary, so every release says when its walls were last checked.
+  # It holds up the deploy (Nov 15 2026, after passing on all 11 deploys since Nov 12): red
+  # here means nothing was deployed. If it failed on the runner itself (a Docker pull, say)
+  # and not on a check, `gh run rerun <run id> --failed` runs it again and the deploy follows.
   isolation:
     uses: ./.github/workflows/isolation.yml
 
   deploy-production:
     if: github.event_name == 'workflow_dispatch'
-    needs: [test, browser-gate]
+    needs: [test, browser-gate, isolation]
     runs-on: ubuntu-latest
     steps:
       # The typed phrase and the branch arrive as data, never pasted into the script.

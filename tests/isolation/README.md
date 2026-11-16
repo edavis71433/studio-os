@@ -32,10 +32,11 @@ on that runner.
 
 - With every production deploy: `deploy.yml` calls `isolation.yml` beside the pull
   request checks and the browser gate, and its result, the date and the commit go in
-  the run's summary. It takes a few minutes. For now it reports and doesn't hold up
-  the deploy: it joins `deploy-production`'s `needs` once it has passed on several
-  deploys in a row, the last step of item 212. A deploy run that shows it red needs
-  a look before the next one.
+  the run's summary. It takes a few minutes. Since Nov 15 2026 (after it passed on all
+  11 deploys from Nov 12) it holds up the deploy: `deploy-production` needs it, so
+  nothing reaches production unless the walls held on that commit. If it fails on the
+  runner itself (a Docker pull, say) rather than on a check, `gh run rerun <run id>
+  --failed` runs it again and the deploy follows. A rollback doesn't wait for it.
 - On a pull request that changes the workflow, the script or this folder.
 - By hand: Actions, "Walls between studios (scratch database)", Run workflow.
 
@@ -81,6 +82,10 @@ parts.
   Actions run 43218372665, commit c757c85). Every later run is on the Actions tab
   under "Walls between studios (scratch database)", and each run's summary says how
   many checks passed, the date and the commit.
+- Since Nov 15 2026 the newest release is the newest run: each production deploy run
+  (Actions, "Deploy Edge Functions") carries the line "Walls between studios: all N
+  checks passed on a scratch database on <date>, commit <commit>", and a deploy without
+  that line deployed nothing.
 
 Getting there found four things, all fixed in the same change:
 
