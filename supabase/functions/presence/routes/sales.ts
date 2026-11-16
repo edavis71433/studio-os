@@ -1986,7 +1986,8 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
  *                         charged, and the deal ledger records who voided what.
  *    paid               → NEVER. 409. Money changed hands; a paid invoice is a
  *                         financial record and a receipt the client is holding.
- *                         Refunds are Stripe's job, not a status rewrite.
+ *                         Refunds are Stripe's job, not a status rewrite: one made
+ *                         there reaches the invoice by itself (sales item 126).
  *    void               → IDEMPOTENT 200 (`already: true`), the same shape
  *                         handleSalesProposalDecide / handleSalesContractSign use
  *                         for "you already got what you asked for". Nothing is
@@ -2007,10 +2008,10 @@ export async function handleSalesInvoiceVoid(site: SiteRow, principal: Principal
   if (!invR.ok) invR = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,deal_id,status,title,amount_cents,purpose,stripe_payment_link_id&limit=1`);
   const inv = rows(invR)[0];
   if (!inv) return json({ error: 'not_found', message: 'That invoice is no longer here.' }, 404, cors);
-  if (inv.status === 'paid') return json({ error: 'already_paid', message: 'This invoice is paid — it’s a financial record and stays. Refund it in Stripe if the money needs to go back.' }, 409, cors);
+  if (inv.status === 'paid') return json({ error: 'already_paid', message: 'This invoice is paid — it’s a financial record and stays. Refund it in Stripe if the money needs to go back, and the invoice will show it.' }, 409, cors);
   // Oct 2026 (item 2): the client already paid and Stripe is settling it — voiding
   // now would leave money landing on a withdrawn invoice. Wait for it to land.
-  if (inv.status === 'open' && inv.processing_since) return json({ error: 'processing', message: 'The client has already paid this — the payment is settling with Stripe. Let it land, then refund it in Stripe if the money needs to go back.' }, 409, cors);
+  if (inv.status === 'open' && inv.processing_since) return json({ error: 'processing', message: 'The client has already paid this — the payment is settling with Stripe. Let it land, then refund it in Stripe if the money needs to go back, and the invoice will show it.' }, 409, cors);
   if (inv.status === 'void') return json({ data: { ok: true, id, status: 'void' }, already: true }, 200, cors);
   const up = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&select=id,deal_id`,
     { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'void', updated_at: nowIso() }) });
