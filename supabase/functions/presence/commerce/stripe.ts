@@ -14,11 +14,15 @@
 // it a call gets the account's default of the day, and one press of "Upgrade" in
 // Stripe's Workbench would change the shape of every answer with nobody told.
 import { STRIPE_API_VERSION } from './stripe_shape.ts';
+import { stripeKeyKind } from './stripe_key.ts';
 
 const STRIPE_SECRET = Deno.env.get('STRIPE_SECRET') || '';
 const SITE_URL = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
 
 export function stripeConfigured(): boolean { return !!STRIPE_SECRET; }
+/** Restricted or full-power, live or test, read from the key's prefix (sales item 131).
+ *  The key itself stays in this file. */
+export const heldKeyKind = () => stripeKeyKind(STRIPE_SECRET);
 
 async function stripeReq(path: string, params: Record<string, string>, idem?: string, method: 'POST' | 'GET' | 'DELETE' = 'POST'): Promise<any> {
   const h: Record<string, string> = { Authorization: `Bearer ${STRIPE_SECRET}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Stripe-Version': STRIPE_API_VERSION };
@@ -31,6 +35,29 @@ async function stripeReq(path: string, params: Record<string, string>, idem?: st
   return j;
 }
 
+/** One question to Stripe whose answer is only its status (sales item 131, the key
+ *  check in commerce/stripe_key.ts). A 403 from Stripe names the permission the key
+ *  lacks ("Having the 'rak_payout_write' permission would allow this request"); that
+ *  name is the only thing kept from the answer. Stripe's message also quotes part of
+ *  the key and the account, so neither is ever passed on. Never throws: a network
+ *  failure is status 0. */
+export async function stripeProbe(method: 'GET' | 'POST' | 'DELETE', path: string, params: Record<string, string> = {}): Promise<{ status: number; lacks: string | null }> {
+  if (!STRIPE_SECRET) return { status: 0, lacks: null };
+  try {
+    const qs = method !== 'POST' && Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
+    const r = await fetch(`https://api.stripe.com/v1/${path}${qs}`, {
+      method,
+      headers: { Authorization: `Bearer ${STRIPE_SECRET}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Stripe-Version': STRIPE_API_VERSION },
+      body: method === 'POST' ? new URLSearchParams(params).toString() : undefined,
+      signal: AbortSignal.timeout(10_000),
+    });
+    const j = await r.json().catch(() => null);
+    const said = String((j && j.error && j.error.message) || '');
+    const m = r.status === 403 ? said.match(/'(rak_[a-z_]+)'/) : null;
+    return { status: r.status, lacks: m ? m[1] : null };
+  } catch { return { status: 0, lacks: null }; }
+}
+
 /** Cancel a subscription immediately (stops future billing). Keeps the Stripe
  *  customer + past invoices for tax/audit. Idempotent-ish: canceling an already-
  *  canceled sub returns ok. Never throws to the caller. */
@@ -40,6 +67,21 @@ export async function cancelSubscription(subId: string): Promise<{ ok: boolean; 
   try { await stripeReq(`subscriptions/${encodeURIComponent(subId)}`, {}, undefined, 'DELETE'); return { ok: true }; }
   catch (e) { const m = String((e as Error).message || e); if (/no such subscription|already canceled|resource_missing/i.test(m)) return { ok: true }; return { ok: false, error: m }; }
 }
+
+/** The ways a client can pay (sales item 132, the Nov 15 2026 Stripe review, finding 6).
+ *  A link that names none offers whatever is switched on in Stripe's settings, which on
+ *  a dollar invoice was card, Link, bank, Klarna, Cash App Pay and Amazon Pay. Klarna
+ *  costs about twice a card and no client has used it, so every link now names exactly:
+ *    card             a card, with Apple Pay and Google Pay (Stripe offers both under card)
+ *    link             Link, Stripe's saved-details checkout
+ *    us_bank_account  a US bank payment (ACH); dollars only, so it is left off any other currency
+ *  A method switched on in Stripe for something else can't appear on an invoice by
+ *  surprise. Adding one later means adding it here. */
+export function payMethodTypes(currency?: string): string[] {
+  return String(currency || 'usd').toLowerCase() === 'usd' ? ['card', 'link', 'us_bank_account'] : ['card', 'link'];
+}
+const payMethodParams = (currency?: string): Record<string, string> =>
+  Object.fromEntries(payMethodTypes(currency).map((t, i) => [`payment_method_types[${i}]`, t]));
 
 /** A one-time SERVICE invoice payment link (a deposit / project charge). A Payment
  *  Link (NOT a 24h Checkout session), so it never expires — a customer can pay
@@ -70,6 +112,7 @@ export async function createServicePaymentLink(p: { amountCents: number; currenc
   const link = await stripeReq('payment_links', {
     'line_items[0][price]': String(price.id),
     'line_items[0][quantity]': '1',
+    ...payMethodParams(p.currency),
     'metadata[presence_invoice_id]': p.invoiceId,
     'metadata[kind]': 'service_invoice',
     'payment_intent_data[metadata][presence_invoice_id]': p.invoiceId,
@@ -122,6 +165,7 @@ export async function createServiceRetainerLink(p: { productName: string; amount
   const link = await stripeReq('payment_links', {
     'line_items[0][price]': String(price.id),
     'line_items[0][quantity]': '1',
+    ...payMethodParams('usd'),   // the same ways to pay as an invoice; each later charge uses the one approved here
     'metadata[purpose]': 'service_retainer',
     'metadata[kind]': 'service_retainer',
     'metadata[deal_id]': p.dealId,
