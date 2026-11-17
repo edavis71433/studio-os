@@ -31,6 +31,7 @@ import { summarizeHealthCenter } from '../lib/health_center.ts';
 import { timingSafeEqual } from '../../_shared/hmac.ts';
 import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
 import { oauthConfigured } from '../connected/auth.ts';
+import { heldKeyKind } from '../commerce/stripe.ts';
 
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
 
@@ -272,6 +273,7 @@ export async function computeHealthCenter(): Promise<any> {
     failedRuns: failedRuns ?? 0,
     activeNotices: notices ?? 0,
     backupsVerified: envPresent('BACKUPS_VERIFIED'),
+    stripeKey: heldKeyKind(),   // sales item 131: restricted or full-power, from the prefix alone
   });
 }
 

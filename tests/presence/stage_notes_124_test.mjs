@@ -62,13 +62,14 @@ eq('an empty note puts the starter back', N.withStageNote({ lead: 'A', won: 'B' 
 
 // ═══ the pages ═══
 {
-  const crm = read('crm.html'), pipe = read('pipeline.html'), settings = read('settings.html');
+  const crm = read('crm.html'), pipe = read('pipeline.html'), settings = read('settings.html'), shared = read('deal-path.js');
+  // builder item 102: the note's markup is the one stage bar's (deal-path.js); tests/presence/deal_path_102_test.mjs drives it
+  ok('the shared note sits under the stage bar, and Edit note is a setting (data-needs="configure")', /class="stage-note"/.test(shared) && /What to do now/.test(shared) && /class="sn-edit" id="snEdit" data-needs="configure">Edit note</.test(shared));
   for (const [name, src] of [['the record', crm], ['Pipeline’s deal', pipe]]) {
-    ok(`${name}: the note sits under the stage bar`, /class="stage-note"/.test(src) && /What to do now/.test(src));
-    ok(`${name}: Edit note is a setting, so it carries data-needs="configure"`, /class="sn-edit" id="snEdit" data-needs="configure">Edit note</.test(src));
+    ok(`${name}: draws the shared note under the stage bar`, src.includes('<script src="/deal-path.js"></script>') && /ddsDealPath\.noteHtml\(\{stage,label:stageLabel\(stage\),text:STAGE_NOTES&&STAGE_NOTES\[stage\]/.test(src));
     ok(`${name}: it saves one stage’s note through PUT /sales/stages`, /'\/sales\/stages','PUT',\{note:\{stage,text\}\}/.test(src));
     ok(`${name}: the old one-line tip strip is gone`, !/<b>Tip:<\/b>/.test(src));
-    ok(`${name}: what the deal itself knows shows even when the notes couldn’t be read, with no Edit note`, /if\(!text&&!fact\)return'';/.test(src) && /const body=!text\?'':NOTE_EDIT/.test(src) && /\$\{NOTE_EDIT\|\|!text\?'':'<button type="button" class="sn-edit"/.test(src));
+    ok(`${name}: hands the shared note what the deal itself knows, which shows even without the studio’s notes`, /editing:NOTE_EDIT,\s*fact/.test(src));
   }
   // builder item 165: the note saves when its box is left, through the same PUT
   ok('Settings: all six notes, with the same save', /id="stageNotes"/.test(settings) && /api\('\/sales\/stages', 'PUT', \{ note \}\)/.test(settings) && /t\.addEventListener\('change', \(\) => saveStageNote\(k, t\.value\)\);/.test(settings) && !/data-sn-save/.test(settings));

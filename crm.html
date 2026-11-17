@@ -90,53 +90,7 @@
   .btable tr.paying td{background:var(--p-soft)}
   @media (max-width:640px){.pf-chip span{min-height:44px}}
 
-  /* ── Path (Lightning chevrons, dds skin) ── */
-  .pathcard{margin-top:var(--dds-s4,16px);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--shadow);padding:var(--dds-s3,12px) var(--dds-s4,16px)}
-  .pathrow{display:flex;gap:var(--dds-s3,12px);align-items:center;flex-wrap:wrap}
-  .path{display:flex;flex:1 1 340px;min-width:0}
-  .path button.pstep{flex:1;min-width:0;border:none;font-family:inherit;font-size:12.5px;font-weight:500;padding:var(--dds-s2,8px) var(--dds-s4,16px);cursor:default;
-    background:var(--bg);color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%,11px 50%)}
-  .path button.pstep:first-child{clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%);border-radius:var(--dds-r,8px) 0 0 var(--dds-r,8px)}
-  .path button.pstep:last-child{clip-path:polygon(0 0,100% 0,100% 100%,0 100%,11px 50%);border-radius:0 var(--dds-r,8px) var(--dds-r,8px) 0}
-  .path button.pstep.done{background:var(--good-soft);color:var(--good)}
-  .path button.pstep.canback{cursor:pointer}
-  .path button.pstep.canback:hover{filter:brightness(.96)}
-  .path button.pstep.current{background:var(--p);color:#fff;cursor:pointer}
-  .path button.pstep.current:hover{filter:brightness(1.06)}
-  .path button.pstep.lost-terminal{background:var(--warn-soft);color:var(--warn)}
-  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) —
-     same treatment as pipeline.html's Path, kept in sync by hand */
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .path button.pstep.current{color:#171320}}
-  :root[data-theme="dark"] .path button.pstep.current{color:#171320}
-  .path-side{display:flex;align-items:center;gap:10px;flex:0 0 auto}
-  .path-guide{margin-top:10px;font-size:13.5px;color:var(--soft)}
-  .path-guide b{color:var(--ink);font-weight:600}
-  /* sales item 124: what to do now, under the stage bar (the same block as pipeline.html's) */
-  .stage-note{display:flex;gap:18px;align-items:flex-start;margin-top:12px;padding:18px 22px 18px 24px;border-radius:16px;background:var(--p-soft);border-left:5px solid var(--p);box-shadow:0 6px 18px -6px rgba(27,21,37,.08)}
-  .stage-note .sn-ic{flex:0 0 auto;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,#7a5bd6,var(--p))}
-  .stage-note .sn-body{flex:1;min-width:0}
-  .stage-note .sn-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .stage-note h3{font-family:var(--serif);font-weight:600;font-size:19px;line-height:1.25;margin:0;color:var(--ink)}
-  .stage-note .sn-chip{font-size:12px;font-weight:600;color:var(--p);background:var(--card);border-radius:999px;padding:3px 10px}
-  .stage-note .sn-fact{margin:10px 0 0;padding:9px 12px;border-radius:10px;background:var(--good-soft);color:var(--good);font-size:14px}
-  .stage-note .sn-fact b{font-weight:600}
-  .stage-note .sn-steps{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
-  .stage-note .sn-steps li{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;line-height:1.45;color:var(--ink)}
-  .stage-note .sn-ck{flex:0 0 auto;margin-top:1px;color:var(--p)}
-  .stage-note .sn-foot{margin:10px 0 0;font-size:12.5px;color:var(--faint)}
-  .stage-note .sn-edit{flex:0 0 auto;font:inherit;font-size:13px;font-weight:600;border:1px solid var(--dds-line-strong,#d6d4e2);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 14px;min-height:36px;cursor:pointer}
-  .stage-note .sn-edit:hover{background:var(--card);border-color:var(--p)}
-  .stage-note .sn-text{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:14.5px;line-height:1.6;padding:12px 14px;margin-top:10px;border:2px solid color-mix(in srgb,var(--p) 45%,transparent);border-radius:10px;background:var(--card);color:var(--ink);resize:vertical}
-  .stage-note .sn-text:focus{outline:2px solid var(--p);outline-offset:1px}
-  .stage-note .sn-help{font-size:12.5px;color:var(--soft);margin:8px 0 0}
-  .stage-note .sn-acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
-  .stage-note .sn-reset{margin-left:auto;font:inherit;font-size:13px;font-weight:600;color:var(--p);background:none;border:none;padding:6px 0;cursor:pointer}
-  @media (max-width:640px){.stage-note{flex-wrap:wrap;gap:12px;padding:16px}.stage-note .sn-ic{width:36px;height:36px}.stage-note .sn-edit{width:100%;min-height:44px}.stage-note .sn-reset{margin-left:0}}
-  .path-confirm{margin-top:10px;display:flex;gap:var(--dds-s2,8px);align-items:center;font-size:13.5px;flex-wrap:wrap}
-  .terminal-chip{font-size:12px;font-weight:700;border-radius:999px;padding:var(--dds-s1,4px) var(--dds-s3,12px)}
-  .terminal-chip.won{background:var(--good-soft);color:var(--good)}
-  .terminal-chip.lost{background:var(--warn-soft);color:var(--warn)}
+  /* ── the deal stage bar and its What to do now note: deal-path.js brings their rules (builder item 102) ── */
 
   /* ── two-region body ── */
   .body{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:var(--dds-s5,20px);margin-top:var(--dds-s5,20px);align-items:start}
@@ -305,19 +259,6 @@
   .more-menu[hidden]{display:none}
   .more-menu .abtn{border:none;background:transparent;justify-content:flex-start;border-radius:var(--dds-r-sm,6px);height:34px;width:100%;box-shadow:none}
   .more-menu .abtn:hover{background:var(--bg)}
-  /* lifecycle bar: Lead → Qualified → Proposal → Agreement → Won → Project → Growth */
-  .pathcard{box-shadow:none;padding:var(--dds-s3,12px) var(--dds-s4,16px)}
-  .path{gap:6px;flex:1 1 520px}
-  .path .pstep,.path button.pstep,.path button.pstep:first-child,.path button.pstep:last-child{flex:1;min-width:0;border:none;border-top:5px solid #e1e1e8;border-radius:3px 3px 0 0;background:transparent;color:var(--faint);font-family:inherit;font-size:12px;font-weight:500;padding:var(--dds-s2,8px) var(--dds-s1,4px) 0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;clip-path:none;cursor:default;line-height:1.3}
-  .path .pstep.done,.path button.pstep.done{border-top-color:var(--good);background:transparent;color:var(--soft)}
-  .path .pstep.current,.path button.pstep.current{border-top-color:var(--p);background:transparent;color:var(--p);font-weight:600;cursor:pointer}
-  .path button.pstep.current:hover{filter:none;color:var(--p-deep)}
-  .path button.pstep.canback{cursor:pointer} .path button.pstep.canback:hover{filter:none;color:var(--ink)}
-  .path button.pstep.lost-terminal,.path .pstep.lost-terminal{border-top-color:var(--warn);background:transparent;color:var(--warn)}
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .path button.pstep.current{color:var(--p)}}
-  :root[data-theme="dark"] .path button.pstep.current{color:var(--p)}
-  .path-guide{margin-top:10px;font-size:13px}
-  .terminal-chip{font-weight:600;padding:var(--dds-s1,4px) 10px;font-size:12px}
   /* tabs + sections */
   .tabs button{font-size:13.5px;padding:var(--dds-s2,8px) var(--dds-s3,12px);border-bottom-width:2px}
   .tabs button .n{margin-left:6px;font-size:11.5px;color:var(--faint);font-weight:500}
@@ -352,8 +293,6 @@
   .dkv span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .dkv .muted{color:var(--faint);font-size:12.5px}
   .dkv a{color:var(--p);text-decoration:none} .dkv a:hover{text-decoration:underline}
-  /* phones: the seven lifecycle steps scroll sideways instead of truncating */
-  @media (max-width:640px){.path{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}.path .pstep,.path button.pstep{flex:0 0 auto;min-width:96px}}
   .composer-tabs button{font-size:12.5px;padding:var(--dds-s2,8px) var(--dds-s2,8px);border-bottom-width:2px}
   .fchips{display:inline-flex;gap:0;margin-top:var(--dds-s4,16px);border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden;background:var(--bg)}
   .fchips button{border:none;border-radius:0;padding:var(--dds-s1,4px) 10px;font-size:12.5px;background:transparent;color:var(--soft);font-weight:500}
@@ -400,7 +339,6 @@
   /* B21: on a phone the name keeps its place beside the avatar — 56px + the gap + a 300px start
      was wider than a 375px screen, so the name wrapped under the avatar */
   @media (max-width:760px){.rec-head .rec-who{flex:1 1 0}}
-  .path button.pstep.done::before{content:"✓ ";font-weight:700}
   #markComplete{border-radius:999px;padding:9px 18px;font-weight:600;background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff);border:0;box-shadow:0 6px 16px -8px color-mix(in srgb,var(--p) 70%,transparent)}
 
   /* ══ Bold redesign — the record, part B: Activity first; the rail is cards ══ */
@@ -460,6 +398,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="dds-hint" data-hint="crm-notes" hidden>Notes here stay private to you unless you mark one “shared” — then the client sees it too.</div>
 
+<script src="/deal-path.js"></script>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── The unified Client Record — the Lightning record page (dds skin) ─────────
@@ -1047,9 +986,7 @@ function renderHighlights(){
 // the one line the deal itself knows above it: signed, declined, expired, a project under
 // way. Edit note changes it for every deal at that stage (PUT /sales/stages { note }, a
 // setting, so data-needs="configure"). Tapping the current stage hides it, as the tip
-// strip did. Kept in step with pipeline.html's deal (stageNoteHtml there).
-const SN_FLAG='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg>';
-const SN_CK='<svg class="sn-ck" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9.5"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>';
+// strip did. The note's markup and keys are shared with the Pipeline's deal (deal-path.js).
 function stageFact(stage,d,signed){
   const out=(stage!=='won'&&stage!=='lost')?proposalOutcome():null;
   if(out)return out.state==='declined'?{tip:'They declined your proposal.',action:'Revise it and send it again, or mark the deal not a fit.'}:{tip:'Your proposal expired before they answered.',action:'Revise it and send it again.'};
@@ -1062,17 +999,10 @@ function stageFact(stage,d,signed){
   return null;
 }
 function stageNoteHtml(stage,d,signed){
-  const text=STAGE_NOTES&&STAGE_NOTES[stage], fact=stageFact(stage,d,signed);
   // what the deal itself knows (declined, expired, signed) shows even when the notes couldn't be read
-  if(!text&&!fact)return'';
-  const label=stageLabel(stage), mine=!!(STAGE_NOTES_CUSTOM&&STAGE_NOTES_CUSTOM[stage]);
-  const body=!text?'':NOTE_EDIT
-    ?`<label class="sr-only" for="snText">What to do now at ${esc(label)}, one step a line</label><textarea id="snText" class="sn-text" rows="${Math.min(9,Math.max(3,text.split('\n').length+1))}">${esc(text)}</textarea>
-      <p class="sn-help">One step a line, up to eight. Everyone on your team sees this on every deal at ${esc(label)}.</p>
-      <div class="sn-acts"><button type="button" class="primary" id="snSave">Save for every deal</button><button type="button" id="snCancel">Cancel</button>${mine?'<button type="button" class="sn-reset" id="snReset">Put back the starter note</button>':''}</div>`
-    :`<ul class="sn-steps">${text.split('\n').map(l=>`<li>${SN_CK}<span>${esc(l)}</span></li>`).join('')}</ul>
-      <p class="sn-foot">${mine?'Your studio’s note':'A starter note'} for every deal at ${esc(label)}. Tap ${esc(label)} on the bar to hide it.</p>`;
-  return `<section class="stage-note" aria-labelledby="snHead"><span class="sn-ic">${SN_FLAG}</span><div class="sn-body"><div class="sn-head"><h3 id="snHead">What to do now</h3><span class="sn-chip">${esc(label)}</span></div>${fact?`<p class="sn-fact"><b>${esc(fact.tip)}</b> ${esc(fact.action)}</p>`:''}${body}</div>${NOTE_EDIT||!text?'':'<button type="button" class="sn-edit" id="snEdit" data-needs="configure">Edit note</button>'}</section>`;
+  const fact=stageFact(stage,d,signed);
+  return ddsDealPath.noteHtml({stage,label:stageLabel(stage),text:STAGE_NOTES&&STAGE_NOTES[stage],mine:!!(STAGE_NOTES_CUSTOM&&STAGE_NOTES_CUSTOM[stage]),
+    editing:NOTE_EDIT,fact,buttons:{save:'primary',cancel:''}});
 }
 async function saveStageNote(stage,text,btn){
   if(btn)btn.disabled=true;
@@ -1085,12 +1015,7 @@ async function saveStageNote(stage,text,btn){
   const e=$('snEdit');if(e)e.focus();
 }
 function wireStageNote(stage){
-  const ed=$('snEdit');if(ed)ed.addEventListener('click',()=>{NOTE_EDIT=true;renderPath();const t=$('snText');if(t){t.focus();t.setSelectionRange(t.value.length,t.value.length);}});
-  const cancel=()=>{NOTE_EDIT=false;renderPath();const e=$('snEdit');if(e)e.focus();};
-  const cn=$('snCancel');if(cn)cn.addEventListener('click',cancel);
-  const sv=$('snSave');if(sv)sv.addEventListener('click',()=>saveStageNote(stage,$('snText').value,sv));
-  const rs=$('snReset');if(rs)rs.addEventListener('click',()=>saveStageNote(stage,'',rs));
-  const tx=$('snText');if(tx)tx.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.preventDefault();cancel();}else if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();if(sv)sv.click();}});
+  ddsDealPath.wireNote({stage,repaint:renderPath,setEditing:(v)=>{NOTE_EDIT=v;},save:saveStageNote});
 }
 // ── Path: the chevron stage bar (only when the record has a deal) ───────────
 // Does the Path (renderPath) draw a filled action for this deal — Mark stage
@@ -1111,21 +1036,12 @@ function renderPath(){
   const d=DEAL&&DEAL.deal; if(!d||!d.stage){host.innerHTML='';return;}
   const stage=String(d.stage);
   const signed=(DEAL.contracts||[]).some(c=>c.status==='signed');
-  const terminal=stage==='won'||stage==='lost';
   const curIdx=PATH_STEPS.indexOf(stage);
   // exactly TWO steps are interactive: the current stage (toggles the guidance
   // strip) and the ONE legal BOARD_NEXT back-target. Everything else renders
   // non-interactive — no pointer, no hover, out of the tab order.
-  const steps=PATH_STEPS.map((s,i)=>{
-    const done=stage==='won'||(curIdx>-1&&i<curIdx);
-    const current=s===stage;
-    const canBack=!terminal&&(BOARD_NEXT[stage]||[]).includes(s)&&done;
-    const cls=(done?'done':current?'current':(stage==='lost'?'lost-terminal':''))+(canBack?' canback':'');
-    const state=done?'complete':current?'current stage':'upcoming';
-    const attrs=canBack?'':current?` aria-expanded="${GUIDE_OPEN?'true':'false'}"`:' tabindex="-1" aria-disabled="true"';
-    const hint=canBack?'. Activate to move the deal back here.':current?'. Activate to show or hide the stage guidance.':'';
-    return `<button class="pstep ${cls}" data-stage="${s}"${attrs} aria-label="${esc(stageLabel(s))} — ${state}${hint}">${esc(stageLabel(s))}</button>`;
-  }).join('')
+  // the four sales steps: one shared bar (deal-path.js, builder item 102), the same as the Pipeline's
+  const steps=ddsDealPath.steps({stage,next:BOARD_NEXT,label:stageLabel,guideOpen:GUIDE_OPEN})
   // visual refresh: the bar is the whole relationship, not just the sale —
   // Won · Project · Growth follow the four sales stages (read-only markers;
   // the sales stages keep their interactivity rules above).
@@ -1165,7 +1081,7 @@ function renderPath(){
   const mc=$('markComplete');
   if(mc)mc.addEventListener('click',()=>moveStage(fwd,mc));
   host.querySelectorAll('.pstep.canback').forEach(b=>b.addEventListener('click',()=>{
-    PENDING_BACK=b.getAttribute('data-stage'); renderPath();   // only the honest one-back move renders interactive
+    PENDING_BACK=b.getAttribute('data-pstep'); renderPath();   // only the honest one-back move renders interactive
   }));
   const cur=host.querySelector('.pstep.current');
   if(cur)cur.addEventListener('click',()=>{GUIDE_OPEN=!GUIDE_OPEN;NOTE_EDIT=false;renderPath();});

@@ -103,7 +103,6 @@ const { handlePushSubscribe } = await import('../../supabase/functions/presence/
 // here is not a typed address: a fixed service, our own storage, or a script that runs in a
 // visitor's browser. A new one fails until it goes through guardedFetch or is listed, with why.
 const SAFE = {
-  'commerce/stripe.ts': [1, 'the Stripe API, from its fixed base'],
   'commerce/account.ts': [1, 'Resend’s email API, or the stand-in a scratch run names in RESEND_API_URL: a server setting, never a typed address'],
   'connected/adapters.ts': [2, 'a connection provider’s fixed API, from its own spec'],
   'connected/auth.ts': [2, 'a connection provider’s fixed token and revoke endpoints'],

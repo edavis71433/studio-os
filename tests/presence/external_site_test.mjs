@@ -182,15 +182,16 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
   ok('the response tells the caller which address was stored',
     /external_domain: externalDomain/.test(sales));
 
-  for (const p of ['customers.html', 'contacts.html']) {
+  // builder item 102: Customers, Contacts and Home open the one Add a customer box (customer-add.js)
+  for (const p of ['customer-add.js']) {
     const h = page(p);
-    ok(`${p}: the dialog asks where their existing website lives`,
+    ok(`${p}: the box asks where their existing website lives`,
       /id="cu-website"/.test(h) && /Their existing website address/.test(h));
     ok(`${p}: the field appears exactly when a site exists somewhere we don't host (build-elsewhere, monitor)`,
-      /function cuAsksWebsite\(\)\{const v=\$\('cu-edition'\)\.value;return v==='business_os_only'\|\|v==='presence_monitor';\}/.test(h)
-      && /cu-website-wrap'\);if\(w\)w\.style\.display=cuAsksWebsite\(\)\?'':'none'/.test(h));
+      /function cuAsksWebsite\(\) \{ var v = \$\('cu-edition'\)\.value; return v === 'business_os_only' \|\| v === 'presence_monitor'; \}/.test(h)
+      && /var w = \$\('cu-website-wrap'\); if \(w\) w\.style\.display = cuAsksWebsite\(\) \? '' : 'none';/.test(h));
     ok(`${p}: the address is actually submitted to /sales/customers`,
-      /website_url:\(cuAsksWebsite\(\)/.test(h));
+      /website_url: \(cuAsksWebsite\(\)/.test(h));
     ok(`${p}: the hint is honest about which numbers this unlocks and which it doesn’t`,
       /whoever hosts it/.test(h) && /Visitor counts still can’t come from here/.test(h));
   }

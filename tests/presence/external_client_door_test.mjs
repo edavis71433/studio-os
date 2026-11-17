@@ -122,32 +122,25 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
 }
 
 // ═══ 5. the dropdown: distinct values, no stranded case ═════════════════════
+// Builder item 102: Home, Customers and Contacts open ONE box (customer-add.js), so the
+// checks read that file; the drift pin that compared two hand-kept copies became "no page
+// keeps a copy of its own".
 {
-  const extractDlg = (t) => { const i = t.indexOf('<dialog id="custDlg"'); return t.slice(i, t.indexOf('</dialog>', i) + 9); };
-  const extractJs = (t) => {
-    const i = t.indexOf('function cuPlan');   // the first dialog helper (cuHostedHere went with the pricing box — audit change 4)
-    const endMark = "Refresh will catch it up.'));";
-    const j = t.indexOf(endMark, i);
-    return t.slice(i, t.indexOf('};', j) + 2);
-  };
-  const c = page('contacts.html'), k = page('customers.html');
-
-  for (const [name, t] of [['contacts.html', c], ['customers.html', k]]) {
-    const dlg = extractDlg(t);
-    const values = [...dlg.matchAll(/<option value="([^"]+)"/g)].map((m2) => m2[1]);
-    ok(`${name}: every dropdown value is distinct (two options shared "business_os_only")`,
-      new Set(values).size === values.length);
-    ok(`${name}: the four answers are the four real situations`,
-      JSON.stringify(values) === JSON.stringify(['presence', 'business_os_only', 'business_os_no_site', 'presence_monitor']));
-    ok(`${name}: build-elsewhere keeps the server's real plan key (no translation needed)`,
-      /value="business_os_only">Building or redoing their site on another platform/.test(dlg));
-    ok(`${name}: the no-site answer maps back to the Business OS plan before submit`,
-      /function cuPlan\(\)\{const v=\$\('cu-edition'\)\.value;return v==='business_os_no_site'\?'business_os_only':v;\}/.test(t));
-    ok(`${name}: the submit body sends the MAPPED plan, never the raw option value`,
-      /edition:cuPlan\(\),/.test(t) && !/edition:\$\('cu-edition'\)\.value,/.test(t));
-    ok(`${name}: build-elsewhere and monitor ask for the address; no-site-work does not`,
-      /return v==='business_os_only'\|\|v==='presence_monitor';/.test(t));
-  }
+  const box = page('customer-add.js');
+  const dlg = box.slice(box.indexOf("'<dialog id=\"custDlg\""), box.indexOf("'</dialog>'") + 12);
+  const values = [...dlg.matchAll(/<option value="([^"]+)"/g)].map((m2) => m2[1]);
+  ok('the box: every dropdown value is distinct (two options shared "business_os_only")',
+    new Set(values).size === values.length);
+  ok('the box: the four answers are the four real situations',
+    JSON.stringify(values) === JSON.stringify(['presence', 'business_os_only', 'business_os_no_site', 'presence_monitor']));
+  ok('the box: build-elsewhere keeps the server\'s real plan key (no translation needed)',
+    /value="business_os_only">Building or redoing their site on another platform/.test(dlg));
+  ok('the box: the no-site answer maps back to the Business OS plan before submit',
+    /function cuPlan\(\) \{ var v = \$\('cu-edition'\)\.value; return v === 'business_os_no_site' \? 'business_os_only' : v; \}/.test(box));
+  ok('the box: the submit body sends the MAPPED plan, never the raw option value',
+    /edition: cuPlan\(\),/.test(box) && !/edition: \$\('cu-edition'\)\.value/.test(box));
+  ok('the box: build-elsewhere and monitor ask for the address; no-site-work does not',
+    /return v === 'business_os_only' \|\| v === 'presence_monitor';/.test(box));
 
   // an unknown edition key would silently become the HOSTED plan server-side
   // (pickPlan defaults to 'presence') — so the raw option value must never
@@ -156,16 +149,12 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
   ok('the server plan whitelist knows nothing of the UI-only no-site key (it must be mapped client-side)',
     !/business_os_no_site/.test(sales) && /CONVERT_PLANS = new Set\(\['presence', 'cms_only', 'business_os_only', 'presence_monitor', 'presence_managed'\]\)/.test(sales));
 
-  // ── the drift pin: contacts.html and customers.html carry the SAME dialog,
-  //    by hand ("ported wholesale — kept in sync by hand"). Byte-identical, or
-  //    this fails and names the divergence before it strands a customer type
-  //    on one page but not the other.
-  ok('the Add-a-customer DIALOG MARKUP is byte-identical between contacts.html and customers.html',
-    extractDlg(c) === extractDlg(k));
-  ok('the Add-a-customer DIALOG SCRIPT (cuPlan → submit handler) is byte-identical between the two pages',
-    extractJs(c) === extractJs(k));
-  ok('the pinned script region is non-trivial (the extractor found the real block)',
-    extractJs(c).length > 3000 && extractJs(c).includes("api('/sales/customers','POST',body)"));
+  // ── no drift left to pin: no page keeps its own copy of the box, and all three load the one
+  const pages = ['agency.html', 'customers.html', 'contacts.html'].map((p) => [p, page(p)]);
+  ok('no page keeps its own Add a customer box (Home, Customers and Contacts)',
+    pages.every(([, t]) => !t.includes('<dialog id="custDlg"') && !t.includes('function cuPlan')));
+  ok('Home, Customers and Contacts all load the one box and open it from there',
+    pages.every(([, t]) => t.includes('<script src="/customer-add.js"></script>') && t.includes('window.ddsAddCustomer.mount(')));
 }
 
 // ═══ verdict ════════════════════════════════════════════════════════════════
