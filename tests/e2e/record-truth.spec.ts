@@ -173,7 +173,7 @@ test.describe('item 99 — no connection (B17)', () => {
     await page.route(`**/functions/v1/presence/sales/deals/${DEAL}/stage`, (route) => route.abort('internetdisconnected'));
     await page.goto(`/crm.html?client=${CLIENT}`);
     await page.locator('#markComplete').click();
-    await expect(toastWith(page, 'We couldn’t reach the server')).toBeVisible();
+    await expect(toastWith(page, 'We couldn’t reach Studio OS')).toBeVisible();   // the shell's one sentence for no connection (builder item 101)
     await expect(page.locator('#markComplete')).toBeEnabled();
   });
 });
