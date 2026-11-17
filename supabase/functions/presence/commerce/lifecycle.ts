@@ -293,25 +293,32 @@ export async function runWeeklyDigest(): Promise<{ sent: number; skipped_no_emai
     const ownSite = Array.isArray(ident.json) ? ident.json[0]?.site_id : null;
     if (ownSite) {
       const usd = (c: number) => '$' + (Math.max(0, c) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
-      const [newLeads, wonCount, paidRows, retainerRows, dealRows] = await Promise.all([
+      const { RETURNED_SELECT, returnedPayments } = await import('../lib/money_returns.ts');
+      const [newLeads, wonCount, paidRows, retainerRows, dealRows, backRows] = await Promise.all([
         svcCount(`presence_form_submissions?site_id=eq.${ownSite}&spam=is.false&created_at=gt.${since}`),
         svcCount(`presence_deals?site_id=eq.${ownSite}&deleted_at=is.null&converted_at=gt.${since}`),
         svc(`presence_invoices?site_id=eq.${ownSite}&status=eq.paid&paid_at=gt.${since}&deleted_at=is.null&select=amount_cents&limit=500`),
         // sales item 120: a retainer charge is a payment too, though only ever a deal event
         svc(`presence_deal_events?site_id=eq.${ownSite}&kind=eq.invoice_paid&detail->>retainer=eq.true&created_at=gt.${since}&select=kind,detail,created_at&limit=500`),
         svc(`presence_deals?site_id=eq.${ownSite}&deleted_at=is.null&select=stage,expected_value_cents,converted_client_id,converted_at,updated_at&limit=2000`),
+        // sales items 126, 127: a refund made in Stripe or a dispute lost this week comes off what was collected
+        svc(`presence_money_returns?site_id=eq.${ownSite}&counted_cents=gt.0&counted_at=gt.${since}&select=${RETURNED_SELECT}&limit=500`),
       ]);
       // a money read that failed drops the block below, never a week that reads "no payments"
-      if (!paidRows.ok || !retainerRows.ok) throw new Error('payments unread');
+      if (!paidRows.ok || !retainerRows.ok || !backRows.ok) throw new Error('payments unread');
       const { retainerPayments } = await import('../lib/invoice_billing.ts');
       const paid = [...(Array.isArray(paidRows.json) ? paidRows.json : []) as Array<{ amount_cents: number }>, ...retainerPayments(retainerRows.json)];
-      const collected = paid.reduce((a, r) => a + (Number(r.amount_cents) || 0), 0);
+      const gross = paid.reduce((a, r) => a + (Number(r.amount_cents) || 0), 0);
+      const back = returnedPayments(backRows.json).reduce((a, r) => a + r.amount_cents, 0);
+      const collected = gross - back;
       const summary = summarizePipeline(Array.isArray(dealRows.json) ? dealRows.json : [], new Date().toISOString());
       const nLeads = n(newLeads), nWon = n(wonCount);
       numbersHtml = `<p style="margin-top:22px"><strong>Your business this week</strong></p><ul>
 <li>${nLeads ? `<strong>${nLeads}</strong> new website ${nLeads === 1 ? 'enquiry' : 'enquiries'}.` : 'No new website enquiries this week.'}</li>
 <li>${nWon ? `<strong>${nWon}</strong> ${nWon === 1 ? 'deal became a customer' : 'deals became customers'}.` : 'No deals became customers this week.'}</li>
-<li>${collected ? `<strong>${usd(collected)}</strong> collected across ${paid.length} ${paid.length === 1 ? 'payment' : 'payments'}.` : 'No payments collected this week.'}</li>
+<li>${!gross && !back ? 'No payments collected this week.'
+  : collected < 0 ? `<strong>${usd(back)}</strong> went back to clients, refunded or lost to disputes, and ${usd(gross)} came in.`
+  : `<strong>${usd(collected)}</strong> collected across ${paid.length} ${paid.length === 1 ? 'payment' : 'payments'}${back ? `, after ${usd(back)} refunded or lost to disputes` : ''}.`}</li>
 <li>${summary.open.count ? `<strong>${usd(summary.open.value_cents)}</strong> in open pipeline across ${summary.open.count} ${summary.open.count === 1 ? 'deal' : 'deals'}.` : 'No open deals in your pipeline right now.'}</li>
 </ul>`;
     }

@@ -939,6 +939,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // Zelle): all of the invoice or part of it, and Undo for one recorded by mistake.
     m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/payment(\/undo)?$/);
     if (m && method === 'POST') return m[2] ? handleInvoicePaymentUndo(req, site, principal, m[1], cors) : handleInvoicePayment(req, site, principal, m[1], cors);
+    // Sales item 127: the proof Studio OS holds for a disputed payment, in one zip (lazy: rarely needed)
+    m = route.match(/^\/sales\/disputes\/([0-9a-f-]{36})\/proof$/);
+    if (m && method === 'GET') return (await import('./routes/dispute_proof.ts')).handleDisputeProof(req, site, principal, m[1], cors);
     // Retainer (recurring SERVICE billing) — set up / cancel a "$X every month/
     // year" on a deal. A separate service-purpose Stripe subscription, distinct
     // from the SaaS subscription (frozen billing boundary). Studio-gated & site-scoped.

@@ -14,11 +14,14 @@
 //              checkout.session.async_payment_succeeded,
 //              checkout.session.async_payment_failed,
 //              customer.subscription.created / updated / deleted,
-//              invoice.paid, invoice.payment_failed
+//              invoice.paid, invoice.payment_failed,
+//              charge.refunded, refund.updated,
+//              charge.dispute.created / updated / closed / funds_withdrawn / funds_reinstated
 //      (payment_intent.processing and the two async events carry the
 //      "Processing" money state for delayed methods such as ACH — see
 //      markPresenceInvoiceProcessing below; invoice.paid / payment_failed are
-//      each retainer charge, sales item 128)
+//      each retainer charge, sales item 128; the refund and dispute events are
+//      sales items 126 and 127)
 //  Copy the endpoint's signing secret (whsec_...) into this function's secrets
 //  as STRIPE_WEBHOOK_SECRET. SB_URL / SERVICE_ROLE_KEY / (optionally)
 //  STRIPE_SECRET must also be present, same values as the other functions.
@@ -153,6 +156,25 @@ async function forwardInvoiceBounced(invoiceId: string): Promise<{ delivered: bo
     const d = out && typeof out === 'object' ? (out as { data?: { notice?: unknown; already?: unknown } }).data : null;
     return { delivered: !!d && (d.notice === true || d.already === true) };
   } catch (e) { console.warn(`[stripe-webhook] invoice-bounced hop for ${invoiceId} threw: ${String(e)}`); return { delivered: false }; }
+}
+
+/** A refund or a dispute made in Stripe (sales items 126, 127): hand its Stripe id
+ *  to the presence function, which reads it fresh from Stripe, records it on the
+ *  invoice, takes it off the money reports and tells the studio and the client. An id
+ *  only, the same secret. Delivered only when the route says it was recorded (200);
+ *  anything else is false, so the caller answers 500 and Stripe sends it again
+ *  (the route is idempotent: a repeat records nothing and tells nobody twice). */
+async function forwardChargeEvent(what: { charge?: string; dispute?: string }): Promise<boolean> {
+  if (!BILLING_SYNC_SECRET) { console.error('[stripe-webhook] BILLING_SYNC_SECRET unset — cannot record a refund or dispute; set it on this function'); return false; }
+  try {
+    const r = await fetch(`${SB_URL}/functions/v1/presence/commerce/charge-event`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-commerce-secret': BILLING_SYNC_SECRET, apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` },
+      body: JSON.stringify(what),
+    });
+    if (!r.ok) { console.error(`[stripe-webhook] charge-event ${JSON.stringify(what)} returned ${r.status}`); return false; }
+    return true;
+  } catch (e) { console.error(`[stripe-webhook] charge-event ${JSON.stringify(what)} threw: ${String(e)}`); return false; }
 }
 
 const enc = new TextEncoder();
@@ -754,6 +776,28 @@ Deno.serve(async (req: Request) => {
         // invoice shows Upcoming/Overdue with its Pay button again.
         if (md.presence_invoice_id) await bouncePresenceInvoice(String(md.presence_invoice_id), 'payment_intent.payment_failed');
         console.error(`[stripe-webhook] payment FAILED${md.invoice_id ? ` for invoice ${md.invoice_id}` : ''} (${obj.id || '?'}): ${obj.last_payment_error?.message || 'no detail'} — invoice state unchanged`);
+        return new Response('ok', { status: 200 });
+      }
+
+      // REFUNDS AND DISPUTES (sales items 126, 127). A refund made in Stripe, full or
+      // part, used to leave the invoice Paid and counted everywhere, and a dispute
+      // raised nothing at all. charge.refunded carries the charge, refund.updated a
+      // refund that settled or failed, and charge.dispute.* the dispute. Each hands an
+      // id to the presence function, which reads the charge or the dispute fresh from
+      // Stripe (so these events may come in any order) and does the rest. A charge
+      // that isn't Studio OS's own (an audit order, a plan) is recorded nowhere.
+      if (type === 'charge.refunded' || type === 'refund.updated') {
+        const charge = type === 'charge.refunded' ? String(obj.id || '') : String((typeof obj.charge === 'string' ? obj.charge : obj.charge?.id) || '');
+        if (!charge) { console.log(`[stripe-webhook] ${type} names no charge (${obj.id || '?'}) — acknowledged`); return new Response('ok', { status: 200 }); }
+        if (!(await forwardChargeEvent({ charge }))) { console.error(`[stripe-webhook] ${type} for ${charge} not recorded — 500 so Stripe retries`); return new Response('sync failed', { status: 500 }); }
+        console.log(`[stripe-webhook] ${type} → refunds on ${charge} recorded`);
+        return new Response('ok', { status: 200 });
+      }
+      if (type === 'charge.dispute.created' || type === 'charge.dispute.updated' || type === 'charge.dispute.closed' || type === 'charge.dispute.funds_withdrawn' || type === 'charge.dispute.funds_reinstated') {
+        const dispute = String(obj.id || '');
+        if (!dispute) { console.log(`[stripe-webhook] ${type} names no dispute — acknowledged`); return new Response('ok', { status: 200 }); }
+        if (!(await forwardChargeEvent({ dispute }))) { console.error(`[stripe-webhook] ${type} for ${dispute} not recorded — 500 so Stripe retries`); return new Response('sync failed', { status: 500 }); }
+        console.log(`[stripe-webhook] ${type} → dispute ${dispute} recorded (${obj.status || '?'})`);
         return new Response('ok', { status: 200 });
       }
 
