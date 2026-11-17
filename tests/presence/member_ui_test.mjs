@@ -92,8 +92,11 @@ const CONTROLS = [
   ['PUT /sales/goal-ai', 'settings.html', `api('/sales/goal-ai', 'PUT', patch)`, ['id="goal" aria-labelledby="goalHead" hidden data-needs="configure"']],   // sales item 94: the month's goal and the AI help switch (the switch is the owner's alone: the route says so)
   // sales item 124: a stage's "what to do now" note, from Settings and from the note under the stage bar
   ['PUT /sales/stages', 'settings.html', `api('/sales/stages', 'PUT', { note })`, ['id="stages" aria-labelledby="stagesHead" hidden data-needs="configure"']],
-  ['PUT /sales/stages', 'crm.html', `apiAg('/sales/stages','PUT',{note:{stage,text}})`, ['id="snEdit" data-needs="configure"']],
-  ['PUT /sales/stages', 'pipeline.html', `api('/sales/stages','PUT',{note:{stage,text}})`, ['id="snEdit" data-needs="configure"']],
+  // builder item 102: the record and the Pipeline draw the note's Edit note from the one stage bar (deal-path.js)
+  ['PUT /sales/stages', 'crm.html', `apiAg('/sales/stages','PUT',{note:{stage,text}})`, [['deal-path.js', 'id="snEdit" data-needs="configure"']]],
+  ['PUT /sales/stages', 'pipeline.html', `api('/sales/stages','PUT',{note:{stage,text}})`, [['deal-path.js', 'id="snEdit" data-needs="configure"']]],
+  // builder item 241: Delete customer is one box (customer-add.js), opened from the profile's More menu and a customer's preview on Customers
+  ['POST /sales/customers/:id/delete', 'customer-add.js', `'/sales/customers/' + encodeURIComponent(c.client_id) + '/delete'`, ['id="cd-go" data-needs="delete"']],
   ['PUT /report/monthly', 'settings.html', `api('/report/monthly', 'PUT', patch)`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],   // builder list item 58
   ['POST /report/monthly/preview', 'settings.html', `api('/report/monthly/preview', 'POST', {})`, ['id="report" aria-labelledby="reportHead" hidden data-needs="configure"']],
   ['DELETE /broadcasts/lists/:id', 'broadcasts.html', `api('/broadcasts/lists/'+encodeURIComponent(SEL.slice(5)),'DELETE')`, ['id="dropList" data-needs="delete"']],
@@ -127,7 +130,8 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
     const need = needOf(route);
     ok(`${route} on ${page}: staff can't, so it needs its control marked`, (need === 'delete' || need === 'configure') && !siteCan('business_staff', need), String(need));
     ok(`${route} on ${page}: the page makes this call`, SOURCE[page].includes(call), call);
-    for (const m of marks) ok(`${route} on ${page}: its control is marked`, SOURCE[page].includes(m), m);
+    // a mark may live in a shared script the page loads (builder item 102: deal-path.js)
+    for (const m of marks) { const [where, mark] = Array.isArray(m) ? m : [page, m]; ok(`${route} on ${page}: its control is marked${where === page ? '' : ' (in ' + where + ', which the page loads)'}`, SOURCE[where].includes(mark) && (where === page || SOURCE[page].includes(`<script src="/${where}"></script>`)), mark); }
   }
   ok('the row delete and the card delete on Contacts both carry the mark', count(SOURCE['contacts.html'], 'data-needs="delete" data-del=') === 2);
   ok('the three builder "Remove for good" buttons all carry the mark', count(SOURCE['presence.html'], 'data-act="del" data-needs="delete"') === 3 && !SOURCE['presence.html'].includes('data-act="del">'));
@@ -141,7 +145,7 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   const decided = read('tests/presence/member_capability_test.mjs');
   const listed = (name) => [...decided.split('const DECIDED = {')[1].split(`\n  ${name}: [`)[1].split('\n  ],')[0].matchAll(/'((?:DELETE|POST|PUT|PATCH) [^']+)'/g)].map((m) => m[1]);
   const routes = [...listed('delete'), ...listed('configure')];
-  ok('the decided delete and configure lists were read', routes.length === 53, String(routes.length));   // builder list item 218 added Delete for good; builder list item 221 added the welcome email and its test   // builder item 158 added the Coming soon page; builder item 203 added the enquiry delete; sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
+  ok('the decided delete and configure lists were read', routes.length === 54, String(routes.length));   // builder list item 241 added Delete customer   // builder list item 218 added Delete for good; builder list item 221 added the welcome email and its test   // builder item 158 added the Coming soon page; builder item 203 added the enquiry delete; sales item 94 added the month's goal; sales item 105 added Home's setup strip; item 47 added two; item 104 took away the seven DNS document and zone writes; item 58 added two; item 112 added the prospect delete; item 115 added the Google review link; item 175 the visitor password; item 77 the payment undo; item 174 added the two domain forwards; items 86 + 105 added three (import undo, merge, unmerge); item 106 the project template and saved to-do list removals; sales item 117 the client's retainer cancel
   const covered = new Set(CONTROLS.map(([r]) => r));
   const open = routes.filter((r) => !covered.has(r) && !NO_CONTROL[r] && !PORTAL_OWNER_ONLY[r]);
   for (const [route, c] of Object.entries(PORTAL_OWNER_ONLY)) {
@@ -237,8 +241,11 @@ const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
   ok('css: it beats a page that shows the control itself', /\[data-needs="owner"\]\{display:none!important\}/.test(css));
   ok('css: a note beats the builder\'s [hidden] rule only for someone lacking it', css.includes('html[data-dds-lacks~="configure"] [data-if-lacks="configure"][hidden]{display:block!important}'));
   ok('builder: a note starts hidden, so nobody else ever sees it', SOURCE['presence.html'].includes('n.hidden = true; n.dataset.ifLacks = "configure"'));
-  const marked = PAGES.filter((p) => /data-needs|dataset\.needs|needs: '/.test(SOURCE[p]) && p !== 'shell.js');
-  ok('the twelve pages with marked controls are the ones expected', JSON.stringify(marked.sort()) === JSON.stringify(['agency.html', 'broadcasts.html', 'connections.html', 'contacts.html', 'crm.html', 'files.html', 'inbox.html', 'pipeline.html', 'presence.html', 'projects.html', 'prospects.html', 'settings.html']), marked.join(', '));   // projects.html: Remove a project template (sales item 106)   // prospects.html: Remove (sales review item 112)   // connections.html: the calendar link (sales review item 46)   // broadcasts.html: Remove this list (sales review items 31 + 39)
+  const SHARED = ['deal-path.js', 'customer-add.js'];   // builder items 102 and 241: drawn into pages that load them (all of which load the shell)
+  ok('Delete customer’s ways in carry the mark too: the profile’s More menu and the preview on Customers', SOURCE['crm.html'].includes("label:'Delete customer…',danger:true,needs:'delete'") && SOURCE['customers.html'].includes('data-pv-del data-needs="delete"'));
+  const marked = PAGES.filter((p) => /data-needs|dataset\.needs|needs: '/.test(SOURCE[p]) && p !== 'shell.js' && !SHARED.includes(p));
+  for (const sh of SHARED) ok(`${sh} is drawn only into pages that load the shell`, PAGES.filter((p) => SOURCE[p].includes(`<script src="/${sh}"></script>`)).every((p) => SOURCE[p].includes('src="/shell.js"')));
+  ok('the thirteen pages with marked controls are the ones expected (customers.html: Delete customer, builder item 241)', JSON.stringify(marked.sort()) === JSON.stringify(['agency.html', 'broadcasts.html', 'connections.html', 'contacts.html', 'crm.html', 'customers.html', 'files.html', 'inbox.html', 'pipeline.html', 'presence.html', 'projects.html', 'prospects.html', 'settings.html']), marked.join(', '));   // projects.html: Remove a project template (sales item 106)   // prospects.html: Remove (sales review item 112)   // connections.html: the calendar link (sales review item 46)   // broadcasts.html: Remove this list (sales review items 31 + 39)
   for (const p of marked) ok(`${p} loads the shell script and its stylesheet`, SOURCE[p].includes('src="/shell.js"') && SOURCE[p].includes('href="/shell.css"'));
 }
 

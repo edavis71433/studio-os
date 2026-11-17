@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, pressButton, touchScreen } from './helpers/app';
 
 // ── SS12 — Admin-health ops chrome ───────────────────────────────────────────
 // The operator's ONE operational read (/admin/health-center). SS12 gives it the
@@ -75,6 +75,72 @@ test.describe('Admin Health Center — drill footers to fixing surfaces', () => 
     await expect(page.locator('.card.area', { hasText: 'Usage' }).locator('a[href="/admin-growth.html"]')).toBeVisible();
     // backups has no in-app fixing surface — it is honestly non-interactive, NOT a dead link
     await expect(page.locator('.card.area', { hasText: 'Backups & recovery' }).locator('a')).toHaveCount(0);
+  });
+});
+
+// ── Sales item 131 · the Stripe key: which kind is held, and a check of each permission ──
+// The card comes from the payload like any area; its check asks GET /admin/stripe-key
+// (commerce/stripe_key.ts keyReport's shape) only when pressed, since it asks Stripe.
+const keyLine = (id: string, resource: string, level: string, why: string, verdict: string, ok: boolean) => ({ id, resource, level, why, verdict, ok });
+const HC_KEY = { data: { overall: 'attention', areas: [
+  { key: 'billing', label: 'Billing', state: 'ok', detail: '1 active, all current.' },
+  { key: 'stripe_key', label: 'Stripe key', state: 'attention', detail: 'Studio OS holds a full-power Stripe key. Swap it for a restricted key that can do only what Studio OS needs.' },
+] } };
+const FULL_KEY = { data: { kind: 'secret', live: true, ok: false, checked_at: '2026-11-16T20:00:00Z',
+  summary: 'This key can do 2 things Studio OS never needs, such as refund a payment.',
+  needs: [keyLine('plan_write', 'Prices', 'Write', 'make the price behind each invoice and retainer link', 'allowed', true),
+    keyLine('balance_read', 'Balance', 'Read', 'Stripe’s fee on each payment, for the bookkeeper file', 'allowed', true)],
+  must_not: [keyLine('charge_write', 'Charges', 'Write', 'refund a payment', 'allowed', false),
+    keyLine('payout_write', 'Payouts', 'Write', 'send money out of Stripe', 'allowed', false)] } };
+const GOOD_KEY = { data: { ...FULL_KEY.data, kind: 'restricted', ok: true, summary: 'A restricted key that can do everything Studio OS needs and nothing it was refused.',
+  must_not: FULL_KEY.data.must_not.map((x) => ({ ...x, verdict: 'refused', ok: true })) } };
+
+test.describe('Admin Health Center — the Stripe key (sales item 131)', () => {
+  test('the card sits under Money & usage and checks the key only when asked', async ({ page }) => {
+    let asked = 0;
+    await installApp(page, { api: { '/admin/health-center': HC_KEY, '/admin/stripe-key': () => { asked++; return FULL_KEY; } } });
+    await page.goto('/admin-health.html');
+    const card = page.locator('#stripeKeyCard');
+    await expect(card).toContainText('Studio OS holds a full-power Stripe key');
+    await expect(card.locator('.pill')).toHaveText('Needs a look');
+    expect(asked).toBe(0);   // opening the page asks Stripe nothing
+    const check = card.getByRole('button', { name: 'Check its permissions' });
+    if (touchScreen()) expect((await check.boundingBox())!.height).toBeGreaterThanOrEqual(44);   // big enough for a finger
+    await pressButton(check);
+    await expect(card.locator('#keyRes')).toContainText('can do 2 things Studio OS never needs');
+    await expect(card.locator('li.bad')).toHaveCount(2);
+    await expect(card.locator('li.bad').first()).toContainText('Refund a payment. This key can do it.');
+    await expect(card.locator('li.ok').first()).toContainText('Prices Write: make the price behind each invoice');
+    await expect(card).toContainText('Nothing in Stripe was made or changed.');
+    await expect(card.getByRole('button', { name: 'Check again' })).toBeVisible();
+    expect(asked).toBe(1);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);   // the list wraps on a phone instead of pushing the page sideways
+  });
+
+  test('a restricted key that passes reads as all clear, every line ticked', async ({ page }) => {
+    await installApp(page, { api: { '/admin/health-center': { data: { overall: 'ok', areas: [{ key: 'stripe_key', label: 'Stripe key', state: 'ok', detail: 'A restricted key that can do only what Studio OS needs. Check its permissions to see each one.' }] } }, '/admin/stripe-key': GOOD_KEY } });
+    await page.goto('/admin-health.html');
+    await pressButton(page.getByRole('button', { name: 'Check its permissions' }));
+    await expect(page.locator('#keyRes .ks')).toHaveText('A restricted key that can do everything Studio OS needs and nothing it was refused.');
+    await expect(page.locator('#keyRes li.ok')).toHaveCount(4);
+    await expect(page.locator('#keyRes li.bad')).toHaveCount(0);
+  });
+
+  test('a check pressed too often says so and keeps the card as it was', async ({ page }) => {
+    await installApp(page, { api: { '/admin/health-center': HC_KEY } });
+    await page.route('**/functions/v1/presence/admin/stripe-key', (r) => r.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'rate_limited', message: 'That was checked a moment ago. Try again in a few minutes.' }) }));
+    await page.goto('/admin-health.html');
+    await pressButton(page.getByRole('button', { name: 'Check its permissions' }));
+    await expect(page.locator('.toast')).toContainText('checked a moment ago');
+    await expect(page.locator('#keyRes')).toBeEmpty();
+  });
+
+  test('no key set is Off, with nothing to check', async ({ page }) => {
+    await installApp(page, { api: { '/admin/health-center': { data: { overall: 'ok', areas: [{ key: 'stripe_key', label: 'Stripe key', state: 'off', detail: 'No Stripe key is set, so invoices can’t be paid online.' }] } } } });
+    await page.goto('/admin-health.html');
+    await expect(page.locator('#stripeKeyCard')).toContainText('No Stripe key is set');
+    await expect(page.getByRole('button', { name: 'Check its permissions' })).toHaveCount(0);
   });
 });
 

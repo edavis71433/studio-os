@@ -834,6 +834,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // Add an EXISTING customer directly — no deal/sign/convert ceremony. Studio-gated
   // like every /sales/* route (relationship feature + the reviewer boundary above).
   if (route === '/sales/customers' && method === 'POST') return handleSalesAddCustomer(req, site, principal, cors);
+  if (route.startsWith('/sales/customers/')) {   // builder item 241: a customer's profile, Invite to their portal, Delete and Restore
+    const r = await (await import('./routes/customers.ts')).handleCustomerRoute(req, route, method, site, principal, cors);
+    if (r) return r;
+  }
   // The studio's own services catalog (name + price) that proposal line items are
   // picked from — studio-gated like every /sales/* route (relationship feature + the
   // reviewer boundary above), site-scoped to the studio issuing proposals.

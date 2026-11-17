@@ -67,15 +67,15 @@ async function ask(method, route, body) {
   ok('the connect reply says the person was saved to contacts, not that they will connect on sign-up', /Saved \$\{email\} to your contacts\. Set them up from Add a customer when you’re ready\./.test(sales) && !/when they sign up/i.test(sales.slice(sales.indexOf('export async function handleSalesAddCustomer'))));
 }
 
-// ═══ 3. Add a customer: no sign-up choice, link or price page (Home, Customers, Contacts) ═══
-for (const p of ['agency.html', 'customers.html', 'contacts.html']) {
-  const h = read(p);
-  const di = h.indexOf('<dialog id="custDlg"'), dlg = h.slice(di, h.indexOf('</dialog>', di));
-  ok(`${p}: the dialog has no sign-up wording, link or price page`, di > 0 && !/cu-signup|sign up themselves|pricing\.html/.test(dlg));
-  // Eric (Nov 15): adding a customer starts no website unless asked
-  ok(`${p}: "Just save them for now" is the default; setting them up is the other choice`, /<input type="radio" name="cumode" value="connect" checked>/.test(dlg) && /<strong>Just save them for now<\/strong>/.test(dlg) && /<strong>Set up their website and invite them<\/strong>/.test(dlg));
-  ok(`${p}: the page sends no one to the old price page`, !/pricing\.html/.test(h));
-  ok(`${p}: saving sends only who they are; setting them up sends the full set-up`, /const body=mode==='connect'\?\{mode:'connect',name:name\|\|undefined,email\}:\{mode:'provision',/.test(h));
+// ═══ 3. Add a customer: no sign-up choice, link or price page (one box for Home, Customers and Contacts: customer-add.js, item 102) ═══
+{
+  const box = read('customer-add.js');
+  const dlg = box.slice(box.indexOf("'<dialog id=\"custDlg\""), box.indexOf("'</dialog>'"));
+  ok('the box has no sign-up wording, link or price page', dlg.length > 1000 && !/cu-signup|sign up themselves|pricing\.html/.test(dlg));
+  // Eric (Nov 15), builder item 241: adding a customer saves them and nothing else, so there's no choice to make
+  ok('the box saves the customer: no choice to set them up, and it says what saving does', !/type="radio"|<select/.test(dlg) && /Saves them to your customers\. No website is made and nobody is emailed\./.test(dlg));
+  for (const p of ['agency.html', 'customers.html', 'contacts.html']) ok(`${p}: the page sends no one to the old price page`, !/pricing\.html/.test(read(p)));
+  ok('saving sends who they are and their business, as connect with save; never a set-up', /var body = \{ mode: 'connect', save: true, name: name \|\| undefined, business_name: business_name \|\| undefined, email: email \};/.test(box) && !/mode: 'provision'/.test(box));
 }
 {
   const c = read('customers.html');

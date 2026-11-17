@@ -247,7 +247,7 @@
   .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--p);color:#fff;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
   .btn:hover{filter:brightness(1.05)}
-  /* ── the Add-a-customer dialog — customers.html's custDlg, ported wholesale and kept in sync by hand ── */
+  /* ── dialogs (the Add a customer box brings its own rules: customer-add.js, builder item 102) ── */
   dialog{border:none;border-radius:var(--dds-r-lg,10px);padding:0;margin:8vh auto;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card);color:var(--ink)}
   dialog::backdrop{background:rgba(27,21,37,.4)}
   .dbody{padding:var(--dds-s6,24px);max-height:calc(84vh - 22px);overflow:auto}
@@ -256,18 +256,6 @@
   .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px);outline:none}
   .dbody input:focus,.dbody select:focus{border-color:var(--p)}
   .dbody .note{font-size:12.5px;color:var(--faint);margin:var(--dds-s3,12px) 0 0;line-height:1.5}
-  /* builder item 198: a full plan is said in the box, where the person is looking, not in a toast */
-  .dbody .cu-full{background:var(--dds-warn-soft,#f3ead9);color:var(--dds-warn,#775d31);border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.45}
-  .dbody .cu-full b{display:block}
-  #cu-mode{display:flex;flex-direction:column;gap:var(--dds-s2,8px);margin:2px 0 var(--dds-s1,4px)}
-  .modeopt{display:flex;align-items:flex-start;gap:var(--dds-s2,8px);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px var(--dds-s3,12px);cursor:pointer;font-size:14px;color:var(--ink)}
-  .modeopt:has(input:checked){border-color:var(--p);background:var(--p-soft)}
-  .modeopt input{width:auto;margin-top:var(--dds-s1,4px);accent-color:var(--p)}
-  .modeopt strong{display:block;font-weight:600;font-size:13.5px}
-  .modehint{display:block;font-size:12px;color:var(--faint);margin-top:2px;line-height:1.45}
-  .dbody .done{text-align:center;padding:var(--dds-s2,8px) 0 var(--dds-s1,4px)}
-  .dbody .done .tick{width:44px;height:44px;border-radius:50%;background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto var(--dds-s3,12px)}
-  .dbody .done p{color:var(--soft);font-size:14px;margin:6px 0 0}
   .row2{display:flex;gap:var(--dds-s2,8px);justify-content:flex-end;margin-top:var(--dds-s4,16px)}
   .tscroll td .sub{font-size:12px;color:var(--faint);margin-top:1px}
   /* ── client housekeeping (Oct 2026 studio audit, change 6): tags · owner · note · archive, inline under the row ── */
@@ -537,49 +525,6 @@
 <!-- the one open ⋯ menu lives here, outside the table (a sticky cell is its own
      stacking context and would paint over a menu drawn inside the row) -->
 <div id="rowMenuHost"></div>
-<!-- customers.html's Add-a-customer dialog, ported wholesale — kept in sync by hand -->
-<dialog id="custDlg" aria-label="Add a customer">
-  <form id="custForm" class="dbody">
-    <div id="cust-fields">
-      <h3>Add a customer</h3>
-      <label for="cu-name">Their name</label>
-      <input id="cu-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
-      <label for="cu-email">Email</label>
-      <input id="cu-email" type="email" maxlength="160" placeholder="jane@acmebakery.com" autocomplete="off">
-      <div id="cu-mode" role="radiogroup" aria-label="What adding them does">
-        <label class="modeopt"><input type="radio" name="cumode" value="connect" checked>
-          <span><strong>Just save them for now</strong><span class="modehint">No website yet, and nothing is emailed. You can set up their website later.</span></span></label>
-        <label class="modeopt"><input type="radio" name="cumode" value="provision">
-          <span><strong>Set up their website and invite them</strong><span class="modehint">Makes their workspace and website now, and emails them a link to sign in.</span></span></label>
-      </div>
-      <div id="cu-provision-only" style="display:none">
-        <label for="cu-biz">Business name</label>
-        <input id="cu-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
-        <label for="cu-edition">What kind of work is this?</label>
-        <select id="cu-edition">
-          <option value="presence" selected>Their site will live on my platform (Studio OS)</option>
-          <option value="business_os_only">Building or redoing their site on another platform — they host it elsewhere</option>
-          <option value="business_os_no_site">Just their client workspace / business tools — no site work</option>
-          <option value="presence_monitor">Just monitoring a site they already have</option>
-        </select>
-        <div id="cu-kit-wrap" style="display:none">
-          <label for="cu-kit">Start from</label>
-          <select id="cu-kit"><option value="">No kit — start empty</option></select>
-          <p class="note">A starter kit copies a saved client’s setup — services, FAQs, voice and colors — onto their new site; a template brings its pages, sections and photos too. Their own business details stay theirs to fill in.</p>
-        </div>
-        <div id="cu-website-wrap" style="display:none">
-          <label for="cu-website">Their existing website address</label>
-          <input id="cu-website" maxlength="200" placeholder="acmebakery.com" autocomplete="off" inputmode="url">
-          <p class="note">You don’t host this one, so record where it lives. Google Search Console reports on a domain whoever hosts it — with the address on file, their existing search numbers start arriving. You can add or change this later on their website page.</p>
-        </div>
-        <p class="note">Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.</p>
-      </div>
-      <p class="note cu-full" id="cu-full" role="alert" hidden></p>
-      <div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Save</button></div>
-    </div>
-    <div id="cust-done" style="display:none"></div>
-  </form>
-</dialog>
 
 <!-- Save as a starter kit (from the roster row's ⋯): POST /agency/kits — the kit
      is then offered under "Start from a kit" in Add a customer. Kits left the home. -->
@@ -596,6 +541,7 @@
   </form>
 </dialog>
 
+<script src="/customer-add.js"></script>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // Agency roster (A7.2 → standards sweep SS2): the studio's portfolio as a real
@@ -1100,7 +1046,7 @@ function renderTop(){
       <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Home</h1></div><p class="dds-ph-line" id="phLine">${esc(headLine())}</p></div>
       <div class="dds-ph-acts"><button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
         <div class="dds-ph-more" id="phMore" popover><a class="btn ghost" id="weekBtn" href="/week.html" data-noscope="1">Plan my week</a></div>
-        <button type="button" class="btn primary dds-ph-fill" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button></div></div></header>
+        <button type="button" class="btn primary dds-ph-fill" id="addCust" title="Save a customer. Their website and their portal invite come later, from their profile.">+ Add a customer</button></div></div></header>
     <div class="tgrid"><div class="top hero"><div class="hrow"><span class="hdate">${esc(todayWords())}</span><span class="sep" aria-hidden="true">·</span><div class="brand">${esc((ME&&ME.agency)||'Your agency')}</div><span class="rolebadge">● ${esc(roleWords(ME&&ME.role))}</span></div>
     <p class="hi">${esc(greetWord())}</p><p class="hsub" id="heroSub"></p><div class="hchips" id="heroChips"></div></div>
     <aside class="todaycard" id="todayCard" aria-labelledby="todayHead"><h2 id="todayHead"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Today</h2><div id="todayRows"><p class="tq">Looking…</p></div></aside></div>`;
@@ -1359,136 +1305,24 @@ async function mountStudio(){
   host.querySelectorAll('.gbar [data-w]').forEach(e=>{e.style.width=e.getAttribute('data-w')+'%';});   // sales item 94: the goal bar's parts
 }
 
-// ── ADD A CUSTOMER — customers.html's flow, ported wholesale and kept in sync by
-//    hand: set up a customer with their own workspace + a sign-in invitation.
-//    Builder item 199: nobody signs up by themselves; "Just save them for now" saves
-//    without a website or an email. POST /sales/customers (handleSalesAddCustomer) reads
-//    mode/name/business_name/email/edition/website_url. ──
-function cuPlan(){const v=$('cu-edition').value;return v==='business_os_no_site'?'business_os_only':v;}
-function cuAsksWebsite(){const v=$('cu-edition').value;return v==='business_os_only'||v==='presence_monitor';}
-function syncCuSignup(){
-  const w=$('cu-website-wrap');if(w)w.style.display=cuAsksWebsite()?'':'none';
-}
-// Builder item 199, then Eric (Nov 15): adding a customer starts nothing unless asked.
-// "Just save them for now" (connect, the default) saves them to the contacts and emails
-// nobody; "Set up their website and invite them" (provision) makes their workspace and site.
-function cuMode(){const r=document.querySelector('input[name="cumode"]:checked');return r?r.value:'connect';}
-function syncCuMode(){
-  const save=cuMode()==='connect';
-  const po=$('cu-provision-only');if(po)po.style.display=save?'none':'';
-  const sb2=$('cu-submit');if(sb2)sb2.textContent=save?'Save':'Set up + invite';
-  const cf=$('cu-full');if(cf)cf.hidden=true;   // item 198's full-plan words belong to the last set-up attempt
-  if(!save)syncCuSignup();
-}
-// Start from a kit (Oct 2026 studio audit, change 4): an agency's saved starter
-// kits, applied to the NEW site once the POST answers with its site_id. A studio without an agency never sees the field;
-// no kits (or a failed read) hides it too — the dialog never offers what it can't do.
-async function cuIsAgency(){return true;}   // this IS the agency's home
-async function syncCuKits(){
-  const w=$('cu-kit-wrap'),sel=$('cu-kit');if(!w||!sel)return;
-  w.style.display='none';sel.innerHTML='<option value="">No kit — start empty</option>';
-  try{
-    if(!(await cuIsAgency()))return;
-    const r=await api('/agency/kits');
-    const kits=(r.ok&&r.body&&Array.isArray(r.body.data))?r.body.data:[];
-    if(!kits.length)return;
-    sel.innerHTML+=kits.map(k=>'<option value="'+esc(k.id)+'">'+esc(k.name)+(k.kind==='template'?' — template with its pages':'')+'</option>').join('');   // item 145: a template brings its pages too
-    w.style.display='';
-  }catch(_){/* kits are a nicety — the field just stays hidden */}
-}
-function openAddCustomer(setUp){   // setUp===true opens on setting them up (a click passes an event)
-  $('cu-name').value='';$('cu-biz').value='';$('cu-email').value='';$('cu-edition').value='presence';
-  const wf=$('cu-website');if(wf)wf.value='';
-  const sv=document.querySelector('input[name="cumode"][value="'+(setUp===true?'provision':'connect')+'"]');if(sv)sv.checked=true;
-  syncCuMode();syncCuKits();
-  $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
-  const cf=$('cu-full');if(cf){cf.hidden=true;cf.textContent='';}
-  const sb2=$('cu-submit');if(sb2)sb2.disabled=false;
-  // Name is the dialog's first field, so showModal already focuses it; the late nudge
-  // never pulls focus back from a field someone has moved to
-  $('custDlg').showModal();setTimeout(()=>{const d=$('custDlg'),a=document.activeElement;if(!d.contains(a)||a===d)$('cu-name').focus();},20);
-}
-$('cu-cancel').onclick=()=>$('custDlg').close();
+// ── ADD A CUSTOMER: the one box, shared with Customers and Contacts (customer-add.js,
+//    builder item 102; it was three copies kept in sync by hand). Home asks the server its
+//    own way (reads can come from the early batch), and this IS the agency's home, so its
+//    starter kits are offered. ──
+const ADD=window.ddsAddCustomer.mount({request:(m,p,b)=>m==='GET'?api(p):apiSend(m,p,b),toast,isAgency:async()=>true,done:()=>load(true)});
+function openAddCustomer(){ADD.open();}
 // ⌘K's "Add a customer" lands here as /agency.html#add (lib/navigation.ts) — open the
 // dialog and clear the hash, so Back or a reload never reopens it. Boot calls it once
 // the member is known; a hash change while already on the home opens it too.
 function openFromHash(){
-  // ⌘K's "Starter kits" lands on /agency.html#kits: the kits card left the home,
-  // so it opens Add a customer on setting them up, where "Start from a kit" lives
-  if(location.hash!=='#add'&&location.hash!=='#kits')return;
-  const kits=location.hash==='#kits';
+  // an old link to #kits: starter kits live on Templates (item 166), and a kit starts a website from New site
+  // there, not from Add a customer, which saves the customer and nothing else (builder item 241)
+  if(location.hash==='#kits'){location.replace('/templates.html');return;}
+  if(location.hash!=='#add')return;
   try{history.replaceState(null,'',location.pathname+location.search);}catch(_){/* */}
-  if(ME)openAddCustomer(kits);
+  if(ME)openAddCustomer();
 }
 window.addEventListener('hashchange',openFromHash);
-$('cu-edition').onchange=syncCuSignup;
-document.querySelectorAll('input[name="cumode"]').forEach(r=>r.addEventListener('change',syncCuMode));
-$('custForm').onsubmit=async(e)=>{
-  e.preventDefault();
-  const mode=cuMode();
-  const name=$('cu-name').value.trim(),business_name=$('cu-biz').value.trim(),email=$('cu-email').value.trim();
-  const kitSel=$('cu-kit'),kitId=(mode==='provision'&&kitSel&&kitSel.value)||'',kitName=kitId?String((kitSel.options[kitSel.selectedIndex]||{}).textContent||'kit').trim():'';
-  if(!email){toast(mode==='connect'?'Enter their email to save them.':'Enter their email — that’s where the sign-in invitation goes.',true);$('cu-email').focus();return;}
-  const label=mode==='connect'?'Save':'Set up + invite';
-  const btn=$('cu-submit');btn.disabled=true;btn.textContent=mode==='connect'?'Saving…':'Setting up…';
-  const body=mode==='connect'?{mode:'connect',name:name||undefined,email}:{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:cuPlan(),
-    website_url:(cuAsksWebsite()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
-  try{
-    const r=await apiSend('POST','/sales/customers',body);
-    if(!r.ok){
-      // builder item 198: the plan's sites are all in use; nothing was made, and the box says why
-      if(r.status===409&&r.body&&r.body.error==='client_limit'){const cf=$('cu-full'),t=String(r.body.message||''),cut=t.indexOf('. ');if(cf){cf.innerHTML=cut>0?'<b>'+esc(t.slice(0,cut+1))+'</b>'+esc(t.slice(cut+2)):esc(t);cf.hidden=false;}btn.disabled=false;btn.textContent=label;return;}
-      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||(mode==='connect'?'We couldn’t save them just now.':'We couldn’t set them up just now.'));
-      toast(m,true);btn.disabled=false;btn.textContent=label;return;
-    }
-    const d=(r.body&&r.body.data)||{};
-    const who=esc((mode==='provision'&&business_name)||name||email);
-    let heading,line;
-    if(d.requested){
-      // final pass S1: an account that isn't yours yet is asked, never taken
-      heading='Request sent';
-      line=who+' already has a Studio OS account, so they need to say yes first. They’ll see your request the next time they sign in.';
-    }else if(mode==='connect'){
-      // saved, not set up: no website and no email (someone already yours is connected again)
-      if(d.connected){heading='Connected again';line=who+' was already your customer, so they’re connected again. Nothing was emailed and no website was made.';}
-      else{heading='Saved';line=who+' is saved to your contacts. No website yet, and nothing was emailed. To set up their website later, open Add a customer again and choose Set up their website and invite them.';}
-    }else if(d.already_exists){
-      heading='They already have a workspace';
-      line=who+' already had an account — connected to their existing workspace. Nothing duplicated. Send them their sign-in link if they need it.';
-    }else if(d.invited===false){
-      heading='Account created — the invitation email couldn’t be sent';
-      line='Their workspace is ready, but our email to '+esc(email)+' didn’t go out. Share their sign-in page with them instead.';
-    }else{
-      heading='Invitation sent';
-      line='Invitation sent to '+esc(email)+'. They’ll sign in from the email and land in their client portal.';
-    }
-    // the kit, applied to THEIR new site — after the provision succeeded, on its own
-    // try/catch: a kit that won't apply must never repaint the set-up as a failure
-    let kitLine='',kitRetry=null;   // bug hunt A4: a kit that didn't apply gets a real "Try the kit again", not a Home card that's gone
-    if(kitId){
-      if(d.already_exists||d.requested)kitLine='The '+esc(kitName)+' kit wasn’t applied — they already had a workspace, and a kit only starts a new site.';
-      else if(!d.site_id)kitLine='The '+esc(kitName)+' kit wasn’t applied: their new site didn’t come back to us, so there was nothing to apply it to. Their account is ready.';
-      else{
-        const applyKit=async()=>{let k={ok:false};try{k=await apiSend('POST','/agency/kits/'+encodeURIComponent(kitId)+'/apply',{site_id:d.site_id});}catch(_){k={ok:false};}return !!k.ok;};
-        const kitOk=await applyKit();
-        kitLine=kitOk?esc(kitName)+' applied.':'The '+esc(kitName)+' kit didn’t apply. Their account is ready.';
-        if(!kitOk)kitRetry=applyKit;
-      }
-    }
-    const showLink=!!d.portal_url;
-    const link=showLink?('<p style="margin-top:12px"><a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a></p>'):'';
-    $('cust-fields').style.display='none';
-    const done=$('cust-done');
-    done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">'+heading+'</h3><p>'+line+'</p>'+(kitLine?'<p id="cu-kit-line">'+kitLine+'</p>':'')+link+'</div><div class="row2">'+(kitRetry?'<button type="button" class="btn ghost" id="cu-kit-again">Try the kit again</button>':'')+'<button type="button" class="btn" id="cu-close">Done</button></div>';
-    done.style.display='';
-    const cl=$('cu-close');if(cl){cl.focus();cl.onclick=()=>$('custDlg').close();}
-    const ka=$('cu-kit-again');if(ka&&kitRetry)ka.onclick=async()=>{ka.disabled=true;ka.textContent='Applying…';const okNow=await kitRetry();const kl=$('cu-kit-line');
-      if(okNow){if(kl)kl.textContent=kitName+' applied.';ka.remove();toast(kitName+' applied.');}else{ka.disabled=false;ka.textContent='Try the kit again';toast('The kit didn’t apply this time either.',true);}};
-  }catch(_){toast(mode==='connect'?'We couldn’t save them just now.':'We couldn’t set them up just now.',true);btn.disabled=false;btn.textContent=label;return;}
-  // the creation SUCCEEDED — the roster refresh is best-effort and must never
-  // repaint that success as a failure: a soft refresh toasts on its own
-  load(true).catch(()=>toast('We couldn’t refresh the list just now — Refresh will catch it up.',true));
-};
 
 // The full boot path — named so trouble()'s Try-again can re-run ALL of it.
 async function boot(){
@@ -1502,7 +1336,7 @@ async function boot(){
     if(!me.ok){trouble();return;}
     ME=me.body.data||{};
     renderTop();
-    openFromHash();   // ⌘K → /agency.html#add (or #kits)
+    openFromHash();   // ⌘K → /agency.html#add
     loadSetup();     // sales item 105: the setup strip reads on its own; nothing waits on it
     const needs=mountNeeds();   // what needs the studio — reads alongside the roster; re-paints Status/Next when it lands
     // final pass (Nov 8, batch B): the studio strip reads alongside the roster and

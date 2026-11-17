@@ -86,20 +86,36 @@ export function invoiceExportRows(items: BookRow[], p: ExportPeriod, tzo = 0): {
   return { rows: out, invoices, cents };
 }
 
-export const PAYMENT_HEAD = ['Date', 'Customer', 'Invoice', 'For', 'How it was paid', 'Amount', 'Note'];
-export interface RetainerCharge { amount_cents: number; paid_at: string; customer: string; deal_title: string }
+// Sales item 133: Stripe fee, You kept and Paid out on show what reached the bank. A
+// payment taken by hand (check, cash, Zelle...) has no fee and was kept whole; one Stripe
+// took shows its fee once Stripe has been read (routes/accounting_export.ts, staff only).
+export const PAYMENT_HEAD = ['Date', 'Customer', 'Invoice', 'For', 'How it was paid', 'Amount', 'Stripe fee', 'You kept', 'Paid out on', 'Note'];
+export interface RetainerCharge { amount_cents: number; paid_at: string; customer: string; deal_title: string; stripe_invoice?: string }
 /** Money that went back (sales items 126, 127): a refund made in Stripe or a dispute lost,
  *  on the day it happened, or Stripe's dispute fee, on the day Stripe took it. `what` is
  *  the invoice's or the retainer's name; `invoice_no` its number ('' for a retainer). */
 export interface MoneyBack { kind: 'refund' | 'dispute' | 'fee'; amount_cents: number; at: string; customer: string; invoice_no: string; what: string; bank?: boolean }
+/** Stripe's side of a payment it took: its fee, and the day the payout carrying it
+ *  arrived ('' while it hasn't). lib/stripe_ledger.ts stripeSide makes one. */
+export interface StripeSide { fee_cents: number; paid_out_on: string }
+export interface StripeLookup { forInvoice(id: string): StripeSide | null; forRetainer(stripeInvoice: string): StripeSide | null }
 /** payments.csv: every payment that came in during the period, oldest first. A paid invoice's
  *  own row is its last payment (what was left after any parts); each part payment is a row
  *  of its own, under its invoice's number; each retainer charge is a row; each refund, dispute
  *  lost and dispute fee is a row with a minus amount. `payments` and `cents` count what came
- *  in; `returned` and `returned_cents` what went back. Pure. */
-export function paymentExportRows(items: BookRow[], retainers: RetainerCharge[], p: ExportPeriod, tzo = 0, back: MoneyBack[] = []): { rows: string[][]; payments: number; cents: number; returned: number; returned_cents: number } {
+ *  in; `returned` and `returned_cents` what went back. `stripe`, when Stripe was read, fills
+ *  in the fee on each payment it took (sales item 133). Pure. */
+export function paymentExportRows(items: BookRow[], retainers: RetainerCharge[], p: ExportPeriod, tzo = 0, back: MoneyBack[] = [], stripe: StripeLookup | null = null): { rows: string[][]; payments: number; cents: number; returned: number; returned_cents: number; fee_cents: number; kept_cents: number; fees_missing: number } {
   const byId = new Map(items.map((i) => [String(i.id), i]));
   const rows: Array<{ at: string; row: string[]; cents: number }> = [];
+  let feeCents = 0, keptCents = 0, missing = 0;
+  // the three new columns: by hand, kept whole; through Stripe, its fee when Stripe said
+  const money = (amt: number, viaStripe: boolean, side: StripeSide | null) => {
+    if (!viaStripe) { keptCents += amt; return ['', dollars(amt), '']; }
+    if (!side) { if (stripe) missing++; return ['', '', '']; }
+    feeCents += side.fee_cents; keptCents += amt - side.fee_cents;
+    return [dollars(side.fee_cents), dollars(amt - side.fee_cents), side.paid_out_on ? usDate(side.paid_out_on) : ''];
+  };
   for (const i of items) {
     if (String(i.status) !== 'paid') continue;
     const day = localYmd(i.paid_at, tzo);
@@ -107,35 +123,44 @@ export function paymentExportRows(items: BookRow[], retainers: RetainerCharge[],
     const parent = i.payment_for ? byId.get(String(i.payment_for)) : null;
     const of = parent || i;
     const amt = Math.round(Number(i.amount_cents) || 0);
-    rows.push({ at: String(i.paid_at || ''), cents: amt, row: [usDate(day), who(of), exportNo(of.number), String(of.deal_title || of.title || '').slice(0, 200) + (parent ? ' (part payment)' : ''), methodWord(i.paid_method), dollars(amt), String(i.paid_note || '').slice(0, 300)] });
+    const viaStripe = !i.paid_method;   // the webhook leaves paid_method blank; by hand always names one
+    rows.push({ at: String(i.paid_at || ''), cents: amt, row: [usDate(day), who(of), exportNo(of.number), String(of.deal_title || of.title || '').slice(0, 200) + (parent ? ' (part payment)' : ''), methodWord(i.paid_method), dollars(amt),
+      ...money(amt, viaStripe, viaStripe && stripe ? stripe.forInvoice(String(i.id)) : null), String(i.paid_note || '').slice(0, 300)] });
   }
   for (const r of retainers) {
     const day = localYmd(r.paid_at, tzo);
     if (!inPeriod(day, p) || !(r.amount_cents > 0)) continue;
-    rows.push({ at: r.paid_at, cents: r.amount_cents, row: [usDate(day), r.customer || 'Customer', '', `Retainer${r.deal_title ? ': ' + r.deal_title : ''}`.slice(0, 200), 'Card or bank, through Stripe', dollars(r.amount_cents), ''] });
+    rows.push({ at: r.paid_at, cents: r.amount_cents, row: [usDate(day), r.customer || 'Customer', '', `Retainer${r.deal_title ? ': ' + r.deal_title : ''}`.slice(0, 200), 'Card or bank, through Stripe', dollars(r.amount_cents),
+      ...money(r.amount_cents, true, stripe && r.stripe_invoice ? stripe.forRetainer(r.stripe_invoice) : null), ''] });
   }
   for (const r of back) {
     const day = localYmd(r.at, tzo);
     if (!inPeriod(day, p) || !(r.amount_cents > 0)) continue;
     const label = r.kind === 'refund' ? 'Refund' : r.kind === 'dispute' ? 'Dispute lost' : 'Stripe dispute fee';
     const how = r.kind === 'refund' ? 'Refunded through Stripe' : r.kind === 'dispute' ? (r.bank ? 'Bank dispute, through Stripe' : 'Card dispute, through Stripe') : 'Stripe fee';
-    rows.push({ at: r.at, cents: -r.amount_cents, row: [usDate(day), r.customer || 'Customer', r.invoice_no, `${label}: ${r.what || 'Invoice'}`.slice(0, 200), how, dollars(-r.amount_cents), ''] });
+    rows.push({ at: r.at, cents: -r.amount_cents, row: [usDate(day), r.customer || 'Customer', r.invoice_no, `${label}: ${r.what || 'Invoice'}`.slice(0, 200), how, dollars(-r.amount_cents), '', dollars(-r.amount_cents), '', ''] });   // ten columns: no fee of its own, kept = the minus amount, never paid out
   }
   rows.sort((a, b) => a.at.localeCompare(b.at));
   const ins = rows.filter((r) => r.cents >= 0), outs = rows.filter((r) => r.cents < 0);
-  return { rows: rows.map((r) => r.row), payments: ins.length, cents: ins.reduce((a, r) => a + r.cents, 0), returned: outs.length, returned_cents: -outs.reduce((a, r) => a + r.cents, 0) };
+  return { rows: rows.map((r) => r.row), payments: ins.length, cents: ins.reduce((a, r) => a + r.cents, 0), returned: outs.length, returned_cents: -outs.reduce((a, r) => a + r.cents, 0), fee_cents: feeCents, kept_cents: keptCents, fees_missing: missing };
 }
 
-/** READ-ME.txt: what the two files hold and how to bring them into QuickBooks Online. */
-export function exportReadMe(p: ExportPeriod, inv: { invoices: number; cents: number }, pay: { payments: number; cents: number; returned?: number; returned_cents?: number }, partial: boolean): string {
+/** READ-ME.txt: what the files hold and how to bring them into QuickBooks Online. `stripe`
+ *  is set when Stripe's fees and payouts were read (sales item 133). */
+export function exportReadMe(p: ExportPeriod, inv: { invoices: number; cents: number }, pay: { payments: number; cents: number; returned?: number; returned_cents?: number; fee_cents?: number; kept_cents?: number; fees_missing?: number }, partial: boolean,
+  stripe: { payouts: number; cents: number; capped: boolean } | null = null): string {
   const money = (c: number) => '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return [
     `Export for your bookkeeper: ${usDate(p.from)} to ${usDate(p.to)}`,
     '',
     `invoices.csv  ${inv.invoices} invoice${inv.invoices === 1 ? '' : 's'} issued in these days, ${money(inv.cents)} billed. One row per line.`,
     `payments.csv  ${pay.payments} payment${pay.payments === 1 ? '' : 's'} received in these days, ${money(pay.cents)} in all, retainer charges included.`,
+    ...(stripe ? [`              Stripe kept ${money(pay.fee_cents || 0)} in fees from the ones it took, so you kept ${money(pay.kept_cents || 0)}.`] : []),
     ...(pay.returned ? [`              ${pay.returned} row${pay.returned === 1 ? '' : 's'} of money that went back, ${money(pay.returned_cents || 0)} in all: refunds made in Stripe, disputes lost and Stripe's dispute fees, each with a minus amount on the day it went.`] : []),
+    ...(stripe ? [`payouts.csv   ${stripe.payouts} payout${stripe.payouts === 1 ? '' : 's'} from Stripe due in these days, ${money(stripe.cents)} arrived. Each row is one deposit; its columns show what made it up.`] : []),
     ...(partial ? ['', 'Note: this studio has more invoices than one export reads (2,000). The oldest ones are left out; pick a shorter stretch of days to get them.'] : []),
+    ...(stripe && pay.fees_missing ? ['', `Note: Stripe had no fee for ${pay.fees_missing} payment${pay.fees_missing === 1 ? '' : 's'} it took, so their Stripe fee and You kept are blank. Its dashboard has them.`] : []),
+    ...(stripe && stripe.capped ? ['', 'Note: Stripe had more for these days than one export reads. Pick a shorter stretch of days to get all of it.'] : []),
     '',
     'Bringing invoices.csv into QuickBooks Online:',
     '1. In QuickBooks, open Settings, then Import data, then Invoices.',
@@ -143,7 +168,12 @@ export function exportReadMe(p: ExportPeriod, inv: { invoices: number; cents: nu
     '3. Match the columns: InvoiceNo, Customer, InvoiceDate, DueDate and ItemAmount are the ones it needs.',
     'QuickBooks takes 100 invoices at a time, and not at all when sales tax is switched on there. In that case your bookkeeper can enter the totals from this file instead.',
     '',
-    'payments.csv is for matching what came into the bank. Google Sheets, Excel and Numbers open both files.',
+    ...(stripe ? [
+      'Matching what came into the bank: Stripe keeps its fee from each payment it takes and sends the rest in payouts, usually two business days later.',
+      'Each row of payouts.csv is one deposit from Stripe. In payments.csv, Paid out on says which deposit carried each payment, and You kept is the payment less Stripe\'s fee.',
+      'payouts.csv counts every payment Stripe took, including any that isn\'t an invoice here, such as a free-tools order.',
+      'Google Sheets, Excel and Numbers open all three files.',
+    ] : ['payments.csv is for matching what came into the bank. Google Sheets, Excel and Numbers open both files.']),
     'Voided invoices are left out. A part payment is listed under its invoice\'s number.',
     '',
   ].join('\r\n');
