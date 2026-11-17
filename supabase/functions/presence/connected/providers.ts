@@ -151,10 +151,12 @@ export const CONNECTED_PROVIDERS: readonly ConnectedProvider[] = [
     rateNote: 'token-bucket per key', status: 'planned' },
 
   // ── Payments (the BUSINESS's own processor — distinct from Studio OS billing) ──
+  // sales item 134: the read is the last 30 days, paid less refunded, and payouts
+  // (connected/adapters.ts readStripeAccount); it reads no subscriptions, so it doesn't say so
   { key: 'stripe_connect', name: 'Stripe (your account)', customerLabel: 'your payments',
     category: 'payments', purpose: 'See your own sales and, later, send a payment link from your site.',
     auth: 'oauth2', approval: 'oauth_consent', scopes: ['read_only'],
-    reads: ['recent payments and payouts', 'active subscriptions'], futureWrites: ['create a payment link'],
+    reads: ['what you took in the last 30 days, less refunds', 'what Stripe paid out to your bank'], futureWrites: ['create a payment link'],
     minEdition: 'presence', rateNote: 'generous; read-mostly', status: 'planned' },
   { key: 'square', name: 'Square', customerLabel: 'your Square sales',
     category: 'payments', purpose: 'Bring your Square sales and catalog into view.',

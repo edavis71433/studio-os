@@ -312,7 +312,12 @@ function dataLine(d){
   if(d.contacts!=null) bits.push(esc(d.contacts)+' contacts');
   if(d.subscribers!=null) bits.push(esc(d.subscribers)+' subscribers');
   if(d.open_rate!=null) bits.push(esc(d.open_rate)+'% open rate');
+  // sales item 134: a business's own Stripe, over its last 30 days: what came in less refunds, and what reached the bank
+  const cash=(v)=>{const x=Number(v)||0;try{return new Intl.NumberFormat('en-US',{style:'currency',currency:String(d.currency||'usd').toUpperCase()}).format(x);}catch(_){return '$'+x.toFixed(2);}};
+  if(d.revenue!=null) bits.push(esc(cash(d.revenue))+' taken in '+esc(d.window_days||30)+' days');
   if(d.payments!=null) bits.push(esc(d.payments)+' payments');
+  if(d.refunded) bits.push(esc(cash(d.refunded))+' refunded');
+  if(d.paid_out!=null) bits.push(esc(cash(d.paid_out))+' paid out');
   if(d.tags_installed!=null) bits.push(esc(d.tags_installed)+' tags installed');
   if(d.managed_assets!=null) bits.push(esc(d.managed_assets)+' pages managed');
   if(d.listing_verified!=null) bits.push(d.listing_verified?'Verified':'Not verified');

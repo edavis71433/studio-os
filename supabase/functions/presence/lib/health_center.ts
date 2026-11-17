@@ -20,6 +20,9 @@ export interface HealthCenterInputs {
   failedRuns: number;
   activeNotices: number;
   backupsVerified: boolean;   // owner confirms a restore drill was done
+  /** sales item 131: which kind of Stripe key Studio OS holds, from its prefix only
+   *  (commerce/stripe.ts heldKeyKind). Left out, the area isn't shown. */
+  stripeKey?: { kind: 'restricted' | 'secret' | 'none' | 'other'; live: boolean | null };
 }
 
 export type AreaState = 'ok' | 'attention' | 'off';
@@ -47,6 +50,18 @@ export function summarizeHealthCenter(i: HealthCenterInputs): { overall: AreaSta
   const billTrouble = i.billing.paused + i.billing.lapsed;
   add('billing', 'Billing', billTrouble > 0 ? 'attention' : 'ok',
     billTrouble > 0 ? `${i.billing.paused} with payment trouble, ${i.billing.lapsed} lapsed.` : `${i.billing.active} active, all current.`);
+
+  // the Stripe key (sales item 131): a full-power key works, but a leak of it could
+  // refund, pay out and change settings, so it asks for a look until it's swapped
+  if (i.stripeKey) {
+    const k = i.stripeKey;
+    add('stripe_key', 'Stripe key', k.kind === 'none' ? 'off' : k.kind === 'restricted' && k.live === true ? 'ok' : 'attention',
+      k.kind === 'none' ? 'No Stripe key is set, so invoices can’t be paid online.'
+        : k.kind === 'other' ? 'The Stripe key isn’t one Stripe gives out. Check the STRIPE_SECRET setting.'
+        : k.live === false ? 'This is a test key, so real payments can’t be taken.'
+        : k.kind === 'secret' ? 'Studio OS holds a full-power Stripe key. Swap it for a restricted key that can do only what Studio OS needs.'
+        : 'A restricted key that can do only what Studio OS needs. Check its permissions to see each one.');
+  }
 
   // AI
   add('ai', 'AI', i.aiConfigured ? 'ok' : 'off',

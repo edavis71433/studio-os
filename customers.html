@@ -55,8 +55,7 @@
   .search{flex:1;min-width:180px;font-family:inherit;font-size:16px;padding:var(--dds-s3,12px) var(--dds-s4,16px);border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink)}
   .search:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
 
-  /* ── the Add-a-customer dialog — contacts.html's custDlg, ported wholesale
-        (C4); anatomy kept in sync by hand ── */
+  /* ── dialogs (the Add a customer box brings its own rules: customer-add.js, builder item 102) ── */
   /* Centering, mobile-safe (SS6 review). NOT margin:auto — mobile browsers
      resolve the top-layer dialog's containing block against the DOCUMENT
      height, so vertical auto-margins push a tall dialog's bottom below the
@@ -75,18 +74,6 @@
   .dbody input,.dbody select{width:100%;font-family:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px);outline:none}
   .dbody input:focus,.dbody select:focus{border-color:var(--p)}
   .dbody .note{font-size:12.5px;color:var(--faint);margin:var(--dds-s3,12px) 0 0;line-height:1.5}
-  /* builder item 198: a full plan is said in the box, where the person is looking, not in a toast */
-  .dbody .cu-full{background:var(--dds-warn-soft,#f3ead9);color:var(--dds-warn,#775d31);border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.45}
-  .dbody .cu-full b{display:block}
-  #cu-mode{display:flex;flex-direction:column;gap:var(--dds-s2,8px);margin:2px 0 var(--dds-s1,4px)}
-  .modeopt{display:flex;align-items:flex-start;gap:var(--dds-s2,8px);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:10px var(--dds-s3,12px);cursor:pointer;font-size:14px;color:var(--ink)}
-  .modeopt:has(input:checked){border-color:var(--p);background:var(--p-soft)}
-  .modeopt input{width:auto;margin-top:var(--dds-s1,4px);accent-color:var(--p)}
-  .modeopt strong{display:block;font-weight:600;font-size:13.5px}
-  .modehint{display:block;font-size:12px;color:var(--faint);margin-top:2px;line-height:1.45}
-  .dbody .done{text-align:center;padding:var(--dds-s2,8px) 0 var(--dds-s1,4px)}
-  .dbody .done .tick{width:44px;height:44px;border-radius:50%;background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto var(--dds-s3,12px)}
-  .dbody .done p{color:var(--soft);font-size:14px;margin:6px 0 0}
   .row2{display:flex;gap:var(--dds-s2,8px);justify-content:flex-end;margin-top:var(--dds-s4,16px)}
 
   /* ── the table view: sortable columns; the table scrolls in its OWN container ── */
@@ -279,6 +266,10 @@
   .cp-foot{padding:12px 18px 16px;border-top:1px solid var(--line)}
   .cp-open{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:11px 16px;border-radius:999px;border:1px solid var(--dds-line-strong,#d6d4e2);background:var(--card);color:var(--ink);font-weight:600;font-size:14px;text-decoration:none}
   .cp-open:hover{border-color:var(--p);color:var(--p)}
+  /* builder item 241: a customer added by mistake can go, from their preview */
+  .cp-del{display:block;margin:10px auto 0;font:inherit;font-size:13px;font-weight:600;color:var(--dds-bad,#b42318);background:none;border:0;padding:8px 12px;border-radius:8px;min-height:36px;cursor:pointer}
+  .cp-del:hover{background:var(--dds-bad-soft,#fde8e6)}
+  @media (pointer:coarse){.cp-del{min-height:44px}}
   .cp-skel{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--dds-up,#f7f6fb),color-mix(in srgb,var(--ink) 8%,var(--card)),var(--dds-up,#f7f6fb));background-size:200% 100%;animation:cp-sh 1.2s linear infinite}
   @keyframes cp-sh{to{background-position:-200% 0}}
   @media (prefers-reduced-motion:reduce){dialog.cprev,.cp-skel{animation:none}}
@@ -288,49 +279,7 @@
 </head>
 <body>
 <div class="wrap"><div id="main"><div class="spin" role="status" aria-label="Loading"></div></div></div>
-<!-- C4: contacts.html's Add-a-customer dialog, ported wholesale — kept in sync by hand -->
-<dialog id="custDlg" aria-label="Add a customer">
-  <form id="custForm" class="dbody">
-    <div id="cust-fields">
-      <h3>Add a customer</h3>
-      <label for="cu-name">Their name</label>
-      <input id="cu-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
-      <label for="cu-email">Email</label>
-      <input id="cu-email" type="email" maxlength="160" placeholder="jane@acmebakery.com" autocomplete="off">
-      <div id="cu-mode" role="radiogroup" aria-label="What adding them does">
-        <label class="modeopt"><input type="radio" name="cumode" value="connect" checked>
-          <span><strong>Just save them for now</strong><span class="modehint">No website yet, and nothing is emailed. You can set up their website later.</span></span></label>
-        <label class="modeopt"><input type="radio" name="cumode" value="provision">
-          <span><strong>Set up their website and invite them</strong><span class="modehint">Makes their workspace and website now, and emails them a link to sign in.</span></span></label>
-      </div>
-      <div id="cu-provision-only" style="display:none">
-        <label for="cu-biz">Business name</label>
-        <input id="cu-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">
-        <label for="cu-edition">What kind of work is this?</label>
-        <select id="cu-edition">
-          <option value="presence" selected>Their site will live on my platform (Studio OS)</option>
-          <option value="business_os_only">Building or redoing their site on another platform — they host it elsewhere</option>
-          <option value="business_os_no_site">Just their client workspace / business tools — no site work</option>
-          <option value="presence_monitor">Just monitoring a site they already have</option>
-        </select>
-        <div id="cu-kit-wrap" style="display:none">
-          <label for="cu-kit">Start from</label>
-          <select id="cu-kit"><option value="">No kit — start empty</option></select>
-          <p class="note">A starter kit copies a saved client’s setup — services, FAQs, voice and colors — onto their new site. Their own business details stay theirs to fill in.</p>
-        </div>
-        <div id="cu-website-wrap" style="display:none">
-          <label for="cu-website">Their existing website address</label>
-          <input id="cu-website" maxlength="200" placeholder="acmebakery.com" autocomplete="off" inputmode="url">
-          <p class="note">You don’t host this one, so record where it lives. Google Search Console reports on a domain whoever hosts it — with the address on file, their existing search numbers start arriving. Visitor counts still can’t come from here (there’s no counter of ours on their pages). You can add or change this later on their website page.</p>
-        </div>
-        <p class="note">Adding them creates their client workspace and their site, and emails them a sign-in link. You bill them for your work the usual way — they never pay for software here.</p>
-      </div>
-      <p class="note cu-full" id="cu-full" role="alert" hidden></p>
-      <div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Save</button></div>
-    </div>
-    <div id="cust-done" style="display:none"></div>
-  </form>
-</dialog>
+<script src="/customer-add.js"></script>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // Customers roster (FIX 6 → redesign slice 3): the studio's list of the customers
@@ -495,7 +444,7 @@ function importCustomers(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
   k.importPanel(z,{back:'#importCsv',
     title:'Import customers from a CSV',
-    help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has a Studio OS account gets a request to accept you the next time they sign in, and the rest are saved to your contacts, to set up with Add a customer when you’re ready.',
+    help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has a Studio OS account gets a request to accept you the next time they sign in, and the rest are saved to your contacts. To make one a customer, use Add a customer with their email.',
     noun:'customer',
     // item 97: "Business Phone" or "Business Street" is never the business's name, and "first"/"last"
     // are names only beside "name" ("Last activity" was glued onto names) — the Contacts rules
@@ -504,7 +453,7 @@ function importCustomers(){
     toItem:(o)=>{const email=String(o.email||'').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return null;return{email,name:o.name||[o.first,o.last].filter(Boolean).join(' '),business_name:o.business||''};},
     label:(it)=>it.business_name||it.name||it.email,
     send:async(it)=>{const r=await api('/sales/customers','POST',{mode:'connect',email:it.email,name:it.name,business_name:it.business_name});if(!r.ok)return'failed';const d=(r.body&&r.body.data)||{};return d.requested?'skipped':d.connected?'added':d.pending?'existed':'added';},
-    summary:(c)=>`${c.added} already yours · ${c.existed} saved to your contacts to set up later${c.skipped?` · ${c.skipped} asked to accept you`:''}${c.failed?` · ${c.failed} couldn’t be imported`:''}.`,
+    summary:(c)=>`${c.added} already yours · ${c.existed} saved to your contacts${c.skipped?` · ${c.skipped} asked to accept you`:''}${c.failed?` · ${c.failed} couldn’t be imported`:''}.`,
     done:()=>load(),
   });
 }
@@ -557,7 +506,7 @@ function headerHtml(list){
         <div id="viewMenu" role="listbox" aria-label="Customer views" hidden></div>
       </div>`}</div>
       <p class="dds-ph-line" id="lmeta">${esc(lmetaText(list))}</p></div>
-    <div class="dds-ph-acts">${people?'<a class="btn ghost" href="/contacts.html">Add or edit people</a>':'<button class="btn primary dds-ph-fill" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button>'}</div>
+    <div class="dds-ph-acts">${people?'<a class="btn ghost" href="/contacts.html">Add or edit people</a>':'<button class="btn primary dds-ph-fill" id="addCust" title="Save a customer. Their website and their portal invite come later, from their profile.">+ Add a customer</button>'}</div>
   </div>
   ${tabsHtml()}</header>`;
 }
@@ -949,7 +898,7 @@ function pvPaint(){
       <h3 class="cp-l">Latest</h3>
       ${loading?`<div class="cp-wait" role="status" aria-label="Loading">${skel}</div>`:failed?`<p class="cp-none">We couldn’t load the latest just now. <button type="button" class="cp-retry" data-pv-retry data-k="retry">Try again</button></p>`:latest.length?`<ul class="cp-latest">${latest.map(i=>`<li><span>${esc(i.title)}</span><time datetime="${esc(i.at||'')}">${esc(pvAgo(i.at))}</time></li>`).join('')}</ul>`:'<p class="cp-none">Nothing yet — a call, a message or an invoice shows up here.</p>'}
     </div>
-    <div class="cp-foot"><a class="cp-open" href="${esc(s.href)}" data-noscope="1" data-k="open">Open full record <span aria-hidden="true">→</span></a></div>`;
+    <div class="cp-foot"><a class="cp-open" href="${esc(s.href)}" data-noscope="1" data-k="open">Open full record <span aria-hidden="true">→</span></a>${s.cust?'<button type="button" class="cp-del" data-pv-del data-needs="delete" data-k="del">Delete customer…</button>':''}</div>`;
   if(fk){const n=box.querySelector(`[data-k="${fk}"]`)||$('cprev-h');if(n)n.focus({preventScroll:true});}
 }
 function pvMode(){
@@ -971,6 +920,7 @@ function pvMount(){
     if(e.target===box){const r=box.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom){closePreview();return;}}
     if(e.target.closest('[data-pv-close]')){closePreview();return;}
     if(e.target.closest('[data-pv-retry]')){pvRefresh();return;}
+    if(e.target.closest('[data-pv-del]')){pvDelete(e.target.closest('[data-pv-del]'));return;}   // builder item 241
     const b=e.target.closest('[data-pv]');if(!b||!PV)return;
     const kind=b.getAttribute('data-pv'),s=PV.s;
     // + Create's drawers, started on this customer's deal — a tap before the
@@ -1011,6 +961,23 @@ function pvRefresh(){
   PV.d=undefined;pvPaint();
   PV.p=pvLoad(s);PV.p.then(d=>{if(seq!==PV_SEQ||!PV)return;PV.d=d;pvPaint();});
 }
+// ── builder item 241: Delete customer, from their preview. The box is the one their profile opens
+//    (customer-add.js); it asks about their website first, so it reads where that stands. ──
+async function pvDelete(btn){
+  if(!PV||!PV.s||!PV.s.cust||!window.ddsCustomerDelete)return;
+  const c=PV.s.cust,id=String(c.client_id);
+  btn.disabled=true;
+  let st=null;try{const r=await api('/sales/customers/'+encodeURIComponent(id));st=r.ok&&r.body&&r.body.data;}catch(_){st=null;}
+  btn.disabled=false;
+  if(!st){toast('We couldn’t open that just now. Please try again.');return;}
+  window.ddsCustomerDelete.open({request:(m,p,b)=>api(p,m,b),toast,customer:{client_id:id,name:c.name||st.business_name||'this customer',website:st.website,can_manage_sites:!!(st.offers&&st.offers.can_manage_sites)},onDeleted:(d)=>{
+    closePreview();
+    CUSTOMERS=CUSTOMERS.filter(x=>String(x.client_id)!==id);PICKED.delete(id);render();
+    const k=KIT(),s=d&&d.site,where=s?(s.kept===false?' Their website went to the Trash.':' Their website stayed on Sites.'):'';
+    const back=async()=>{const r=await window.ddsCustomerDelete.restore({request:(m,p,b)=>api(p,m,b)},id);if(!r||!r.ok)throw new Error('no');toast((c.name||'They')+' are back.');await load().catch(()=>{});};
+    if(k&&k.undoToast)k.undoToast((c.name||'The customer')+' is deleted.'+where+' Recently deleted keeps them for 30 days.',back);else toast((c.name||'The customer')+' is deleted.'+where);
+  }});
+}
 function closePreview(){
   if(!PV)return;
   const key=PV.s.row;PV=null;++PV_SEQ;
@@ -1032,151 +999,13 @@ document.addEventListener('keydown',(e)=>{
 // a call, an invoice or a to-do made from + Create (it says so on window) → the preview and the list catch up
 window.addEventListener('dds:created',()=>{if(!TOKEN)return;load().catch(()=>{});});
 
-// ── ADD A CUSTOMER (C4) — contacts.html's flow, ported wholesale and kept in
-// sync by hand: save a customer for now, or set them up with their own workspace
-// and a sign-in invitation (builder item 199: nobody signs up by themselves, and
-// "Just save them for now" makes no website and sends no email). POST /sales/customers
-// (handleSalesAddCustomer) reads mode/name/business_name/email/edition. ──
-// The four dropdown answers map to THREE server plans (sales.ts CONVERT_PLANS):
-// 'business_os_no_site' is the same Business OS plan as the build-elsewhere
-// option — the server knows no such key, and an unknown value would silently
-// default to 'presence', the hosted plan: exactly wrong for a no-site customer.
-// Distinct values exist because two <option>s sharing value="business_os_only"
-// made "building elsewhere AND wants their site tracked" indistinguishable from
-// "no site work at all" — Eric's external-client case fell into that crack.
-function cuPlan(){const v=$('cu-edition').value;return v==='business_os_no_site'?'business_os_only':v;}
-// Who gets asked "where is their website?": every answer where a site exists (or
-// will exist) somewhere we don't host — build-elsewhere and monitor. That domain
-// is the one thing Search Console needs and the one thing we otherwise never
-// learn. The no-site-work answer isn't asked (there is no site to track); the
-// door stays open later on their website page (presence.html#monitor).
-function cuAsksWebsite(){const v=$('cu-edition').value;return v==='business_os_only'||v==='presence_monitor';}
-function syncCuSignup(){
-  const w=$('cu-website-wrap');if(w)w.style.display=cuAsksWebsite()?'':'none';
-}
-// Builder item 199, then Eric (Nov 15): adding a customer starts nothing unless asked.
-// "Just save them for now" (connect, the default) saves them to the contacts and emails
-// nobody; "Set up their website and invite them" (provision) makes their workspace and site.
-function cuMode(){const r=document.querySelector('input[name="cumode"]:checked');return r?r.value:'connect';}
-function syncCuMode(){
-  const save=cuMode()==='connect';
-  const po=$('cu-provision-only');if(po)po.style.display=save?'none':'';
-  const sb2=$('cu-submit');if(sb2)sb2.textContent=save?'Save':'Set up + invite';
-  const cf=$('cu-full');if(cf)cf.hidden=true;   // item 198's full-plan words belong to the last set-up attempt
-  if(!save)syncCuSignup();
-}
-// Start from a kit (Oct 2026 studio audit, change 4): an agency's saved starter
-// kits, applied to the NEW site once the POST answers with its site_id. A studio without an agency never sees the field;
-// no kits (or a failed read) hides it too — the dialog never offers what it can't do.
-// Bug hunt K7 (Nov 10): who you are and your kits are read once per page and reused each
-// time the dialog opens; neither changes between opens. A read that failed is asked again.
-let CU_AGENCY=null,CU_KITS=null;
-async function cuIsAgency(){
-  if(CU_AGENCY===null){try{const c=window.ddsContext?await window.ddsContext():(await api('/portal/context')).body.data;CU_AGENCY=!!(c&&c.is_agency);}catch(_){return false;}}
-  return CU_AGENCY;
-}
-async function cuKits(){
-  if(CU_KITS)return CU_KITS;
-  const r=await api('/agency/kits');
-  if(!(r.ok&&r.body&&Array.isArray(r.body.data)))return [];
-  CU_KITS=r.body.data;return CU_KITS;
-}
-async function syncCuKits(){
-  const w=$('cu-kit-wrap'),sel=$('cu-kit');if(!w||!sel)return;
-  w.style.display='none';sel.innerHTML='<option value="">No kit — start empty</option>';
-  try{
-    if(!(await cuIsAgency()))return;
-    const kits=await cuKits();
-    if(!kits.length)return;
-    sel.innerHTML+=kits.map(k=>'<option value="'+esc(k.id)+'">'+esc(k.name)+'</option>').join('');
-    w.style.display='';
-  }catch(_){/* kits are a nicety — the field just stays hidden */}
-}
-function openAddCustomer(){
-  $('cu-name').value='';$('cu-biz').value='';$('cu-email').value='';$('cu-edition').value='presence';
-  const wf=$('cu-website');if(wf)wf.value='';
-  const sv=document.querySelector('input[name="cumode"][value="connect"]');if(sv)sv.checked=true;
-  syncCuMode();syncCuKits();
-  $('cust-fields').style.display='';$('cust-done').style.display='none';$('cust-done').innerHTML='';
-  const cf=$('cu-full');if(cf){cf.hidden=true;cf.textContent='';}
-  const sb2=$('cu-submit');if(sb2)sb2.disabled=false;
-  // Name is the dialog's first field, so showModal already focuses it; the late nudge
-  // never pulls focus back from a field someone has moved to
-  $('custDlg').showModal();setTimeout(()=>{const d=$('custDlg'),a=document.activeElement;if(!d.contains(a)||a===d)$('cu-name').focus();},20);
-}
-$('cu-cancel').onclick=()=>$('custDlg').close();
-$('cu-edition').onchange=syncCuSignup;
-document.querySelectorAll('input[name="cumode"]').forEach(r=>r.addEventListener('change',syncCuMode));
-$('custForm').onsubmit=async(e)=>{
-  e.preventDefault();
-  const mode=cuMode();
-  const name=$('cu-name').value.trim(),business_name=$('cu-biz').value.trim(),email=$('cu-email').value.trim();
-  const kitSel=$('cu-kit'),kitId=(mode==='provision'&&kitSel&&kitSel.value)||'',kitName=kitId?String((kitSel.options[kitSel.selectedIndex]||{}).textContent||'kit').trim():'';
-  if(!email){toast(mode==='connect'?'Enter their email to save them.':'Enter their email — that’s where the sign-in invitation goes.');$('cu-email').focus();return;}
-  const label=mode==='connect'?'Save':'Set up + invite';
-  const btn=$('cu-submit');btn.disabled=true;btn.textContent=mode==='connect'?'Saving…':'Setting up…';
-  const body=mode==='connect'?{mode:'connect',name:name||undefined,email}:{mode:'provision',name:name||undefined,business_name:business_name||undefined,email,edition:cuPlan(),
-    website_url:(cuAsksWebsite()&&$('cu-website')&&$('cu-website').value.trim())||undefined};
-  try{
-    const r=await api('/sales/customers','POST',body);
-    if(!r.ok){
-      // builder item 198: the plan's sites are all in use; nothing was made, and the box says why
-      if(r.status===409&&r.body&&r.body.error==='client_limit'){const cf=$('cu-full'),t=String(r.body.message||''),cut=t.indexOf('. ');if(cf){cf.innerHTML=cut>0?'<b>'+esc(t.slice(0,cut+1))+'</b>'+esc(t.slice(cut+2)):esc(t);cf.hidden=false;}btn.disabled=false;btn.textContent=label;return;}
-      const m=r.status===403?'Customers are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||(mode==='connect'?'We couldn’t save them just now.':'We couldn’t set them up just now.'));
-      toast(m);btn.disabled=false;btn.textContent=label;return;
-    }
-    const d=(r.body&&r.body.data)||{};
-    const who=esc((mode==='provision'&&business_name)||name||email);
-    let heading,line;
-    if(d.requested){
-      // final pass S1: an account that isn't yours yet is asked, never taken
-      heading='Request sent';
-      line=who+' already has a Studio OS account, so they need to say yes first. They’ll see your request the next time they sign in.';
-    }else if(mode==='connect'){
-      // saved, not set up: no website and no email (someone already yours is connected again)
-      if(d.connected){heading='Connected again';line=who+' was already your customer, so they’re connected again. Nothing was emailed and no website was made.';}
-      else{heading='Saved';line=who+' is saved to your contacts. No website yet, and nothing was emailed. To set up their website later, open Add a customer again and choose Set up their website and invite them.';}
-    }else if(d.already_exists){
-      heading='They already have a workspace';
-      line=who+' already had an account — connected to their existing workspace. Nothing duplicated. Send them their sign-in link if they need it.';
-    }else if(d.invited===false){
-      // honest outcome: the account exists but the invitation email failed —
-      // never claim "Invitation sent" (SS6; server: handleSalesAddCustomer)
-      heading='Account created — the invitation email couldn’t be sent';
-      line='Their workspace is ready, but our email to '+esc(email)+' didn’t go out. Share their sign-in page with them instead.';
-    }else{
-      heading='Invitation sent';
-      line='Invitation sent to '+esc(email)+'. They’ll sign in from the email and land in their client portal.';
-    }
-    // A portal link only makes sense once they actually have a workspace.
-    // the kit, applied to THEIR new site — after the provision succeeded, on its own
-    // try/catch: a kit that won't apply must never repaint the set-up as a failure
-    let kitLine='',kitRetry=null;   // bug hunt A4: a kit that didn't apply gets a real "Try the kit again", not a Home card that's gone
-    if(kitId){
-      if(d.already_exists||d.requested)kitLine='The '+esc(kitName)+' kit wasn’t applied — they already had a workspace, and a kit only starts a new site.';
-      else if(!d.site_id)kitLine='The '+esc(kitName)+' kit wasn’t applied: their new site didn’t come back to us, so there was nothing to apply it to. Their account is ready.';
-      else{
-        const applyKit=async()=>{let k={ok:false};try{k=await api('/agency/kits/'+encodeURIComponent(kitId)+'/apply','POST',{site_id:d.site_id});}catch(_){k={ok:false};}return !!k.ok;};
-        const kitOk=await applyKit();
-        kitLine=kitOk?esc(kitName)+' applied.':'The '+esc(kitName)+' kit didn’t apply. Their account is ready.';
-        if(!kitOk)kitRetry=applyKit;
-      }
-    }
-    const showLink=!!d.portal_url;
-    const link=showLink?('<p style="margin-top:12px"><a class="link" href="'+esc(d.portal_url)+'" target="_blank" rel="noopener">Their sign-in page →</a></p>'):'';
-    $('cust-fields').style.display='none';
-    const done=$('cust-done');
-    done.innerHTML='<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">'+heading+'</h3><p>'+line+'</p>'+(kitLine?'<p id="cu-kit-line">'+kitLine+'</p>':'')+link+'</div><div class="row2">'+(kitRetry?'<button type="button" class="btn ghost" id="cu-kit-again">Try the kit again</button>':'')+'<button type="button" class="btn" id="cu-close">Done</button></div>';
-    done.style.display='';
-    const cl=$('cu-close');if(cl){cl.focus();cl.onclick=()=>$('custDlg').close();}
-    const ka=$('cu-kit-again');if(ka&&kitRetry)ka.onclick=async()=>{ka.disabled=true;ka.textContent='Applying…';const okNow=await kitRetry();const kl=$('cu-kit-line');
-      if(okNow){if(kl)kl.textContent=kitName+' applied.';ka.remove();toast(kitName+' applied.');}else{ka.disabled=false;ka.textContent='Try the kit again';toast('The kit didn’t apply this time either.',true);}};
-  }catch(_){toast(mode==='connect'?'We couldn’t save them just now.':'We couldn’t set them up just now.');btn.disabled=false;btn.textContent=label;return;}
-  // The creation SUCCEEDED — the roster refresh is best-effort and must never
-  // repaint that success as a failure (SS6): its own failure gets the soft
-  // couldn’t-refresh line, never the creation-failed toast.
-  load().catch(()=>toast('We couldn’t refresh the list just now — Refresh will catch it up.'));
-};
+// ── ADD A CUSTOMER: the one box, shared with Home and Contacts (customer-add.js, builder
+//    item 102; it was three copies kept in sync by hand). Starter kits are offered when this
+//    sign-in runs an agency. ──
+const ADD=window.ddsAddCustomer.mount({request:(m,p,b)=>api(p,m,b),toast:(m)=>toast(m),
+  isAgency:async()=>{const c=window.ddsContext?await window.ddsContext():(await api('/portal/context')).body.data;return !!(c&&c.is_agency);},
+  done:()=>load()});
+function openAddCustomer(){ADD.open();}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your customers.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
 function notStudio(){$('main').innerHTML=`<div class="center"><h2>This is your studio’s customer list.</h2><p class="muted">It’s available to your studio team.</p></div>`;}
 function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your customers just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup — try again.</p><button id="retry" class="btn">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>{load().catch(()=>{});});}
