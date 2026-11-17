@@ -203,18 +203,18 @@ test.describe('Small ones (H11) and the add-a-customer dialog (K7)', () => {
   });
 
   for (const pagePath of ['/customers.html', '/contacts.html']) {
-    test(`K7 — on ${pagePath}, opening "+ Add a customer" twice asks for the kits once`, async ({ page }) => {
+    test(`K7 — on ${pagePath}, opening "+ Add a customer" twice asks the server nothing (builder item 241: no kits in the box)`, async ({ page }) => {
       let kits = 0;
       await installApp(page, { api: { '/portal/context': AGENCY_CTX, '/sales/contacts': { data: [], total: 0 } } });
       await page.route('**/presence/agency/kits', (route) => { kits++; return route.fulfill(json({ data: [{ id: 'k1', name: 'Restaurant kit' }] })); });
       await page.goto(pagePath);
       // builder item 165: on Contacts + Add a customer waits behind the header's ⋯ on a phone
       await (await headerAction(page, '#addCust')).first().click();
-      await expect(page.locator('#cu-kit option')).toHaveCount(2);
+      await expect(page.locator('#cu-name')).toBeFocused();
       await page.keyboard.press('Escape');
       await (await headerAction(page, '#addCust')).first().click();
-      await expect(page.locator('#cu-kit option')).toHaveCount(2);
-      expect(kits).toBe(1);
+      await expect(page.locator('#cu-name')).toBeFocused();
+      expect(kits).toBe(0);
     });
   }
 });

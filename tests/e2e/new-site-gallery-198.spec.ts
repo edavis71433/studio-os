@@ -198,25 +198,19 @@ test.describe('the plan\'s count (builder item 198)', () => {
     await expect(dlg.locator('#new-done')).toBeHidden();
   });
 
-  test('Home\'s Add a customer says it in the box, not in a passing toast', async ({ page }) => {
-    await installApp(page, { api: { '/agency/kits': { data: [] } } });
-    await page.route('**/functions/v1/presence/sales/customers', (route) => route.fulfill(json({ error: 'client_limit', message: 'Your plan covers 25 sites, and all 25 are in use. Move one you no longer need to the Trash on Sites, then add them. Nothing was made.', room: { used: 25, limit: 25, full: true } }, 409)));
+  test('Home\'s Add a customer makes no site, so a full plan never stops it (builder item 241)', async ({ page }) => {
+    let sent: unknown = null;
+    await installApp(page, { api: { 'POST /sales/customers': (b: unknown) => { sent = b; return { data: { mode: 'save', saved: true, created: true, client_id: 'cccccccc-4444-4444-8444-cccccccccccc' } }; } } });
     await page.goto('/agency.html');
     await page.locator('#top').getByRole('button', { name: '+ Add a customer' }).click();
     const dlg = page.locator('#custDlg');
     await expect(dlg).toBeVisible();
-    await expect(dlg.locator('#cu-full')).toBeHidden();
     await expect(dlg.locator('#cu-name')).toBeFocused();
-    await dlg.getByRole('radio', { name: /Set up their website and invite them/ }).check();   // a full plan only stops setting them up
     await dlg.locator('#cu-email').fill('new@person.example');
     await dlg.locator('#cu-submit').click();
-    await expect(dlg.locator('#cu-full')).toBeVisible();
-    await expect(dlg.locator('#cu-full')).toContainText('Your plan covers 25 sites, and all 25 are in use.');
-    await expect(dlg.locator('#cu-full')).toContainText('Nothing was made.');
-    await expect(dlg.locator('#cu-submit')).toBeEnabled();
-    await dlg.getByRole('radio', { name: /Just save them for now/ }).check();   // saving makes no site, so the words go
-    await expect(dlg.locator('#cu-full')).toBeHidden();
-    await expect(dlg.locator('#cu-submit')).toHaveText('Save');
+    await expect(dlg.locator('#cust-done')).toContainText('Saved to your customers');
+    expect(sent).toMatchObject({ mode: 'connect', save: true, email: 'new@person.example' });
+    await expect(dlg.locator('#cu-full')).toHaveCount(0);
   });
 });
 

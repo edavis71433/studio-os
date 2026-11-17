@@ -91,6 +91,46 @@
   @media (max-width:640px){.pf-chip span{min-height:44px}}
 
   /* ── the deal stage bar and its What to do now note: deal-path.js brings their rules (builder item 102) ── */
+  /* ── builder item 241: a customer's two next steps, each on its own (Figma: Customers… items 241 and 102) ── */
+  #custsteps:empty{display:none}
+  .cs-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,372px);gap:16px;margin-top:var(--dds-s4,16px)}
+  .cs-card{border-radius:20px;padding:24px 26px;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .cs-card.plain{background:var(--card);border:1px solid var(--line)}
+  .cs-card.bold{background:linear-gradient(110deg,#5b2fc7,#8b5cf6);color:#fff;flex-direction:row;align-items:center;gap:24px}
+  .cs-card .cs-words{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1}
+  .cs-k{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--p)}
+  .cs-card.bold .cs-k{color:#fff;opacity:.88}
+  .cs-t{font-family:var(--serif);font-weight:600;font-size:22px;line-height:1.2;margin:0;color:var(--ink);overflow-wrap:anywhere}
+  .cs-card.bold .cs-t{font-size:28px;color:#fff}
+  .cs-p{font-size:13.5px;line-height:1.5;color:var(--soft);margin:0;overflow-wrap:anywhere}
+  .cs-card.bold .cs-p{color:#fff;opacity:.94;font-size:14px;max-width:440px}
+  .cs-acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px}
+  .cs-go{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 22px;border-radius:999px;font:inherit;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;border:1.5px solid #cfc6ee;background:var(--card);color:var(--p)}
+  .cs-card.bold .cs-go{background:#fff;color:#5b2fc7;border-color:#fff}
+  .cs-go:hover{border-color:var(--p)}
+  .cs-go[disabled]{opacity:.6;cursor:default}
+  .cs-pic{flex:0 0 auto;width:176px;border-radius:12px;padding:10px 12px 14px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);display:flex;flex-direction:column;gap:8px}
+  .cs-pic i{display:block;height:9px;border-radius:4px;background:rgba(255,255,255,.45)}
+  .cs-pic i.big{height:46px;background:rgba(255,255,255,.3)}
+  .cs-pic i.w80{width:80%} .cs-pic i.w64{width:64%}
+  .cs-pic b{display:flex;gap:5px}
+  .cs-pic b::before,.cs-pic b::after,.cs-pic b span{content:"";display:block;width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.7)}
+  .cs-form{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  .cs-form label{font-size:13px;font-weight:600;color:var(--soft)}
+  .cs-form input{font:inherit;font-size:16px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg);color:var(--ink);min-width:0}
+  .cs-form input:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .cs-msg{font-size:13px;color:var(--soft);margin:2px 0 0}
+  .cs-else{align-self:flex-start;font:inherit;font-size:13.5px;font-weight:600;color:#fff;background:none;border:0;padding:6px 0;text-decoration:underline;text-underline-offset:3px;cursor:pointer;min-height:36px}
+  .cs-card.bold .cs-form label,.cs-card.bold .cs-msg{color:#fff}
+  .cs-card.bold .cs-form input{background:#fff;color:#171522;border-color:#fff}
+  .cs-card.bold .cs-msg.bad{color:#fff;font-weight:600}
+  .cs-msg.bad{color:var(--dds-bad,#b42318)}
+  .cs-gone{max-width:620px;margin:48px auto;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
+  .cs-gone h2{font-family:var(--serif);font-weight:600;font-size:26px;margin:0}
+  .cs-gone p{color:var(--soft);margin:0}
+  .more-menu .abtn.danger{color:var(--dds-bad,#b42318);font-weight:600}
+  .more-menu .abtn.danger:hover{background:var(--dds-bad-soft,#fde8e6)}
+  @media (max-width:860px){.cs-row{grid-template-columns:1fr}.cs-pic{display:none}.cs-card.bold .cs-t{font-size:24px}.cs-go{width:100%}}
 
   /* ── two-region body ── */
   .body{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:var(--dds-s5,20px);margin-top:var(--dds-s5,20px);align-items:start}
@@ -399,6 +439,7 @@
 <div class="dds-hint" data-hint="crm-notes" hidden>Notes here stay private to you unless you mark one “shared” — then the client sees it too.</div>
 
 <script src="/deal-path.js"></script>
+<script src="/customer-add.js"></script>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── The unified Client Record — the Lightning record page (dds skin) ─────────
@@ -552,6 +593,7 @@ const BOARD_NEXT={lead:['qualified','lost'],qualified:['proposal','lead','lost']
 const PATH_STEPS=['lead','qualified','proposal','contract'];   // won/lost are terminal outcomes, not steps
 
 let REC=null, TAB='', PROFILE=null, DEAL=null, PROJ=null, DETAIL=null, STAGE_NAMES_ASKED=false;
+let CUST=null;   // builder item 241: a customer's website and portal (GET /sales/customers/:id), when the record is one of the studio's customers
 let ACT={items:[],upcoming:[],reply_to:null,reply_support_to:null,failed:false};
 let FILTER='all', COMPOSER='message', LOGKIND='call', NEWAUD='internal', FOCUS_COMPOSER=false, PENDING_BACK='', GUIDE_OPEN=true;
 // sales item 124: each stage's "what to do now" note (GET /sales/stages notes; null until read, or when it couldn't be)
@@ -684,6 +726,7 @@ function renderShell(){
       <div id="actbar" class="actbar" role="toolbar" aria-label="Actions for this client"></div>
     </div>
     <div id="hlpanel"></div>
+    <div id="custsteps"></div>
     <div id="pathwrap"></div>
     <div class="body">
       <div class="col-main">
@@ -716,6 +759,84 @@ function renderShell(){
   renderSummaryCards();
   renderAiCard();
   renderDetailsCard();
+  renderCustSteps();   // builder item 241
+}
+
+// ── Builder item 241: a customer's two next steps, each on its own ──────────────
+// Adding a customer saves them and nothing else, so the profile offers what comes next:
+// Create website (+ New site's sheet, opened for them on Sites) and Invite to their portal.
+// Each card says where that step stands once it has happened. Drawn in Figma first.
+const fmtDay=(iso)=>{const t=Date.parse(iso||'');return isFinite(t)?new Date(t).toLocaleDateString([], {month:'short',day:'numeric'}):'';};
+let INVITE_OPEN=false,ELSE_OPEN=false;
+function renderCustSteps(){
+  const host=$('custsteps'); if(!host)return;
+  if(!CUST||!CUST.website||!CUST.portal){host.innerHTML='';return;}
+  const w=CUST.website, p=CUST.portal, o=CUST.offers||{}, biz=CUST.business_name||(REC&&REC.header&&REC.header.name)||'them';
+  let web='';
+  if(w.in_trash)web=`<section class="cs-card plain" aria-labelledby="csWebT"><span class="cs-k">Their website</span><h2 class="cs-t" id="csWebT">In the Trash</h2><p class="cs-p">It’s in the Trash on Sites, where it can be restored for 90 days.</p><div class="cs-acts"><a class="cs-go" href="/sites.html#trash">Open the Trash</a></div></section>`;
+  else if(o.create_website)web=`<section class="cs-card bold" aria-labelledby="csWebT"><div class="cs-words"><span class="cs-k">Their website</span><h2 class="cs-t" id="csWebT">No website yet</h2><p class="cs-p">Pick a look for ${esc(biz)}. Their name and business are already filled in. Nothing is published, and nobody is emailed.</p>${o.can_manage_sites?`<div class="cs-acts"><a class="cs-go" id="csCreate" href="/sites.html?for=${encodeURIComponent(CUST.client_id)}">Create website <span aria-hidden="true">→</span></a></div>`:'<p class="cs-p">Someone who looks after your clients’ sites can make it.</p>'}${ELSE_OPEN?`<form class="cs-form" id="csElseForm"><label for="csAddr">Their website address</label><input id="csAddr" type="text" inputmode="url" maxlength="200" autocomplete="off" placeholder="acmebakery.com"><div class="cs-acts"><button type="submit" class="cs-go" id="csWatch">Watch it</button><button type="button" class="cs-go" id="csElseNo">Cancel</button></div><p class="cs-msg" id="csElseMsg" role="status">We keep the address so their search numbers can arrive. Nothing is published, and nobody is emailed.</p></form>`:'<button type="button" class="cs-else" id="csElse">Their site lives somewhere else?</button>'}</div><div class="cs-pic" aria-hidden="true"><b><span></span></b><i class="big"></i><i class="w80"></i><i></i><i class="w64"></i></div></section>`;
+  else if(w.state==='elsewhere')web=`<section class="cs-card plain" aria-labelledby="csWebT"><span class="cs-k">Their website</span><h2 class="cs-t" id="csWebT">On their own host</h2><p class="cs-p">${esc(w.address||'')}</p>${w.site_id?`<div class="cs-acts"><a class="cs-go" href="/presence.html?client=${encodeURIComponent(w.site_id)}">Open their website page</a></div>`:''}</section>`;
+  else web=`<section class="cs-card plain" aria-labelledby="csWebT"><span class="cs-k">Their website</span><h2 class="cs-t" id="csWebT">${w.live?'Live':'Not live yet'}</h2><p class="cs-p">${w.live&&w.address?`At ${esc(String(w.address).replace(/^https?:\/\//,''))}${w.last_published_at?' · published '+esc(fmtDay(w.last_published_at)):''}`:'Made, and private until it’s published.'}</p>${w.site_id?`<div class="cs-acts"><a class="cs-go" href="/presence.html?client=${encodeURIComponent(w.site_id)}">Edit website <span aria-hidden="true">→</span></a></div>`:''}</section>`;
+  let por='';
+  const email=p.email||'';
+  if(o.invite){
+    por=`<section class="cs-card plain" aria-labelledby="csPorT"><span class="cs-k">Their client portal</span><h2 class="cs-t" id="csPorT">Not invited yet</h2><p class="cs-p">Their own sign-in, with their project, messages, files and invoices. Invite them when you’re ready, with or without a website.</p>`
+      +(INVITE_OPEN?`<form class="cs-form" id="csInvite"><label for="csEmail">Their email</label><input id="csEmail" type="email" maxlength="160" autocomplete="off" value="${esc(email)}"><div class="cs-acts"><button type="submit" class="cs-go" id="csSend">Send the invite</button><button type="button" class="cs-go" id="csCancel">Cancel</button></div><p class="cs-msg" id="csInvMsg" role="status"></p></form>`
+        :`<div class="cs-acts"><button type="button" class="cs-go" id="csInviteBtn">Invite to their portal</button></div>`)+`</section>`;
+  }else if(o.invite_again){
+    const ran=p.state==='expired';
+    por=`<section class="cs-card plain" aria-labelledby="csPorT"><span class="cs-k">Their client portal</span><h2 class="cs-t" id="csPorT">${p.invited_at?'Invited '+esc(fmtDay(p.invited_at)):'Invited'}</h2><p class="cs-p">${ran?'Their invite ran out before they came in.':'They haven’t opened it yet.'}${email?' It went to '+esc(email)+'.':''}</p><div class="cs-acts"><button type="button" class="cs-go" id="csAgain">Send the sign-in link again</button></div><p class="cs-msg" id="csInvMsg" role="status"></p></section>`;
+  }else{
+    por=`<section class="cs-card plain" aria-labelledby="csPorT"><span class="cs-k">Their client portal</span><h2 class="cs-t" id="csPorT">In their portal</h2><p class="cs-p">${p.seen_at?'Last in '+esc(fmtDay(p.seen_at))+'.':'They’ve signed in.'}${email?' They sign in as '+esc(email)+'.':''}</p></section>`;
+  }
+  host.innerHTML=`<div class="cs-row">${web}${por}</div>`;
+  const ib=$('csInviteBtn');if(ib)ib.addEventListener('click',()=>{INVITE_OPEN=true;renderCustSteps();const e=$('csEmail');if(e){e.focus();e.select();}});
+  const cn=$('csCancel');if(cn)cn.addEventListener('click',()=>{INVITE_OPEN=false;renderCustSteps();const b=$('csInviteBtn');if(b)b.focus();});
+  const fm=$('csInvite');if(fm)fm.addEventListener('submit',(e)=>{e.preventDefault();sendInvite($('csSend'),($('csEmail').value||'').trim());});
+  const ag=$('csAgain');if(ag)ag.addEventListener('click',()=>sendInvite(ag,''));
+  // their site lives on another platform: keep its address and watch it (the old "they host it elsewhere")
+  const el=$('csElse');if(el)el.addEventListener('click',()=>{ELSE_OPEN=true;renderCustSteps();const a=$('csAddr');if(a)a.focus();});
+  const en=$('csElseNo');if(en)en.addEventListener('click',()=>{ELSE_OPEN=false;renderCustSteps();const b=$('csElse');if(b)b.focus();});
+  const ef=$('csElseForm');if(ef)ef.addEventListener('submit',(e)=>{e.preventDefault();watchElsewhere($('csWatch'),($('csAddr').value||'').trim());});
+}
+async function watchElsewhere(btn,address){
+  const msg=$('csElseMsg');
+  if(!/^[^\s/]+\.[^\s]+$/.test(address.replace(/^https?:\/\//i,''))){if(msg){msg.textContent='Enter the address of their website, like acmebakery.com.';msg.className='cs-msg bad';}$('csAddr').focus();return;}
+  btn.disabled=true;btn.textContent='Saving…';
+  const r=await apiAg('/sales/customers/'+encodeURIComponent(CUST.client_id)+'/website','POST',{address});
+  if(!r.ok){btn.disabled=false;btn.textContent='Watch it';if(msg){msg.textContent=(r.body&&r.body.message)||'That didn’t save just now. Please try again.';msg.className='cs-msg bad';}return;}
+  ELSE_OPEN=false;
+  toast('Their website’s address is on file: '+((r.body&&r.body.data&&r.body.data.address)||address)+'.');
+  const again=await apiAg('/sales/customers/'+encodeURIComponent(CUST.client_id));
+  if(again.ok&&again.body&&again.body.data)CUST=again.body.data;
+  renderCustSteps();
+}
+async function sendInvite(btn,email){
+  if(!CUST)return;
+  const msg=$('csInvMsg');
+  if(btn===$('csSend')&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){if(msg){msg.textContent='Enter their email — that’s where the sign-in link goes.';msg.className='cs-msg bad';}$('csEmail').focus();return;}
+  const label=btn.textContent;btn.disabled=true;btn.textContent='Sending…';
+  const r=await apiAg('/sales/customers/'+encodeURIComponent(CUST.client_id)+'/invite','POST',email?{email}:{});
+  if(!r.ok){btn.disabled=false;btn.textContent=label;if(msg){msg.textContent=(r.body&&r.body.message)||'That didn’t send just now. Please try again.';msg.className='cs-msg bad';}return;}
+  const d=(r.body&&r.body.data)||{};
+  INVITE_OPEN=false;
+  if(d.invited)toast((d.again?'The sign-in link went to ':'Invitation sent to ')+(d.email||email)+'.');
+  else toast('Their portal is ready, but our email to '+(d.email||email)+' didn’t go out. Share their sign-in page with them instead.','err');
+  const again=await apiAg('/sales/customers/'+encodeURIComponent(CUST.client_id));
+  if(again.ok&&again.body&&again.body.data)CUST=again.body.data;
+  renderCustSteps();
+}
+function openDeleteCustomer(){
+  if(!CUST||!window.ddsCustomerDelete)return;
+  const name=(REC&&REC.header&&REC.header.name)||CUST.business_name||'this customer';
+  window.ddsCustomerDelete.open({request:(m,p,b)=>apiAg(p,m,b),toast,back:$('act-more'),customer:{client_id:CUST.client_id,name,website:CUST.website,can_manage_sites:!!(CUST.offers&&CUST.offers.can_manage_sites)},onDeleted:(d)=>showDeleted(name,d)});
+}
+// the profile is gone: say so in place, with Undo for the next while and the way back to Customers
+function showDeleted(name,d){
+  const s=d&&d.site;const where=s?(s.kept===false?' Their website went to the Trash on Sites.':' Their website stayed on Sites.'):'';
+  $('main').innerHTML=`<div class="cs-gone"><h2 id="pagehead" tabindex="-1">${esc(name)} is deleted</h2><p>${esc('They’re off Customers and Contacts.'+where)}</p><p>${esc('You can bring them back from Recently deleted for '+((d&&d.days)||30)+' days.')}</p><div class="cs-acts"><button type="button" class="cs-go" id="csUndo">Undo</button><a class="cs-go" href="/customers.html">Back to Customers</a></div></div>`;
+  const h=$('pagehead');if(h)h.focus();
+  const u=$('csUndo');if(u)u.addEventListener('click',async()=>{u.disabled=true;u.textContent='Bringing them back…';const r=await window.ddsCustomerDelete.restore({request:(m,p,b)=>apiAg(p,m,b)},CUST.client_id);if(r&&r.ok){location.reload();return;}u.disabled=false;u.textContent='Undo';toast((r&&r.body&&r.body.message)||'That didn’t come back just now. Try again from Recently deleted.','err');});
 }
 
 // ── Visual refresh: inline stroke icons for the stat tiles + details card ────
@@ -863,13 +984,15 @@ function renderActions(){
   if(ids.deal)btns.push({id:'act-pipeline',label:'Deal in pipeline',href:agHref('pipeline.html','deal='+encodeURIComponent(ids.deal))});
   // sales item 93: a customer with a website can take everything with them (under More)
   if(ids.client&&REC&&REC.header&&REC.header.status==='customer')btns.push({id:'act-handover',label:'Hand-over pack',on:()=>openHandover()});
+  // builder item 241: a customer added by mistake can go (their website to the Trash or kept)
+  if(CUST&&CUST.offers&&CUST.offers.delete)btns.push({id:'act-delete',label:'Delete customer…',danger:true,needs:'delete',on:()=>openDeleteCustomer()});
   // visual refresh: one filled verb, two quiet ones, the rest under "More"
   // (every button keeps its id and handler — only where it sits changed).
   // Sales review item 41: three in front — Send invoice, Message, Log activity;
   // Open project went under More, because Project is already a tab.
   const render=(b)=>b.href
     ?`<a class="abtn" id="${b.id}" href="${esc(b.href)}">${esc(b.label)}</a>`
-    :`<button type="button" class="abtn${b.primary?' primary':''}" id="${b.id}">${esc(b.label)}</button>`;
+    :`<button type="button" class="abtn${b.primary?' primary':''}${b.danger?' danger':''}" id="${b.id}"${b.needs?` data-needs="${b.needs}"`:''}>${esc(b.label)}</button>`;
   // bold redesign (Nov 2026): the verbs sit in the header, read left to right — Log a call, Message, then the money one
   // item 80 (Figma 264:1136): with an address and no project to message them through, Email stands in
   // front and Message goes under More; a client with a project keeps Message there (item 41)
@@ -924,6 +1047,9 @@ async function loadPanels(){
   if(s.overview)jobs.push(api('/crm/profile').then(r=>{if(r.ok)PROFILE=r.body.data||null;renderHighlights();renderDetailsCard();if(TAB==='details')showTab(TAB,true);}));
   if(ids.deal){DEAL_READY=apiAg('/sales/deals/'+encodeURIComponent(ids.deal)).then(r=>{DEAL=r.ok?(r.body.data||null):{error:true};renderHighlights();renderPath();renderActions();renderSummaryCards();if(TAB==='deal'||TAB==='billing'||TAB==='files')showTab(TAB,true);});jobs.push(DEAL_READY);}
   if(ids.project)jobs.push(apiAg('/projects/'+encodeURIComponent(ids.project)).then(r=>{PROJ=r.ok?(r.body.data||null):{error:true};renderPath();renderHighlights();renderSummaryCards();if(TAB==='delivery'||TAB==='files')showTab(TAB,true);}));
+  // builder item 241: a customer's two steps, read at the studio's level (they are the studio's customer)
+  const cid=REC&&REC.identity&&REC.identity.client_id;
+  if(cid&&!ownBusiness())jobs.push(apiAg('/sales/customers/'+encodeURIComponent(cid)).then(r=>{CUST=r.ok?(r.body.data||null):null;renderCustSteps();renderActions();}));
   jobs.push(loadActivity());
   await Promise.allSettled(jobs);
 }

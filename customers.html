@@ -266,6 +266,10 @@
   .cp-foot{padding:12px 18px 16px;border-top:1px solid var(--line)}
   .cp-open{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:11px 16px;border-radius:999px;border:1px solid var(--dds-line-strong,#d6d4e2);background:var(--card);color:var(--ink);font-weight:600;font-size:14px;text-decoration:none}
   .cp-open:hover{border-color:var(--p);color:var(--p)}
+  /* builder item 241: a customer added by mistake can go, from their preview */
+  .cp-del{display:block;margin:10px auto 0;font:inherit;font-size:13px;font-weight:600;color:var(--dds-bad,#b42318);background:none;border:0;padding:8px 12px;border-radius:8px;min-height:36px;cursor:pointer}
+  .cp-del:hover{background:var(--dds-bad-soft,#fde8e6)}
+  @media (pointer:coarse){.cp-del{min-height:44px}}
   .cp-skel{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--dds-up,#f7f6fb),color-mix(in srgb,var(--ink) 8%,var(--card)),var(--dds-up,#f7f6fb));background-size:200% 100%;animation:cp-sh 1.2s linear infinite}
   @keyframes cp-sh{to{background-position:-200% 0}}
   @media (prefers-reduced-motion:reduce){dialog.cprev,.cp-skel{animation:none}}
@@ -440,7 +444,7 @@ function importCustomers(){
   const k=KIT(),z=$('csvZone');if(!k||!z)return;
   k.importPanel(z,{back:'#importCsv',
     title:'Import customers from a CSV',
-    help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has a Studio OS account gets a request to accept you the next time they sign in, and the rest are saved to your contacts, to set up with Add a customer when you’re ready.',
+    help:'One row per customer with their email; a name and business name help. Nobody is emailed and no account is made: anyone who already has a Studio OS account gets a request to accept you the next time they sign in, and the rest are saved to your contacts. To make one a customer, use Add a customer with their email.',
     noun:'customer',
     // item 97: "Business Phone" or "Business Street" is never the business's name, and "first"/"last"
     // are names only beside "name" ("Last activity" was glued onto names) — the Contacts rules
@@ -449,7 +453,7 @@ function importCustomers(){
     toItem:(o)=>{const email=String(o.email||'').toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return null;return{email,name:o.name||[o.first,o.last].filter(Boolean).join(' '),business_name:o.business||''};},
     label:(it)=>it.business_name||it.name||it.email,
     send:async(it)=>{const r=await api('/sales/customers','POST',{mode:'connect',email:it.email,name:it.name,business_name:it.business_name});if(!r.ok)return'failed';const d=(r.body&&r.body.data)||{};return d.requested?'skipped':d.connected?'added':d.pending?'existed':'added';},
-    summary:(c)=>`${c.added} already yours · ${c.existed} saved to your contacts to set up later${c.skipped?` · ${c.skipped} asked to accept you`:''}${c.failed?` · ${c.failed} couldn’t be imported`:''}.`,
+    summary:(c)=>`${c.added} already yours · ${c.existed} saved to your contacts${c.skipped?` · ${c.skipped} asked to accept you`:''}${c.failed?` · ${c.failed} couldn’t be imported`:''}.`,
     done:()=>load(),
   });
 }
@@ -502,7 +506,7 @@ function headerHtml(list){
         <div id="viewMenu" role="listbox" aria-label="Customer views" hidden></div>
       </div>`}</div>
       <p class="dds-ph-line" id="lmeta">${esc(lmetaText(list))}</p></div>
-    <div class="dds-ph-acts">${people?'<a class="btn ghost" href="/contacts.html">Add or edit people</a>':'<button class="btn primary dds-ph-fill" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button>'}</div>
+    <div class="dds-ph-acts">${people?'<a class="btn ghost" href="/contacts.html">Add or edit people</a>':'<button class="btn primary dds-ph-fill" id="addCust" title="Save a customer. Their website and their portal invite come later, from their profile.">+ Add a customer</button>'}</div>
   </div>
   ${tabsHtml()}</header>`;
 }
@@ -894,7 +898,7 @@ function pvPaint(){
       <h3 class="cp-l">Latest</h3>
       ${loading?`<div class="cp-wait" role="status" aria-label="Loading">${skel}</div>`:failed?`<p class="cp-none">We couldn’t load the latest just now. <button type="button" class="cp-retry" data-pv-retry data-k="retry">Try again</button></p>`:latest.length?`<ul class="cp-latest">${latest.map(i=>`<li><span>${esc(i.title)}</span><time datetime="${esc(i.at||'')}">${esc(pvAgo(i.at))}</time></li>`).join('')}</ul>`:'<p class="cp-none">Nothing yet — a call, a message or an invoice shows up here.</p>'}
     </div>
-    <div class="cp-foot"><a class="cp-open" href="${esc(s.href)}" data-noscope="1" data-k="open">Open full record <span aria-hidden="true">→</span></a></div>`;
+    <div class="cp-foot"><a class="cp-open" href="${esc(s.href)}" data-noscope="1" data-k="open">Open full record <span aria-hidden="true">→</span></a>${s.cust?'<button type="button" class="cp-del" data-pv-del data-needs="delete" data-k="del">Delete customer…</button>':''}</div>`;
   if(fk){const n=box.querySelector(`[data-k="${fk}"]`)||$('cprev-h');if(n)n.focus({preventScroll:true});}
 }
 function pvMode(){
@@ -916,6 +920,7 @@ function pvMount(){
     if(e.target===box){const r=box.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom){closePreview();return;}}
     if(e.target.closest('[data-pv-close]')){closePreview();return;}
     if(e.target.closest('[data-pv-retry]')){pvRefresh();return;}
+    if(e.target.closest('[data-pv-del]')){pvDelete(e.target.closest('[data-pv-del]'));return;}   // builder item 241
     const b=e.target.closest('[data-pv]');if(!b||!PV)return;
     const kind=b.getAttribute('data-pv'),s=PV.s;
     // + Create's drawers, started on this customer's deal — a tap before the
@@ -955,6 +960,23 @@ function pvRefresh(){
   if(!PV)return;const s=PV.s,seq=++PV_SEQ;
   PV.d=undefined;pvPaint();
   PV.p=pvLoad(s);PV.p.then(d=>{if(seq!==PV_SEQ||!PV)return;PV.d=d;pvPaint();});
+}
+// ── builder item 241: Delete customer, from their preview. The box is the one their profile opens
+//    (customer-add.js); it asks about their website first, so it reads where that stands. ──
+async function pvDelete(btn){
+  if(!PV||!PV.s||!PV.s.cust||!window.ddsCustomerDelete)return;
+  const c=PV.s.cust,id=String(c.client_id);
+  btn.disabled=true;
+  let st=null;try{const r=await api('/sales/customers/'+encodeURIComponent(id));st=r.ok&&r.body&&r.body.data;}catch(_){st=null;}
+  btn.disabled=false;
+  if(!st){toast('We couldn’t open that just now. Please try again.');return;}
+  window.ddsCustomerDelete.open({request:(m,p,b)=>api(p,m,b),toast,customer:{client_id:id,name:c.name||st.business_name||'this customer',website:st.website,can_manage_sites:!!(st.offers&&st.offers.can_manage_sites)},onDeleted:(d)=>{
+    closePreview();
+    CUSTOMERS=CUSTOMERS.filter(x=>String(x.client_id)!==id);PICKED.delete(id);render();
+    const k=KIT(),s=d&&d.site,where=s?(s.kept===false?' Their website went to the Trash.':' Their website stayed on Sites.'):'';
+    const back=async()=>{const r=await window.ddsCustomerDelete.restore({request:(m,p,b)=>api(p,m,b)},id);if(!r||!r.ok)throw new Error('no');toast((c.name||'They')+' are back.');await load().catch(()=>{});};
+    if(k&&k.undoToast)k.undoToast((c.name||'The customer')+' is deleted.'+where+' Recently deleted keeps them for 30 days.',back);else toast((c.name||'The customer')+' is deleted.'+where);
+  }});
 }
 function closePreview(){
   if(!PV)return;

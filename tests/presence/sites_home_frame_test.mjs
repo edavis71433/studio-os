@@ -52,7 +52,7 @@ const agency = read('agency.html'), contacts = read('contacts.html'), customers 
 ok('A1: the Sites filter click is wired once', /if\(mn&&!mn\.dataset\.filterWired\)\{mn\.dataset\.filterWired='1';mn\.addEventListener\('click'/.test(sites) && !/^\s*\$\('main'\)\.addEventListener\('click'/m.test(sites));
 ok('A3: the phone bar keeps a + when the sales bar can’t be drawn', /var plusHere = canCreate\(\);/.test(shell) && /#dds-mbar\.plus\{align-items:center\}/.test(css));
 ok('A4: no message sends anyone to the Starter kits card that left Home', ![sites, agency, contacts, customers].some((p) => /Starter kits card on your studio home|try a starter kit from Home|use a starter kit instead/.test(p)));
-ok('A4: a kit that didn’t apply offers it again, in the one Add a customer box (item 102)', /id="cu-kit-again">Try the kit again</.test(box) && /retry: ok \? null : applyKit/.test(box));
+ok('A4: Add a customer offers no kit (item 241: a kit starts a website from New site, whose Try the kit again the Sites browser test drives)', !/cu-kit|applyKit/.test(box));
 ok('A5: Go through them removes the saved row by key, and Skip waits while one saves', /const skip=\(\)=>\{if\(F\.busy\)return;/.test(agency) && /F\.list\.findIndex\(x=>x\.key===r\.key\)/.test(agency));
 ok('A6: an open housekeeping form keeps its fields across a redraw', /const hkVals=hkf\?Array\.from\(hkf\.elements\)/.test(agency) && /if\(hkVals\)\{const nf=document\.querySelector\(hkSel\)/.test(agency));
 ok('A7: the bell’s repaint also sets the phone bar’s Inbox number', /paintMobileInboxDot\(\);\n  \}/.test(shell) && /a\[data-mbar="inbox"\] \.mlbl/.test(shell) && /<a data-mbar="inbox" href=/.test(shell));
