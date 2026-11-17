@@ -519,17 +519,17 @@ const dueLabel=(iso)=>iso?ddsDate.short(String(iso).slice(0,10)):'';   // that d
 function moneyState(i,todayYmd,pending){
   if(!i)return'';
   const s=String(i.status||'open');
-  if(s==='paid')return'paid';
+  if(s==='paid'){const d=String(i.dispute_status||'');if(d==='open')return'disputed';if(d==='lost')return'lost';const a=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);const r=Number(i.refunded_cents)||0;return r>0&&r>=a?'refunded':'paid';}
   if(s==='void'||s==='canceled')return'';
   if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
   const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
   return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
 }
-const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue'};
-const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad'};
+const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue',refunded:'Refunded',disputed:'Disputed',lost:'Dispute lost'};
+const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad',refunded:'',disputed:'bad',lost:'bad'};
 function moneyBuckets(list,todayYmd,pending){
   const b={paid:{count:0,cents:0},processing:{count:0,cents:0},upcoming:{count:0,cents:0},overdue:{count:0,cents:0}};
-  for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(!st)continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=c;}
+  for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(st!=='paid'&&st!=='processing'&&st!=='upcoming'&&st!=='overdue')continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=st==='paid'?Math.max(0,c-(Number(i.refunded_cents)||0)):c;}
   return b;
 }
 // item 65: EVERY "today" on the record is this one (a moment in ms → its local day)
@@ -996,7 +996,7 @@ function renderHighlights(){
   const tiles=[];
   const inv=(DEAL&&DEAL.invoices)||[];
   const paid=inv.filter(v=>invState(v)==='paid'); const openInv=invWaiting(inv);
-  const got=paid.reduce((a,b)=>a+(b.amount_cents||0),0);
+  const got=paid.reduce((a,b)=>a+Math.max(0,(b.amount_cents||0)-(b.refunded_cents||0)),0);   // sales item 126: what was kept
   const owed=DEAL&&DEAL.deal?openInv.reduce((a,b)=>a+(b.amount_cents||0),0):(hl.owed_cents||0);
   // the four states, one formula (item 2): the tile's sub-line names them
   const mb=moneyBuckets(inv,recTodayYmd());
@@ -1426,7 +1426,15 @@ function renderBillingTab(host){
     // item 77: a payment recorded by hand says how it came in, and can be undone (it changes the books, so delete)
     if(st==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(atLabel(v.paid_at)):'';
       sub=(sub?sub+' · ':'')+esc(PAY_WORDS[v.paid_method]||'Paid online')+(v.paid_note?' · '+esc(v.paid_note):'')+(v.paid_private_note?' · <span title="Only you see this. It is not on their receipt.">Private: '+esc(v.paid_private_note)+'</span>':'');
+      if(v.refunded_cents>0)sub+=' · '+esc(fmtC(v.refunded_cents))+' refunded';   // sales item 126: part of it went back through Stripe
       if(v.paid_method)acts+=act(`data-undo-pay="${esc(v.id)}" data-needs="delete"`,'Undo','Recorded by mistake? The invoice goes back to unpaid');}
+    else if(st==='refunded'||st==='disputed'||st==='lost'){
+      // sales items 126, 127: money that came back through Stripe. Nothing to send, record or void; a dispute
+      // that can still be answered says by when, and links to Stripe (the deal page has the proof download)
+      const dsp=((DEAL&&DEAL.returns)||[]).find(r=>r.kind==='dispute'&&r.invoice_id===v.id&&r.status===(st==='lost'?'lost':'open'));
+      state=`<span class="schip ${MONEY_TONE[st]}">${MONEY_WORD[st]}</span>`;due=v.paid_at?esc(atLabel(v.paid_at)):'';
+      sub=(sub?sub+' · ':'')+(st==='refunded'?'Refunded in full through Stripe':st==='lost'?'Went back to them'+(dsp&&dsp.fee_cents>0?', plus Stripe’s '+esc(fmtC(dsp.fee_cents))+' fee':''):dsp&&dsp.bank&&!dsp.inquiry?'Their bank took it back. Bank disputes are final':dsp&&dsp.due_by?'Answer in Stripe by '+esc(atLabel(dsp.due_by)):'Disputed');
+      if(st==='disputed'&&dsp&&dsp.answer_url)acts+=`<a class="rbtn" href="${esc(dsp.answer_url)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block">Answer in Stripe</a>`;}
     else if(!st){state=`<span class="schip" style="background:var(--bg);color:var(--faint)">Voided</span>`;}
     else if(st==='processing'){state=`<span class="schip info">Processing</span>`;sub=(sub?sub+' · ':'')+'Payment on its way';due=v.due_date?esc(dueLabel(v.due_date)):'';}   // the client paid — nothing to resend or void
     else{state=`<span class="schip ${MONEY_TONE[st]}">${MONEY_WORD[st]}</span>`;

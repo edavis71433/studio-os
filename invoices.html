@@ -198,7 +198,13 @@ const kindOf=(i)=>i.status==='void'||i.status==='canceled'?'void':i.status==='pa
 // the status in plain words, on the local day
 function statusChip(i,today){
   if(kindOf(i)==='void')return'<span class="st">Void</span>';
-  if(i.status==='paid'){const how=i.paid_method&&METHOD[i.paid_method]?' by '+METHOD[i.paid_method]:'';return`<span class="st paid">${how?'Paid'+esc(how):'Paid '+esc(niceDay(localDay(i.paid_at)))}</span>`;}
+  if(i.status==='paid'){
+    // sales items 126, 127: money that came back through Stripe
+    const r=Number(i.refunded_cents)||0;
+    if(i.dispute_status==='open')return'<span class="st over">Disputed</span>';
+    if(i.dispute_status==='lost')return'<span class="st over">Dispute lost</span>';
+    if(r>0&&r>=(Number(i.amount_cents)||0))return'<span class="st">Refunded</span>';
+    const how=i.paid_method&&METHOD[i.paid_method]?' by '+METHOD[i.paid_method]:'';return`<span class="st paid">${how?'Paid'+esc(how):'Paid '+esc(niceDay(localDay(i.paid_at)))}</span>${r>0?` <span class="st">${esc(money(r))} refunded</span>`:''}`;}
   if(i.processing||i.state==='processing')return'<span class="st proc">Processing</span>';
   if(!i.due_date)return'<span class="st">Unpaid</span>';
   const d=dayDiff(i.due_date.slice(0,10),today);
@@ -210,13 +216,16 @@ function totals(items,today){
   const inv=items.filter(i=>!isPart(i)),open=inv.filter(i=>i.status==='open');
   const proc=open.filter(i=>i.processing||i.state==='processing');
   const late=open.filter(i=>!(i.processing||i.state==='processing')&&i.due_date&&dayDiff(i.due_date.slice(0,10),today)<0);
-  const paid=items.filter(i=>i.status==='paid'&&i.paid_at);
+  // sales items 126, 127: Paid counts what was kept, never a refunded, disputed or lost payment
+  const kept=(i)=>i.dispute_status==='open'||i.dispute_status==='lost'?0:Math.max(0,(Number(i.amount_cents)||0)-(Number(i.refunded_cents)||0));
+  const paid=items.filter(i=>i.status==='paid'&&i.paid_at&&kept(i)>0);
   const month=today.slice(0,7),year=today.slice(0,4);
   const pm=paid.filter(i=>localDay(i.paid_at).slice(0,7)===month),py=paid.filter(i=>localDay(i.paid_at).slice(0,4)===year);
   const sum=(l)=>l.reduce((a,i)=>a+(Number(i.amount_cents)||0),0);
   const oldest=late.reduce((m,i)=>Math.max(m,-dayDiff(i.due_date.slice(0,10),today)),0);
   const ways=[...new Set(pm.map(i=>i.paid_method).filter(Boolean))];
-  return{owed:sum(open),owedN:open.length,proc:sum(proc),late:sum(late),lateN:late.length,oldest,pm:sum(pm),pmN:pm.length,ways,py:sum(py),pyN:py.length};
+  const keptSum=(l)=>l.reduce((a,i)=>a+kept(i),0);
+  return{owed:sum(open),owedN:open.length,proc:sum(proc),late:sum(late),lateN:late.length,oldest,pm:keptSum(pm),pmN:pm.length,ways,py:keptSum(py),pyN:py.length};
 }
 const plural=(n,w)=>n+' '+w+(n===1?'':'s');
 function filtered(today){

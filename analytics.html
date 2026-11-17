@@ -980,7 +980,7 @@ function paintGlance(rep){
   const rv=rep.revenue,o=rep.outcomes,pl=rep.pipeline;
   // the revenue chart
   const revBody=(rv&&!rv.unavailable&&Array.isArray(rv.months)&&rv.months.length)
-    ?((rv.total_this_year||rv.total_last_year)?revenueChart(rv,12)+revenueChart(rv,6)+`<p class="chartnote">Paid invoices and retainer payments by the month they were paid · last 12 months ${esc(money(rv.total_this_year))}${rv.retainer_this_year?`, ${esc(money(rv.retainer_this_year))} of it from retainers`:''} · the year before ${esc(money(rv.total_last_year))}</p>`:emptyState('No payments yet','Invoices and retainer payments over the last two years will chart here, against the year before.'))
+    ?((rv.total_this_year||rv.total_last_year)?revenueChart(rv,12)+revenueChart(rv,6)+`<p class="chartnote">Paid invoices and retainer payments by the month they were paid · last 12 months ${esc(money(rv.total_this_year))}${rv.retainer_this_year?`, ${esc(money(rv.retainer_this_year))} of it from retainers`:''}${rv.returned_this_year?`, after ${esc(money(rv.returned_this_year))} refunded or lost to disputes`:''} · the year before ${esc(money(rv.total_last_year))}</p>`:emptyState('No payments yet','Invoices and retainer payments over the last two years will chart here, against the year before.'))
     :'<p class="muted">This chart couldn’t load just now — Refresh tries again.</p>';
   // the pipeline as it stands
   let pipeBody;

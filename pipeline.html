@@ -719,17 +719,17 @@ const money=(c)=>c?ddsMoney(c):'';
 function moneyState(i,todayYmd,pending){
   if(!i)return'';
   const s=String(i.status||'open');
-  if(s==='paid')return'paid';
+  if(s==='paid'){const d=String(i.dispute_status||'');if(d==='open')return'disputed';if(d==='lost')return'lost';const a=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);const r=Number(i.refunded_cents)||0;return r>0&&r>=a?'refunded':'paid';}
   if(s==='void'||s==='canceled')return'';
   if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
   const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
   return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
 }
-const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue'};
-const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad'};
+const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue',refunded:'Refunded',disputed:'Disputed',lost:'Dispute lost'};
+const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad',refunded:'',disputed:'bad',lost:'bad'};
 function moneyBuckets(list,todayYmd,pending){
   const b={paid:{count:0,cents:0},processing:{count:0,cents:0},upcoming:{count:0,cents:0},overdue:{count:0,cents:0}};
-  for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(!st)continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=c;}
+  for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(st!=='paid'&&st!=='processing'&&st!=='upcoming'&&st!=='overdue')continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=st==='paid'?Math.max(0,c-(Number(i.refunded_cents)||0)):c;}
   return b;
 }
 // "overdue" is judged on the STUDIO's local day — the operator's calendar, the
@@ -898,6 +898,8 @@ function evtLabel(e){
   if(e.kind==='estimate_deleted')return 'Draft estimate removed';
   if(e.kind==='recurring_invoice'){const w=d.every==='quarter'?'every 3 months':d.every==='year'?'every year':'every month';const on=d.on?niceDay(d.on):'';const why={unpaid:'the last two invoices are still unpaid',no_email:'there’s no client email on this deal',no_stripe:'Stripe isn’t connected'}[d.reason];
     return d.action==='started'?'Recurring invoice started'+(d.title?' — '+d.title:'')+(d.amount_cents?', '+money(d.amount_cents)+' '+w:'')+(on?' from '+on:''):d.action==='changed'?'Recurring invoice changed'+(d.amount_cents?' — '+money(d.amount_cents):'')+(on?(d.amount_cents?',':' —')+' next on '+on:''):d.action==='skipped'?'Recurring invoice: skipped '+(on||'one'):d.action==='paused'?'Recurring invoice paused'+(why?' — '+why:''):d.action==='resumed'?'Recurring invoice resumed'+(on?' — next on '+on:''):d.action==='stopped'?'Recurring invoice stopped':d.action==='finished'?'Recurring invoice finished — the last one went out':d.action==='email_failed'?'Recurring invoice made, but the email didn’t go out — send it again':'Recurring invoice';}
+  // sales items 126, 127 (mirrors crm/deal_activity.ts moneyBackLine): a refund made in Stripe, a dispute, or a payment undone
+  if(e.kind==='payment_undone'){const a=d.amount_cents?' — '+money(d.amount_cents):'';if(d.refund)return(d.applies_to==='extra'?'Extra payment refunded':d.applies_to==='void'?'Payment on a withdrawn invoice refunded':d.full?'Refunded in full':'Refunded')+a;if(d.dispute==='opened'||d.dispute==='reopened')return(d.inquiry?'Card company asked about the payment':d.bank?'Bank payment disputed':d.dispute==='reopened'?'Dispute reopened':'Payment disputed')+a;if(d.dispute==='won')return'Dispute won'+a;if(d.dispute==='closed')return'Card company’s question closed';if(d.dispute==='lost')return'Dispute lost'+a;return'Payment undone'+a;}
   return EVT_LABEL[e.kind]||String(e.kind||'').replace(/_/g,' ');
 }
 // the shell's one date format (shell-kit.js ddsDate): "Nov 3, 3:05 PM", "Nov 3", "Nov 3, 2025"
@@ -2059,6 +2061,15 @@ function wireInvoiceActions(root,refresh){
   // item 77: Record a payment (it opens under the row) and Undo for one recorded by mistake
   root.querySelectorAll('[data-pay-inv]').forEach(b=>b.onclick=()=>{const row=b.closest('.lr,.rcv-row');let inv={};try{inv=JSON.parse(b.dataset.payInv);}catch(_){return;}if(row)openPayForm(row,inv,refresh,{email:b.dataset.email||'',first:b.dataset.first||''});});
   root.querySelectorAll('[data-undo-pay]').forEach(b=>b.onclick=async()=>{const part=b.dataset.part==='1';if(!(await ddsConfirm(part?'Undo this part payment? Its amount goes back on the invoice as due.':'Undo this payment? The invoice goes back to unpaid and its reminders can start again. Use this only for a payment recorded by mistake.',null,part?'Undo part payment':'Undo payment',{danger:true})))return;b.disabled=true;try{const r=await api('/sales/invoices/'+b.dataset.undoPay+'/payment/undo','POST',{});const x=(r&&r.data)||{};toast((part?'Part payment undone. Its amount is due again.':'Payment undone. The invoice is open again.')+(x.fresh_link===false?' A new payment link couldn’t be made just now: press Send on the invoice to make one.':' It has a fresh payment link, so its reminders carry on.')+(x.moved_back?' The deal is back where it was.':''));refresh();}catch(e){toast(nice(e),true);b.disabled=false;}});
+  // sales item 127: the proof Studio OS holds for a disputed payment, in one download for the answer in Stripe
+  root.querySelectorAll('[data-proof]').forEach(b=>b.onclick=async()=>{const label=b.textContent;b.disabled=true;b.textContent='Gathering the proof…';
+    try{const r=await ddsApi.raw('/sales/disputes/'+encodeURIComponent(b.dataset.proof)+'/proof',{scope:scope()});   // a download (shell-kit.js)
+      if(!r.ok||!/zip/.test(r.headers.get('Content-Type')||'')){const j=await r.json().catch(()=>({}));throw new Error((j&&j.message)||'The proof didn’t download. Try again.');}
+      const blob=await r.blob();const fname=(/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition')||'')||[])[1]||'dispute-proof.zip';
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
+      toast('Downloaded '+fname+'. Add its files to your answer in Stripe.');
+    }catch(e){toast(e&&e.message?e.message:'The proof didn’t download. Try again.',true);}
+    finally{if(b.isConnected){b.disabled=false;b.textContent=label;}}});
   root.querySelectorAll('[data-void-inv]').forEach(b=>b.onclick=async()=>{if(!(await ddsConfirm('Void this invoice? It stops being payable — we switch its payment link off and the “still unpaid” reminder clears. It stays on the deal, marked Voided.',null,'Void invoice',{danger:true})))return;b.disabled=true;try{const r=await api('/sales/invoices/'+b.dataset.voidInv+'/void','POST',{});const linkLive=!r.already&&!!r.data&&r.data.link_deactivated===false;toast(linkLive?'Invoice voided — but its payment link may still be live. Open the invoice in Stripe and switch the link off there.':r.already?'Already voided':'Invoice voided',linkLive);refresh();}catch(e){toast(nice(e),true);b.disabled=false;}});
 }
 // "Who owes you" — the receivables list behind the AR strip (open invoices across
@@ -3455,8 +3466,11 @@ async function openDeal(id){
     //    each a fact already on this read) and the three latest timeline items;
     //    plus the tab counts (open invoices · activity items) ──
     const invs=(data.invoices||[]).filter(v=>v.status!=='void');
-    const paidInv=invs.filter(v=>v.status==='paid');
-    const paidC=paidInv.reduce((a,b)=>a+(b.amount_cents||0),0);
+    // sales items 126, 127: Paid counts what was kept, never a refunded, disputed or lost payment
+    const paidInv=invs.filter(v=>invState(v)==='paid');
+    const paidC=paidInv.reduce((a,b)=>a+Math.max(0,(b.amount_cents||0)-(b.refunded_cents||0)),0);
+    const backC=invs.filter(v=>v.status==='paid').reduce((a,v)=>a+Math.min(v.refunded_cents||0,v.amount_cents||0),0);
+    const openDsp=(data.returns||[]).filter(r=>r.kind==='dispute'&&r.status==='open');
     // Outstanding = what still WAITS on the client (upcoming + overdue, the one
     // formula); a settling payment is "processing" — on its way, not outstanding.
     const openInv=invs.filter(invWaits);
@@ -3482,6 +3496,8 @@ async function openDeal(id){
       signedK?kv(IK.check,`Agreement signed${signedK.signed_at?' '+esc(evtDate(signedK.signed_at)):''}`):sentK?kv(IK.check,'Agreement out — awaiting signature'):draftContract?kv(IK.check,'Agreement drafted, not sent',true):kv(IK.check,'No agreement yet',true),
       accP?kv(IK.doc,'Proposal accepted'):sentP?kv(IK.doc,'Proposal sent — awaiting their answer'):(data.proposals||[]).length?kv(IK.doc,'Proposal drafted, not sent',true):kv(IK.doc,'No proposal yet',true),
     ];
+    if(openDsp.length){const due=openDsp.map(r=>r.due_by).filter(Boolean).sort()[0];moneyKv.splice(1,0,kv(IK.clock,`Disputed ${money(openDsp.reduce((a,r)=>a+(r.amount_cents||0),0))}${due?' · answer in Stripe by '+esc(evtDate(due)):''}`));}
+    else if(backC)moneyKv.splice(1,0,kv(IK.money,`Refunded ${money(backC)}`,true));
     for(const s of (data.recurring||[]))if(s.status==='active'||s.status==='paused')moneyKv.push(kv(IK.repeat,`Recurring invoice ${money0(s.amount_cents)} ${s.every==='quarter'?'every 3 months':s.every==='year'?'every year':'every month'} · ${s.status==='paused'?'paused':s.next_on?'next '+esc(niceDay(s.next_on)):'active'}`));   // item 47
     if(d.retainer&&d.retainer.status&&d.retainer.status!=='canceled')moneyKv.push(kv(IK.repeat,`Retainer ${money(d.retainer.amount_cents)} every ${d.retainer.interval==='year'?'year':'month'} · ${d.retainer.status==='active'?'active':d.retainer.status==='past_due'?'payment overdue':'awaiting authorization'}`));
     const billN=(openInv.length+procInv.length)?`${openInv.length+procInv.length} open`:'';
@@ -3570,12 +3586,17 @@ async function openDeal(id){
             const st=invState(v);const waits=invWaits(v);const parent=v.payment_for?(data.invoices||[]).find(x=>x.id===v.payment_for):null;
             const name=v.payment_for?esc('Part payment'+(parent&&invNo(parent.number)?' toward '+invNo(parent.number):'')):(invNo(v.number)?esc(invNo(v.number))+' · ':'')+esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
             const partPaid=(data.invoices||[]).filter(x=>x.payment_for===v.id&&x.status==='paid').reduce((a,b)=>a+(b.amount_cents||0),0);   // item 77
-            const when=st==='paid'?(v.paid_at?` · ${esc(PAY_WORDS[v.paid_method]||'paid')} ${esc(evtDate(v.paid_at))}`:'')+(v.paid_note?' · '+esc(v.paid_note):'')+(v.paid_private_note?' · <span title="Only you see this. It is not on their receipt.">private: '+esc(v.paid_private_note)+'</span>':''):st==='processing'?' · payment on its way':waits?(v.due_date?` · due ${esc(v.due_date)}`:/ · when the work is done$/.test(v.title||'')?'':' · due now')+(partPaid?` · ${money(partPaid)} paid so far`:'')+(v.stripe_url?'':(partPaid?' · send it for a link for what’s left':' · not sent yet')):'';
+            const paidish=st==='paid'||st==='refunded'||st==='disputed'||st==='lost';   // sales items 126, 127: still a payment, with what came back after it
+            const when=paidish?(v.paid_at?` · ${esc(PAY_WORDS[v.paid_method]||'paid')} ${esc(evtDate(v.paid_at))}`:'')+(v.paid_note?' · '+esc(v.paid_note):'')+(v.paid_private_note?' · <span title="Only you see this. It is not on their receipt.">private: '+esc(v.paid_private_note)+'</span>':''):st==='processing'?' · payment on its way':waits?(v.due_date?` · due ${esc(v.due_date)}`:/ · when the work is done$/.test(v.title||'')?'':' · due now')+(partPaid?` · ${money(partPaid)} paid so far`:'')+(v.stripe_url?'':(partPaid?' · send it for a link for what’s left':' · not sent yet')):'';
             const payBtn=waits?` <button class="btn ghost" data-pay-inv="${esc(JSON.stringify({id:v.id,amount_cents:v.amount_cents,number:v.number||null}))}" data-email="${c&&c.email?'1':''}" data-first="${esc((String(c&&c.name||'').trim().split(/\s+/)[0])||'')}" title="Paid by check, cash, bank transfer or Zelle? Mark it paid here">Record payment</button>`:'';
             const undoBtn=(st==='paid'&&v.paid_method)?` <button class="btn ghost" data-needs="delete" data-undo-pay="${v.id}" data-part="${v.payment_for?'1':''}" title="Recorded by mistake? The invoice goes back to unpaid" aria-label="Undo the payment on ${name}">Undo</button>`:'';
             const acts=undoBtn+payBtn+(waits?` <button class="btn ghost" data-send-inv="${v.id}">${v.stripe_url?'Resend':'Send'}</button>${v.stripe_url?` <button class="btn ghost" data-copy-pay="${esc(v.stripe_url)}">Copy link</button>`:''} <button class="btn ghost" data-needs="delete" data-void-inv="${v.id}" title="${v.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${name}">Void</button>`:'');
-            return `<div class="row2 lr"><span class="mut">${name} — ${money(v.amount_cents)}${when}</span><span>${moneyChip(v)}${acts} <button class="btn ghost" data-doc-inv="${v.id}" title="Open a branded, printable copy (save as PDF)">View / print</button></span></div>`;}).join('')}</div>
-          ${(()=>{const inv=(data.invoices||[]).filter(v=>v.status!=='void');const stages=inv.filter(v=>!v.payment_for).length;if(stages<2)return '';const sum=inv.reduce((a,b)=>a+(b.amount_cents||0),0);const paid=inv.filter(v=>v.status==='paid').reduce((a,b)=>a+(b.amount_cents||0),0);return `<div class="mut" style="margin-top:4px">Payment plan: ${stages} stages · ${money(sum)} total${paid?' · '+money(paid)+' paid':''}</div>`;})()}
+            // sales items 126, 127: a refund made in Stripe, or a dispute with its deadline, the way to answer it and the proof
+            const dsp=(data.returns||[]).find(r=>r.kind==='dispute'&&r.invoice_id===v.id&&r.status===(st==='lost'?'lost':'open'));
+            const backTxt=st==='paid'&&v.refunded_cents>0?` · ${money(v.refunded_cents)} refunded`:st==='refunded'?' · refunded in full':st==='disputed'?(dsp&&dsp.bank&&!dsp.inquiry?' · their bank took it back, and bank disputes are final':dsp&&dsp.due_by?` · answer in Stripe by ${esc(evtDate(dsp.due_by))}`:' · disputed'):st==='lost'?` · went back to them${dsp&&dsp.fee_cents>0?`, plus Stripe’s ${money(dsp.fee_cents)} fee`:''}`:'';
+            const backBtns=st==='disputed'&&dsp&&dsp.answer_url?` <a class="btn ghost" href="${esc(dsp.answer_url)}" target="_blank" rel="noopener">Answer in Stripe</a> <button class="btn ghost" data-proof="${esc(dsp.id)}" title="The signed agreement and its certificate, the accepted proposal, the invoice and the deal’s history, in one download">Download proof</button>`:'';
+            return `<div class="row2 lr"><span class="mut">${name} — ${money(v.amount_cents)}${when}${backTxt}</span><span>${moneyChip(v)}${backBtns}${acts} <button class="btn ghost" data-doc-inv="${v.id}" title="Open a branded, printable copy (save as PDF)">View / print</button></span></div>`;}).join('')}</div>
+          ${(()=>{const inv=(data.invoices||[]).filter(v=>v.status!=='void');const stages=inv.filter(v=>!v.payment_for).length;if(stages<2)return '';const sum=inv.reduce((a,b)=>a+(b.amount_cents||0),0);const paid=inv.filter(v=>invState(v)==='paid'||invState(v)==='refunded').reduce((a,b)=>a+Math.max(0,(b.amount_cents||0)-(b.refunded_cents||0)),0);return `<div class="mut" style="margin-top:4px">Payment plan: ${stages} stages · ${money(sum)} total${paid?' · '+money(paid)+' paid':''}</div>`;})()}
           <div class="mut" style="margin-top:6px">Send the client a secure payment link, or set up a plan — a deposit now with the balance on completion, or milestone installments.</div>
           <div class="row2" style="margin-top:8px"><button class="btn ghost" id="sendInvoice">Send an invoice</button><button class="btn ghost" id="sendDeposit">Request a deposit</button><button class="btn ghost" id="setupPlan">Set up a payment schedule</button></div><div id="invForm"></div></div>
         <div class="sec"><h3>Retainer</h3>
