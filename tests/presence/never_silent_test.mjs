@@ -51,6 +51,8 @@ const jr = (data, status = 200) => new Response(data === null ? '' : JSON.string
  *   retainer      {...} → the deal's stored retainer state
  *   projectEventFails n → first n presence_project_events POSTs return 500
  *   dealTasks / nextStepDeals → rows for the reminder sweep
+ *   receiptSent   true  → the client's receipt already went out (sales item 130:
+ *                         presence_invoices.receipt_sent_at is set, so the claim finds no row)
  */
 function installFake(cfg = {}) {
   const calls = [];
@@ -73,6 +75,8 @@ function installFake(cfg = {}) {
       if (eventFails > 0) { eventFails--; return jr({ message: 'boom' }, 500); }
       return jr(null, 201);
     }
+    // sales item 130: the receipt's claim is a PATCH matching receipt_sent_at=is.null — no row once it went out
+    if (url.includes('presence_invoices') && method === 'PATCH' && url.includes('receipt_sent_at=is.null')) return jr(cfg.receiptSent ? [] : [{ id: INVOICE }]);
     if (url.includes('presence_invoices')) return jr([{ id: INVOICE, site_id: AGENCY, deal_id: DEAL, title: 'Deposit', amount_cents: 50000, purpose: 'deposit' }]);
     if (url.includes('presence_deal_tasks')) return jr(cfg.dealTasks || []);
     if (url.includes('presence_deals') && url.includes('next_step_at=not.is.null')) return jr(cfg.nextStepDeals || []);
@@ -136,17 +140,28 @@ try {
     restore();
   }
   {
-    const { sent } = installFake({ noticeCreated: false });
+    const { sent } = installFake({ noticeCreated: false, receiptSent: true });
     const out = await (await echo()).json();
     ok('A3: a retry answers notice:false, already:TRUE (the operator was told before) and re-sends nothing',
       out.data?.notice === false && out.data?.already === true && sent.length === 0);
     restore();
   }
   {
+    // sales item 130: the webhook's floor wrote the studio's line while this server was
+    // down, so the line is old when the echo finally runs. The receipt has its own claim
+    // now, so the client still gets it, once; the studio isn't emailed a second time.
+    const { sent } = installFake({ noticeCreated: false });
+    const out = await (await echo()).json();
+    ok('A3b: a late echo after the webhook\'s floor still sends the client\'s receipt, once, and no second studio email',
+      out.data?.already === true && out.data?.receipted === true && sent.filter((x) => x?.to === 'jordan@client.test').length === 1 && !sent.some((x) => x?.to === 'studio@davisdigitalstudio.com'));
+    restore();
+  }
+  {
     const { sent } = installFake({ noticeStatus: 400 });
     const out = await (await echo()).json();
     ok('A4: a FAILED insert answers notice:false, already:false — the hollow 200 the webhook floor keys on',
-      out.data?.notice === false && out.data?.already === false && sent.length === 0);
+      out.data?.notice === false && out.data?.already === false && !sent.some((x) => x?.to === 'studio@davisdigitalstudio.com'));
+    ok('A4: …and the client\'s receipt doesn\'t hang on the studio\'s line (sales item 130)', sent.filter((x) => x?.to === 'jordan@client.test').length === 1);
     restore();
   }
   {
@@ -202,7 +217,10 @@ try {
   {
     const c = retainerNoticeCopy('past_due', 'Larkspur care plan', 45000, 'month');
     ok('C0: the past_due copy names the client, the amount, and what to do (plain voice, no jargon)',
-      /Larkspur care plan/.test(c.subject) && /\$450\.00\/month/.test(c.body) && /card/i.test(c.body) && /Stripe/i.test(c.html));
+      /Larkspur care plan/.test(c.subject) && /\$450\.00 a month/.test(c.body) && /card/i.test(c.body) && /Stripe/i.test(c.html));
+    // sales item 129: what to do is the deal's Email the card link, never a fresh approval the deal refuses while past due
+    ok('C0: the past_due copy points at Email the card link, not a fresh authorization link',
+      /Email the card link/.test(c.body) && /Email the card link/.test(c.html) && !/authorization link/.test(c.body + c.html));
     const k = retainerNoticeCopy('canceled', '', 120000, 'year');
     ok('C0: the canceled copy degrades gracefully with no title and says it won’t bill again',
       /a retainer client/.test(k.subject) && /\$1,200\.00\/year/.test(k.body) && /won’t bill again/.test(k.body));
@@ -220,9 +238,9 @@ try {
       r.synced === true && notice?.body?.kind === 'retainer_status' && new RegExp(`^retainer:${DEAL}:past_due:w\\d+$`).test(String(notice?.body?.period)),
       String(notice?.body?.period));
     ok('C1: …and EMAILS the operator once (send-once rides the notice’s created flag)',
-      sent.length === 1 && sent[0]?.to === 'studio@davisdigitalstudio.com' && /retainer payment didn’t go through/i.test(String(sent[0]?.subject)));
-    ok('C1: the email’s CTA is the Stripe subscription (where the fix lives)',
-      /dashboard\.stripe\.com\/subscriptions\/sub_1/.test(String(sent[0]?.html || '')));
+      sent.length === 1 && sent[0]?.to === 'studio@davisdigitalstudio.com' && /retainer card didn’t go through/i.test(String(sent[0]?.subject)));
+    ok('C1: the email’s button opens the deal\'s Billing, where Email the card link is (sales item 129)',
+      String(sent[0]?.html || '').includes(`/pipeline.html?deal=${DEAL}&amp;dtab=billing`) || String(sent[0]?.html || '').includes(`/pipeline.html?deal=${DEAL}&dtab=billing`), String(sent[0]?.html || '').slice(0, 400));
     restore();
   }
   {

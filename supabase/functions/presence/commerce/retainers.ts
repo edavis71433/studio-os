@@ -18,6 +18,7 @@
 // Pure cores up top (exhaustively unit-tested); the impure webhook sync below.
 import { svc } from '../lib/db.ts';
 import { stripeMetaOf, stripeSubscriptionIdOf, subscriptionPeriodEnd, invoicePaidCents, invoicePaidAt } from './stripe_shape.ts';
+import { stripeConfigured, retrieveSubscription } from './stripe.ts';
 
 export const RETAINER_PURPOSE = 'service_retainer';
 
@@ -115,25 +116,48 @@ export function retainerNoticePeriod(dealId: string, transition: 'past_due' | 'c
   return `${retainerNoticePeriodPrefix(dealId)}${transition}:w${w}`;
 }
 
-/** The studio's plain voice: what happened, which client/deal, what to do. Pure. */
-export function retainerNoticeCopy(transition: 'past_due' | 'canceled', dealTitle: string, amountCents: number, interval: string): { headline: string; body: string; subject: string; html: string } {
+/** The studio's plain voice: what happened, which client/deal, what to do. Pure.
+ *
+ *  Sales item 129: the failed-card line used to say "send the client a fresh
+ *  authorization link from the deal", which the deal refuses while the retainer is
+ *  past due. It now says what works: Email the card link on the deal (Stripe's own
+ *  page for a new card), or the client does it from their portal. `reason` is
+ *  Stripe's cancellation_details.reason on a retainer that ended: 'payment_failed'
+ *  means every retry failed and Stripe stopped it. */
+export function retainerNoticeCopy(transition: 'past_due' | 'canceled', dealTitle: string, amountCents: number, interval: string, reason?: string): { headline: string; body: string; subject: string; html: string } {
   const name = (dealTitle || '').trim() || 'a retainer client';
   const amt = '$' + ((Number(amountCents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
   const per = interval === 'year' ? 'year' : 'month';
+  const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
   if (transition === 'past_due') {
     return {
-      headline: `A retainer payment didn’t go through — ${name}`,
-      body: `The ${amt}/${per} retainer didn’t collect this cycle. Stripe retries automatically — if it keeps failing, the client’s card likely needs updating. The work agreement itself hasn’t changed.`,
-      subject: `A retainer payment didn’t go through — ${name}`,
-      html: `<p>The <b>${amt}/${per}</b> retainer for <b>${name}</b> didn’t collect this cycle.</p><p>Stripe retries automatically over the next few days. If it keeps failing, the client’s card needs updating — open the subscription in Stripe to see the attempts, or send the client a fresh authorization link from the deal.</p>`,
+      headline: `A retainer card didn’t go through: ${name}`,
+      body: `The ${amt} a ${per} charge didn’t go through. Stripe tries the card again over the next few days. To fix it sooner, press Email the card link on the deal: the client puts in a new card on Stripe’s own page. They can also do it from their portal. If every try fails, Stripe ends the retainer.`,
+      subject: `A retainer card didn’t go through: ${name}`,
+      html: `<p>The <b>${amt} a ${per}</b> retainer charge for <b>${esc(name)}</b> didn’t go through.</p><p>Stripe tries the card again over the next few days. To fix it sooner, open the deal and press <b>Email the card link</b>: the client puts in a new card on Stripe’s own page, and Stripe uses it for the next try. They can also do it from their portal.</p><p>If every try fails, Stripe ends the retainer.</p>`,
+    };
+  }
+  if (reason === 'payment_failed') {
+    return {
+      headline: `A retainer ended after its card kept failing: ${name}`,
+      body: `Stripe tried the ${amt} a ${per} charge several times, then ended the retainer. It won’t charge again. To start it again, set up the retainer again from the deal: the client approves it with a card that works.`,
+      subject: `A retainer ended after its card kept failing: ${name}`,
+      html: `<p>Stripe tried the <b>${amt} a ${per}</b> retainer charge for <b>${esc(name)}</b> several times, then ended the retainer. It won’t charge again.</p><p>To start it again, open the deal and set up the retainer again: the client approves it with a card that works.</p>`,
     };
   }
   return {
     headline: `A retainer ended — ${name}`,
     body: `The ${amt}/${per} retainer has been canceled in Stripe and won’t bill again. If that’s expected, nothing to do. If not, a fresh authorization link from the deal restarts it.`,
     subject: `A retainer ended — ${name}`,
-    html: `<p>The <b>${amt}/${per}</b> retainer for <b>${name}</b> has been canceled in Stripe and won’t bill again.</p><p>If you and the client agreed to wrap up, nothing to do. If this is a surprise, open the deal and send a fresh authorization link to restart it.</p>`,
+    html: `<p>The <b>${amt}/${per}</b> retainer for <b>${esc(name)}</b> has been canceled in Stripe and won’t bill again.</p><p>If you and the client agreed to wrap up, nothing to do. If this is a surprise, open the deal and send a fresh authorization link to restart it.</p>`,
   };
+}
+
+/** Can the client put in a new card for this retainer (sales item 129)? Only a live
+ *  one, and only once Stripe has named its customer (the approval did that). Pure. */
+export function retainerCardFixable(r: Partial<RetainerState> | null | undefined): boolean {
+  if (!r || typeof r !== 'object') return false;
+  return (r.status === 'active' || r.status === 'past_due') && !!String(r.stripe_customer_id || '');
 }
 
 // ── A SECOND APPROVAL (sales item 117, Nov 12 2026 review, finding 5) ────────
@@ -183,6 +207,7 @@ export function retainerPortalView(deal: { id: string; title?: unknown; retainer
     since: r.created_at || null, next_charge: status === 'active' ? (r.current_period_end || null) : null, canceled_at: r.canceled_at || null,
     approve_url: status === 'pending' ? String(r.checkout_url) : null,
     can_cancel: status === 'active' || status === 'past_due',
+    can_update_card: retainerCardFixable(r),   // sales item 129: Stripe's page for a new card
     charges: charges.slice(0, 24),
   };
 }
@@ -190,14 +215,48 @@ export function retainerPortalView(deal: { id: string; title?: unknown; retainer
 /** Merge a webhook/API patch onto the deal's stored retainer, stamping updated_at.
  *  Load-bearing guard: a CANCELED retainer is never resurrected by a late,
  *  out-of-order webhook (a subscription.updated arriving after cancel) — canceling
- *  is final. Pure. */
+ *  is final. Sales item 130: nor does a retainer that went live ever go back to
+ *  waiting for approval. Stripe's 'incomplete' (our pending) comes only before the
+ *  first charge, so it arriving later is an old message landing late, and it used to
+ *  tell a paying client to approve their retainer again. Pure. */
 export function mergeRetainerState(prior: Partial<RetainerState> | null, patch: Partial<RetainerState>, nowIso: string): RetainerState {
   const base: Partial<RetainerState> = prior || {};
   const clean: Partial<RetainerState> = {};
   for (const [k, v] of Object.entries(patch)) if (v !== undefined) (clean as Record<string, unknown>)[k] = v;
   const out = { ...base, ...clean, updated_at: nowIso } as RetainerState;
   if (base.status === 'canceled' && patch.status && patch.status !== 'canceled') out.status = 'canceled';
+  if ((base.status === 'active' || base.status === 'past_due') && patch.status === 'pending') out.status = base.status;
   return out;
+}
+
+/** What a retainer is, by Stripe's word now rather than the message's (sales item 130).
+ *  Stripe sends no message in order: a failure that arrives after the charge that put
+ *  it right would set a paid-up retainer past due, and a paid charge arriving after a
+ *  newer failure would hide that failure. So the subscription is read fresh, and its
+ *  status decides. `fallback` is what the event alone would have said, used when
+ *  Stripe can't be asked. A message about a charge or an approval proves the retainer
+ *  started, so Stripe's pre-first-charge 'incomplete' never undoes it. Pure. */
+export function retainerStatusNow(type: string, live: { status?: unknown } | null, fallback: RetainerStatus): RetainerStatus {
+  if (type === 'customer.subscription.deleted') return 'canceled';
+  if (!live || typeof live.status !== 'string' || !live.status) return fallback;
+  const fresh = retainerStatusFromStripe(live.status);
+  if (fresh === 'pending' && type !== 'customer.subscription.created' && type !== 'customer.subscription.updated') return fallback;
+  return fresh;
+}
+
+/** The retainer's subscription as Stripe has it now, or null when it can't be asked
+ *  (no Stripe here, Stripe unreachable, or an answer about some other subscription).
+ *  A failed read falls back to the message: the daily check puts it right the next day. */
+async function liveSubscription(subId: string, given?: any): Promise<any | null> {
+  if (given && typeof given === 'object' && given.id === subId && typeof given.status === 'string') return given;
+  if (!subId || !stripeConfigured()) return null;
+  try {
+    const s = await retrieveSubscription(subId);
+    return s && s.id === subId && typeof s.status === 'string' ? s : null;
+  } catch (e) {
+    console.warn(`[retainer] could not read subscription ${subId} from Stripe (${String((e as Error)?.message || e)}); using the message as sent`);
+    return null;
+  }
 }
 
 // ── Agreement renewal / expiry reminder (a SIGNED contract's term-end) ───────
@@ -292,7 +351,7 @@ export function retainerChargeRow(inv: any, x: { dealId: string; siteId: string;
 
 /** Put one charge on the deal, once. ok:false means it may not be recorded and
  *  Stripe should send the event again (the read or the write failed). */
-async function recordRetainerCharge(inv: any, x: { dealId: string; siteId: string; interval: unknown; fallbackCents: unknown; extra?: boolean }): Promise<{ ok: boolean; recorded: boolean }> {
+export async function recordRetainerCharge(inv: any, x: { dealId: string; siteId: string; interval: unknown; fallbackCents: unknown; extra?: boolean }): Promise<{ ok: boolean; recorded: boolean }> {
   const row = retainerChargeRow(inv, x);
   if (!row) return { ok: true, recorded: false };
   const stripeInvoice = String((row.detail as { stripe_invoice?: string }).stripe_invoice || '');
@@ -317,7 +376,7 @@ async function recordRetainerCharge(inv: any, x: { dealId: string; siteId: strin
 // retainer itself, or a charge), so billing-sync answers 502 and Stripe sends it
 // again. Every step is safe to run twice. A notice or an email that fails never
 // asks for a retry: the state is what matters, and Stripe would re-send forever.
-export async function applyRetainerSync(type: string, obj: any): Promise<{ synced: boolean; reason?: string; retry?: boolean }> {
+export async function applyRetainerSync(type: string, obj: any, opts: { live?: any } = {}): Promise<{ synced: boolean; reason?: string; retry?: boolean }> {
   const nowIso = new Date().toISOString();
   const md = stripeMetaOf(obj);
   let dealId = String(md.deal_id || '');
@@ -342,6 +401,9 @@ export async function applyRetainerSync(type: string, obj: any): Promise<{ synce
   // A second approval never becomes the retainer (sales item 117): see isExtraSubscription.
   if (isExtraSubscription(prior, subId)) return await syncExtraSubscription(type, obj, { dealId, siteId, title: String((deal as { title?: string }).title || ''), prior, subId, nowIso });
 
+  // Sales item 130: the subscription as Stripe has it now decides, whatever order the
+  // messages came in (retainerStatusNow). The daily check hands over the one it just read.
+  const live = subId ? await liveSubscription(subId, opts.live) : null;
   const patch: Partial<RetainerState> = {};
   if (subId) patch.stripe_subscription_id = subId;
   if (obj?.customer) patch.stripe_customer_id = String(typeof obj.customer === 'string' ? obj.customer : obj.customer.id);
@@ -349,16 +411,17 @@ export async function applyRetainerSync(type: string, obj: any): Promise<{ synce
     patch.status = 'canceled';
     patch.canceled_at = nowIso;
   } else if (type.startsWith('customer.subscription.')) {
-    patch.status = retainerStatusFromStripe(String(obj?.status || ''));
-    const cpe = subscriptionPeriodEnd(obj);
-    if (cpe) patch.current_period_end = new Date(cpe * 1000).toISOString();
+    patch.status = retainerStatusNow(type, live, retainerStatusFromStripe(String(obj?.status || '')));
+    if (patch.status === 'canceled' && prior.status !== 'canceled') patch.canceled_at = nowIso;
   } else if (type === 'checkout.session.completed') {
-    patch.status = 'active';   // the client authorized; subscription.created reconciles the details
+    patch.status = retainerStatusNow(type, live, 'active');   // the client authorized
   } else if (isRetainerChargeEvent(type)) {
-    patch.status = 'active';
+    patch.status = retainerStatusNow(type, live, 'active');
   } else if (type === 'invoice.payment_failed') {
-    patch.status = 'past_due';
+    patch.status = retainerStatusNow(type, live, 'past_due');
   }
+  const cpe = subscriptionPeriodEnd(live || (type.startsWith('customer.subscription.') ? obj : null));
+  if (cpe) patch.current_period_end = new Date(cpe * 1000).toISOString();
 
   const next = mergeRetainerState(prior, patch, nowIso);
   const up = await svc(`presence_deals?id=eq.${encodeURIComponent(dealId)}&site_id=eq.${encodeURIComponent(siteId)}`, {
@@ -408,7 +471,9 @@ export async function applyRetainerSync(type: string, obj: any): Promise<{ synce
           await clearNoticePrefix(clientId, 'retainer_status', retainerNoticePeriodPrefix(dealId));
         } else {
           const title = String((deal as { title?: string }).title || '').slice(0, 80);
-          const copy = retainerNoticeCopy(change, title, Number(next.amount_cents) || 0, String(next.interval || 'month'));
+          // sales item 129: an ending says why when Stripe gave up on a failing card
+          const reason = change === 'canceled' ? String(obj?.cancellation_details?.reason || '') : '';
+          const copy = retainerNoticeCopy(change, title, Number(next.amount_cents) || 0, String(next.interval || 'month'), reason);
           const fresh = await raiseNotice({
             siteId, clientId, kind: 'retainer_status',
             period: retainerNoticePeriod(dealId, change, Date.now()),
@@ -416,11 +481,9 @@ export async function applyRetainerSync(type: string, obj: any): Promise<{ synce
           });
           if (fresh) {
             const { emailOperator } = await import('../lib/service_bridge.ts');
-            const href = next.stripe_subscription_id
-              ? `https://dashboard.stripe.com/subscriptions/${next.stripe_subscription_id}`
-              : `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/pipeline.html?deal=${dealId}`;
-            emailOperator(siteId, copy.subject, copy.html, 'retainer_status',
-              { label: change === 'past_due' ? 'Open it in Stripe' : 'Open the deal', href }).catch(() => {});
+            // the fix is on the deal now (Email the card link, or set it up again), not in Stripe
+            const href = `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/pipeline.html?deal=${dealId}&dtab=billing`;
+            emailOperator(siteId, copy.subject, copy.html, 'retainer_status', { label: 'Open the deal', href }).catch(() => {});
           }
         }
       }
