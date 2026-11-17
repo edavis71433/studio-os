@@ -21,6 +21,8 @@
     '#custDlg .modeopt{display:flex;align-items:flex-start;gap:var(--dds-s2,8px);border:1px solid var(--dds-line,#eee9e0);border-radius:var(--dds-r,8px);padding:10px var(--dds-s3,12px);cursor:pointer;font-size:14px;color:var(--dds-ink,#1b1525)}',
     '#custDlg .modeopt:has(input:checked){border-color:var(--dds-p,#5b3fa0);background:var(--dds-p-soft,#efeafa)}',
     '#custDlg .modeopt input{width:auto;margin-top:var(--dds-s1,4px);accent-color:var(--dds-p,#5b3fa0)}',
+    // builder item 98: on a touch screen a finger just left of the round button still picks the choice
+    '@media (pointer:coarse){#custDlg .modeopt{padding-left:20px}}',
     '#custDlg .modeopt strong{display:block;font-weight:600;font-size:13.5px}',
     '#custDlg .modehint{display:block;font-size:12px;color:var(--dds-faint,#746b8a);margin-top:2px;line-height:1.45}',
     // builder item 198: a full plan is said in the box, where the person is looking, not in a toast

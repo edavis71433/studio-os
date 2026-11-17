@@ -21,8 +21,8 @@ import { RECORD_98, RECORD_98_CLIENT } from './tap-targets-98.phone-tablet-walk'
 type Miss = { el: string; text: string; w: number; h: number; side: string };
 
 /** Every visible control whose 44x44 box isn't all its own, after scrolling each to the middle. */
-async function smallTargets(page: Page): Promise<Miss[]> {
-  return page.evaluate(async () => {
+async function smallTargets(page: Page, within = 'body'): Promise<Miss[]> {
+  return page.evaluate(async (within) => {
     const SEL = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="tab"], [role="switch"], [role="checkbox"], [role="radio"], [role="menuitem"]';
     const name = (el: Element) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : '');
     const shown = (el: Element) => {
@@ -54,7 +54,7 @@ async function smallTargets(page: Page): Promise<Miss[]> {
     };
     const out: { el: string; text: string; w: number; h: number; side: string }[] = [];
     const seen = new Set<Element>();
-    for (const el of Array.from(document.querySelectorAll(SEL))) {
+    for (const el of Array.from(document.querySelector(within)?.querySelectorAll(SEL) || [])) {
       if (!shown(el) || inSentence(el)) continue;
       const t = targetOf(el); if (seen.has(t)) continue; seen.add(t);
       t.scrollIntoView({ block: 'center', inline: 'center' });
@@ -69,7 +69,7 @@ async function smallTargets(page: Page): Promise<Miss[]> {
     }
     window.scrollTo(0, 0);
     return out;
-  });
+  }, within);
 }
 
 const PAGES: Array<{ name: string; path: string; api: Record<string, unknown>; ready: string }> = [
@@ -99,4 +99,17 @@ test.describe('every control is a finger-sized target on a touch screen (builder
       expect(small, small.map((m) => `${m.el} "${m.text}" ${m.w}x${m.h} misses ${m.side}`).join('\n')).toEqual([]);
     });
   }
+
+  test('the Add a customer box', async ({ page }) => {
+    test.skip(!test.info().project.use.hasTouch, 'touch screens only');
+    await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'));
+    await installApp(page, { api: CUSTOMERS_API as never });
+    await page.goto('/customers.html');
+    await page.locator('#addCust').click();
+    const box = page.locator('dialog[open]');
+    await expect(box).toBeVisible();
+    await settled(page);
+    const small = await smallTargets(page, 'dialog[open]');
+    expect(small, small.map((m) => `${m.el} "${m.text}" ${m.w}x${m.h} misses ${m.side}`).join('\n')).toEqual([]);
+  });
 });
