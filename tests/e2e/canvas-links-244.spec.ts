@@ -4,8 +4,9 @@ import { installApp, STUDIO_NAV, ALL_FEATURES, settled, pressButton } from './he
 // A link or a form on the editor's canvas never loads another page into it (builder list item 244,
 // Nov 2026). In Edit mode, pressing the business name in the header took the canvas to the
 // editor's own address, on every device, and so did a section's button, a footer link and a
-// form's Send. Preview and Timewarp already held them; now every mode does. Presses keep their
-// editing meaning: the header's name and links don't open its card, the menu opens Pages.
+// form's Send. Preview and Timewarp already held them; now every mode does, from the moment a
+// page is in the canvas rather than once it has loaded. Presses keep their editing meaning: the
+// header's name and links don't open its card, the menu opens Pages.
 const BLOCKS = [{ type: 'title', title: 'Fresh bread, every morning', subtitle: 'Baked in Burbank' }];
 const META = { blocks: [{ sid: 'title', key: 'block_title', src_index: 0 }], pages: {} };
 const HTML = '<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0}header.site{background:#fff;padding:18px 24px;display:flex;justify-content:space-between}section{padding:48px 24px;min-height:300px;text-align:center}footer.site{background:#201b17;color:#fff;padding:40px 24px;text-align:center}footer.site a{color:#fff}</style></head><body>'
@@ -72,6 +73,28 @@ test.describe('a link on the canvas never loads another page into it (builder it
     expect(all.filter((p) => p.follows)).toEqual([]);
     expect(all.map((p) => p.on)).toEqual(expect.arrayContaining(['Book a table', 'Privacy']));
     expect(went).toEqual([]);
+    await expect(frame(page).locator('#a h2')).toHaveText('Fresh bread, every morning');
+  });
+
+  test('a press the moment the canvas is drawn again, with a photo still coming, doesn’t either', async ({ page }) => {
+    const { went } = await mount(page);
+    // Every save draws the canvas again. The new page can be pressed as soon as it's there, but its
+    // load (when the editor's own tools come) waits for its photos, and the guard used to wait with
+    // them: on a slow connection a press in that moment loaded another page. Here a photo never comes.
+    await page.route('**/photo-still-coming.jpg', () => { /* never answered: the page never loads */ });
+    await page.route('**/functions/v1/presence/preview**', (route: Route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML.replace('<h1>', '<img src="/photo-still-coming.jpg" width="48" height="48" alt=""><h1>') }));
+    await page.evaluate(() => (window as unknown as { refreshDesignPreview: () => void }).refreshDesignPreview());
+    await expect(frame(page).locator('img[src="/photo-still-coming.jpg"]')).toBeAttached();
+    expect(await frame(page).locator('html').evaluate(() => document.readyState)).not.toBe('complete');
+    await page.evaluate(() => {   // the new page's own window hears the press last; kept on the editor's side
+      const w = (document.getElementById('designPreview') as HTMLIFrameElement).contentWindow!;
+      const top = window as unknown as { __follows?: boolean[] };
+      w.addEventListener('click', (e) => { top.__follows = [...(top.__follows || []), !e.defaultPrevented]; });
+    });
+    await pressButton(frame(page).locator('header.site a.brand'));
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __follows?: boolean[] }).__follows)).toEqual([false]);
+    await settled(page);
+    expect(went.filter((u) => u !== 'about:srcdoc')).toEqual([]);   // the redraw is the only page the canvas took
     await expect(frame(page).locator('#a h2')).toHaveText('Fresh bread, every morning');
   });
 
