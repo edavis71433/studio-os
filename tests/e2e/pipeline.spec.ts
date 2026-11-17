@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, onAsk, pressButton } from './helpers/app';
 import { installIosFocusSemantics } from './helpers/ios-focus';
 
 // Pipeline (redesign slice 3): a 3-way List · Board · Table display (persisted),
@@ -1167,12 +1167,12 @@ test.describe('deal page — remove an unsent draft', () => {
     await expect(rowFor(page, '[data-link-proposal="p-sent"]')).not.toContainText('Delete');
 
     // destructive → confirm first; dismissing does nothing at all
-    page.once('dialog', (d) => d.dismiss());
+    await onAsk(page, () => false);
     await page.locator('[data-del-prop="p-dup"]').click();
     expect(calls.filter((c) => c.method === 'DELETE')).toHaveLength(0);
 
     // accepting sends the DELETE, then re-renders the deal and says so plainly
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator('[data-del-prop="p-dup"]').click();
     await expect(page.locator('.dds-toast')).toContainText('Draft removed');
     expect(calls).toContainEqual({ path: '/sales/proposals/p-dup', method: 'DELETE' });
@@ -1195,7 +1195,7 @@ test.describe('deal page — remove an unsent draft', () => {
     await expect(rowFor(page, '[data-doc-con="k-signed"]')).toContainText('Signed');
     await expect(rowFor(page, '[data-doc-con="k-signed"]')).not.toContainText('Delete');
 
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator('[data-del-con="k-draft"]').click();
     await expect(page.locator('.dds-toast')).toContainText('Draft removed');
     expect(calls).toContainEqual({ path: '/sales/contracts/k-draft', method: 'DELETE' });
@@ -1208,7 +1208,7 @@ test.describe('deal page — remove an unsent draft', () => {
       return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_sent', message: 'This was already sent — it stays on the record.' }) });
     });
     await page.goto(`/pipeline.html?deal=${DEAL4}&dtab=billing`);
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator('[data-del-prop="p-dup"]').click();
     await expect(page.locator('.dds-toast')).toContainText('already sent');
     await expect(page.locator('[data-del-prop="p-dup"]')).toBeVisible();        // still there to try again
@@ -1324,10 +1324,12 @@ test.describe('agreement — one per package', () => {
     await page.locator('#addCon').click();
     await seeded(page);
     await conBody(page).fill('MY OWN WORDING, typed by hand.');
-    page.once('dialog', (d) => { expect(d.message()).toContain('Custom + Photography'); d.dismiss(); });
+    let asked = '';
+    await onAsk(page, (q) => { asked = q; return false; });
     await page.locator('#conPkg').selectOption('custom_photography');
-    await expect(conBody(page)).toHaveValue('MY OWN WORDING, typed by hand.');   // untouched
     await expect(page.locator('#conPkg')).toHaveValue('growth');                 // …and the select snapped back
+    await expect(conBody(page)).toHaveValue('MY OWN WORDING, typed by hand.');   // untouched
+    expect(asked).toContain('Custom + Photography');
   });
 });
 
@@ -1352,7 +1354,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     await page.locator('#addCon').click();
     await seeded(page);
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await onAsk(page, (q) => { msg = q; return false; });
     await page.locator('#conForm .row2 .btn:not(.ghost)').click();               // Save & send for signature →
     await expect(page.locator('.dds-toast')).toContainText('Not sent — fill in the blanks');
     expect(msg).toContain('26 fill-in blanks');
@@ -1368,7 +1370,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     await seeded(page);
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator('#conForm .row2 .btn:not(.ghost)').click();
     await expect.poll(() => calls).toContain(`/sales/deals/${DEAL5}/contracts`);
     await expect.poll(() => calls).toContain('/sales/contracts/k-new/send');
@@ -1379,7 +1381,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     let dialogs = 0;
     await installApp(page, { api: PKG_API });
     await postsTo(page, calls);
-    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await onAsk(page, () => { dialogs++; return false; });
     await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('#addCon').click();
     const text = await seeded(page);
@@ -1398,7 +1400,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     await postsTo(page, calls);
     await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await onAsk(page, (q) => { msg = q; return false; });
     await page.locator('[data-send-contract="k-blank"]').first().click();
     await expect(page.locator('.dds-toast')).toContainText('Not sent — fill in the blanks');
     expect(msg).toContain('2 fill-in blanks');
@@ -1413,7 +1415,7 @@ test.describe('agreement — the unfilled-blanks warning', () => {
     let dialogs = 0;
     await installApp(page, { api: { ...PKG_API, [`/sales/deals/${DEAL5}`]: done } });
     await postsTo(page, calls);
-    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await onAsk(page, () => { dialogs++; return false; });
     await page.goto(`/pipeline.html?deal=${DEAL5}&dtab=billing`);
     await page.locator('[data-send-contract="k-done"]').first().click();
     await expect.poll(() => calls).toContain('/sales/contracts/k-done/send');
@@ -1495,7 +1497,7 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
     const draft = { ...SIGNED_NO_TERM, id: 'k-dr', status: 'draft', signer_name: null, signed_at: null };
     let dialogs = 0;
     await installApp(page, { api: conApi(draft) });
-    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await onAsk(page, () => { dialogs++; return false; });
     await page.route('**/functions/v1/presence/sales/contracts/k-dr/send', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { id: 'k-dr', status: 'sent' }, url: 'https://example.test/sign/x', emailed: true, deposit: { minted: true, amount_cents: 250000, invoice_id: 'inv-1' } }) }));
     await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
@@ -1516,7 +1518,7 @@ test.describe('deal drawer — signed fact, renewal hint, deposit mint', () => {
     });
     await page.goto(`/pipeline.html?deal=${DEAL7}&dtab=billing`);
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await onAsk(page, (q) => { msg = q; return false; });
     await page.locator('[data-send-contract="k-bl"]').first().click();
     await expect(page.locator('.dds-toast')).toContainText('Not sent — set the deal value in Details first.');
     expect(msg).toContain('the deal has no value set');
@@ -1576,7 +1578,7 @@ test.describe('deal drawer — one "Send proposal & agreement"', () => {
   test('the one button POSTs /sales/deals/:id/send with both ids; the toast names the client and the minted deposit', async ({ page }) => {
     let dialogs = 0;
     await installApp(page, { api: bothApi() });
-    page.on('dialog', (d) => { dialogs++; d.dismiss(); });
+    await onAsk(page, () => { dialogs++; return false; });
     await page.route(`**/functions/v1/presence/sales/deals/${DEAL8}/send`, (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { proposal: { id: 'p-b', status: 'sent' }, contract: { id: 'k-b', status: 'sent' }, deposit: { minted: true, amount_cents: 250000, invoice_id: 'inv-1' } }, url: 'https://example.test/sign.html?t=flow', emailed: true, sent: { proposal: true, contract: true } }) }));
     await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
@@ -1598,7 +1600,7 @@ test.describe('deal drawer — one "Send proposal & agreement"', () => {
     });
     await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await onAsk(page, (q) => { msg = q; return false; });
     await page.locator('#sendBothBtn').click();
     await expect(page.locator('.dds-toast')).toContainText('Not sent — fill in the blanks, then send it.');
     expect(msg).toContain('[LIST THE FIVE CORE PAGES]');
@@ -1709,13 +1711,13 @@ test.describe('invoice — the Void control', () => {
     await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeVisible();
 
     // Destructive → confirms first, and declining sends nothing.
-    page.once('dialog', (d) => d.dismiss());
+    await onAsk(page, () => false);
     await page.locator(`[data-void-inv="${INV_SENT}"]`).click();
     await expect.poll(() => calls.length).toBe(0);
     await expect(page.locator(`[data-void-inv="${INV_SENT}"]`)).toBeVisible();
 
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.accept(); });
+    await onAsk(page, (q) => { msg = q; return true; });
     await page.locator(`[data-void-inv="${INV_SENT}"]`).click();
     await expect(page.locator('.dds-toast')).toContainText('Invoice voided');
     expect(msg).toContain('Void this invoice?');
@@ -1734,7 +1736,7 @@ test.describe('invoice — the Void control', () => {
       return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_paid', message: 'That payment landed while you were voiding — a paid invoice is a financial record and stays.' }) });
     });
     await page.goto(`/pipeline.html?deal=${DEAL6}&dtab=billing`);
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator(`[data-void-inv="${INV_SENT}"]`).click();
     await expect(page.locator('.dds-toast')).toContainText('financial record');
     // Nothing was hidden on a refusal — the invoice is still there, still waiting
@@ -1816,13 +1818,13 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
     await openList(page);
 
     // Declining the confirm sends nothing and the row stays.
-    page.once('dialog', (d) => d.dismiss());
+    await onAsk(page, () => false);
     await page.locator(`[data-void-inv="${RINV1}"]`).click();
     await expect.poll(() => calls.length).toBe(0);
     await expect(page.locator('.rcv-row').filter({ hasText: 'Foreign Code' })).toBeVisible();
 
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.accept(); });
+    await onAsk(page, (q) => { msg = q; return true; });
     await page.locator(`[data-void-inv="${RINV1}"]`).click();
     await expect(page.locator('.dds-toast')).toContainText('Invoice voided');
     expect(msg).toContain('Void this invoice?');   // the drawer's exact confirm — shared wiring, not a copy
@@ -1849,7 +1851,7 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
       return route.fallback();
     });
     await openList(page);
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator(`[data-void-inv="${RINV2}"]`).click();
     await expect(page.locator('#detailInner')).toContainText('Nobody owes you anything');
     await expect(page.locator('.rcv-row')).toHaveCount(0);
@@ -1862,7 +1864,7 @@ test.describe('receivables — the "Who owes you" list carries the invoice actio
       return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'already_paid', message: 'That payment landed while you were voiding — a paid invoice is a financial record and stays.' }) });
     });
     await openList(page);
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator(`[data-void-inv="${RINV1}"]`).click();
     await expect(page.locator('.dds-toast')).toContainText('financial record');
     // Nothing was hidden on a refusal — both rows and the total are untouched.
@@ -2403,5 +2405,50 @@ test.describe('Pipeline — the record’s Payment schedule link, ?tab=, #outsta
     await page.goto(`/pipeline.html?deal=${DEAL}&dtab=billing`);
     await page.locator('#sendDeposit').click();
     await expect(page.locator('#invForm button[type="submit"]')).toHaveText('Request deposit');
+  });
+});
+
+// ── Sales item 129 (Stripe review, finding 3): a retainer card that didn't go through ──
+// The studio's line used to say "send a fresh authorization link", which the deal refuses
+// while the retainer is past due. The Retainer box now says the charge failed, and Email the
+// card link sends the client Stripe's own page for a new card.
+test.describe('deal page — a retainer card that didn’t go through (sales item 129)', () => {
+  const PAST_DUE = { status: 'past_due', amount_cents: 50000, interval: 'month', stripe_subscription_id: 'sub_1', stripe_customer_id: 'cus_1', checkout_url: null, created_at: '2026-10-01T00:00:00Z' };
+  const withRetainer = (retainer: unknown) => ({ ...TAB_API, [`/sales/deals/${WON_DEAL}`]: { data: { ...WON_DETAIL.data, deal: { ...WON_DETAIL.data.deal, retainer } } } });
+  const retainerBox = (page: import('@playwright/test').Page) => page.locator('#detailInner .sec').filter({ has: page.getByRole('heading', { name: 'Retainer', exact: true }) });
+
+  test('the Retainer box says the charge failed, and Email the card link sends the client Stripe’s page', async ({ page }) => {
+    const sent: unknown[] = [];
+    await installApp(page, { api: { ...withRetainer(PAST_DUE), [`POST /sales/deals/${WON_DEAL}/retainer/card-link`]: (body: unknown) => { sent.push(body); return { data: { emailed: true, to: 'j•••@example.com', url: 'https://app.example/card.html?t=x' } }; } } });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}&dtab=billing`);
+    const box = retainerBox(page);
+    await expect(box).toContainText('Payment overdue');
+    await expect(box).toContainText('The last charge didn’t go through. Stripe tries the card again over the next few days.');
+    await expect(box).not.toContainText('authorization link');
+    const email = box.getByRole('button', { name: 'Email the card link' });
+    await pressButton(email);
+    await expect(page.locator('.dds-toast')).toContainText('Card link emailed to j•••@example.com');
+    expect(sent).toHaveLength(1);
+    await expect(email).toBeEnabled();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test('no email on the contact: nothing is sent, the link is copied, and the words say so', async ({ page }) => {
+    await installApp(page, { api: { ...withRetainer({ ...PAST_DUE, status: 'active' }), [`POST /sales/deals/${WON_DEAL}/retainer/card-link`]: { data: { emailed: false, reason: 'no_email', url: 'https://app.example/card.html?t=x' } } } });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}&dtab=billing`);
+    const box = retainerBox(page);
+    await expect(box).toContainText('Active');
+    await expect(box).not.toContainText('The last charge didn’t go through.');
+    await pressButton(box.getByRole('button', { name: 'Email the card link' }));
+    await expect(page.locator('.dds-toast')).toContainText('There’s no email on the contact, so the card link is copied. Send it to them yourself.');
+  });
+
+  test('a retainer waiting for approval, or one Stripe hasn’t named a customer for, offers no card link', async ({ page }) => {
+    await installApp(page, { api: withRetainer({ ...PAST_DUE, status: 'pending', stripe_customer_id: null, stripe_subscription_id: null, checkout_url: 'https://pay.example/r' }) });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}&dtab=billing`);
+    await expect(retainerBox(page)).toContainText('Awaiting the client’s authorization');
+    await expect(retainerBox(page).getByRole('button', { name: 'Copy authorization link' })).toBeVisible();
+    await expect(page.locator('#retCardLink')).toHaveCount(0);
   });
 });

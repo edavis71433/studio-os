@@ -64,7 +64,8 @@ ok('report: the studio\'s day → 1', (await report(`&today=${UTC_YESTERDAY}`)).
   const h = Deno.readTextFileSync(new URL('../../projects.html', import.meta.url));
   ok('page: the board\'s progress read carries today', /api\('\/projects\/progress\?ids='\+part\.join\(','\)\+'&today='\+today\)/.test(h));
   ok('page: the record and its report carry today', /const td='\?today='\+todayYmd\(\);/.test(h) && /api\('\/projects\/'\+id\+td\),api\('\/projects\/'\+id\+'\/report'\+td\)/.test(h));
-  ok('page: today is the computer\'s own day', /const todayYmd=\(\)=>\{const d=new Date\(\);return d\.getFullYear\(\)/.test(h));
+  // that today is the computer's own day (the shell's ddsDate.ymd, builder item 101) is checked in the
+  // browser: tests/e2e/projects-record-sync.spec.ts "the board, the record and its report all send the computer’s own day"
 }
 
 const passed = results.filter(Boolean).length;

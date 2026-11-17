@@ -245,6 +245,7 @@ const DECIDED = {
     'POST /sales/prospects/:id/pack',   // sales review item 113: the pitch pack build
     'POST /sales/contacts/imports',   // sales review item 86: starting an import (each row is a POST /sales/contacts)
     'POST /sales/invoices/:id/payment',   // sales review item 77: recording a check, cash, transfer or Zelle payment
+    'POST /sales/deals/:id/retainer/card-link', 'POST /client/retainers/:id/card',   // sales item 129: Stripe's page for a new card keeps a retainer paid and stops nothing
     'POST /projects/templates',   // sales item 106: saving a project as a template
     'POST /sales/todo-templates', 'POST /sales/deals/:id/tasks/from-template',   // sales item 106: saving a deal's to-dos as a list, and adding one to a deal
   ],
@@ -519,6 +520,7 @@ const WRITE_HANDLERS = [
   'handleEstimateCreate', 'handleEstimateSend', 'handleEstimateToProposal', 'handleEstimateToInvoice', 'handleEstimateDelete',
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
   'handleInvoicePayment', 'handleInvoicePaymentUndo',   // sales review item 77 (see DECIDED.edit and .delete)
+  'handleSalesRetainerCardLink', 'handleClientRetainerCard',   // sales item 129 (see DECIDED.edit)
   // sales review item 112: prospects (DELETE and PATCH /sales/prospects/:id share handleProspect)
   'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft', 'handleProspectPack',
   // sales review items 86 + 105: imports (POST edit; undo delete) and merging two records (delete)

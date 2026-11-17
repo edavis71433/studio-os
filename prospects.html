@@ -93,8 +93,6 @@
   .dbody input,.dbody textarea{width:100%;font:inherit;font-size:14.5px;padding:9px 12px;border:1px solid var(--dds-line-strong,#d6d4e2);border-radius:var(--dds-r,8px);background:var(--card);color:var(--ink)}
   .dbody textarea{min-height:230px;resize:vertical;line-height:1.5}
   .row2{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;flex-wrap:wrap}
-  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--p-deep);color:#fff;font-size:14px;padding:10px 18px;border-radius:999px;opacity:0;pointer-events:none;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out)}
-  .toast.show{opacity:1;transform:translateX(-50%)}
   footer{margin-top:40px;font-size:12.5px;color:var(--faint);text-align:center}
   @media (max-width:767px){
     .row{grid-template-columns:auto 1fr}
@@ -140,21 +138,20 @@
     </div>
   </form>
 </dialog>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let TOKEN="",SAVED=[],FINDS=null,QUERYRAN="",BUSY=false,LEADS=[],LEADS_OK=false;
+let TOKEN="",SAVED=[],FINDS=null,QUERYRAN="",BUSY=false,LEADS=[],LEADS_OK=false,LOADED=false;
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope(),'x-region':FN_REGION});
-async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+// the shell's one API helper (shell-kit.js): it never throws, so a button switched off for a
+// call comes back on a dropped connection too (no answer at all is { ok:false, status:0 })
+const api=(path,method,body)=>ddsApi(path,{method,body,scope:scope()});
+const toast=(m,kind,action)=>ddsToast(m,kind,action);   // the shell's one toast: 'err' shows a failure as one
 
 // warmth: the server's score, read as a word the page colors by
 const heat=(p)=>p.site_health==='no_website'||p.site_health==='unreachable'?'hot':p.site_health==='dated'?'warm':'cool';
@@ -301,22 +298,22 @@ function wire(){
   const st=$('saveTicked');
   if(st)st.addEventListener('click',async()=>{
     const picked=[...document.querySelectorAll('input[data-find]:checked')].map(x=>FINDS[Number(x.dataset.find)]);
-    if(!picked.length)return toast('Tick at least one business first.');
+    if(!picked.length)return toast('Tick at least one business first.','err');
     st.disabled=true;
     const r=await api('/sales/prospects','POST',{query:QUERYRAN,prospects:picked});
-    if(!r.ok){st.disabled=false;return toast((r.body&&r.body.message)||'That didn’t save — try again.');}
+    if(!r.ok){st.disabled=false;return toast((r.body&&r.body.message)||'That didn’t save — try again.','err');}
     toast(`Saved ${r.body.data.saved.length}${r.body.data.skipped?` · ${r.body.data.skipped} already kept`:''}`);
     FINDS=null;QUERYRAN="";await load();
   });
   $('exportBtn').addEventListener('click',async()=>{
-    const r=await fetch(FN+'/sales/prospects/export',{headers:H()});
-    if(!r.ok)return toast('The download didn’t start — try again.');
+    let r=null;try{r=await ddsApi.raw('/sales/prospects/export',{scope:scope()});}catch(_){/* no answer at all: said below */}
+    if(!r||!r.ok)return toast('The download didn’t start — try again.','err');
     const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download='prospects.csv';a.click();URL.revokeObjectURL(a.href);
   });
   document.querySelectorAll('[data-deal]').forEach(b=>b.addEventListener('click',async()=>{
     b.disabled=true;
     const r=await api('/sales/prospects/'+b.dataset.deal+'/convert','POST',{});
-    if(!r.ok&&!(r.body&&r.body.already_converted)){b.disabled=false;return toast((r.body&&r.body.message)||'That didn’t work — try again.');}
+    if(!r.ok&&!(r.body&&r.body.already_converted)){b.disabled=false;return toast((r.body&&r.body.message)||'That didn’t work — try again.','err');}
     // item 119: the deal comes with its contact (one already holding that phone number is used)
     const c=r.body&&r.body.contact;
     toast(r.body.already_converted?'Already in your pipeline.':c&&c.reused?`Deal started with ${c.name}, already in your contacts.`:'Deal and contact started.');
@@ -326,7 +323,7 @@ function wire(){
     b.disabled=true;
     const r=await api('/sales/prospects/'+b.dataset.draft+'/draft','POST',{});
     b.disabled=false;
-    if(!r.ok)return toast((r.body&&r.body.message)||'The draft didn’t come — try again.');
+    if(!r.ok)return toast((r.body&&r.body.message)||'The draft didn’t come — try again.','err');
     $('d-subject').value=r.body.data.subject;$('d-body').value=r.body.data.body;
     $('draftDlg').showModal();
   }));
@@ -335,25 +332,25 @@ function wire(){
   document.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',async()=>{
     if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='Remove — sure?';setTimeout(()=>{b.dataset.armed='';b.textContent='Remove';},3000);return;}
     const r=await api('/sales/prospects/'+b.dataset.remove,'DELETE');
-    if(!r.ok)return toast('That didn’t work — try again.');
+    if(!r.ok)return toast('That didn’t work — try again.','err');
     toast('Off the list.');await load();
   }));
   document.querySelectorAll('select[data-status]').forEach(s=>s.addEventListener('change',async()=>{
     const r=await api('/sales/prospects/'+s.dataset.status,'PATCH',{status:s.value});
-    if(!r.ok){toast('That didn’t save — try again.');await load();return;}
+    if(!r.ok){toast('That didn’t save — try again.','err');await load();return;}
     const row=SAVED.find(p=>p.id===s.dataset.status);if(row)row.status=s.value;
   }));
   document.querySelectorAll('[data-lead-deal]').forEach(b=>b.addEventListener('click',async()=>{
     b.disabled=true;
     const r=await api('/sales/tool-leads/'+b.dataset.leadDeal+'/convert','POST',{});
-    if(!r.ok&&!(r.body&&r.body.already_converted)){b.disabled=false;return toast((r.body&&r.body.message)||'That didn’t work — try again.');}
+    if(!r.ok&&!(r.body&&r.body.already_converted)){b.disabled=false;return toast((r.body&&r.body.message)||'That didn’t work — try again.','err');}
     toast(r.body.already_converted?'Already in your pipeline.':'Contact and deal started.');
     await load();
   }));
   document.querySelectorAll('[data-lead-status]').forEach(b=>b.addEventListener('click',async()=>{
     b.disabled=true;
     const r=await api('/sales/tool-leads/'+b.dataset.leadStatus,'PATCH',{status:b.dataset.to});
-    if(!r.ok){b.disabled=false;return toast((r.body&&r.body.message)||'That didn’t save — try again.');}
+    if(!r.ok){b.disabled=false;return toast((r.body&&r.body.message)||'That didn’t save — try again.','err');}
     toast(b.dataset.to==='not_a_fit'?'Marked not a fit.':'Marked contacted.');
     await load();
   }));
@@ -401,7 +398,7 @@ async function buildPack(){
       +(notes.length?`<div class="pnotes" style="margin-top:10px"><b>What the pack couldn’t check</b>, only you see this:<ul>${notes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:'');
     go.hidden=true;
     const url=location.origin+res.share_url;
-    $('pk-copy').hidden=false;$('pk-copy').onclick=async()=>{try{await navigator.clipboard.writeText(url);toast('Link copied.');}catch(_){toast(url);}};
+    $('pk-copy').hidden=false;$('pk-copy').onclick=async()=>{try{await navigator.clipboard.writeText(url);toast('Link copied.');}catch(_){toast(url,'err');}};   // it couldn't copy: the link itself, to copy by hand
     const op=$('pk-open');op.hidden=false;op.style.display='inline-flex';op.href=res.share_url;
     load();
   }else{
@@ -414,10 +411,12 @@ async function load(){
   const [r,lr]=await Promise.all([api('/sales/prospects'),api('/sales/tool-leads')]);
   LEADS_OK=lr.ok;LEADS=lr.ok&&lr.body&&Array.isArray(lr.body.data)?lr.body.data:[];
   if(!r.ok){
+    // no answer at all on a refresh keeps the list on screen, as when the old wrapper threw
+    if(r.status===0&&LOADED)throw new Error('offline');
     if(r.status===503&&r.body&&r.body.message){$('main').innerHTML=`<div class="center"><h2>One quick setup step</h2><p class="muted">${esc(r.body.message)}</p></div>`;return;}
     trouble();return;
   }
-  SAVED=r.body.data||[];
+  SAVED=r.body.data||[];LOADED=true;
   render();
 }
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your prospects.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}

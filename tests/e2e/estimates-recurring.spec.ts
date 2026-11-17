@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { installApp } from './helpers/app';
+import { installApp, onAsk } from './helpers/app';
 
 // Sales review item 47 (Nov 2026): estimates and recurring invoices, as Eric chose
 // them on Nov 8. On the deal's Billing tab: an Estimates section (a price before
@@ -103,7 +103,7 @@ test.describe('Deals — estimates (item 47)', () => {
   test('a draft: Send it, or remove it (after a confirm)', async ({ page }) => {
     await installApp(page, { api: dealApi({ estimates: [{ ...ESTIMATE, status: 'draft', sent_at: null, expires_at: null, first_viewed_at: null, decided_at: null, decided_note: '' }] }) });
     const writes = await recordWrites(page);
-    page.on('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await billing(page);
     const row = page.locator(`[data-est="${EST}"]`);
     await expect(row).toContainText('Draft — not sent yet');
@@ -159,7 +159,7 @@ test.describe('Deals — recurring invoices (item 47)', () => {
     await installApp(page, { api: dealApi({ estimates: [], recurring: [SCHEDULE] }) });
     const writes = await recordWrites(page);
     const asked: string[] = [];
-    page.on('dialog', (d) => { asked.push(d.message()); d.accept(); });
+    await onAsk(page, (q) => { asked.push(q); return true; });
     await billing(page);
     const row = page.locator(`[data-rec="${REC}"]`);
     await expect(row).toContainText('Website care — $500 every month · Next invoice: Dec 1, 2026 · 2 sent');
@@ -193,7 +193,7 @@ test.describe('Deals — recurring invoices (item 47)', () => {
     await installApp(page, { api: dealApi({ estimates: [], recurring: [{ ...SCHEDULE, status: 'paused', paused_reason: 'unpaid', next_on: '2026-01-01' }] }) });
     const writes = await recordWrites(page);
     const asked: string[] = [];
-    page.on('dialog', (d) => { asked.push(d.message()); d.accept(); });
+    await onAsk(page, (q) => { asked.push(q); return true; });
     await billing(page);
     const row = page.locator(`[data-rec="${REC}"]`);
     await expect(row).toContainText('Paused — the last two invoices are still unpaid');

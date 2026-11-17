@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, onAsk, pressButton } from './helpers/app';
 import { settled } from './helpers/app';
 import { headerAction } from './helpers/page-header';
 
@@ -526,6 +526,21 @@ test.describe('Relationship view', () => {
     await expect(page.locator('[data-doc="proposals:p-1"]')).toBeVisible();
   });
 
+  // Sales item 129 (Stripe review, finding 3): a retainer card that didn't go through can be
+  // put right from the record too, with the deal page's own Email the card link
+  test('Billing: a past-due retainer says the charge failed, and Email the card link sends the client Stripe’s page', async ({ page }) => {
+    const sent: unknown[] = [];
+    const deal = { data: { ...HUB_DEAL.data, deal: { ...HUB_DEAL.data.deal, retainer: { amount_cents: 50000, interval: 'month', status: 'past_due', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1' } } } };
+    await installApp(page, { api: { '/crm/record': HUB_RECORD, [`/sales/deals/${DEAL}`]: deal, [`POST /sales/deals/${DEAL}/retainer/card-link`]: (body: unknown) => { sent.push(body); return { data: { emailed: true, to: 'm•••@example.com', url: 'https://app.example/card.html?t=x' } }; }, '/crm/activity': activityFx(), [`/projects/${PROJECT}`]: { data: { project: { id: PROJECT, name: 'Marlow’s Kitchen', status: 'active' }, milestones: [], tasks: [], deliverables: [] } } } });
+    await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
+    await expect(page.locator('.brow .schip', { hasText: 'Payment overdue' })).toBeVisible();
+    await expect(page.getByText('The last charge didn’t go through. Stripe tries the card again over the next few days.')).toBeVisible();
+    await expect(page.locator('[data-ret-cancel]')).toBeVisible();   // Cancel stays, beside it
+    await pressButton(page.locator('[data-ret-cardlink]'));
+    await expect(page.locator('.dds-toast')).toContainText('Card link emailed to m•••@example.com');
+    expect(sent).toHaveLength(1);
+  });
+
   // ── ONE LINK from proposal to deposit (benchmark 2026-10, item 5) ────────
   // With BOTH a proposal and an agreement drafted on an open deal, the three
   // sends (proposal · agreement · deposit) collapse to ONE "Send proposal &
@@ -945,7 +960,7 @@ test.describe('Client record — editing and removing the contact', () => {
     // Playwright's auto-dismiss and the second dialog arrives already handled.
     const seen: string[] = [];
     let answer: 'dismiss' | 'accept' = 'dismiss';
-    page.on('dialog', (d) => { seen.push(d.message()); answer === 'accept' ? d.accept() : d.dismiss(); });
+    await onAsk(page, (q) => { seen.push(q); return answer === 'accept'; });
 
     // FIRST: back out. The dry run has already happened; nothing else may write.
     await page.locator('#ec-del').click();

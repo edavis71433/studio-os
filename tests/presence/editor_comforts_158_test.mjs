@@ -4,6 +4,7 @@
 // everything that sits on every page, in one place. (The right-click menu and shortcuts,
 // the code to open the draft on a phone and the Coming soon page wait for Eric's yes on
 // the drawings.)
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY' })) Deno.env.set(k, v);
 const P = '../../supabase/functions/presence';
 const { normalizeStars, toggleStar, VERSION_STARS_MAX } = await import(`${P}/routes/publish.ts`);
@@ -87,7 +88,7 @@ ok('starring a version is edit, like naming one', memberWriteNeeds('/publishes/s
 
 // ── the editor and Files ──
 {
-  const page = read('presence.html'), files = read('files.html');
+  const page = editorSource(), files = read('files.html');
   ok('Versions: a star on every kept version, and All, Published or Starred', /function verStar\(p\)/.test(page) && /api\("PUT", "\/publishes\/stars", \{ id: p\.id, starred: next \}\)/.test(page) && /\["all", "All"\], \["published", "Published"\], \["starred", "Starred \(" \+ starredN \+ "\)"\]/.test(page));
   ok('Styles › Looks: Still or Gentle motion, with what it does said', /pillRow\(card, "Motion", \[\["Still", ""\], \["Gentle motion", "gentle"\]\]/.test(page) && /saveTokens\(\{ motion: o\[1\] \}/.test(page));
   ok('Styles › Looks: the site icon, shown as a browser tab shows it, with the letter one press away', /function siteIconRow\(\)/.test(page) && /tab\.setAttribute\("role", "img"\)/.test(page) && /"How your site shows in a browser tab: "/.test(page) && /settingsPut\(\{ icon_media_id: id \}\)/.test(page));

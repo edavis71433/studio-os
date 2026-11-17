@@ -7,12 +7,13 @@
 // named fields by their storage keys ("seo description"); Connections ran "searchas of
 // 2026-11-08" together; and the "not switched on yet" help for a Google product named
 // secrets nobody needs since it signs in with the studio's Google app.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const results = [];
 const ok = (n, p, note = '') => { results.push(p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
 
-const presence = read('presence.html');
+const presence = editorSource();
 const tip = presence.match(/search: \["search-plain", "([^"]+)"\]/)?.[1] || '';
 ok('the Search tip says what is on the tab, and where a page’s own Google settings are', !!tip && !/Show this page on Google/.test(tip) && /Pages tab/.test(tip), tip);
 ok('the Search card prints no schema word', !/h\.schema/.test(presence) && !/LocalBusiness/.test(presence));

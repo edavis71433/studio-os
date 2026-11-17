@@ -15,11 +15,12 @@ import { renderSnapshot, devLayerFragments, listTemplates, FIXED_COLOR_TEMPLATES
 import { BUTTON_SETS, FORM_STYLES, buttonStyle, siteColours } from '../../supabase/functions/presence/lib/site_buttons.ts';
 import { fixture, fullFixture, variantPages } from './full_fixture.mjs';
 import { parseHtml, elementsIn, sheetsOf, cascade, hexOf } from './style_cascade.mjs';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); if (!p) console.log(`FAIL  ${n}${note ? ' — ' + note : ''}`); };
 const SITE = { baseUrl: 'https://example.com' };
-const PAGE = Deno.readTextFileSync(new URL('../../presence.html', import.meta.url));
+const PAGE = editorSource();
 const pageArray = (name) => new Function(`return ${PAGE.match(new RegExp(`\\nconst ${name} = (\\[[\\s\\S]*?\\n\\]);`))[1]};`)();
 // every palette and look the editor offers; a look with a palette's very colours is read once
 const COLOUR_TOKENS = ['accent', 'accent_dark', 'ink', 'soft', 'bg'];

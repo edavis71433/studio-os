@@ -10,8 +10,9 @@
 //   deno run --allow-read --allow-env tests/presence/palettes_test.mjs
 import { validateThemeTokens } from '../../supabase/functions/presence/lib/devmode.ts';
 import { devLayerFragments } from '../../supabase/functions/presence/lib/render.ts';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
-const PAGE = Deno.readTextFileSync(new URL('../../presence.html', import.meta.url));
+const PAGE = editorSource();
 /** A top-level `const NAME = [ ... ];` array literal from the page, evaluated. */
 function pageArray(name) {
   const m = PAGE.match(new RegExp(`\\nconst ${name} = (\\[[\\s\\S]*?\\n\\]);`));

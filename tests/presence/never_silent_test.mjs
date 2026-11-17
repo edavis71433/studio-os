@@ -217,7 +217,10 @@ try {
   {
     const c = retainerNoticeCopy('past_due', 'Larkspur care plan', 45000, 'month');
     ok('C0: the past_due copy names the client, the amount, and what to do (plain voice, no jargon)',
-      /Larkspur care plan/.test(c.subject) && /\$450\.00\/month/.test(c.body) && /card/i.test(c.body) && /Stripe/i.test(c.html));
+      /Larkspur care plan/.test(c.subject) && /\$450\.00 a month/.test(c.body) && /card/i.test(c.body) && /Stripe/i.test(c.html));
+    // sales item 129: what to do is the deal's Email the card link, never a fresh approval the deal refuses while past due
+    ok('C0: the past_due copy points at Email the card link, not a fresh authorization link',
+      /Email the card link/.test(c.body) && /Email the card link/.test(c.html) && !/authorization link/.test(c.body + c.html));
     const k = retainerNoticeCopy('canceled', '', 120000, 'year');
     ok('C0: the canceled copy degrades gracefully with no title and says it won’t bill again',
       /a retainer client/.test(k.subject) && /\$1,200\.00\/year/.test(k.body) && /won’t bill again/.test(k.body));
@@ -235,9 +238,9 @@ try {
       r.synced === true && notice?.body?.kind === 'retainer_status' && new RegExp(`^retainer:${DEAL}:past_due:w\\d+$`).test(String(notice?.body?.period)),
       String(notice?.body?.period));
     ok('C1: …and EMAILS the operator once (send-once rides the notice’s created flag)',
-      sent.length === 1 && sent[0]?.to === 'studio@davisdigitalstudio.com' && /retainer payment didn’t go through/i.test(String(sent[0]?.subject)));
-    ok('C1: the email’s CTA is the Stripe subscription (where the fix lives)',
-      /dashboard\.stripe\.com\/subscriptions\/sub_1/.test(String(sent[0]?.html || '')));
+      sent.length === 1 && sent[0]?.to === 'studio@davisdigitalstudio.com' && /retainer card didn’t go through/i.test(String(sent[0]?.subject)));
+    ok('C1: the email’s button opens the deal\'s Billing, where Email the card link is (sales item 129)',
+      String(sent[0]?.html || '').includes(`/pipeline.html?deal=${DEAL}&amp;dtab=billing`) || String(sent[0]?.html || '').includes(`/pipeline.html?deal=${DEAL}&dtab=billing`), String(sent[0]?.html || '').slice(0, 400));
     restore();
   }
   {

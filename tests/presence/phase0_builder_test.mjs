@@ -4,6 +4,7 @@
 // from a plain local server, so the production _headers file never applies to it.
 // That is how a CSP that blocked every Supabase image survived from July to
 // November with the whole suite green.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 
@@ -45,7 +46,7 @@ const commercial = read('supabase/functions/presence/routes/commercial.ts');
 ok('a form submit looks through the custom pages too', /select=blocks,pages/.test(commercial) && /stored\.pages\.map/.test(commercial));
 
 // ── the builder ──────────────────────────────────────────────────────────────
-const page = read('presence.html');
+const page = editorSource();
 ok('no emoji left as a builder control', !/[\u{1F4AC}\u{1F5D1}\u{1F648}\u{1F3E0}\u{1F4C4}\u{1F4CB}\u{1F517}\u{1F512}\u{1F5BC}\u{2728}]/u.test(page.replace(/\/\/[^\n]*/g, '')));
 ok('the icon helper has its own name: `bi` is a section index all over the canvas', /function uiIcon\(/.test(page) && !/function bi\(/.test(page));
 ok('account notices stay out of a client view', /if \(!studioInClient\(\)\) \{\s*renderFirstRun\(\);\s*renderPlanNotice\(\);/.test(page));

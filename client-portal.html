@@ -84,7 +84,7 @@
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── Client portal (builder list items 236 and 232, Nov 2026) ─────────────────
 // One place for the studio's client portal: its address to share, where its clients
@@ -95,16 +95,14 @@
 // portal — from the Agiled check"). In the studio's menu under Customers.
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const toast=(m,bad)=>{ if(window.ddsToast) window.ddsToast(m,bad?'err':'ok'); };
+const toast=(m,bad,action)=>ddsToast(m,bad?'err':'ok',action);   // the shell's one toast
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-region':FN_REGION});
-async function api(path){let r;try{r=await fetch(FN+path,{headers:H()});}catch(_){return{ok:false,status:0,body:{}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+const api=(path)=>ddsApi(path,{scope:''});   // the studio's own portal: no client goes with it
 let DATA=null;
 
 const STEP_WORDS={
@@ -114,8 +112,9 @@ const STEP_WORDS={
   preview:['See your portal as a client does','Open',''],
   invite:['Invite your first client','Invite','/agency.html#add'],
 };
-const dayWords=(iso)=>{const t=Date.parse(iso||'');return Number.isFinite(t)?new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';};
-function agoWords(iso){const t=Date.parse(iso||'');if(!Number.isFinite(t))return'';const d=Math.floor((Date.now()-t)/86400000);return d<=0?'today':d===1?'yesterday':d<30?d+' days ago':'on '+dayWords(iso);}
+const dayWords=(iso)=>ddsDate.short(iso);   // "Nov 3", with the year when it isn't this one
+// "Last in 3 days ago": calendar days, as the shell counts them (ddsDate.days), in this page's own words
+function agoWords(iso){const n=ddsDate.days(iso);if(n===null)return'';const d=-n;return d<=0?'today':d===1?'yesterday':d<30?d+' days ago':'on '+dayWords(iso);}
 function stateWords(c){
   if(c.state==='joined')return 'Last in '+agoWords(c.seen_at);
   if(c.state==='waiting')return 'Invited '+dayWords(c.invited_at)+' · hasn’t signed in yet';

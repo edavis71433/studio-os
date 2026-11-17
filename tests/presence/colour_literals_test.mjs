@@ -9,8 +9,9 @@
 // never up (a new look belongs in a class in the <style> block).
 //
 //   deno run --allow-read tests/presence/colour_literals_test.mjs
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
-const src = Deno.readTextFileSync(new URL('presence.html', ROOT));
+const src = editorSource();
 const lines = src.split('\n');
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; } else { fail++; console.log('FAIL  ' + n); } };

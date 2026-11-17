@@ -333,6 +333,26 @@ export async function paymentIntentForInvoice(stripeInvoiceId: string): Promise<
   return String((typeof pi === 'string' ? pi : pi?.id) || '');
 }
 
+// ── Retainer cards (sales item 129) ──────────────────────────────────────────
+/** Stripe's own page for a client to put in a new card (sales item 129): the
+ *  customer portal, opened on "update your payment method" and nothing else, which
+ *  Stripe's own guide sends a subscriber to when a charge fails. They come back to
+ *  `doneUrl` once a card is saved, or to `returnUrl` if they leave first. A session
+ *  lives a short while, so every press makes a new one. Stripe refuses until the
+ *  customer portal has been saved once in its settings, and then this throws. */
+export async function createCardUpdateSession(p: { customerId: string; returnUrl: string; doneUrl: string }): Promise<{ url: string }> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  const s = await stripeReq('billing_portal/sessions', {
+    customer: p.customerId,
+    return_url: p.returnUrl,
+    'flow_data[type]': 'payment_method_update',
+    'flow_data[after_completion][type]': 'redirect',
+    'flow_data[after_completion][redirect][return_url]': p.doneUrl,
+  });
+  if (!/^https:\/\//.test(String(s?.url || ''))) throw new Error('no_session_url');
+  return { url: String(s.url) };
+}
+
 // ── The daily check against Stripe (sales item 130) ──────────────────────────
 // Reads only. Stripe sends each change as a message, and one that never lands (our
 // server down for more than the three days Stripe keeps trying, a retry dropped) was

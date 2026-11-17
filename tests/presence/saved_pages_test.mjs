@@ -13,6 +13,7 @@
 //     what's untouched;
 //   · before migration 0217 nothing breaks: the list is empty and a save says so.
 //   deno run --allow-read --allow-env tests/presence/saved_pages_test.mjs
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 Deno.env.set('SUPABASE_URL', 'http://stub.local');
 Deno.env.set('SERVICE_ROLE_KEY', 'service-key');
 const P = '../../supabase/functions/presence';
@@ -261,7 +262,7 @@ const settingsOf = (id) => T.presence_settings.find((s) => s.site_id === id);
 
 // ═══ 5. wiring ═══
 {
-  const lock = read('supabase/functions/presence/lib/optimistic_lock.ts'), page = read('presence.html');
+  const lock = read('supabase/functions/presence/lib/optimistic_lock.ts'), page = editorSource();
   const rx = (src) => (src.match(/const DRAFT_WRITE = (\/.*\/);/) || [])[1];
   ok('a draft write on both sides, in the same words', rx(lock) && rx(lock) === rx(page) && rx(lock).includes('pages\\/(?:duplicate|from-saved)'));
   const idx = read('supabase/functions/presence/index.ts');

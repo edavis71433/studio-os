@@ -8,6 +8,7 @@
 //   17. the leftover-record check told owners to delete a working "www" record
 // The rules first, then the routes against stubbed DNS, hosting, database and email. No
 // outside call leaves.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL: 'https://app.example', RESEND_KEY: 're_test_unused', NETLIFY_AUTH_TOKEN: 'nf-test' })) Deno.env.set(k, v);
 
 const results = [];
@@ -277,7 +278,7 @@ world({ dns: { 'bistro.example': { A: [NETLIFY_APEX_IP] }, 'www.bistro.example':
 
 // ═══ the page ═══
 {
-  const page = read('presence.html');
+  const page = editorSource();
   ok('16: no checklist is no claim, on the sheet', page.includes('const allOk = !!lines && dstat.all_ok === true;') && !page.includes('const allOk = !lines || dstat.all_ok === true;') && page.includes('"We couldn’t check " + dstat.custom_domain + " just now."') && page.includes('el("button", "textact", "Check again")'));
   ok('16: …and on the Search tab’s card', page.includes('!checked ? "We couldn’t check " + d.custom_domain + " just now."') && page.includes('!checked ? "Check again"'));
   ok('13: the studio has Mark as done, and it calls the route', page.includes('el("button", "textact", "Mark as done")') && page.includes('api("POST", `/foundations/plans/${p.id}/done`)'));

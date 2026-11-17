@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Update your card</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/fonts/brand.css">
+<style>
+  /* Sales item 129: where the "Update your card" link in a retainer email lands. The pay
+     pages' look (payment-success.html, payment-canceled.html): a band in the studio's own
+     colour when the server or this browser knows the studio, the card over it with a seal.
+     It asks the server for a fresh Stripe page and goes there; Stripe sends the client back
+     here with ?done=1 (a card was saved) or ?left=1 (they left without saving one). */
+  :root { --p:#5b3fa0; --band-a:#241d38; --band-b:#5b3fa0; --ink:#1a1523; --muted:#6b6478; --cream:#faf8f5; --card:#fff; --seal:#5b3fa0; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--cream); color:var(--ink); min-height:100vh; -webkit-font-smoothing:antialiased; }
+  .band { background:var(--band-b); background:linear-gradient(100deg,var(--band-a),var(--band-b)); color:#fff; padding:22px 24px 96px; min-height:170px; }
+  .band .studio { max-width:520px; margin:0 auto; display:flex; align-items:center; gap:10px; font-weight:600; font-size:15px; min-height:30px; }
+  .band .smark { flex:none; width:30px; height:30px; border-radius:9px; background:rgba(255,255,255,.18); display:grid; place-items:center; font-size:14px; font-weight:700; }
+  .wrap { max-width:520px; margin:-72px auto 0; padding:0 16px 40px; }
+  .card { background:var(--card); border-radius:24px; padding:0 32px 36px; text-align:center; box-shadow:0 1px 2px rgba(27,21,37,.04),0 10px 30px rgba(27,21,37,.08); }
+  .mark { width:72px; height:72px; border-radius:50%; background:var(--seal); color:#fff; font-size:30px; font-weight:700; display:flex; align-items:center; justify-content:center; margin:0 auto 18px; border:5px solid var(--card); position:relative; top:-36px; margin-bottom:-18px; }
+  .card.good { --seal:#2f6a4a; }
+  .card.warn { --seal:#775d31; }
+  h1 { font-family:'Fraunces',Georgia,serif; font-weight:400; font-size:clamp(25px,6vw,30px); line-height:1.2; margin-bottom:12px; }
+  p { font-size:14.5px; line-height:1.65; color:var(--muted); margin-bottom:10px; }
+  button.btn { display:block; width:100%; margin-top:20px; background:var(--p); color:#fff; border:0; padding:14px 26px; min-height:48px; border-radius:100px; font:inherit; font-size:15px; font-weight:600; cursor:pointer; }
+  button.btn:focus-visible { outline:3px solid var(--p); outline-offset:3px; }
+  button.btn[hidden] { display:none; }
+  @media (prefers-color-scheme:dark){
+    :root { --ink:#EFEAF7; --muted:#A79DBE; --cream:#171320; --card:#241d38; }
+  }
+</style>
+</head>
+<body>
+  <div class="band"><div class="studio" id="studio"></div></div>
+  <main class="wrap"><div class="card" id="card">
+    <div class="mark" id="mark" aria-hidden="true">…</div>
+    <h1 id="h" tabindex="-1">Taking you to Stripe…</h1>
+    <p id="p" role="status">Stripe’s secure page opens in a moment, where you can put in a new card for your retainer.</p>
+    <button type="button" class="btn" id="again" hidden>Try again</button>
+  </div></main>
+  <script>
+    var FN = "https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/presence";
+    var FN_REGION = 'us-west-2';   // run the server beside the database (Oregon): see shell.js
+    var KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+    var q = new URLSearchParams(location.search);
+    var $ = function (id) { return document.getElementById(id); };
+    var STUDIO_NAME = '';
+    var titled = function () { document.title = $('h').textContent + (STUDIO_NAME ? ' | ' + STUDIO_NAME : ''); };
+    // the band wears the studio's name and colour: from the server's answer, kept for the way
+    // back from Stripe in this tab, else what a signed-in client left in this browser
+    function brand(b) {
+      if (!b || typeof b.name !== 'string' || !b.name.trim()) return;
+      var name = b.name.trim().slice(0, 80), el = $('studio');
+      el.textContent = '';
+      var m = document.createElement('span'); m.className = 'smark'; m.setAttribute('aria-hidden', 'true'); m.textContent = name.charAt(0).toUpperCase();
+      var t = document.createElement('span'); t.textContent = name;
+      el.appendChild(m); el.appendChild(t);
+      STUDIO_NAME = name; titled();
+      var hex = /^#[0-9a-f]{6}$/i.test(b.accent || '') ? b.accent : '';
+      if (!hex) return;
+      var mix = function (h, to, k) { return '#' + [1, 3, 5].map(function (i) { var a = parseInt(h.substr(i, 2), 16), z = parseInt(to.substr(i, 2), 16); return ('0' + Math.round(a + (z - a) * k).toString(16)).slice(-2); }).join(''); };
+      var root = document.documentElement.style;
+      root.setProperty('--band-b', hex); root.setProperty('--band-a', mix(hex, '#140c1f', 0.45)); root.setProperty('--p', mix(hex, '#140c1f', 0.12));
+    }
+    function kept() {
+      var b = null;
+      try { b = JSON.parse(sessionStorage.getItem('dds-card-brand') || 'null'); } catch (e) {}
+      if (!b) { try { b = JSON.parse(localStorage.getItem('dds-studio-brand') || 'null'); } catch (e) {} }
+      return b;
+    }
+    function say(tone, mark, h, p, again) {
+      $('card').className = 'card' + (tone ? ' ' + tone : '');
+      $('mark').textContent = mark;
+      $('h').textContent = h;
+      $('p').textContent = p;
+      $('again').hidden = !again;
+      titled();
+    }
+    function open() {
+      var token = q.get('t') || '';
+      if (!token || token.length > 1200) { say('warn', '!', 'This link isn’t right', 'Ask your studio to send the card link again.', false); brand(kept()); return; }
+      say('', '…', 'Taking you to Stripe…', 'Stripe’s secure page opens in a moment, where you can put in a new card for your retainer.', false);
+      fetch(FN + '/retainer-card', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + KEY, 'apikey': KEY, 'x-region': FN_REGION }, body: JSON.stringify({ token: token }) })
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (b) { return { ok: r.ok, status: r.status, body: b || {} }; }); })
+        .then(function (r) {
+          var d = r.body.data || {}, studio = d.studio || r.body.studio || null;
+          if (studio) { try { sessionStorage.setItem('dds-card-brand', JSON.stringify(studio)); } catch (e) {} }
+          brand(studio || kept());
+          if (r.ok && /^https:\/\//.test(String(d.url || ''))) { location.replace(d.url); return; }
+          var msg = r.body.message || 'Please try again in a minute.';
+          if (r.status === 410) say('warn', '!', 'This link has run out', msg, false);
+          else if (r.status === 404) say('warn', '!', 'This link isn’t right', msg, false);
+          else if (r.status === 409) say('warn', '!', 'There’s no card to change', msg, false);
+          else say('warn', '!', 'Stripe’s page didn’t open', msg, true);
+          $('h').focus();
+        }, function () {
+          brand(kept());
+          say('warn', '!', 'Stripe’s page didn’t open', 'We couldn’t reach the server. Check your connection and try again.', true);
+          $('h').focus();
+        });
+    }
+    $('again').addEventListener('click', open);
+    if (q.get('done') === '1') {
+      say('good', '✓', 'Your new card is saved', 'Stripe uses it for your next charge. If a charge didn’t go through, Stripe tries it again with the new card, so there’s nothing else to do.', false);
+      brand(kept());
+    } else if (q.get('left') === '1') {
+      say('warn', '↩', 'Your card wasn’t changed', 'Nothing was saved. The link in your email works for 30 days, so you can come back to it whenever you’re ready.', false);
+      brand(kept());
+    } else {
+      open();
+    }
+  </script>
+</body>
+</html>

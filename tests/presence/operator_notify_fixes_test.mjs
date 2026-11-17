@@ -17,6 +17,7 @@
 //       and a client APPROVING flipped a thread to "needs reply".
 //   F8  the e2e "coverage" restated its own stub — it passed with the server
 //       change fully reverted. Replaced by the pure shaping tests below.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const results = [];
 const ok = (n, p, note = '') => { results.push(p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
 
@@ -127,7 +128,7 @@ const { notifyStudioOfClientAction, deliverStudioNotification } =
 
 // ═══════════ F2 · client chatter must never render the plan-upgrade card ═════
 {
-  const presence = read('presence.html');
+  const presence = editorSource();
   const fn = presence.slice(presence.indexOf('async function renderPlanNotice'), presence.indexOf('// ── L1: first-run welcome'));
   ok('F2: renderPlanNotice filters the client-activity kinds out of its candidates', /PLAN_CARD_EXCLUDE|NOTICE_NOT_PLAN_CARD/.test(fn));
   // the exclusion list itself must name all four, and must live where the

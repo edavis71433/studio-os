@@ -78,8 +78,6 @@
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;color:var(--ink);margin:0 0 10px}
   .muted{color:var(--soft);font-size:14px}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:60px auto}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:999px;font-size:14px;opacity:0;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none;max-width:90vw;text-align:center}
-  .toast.show{opacity:1}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 </style>
@@ -89,9 +87,8 @@
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // Developer tools (Phase B's "Developer Mode"; builder item 165 named it in plain words). A capability of Studio OS — reachable only by an
 // operator or a member with the developer capability (the server enforces it;
@@ -101,9 +98,8 @@
 // server sanitizes on save. Render-LOGIC (templates) is read-only here.
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
@@ -114,9 +110,9 @@ sb.auth.onAuthStateChange((_e,s)=>{ if(s&&s.access_token) TOKEN=s.access_token; 
 const ownBusiness=()=>{const id=new URLSearchParams(location.search).get('client')||'';return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)&&window.ddsScopeInfo&&!window.ddsScopeInfo()?id:'';};
 const SHELL_READY=document.readyState==='loading'?new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true})):Promise.resolve();   // shell.js (deferred) is in by DOMContentLoaded. Made now, while the page parses: after an await, readyState can already say 'interactive' with shell.js still on its way
 async function businessKnown(){if(!new URLSearchParams(location.search).get('client'))return;await SHELL_READY;if(window.ddsContext)await window.ddsContext().catch(()=>null);}
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':ownBusiness(),'x-region':FN_REGION});
-async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,body:{}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}   // a dropped connection answers as a failed save, never a throw
-function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);}
+// the shell's one API helper (shell-kit.js), sending your own business (ownBusiness) as the scope;
+// a dropped connection answers as a failed save (status 0), never a throw
+const api=(path,method,body)=>ddsApi(path,{method,body,scope:ownBusiness()});
 
 // ── state ──
 let STATE={files:[],template:{},cust:{theme_tokens:{},custom_css:'',custom_html:'',allowed_tokens:[]},active:'theme/tokens.json'};
@@ -260,7 +256,7 @@ async function loadRealPreview(){
   await save();
   if(btn)btn.textContent='Rendering…';
   try{
-    const r=await fetch(FN+'/preview?version=draft&page=/',{headers:H()});
+    const r=await ddsApi.raw('/preview?version=draft&page=/',{scope:ownBusiness()});   // the page as HTML, read as text
     if(!r.ok){if(note)note.textContent='Couldn’t render the real page just now — the sample above still reflects your theme.';}
     else{const html=await r.text();if(f)f.srcdoc=html;if(note)note.textContent='This is your real site, rendered through the publishing pipeline with your saved customization. Publish from your workspace to take it live.';}
   }catch(_){if(note)note.textContent='Couldn’t render the real page just now.';}

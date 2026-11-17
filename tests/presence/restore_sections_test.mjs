@@ -16,6 +16,7 @@
 //     keeps its lock, one it would remove or change refuses it with nothing written
 //   deno run --allow-read --allow-env --allow-net tests/presence/restore_sections_test.mjs
 import { installFakePostgrest } from './fake_pgrst.mjs';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const uuid = (c) => `${c.repeat(8)}-${c.repeat(4)}-4${c.repeat(3)}-8${c.repeat(3)}-${c.repeat(12)}`;
 const hex = (k, i) => `${k}${i.toString(16).padStart(7, '0')}-0000-4000-8000-000000000000`;
 const SITE = uuid('a'), U = uuid('3'), LIB = hex(6, 1), LOCK = hex(8, 1), PUB = hex(9, 1), BIN = hex(9, 2);
@@ -377,7 +378,7 @@ const websiteNow = () => Object.fromEntries(SETTINGS_CONTENT_FIELDS ? [...SETTIN
   ok('rule: a section locked on Home doesn’t take the lock of a copy on a page', restoreUnderLocks({ blocks: home, pages: [] }, { blocks: [], pages: [{ slug: 'p', title: 'P', blocks: [{ type: 'richtext', title: 'B', body: 'b' }] }] }).edits.length === 1);
 
   // the sentence: under the 160 characters the editor shows as they are (presence.html nice())
-  const html = await Deno.readTextFile(new URL('../../presence.html', import.meta.url));
+  const html = await editorSource();
   const nice = new Function(`${html.match(/function nice\(e\) \{[\s\S]*?\n\}/)[0]}; return nice;`)();
   const longest = lockedRestoreMessage([{ name: 'x'.repeat(60), what: 'changed' }], 'that checkpoint');
   ok('sentence: with the longest name it reaches the editor as it is', nice(new Error(longest)) === longest && longest.length < 160, String(longest.length));

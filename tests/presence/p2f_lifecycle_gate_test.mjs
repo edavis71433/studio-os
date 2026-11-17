@@ -3,6 +3,7 @@
 // One contract over the connected product: each integration seam the milestone
 // promises is backed by real code (not a comment). Complements the live/e2e
 // suites (which need staging creds). Steps mirror the P2-F validation list.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const R = [];
@@ -17,7 +18,7 @@ const sales = read('supabase/functions/presence/routes/sales.ts');
 const commercial = read('supabase/functions/presence/routes/commercial.ts');
 const analytics = read('supabase/functions/presence/routes/analytics.ts');
 const compose = read('supabase/functions/presence/analytics/compose.ts');   // SS7: the oversight row shape lives in the pure websiteRows builder
-const review = read('presence.html');
+const review = editorSource();
 const notice = read('supabase/functions/presence/lib/notice.ts');
 const clientd = read('supabase/functions/presence/routes/client_delivery.ts');
 const projects = read('supabase/functions/presence/routes/projects.ts');

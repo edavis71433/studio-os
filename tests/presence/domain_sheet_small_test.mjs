@@ -11,6 +11,7 @@
 //   25. opening the sheet was slow and saved a row every time
 //   26. the domain box had no name, and every Copy button was just "Copy"
 // The rules first, then the routes against stubbed DNS, hosting, database and email.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL: 'https://app.example', RESEND_KEY: 're_test_unused', NETLIFY_AUTH_TOKEN: 'nf-test' })) Deno.env.set(k, v);
 
 const results = [];
@@ -205,7 +206,7 @@ world();
 
 // ═══ the pages ═══
 {
-  const page = read('presence.html');
+  const page = editorSource();
   const fn = (name) => { const i = page.indexOf(`function ${name}(`); let d = 0, j = page.indexOf('{', i); for (let k = j; k < page.length; k++) { if (page[k] === '{') d++; else if (page[k] === '}') { d--; if (d === 0) return page.slice(i, k + 1); } } return ''; };
   // 23: the name, the way a provider's form wants it
   const dnsRecHost = new Function(`${fn('dnsRecHost')}; return dnsRecHost;`)();

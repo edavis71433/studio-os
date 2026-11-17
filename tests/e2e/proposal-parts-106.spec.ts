@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, onAsk } from './helpers/app';
 
 // Sales item 106 (borrowed from Wix Studio's sales side): a proposal paid in parts on a
 // schedule, saved proposals that fill the editor (lines, discount, tax and parts), and
@@ -135,7 +135,7 @@ test.describe('The agreement says the same as the parts (sales item 106)', () =>
     const sends: string[] = [];
     await page.route('**/functions/v1/presence/sales/contracts/*/send', (route) => { sends.push(route.request().url()); return route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":{}}' }); });
     const asked: string[] = [];
-    page.on('dialog', (d) => { asked.push(d.message()); d.dismiss(); });
+    await onAsk(page, (q) => { asked.push(q); return false; });
     await page.goto(`/pipeline.html?deal=${DEAL}&dtab=billing`);
     await page.locator('[data-send-contract="k-half"]').first().click();
     await expect.poll(() => asked.length).toBe(1);

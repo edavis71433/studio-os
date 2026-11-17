@@ -6,6 +6,7 @@
 // saves the result (a NEW file, never a replace). The dialog itself is driven
 // in a browser by tests/e2e/image-editor.spec.ts.
 //   deno run --allow-read tests/presence/image_editor_test.mjs
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 await import(new URL('image-editor.js', ROOT).href);
@@ -245,7 +246,7 @@ const FULL = { x: 0, y: 0, w: 1, h: 1 };
 
 // ═══ 9. how the builder's photo picker uses it (found Nov 9 while building item 39) ═══
 {
-  const pres = read('presence.html'), files = read('files.html');
+  const pres = editorSource(), files = read('files.html');
   const v = (page) => (/s\.src ?= ?['"]\/image-editor\.js\?v=(\d+)['"]/.exec(page) || [])[1];
   ok('the builder loads the editor on first use, at the same ?v= as Files', !!v(pres) && v(pres) === v(files), `builder v=${v(pres)}, files v=${v(files)}`);
   const edit = pres.slice(pres.indexOf('async function editInPicker('), pres.indexOf('const editedName ='));

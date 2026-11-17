@@ -70,6 +70,7 @@ const openPanel = async (page: Page, domain: string) => {
 
 test.describe('Domains: Ask for access (item 222)', () => {
   test('the list: a pill under each name that has an ask, a chip while one waits, and the count in the line', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 101)
     const t = await openDomains(page);
     await expect(page.locator('tr[data-domain="harbordental.com"] .acc')).toHaveText('Access: yes');
     await expect(page.locator('tr[data-domain="harbordental.com"] .acc')).toHaveClass(/\byes\b/);
@@ -84,6 +85,7 @@ test.describe('Domains: Ask for access (item 222)', () => {
   });
 
   test('the panel: the card says where the records are kept; the sheet shows the email the client gets, then sends it', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 101)
     const t = await openDomains(page);
     await openPanel(page, 'brightbakery.com');
     const card = page.locator('#dpanel .dp-acc');

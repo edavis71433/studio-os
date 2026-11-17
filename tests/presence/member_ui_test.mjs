@@ -7,11 +7,12 @@
 // in a browser for each kind of person.
 //
 //   deno run --allow-read tests/presence/member_ui_test.mjs
+import { editorSource, EDITOR_FILES } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const P = '../../supabase/functions/presence';
 const { memberWriteNeeds, contentWriteNeeds, siteCan } = await import(`${P}/lib/site_roles.ts`);
 
 const ROOT = new URL('../../', import.meta.url);
-const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
+const read = (p) => { if (p === 'presence.html') return editorSource(); return Deno.readTextFileSync(new URL(p, ROOT)); };   // builder item 38: the editor is four files now
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
 const count = (text, s) => text.split(s).length - 1;
@@ -121,7 +122,8 @@ const NO_CONTROL = {
 const PORTAL_OWNER_ONLY = {
   'POST /client/retainers/:id/cancel': { page: 'client.html', call: `api('/client/retainers/'+encodeURIComponent(id)+'/cancel','POST',{})`, guard: `if(PORTAL.persona!=='client'){ // reviewer: /client/* is 403 server-side — the calm read-only state, NO fetches, never an error line; money lives with the account owner` },
 };
-const PAGES = [...Deno.readDirSync(ROOT)].filter((f) => f.isFile && /\.(html|js)$/.test(f.name)).map((f) => f.name);
+// builder item 38: the editor's two scripts are read as part of presence.html (editorSource), not apart
+const PAGES = [...Deno.readDirSync(ROOT)].filter((f) => f.isFile && /\.(html|js)$/.test(f.name) && (f.name === 'presence.html' || !EDITOR_FILES.includes(f.name))).map((f) => f.name);
 const SOURCE = Object.fromEntries(PAGES.map((p) => [p, read(p)]));
 
 // ═══ 1. the table tells the truth, against the lists the server enforces ═══

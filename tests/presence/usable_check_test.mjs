@@ -4,6 +4,7 @@
 // This checks the parts that need no browser: the sums, the words each row says, how pages
 // are counted, what's kept with the site, and that the editor is wired to all of it. The
 // drawn-page reading itself is tested in tests/e2e/usable-check-150.spec.ts.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 await import('../../a11y-check.js');
 const A = globalThis.DDSA11Y;
 const { normalizeUsable, applyUsable, USABLE_TICKS } = await import('../../supabase/functions/presence/lib/usable_check.ts');
@@ -86,7 +87,7 @@ eq('kept: a made-up date is no check', normalizeUsable({ last: { at: 'soon', fix
 
 // the editor is wired to it, and the server knows the route
 const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url));
-const page = read('presence.html'), index = read('supabase/functions/presence/index.ts'), roles = read('supabase/functions/presence/lib/site_roles.ts');
+const page = editorSource(), index = read('supabase/functions/presence/index.ts'), roles = read('supabase/functions/presence/lib/site_roles.ts');
 ok('editor: loads the check only when asked', /sc\.src = "\/a11y-check\.js\?v=\d+"/.test(page) && !/<script[^>]+a11y-check\.js/.test(page));
 ok('editor: the draft is read out of sight and its scripts never run', /setAttribute\("sandbox", "allow-same-origin"\)/.test(page) && /\.ue-frame\{[^}]*visibility:hidden/.test(page));
 ok('editor: the Publish card shows the row beside the ready list', /renderReadyList\(\);\n\s+ueRitualRow\(\);/.test(page));

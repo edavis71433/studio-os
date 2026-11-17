@@ -8,6 +8,7 @@
 // code is under five minutes old. Part C: the owner's alert. Part D: each risky route asks before it writes,
 // and every sign-in check in both functions applies the second-step rule.
 import { installFakePostgrest } from './fake_pgrst.mjs';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
 const ok = (n, p, note = '') => { results.push(!!p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
@@ -25,7 +26,7 @@ globalThis.fetch = async (url, init = {}) => {
   return fake(url, init);
 };
 const ROOT = new URL('../../', import.meta.url);
-const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
+const read = (p) => { if (p === 'presence.html') return editorSource(); return Deno.readTextFileSync(new URL(p, ROOT)); };   // builder item 38: the editor is four files now
 const P = '../../supabase/functions/presence';
 const F = await import(`${P}/lib/fresh_code.ts`);
 const A = await import(`${P}/lib/security_alerts.ts`);
@@ -139,7 +140,7 @@ const rows = () => db.tables.presence_fresh_codes || [];
 // The app's code is checked in the page with the page's own Supabase client (fresh-code.js),
 // so a page that left it out would leave someone with two-step sign-in stuck at the sheet.
 {
-  const read = (f) => Deno.readTextFileSync(new URL(`../../${f}`, import.meta.url));
+  const read = (f) => { if (f === 'presence.html') return editorSource(); return Deno.readTextFileSync(new URL(`../../${f}`, import.meta.url)); };   // builder item 38: the editor is four files now
   const runs = { 'people.js': /F\.run\(function \(extra\) \{[^\n]*\}, \{ sb: me\.o\.sb \}\)/, 'presence.html': /ddsFresh\.run\(send, \{ sb \}\)/, 'settings.html': /ddsFresh\.run\(send, \{ sb \}\)/, 'transfer.html': /ddsFresh\.run\(send,\{sb\}\)/ };
   for (const [f, re] of Object.entries(runs)) ok(`${f}: the code sheet gets the page’s own sign-in`, re.test(read(f)));
   ok('the People sheet is handed the page’s sign-in on Sharing and on Sites', /ddsPeople\.mount\(\$\('peopleHost'\),\{siteName:who,sb,/.test(read('sharing.html')) && /view:view\|\|'people',sb,api:/.test(read('sites.html')));

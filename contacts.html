@@ -122,6 +122,7 @@
   .c .co{font-size:13px;color:var(--faint)}
   .c .contact{font-size:13.5px;color:var(--soft);margin-top:var(--dds-s1,4px)}
   .c .contact a{color:var(--p);text-decoration:none}
+  @media (pointer:coarse){.c .contact a{display:inline-flex;align-items:center;min-height:44px}.c .acts button,.c .acts a{min-height:44px}}   /* builder item 98 */
   .c .acts{display:flex;gap:var(--dds-s2,8px);margin-top:var(--dds-s3,12px);flex-wrap:wrap}
   .c .acts button,.c .acts a{font-family:inherit;font-size:12.5px;font-weight:500;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:var(--dds-r,8px);padding:var(--dds-s3,12px) var(--dds-s4,16px);cursor:pointer;text-decoration:none}
   .c .acts a.reply{color:var(--p);border-color:var(--p)}   /* outlined — the toolbar's + Add a contact is the page's one filled button (experience review #25) */
@@ -194,8 +195,6 @@
   .tagfilter button{font:inherit;font-size:12px;font-weight:600;border:0;background:var(--p-soft);color:var(--p);border-radius:999px;padding:2px 10px;cursor:pointer;min-height:24px}
   .row2{display:flex;gap:var(--dds-s2,8px);justify-content:flex-end;margin-top:var(--dds-s4,16px)}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:999px;font-size:14px;opacity:0;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none}
-  .toast.show{opacity:1}
   footer{margin-top:var(--dds-s8,40px);padding-top:var(--dds-s5,20px);border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
@@ -323,15 +322,14 @@
 <!-- items 86 + 105: two records for one person, merged into the one you keep. Built from the
      server's dry run (POST …/merge without confirm), so what moves is the database's word. -->
 <dialog id="mergeDlg" aria-labelledby="merge-h"><div class="dbody" id="mergeBody"></div></dialog>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="/shell-kit.js"></script>
 <script src="/customer-add.js"></script>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 // builder item 165: on a phone the header's other actions sit in a sheet behind ⋯; picking one puts the sheet away
 document.addEventListener('click',(e)=>{const m=e.target&&e.target.closest?e.target.closest('.dds-ph-more'):null;if(!m||!e.target.closest('button,a'))return;try{if(m.matches(':popover-open'))m.hidePopover();}catch(_){/* no popover support: there is no sheet */}});
@@ -392,7 +390,8 @@ const viewMatch=(c)=>{
 // Table ⇄ Cards display choice, persisted; small screens default to Cards.
 const DISPLAY_KEY='dds-display:contacts';
 let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='cards')return v;}catch(_){/* storage may be denied */}
-  return (window.matchMedia&&window.matchMedia('(max-width:759px)').matches)?'cards':'table';})();
+  // builder item 98: a phone, and a touch tablet too, start on the cards (on an upright iPad the table's columns were ~30px)
+  return (window.matchMedia&&window.matchMedia('(max-width:759px), (pointer:coarse) and (max-width:1100px)').matches)?'cards':'table';})();
 function setDisplay(v){DISPLAY=v;try{localStorage.setItem(DISPLAY_KEY,v);}catch(_){/* */}render();}
 // sortable columns (the fields GET /sales/contacts actually returns)
 const COLS=[
@@ -479,7 +478,7 @@ async function saveView(){
   const same=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());
   const view={id:(same&&same.id)||(cur&&cur.name.toLowerCase()===name.toLowerCase()?cur.id:undefined),name,base:VIEWNAME,q:Q,cols:shownCols().map(c=>c[0]),sort:SORT,...(anyFilter()?{filters:FFILT}:{})};
   const out=await k.saveViews('contacts',SAVED.filter(x=>x.id!==view.id&&x.name.toLowerCase()!==name.toLowerCase()).concat(view));
-  if(!out){toast('That view didn’t save — try again in a moment.');return;}
+  if(!out){toast('That view didn’t save — try again in a moment.','err');return;}
   SAVED=out;const now=SAVED.find(x=>x.name.toLowerCase()===name.toLowerCase());CURVIEW=now?now.id:'';
   render();toast('View saved — it’s in the view menu.');
   const f=$('saveView');if(f)f.focus();   // batch C: the re-draw had left focus on <body>
@@ -489,7 +488,7 @@ async function dropView(){
   // batch C: a saved view is the whole team's — ask in place first
   if(!(await k.confirmIn($('dropView'),{text:`Remove “${cur.name}” for everyone?`,yes:'Yes, remove it'})))return;
   const out=await k.saveViews('contacts',SAVED.filter(x=>x.id!==cur.id));
-  if(!out){toast('That didn’t save — try again in a moment.');return;}
+  if(!out){toast('That didn’t save — try again in a moment.','err');return;}
   SAVED=out;CURVIEW='';render();toast('View removed.');
   const f=$('saveView');if(f)f.focus();   // batch C: focus was left on <body> when the button went
 }
@@ -499,7 +498,7 @@ function bulkHtml(){
   return `<div class="dds-bulk" role="region" aria-label="Selected contacts"><b>${PICKED.size} selected</b><button type="button" class="go" id="bulkSend">Send an update</button><select id="bulkVia" aria-label="How the selected people found you"><option value="">Found via…</option>${FOUND_VIA.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select><button type="button" id="bulkTag">Add a tag</button><button type="button" id="bulkDel" data-needs="delete">Delete</button><button type="button" class="clr" id="bulkClear">Clear</button></div>`;
 }
 const people=(n)=>n===1?'1 person':n+' people';
-function bulkDone(msg,undo){const k=KIT();if(undo&&k&&k.undoToast)k.undoToast(msg,undo);else toast(msg);}
+function bulkDone(msg,undo,bad){const k=KIT();if(undo&&k&&k.undoToast)k.undoToast(msg,undo);else toast(msg,bad?'err':'ok');}
 async function bulkVia(sel){
   const v=sel.value;if(!v)return;const k=KIT(),n=PICKED.size;if(!k)return;
   if(!(await k.confirmIn(sel,{text:`Say ${n===1?'this person':'these '+n+' people'} found you via ${v}?`,yes:'Yes, set it'}))){sel.value='';return;}
@@ -509,15 +508,15 @@ async function bulkVia(sel){
   for(const c of picked){let r;try{r=await api('/sales/contacts/'+encodeURIComponent(c.id),'PATCH',{found_via:v});}catch(_){r={ok:false};}if(r.ok){done.push({id:c.id,was:c.found_via||''});c.found_via=v;}else fail++;}
   bulkDone(`${people(done.length)} now found you via ${v}${fail?` · ${fail} couldn’t change`:''}.`,done.length?async()=>{
     let bad=0;for(const x of done){let r;try{r=await api('/sales/contacts/'+encodeURIComponent(x.id),'PATCH',{found_via:x.was});}catch(_){r={ok:false};}if(!r.ok)bad++;}
-    toast(bad?`${bad} couldn’t be put back.`:'Put back as they were.');await load().catch(()=>{});
-  }:null);
+    toast(bad?`${bad} couldn’t be put back.`:'Put back as they were.',bad?'err':'ok');await load().catch(()=>{});
+  }:null,fail&&!done.length);
   if(anyFilter()||CHARTS)await load().catch(()=>{});else renderListZone();
 }
 async function bulkTag(){
   const k=KIT(),n=PICKED.size;if(!k)return;
   const raw=await k.askIn($('bulkTag'),{text:`A tag for ${people(n)}:`,field:{kind:'text',label:'The tag',placeholder:'e.g. restaurant',max:30,required:true,need:'Type the tag first.'},yes:'Add the tag'});
   if(raw===null)return;
-  const tag=k.cleanTag(raw);if(!tag){toast('That tag is empty once commas and spaces are taken out.');return;}
+  const tag=k.cleanTag(raw);if(!tag){toast('That tag is empty once commas and spaces are taken out.','err');return;}
   const picked=knownRows().filter(c=>PICKED.has(String(c.id)));
   PICKED.clear();renderListZone();
   const done=[];let had=0,full=0,fail=0;
@@ -530,8 +529,8 @@ async function bulkTag(){
   }
   bulkDone(`Tagged ${people(done.length)} “${tag}”${had?` · ${had} already had it`:''}${full?` · ${full} already have twelve tags`:''}${fail?` · ${fail} couldn’t change`:''}.`,done.length?async()=>{
     let bad=0;for(const x of done){let r;try{r=await api('/sales/contacts/'+encodeURIComponent(x.id),'PATCH',{tags:x.was});}catch(_){r={ok:false};}if(!r.ok)bad++;}
-    toast(bad?`${bad} couldn’t be put back.`:'Tag taken off again.');await load().catch(()=>{});
-  }:null);
+    toast(bad?`${bad} couldn’t be put back.`:'Tag taken off again.',bad?'err':'ok');await load().catch(()=>{});
+  }:null,fail&&!done.length);
   renderListZone();
 }
 async function bulkDel(){
@@ -543,17 +542,17 @@ async function bulkDel(){
   for(const c of picked){const id=c.id;let r;try{r=await api('/sales/contacts/'+encodeURIComponent(id)+'?confirm=1','DELETE');}catch(_){r={ok:false};}if(r.ok)gone.push(id);else fail++;}
   bulkDone(`Deleted ${people(gone.length)}${fail?` · ${fail} couldn’t be deleted`:''}.`,gone.length?async()=>{
     let bad=0;for(const id of gone){let r;try{r=await api('/sales/contacts/'+encodeURIComponent(id)+'/restore','POST');}catch(_){r={ok:false};}if(!r.ok)bad++;}
-    toast(bad?`${bad} couldn’t be put back.`:`${people(gone.length)} put back.`);await load().catch(()=>{});
-  }:null);
-  await load().catch(()=>toast('Deleted — but we couldn’t refresh the list. Refresh will catch it up.'));
+    toast(bad?`${bad} couldn’t be put back.`:`${people(gone.length)} put back.`,bad?'err':'ok');await load().catch(()=>{});
+  }:null,fail&&!gone.length);
+  await load().catch(()=>toast('Deleted — but we couldn’t refresh the list. Refresh will catch it up.','err'));
 }
 async function bulkSend(){
   const k=KIT();if(!k)return;
   const people=knownRows().filter(c=>PICKED.has(String(c.id))&&c.email).map(c=>({email:c.email,name:c.name||''}));
-  if(!people.length){toast('None of the people you picked has an email address.');return;}
+  if(!people.length){toast('None of the people you picked has an email address.','err');return;}
   const b=$('bulkSend');if(b)b.disabled=true;
   // item 110 (K5): a dropped connection left the button grey with no word
-  let ok=false;try{ok=await k.sendTo(people);}catch(_){toast('We couldn’t reach the server — nothing was sent. Try again in a moment.');}
+  let ok=false;try{ok=await k.sendTo(people);}catch(_){toast('We couldn’t reach the server — nothing was sent. Try again in a moment.','err');}
   if(!ok){const nb=$('bulkSend');if(nb)nb.disabled=false;}
 }
 let VIEWS_ASKED=false;
@@ -572,9 +571,8 @@ const scope=()=>new URLSearchParams(location.search).get('client')||'';
 const inClient=()=>!!scope()&&(window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope())?!!window.ddsScopeInfo():true);
 let PAINTED_IN=null;
 document.addEventListener('dds:context',()=>{if(PAINTED_IN!==null&&PAINTED_IN!==inClient()){render();loadSavedViews();loadImportStrip();}});
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope(),'x-region':FN_REGION});
-async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+const api=(path,method,body)=>ddsApi(path,{method,body,scope:scope()});
+const toast=(m,kind,action)=>ddsToast(m,kind,action);   // the shell's one toast: 'err' shows a failure as one
 
 function sortedRows(){
   const q=Q.trim().toLowerCase();
@@ -722,7 +720,7 @@ function reorder(focusSel){
   const back=()=>{if(focusSel){const n=document.querySelector(focusSel);if(n)n.focus();}};
   if(keyLoaded()||wholeRoster()){render();back();if(Q.trim())searchServer();return;}
   SRCH=null;
-  return load().then(back).catch(()=>toast('We couldn’t load your contacts in that order just now.'));
+  return load().then(back).catch(()=>toast('We couldn’t load your contacts in that order just now.','err'));
 }
 // one more page of people joins the list (Show more, and Print's "the rest of them")
 function takePage(r,s){
@@ -737,7 +735,7 @@ async function showMore(){
   MORE_BUSY=true;renderListZone();
   let r;try{r=await readPage(s?s.rows.length:NEXT_OFF,s?s.q:'');}catch(_){r={ok:false};}
   MORE_BUSY=false;
-  if(!r.ok){renderListZone();toast('We couldn’t load more contacts just now.');return;}
+  if(!r.ok){renderListZone();toast('We couldn’t load more contacts just now.','err');return;}
   if(!takePage(r,s)){renderListZone();return;}
   renderListZone();
   const nb=$('moreBtn');if(nb)nb.focus();else{const z=$('listZone');const last=z&&z.querySelectorAll('[data-open]');if(last&&last.length)last[last.length-1].focus();}
@@ -814,14 +812,14 @@ function wire(){
   }
   const sv=$('saveView');if(sv)sv.addEventListener('click',saveView);
   const ch=$('chartsBtn');if(ch)ch.addEventListener('click',()=>{CHARTS=!CHARTS;try{localStorage.setItem(CHARTS_KEY,CHARTS?'1':'0');}catch(_){/* storage may be denied */}ch.setAttribute('aria-pressed',CHARTS?'true':'false');paintCharts();});
-  const pr=$('printBtn');if(pr)pr.addEventListener('click',()=>{printContacts().catch(()=>toast('That couldn’t print just now.'));});
+  const pr=$('printBtn');if(pr)pr.addEventListener('click',()=>{printContacts().catch(()=>toast('That couldn’t print just now.','err'));});
   const dv=$('dropView');if(dv)dv.addEventListener('click',dropView);
   // shell.js is deferred and can land after this draw, so the kit is looked up on the press (a check here left Columns dead)
   const cb=$('colsBtn');if(cb)cb.addEventListener('click',(e)=>{const k=KIT();if(!k)return;e.stopPropagation();k.columnsMenu(cb,COLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderListZone();});});
   // Refresh: a rejected load (network hiccup) toasts the page's standard copy —
   // never an unhandled promise; the initial-boot trouble() path is unchanged.
   // These re-renders also restore focus to their control (the sort handlers' pattern).
-  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load().then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('We couldn’t load your contacts just now.')));
+  const rf=$('refreshBtn');if(rf)rf.addEventListener('click',()=>load().then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('We couldn’t load your contacts just now.','err')));
   const dt=$('dispTable');if(dt)dt.addEventListener('click',()=>{if(DISPLAY!=='table'){setDisplay('table');const nb=$('dispTable');if(nb)nb.focus();}});
   const dc=$('dispCards');if(dc)dc.addEventListener('click',()=>{if(DISPLAY!=='cards'){setDisplay('cards');const nb=$('dispCards');if(nb)nb.focus();}});
   const rt=$('retry');if(rt)rt.addEventListener('click',load);
@@ -830,7 +828,7 @@ function wire(){
   // custom-field definitions editor — reachable from the toolbar (the old path
   // lived only inside a never-shown detail dialog; a fetch failure just keeps
   // the current defs and the dialog still opens for editing from scratch)
-  const mfb=$('manageFields');if(mfb)mfb.addEventListener('click',()=>{openFields().catch(()=>toast('We couldn’t load your fields just now.'));});
+  const mfb=$('manageFields');if(mfb)mfb.addEventListener('click',()=>{openFields().catch(()=>toast('We couldn’t load your fields just now.','err'));});
 }
 // handlers whose targets live INSIDE #listZone — re-wired on every list re-render
 function wireList(){
@@ -898,7 +896,7 @@ $('c-cancel').onclick=()=>$('newDlg').close();
 $('newForm').onsubmit=async(e)=>{
   e.preventDefault();
   const name=$('c-name').value.trim(),email=$('c-email').value.trim();
-  if(!name&&!email){toast('A contact needs a name or an email.');return;}
+  if(!name&&!email){toast('A contact needs a name or an email.','err');return;}
   const m=readMore('c');
   const payload={name,email:email||undefined,phone:m.phone||undefined,phone2:m.phone2||undefined,job_title:m.job_title||undefined,company:m.company||undefined,
     address:Object.values(m.address).some(Boolean)?m.address:undefined,tags:m.tags&&m.tags.length?m.tags:undefined,found_via:m.found_via||undefined};
@@ -906,7 +904,7 @@ $('newForm').onsubmit=async(e)=>{
   const again=!!(e.submitter&&e.submitter.id==='c-again');
   const btns=[$('c-again'),$('c-add')];btns.forEach(b=>{if(b)b.disabled=true;});
   try{await createContact(payload,true,again);}
-  catch(_){toast('That didn’t save.');}
+  catch(_){toast('That didn’t save.','err');}
   finally{btns.forEach(b=>{if(b)b.disabled=false;});}
 };
 // Create a contact. With checkDupe, the server also runs FUZZY near-duplicate
@@ -916,7 +914,7 @@ async function createContact(payload,checkDupe,again){
   const body=Object.assign({},payload);if(checkDupe)body.dedupe_check=true;
   const r=await api('/sales/contacts','POST',body);
   if(r.status===409&&r.body&&r.body.error==='possible_duplicate'){showDupe(payload,r.body.matches||[],again);return;}
-  if(!r.ok){toast(r.status===403?'Contacts are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||'That didn’t save.'));return;}
+  if(!r.ok){toast(r.status===403?'Contacts are part of your plan’s business tools — an upgrade adds them.':((r.body&&r.body.message)||'That didn’t save.'),'err');return;}
   const who=payload.name||payload.email||'They';
   const said=r.body&&r.body.deduped?'That contact already existed.':(r.body&&r.body.warning==='fields_unavailable'?(r.body.message||'Contact added.'):'Contact added.');
   if(again){
@@ -943,7 +941,7 @@ function showDupe(payload,matches,again){
 // ── ADD A CUSTOMER: the one box, shared with Home and Customers (customer-add.js, builder
 //    item 102; it was three copies kept in sync by hand). Starter kits are offered when this
 //    sign-in runs an agency. ──
-const ADD=window.ddsAddCustomer.mount({request:(m,p,b)=>api(p,m,b),toast:(m)=>toast(m),
+const ADD=window.ddsAddCustomer.mount({request:(m,p,b)=>api(p,m,b),toast,
   isAgency:async()=>{const c=window.ddsContext?await window.ddsContext():(await api('/portal/context')).body.data;return !!(c&&c.is_agency);},
   done:()=>load()});
 function openAddCustomer(){ADD.open();}
@@ -1012,7 +1010,7 @@ async function openImport(){
     sendAll:async(items,ctx)=>{
       let r;try{r=await api('/sales/contacts/imports','POST',{file_name:ctx.fileName||'',on_existing:ctx.onExisting,rows:items});}catch(_){r={ok:false,status:0,body:{}};}
       const d=r.ok&&r.body&&r.body.data;
-      if(!d){if(r.body&&r.body.message)toast(r.body.message);return{failed:items.length};}
+      if(!d){if(r.body&&r.body.message)toast(r.body.message,'err');return{failed:items.length};}
       ctx.importId=d.id||null;
       if(d.counts)return d.counts;
       const c={added:0,updated:0,existed:0,failed:0};
@@ -1047,7 +1045,7 @@ async function undoImport(){
   if(k&&!(await k.confirmIn(b,{text:`Take this import back? The ${IMPORT.added} added go, the ${IMPORT.updated} updated go back as they were.`,yes:'Yes, undo it'})))return;
   b.disabled=true;
   let r;try{r=await api('/sales/contacts/imports/'+encodeURIComponent(IMPORT.id)+'/undo','POST',{});}catch(_){r={ok:false,status:0,body:{}};}
-  if(!r.ok){toast((r.body&&r.body.message)||'That import couldn’t be undone just now — try again in a moment.');b.disabled=false;return;}
+  if(!r.ok){toast((r.body&&r.body.message)||'That import couldn’t be undone just now — try again in a moment.','err');b.disabled=false;return;}
   const d=(r.body&&r.body.data)||{};
   toast(d.already?'That import was already undone.':`Import undone: ${d.removed||0} taken off, ${d.restored||0} put back as they were${d.kept?`; ${d.kept} kept (they have a deal now, or were changed since)`:''}.`);
   IMPORT=null;paintImportStrip();load().catch(()=>{});
@@ -1062,20 +1060,20 @@ async function newDealOnce(cid){
   const title=(c.name||c.company||c.email||'New')+' — project';
   try{
     const d=await api('/sales/deals','POST',{title,contact_id:cid});
-    if(!d.ok){toast(d.status===403?'The pipeline is part of your plan’s business tools — an upgrade adds it.':((d.body&&d.body.message)||'Couldn’t start that deal.'));return;}
+    if(!d.ok){toast(d.status===403?'The pipeline is part of your plan’s business tools — an upgrade adds it.':((d.body&&d.body.message)||'Couldn’t start that deal.'),'err');return;}
     const dealId=d.body&&d.body.data&&d.body.data.id;
     toast('Deal started.');
     // JS navigation carries the agency drill-in scope itself (the openDetail idiom
     // below — shell.js only rewrites <a href> anchors).
     if(dealId)setTimeout(()=>{const sc=scope();location.href='/crm.html?deal='+dealId+'&tab=deal'+(sc?'&client='+sc:'');},700);
-  }catch(_){toast('Couldn’t start that deal.');}
+  }catch(_){toast('Couldn’t start that deal.','err');}
 }
 // ── CONTACT open + custom fields (a contact opens the unified Client Record;
 //    the field-definitions editor lives here, off the toolbar's Manage fields) ──
 let FIELD_DEFS=[];       // owner-defined custom fields (loaded lazily)
-// calendar days on the local clock (the record's when()): 24-hour blocks called last night's edit "today"
-const dayNo=(t)=>{const d=new Date(t);return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000;};
-function relWhen(iso){if(!iso)return '';const then=Date.parse(iso);if(!isFinite(then))return '';const days=dayNo(Date.now())-dayNo(then);if(days<=0)return 'today';if(days===1)return 'yesterday';if(days<7)return days+' days ago';if(days<14)return 'last week';if(days<60)return Math.floor(days/7)+' weeks ago';return Math.floor(days/30)+' months ago';}
+// calendar days on the local clock (the shell's ddsDate.ago): 24-hour blocks called last night's edit "today".
+// An edit stamped a little ahead of this device's clock is still "today" here, never "soon".
+function relWhen(iso){const n=ddsDate.days(iso);return n===null?'':n>0?'today':ddsDate.ago(iso);}
 async function loadFieldDefs(force){if(FIELD_DEFS.length&&!force)return FIELD_DEFS;try{const r=await api('/sales/contacts/fields');if(r.ok)FIELD_DEFS=(r.body&&r.body.data)||[];}catch(_){}return FIELD_DEFS;}
 // Opening a contact goes to their unified CLIENT RECORD (Details tab) — the whole
 // relationship in one place — rather than a here-only modal with no shareable URL.
@@ -1164,7 +1162,7 @@ $('editForm').onsubmit=async(e)=>{
   e.preventDefault();
   const id=EDIT_ID;if(!id)return;
   const name=$('e-name').value.trim(),email=$('e-email').value.trim();
-  if(!name&&!email){toast('A contact needs a name or an email.');$('e-name').focus();return;}
+  if(!name&&!email){toast('A contact needs a name or an email.','err');$('e-name').focus();return;}
   const m=readMore('e');   // item 89: the job title, second phone, address and tags save with the rest
   const body={name,email,phone:m.phone,phone2:m.phone2,job_title:m.job_title,company:m.company,address:m.address,tags:m.tags,...(EDIT_FULL?{found_via:m.found_via}:{})};
   if(EDIT_DEFS.length){
@@ -1181,14 +1179,14 @@ $('editForm').onsubmit=async(e)=>{
       :r.status===403?'Contacts are part of your plan’s business tools — an upgrade adds them.'
       :r.status===404?'That contact is no longer in your list — refresh to see the current roster.'
       :!r.status?'That didn’t save — we couldn’t reach the server.'
-      :((r.body&&r.body.message)||('That didn’t save — the server answered '+r.status+'.')));
+      :((r.body&&r.body.message)||('That didn’t save — the server answered '+r.status+'.')),'err');
     if(btn)btn.disabled=false;return;
   }
   EDIT_ID='';$('editDlg').close();
   // The save SUCCEEDED. A refresh failure afterwards is its own, softer story —
   // it must never repaint a real save as a failure.
   toast(r.body&&(r.body.warning==='custom_unavailable'||r.body.warning==='fields_unavailable'||r.body.warning==='found_via_unavailable')?((r.body.message)||'Saved.'):'Contact updated.');
-  load().catch(()=>toast('Saved — but we couldn’t refresh the list. Refresh will catch it up.'));
+  load().catch(()=>toast('Saved — but we couldn’t refresh the list. Refresh will catch it up.','err'));
 };
 
 // ── MERGE two records for one person (sales items 86 + 105) ─────────────────
@@ -1254,7 +1252,7 @@ async function doMerge(){
   const msg=`Merged into one${away.name?` — ${away.name}’s record was set aside`:''}.${cut?` Their notes were cut by ${cut} characters to fit; Undo brings them back in full.`:''}`;
   if(window.ddsToast)ddsToast(msg,'ok',{label:'Undo',onClick:async()=>{
     let u;try{u=await api('/sales/contacts/'+encodeURIComponent(away.id)+'/unmerge','POST',{});}catch(_){u={ok:false,body:{}};}
-    toast(u.ok?'The merge is undone — both records are back.':((u.body&&u.body.message)||'We couldn’t undo that merge just now.'));
+    toast(u.ok?'The merge is undone — both records are back.':((u.body&&u.body.message)||'We couldn’t undo that merge just now.'),u.ok?'ok':'err');
     await load();
   }});
   else toast(msg);
@@ -1278,7 +1276,7 @@ async function askDelete(id){
     toast(r.status===403?'Contacts are part of your plan’s business tools — an upgrade adds them.'
       :r.status===404?'That contact is no longer in your list — refresh to see the current roster.'
       :!r.status?'We couldn’t check what’s attached to '+who+' — the server didn’t answer. Nothing was deleted.'
-      :((r.body&&r.body.message)||('We couldn’t check what’s attached to '+who+' — the server answered '+r.status+'. Nothing was deleted.')));
+      :((r.body&&r.body.message)||('We couldn’t check what’s attached to '+who+' — the server answered '+r.status+'. Nothing was deleted.')),'err');
     return;
   }
   const b=r.body||{};
@@ -1308,7 +1306,7 @@ async function askDelete(id){
     // ONE Undo that puts the contact straight back (POST …/restore).
     if(window.ddsToast)ddsToast(msg,'ok',{label:'Undo',onClick:async()=>{
       let u;try{u=await api('/sales/contacts/'+encodeURIComponent(id)+'/restore','POST');}catch(_){u={ok:false,status:0,body:{}};}
-      if(u.ok){toast((b.name||who)+' is back.');}else toast((u.body&&u.body.message)||'We couldn’t put them back — refresh and check the roster.');
+      if(u.ok){toast((b.name||who)+' is back.');}else toast((u.body&&u.body.message)||'We couldn’t put them back — refresh and check the roster.','err');
       await load();
     }});
     else toast(msg);
@@ -1328,7 +1326,7 @@ $('fieldsForm').onsubmit=async(e)=>{
   const fields=[];
   document.querySelectorAll('#fieldsRows .field-row').forEach(row=>{const label=row.querySelector('.fr-label').value.trim();if(!label)return;const type=row.querySelector('.fr-type').value;const f={label:label,type:type};if(type==='select')f.choices=row.querySelector('.fr-choices').value.split(',').map(s=>s.trim()).filter(Boolean);fields.push(f);});
   const r=await api('/sales/contacts/fields','PUT',{fields});
-  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save.');return;}
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save.','err');return;}
   FIELD_DEFS=(r.body&&r.body.data)||[];$('fieldsDlg').close();toast('Fields saved.');
 };
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your contacts.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
@@ -1345,7 +1343,8 @@ async function load(){
   const r=rs.find(x=>!x.ok)||rs[rs.length-1];
   if(seq!==REQ_SEQ)return;
   if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Contacts are part of your plan’s business tools.</h2><p class="muted">Your current plan doesn’t include the Customers area yet — an upgrade adds it.</p></div>`;return;}
-  if(!r.ok){trouble();return;}
+  // no answer at all on a refresh keeps the list on screen; the caller says it couldn't refresh
+  if(!r.ok){if(r.status===0&&LOADED_AT)throw new Error('offline');trouble();return;}
   {const seen=new Set();ALL=[];for(const x of rs)for(const c of ((x.body&&x.body.data)||[]))if(!seen.has(String(c.id))){seen.add(String(c.id));ALL.push(c);}}
   const last=rs[rs.length-1].body||{};
   NEXT_OFF=rs.reduce((n,x)=>n+((x.body&&x.body.data)||[]).length,0);TOTAL=typeof last.total==='number'?last.total:null;LAST_FULL=((last.data)||[]).length>=PAGE;

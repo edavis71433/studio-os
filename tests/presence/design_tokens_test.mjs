@@ -4,6 +4,7 @@
 // reduced-motion block live in shell.css; no operator page (and not shell.css)
 // declares a transition with a raw second/millisecond value — every one rides
 // --dds-t-fast / -base / -slow; and DESIGN-SYSTEM.md names every token.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url));
 const css = read('shell.css');
 const shell = read('shell.js');
@@ -49,7 +50,7 @@ ok('shell.js: the styles it injects carry no raw transition', !rawIn(shell));
 ok('shell.css transitions ride the ladder with the one curve', /transition:opacity var\(--dds-t-base\) var\(--dds-ease\),transform var\(--dds-t-base\) var\(--dds-ease\)/.test(css));
 ok('the pages ride the ladder (fast · base · slow all appear)', PAGES.some((p) => /var\(--dds-t-fast/.test(read(p))) && PAGES.some((p) => /var\(--dds-t-base/.test(read(p))) && PAGES.some((p) => /var\(--dds-t-slow/.test(read(p))));
 ok('the pages use the spacing scale', PAGES.filter((p) => /var\(--dds-s[1-8]/.test(read(p))).length === PAGES.length);
-ok('the builder’s own --dur/--ease alias the ladder', /--dur:var\(--dds-t-base,200ms\); --ease:var\(--dds-ease,ease-out\);/.test(read('presence.html')));
+ok('the builder’s own --dur/--ease alias the ladder', /--dur:var\(--dds-t-base,200ms\); --ease:var\(--dds-ease,ease-out\);/.test(editorSource()));
 
 // ═══ DESIGN-SYSTEM.md names every token ═══
 for (const k of Object.keys(STEPS)) ok(`DESIGN-SYSTEM.md names --dds-${k}`, doc.includes(`--dds-${k}`));

@@ -13,12 +13,13 @@ import { esc, attr, safeHref, renderMarkdown } from '../../supabase/functions/pr
 import { menuForCopy } from '../../supabase/functions/presence/lib/site_layout.ts';
 import { deadJumps, validateSnapshot } from '../../supabase/functions/presence/lib/manifest_validate.ts';
 import { renderSnapshot } from '../../supabase/functions/presence/lib/render.ts';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
 const ok = (n, p, note = '') => { results.push(!!p); if (!p) console.log(`FAIL  ${n}${note ? ' — ' + note : ''}`); };
 const ctx = { esc, attr, safeHref };
 const draw = (list) => renderSiteBlocks(resolveBlockMedia(validateBlocks(list), () => null), ctx).map((r) => r.html).join('\n');
-const PAGE = Deno.readTextFileSync(new URL('../../presence.html', import.meta.url));
+const PAGE = editorSource();
 const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url));
 
 // ── the name rule ──

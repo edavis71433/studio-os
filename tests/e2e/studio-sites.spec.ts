@@ -867,6 +867,9 @@ test.describe('Domains: the page does things (item 162)', () => {
   });
 
   test('each row says who runs the DNS, a lock that’s off, what the registry’s words mean, and when it was last checked', async ({ page }) => {
+    // gone.example was checked Nov 8 at midnight: two days back on the calendar, the shell's words (builder item 101;
+    // a 24-hour count said "3 days ago" here)
+    await page.clock.setFixedTime(new Date('2026-11-10T18:00:00Z'));
     await openDomains(page);
     const row = (d: string) => page.locator(`table[aria-label="Domains"] tbody tr[data-domain="${d}"]`);
     await expect(row('bistro.example').locator('td').nth(3)).toContainText('DNS at Cloudflare');
@@ -874,7 +877,7 @@ test.describe('Domains: the page does things (item 162)', () => {
     await expect(row('bistro.example').locator('td').nth(2)).not.toContainText('transfer lock');   // said once, in Provider; the sentence is in the panel
     await expect(row('gone.example').locator('td').nth(3)).not.toContainText('Lock');
     await expect(row('garage.example').locator('td').nth(6)).toHaveText('Not yet');
-    await expect(row('gone.example').locator('td').nth(6)).toHaveText(/ago$|^Just now$/);
+    await expect(row('gone.example').locator('td').nth(6)).toHaveText('2 days ago');
   });
 
   test('Details: the whole story in a side panel, every record, notes that save, and Check now', async ({ page }) => {
