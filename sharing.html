@@ -72,7 +72,6 @@
   .center{text-align:center;padding:50px var(--dds-s5,20px)}.center h2{font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 var(--dds-s2,8px)}
   .muted{color:var(--soft);font-size:14px}a.link{color:var(--p);text-decoration:none;font-weight:500}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:999px;font-size:14px;opacity:0;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none}.toast.show{opacity:1}
   @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation:none}.sw,.sw::after{transition:none}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
@@ -85,9 +84,8 @@
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script src="/people.js?v=451"></script>
 <script>
 // Sharing & access (A7.2). The owner chooses who can get in, each with a role
@@ -97,9 +95,8 @@
 // private by default and only shared here on purpose.
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="";
@@ -108,13 +105,13 @@ sb.auth.onAuthStateChange((_e,s)=>{ if(s&&s.access_token) TOKEN=s.access_token; 
 // uses — cosmetic; the server re-validates and fails closed). EVERY request this
 // page makes carries it as x-dds-scope-site, so an operator drilled into a
 // client invites to THAT client's site and flips THAT client's shares — not the
-// studio's own (studio audit 2026-10, change 1). Unscoped the header is empty,
+// studio's own (studio audit 2026-10, change 1). Unscoped there is no header,
 // exactly as the shell sends it.
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const scopeId=()=>{try{const v=new URLSearchParams(location.search).get('client')||'';return UUID_RE.test(v)?v:'';}catch(_){return '';}};
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scopeId(),'x-region':FN_REGION});
-async function api(p,m,b){const r=await fetch(FN+p,{method:m||'GET',headers:H(),body:b?JSON.stringify(b):undefined});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+// the shell's one API helper (shell-kit.js): it never throws; no answer at all is { ok:false, status:0 }
+const api=(p,m,b)=>ddsApi(p,{method:m,body:b,scope:scopeId()});
+const toast=(m,kind,action)=>ddsToast(m,kind,action);   // the shell's one toast: 'err' shows a failure as one
 
 // surfaces the owner can share with a client reviewer + their default posture
 const SURFACES=[
@@ -179,7 +176,7 @@ async function toggle(btn){const surface=btn.getAttribute('data-surface');const 
   btn.setAttribute('aria-checked',String(next));paintState(surface,next);
   const r=await api('/portal/shares','POST',{surface,shared:next});
   if(r.ok){SHARES[surface+':*']=next;toast(next?'Shared with clients.':'Kept internal.');}
-  else{btn.setAttribute('aria-checked',String(!next));paintState(surface,!next);toast('That didn’t save.');}
+  else{btn.setAttribute('aria-checked',String(!next));paintState(surface,!next);toast('That didn’t save.','err');}
 }
 function notOwner(){$('main').innerHTML=`<div class="center"><h2>Only the account owner can manage sharing.</h2><p class="muted">Ask your studio if you need access changed.</p></div>`;}
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to manage sharing.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
@@ -214,6 +211,7 @@ async function load(){
   if(!((CTX&&CTX.capabilities)||[]).includes('invite')){notOwner();return;}   // managing people is the invite capability (staff and developers don't have it)
   const sh=await api('/portal/shares');
   if(sh.status===403){notOwner();return;}
+  if(sh.status===0){trouble();return;}   // no answer at all: the trouble screen, as when the old wrapper threw (never the default switches)
   SHARES={};if(sh.ok&&sh.body.data&&sh.body.data.shares)for(const s of sh.body.data.shares)SHARES[s.surface+':'+(s.item_id||'*')]=s.shared;
   render();
 }

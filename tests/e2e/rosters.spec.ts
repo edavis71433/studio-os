@@ -496,6 +496,29 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t refresh' }).first()).toBeVisible();
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t save them' })).toHaveCount(0);
   });
+
+  // Builder item 101: the box's failures reach the shell's toast as failures
+  // (the pages used to pass toast:(m)=>toast(m), which dropped the flag).
+  for (const p of [
+    { url: '/customers.html', display: 'dds-display:customers', api: { '/studio/customers': CUSTOMERS }, rows: 3 },
+    { url: '/contacts.html', display: 'dds-display:contacts', api: { '/sales/contacts': CONTACTS }, rows: 2 },
+  ]) {
+    test(`${p.url.slice(1, -5)} — a save that fails shows as a failure, and Save can be pressed again`, async ({ page }) => {
+      await pinTable(p.display)(page);
+      await installApp(page, { api: p.api });
+      await page.route(/\/functions\/v1\/presence\/sales\/customers(\?|$)/, (r) => r.request().method() === 'POST'
+        ? r.fulfill({ status: 500, contentType: 'application/json', body: '{}' })
+        : r.fallback());
+      await page.goto(p.url);
+      await expect(page.locator('tbody tr')).toHaveCount(p.rows);
+      await (await headerAction(page, '#addCust')).click();
+      await expect(page.locator('#cu-name')).toBeFocused();
+      await page.locator('#cu-email').fill('jane@acmebakery.com');
+      await page.locator('#cu-submit').click();
+      await expect(page.locator('.dds-toast.err')).toContainText('couldn’t save them');
+      await expect(page.locator('#cu-submit')).toBeEnabled();
+    });
+  }
 });
 
 // ── Oct 2026 nav cut: Customers is its own place again (the roster with its

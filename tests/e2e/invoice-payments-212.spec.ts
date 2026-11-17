@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, onAsk } from './helpers/app';
 import { capabilitiesOf, type SiteRole } from '../../supabase/functions/presence/lib/site_roles';
 
 // Builder item 212: what tests/presence/invoice_payments_test.mjs used to check by reading
@@ -196,7 +196,7 @@ test.describe('the deal page', () => {
     const w = await guardWrites(page, [{ method: 'POST', path: new RegExp(`^/sales/invoices/${PAID}/payment/undo$`), answer: (r) => r.fulfill(json({ data: { undone: true, part: false, fresh_link: true, moved_back: 'contract' } })) }]);
     const asked: string[] = [];
     let answer = false;
-    page.on('dialog', (d) => { asked.push(d.message()); return answer ? d.accept() : d.dismiss(); });
+    await onAsk(page, (q) => { asked.push(q); return answer; });
     await page.goto(`/pipeline.html?deal=${DEAL}&dtab=billing`);
     const undo = page.locator('#detailInner').getByRole('button', { name: /Undo the payment on/ });
     await expect(undo).toBeVisible();

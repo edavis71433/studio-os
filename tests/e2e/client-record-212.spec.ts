@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, onAsk } from './helpers/app';
 
 // Builder item 212 (review finding 108): tests/presence/client_record_test.mjs used to
 // read crm.html, pipeline.html, projects.html and customers.html as text. What those
@@ -358,12 +358,12 @@ test.describe('pipeline.html, as the record\'s partner', () => {
     await page.route(`**/functions/v1/presence/sales/deals/${DEAL8}/send`, (route) => { sent = route.request().postDataJSON(); return route.fulfill(json({ data: { proposal: { id: 'p-b', status: 'sent' }, contract: { id: 'k-b', status: 'sent' }, deposit: { minted: false } }, url: 'https://example.test/sign.html?t=flow', emailed: true })); });
     await page.goto(`/pipeline.html?deal=${DEAL8}&dtab=billing`);
     let asked = '';
-    page.once('dialog', (d) => { asked = d.message(); void d.dismiss(); });
+    await onAsk(page, (q) => { asked = q; return false; });
     await page.locator('#sendBothBtn').click();
     await expect(page.locator('.dds-toast')).toContainText('Not sent — set the deal value in Details first.');
     expect(asked).toContain('the deal has no value set');
     expect(writes).toEqual([]);
-    page.once('dialog', (d) => { void d.accept(); });
+    await onAsk(page, () => true);
     await page.locator('#sendBothBtn').click();
     await expect.poll(() => sent).toEqual({ proposal_id: 'p-b', contract_id: 'k-b' });
     expect(writes).toEqual([`POST /sales/deals/${DEAL8}/send`]);

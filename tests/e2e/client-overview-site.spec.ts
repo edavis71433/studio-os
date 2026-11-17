@@ -39,7 +39,7 @@ async function open(page: Page, row: Record<string, unknown> | null, extraCtx: R
   await installApp(page, { api: { '/portal/context': ctx(extraCtx), '/crm/record': RECORD, '/sales/summary': QUIET } });
   await page.route(/\/functions\/v1\/presence\/agency\/sites(\/|$|\?)/, async (route: Route) => {
     const u = new URL(route.request().url());
-    scopes.push(route.request().headers()['x-dds-scope-site'] ?? 'none');
+    scopes.push(route.request().headers()['x-dds-scope-site'] ?? '');
     if (/\/thumb$/.test(u.pathname)) return route.fulfill(json({ data: { html: THUMB, version: 'live' } }));
     if (row === null) return route.fulfill(json({ error: 'forbidden' }, 403));
     return route.fulfill(json({ data: [OTHER, row], partial: false, can_open: true, can_pin: true, can_duplicate: true }));

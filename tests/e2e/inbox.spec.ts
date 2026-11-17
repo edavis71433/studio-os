@@ -576,7 +576,8 @@ test.describe('Batch A regressions — inbox', () => {
     await expect(notice).toBeHidden();
   });
 
-  test('A8 — the 7-13 day band reads "1 week ago", never "1 weeks ago"', async ({ page }) => {
+  // builder item 101: the shell's one date word (ddsDate.ago) says "last week" for 7 to 13 days, as the server's own does
+  test('A8 — the 7-13 day band reads "last week", never "1 weeks ago"', async ({ page }) => {
     const D8 = new Date(Date.now() - 8 * 86400000).toISOString();
     await installApp(page, { api: { ...API,
       '/portal/feed': { data: { ...FEED.data,
@@ -585,7 +586,7 @@ test.describe('Batch A regressions — inbox', () => {
     } });
     await page.goto('/inbox.html');
     const row = page.locator('#rows [role=option]').filter({ hasText: 'Sam Rivera' });
-    await expect(row.locator('.rwhen')).toHaveText('1 week ago');
+    await expect(row.locator('.rwhen')).toHaveText('last week');
   });
 });
 

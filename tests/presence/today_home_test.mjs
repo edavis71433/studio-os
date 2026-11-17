@@ -10,10 +10,15 @@
 // says couldn't-check), recents render as-cached with data-noscope, and the
 // portal's Needs-you queue carries a calm line for any source read that FAILED.
 
+// the shell's shared helpers the pages call (shell-kit.js ddsMoney, ddsDate), loaded as the pages load them
+globalThis.window = globalThis;
+await import('../../shell-kit.js');
+const { ddsMoney, ddsDate } = globalThis;
+
 // ── mirrors (verbatim) of the pure helpers in today.html ──
 function greet(h){h=h==null?new Date().getHours():h;return h<12?'Good morning.':h<18?'Good afternoon.':'Good evening.';}
 function dateLine(nowMs){return new Date(nowMs==null?Date.now():nowMs).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});}
-const money=(c)=>{const v=(c||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});};
+const money=(c)=>ddsMoney(c||0);
 function monthTiles(d){
   d=d||{};const s=d.sales||{};const w=d.website||{};const t=[];
   // D3 sibling: the number is summed EXPECTED deal value — the label says so.
@@ -32,7 +37,7 @@ function monthTrend(s){
 function siteYmd(tz,nowMs){if(tz){try{return new Intl.DateTimeFormat('en-CA',{timeZone:String(tz)}).format(new Date(nowMs==null?Date.now():nowMs));}catch(_){/* unknown zone → browser-local */}}return localYmd(nowMs);}
 function todaySlots(list,nowMs){return(Array.isArray(list)?list:[]).filter(a=>a&&String(a.slot_start_local||'').slice(0,10)===siteYmd(a.timezone,nowMs)&&(a.status==='pending'||a.status==='confirmed')).sort((a,b)=>String(a.slot_start_local).localeCompare(String(b.slot_start_local))).slice(0,6);}
 function slotTime(s){const m=/T(\d\d):(\d\d)/.exec(String(s||''));if(!m)return'';let h=+m[1];const ap=h>=12?'pm':'am';h=h%12||12;return h+':'+m[2]+' '+ap;}
-function localYmd(nowMs){const d=new Date(nowMs==null?Date.now():nowMs);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function localYmd(nowMs){return ddsDate.ymd(nowMs==null?undefined:nowMs);}
 function safeRecents(a){return Array.isArray(a)?a.filter(function(r){return r&&r.label&&typeof r.href==='string'&&/^\/(?![/\\])/.test(r.href);}).slice(0,5):[];}
 
 // ── the studio home (2026-10 mockup) pure helpers — mirrored 1:1 from

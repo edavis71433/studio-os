@@ -77,7 +77,7 @@ const ag = read('agency.html');
 ok('Home is titled Home, as the menu says', /<title>Home — Studio OS<\/title>/.test(ag));
 ok('Home says how many have waited over a month, and offers to clear them', /\$\{old\} of these \$\{old===1\?'has':'have'\} waited over a month\. <button type="button" class="linkbtn" id="needsClearOld">/.test(ag));
 ok('clearing asks first, in place', /k\.confirmIn\(btn,\{text:`Clear \$\{n\} item/.test(ag) && /if\(!n\|\|!k\|\|!k\.confirmIn\)return;/.test(ag));
-ok('an enquiry is marked read inside its client’s account; a support request is closed', /apiSend\('POST','\/forms\/inbox\/'\+encodeURIComponent\(id\),\{status:'read'\},it\.site_id\|\|''\)/.test(ag) && /apiSend\('PATCH','\/support\/'\+encodeURIComponent\(id\),\{status:'closed'\}\)/.test(ag) && /if\(site\)h\['x-dds-scope-site'\]=site;/.test(ag));
+ok('an enquiry is marked read inside its client’s account; a support request is closed', /apiSend\('POST','\/forms\/inbox\/'\+encodeURIComponent\(id\),\{status:'read'\},it\.site_id\|\|''\)/.test(ag) && /apiSend\('PATCH','\/support\/'\+encodeURIComponent\(id\),\{status:'closed'\}\)/.test(ag) && /const apiSend=\(method,path,payload,site\)=>ddsApi\(path,\{method,body:payload\|\|undefined,scope:site\|\|''\}\)/.test(ag));
 ok('then the list is read fresh', /mountNeeds\(true\);/.test(ag) && /api\('\/agency\/needs-you'\+\(fresh\?'\?fresh=1':''\)\)/.test(ag));
 ok('the platform line left Home', !/healthDoor|healthLine|\/admin\/health-center/.test(ag));
 ok('the role reads as words', /account_manager:'Account manager'/.test(ag) && /● \$\{esc\(roleWords\(ME&&ME\.role\)\)\}/.test(ag));

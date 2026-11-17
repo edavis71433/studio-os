@@ -288,8 +288,6 @@
     .tpl .ti{display:none}
   }
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:50px auto}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:999px;font-size:14px;opacity:0;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none;z-index:20}
-  .toast.show{opacity:1}
   footer{margin-top:var(--dds-s8,40px);padding-top:var(--dds-s5,20px);border-top:1px solid var(--line);color:var(--faint);font-size:12.5px;text-align:center}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
@@ -301,14 +299,12 @@
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
   <footer>Studio OS · You always preview and press send — nothing goes out on its own. Everyone can unsubscribe with one tap.</footer>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 // a scheduled moment people can read: "Nov 19, 2026, 6:00 PM" (toLocaleString printed seconds)
 const whenLabel=(iso)=>{const d=new Date(iso);return isFinite(d)?d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):String(iso||'');};
@@ -328,62 +324,11 @@ let WEL=null,WEL_FAIL=false,WEL_FORM=null,WEL_BUSY=false,WEL_SEE=false;   // bui
 let SITE_ID='';     // this site, for the client a kept template came from (GET /identity, else ?client=)
 const updatedLabel=()=>{const m=Math.floor((Date.now()-LOADED_AT)/60000);return m<1?'Updated just now':'Updated '+m+' min ago';};
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''),'x-region':FN_REGION});
-// a dropped connection answers like a refusal (status 0) instead of throwing, so every
-// button that greyed or set BUSY gets it back and says why (bug hunt C6)
-const NET_MSG='That didn’t go through — check your connection and try again.';
-async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,body:{message:NET_MSG}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
-// Small styled confirm — replaces native confirm(), matching the app's surfaces
-// (same pattern as files.html / connections.html / visual-studio.html). Resolves true/false.
-function askConfirm(title, body, okLabel){
-  return new Promise((resolve)=>{
-    const dlg=document.createElement('dialog');
-    dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
-    const box=document.createElement('div'); box.style.cssText='padding:20px';
-    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
-    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
-    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
-    const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
-      b.style.cssText=primary
-        ?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer'
-        :'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
-      return b; };
-    const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
-    row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
-    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
-    cancel.addEventListener('click',()=>finish(false));
-    ok.addEventListener('click',()=>finish(true));
-    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(false); });
-    dlg.showModal(); setTimeout(()=>ok.focus(),20);
-  });
-}
-// Small styled text prompt — matches askConfirm; resolves the trimmed string, or null on cancel/empty.
-function askPrompt(title, body, okLabel, placeholder, value){
-  return new Promise((resolve)=>{
-    const dlg=document.createElement('dialog');
-    dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
-    const box=document.createElement('div'); box.style.cssText='padding:20px';
-    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
-    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
-    const inp=document.createElement('input'); inp.type='text'; inp.placeholder=placeholder||''; inp.maxLength=200; inp.value=value||'';
-    inp.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--bg,#faf8f5);color:inherit;font:inherit;font-size:14px'; box.appendChild(inp);
-    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
-    const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
-      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
-      return b; };
-    const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
-    row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
-    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
-    const submit=()=>{ const v=inp.value.trim(); finish(v||null); };
-    cancel.addEventListener('click',()=>finish(null));
-    ok.addEventListener('click',submit);
-    inp.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } });
-    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(null); });
-    dlg.showModal(); setTimeout(()=>inp.focus(),20);
-  });
-}
-function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<0)return'soon';if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';const w=Math.floor(d/7);return w+(w===1?' week':' weeks')+' ago';}
+// a dropped connection answers like a refusal (status 0, never a throw), so every button
+// that greyed or set BUSY gets it back and says why (bug hunt C6): the shell's one API helper
+const api=(path,method,body)=>ddsApi(path,{method,body});
+const toast=(m,kind,action)=>ddsToast(m,kind,action);   // the shell's one toast: 'err' shows a failure as one
+const when=(iso)=>ddsDate.ago(iso);   // calendar days, as everywhere (it counted 24-hour blocks)
 function segCount(k){const s=SEGMENTS.find(x=>x.key===k);return s?s.count:0;}
 
 const IC={
@@ -559,9 +504,9 @@ function wire(){
   // sales review items 31 + 39: a picked list can be removed (the server refuses while a scheduled update uses it)
   const dl=$('dropList');if(dl)dl.addEventListener('click',async()=>{
     const s0=SEGMENTS.find(x=>x.key===SEL);if(!s0)return;
-    if(!(await askConfirm('Remove this list?','“'+(s0.label||'This list')+'” goes from your audiences. The people stay in your contacts and customers.','Remove list')))return;
+    if(!(await ddsConfirm('Remove this list?','“'+(s0.label||'This list')+'” goes from your audiences. The people stay in your contacts and customers.','Remove list',{danger:true})))return;
     const r=await api('/broadcasts/lists/'+encodeURIComponent(SEL.slice(5)),'DELETE');
-    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through — try again in a moment.');return;}
+    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through — try again in a moment.','err');return;}
     syncDraftFromForm();SEL='contacts';toast('List removed.');load(true);
   });
   const a=$('assist');if(a)a.addEventListener('click',assist);
@@ -656,7 +601,7 @@ async function editDraft(id){
   if(BUSY)return;BUSY=true;
   let r;try{r=await api('/broadcasts/'+id);}catch(_){r={ok:false,status:0,body:{}};}
   BUSY=false;
-  if(!r.ok||!r.body.data||!r.body.data.broadcast){toast('Couldn’t open that draft just now.');return;}
+  if(!r.ok||!r.body.data||!r.body.data.broadcast){toast('Couldn’t open that draft just now.','err');return;}
   const b=r.body.data.broadcast;
   DETAILS[id]=r.body.data;
   DRAFT={id:b.id,subject:b.subject||'',body:b.body||'',audience:b.audience};
@@ -669,7 +614,7 @@ async function reschedule(id){
   if(BUSY)return;BUSY=true;
   let r;try{r=await api('/broadcasts/'+id);}catch(_){r={ok:false,status:0,body:{}};}
   BUSY=false;
-  if(!r.ok||!r.body.data){toast('Couldn’t open that one just now.');return;}
+  if(!r.ok||!r.body.data){toast('Couldn’t open that one just now.','err');return;}
   stageFor(id,r.body.data,{scheduleFirst:true,laterLabel:'Reschedule'});
 }
 // ── the formatting bar: plain markdown the email renderer understands
@@ -746,8 +691,8 @@ async function takePost(){
   try{const u=new URL(location.href);u.searchParams.delete('post');history.replaceState(null,'',u.toString());}catch(_){/* */}
   const r=await api('/posts/'+id+'/email-draft');
   const d=r.ok&&r.body&&r.body.data;
-  if(!d){toast((r.body&&r.body.message)||'That post couldn’t be read just now.');return;}
-  if(!d.live){toast(d.message||'Publish the post first.');return;}
+  if(!d){toast((r.body&&r.body.message)||'That post couldn’t be read just now.','err');return;}
+  if(!d.live){toast(d.message||'Publish the post first.','err');return;}
   syncDraftFromForm();
   if(DRAFT&&(DRAFT.subject||'').trim()&&(DRAFT.body||'').trim())return;   // never over words already written
   DRAFT={subject:d.subject||'',body:d.body||''};FROM_POST=d.subject||'';
@@ -760,9 +705,9 @@ async function takePhoto(){
   const id=String(new URLSearchParams(location.search).get('photo')||'').toLowerCase();
   if(!/^[0-9a-f-]{36}$/.test(id))return;
   try{const u=new URL(location.href);u.searchParams.delete('photo');history.replaceState(null,'',u.toString());}catch(_){/* */}
-  let list;try{list=await loadPhotos();}catch(_){toast('Your photos couldn’t load just now — add it with + Image.');return;}
+  let list;try{list=await loadPhotos();}catch(_){toast('Your photos couldn’t load just now — add it with + Image.','err');return;}
   const a=list.find(x=>String(x.id).toLowerCase()===id);
-  if(!a){toast('That photo can’t go in an update — it may be private to a client or archived.');return;}
+  if(!a){toast('That photo can’t go in an update — it may be private to a client or archived.','err');return;}
   insertLine('!['+photoWords(a)+'](media:'+id+')');
   toast('Your photo is in the message — write your update around it.');
 }
@@ -790,11 +735,11 @@ function syncDraftFromForm(){const s=$('subj'),t=$('bodytx');if(s&&t){DRAFT=DRAF
 
 async function assist(){
   syncDraftFromForm();   // capture what's typed FIRST, like every other render path — the proposal merges in, it never replaces
-  const goal=await askPrompt('What’s this update about?','A sentence is enough — you’ll get a draft you can edit.','Draft it','e.g. the summer menu is live');
+  const goal=await ddsAsk({title:'What’s this update about?',text:'A sentence is enough — you’ll get a draft you can edit.',yes:'Draft it',placeholder:'e.g. the summer menu is live'});
   if(!goal)return;
   toast('Writing a draft…');
   const r=await api('/broadcasts/draft-assist','POST',{goal});
-  if(!r.ok){toast(r.body&&r.body.message||'Couldn’t draft that.');return;}
+  if(!r.ok){toast(r.body&&r.body.message||'Couldn’t draft that.','err');return;}
   // overwrite ONLY what the server proposed — draft-assist may return subject-only
   // or body-only (routes/broadcasts.ts cleans each independently), and a
   // subject-only proposal must not blank a typed body, nor vice versa
@@ -807,16 +752,16 @@ async function ensureDraft(){
   syncDraftFromForm();
   const subject=($('subj')&&$('subj').value||'').trim();
   const body=($('bodytx')&&$('bodytx').value||'').trim();
-  if(!subject){toast('Add a subject line first.');return null;}
-  if(!body){toast('Write your message first.');return null;}
+  if(!subject){toast('Add a subject line first.','err');return null;}
+  if(!body){toast('Write your message first.','err');return null;}
   if(DRAFT&&DRAFT.id){
     const u=await api('/broadcasts/'+DRAFT.id,'PATCH',{subject,body,audience:SEL});
-    if(!u.ok){toast((u.body&&u.body.message)||'That didn’t save.');return null;}
+    if(!u.ok){toast((u.body&&u.body.message)||'That didn’t save.','err');return null;}
     delete DETAILS[DRAFT.id];   // the cached drill-in is stale now
     return DRAFT.id;
   }
   const r=await api('/broadcasts','POST',{subject,body,audience:SEL});
-  if(!r.ok||!r.body.data||!r.body.data.id){toast(r.status===0?NET_MSG:'Couldn’t save the draft.');return null;}
+  if(!r.ok||!r.body.data||!r.body.data.id){toast(r.status===0?ddsApi.say(r):'Couldn’t save the draft.','err');return null;}
   DRAFT=r.body.data;return DRAFT.id;
 }
 
@@ -832,15 +777,15 @@ async function doTest(){
   BUSY=false;{const nb=$('sendTest');if(nb)nb.disabled=false;}
   if(r.ok){const to=r.body&&r.body.data&&r.body.data.to;toast(to?`Test sent to ${to} — only you got it.`:'Test sent — only you got it.');return;}
   // an older server has no such route yet (the page can go live before it)
-  if(r.status===404&&!(r.body&&r.body.message))return void toast('Test emails aren’t switched on yet — try again shortly.');
-  toast((r.body&&r.body.message)||'The test didn’t send — try again in a moment.');
+  if(r.status===404&&!(r.body&&r.body.message))return void toast('Test emails aren’t switched on yet — try again shortly.','err');
+  toast((r.body&&r.body.message)||'The test didn’t send — try again in a moment.','err');
 }
 async function doPreview(opts){
   if(BUSY)return;BUSY=true;
   const words=formWords();   // what this preview is of (ensureDraft saves the same trimmed words)
   const id=await ensureDraft();BUSY=false;if(!id)return;
   const r=await api('/broadcasts/'+id);
-  if(!r.ok){toast(r.status===0?NET_MSG:'Couldn’t build the preview.');return;}
+  if(!r.ok){toast(r.status===0?ddsApi.say(r):'Couldn’t build the preview.','err');return;}
   const later=!!(opts&&opts.scheduleFirst);
   stageFor(id,r.body.data,later?{scheduleFirst:true}:{});
   PV={id,subject:words.subject,body:words.body,later,stale:false};
@@ -910,18 +855,18 @@ async function doSend(id){
   if(BUSY)return;
   const later=document.querySelector('[name=whenmode]:checked').value==='later';
   let scheduled_at=null;
-  if(later){const v=$('when').value;if(!v){toast('Pick a date and time.');return;}scheduled_at=new Date(v).toISOString();if(Date.parse(scheduled_at)<=Date.now()){toast('Pick a time in the future — or choose Send now.');return;}}
-  if(!later&&!(await askConfirm('Send this to your list now?','It goes straight out to everyone on the list — an email can’t be unsent.','Send now')))return;
+  if(later){const v=$('when').value;if(!v){toast('Pick a date and time.','err');return;}scheduled_at=new Date(v).toISOString();if(Date.parse(scheduled_at)<=Date.now()){toast('Pick a time in the future — or choose Send now.','err');return;}}
+  if(!later&&!(await ddsConfirm('Send this to your list now?','It goes straight out to everyone on the list — an email can’t be unsent.','Send now',{danger:true})))return;
   const sendBtn=$('send'),sendLabel=sendBtn.textContent;
   BUSY=true;sendBtn.disabled=true;sendBtn.textContent=later?'Scheduling…':'Sending…';
   const r=await api('/broadcasts/'+id+'/send','POST',scheduled_at?{scheduled_at}:{});
   BUSY=false;
   // a dropped connection can't say whether the server got it (a repeat press is refused if it did)
-  if(!r.ok){toast(r.status===0?'We lost the connection before hearing back, so we can’t tell whether it went. Check Recent updates before you try again.':(r.body&&r.body.message||'That didn’t send.'));sendBtn.disabled=false;sendBtn.textContent=sendLabel;return;}
+  if(!r.ok){toast(r.status===0?'We lost the connection before hearing back, so we can’t tell whether it went. Check Recent updates before you try again.':(r.body&&r.body.message||'That didn’t send.'),'err');sendBtn.disabled=false;sendBtn.textContent=sendLabel;return;}
   const d=r.body.data||{};
   if(d.status==='scheduled')toast('Scheduled. It’ll go out then — you can cancel any time before.');
   else if(d.status==='queued')toast('Sending now — it goes out over the next few minutes.');
-  else toast(`Sent to ${d.sent_count||0} ${(d.sent_count===1)?'person':'people'}.`+(d.failed_count?` (${d.failed_count} couldn’t be reached.)`:''));
+  else toast(`Sent to ${d.sent_count||0} ${(d.sent_count===1)?'person':'people'}.`+(d.failed_count?` (${d.failed_count} couldn’t be reached.)`:''),d.failed_count&&!d.sent_count?'err':'ok');
   if(DRAFT&&DRAFT.id===id){
     // This send CONSUMED the composer's draft — so empty the FORM too, before
     // load() runs: load() calls syncDraftFromForm(), which re-captures whatever
@@ -938,9 +883,9 @@ async function doSend(id){
 }
 
 async function cancelBc(id){
-  if(!(await askConfirm('Cancel this scheduled broadcast?','It won’t go out. It stays in your history and nothing is deleted.','Cancel it')))return;
+  if(!(await ddsConfirm('Cancel this scheduled broadcast?','It won’t go out. It stays in your history and nothing is deleted.','Cancel it',{danger:true})))return;
   const r=await api('/broadcasts/'+id+'/cancel','POST',{});
-  if(!r.ok){toast(r.body&&r.body.message||'Couldn’t cancel.');return;}
+  if(!r.ok){toast(r.body&&r.body.message||'Couldn’t cancel.','err');return;}
   delete DETAILS[id];if(OPEN===id)OPEN=null;
   toast('Canceled.');await load();
 }
@@ -949,7 +894,7 @@ async function cancelBc(id){
 // Templates: a good update kept by the studio (agency/update_templates.ts), to start an update
 // for any client. Kept: the subject and the words with their fill-ins; a photo stays with the
 // client it came from. Shown only to a studio's team, once the database step is in.
-const shortDay=(iso)=>{const d=new Date(iso);return isFinite(d)?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';};
+const shortDay=(iso)=>ddsDate.short(iso);   // "Nov 3" ("Nov 3, 2025" in another year): the shell's one date format
 function applyTemplates(r){
   const b=r&&r.ok&&r.body;
   if(b&&Array.isArray(b.data)){TPL={on:b.available!==false,list:b.data,canManage:!!b.can_manage};return;}
@@ -1005,10 +950,10 @@ async function useTemplate(id){
   const t=TPL.list.find(x=>x.id===id);
   syncDraftFromForm();
   const has=!!(DRAFT&&(String(DRAFT.subject||'').trim()||String(DRAFT.body||'').trim()));
-  if(has&&!(await askConfirm('Replace what you wrote?','The subject and message you have now go, and “'+(t?t.name:'the template')+'” comes in. Who it goes to stays as it is.','Use the template')))return;
+  if(has&&!(await ddsConfirm('Replace what you wrote?','The subject and message you have now go, and “'+(t?t.name:'the template')+'” comes in. Who it goes to stays as it is.','Use the template',{danger:true})))return;
   const r=await api('/agency/update-templates/'+encodeURIComponent(id));
   const g=r.ok&&r.body&&r.body.data;
-  if(!g){toast((r.body&&r.body.message)||'That template couldn’t open just now. Try again in a moment.');return;}
+  if(!g){toast((r.body&&r.body.message)||'That template couldn’t open just now. Try again in a moment.','err');return;}
   const d=$('tplDlg');if(d&&d.open){d.onclose=null;d.close();}
   DRAFT={...(DRAFT||{}),subject:g.subject||'',body:g.body||''};FROM_TPL=g.name||'';FROM_POST='';
   render();
@@ -1017,26 +962,26 @@ async function useTemplate(id){
 }
 async function renameTemplate(id,after){
   const t=TPL.list.find(x=>x.id===id);if(!t)return;
-  const name=await askPrompt('Rename this template',null,'Rename','A name for it',t.name);
+  const name=await ddsAsk({title:'Rename this template',yes:'Rename',placeholder:'A name for it',value:t.name});
   if(!name||name===t.name)return;
   const r=await api('/agency/update-templates/'+encodeURIComponent(t.id),'PATCH',{name});
-  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save. Nothing was changed.');return;}
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save. Nothing was changed.','err');return;}
   t.name=(r.body&&r.body.data&&r.body.data.name)||name;
   if(after)after();toast('Renamed.');
 }
 async function removeTemplate(id,after){
   const t=TPL.list.find(x=>x.id===id);if(!t)return;
-  if(!(await askConfirm('Remove this template?','“'+t.name+'” goes from your studio’s templates. Updates already sent stay as they are.','Remove')))return;
+  if(!(await ddsConfirm('Remove this template?','“'+t.name+'” goes from your studio’s templates. Updates already sent stay as they are.','Remove',{danger:true})))return;
   const r=await api('/agency/update-templates/'+encodeURIComponent(t.id),'DELETE');
-  if(!r.ok&&r.status!==404){toast((r.body&&r.body.message)||'That didn’t go through. Try again in a moment.');return;}
+  if(!r.ok&&r.status!==404){toast((r.body&&r.body.message)||'That didn’t go through. Try again in a moment.','err');return;}
   TPL.list=TPL.list.filter(x=>x.id!==id);
   updateTplCount();if(after)after();toast('Removed.');
 }
 // Save as a template (the message being written) and Keep as a template (one already sent)
 async function keepTemplate(words,opener){
   const subject=String(words.subject||'').trim(),body=String(words.body||'').trim();
-  if(!subject){toast('Add a subject line first.');return;}
-  if(!body){toast('Write your message first.');return;}
+  if(!subject){toast('Add a subject line first.','err');return;}
+  if(!body){toast('Write your message first.','err');return;}
   const photos=body.split('\n').filter(l=>IMG_LINE.test(l.trim())).length;
   const d=tplDialog('keepDlg');
   d.onclose=()=>{if(opener&&opener.isConnected)opener.focus();};
@@ -1049,12 +994,12 @@ async function keepTemplate(words,opener){
   const go=d.querySelector('#keepGo'),nameIn=d.querySelector('#keepName');
   const submit=async()=>{
     const name=nameIn.value.trim();
-    if(!name){toast('Give the template a name.');nameIn.focus();return;}
+    if(!name){toast('Give the template a name.','err');nameIn.focus();return;}
     go.disabled=true;
     const r=await api('/agency/update-templates','POST',{site_id:SITE_ID||new URLSearchParams(location.search).get('client')||'',name,subject,body});
     go.disabled=false;
     const t=r.ok&&r.body&&r.body.data;
-    if(!t){toast((r.body&&r.body.message)||'That didn’t save. Nothing was kept.');return;}
+    if(!t){toast((r.body&&r.body.message)||'That didn’t save. Nothing was kept.','err');return;}
     TPL.list=[t,...TPL.list.filter(x=>x.id!==t.id)];updateTplCount();
     d.close();
     toast((r.body.photos_left?'Kept as “'+t.name+'”. '+(r.body.photos_left===1?'Its photo stays':'Its photos stay')+' with '+(BIZ||'this business')+'.':'Kept as “'+t.name+'”. It’s in Templates on every client.'));
@@ -1150,7 +1095,7 @@ function wireWelcome(){
   const sv=$('welSave');if(sv)sv.addEventListener('click',()=>saveWelcome({subject:s.value,body:b.value},'words'));
   const tt=$('welTest');if(tt)tt.addEventListener('click',testWelcome);
   const st=$('welStd');if(st)st.addEventListener('click',async()=>{
-    if(!(await askConfirm('Use the standard words?','Your own words here go, and the standard welcome comes back. You can change it again any time.','Use the standard words')))return;
+    if(!(await ddsConfirm('Use the standard words?','Your own words here go, and the standard welcome comes back. You can change it again any time.','Use the standard words',{danger:true})))return;
     saveWelcome({standard:true},'standard');
   });
   const sb=$('welSeeBtn');if(sb)sb.addEventListener('click',()=>{WEL_SEE=!WEL_SEE;sb.setAttribute('aria-expanded',WEL_SEE?'true':'false');$('welSeeBox').classList.toggle('open',WEL_SEE);});
@@ -1160,7 +1105,7 @@ async function saveWelcome(patch,kind){
   if(WEL_BUSY)return;WEL_BUSY=true;welBusy(true);
   const r=await api('/broadcasts/welcome','PUT',patch);
   WEL_BUSY=false;
-  if(!r.ok||!r.body||!r.body.data){welBusy(false);toast((r.body&&r.body.message)||'That didn’t save. Nothing was changed.');return;}
+  if(!r.ok||!r.body||!r.body.data){welBusy(false);toast((r.body&&r.body.message)||'That didn’t save. Nothing was changed.','err');return;}
   WEL=r.body.data;if(kind!=='switch')WEL_FORM=null;   // the switch keeps words still being written
   paintWelcome();
   const f=kind==='switch'?$('welSw'):kind==='words'?$('welSave'):$('welSubj');if(f)f.focus();
@@ -1172,7 +1117,7 @@ async function testWelcome(){
   const r=await api('/broadcasts/welcome/test','POST',words);
   WEL_BUSY=false;welBusy(false);
   if(r.ok){const to=r.body&&r.body.data&&r.body.data.sent_to;toast(to?`A test went to ${to}, marked [Test], with the words as they are now.`:'A test went to you, marked [Test].');return;}
-  toast((r.body&&r.body.message)||'The test didn’t send. Try again in a moment.');
+  toast((r.body&&r.body.message)||'The test didn’t send. Try again in a moment.','err');
 }
 
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to send an update.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
@@ -1195,14 +1140,14 @@ async function load(soft){
   if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
   applyWelcome(wel);applyTemplates(tpl);
   if(seg.status===403||list.status===403){$('main').innerHTML=`<div class="center"><h2>Sending updates lives in your studio workspace.</h2></div>`;return;}
-  if(!seg.ok&&!list.ok){if(soft)return void toast('Couldn’t refresh just now.');trouble();return;}
-  if(soft&&(!seg.ok||!list.ok))toast('Couldn’t refresh just now.');
+  if(!seg.ok&&!list.ok){if(soft)return void toast('Couldn’t refresh just now.','err');trouble();return;}
+  if(soft&&(!seg.ok||!list.ok))toast('Couldn’t refresh just now.','err');
   if(seg.ok){SEGMENTS=(seg.body.data&&seg.body.data.segments)||[];SEG_OK=true;
     // arriving from a list's "Send an update" (?list=<id>): that list is who it goes to
     const pick=new URLSearchParams(location.search).get('list');
     // S4: the picked people who aren't your contacts, enquiries or customers were left off the list
     const left=Number(new URLSearchParams(location.search).get('left'))||0;
-    if(left>0)toast(left===1?'1 of the people you picked isn’t one of your contacts, enquiries or customers, so they were left out.':`${left} of the people you picked aren’t among your contacts, enquiries or customers, so they were left out.`);
+    if(left>0)toast(left===1?'1 of the people you picked isn’t one of your contacts, enquiries or customers, so they were left out.':`${left} of the people you picked aren’t among your contacts, enquiries or customers, so they were left out.`,'err');
     if(pick&&!DRAFT&&SEGMENTS.some(x=>x.key==='list:'+pick)){SEL='list:'+pick;try{const u=new URL(location.href);u.searchParams.delete('list');u.searchParams.delete('left');history.replaceState(null,'',u.toString());}catch(_){/* */}}
   }
   else if(!soft)SEG_OK=false;   // soft keeps the last good lists on screen

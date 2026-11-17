@@ -443,3 +443,29 @@ export async function answerAsks(page: Page, answer = true): Promise<void> {
 }
 export const setAsksAnswer = (page: Page, yes: boolean) => page.evaluate((y) => { (window as unknown as { __askAnswer: boolean }).__askAnswer = y; }, yes);
 export const askedSoFar = (page: Page) => page.evaluate(() => (window as unknown as { __asked?: string[] }).__asked || []);
+
+// Builder item 101: the back office asks in the shell's styled question too (shell-kit.js ddsConfirm,
+// the same dialog.ask-yes). onAsk is page.on('dialog') for it: the handler gets the words asked and
+// returns true for the answer button, anything else for Cancel. A later onAsk replaces the handler.
+const ASK_HANDLERS = new WeakMap<Page, (asked: string) => boolean | void>();
+export async function onAsk(page: Page, handler: (asked: string) => boolean | void): Promise<void> {
+  const first = !ASK_HANDLERS.has(page);
+  ASK_HANDLERS.set(page, handler);
+  if (!first) return;
+  await page.exposeFunction('__e2eOnAsk', (asked: string) => { const h = ASK_HANDLERS.get(page); return !!(h && h(asked) === true); });
+  const install = () => {
+    const w = window as unknown as { __askAsk?: boolean; __e2eOnAsk: (q: string) => Promise<boolean> };
+    if (w.__askAsk) return;
+    w.__askAsk = true;
+    new MutationObserver(() => {
+      const d = document.querySelector('dialog.ask-yes[open]:not([data-e2e-asked])');
+      if (!d) return;
+      d.setAttribute('data-e2e-asked', '');
+      void w.__e2eOnAsk((d.querySelector('.ask-msg')?.textContent || '').trim()).then((yes) => {
+        (d.querySelector(yes ? '.ask-ok' : '.ask-cancel') as HTMLElement | null)?.click();
+      });
+    }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] });
+  };
+  await page.addInitScript(install);
+  await page.evaluate(install).catch(() => { /* nothing open yet */ });
+}

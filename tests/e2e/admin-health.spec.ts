@@ -132,7 +132,7 @@ test.describe('Admin Health Center — the Stripe key (sales item 131)', () => {
     await page.route('**/functions/v1/presence/admin/stripe-key', (r) => r.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'rate_limited', message: 'That was checked a moment ago. Try again in a few minutes.' }) }));
     await page.goto('/admin-health.html');
     await pressButton(page.getByRole('button', { name: 'Check its permissions' }));
-    await expect(page.locator('.toast')).toContainText('checked a moment ago');
+    await expect(page.locator('.dds-toast.err')).toContainText('checked a moment ago');   // the shell's toast, as a failure (builder item 101)
     await expect(page.locator('#keyRes')).toBeEmpty();
   });
 
@@ -169,7 +169,7 @@ test.describe('Admin Health Center — family chrome', () => {
     await page.route(HEALTH_GLOB, (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{}' }));
     await openMore(page);
     await page.locator('#refreshBtn').click();
-    await expect(page.locator('.toast')).toContainText('Couldn’t refresh');
+    await expect(page.locator('.dds-toast.err')).toContainText('Couldn’t refresh');   // the shell's toast, shown as a failure (builder item 101)
     await expect(page.locator('.card.area')).toHaveCount(10); // kept, not wiped
   });
 });

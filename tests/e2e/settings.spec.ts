@@ -102,6 +102,7 @@ test.describe('Settings page', () => {
 
   // ── studio audit 2026-10, change 5: the plan lives on Settings ──────────────
   test('a self-serve plan: the inline section reads plan · status · renews, and Manage billing POSTs /commerce/portal then follows Stripe’s url', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-16T12:00:00Z'));   // "renews Nov 3" is this year's (builder item 101: a day in another year says its year)
     await installApp(page, { api: API });
     await page.route('**/functions/v1/presence/commerce/portal', (route) => route.request().method() === 'POST'
       ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { url: '/help.html?from=billing-portal' } }) })
@@ -123,6 +124,7 @@ test.describe('Settings page', () => {
   });
 
   test('the Agency plan: the limits line from /agency/usage, no button, and the sentence that changes go through our team', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-16T12:00:00Z'));   // "renews Nov 3" is this year's (builder item 101: a day in another year says its year)
     const seen: string[] = [];
     page.on('request', (r) => { if (/\/functions\/v1\/presence\//.test(r.url())) seen.push(new URL(r.url()).pathname.replace(/^.*\/functions\/v1\/presence/, '')); });
     await installApp(page, { api: { ...API, '/portal/context': AGENCY_CTX,
@@ -151,6 +153,7 @@ test.describe('Settings page', () => {
   });
 
   test('the Plan & billing card opens the inline section; #billing deep-links to it', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-11-16T12:00:00Z'));   // "renews Nov 3" is this year's (builder item 101: a day in another year says its year)
     await installApp(page, { api: API });
     await page.goto('/settings.html');
     await page.locator('[data-card="billing"]').click();

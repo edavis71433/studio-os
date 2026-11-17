@@ -183,16 +183,24 @@ test('Pipeline: your second business keeps New deal, Import, Views, Charts and P
 test('Contacts: your second business can add, import and save views as at your first; a client’s says contacts live at the studio level', async ({ page }) => {
   test.slow();   // three pages opened in turn
   const errors = errorsOf(page);
+  const rec = recorder(page);
   for (const who of [FIRST, SECOND]) {
+    rec.reset();
     await open(page, who, '/contacts.html', { '/sales/contacts': { data: [] } });
     await expect(page.locator('#new')).toBeVisible();
     await expect(page.locator('#importCsv')).toHaveCount(1);
     await expect(page.getByText('Contacts live at the studio level.')).toHaveCount(0);
+    // the address goes with every read: your second business's contacts are its own (builder item 101: the shell's API helper sends it)
+    expect(rec.asked('/sales/contacts').length).toBeGreaterThan(0);
+    expect(rec.asked('/sales/contacts').every((s) => s.scope === who.client)).toBe(true);
   }
+  rec.reset();
   await open(page, STUDIO, '/contacts.html', { '/sales/contacts': { data: [] } });
   await expect(page.getByText('Contacts live at the studio level.')).toBeVisible();
   await expect(page.locator('#new')).toHaveCount(0);
   await expect(page.locator('#importCsv')).toHaveCount(0);
+  expect(rec.asked('/sales/contacts').length).toBeGreaterThan(0);
+  expect(rec.asked('/sales/contacts').every((s) => s.scope === CLIENT)).toBe(true);   // inside a client, as before
   expect(errors).toEqual([]);
 });
 
