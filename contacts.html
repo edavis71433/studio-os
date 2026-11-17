@@ -759,7 +759,7 @@ document.addEventListener('click',(e)=>{const x=e.target&&e.target.closest?e.tar
 // So the add, import and fields buttons only show at the studio level (+ Add a contact is the
 // header's filled action; these are its others).
 function moreButtons(){
-  return `<button class="btn ghost" id="addCust" title="Set up an existing customer with their own workspace and a sign-in invitation">+ Add a customer</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button><button class="btn ghost" id="manageFields" data-needs="configure" title="Define up to 5 of your own fields — they show on every contact’s record">Manage fields</button>`;
+  return `<button class="btn ghost" id="addCust" title="Save a customer. Their website and their portal invite come later, from their profile.">+ Add a customer</button><button class="btn ghost" id="importCsv" title="Bring your existing contact list — a CSV export from anywhere">Import CSV</button><button class="btn ghost" id="manageFields" data-needs="configure" title="Define up to 5 of your own fields — they show on every contact’s record">Manage fields</button>`;
 }
 function render(){
   PAINTED_IN=inClient();

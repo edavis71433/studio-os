@@ -256,6 +256,11 @@
   .stop{display:flex;align-items:center;gap:16px;padding:24px 32px 20px;border-bottom:1px solid var(--line);flex:0 0 auto}
   .stop h3{font-family:var(--serif);font-weight:600;font-size:30px;line-height:1.15;margin:0;letter-spacing:-.01em}
   .stop p{margin:2px 0 0;color:var(--soft);font-size:14px}
+  /* builder item 241: the sheet opened from a customer's profile names them */
+  .nfor{display:flex;align-items:center;gap:10px;padding:10px 14px 10px 12px;border-radius:12px;background:var(--p-soft);margin:0 0 4px}
+  .nfor .nfav{flex:0 0 auto;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--p);color:var(--dds-on-p,#fff);font-size:12px;font-weight:600}
+  .nfor .nfk{display:block;font-size:11.5px;font-weight:600;color:var(--p)}
+  .nfor .nfw{display:block;font-size:14px;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
   .sx{margin-left:auto;flex:0 0 auto;width:44px;height:44px;border:1px solid var(--line);border-radius:12px;background:transparent;color:var(--soft);font:inherit;font-size:22px;line-height:1;cursor:pointer}
   .sx:hover{color:var(--p);border-color:var(--p)}
   .sfields{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
@@ -481,6 +486,7 @@
     <div id="new-fields" class="sfields">
       <div class="nbody">
         <div class="sleft">
+          <div class="nfor" id="new-for" hidden><span class="nfav" aria-hidden="true" id="new-for-av"></span><span><span class="nfk">For your customer</span><span class="nfw" id="new-for-who"></span></span></div>
           <div><label class="fl" for="new-biz">Business name</label>
           <input type="text" id="new-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off"></div>
           <fieldset id="new-kind-wrap" hidden>
@@ -1644,6 +1650,9 @@ let NEW_BUSY=false,NEW_MADE=null,KITS=[],DESIGNS=null;
 // chosen: the studio picked a kind or a design, so the design is sent; the untouched sheet
 // sends none and the site keeps the usual look.
 let NEWS={kind:'',industry:'',look:'',chosen:false,byHand:false,kit:'',tpl:false};
+// builder item 241: Create website on a customer's profile opens this sheet for them (?for=<their id>):
+// it names them, fills in their business, and the site is made for their record
+let NEW_FOR=null;
 // a template (item 145) also brings a saved site's pages, sections, photos, menu and look
 const kitHintOf=(k)=>k&&k.kind==='template'
   ?'Template: '+(k.summary&&k.summary.pages?k.summary.pages+' page'+(k.summary.pages===1?'':'s')+' with their sections and photos':'its pages, sections and photos')+', the menu and the look, plus services, FAQs, voice and colors.'
@@ -1706,13 +1715,19 @@ function paintNewFull(msg){
   $('new-full').hidden=!full;
   $('new-submit').disabled=full;
 }
-async function openNewSite(preset){
+async function openNewSite(preset,forCustomer){
   if(!META.can_create||$('newDlg').open)return;
   const want=typeof preset==='string'?preset:'';   // the Templates tab's "New site with this" (#new=<design>)
   NEW_MADE=null;$('new-biz').value='';
+  NEW_FOR=forCustomer&&forCustomer.client_id?forCustomer:null;
+  const fb=$('new-for'),who=NEW_FOR?[NEW_FOR.person,NEW_FOR.business].filter(Boolean).join(' · '):'';
+  fb.hidden=!NEW_FOR;$('new-for-who').textContent=who;$('new-for-av').textContent=NEW_FOR?String(NEW_FOR.person||NEW_FOR.business||'?').split(/\s+/).map(w=>w.charAt(0)).join('').slice(0,2).toUpperCase():'';
+  $('newHead').textContent=NEW_FOR?'New website for '+(NEW_FOR.business||NEW_FOR.person||'your customer'):'New site';
+  $('newHead').nextElementSibling.textContent=NEW_FOR?'For your customer'+(NEW_FOR.person?' '+NEW_FOR.person:'')+'. Nothing is published, and nobody is emailed.':'Build it in private. Nobody is emailed until you invite the owner.';
+  if(NEW_FOR&&NEW_FOR.business)$('new-biz').value=NEW_FOR.business;
   NEWS={kind:'',industry:'',look:'',chosen:false,byHand:false,kit:'',tpl:false};
   $('new-fields').style.display='';$('new-done').style.display='none';$('new-done').innerHTML='';
-  const b=$('new-submit');b.textContent='Create site';
+  const b=$('new-submit');b.textContent=NEW_FOR?'Create website':'Create site';
   paintNewFull('');paintNewSum();
   $('newDlg').showModal();$('new-biz').focus();   // at once: a later focus could catch typing already under way
   // the designs and your kits are niceties: none (or a failed read) leaves the name and the usual look
@@ -1758,11 +1773,13 @@ function paintNewDone(d,name){
   $('new-fields').style.display='none';
   const done=$('new-done'),kit=d.kit||null,look=newLookLine(d);
   const open=META.can_open?`<a class="btn" id="new-open" href="${esc(scoped('/presence.html',d.site_id))}" style="text-decoration:none;display:inline-flex;align-items:center">Open the editor</a>`:'';
-  done.innerHTML=`<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">${esc(name)}’s site is ready</h3>${look?`<p id="new-look-line">${look}</p>`:''}${kit?`<p id="new-kit-line">${newKitLine(kit)}</p>`:''}<p>Nobody has been emailed. Invite the owner from its card when you’re ready to show them.</p></div>`
-    +`<div class="row2">${kit&&kit.failed?'<button type="button" class="btn ghost" id="new-kit-again">Try the kit again</button>':''}<button type="button" class="btn${open?' ghost':''}" id="new-close">Done</button>${open}</div>`;
+  // builder item 241: made for a customer, the way back is their profile, where Invite to their portal is
+  const prof=d.for_customer?`<a class="btn" id="new-profile" href="/crm.html?client=${encodeURIComponent(d.site_id)}" style="text-decoration:none;display:inline-flex;align-items:center">Back to their profile</a>`:'';
+  done.innerHTML=`<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">${esc(name)}’s ${d.for_customer?'website':'site'} is ready</h3>${look?`<p id="new-look-line">${look}</p>`:''}${kit?`<p id="new-kit-line">${newKitLine(kit)}</p>`:''}<p>${d.for_customer?'Nobody has been emailed. Invite them to their portal from their profile when you’re ready.':'Nobody has been emailed. Invite the owner from its card when you’re ready to show them.'}</p></div>`
+    +`<div class="row2">${kit&&kit.failed?'<button type="button" class="btn ghost" id="new-kit-again">Try the kit again</button>':''}${prof?(open?open.replace('class="btn"','class="btn ghost"'):'')+prof:`<button type="button" class="btn${open?' ghost':''}" id="new-close">Done</button>${open}`}</div>`;
   done.style.display='';
-  const cl=$('new-close');cl.onclick=()=>$('newDlg').close();
-  (($('new-open'))||cl).focus();
+  const cl=$('new-close');if(cl)cl.onclick=()=>$('newDlg').close();
+  (($('new-profile'))||($('new-open'))||cl).focus();
   // bug hunt A4's rule: a kit that didn't apply gets a real retry, on the site just made
   const ka=$('new-kit-again');if(ka)ka.onclick=async()=>{
     if(NEW_BUSY)return;NEW_BUSY=true;ka.disabled=true;ka.textContent='Applying…';
@@ -1780,12 +1797,12 @@ $('newForm').onsubmit=async(e)=>{
   const kit_id=NEWS.kit||'',template_slug=!NEWS.tpl&&NEWS.chosen&&NEWS.look?NEWS.look:'',industry_key=NEWS.industry||'';
   NEW_BUSY=true;const btn=$('new-submit');btn.disabled=true;btn.textContent='Making the site…';
   let r=null;
-  try{r=await apiSend('POST','/agency/sites',{business_name,kit_id:kit_id||undefined,template_slug:template_slug||undefined,industry_key:industry_key||undefined});}
+  try{r=await apiSend('POST','/agency/sites',{business_name,kit_id:kit_id||undefined,template_slug:template_slug||undefined,industry_key:industry_key||undefined,client_id:(NEW_FOR&&NEW_FOR.client_id)||undefined});}
   finally{NEW_BUSY=false;}
   // no answer at all: the site may or may not have been made
   if(r&&r.status===0){r=null;toast('We lost the connection, so we can’t tell whether the site was made. Refresh Sites before trying again.',true);}
   if(!r||!r.ok){
-    btn.textContent='Create site';
+    btn.textContent=NEW_FOR?'Create website':'Create site';
     // item 198: the plan filled up since the page loaded; say so where Create site is
     if(r&&r.status===409&&r.body&&r.body.error==='client_limit'){if(r.body.room)META.room=r.body.room;paintNewFull(r.body.message||'');return;}
     if(r)toast((r.body&&r.body.message)||'We couldn’t make the site just now.',true);btn.disabled=false;return;
@@ -1802,6 +1819,18 @@ function openNewFromHash(){
   if(META.can_create)openNewSite(m[1]||'');
 }
 window.addEventListener('hashchange',openNewFromHash);
+// builder item 241: /sites.html?for=<customer> (Create website on their profile): who they are comes from
+// the server, never the address, and the address forgets it so a reload doesn't open the sheet again
+async function openNewForCustomer(){
+  const id=new URLSearchParams(location.search).get('for')||'';
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return;
+  try{const q=new URLSearchParams(location.search);q.delete('for');history.replaceState(null,'',location.pathname+(q.toString()?'?'+q.toString():'')+location.hash);}catch(_){/* */}
+  if(!META.can_create)return;
+  let c=null;try{const r=await api('/sales/customers/'+encodeURIComponent(id));c=r.ok&&r.body&&r.body.data;}catch(_){c=null;}
+  if(!c){toast('We couldn’t find that customer just now. Open them from Customers and try again.',true);return;}
+  if(c.offers&&!c.offers.create_website){location.replace('/crm.html?client_id='+encodeURIComponent(id));return;}   // they have a website already
+  openNewSite('',{client_id:id,business:c.business_name||'',person:(c.person&&c.person.name)||''});
+}
 
 // ── Invite the owner (item 135): the later, separate step. Their sign-in email goes
 //    out from your studio and they become one of your customers; the site doesn't change. ──
@@ -1930,6 +1959,7 @@ async function load(soft){
   LOADED_AT=Date.now();MENU_OPEN=null;
   render();
   openNewFromHash();
+  openNewForCustomer();   // builder item 241
   if(window.ClientTools)ClientTools.mount();   // item 176: each card's content form and kit line
   mountNumbers();
 }

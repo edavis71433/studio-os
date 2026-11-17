@@ -156,6 +156,7 @@ const DECIDED = {
     'DELETE /projects/templates/:id',   // sales item 106: removing a saved project template
     'DELETE /sales/todo-templates/:id',   // sales item 106: removing a saved to-do list
     'DELETE /assets/:id/forever',   // builder list item 218: a file in the Trash deleted for good, like the Delete that put it there
+    'POST /sales/customers/:id/delete',   // builder list item 241: a customer added by mistake leaves Customers (their website to the Trash or kept)
   ],
   configure: [
     'DELETE /foundations/domain', 'POST /foundations/domain', 'POST /foundations/prepare',
@@ -220,6 +221,7 @@ const DECIDED = {
     'POST /redirects', 'POST /restore-to-draft', 'POST /review/reports/:id/dismiss', 'POST /review/run',
     'POST /reviews/:id/approve', 'POST /reviews/:id/hide', 'POST /reviews/:id/reply', 'POST /sales/contacts',
     'POST /sales/contacts/:id/restore', 'POST /sales/deals/:id/restore', 'POST /sales/contracts/:id/send', 'POST /sales/contracts/:id/term',
+    'POST /sales/customers/:id/restore', 'POST /sales/customers/:id/invite', 'POST /sales/customers/:id/website',   // builder list item 241: a deleted customer back; their portal invite, like a deal's resend-invite; a site they keep elsewhere
     'POST /sales/customers', 'POST /sales/deals', 'POST /sales/deals/:id/activity',
     'POST /sales/tasks', 'POST /sales/people/activity',   // sales items 85 and 106: to-dos and calls for anyone
     'POST /sales/email',   // sales item 80: an email from the record, like the reply to an enquiry
@@ -354,6 +356,7 @@ const CHANGED = [
   { name: 'POST /sales/contacts/imports/:id/undo', fx: { rows: { presence_contact_imports: { created_at: new Date().toISOString(), undone_at: null } } }, run: (r, p) => handleContactImportUndo(r, A, p, ROW, cors) },
   { name: 'POST /sales/contacts/:id/merge', body: { from: ROW2, confirm: true }, fx: { rows: { presence_contacts: { client_id: null, deleted_at: null } } }, run: (r, p) => handleContactMerge(r, A, p, ROW, cors) },
   { name: 'POST /sales/contacts/:id/unmerge', fx: { rows: { presence_contacts: { merged_into: ROW2, merge_record: { at: new Date().toISOString(), into: ROW2, moved: { deals: [], appointments: [], reviews: [] }, keep_before: {}, keep_after: {} } } } }, run: (r, p) => handleContactUnmerge(r, A, p, ROW, cors) },
+  { name: 'POST /sales/customers/:id/delete', body: { site: 'keep' }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/customers.ts')).handleCustomerDelete(r, A, p, ROW, cors) },   // builder list item 241
   { name: 'POST /sales/invoices/:id/payment/undo', fx: { rows: { presence_invoices: { status: 'paid', paid_method: 'check', payment_for: null } } }, run: (r, p) => handleInvoicePaymentUndo(r, A, p, ROW, cors) },   // sales review item 77
   { name: 'POST /foundations/domain', body: { domain: 'beta.example' }, run: (r, p) => handleDomain(r, 'POST', A, p, cors) },
   { name: 'DELETE /foundations/domain', body: { confirm: 'alpha.example' }, run: (r, p) => handleDomain(r, 'DELETE', A, p, cors) },   // item 163: removing needs the name typed back
@@ -497,7 +500,7 @@ const WRITE_HANDLERS = [
   'handlePreviewShareLink', 'handleProject', 'handleProjectChecklist', 'handleProjectStatus', 'handleProjectSurveys',
   'handleProjects', 'handleProjectTemplates', 'handleTodoTemplates', 'handleDealTasksFromTemplate', 'handlePublish', 'handlePutIdentity', 'handlePutTemplate', 'handleRedirectCreate',
   'handleRedirectDelete', 'handleRestore', 'handleRestoreToDraft', 'handleReviewApprove', 'handleReviewDismiss',
-  'handleReviewHide', 'handleReviewReply', 'handleReviewRequest', 'handleReviewRun', 'handleSalesAddCustomer',
+  'handleReviewHide', 'handleReviewReply', 'handleReviewRequest', 'handleReviewRun', 'handleSalesAddCustomer', 'handleCustomerRoute',
   'handleSalesContact', 'handleSalesContactFields', 'handleSalesContactRestore', 'handleSalesRestoreDeal', 'handleSalesContacts',
   'handleSalesTasks', 'handlePeopleActivity',   // sales items 85 and 106 (see DECIDED.edit)
   'handleRecordEmail',   // sales item 80: POST /sales/email is an edit

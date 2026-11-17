@@ -59,8 +59,9 @@ ok('"health" still finds the website’s health check for an owner, on its Searc
 ok('agency.html: no platform line on the studio Home (item 96)', !/Platform: all clear/.test(ag) && !/id="healthDoor"/.test(ag) && !/\/admin\/health-center/.test(ag));
 ok('shell.js: the account menu has "Platform health" for staff only, with its count', /CTX && CTX\.is_operator\) rows \+= '<a class="row" href="\/admin-health\.html" id="dds-health-row">Platform health/.test(shellSrc) && /api\('\/admin\/health-center'\)/.test(shellSrc) && /' areas need'\) \+ ' a look' : 'All clear'/.test(shellSrc));
 ok('agency.html: no text link under the kits any more', !/Platform health — background jobs/.test(ag));
-// Oct 2026 home rebuild: the kits card left the home — #kits opens Add a customer (where "Start from a kit" lives)
-ok('agency.html: #kits opens Add a customer, the kits card is gone', !/class="kitcard"/.test(ag) && /location\.hash!=='#kits'/.test(ag) && /Save as a starter kit/.test(ag));
+// Oct 2026 home rebuild: the kits card left the home. Builder item 241: Add a customer only saves now, so an
+// old #kits link opens Templates, where starter kits live (tests/e2e/agency.spec.ts drives that link)
+ok('agency.html: the kits card is gone, and a row can still be saved as a starter kit', !/class="kitcard"/.test(ag) && /Save as a starter kit/.test(ag));
 
 // ═══ change 12: tidy the edges ═══
 ok('build-public.sh: provision.html is carved out of the public build', /for f in email-signature\.html styleguide\.html a11y\.html provision\.html; do/.test(build));

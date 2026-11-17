@@ -83,7 +83,7 @@ const PAGES: Array<{ name: string; open: Open; want: Parameters<typeof expectOne
   { name: 'Recently deleted', open: async (page) => { await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/deleted': DELETED } }); await page.goto('/recently-deleted.html'); },
     want: { title: 'Recently deleted', icon: 'deleted', trail: 'Settings', line: '3 things deleted in the last 30 days', filled: null } },
   { name: 'Recently deleted, nothing waiting', open: async (page) => { await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/deleted': NOTHING_DELETED } }); await page.goto('/recently-deleted.html'); },
-    want: { title: 'Recently deleted', icon: 'deleted', trail: 'Settings', line: 'Deals, contacts and to-dos you delete wait here for 30 days', filled: null } },
+    want: { title: 'Recently deleted', icon: 'deleted', trail: 'Settings', line: 'Customers, deals, contacts and to-dos you delete wait here for 30 days', filled: null } },
 ];
 
 test.describe('One page header, group 3 (builder item 165)', () => {
