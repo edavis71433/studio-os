@@ -7,6 +7,7 @@ import { ANALYTICS_98 } from './tap-targets-98.analytics';
 import { INBOX_98 } from './tap-targets-98.inbox';
 import { PIPELINE_98 } from './tap-targets-98.pipeline-phone-numbers';
 import { RECORD_98, RECORD_98_CLIENT } from './tap-targets-98.phone-tablet-walk';
+import { CID, PROFILE_241, WITH_SITE, CUSTOMERS_241 } from './tap-targets-98.customer-steps';
 
 // ── Builder item 98: on a touch screen, every control is a finger-sized target ─────────
 // The Nov 8 review measured taps of 16 to 32px where 44px is the phone standard: link-style
@@ -111,5 +112,57 @@ test.describe('every control is a finger-sized target on a touch screen (builder
     await settled(page);
     const small = await smallTargets(page, 'dialog[open]');
     expect(small, small.map((m) => `${m.el} "${m.text}" ${m.w}x${m.h} misses ${m.side}`).join('\n')).toEqual([]);
+  });
+
+  // Builder item 241 (PR 466) came in after this walk was written: a customer's steps card,
+  // its Invite form and "lives somewhere else" field, the Delete customer box, and Delete
+  // customer… in Customers' preview.
+  const say = (small: Miss[]) => small.map((m) => `${m.el} "${m.text}" ${m.w}x${m.h} misses ${m.side}`).join('\n');
+  test('a customer’s steps card, its Invite form and its other-host field', async ({ page }) => {
+    test.skip(!test.info().project.use.hasTouch, 'touch screens only');
+    await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'));
+    await installApp(page, { api: PROFILE_241() as never });
+    await page.goto(`/crm.html?client_id=${CID}`);
+    await expect(page.locator('#custsteps .cs-row')).toBeVisible();
+    await settled(page);
+    let small = await smallTargets(page);
+    expect(small, say(small)).toEqual([]);
+    await page.getByRole('button', { name: 'Invite to their portal' }).click();
+    await expect(page.getByRole('button', { name: 'Send the invite' })).toBeVisible();
+    await settled(page);
+    small = await smallTargets(page, '#custsteps');
+    expect(small, say(small)).toEqual([]);
+    await page.getByRole('button', { name: 'Their site lives somewhere else?' }).click();
+    await expect(page.getByRole('button', { name: 'Watch it' })).toBeVisible();
+    await settled(page);
+    small = await smallTargets(page, '#custsteps');
+    expect(small, say(small)).toEqual([]);
+  });
+
+  test('the Delete customer box', async ({ page }) => {
+    test.skip(!test.info().project.use.hasTouch, 'touch screens only');
+    await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'));
+    await installApp(page, { api: PROFILE_241({ [`/sales/customers/${CID}`]: WITH_SITE }) as never });
+    await page.goto(`/crm.html?client_id=${CID}`);
+    await expect(page.locator('#custsteps .cs-row')).toBeVisible();
+    await page.locator('#act-more').click();
+    await page.getByRole('button', { name: 'Delete customer…' }).click();
+    await expect(page.locator('#custDelDlg')).toBeVisible();
+    await settled(page);
+    const small = await smallTargets(page, '#custDelDlg');
+    expect(small, say(small)).toEqual([]);
+  });
+
+  test('Delete customer… in Customers’ preview', async ({ page }) => {
+    test.skip(!test.info().project.use.hasTouch, 'touch screens only');
+    await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'));
+    await installApp(page, { api: CUSTOMERS_241 as never });
+    await page.addInitScript(() => { try { localStorage.setItem('dds-display:customers', 'table'); } catch (_) { /* */ } });
+    await page.goto('/customers.html');
+    await page.getByRole('row', { name: /Preview Willow & Ash Bakery/ }).click();
+    await expect(page.locator('#cprev').getByRole('button', { name: 'Delete customer…' })).toBeVisible();
+    await settled(page);
+    const small = await smallTargets(page, '#cprev');
+    expect(small, say(small)).toEqual([]);
   });
 });
