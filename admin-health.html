@@ -65,6 +65,21 @@
   .cf{border-top:1px solid var(--line);padding:var(--dds-s2,8px) var(--dds-s4,16px)}
   .cf a{color:var(--p);font-size:12.5px;text-decoration:none;font-weight:600}
   .cf a:hover{text-decoration:underline}
+  /* sales item 131: the Stripe key card's check, its answers listed in the card */
+  .cf .kbtn{border:0;background:none;padding:0;color:var(--p);font:600 12.5px var(--sans);cursor:pointer;min-height:24px}
+  .cf .kbtn:hover{text-decoration:underline}
+  .cf .kbtn[disabled]{color:var(--faint);cursor:default;text-decoration:none}
+  @media (pointer:coarse){.cf .kbtn{min-height:44px;min-width:44px}}   /* big enough for a finger */
+  .kres{margin-top:var(--dds-s3,12px);font-size:13px;color:var(--soft)}
+  .kres .ks{font-weight:600;color:var(--ink);margin-bottom:var(--dds-s2,8px)}
+  .kres .ks.bad{color:var(--attn)}
+  .kres .kh{font-size:12px;font-weight:600;color:var(--faint);margin:var(--dds-s3,12px) 0 var(--dds-s1,4px)}
+  .kres ul{list-style:none;padding:0;margin:0}
+  .kres li{padding:2px 0 2px 20px;position:relative;overflow-wrap:anywhere}
+  .kres li::before{position:absolute;left:0;font-weight:700}
+  .kres li.ok::before{content:"✓";color:var(--ok)} .kres li.bad::before{content:"✕";color:var(--attn)} .kres li.unsure::before{content:"?";color:var(--off)}
+  .kres li b{color:var(--ink);font-weight:600}
+  .kres .kt{margin-top:var(--dds-s3,12px);font-size:12px;color:var(--faint)}
   .pill{flex:none;font-size:12px;font-weight:500;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:999px;white-space:nowrap;text-transform:capitalize}
   .pill.ok{color:var(--ok);background:var(--ok-soft)} .pill.attention{color:var(--attn);background:var(--attn-soft)} .pill.off{color:var(--off);background:var(--off-soft)}
 
@@ -137,7 +152,7 @@ function orderAreas(arr){return arr.slice().sort((a,b)=>(RANK[a.state]==null?3:R
 const BANDS=[
   {label:'Jobs & delivery',keys:['cron','errors','email']},
   {label:'Reach',keys:['domains','usage']},
-  {label:'Money & usage',keys:['billing','ai']},
+  {label:'Money & usage',keys:['billing','stripe_key','ai']},
   {label:'Notices',keys:['platform','alerts','backups']},
 ];
 // Real navigations to the surface where each area is actually FIXED. Areas with no
@@ -159,10 +174,44 @@ function kpiTile(n,label,mod){
 }
 function areaCard(a){
   const dest=DEST[a.key];
-  const cf=dest?'<div class="cf"><a href="'+esc(dest[0])+'">'+esc(dest[1])+' →</a></div>':'';
-  return '<section class="card area c4 '+esc(a.state)+'">'
+  // sales item 131: the Stripe key card checks each permission on request (it asks Stripe, so never on load)
+  const cf=dest?'<div class="cf"><a href="'+esc(dest[0])+'">'+esc(dest[1])+' →</a></div>'
+    :(a.key==='stripe_key'&&a.state!=='off')?'<div class="cf"><button type="button" class="kbtn" id="keyCheck">Check its permissions</button></div>':'';
+  return '<section class="card area c4 '+esc(a.state)+'"'+(a.key==='stripe_key'?' id="stripeKeyCard"':'')+'>'
     +'<div class="ch"><h3 class="t">'+esc(a.label)+'</h3><span class="pill '+esc(a.state)+'">'+esc(WORD[a.state]||a.state)+'</span></div>'
-    +'<div class="cb"><p class="dt">'+esc(a.detail)+'</p></div>'+cf+'</section>';
+    +'<div class="cb"><p class="dt">'+esc(a.detail)+'</p>'+(a.key==='stripe_key'?'<div class="kres" id="keyRes" aria-live="polite"></div>':'')+'</div>'+cf+'</section>';
+}
+
+// ── sales item 131: what the Stripe key may do, asked of Stripe one permission at a
+//    time (GET /admin/stripe-key). Nothing in Stripe is made or changed by it. ──
+function keyLines(list,can){
+  return '<ul>'+list.map(function(x){
+    const cls=x.ok?'ok':(x.verdict==='unknown'||x.verdict==='key_rejected')?'unsure':'bad';
+    const said=can
+      ?(x.ok?'':x.verdict==='refused'?' Missing, so this would fail.':' Stripe didn’t say.')
+      :(x.ok?'':x.verdict==='allowed'?' This key can do it.':' Stripe didn’t say.');
+    const why=String(x.why||'');
+    return '<li class="'+cls+'">'+(can?'<b>'+esc(x.resource)+'</b> '+esc(x.level)+': '+esc(why):esc(why.charAt(0).toUpperCase()+why.slice(1)))+'.'+esc(said)+'</li>';
+  }).join('')+'</ul>';
+}
+function renderKey(d){
+  const box=$('keyRes'); if(!box) return;
+  if(!d||!Array.isArray(d.needs)){ box.innerHTML='<p class="ks bad">Couldn’t check the key just now. Try again in a minute.</p>'; return; }
+  let h='<p class="ks'+(d.ok?'':' bad')+'">'+esc(d.summary)+'</p>';
+  if(d.needs.length){
+    h+='<p class="kh">What Studio OS needs it to do</p>'+keyLines(d.needs,true);
+    h+='<p class="kh">What it must not be able to do</p>'+keyLines(d.must_not,false);
+    h+='<p class="kt">Checked just now. Nothing in Stripe was made or changed. Stripe’s log shows these checks as refused requests, which is expected.</p>';
+  }
+  box.innerHTML=h;
+}
+async function checkKey(){
+  const b=$('keyCheck'); if(!b||b.disabled) return;
+  b.disabled=true; b.textContent='Checking with Stripe…';
+  const r=await api('/admin/stripe-key');
+  b.disabled=false; b.textContent='Check again';
+  if(r.status===429){ toast((r.body&&r.body.message)||'That was checked a moment ago.'); return; }
+  renderKey(r.ok&&r.body?r.body.data:null);
 }
 
 function render(hc){
@@ -197,6 +246,7 @@ function render(hc){
   h+='</div>';
   h+='<p class="foot">Aggregated from what the platform already produces — activation dashboard, cron ledger, domain watch, billing, AI usage, email config, publish/run errors, active notices.</p>';
   $('main').innerHTML=h;
+  const kb=$('keyCheck'); if(kb) kb.addEventListener('click',checkKey);
 }
 
 function hideChrome(){ $('asof').hidden=true; $('refreshBtn').hidden=true; }

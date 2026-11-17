@@ -755,6 +755,13 @@ export async function handleAdmin(req: Request, route: string, method: string, p
   //    drift from what actually runs.
   if (route === '/admin/optimization' && method === 'GET') return json({ data: describeEngine() }, 200, cors);
   if (route === '/admin/health-center' && method === 'GET') return json({ data: await computeHealthCenter() }, 200, cors); // PT-2C: operator-authed Health Center
+  // sales item 131: ask Stripe about each permission the key holds, changing nothing (commerce/stripe_key.ts)
+  if (route === '/admin/stripe-key' && method === 'GET') {
+    if (!(await rateAllow(`stripekey:${principal.userId || 'staff'}`, 6, 600))) return json({ error: 'rate_limited', message: 'That was checked a moment ago. Try again in a few minutes.' }, 429, cors);
+    const { checkStripeKey } = await import('../commerce/stripe_key.ts');
+    const { heldKeyKind, stripeProbe } = await import('../commerce/stripe.ts');
+    return json({ data: await checkStripeKey(heldKeyKind(), stripeProbe) }, 200, cors);
+  }
 
   // ── L4.0: Connected Platform inventory — the living, generated-from-registry
   //    profile of every provider (operator introspection; verifies one shared
