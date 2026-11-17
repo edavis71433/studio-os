@@ -65,6 +65,21 @@
   .cf{border-top:1px solid var(--line);padding:var(--dds-s2,8px) var(--dds-s4,16px)}
   .cf a{color:var(--p);font-size:12.5px;text-decoration:none;font-weight:600}
   .cf a:hover{text-decoration:underline}
+  /* sales item 131: the Stripe key card's check, its answers listed in the card */
+  .cf .kbtn{border:0;background:none;padding:0;color:var(--p);font:600 12.5px var(--sans);cursor:pointer;min-height:24px}
+  .cf .kbtn:hover{text-decoration:underline}
+  .cf .kbtn[disabled]{color:var(--faint);cursor:default;text-decoration:none}
+  @media (pointer:coarse){.cf .kbtn{min-height:44px;min-width:44px}}   /* big enough for a finger */
+  .kres{margin-top:var(--dds-s3,12px);font-size:13px;color:var(--soft)}
+  .kres .ks{font-weight:600;color:var(--ink);margin-bottom:var(--dds-s2,8px)}
+  .kres .ks.bad{color:var(--attn)}
+  .kres .kh{font-size:12px;font-weight:600;color:var(--faint);margin:var(--dds-s3,12px) 0 var(--dds-s1,4px)}
+  .kres ul{list-style:none;padding:0;margin:0}
+  .kres li{padding:2px 0 2px 20px;position:relative;overflow-wrap:anywhere}
+  .kres li::before{position:absolute;left:0;font-weight:700}
+  .kres li.ok::before{content:"✓";color:var(--ok)} .kres li.bad::before{content:"✕";color:var(--attn)} .kres li.unsure::before{content:"?";color:var(--off)}
+  .kres li b{color:var(--ink);font-weight:600}
+  .kres .kt{margin-top:var(--dds-s3,12px);font-size:12px;color:var(--faint)}
   .pill{flex:none;font-size:12px;font-weight:500;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:999px;white-space:nowrap;text-transform:capitalize}
   .pill.ok{color:var(--ok);background:var(--ok-soft)} .pill.attention{color:var(--attn);background:var(--attn-soft)} .pill.off{color:var(--off);background:var(--off-soft)}
 
@@ -83,8 +98,6 @@
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:50px auto}
   @media (prefers-reduced-motion:no-preference){.spin{animation:sp .8s linear infinite}}
   @keyframes sp{to{transform:rotate(360deg)}}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:999px;font-size:14px;opacity:0;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none;z-index:40}
-  .toast.show{opacity:1}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
   /* mobile: KPI tiles pair up, area cards stack — a 1fr grid never scrolls sideways */
   @media (max-width:900px){.c3{grid-column:span 6}.c4{grid-column:span 12}}
@@ -101,14 +114,12 @@
   </header>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 // builder item 165: on a phone the header's other actions sit in a sheet behind ⋯; picking one puts the sheet away
 document.addEventListener('click',(e)=>{const m=e.target&&e.target.closest?e.target.closest('.dds-ph-more'):null;if(!m||!e.target.closest('button,a'))return;try{if(m.matches(':popover-open'))m.hidePopover();}catch(_){/* no popover support: there is no sheet */}});
@@ -118,13 +129,9 @@ sb.auth.onAuthStateChange(function(_e,s){ if(s&&s.access_token) TOKEN=s.access_t
 
 // SS8 family api(): never throws — {ok:false,status:0} on a network hiccup, so
 // every failure routes through ONE honest state switch (401/403/404/other).
-async function api(path){
-  try{
-    const r=await fetch(FN+path,{headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-region':FN_REGION}});
-    return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};
-  }catch(_){return{ok:false,status:0,body:{}};}
-}
-function toast(m){ const t=$('toast'); if(!t) return; t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
+// The shell's one API helper (shell-kit.js); the platform's own read: no client goes with it.
+const api=(path)=>ddsApi(path,{scope:''});
+const toast=(m,kind,action)=>ddsToast(m,kind,action);   // the shell's one toast: 'err' shows a failure as one
 // No server timestamp in the payload — the "as of" honestly reflects the CLIENT
 // read time (stated absolutely, so it can never quietly go stale).
 function asOf(d){const t=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});const sameDay=d.toDateString()===new Date().toDateString();return 'As of '+(sameDay?'today, ':d.toLocaleDateString([],{month:'short',day:'numeric'})+', ')+t;}
@@ -137,7 +144,7 @@ function orderAreas(arr){return arr.slice().sort((a,b)=>(RANK[a.state]==null?3:R
 const BANDS=[
   {label:'Jobs & delivery',keys:['cron','errors','email']},
   {label:'Reach',keys:['domains','usage']},
-  {label:'Money & usage',keys:['billing','ai']},
+  {label:'Money & usage',keys:['billing','stripe_key','ai']},
   {label:'Notices',keys:['platform','alerts','backups']},
 ];
 // Real navigations to the surface where each area is actually FIXED. Areas with no
@@ -159,10 +166,44 @@ function kpiTile(n,label,mod){
 }
 function areaCard(a){
   const dest=DEST[a.key];
-  const cf=dest?'<div class="cf"><a href="'+esc(dest[0])+'">'+esc(dest[1])+' →</a></div>':'';
-  return '<section class="card area c4 '+esc(a.state)+'">'
+  // sales item 131: the Stripe key card checks each permission on request (it asks Stripe, so never on load)
+  const cf=dest?'<div class="cf"><a href="'+esc(dest[0])+'">'+esc(dest[1])+' →</a></div>'
+    :(a.key==='stripe_key'&&a.state!=='off')?'<div class="cf"><button type="button" class="kbtn" id="keyCheck">Check its permissions</button></div>':'';
+  return '<section class="card area c4 '+esc(a.state)+'"'+(a.key==='stripe_key'?' id="stripeKeyCard"':'')+'>'
     +'<div class="ch"><h3 class="t">'+esc(a.label)+'</h3><span class="pill '+esc(a.state)+'">'+esc(WORD[a.state]||a.state)+'</span></div>'
-    +'<div class="cb"><p class="dt">'+esc(a.detail)+'</p></div>'+cf+'</section>';
+    +'<div class="cb"><p class="dt">'+esc(a.detail)+'</p>'+(a.key==='stripe_key'?'<div class="kres" id="keyRes" aria-live="polite"></div>':'')+'</div>'+cf+'</section>';
+}
+
+// ── sales item 131: what the Stripe key may do, asked of Stripe one permission at a
+//    time (GET /admin/stripe-key). Nothing in Stripe is made or changed by it. ──
+function keyLines(list,can){
+  return '<ul>'+list.map(function(x){
+    const cls=x.ok?'ok':(x.verdict==='unknown'||x.verdict==='key_rejected')?'unsure':'bad';
+    const said=can
+      ?(x.ok?'':x.verdict==='refused'?' Missing, so this would fail.':' Stripe didn’t say.')
+      :(x.ok?'':x.verdict==='allowed'?' This key can do it.':' Stripe didn’t say.');
+    const why=String(x.why||'');
+    return '<li class="'+cls+'">'+(can?'<b>'+esc(x.resource)+'</b> '+esc(x.level)+': '+esc(why):esc(why.charAt(0).toUpperCase()+why.slice(1)))+'.'+esc(said)+'</li>';
+  }).join('')+'</ul>';
+}
+function renderKey(d){
+  const box=$('keyRes'); if(!box) return;
+  if(!d||!Array.isArray(d.needs)){ box.innerHTML='<p class="ks bad">Couldn’t check the key just now. Try again in a minute.</p>'; return; }
+  let h='<p class="ks'+(d.ok?'':' bad')+'">'+esc(d.summary)+'</p>';
+  if(d.needs.length){
+    h+='<p class="kh">What Studio OS needs it to do</p>'+keyLines(d.needs,true);
+    h+='<p class="kh">What it must not be able to do</p>'+keyLines(d.must_not,false);
+    h+='<p class="kt">Checked just now. Nothing in Stripe was made or changed. Stripe’s log shows these checks as refused requests, which is expected.</p>';
+  }
+  box.innerHTML=h;
+}
+async function checkKey(){
+  const b=$('keyCheck'); if(!b||b.disabled) return;
+  b.disabled=true; b.textContent='Checking with Stripe…';
+  const r=await api('/admin/stripe-key');
+  b.disabled=false; b.textContent='Check again';
+  if(r.status===429){ toast((r.body&&r.body.message)||'That was checked a moment ago.','err'); return; }
+  renderKey(r.ok&&r.body?r.body.data:null);
 }
 
 function render(hc){
@@ -197,6 +238,7 @@ function render(hc){
   h+='</div>';
   h+='<p class="foot">Aggregated from what the platform already produces — activation dashboard, cron ledger, domain watch, billing, AI usage, email config, publish/run errors, active notices.</p>';
   $('main').innerHTML=h;
+  const kb=$('keyCheck'); if(kb) kb.addEventListener('click',checkKey);
 }
 
 function hideChrome(){ $('asof').hidden=true; $('refreshBtn').hidden=true; }
@@ -220,14 +262,14 @@ async function load(soft){
   const r=await api('/admin/health-center');
   if(seq!==REQ_SEQ) return;
   if(!r.ok){
-    if(soft&&HC_DATA){ toast('Couldn’t refresh just now.'); return; }
+    if(soft&&HC_DATA){ toast('Couldn’t refresh just now.','err'); return; }
     if(r.status===401){ signedOut(); return; }
     if(r.status===403){ notOperator(); return; }
     if(r.status===404){ notFound(); return; }
     trouble(); return;
   }
   const d=r.body&&r.body.data;
-  if(!d||!Array.isArray(d.areas)){ if(soft&&HC_DATA){ toast('Couldn’t refresh just now.'); return; } emptyState(); return; }
+  if(!d||!Array.isArray(d.areas)){ if(soft&&HC_DATA){ toast('Couldn’t refresh just now.','err'); return; } emptyState(); return; }
   HC_DATA=d;
   render(d);
 }

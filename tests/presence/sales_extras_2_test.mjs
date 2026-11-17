@@ -124,7 +124,8 @@ const unzip = (bytes) => {
 {
   ok('crc32: the standard check value ("123456789" → CBF43926)', Z.crc32(new TextEncoder().encode('123456789')) === 0xCBF43926);
   ok('csv: commas, quotes and line breaks are quoted', Z.csvCell('a,b') === '"a,b"' && Z.csvCell('say "hi"') === '"say ""hi"""' && Z.csvCell('two\nlines') === '"two\nlines"' && Z.csvCell(null) === '');
-  ok('csv: a cell that starts like a formula is kept as text', Z.csvCell('=SUM(A1)') === "'=SUM(A1)" && Z.csvCell('+1') === "'+1" && Z.csvCell('@x') === "'@x" && Z.csvCell('-2') === "'-2");
+  ok('csv: a cell that starts like a formula is kept as text', Z.csvCell('=SUM(A1)') === "'=SUM(A1)" && Z.csvCell('+1') === "'+1" && Z.csvCell('@x') === "'@x" && Z.csvCell('-2+3') === "'-2+3" && Z.csvCell('-1e5') === "'-1e5");
+  ok('csv: a plain negative amount stays a number a spreadsheet adds up (sales item 133)', Z.csvCell('-99.00') === '-99.00' && Z.csvCell('-2') === '-2' && Z.csvCell(-15) === '-15');
   ok('csv: a byte-order mark for Excel, CRLF line ends', Z.toCsv(['A', 'B'], [[1, 'x']]) === '﻿A,B\r\n1,x\r\n');
   const zipped = Z.zipStore([{ name: 'a.csv', data: new TextEncoder().encode('one') }, { name: 'café.txt', data: new TextEncoder().encode('two ✓') }]);
   const files = unzip(zipped);
@@ -234,7 +235,7 @@ const unzip = (bytes) => {
   ok('the record shows it on the details card and edits it with the person', /'Found you through '\+esc\(hd\.found_via\)/.test(crm) && /<select id="ec-found" class="dds-pick">/.test(crm) && /found_via:\$\('ec-found'\)\.value[,}]/.test(crm) && /select=name,company,email,phone,found_via&limit=1/.test(crmTs));
   ok('Analytics: Won, by how they found you', /<h4>Won, by how they found you<\/h4>'\+grp\(d\.won_by_found_via,'Found you through'\)/.test(an));
   ok('one picker style that sizes properly on an iPhone', /\.dds-pick\{-webkit-appearance:none;appearance:none;/.test(css) && /@media \(max-width:767px\)\{\.dds-pick\{min-height:44px\}\}/.test(css));
-  ok('Settings › Plan & billing: Download my data fetches the zip as a file', /id="dlData">Download my data</.test(st) && /fetch\(FN \+ '\/sales\/export', \{ headers: H\(\) \}\)/.test(st) && /a\.download = 'studio-data-'/.test(st));
+  ok('Settings › Plan & billing: Download my data fetches the zip as a file', /id="dlData">Download my data</.test(st) && /ddsApi\.raw\('\/sales\/export', \{ scope: SCOPE \}\)/.test(st) && /a\.download = 'studio-data-'/.test(st));   // builder item 101: the shell's API helper, answered as the browser's Response
   ok('the route is wired: GET /sales/export', /route === '\/sales\/export' && method === 'GET'\) return handleSalesExport\(site, principal, cors\)/.test(idx));
   ok('the database step ships with an apply pack and a check', /add column if not exists found_via text not null default ''/.test(read('../../docs/presence/APPLY-0143-prod.sql')) && /information_schema\.columns/.test(read('../../docs/presence/APPLY-0143-prod.sql')));
 }

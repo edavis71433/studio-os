@@ -3748,9 +3748,28 @@ async function dcSetMode(mode) {
 // browser never follows the link. Item 244: Edit mode had no guard of its own.
 function dcGuardNav(doc) {
   try {
+    if (!doc || doc.__dcNavGuard) return;   // once per document: dcWatchNav and the load both bring it
+    doc.__dcNavGuard = true;
     doc.addEventListener("click", (e) => { const a = e.target && e.target.closest && e.target.closest("a"); if (a) e.preventDefault(); }, true);
     doc.addEventListener("submit", (e) => e.preventDefault(), true);
   } catch (_) { /* guard is best-effort; pointer events stay scoped to the frame */ }
+}
+// Item 244: a page written to the canvas can be pressed before its load event, which waits for
+// its pictures, and the guard used to come only at load: every save draws the canvas again, so
+// on a slow connection a press on the business name while a photo was still coming loaded
+// another page into the canvas. For 300 frames after each write (a few seconds; the new page is
+// in the canvas within a few), every frame guards whatever document is there before the browser
+// paints it, so a page is guarded before anyone can see it, let alone press it. The load guards
+// it too. Counting from the write, not the load, means a page whose photos never come doesn't
+// keep the watch running, and an older page's load landing just after a write can't cut short
+// the watch for the new one.
+function dcWatchNav(frame) {
+  let watch = 0, left = 0;   // frames still to watch since the last write
+  const look = () => {
+    try { dcGuardNav(frame.contentDocument); } catch (_) {}
+    watch = --left > 0 ? requestAnimationFrame(look) : 0;
+  };
+  new MutationObserver(() => { left = 300; if (!watch) watch = requestAnimationFrame(look); }).observe(frame, { attributes: true, attributeFilter: ["srcdoc"] });
 }
 // Timewarp: picking a date calls the EXISTING route History's version tools use
 // (renderVersionTools — identical fetch shape), then renders that kept version
@@ -8432,6 +8451,7 @@ function dcTreeSelect(el2, row) {
 // a chrome failure never breaks the proof.
 (function installDesignCanvas() {
   const frame = $("designPreview"); if (!frame) return;
+  dcWatchNav(frame);   // item 244: a page is guarded from the moment it's in the canvas, not from its load
   frame.addEventListener("load", () => {
     let doc; try { doc = frame.contentDocument; } catch (_) { return; }
     if (!doc || !doc.body) return;

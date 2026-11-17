@@ -22,7 +22,7 @@ const today = read('today.html');
 const ws = read('supabase/functions/presence/routes/workspace.ts');
 ok('the context says whether the site is live', /site_live: !!siteLive,/.test(ws));
 ok('the Overview reads the record under the client\'s scope', /apiGet\('\/crm\/record\?client='\+encodeURIComponent\(new URLSearchParams\(location\.search\)\.get\('client'\)\)\)\.catch\(\(\)=>null\)/.test(today));
-ok('…and the project at studio level (no scope header)', /function apiGetStudio\(path\)\{[^}]*'x-dds-scope-site':''/.test(today) && /apiGetStudio\('\/projects\/'\+encodeURIComponent\(pid\)\)/.test(today));
+ok('…and the project at studio level (no scope header)', /const apiGetStudio=\(path\)=>ddsApi\(path,\{scope:''\}\)/.test(today) && /apiGetStudio\('\/projects\/'\+encodeURIComponent\(pid\)\)/.test(today));
 ok('only a studio (or platform staff) gets the band', /if\(c0 && \(c0\.is_agency \|\| c0\.is_operator\) && rec && rec\.data && rec\.data\.identity\)/.test(today));
 // final pass, batch D: clientFacts runs here exactly as the page has it (these three were source
 // pins — one of them matched a code comment)

@@ -1,7 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
 import { applyHeaderScroll } from '../../supabase/functions/presence/lib/site_header';
-import { touchScreen } from './helpers/app';
+import { touchScreen, pressButton, settled } from './helpers/app';
 
 // The site's header and footer, picked on the page (builder list items 41, 50 and 123, Nov 2026;
 // Figma "A · Header and footer on the canvas"): a press on either outlines it, names it "· on
@@ -120,11 +120,24 @@ test.describe('the header and footer, picked on the page (builder items 41, 50 a
     await page.keyboard.press('Enter');
     await expect(panel(page)).toHaveAttribute('data-mode', 'header');
     await page.locator('#btnSettingsClose').click();
+    await settled(page);   // no redraw of the canvas still to come: the press below lands on the page that listens for it
     if (!touchScreen()) await frame(page).locator('header.site a.brand').hover();   // a mouse resting on the name; a finger doesn't rest
     const name = (await frame(page).locator('header.site a.brand').boundingBox())!, chip = (await frame(page).locator('header.site .dc-hf-chip').boundingBox())!;
     expect(chip.y).toBeGreaterThanOrEqual(name.y + name.height - 1);   // the chip hangs below; the name stays clear
-    await frame(page).locator('header.site a.brand').click();
-    await page.waitForTimeout(300);
+    // Item 244: the name is a link, and pressing it loaded another page into the canvas while the
+    // card stayed shut, so this test passed. The frame's own window hears a press last: one
+    // nothing held back is one the browser follows.
+    const went: string[] = [];
+    page.on('framenavigated', (f) => { if (f !== page.mainFrame()) went.push(f.url()); });
+    await page.evaluate(() => {
+      const w = (document.getElementById('designPreview') as HTMLIFrameElement).contentWindow!;
+      w.addEventListener('click', (e) => { (window as unknown as { __nameFollowed?: boolean }).__nameFollowed = !e.defaultPrevented; }, { once: true });
+    });
+    await pressButton(frame(page).locator('header.site a.brand'));
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __nameFollowed?: boolean }).__nameFollowed)).toBe(false);
+    await settled(page);
+    expect(went.filter((u) => u !== 'about:srcdoc')).toEqual([]);   // the canvas drawn again is its own; no other page came
+    await expect(frame(page).locator('header.site[data-dc-hf]')).toBeAttached();   // the canvas keeps its own document
     await expect(panel(page)).not.toHaveClass(/\bon\b/);
   });
 });

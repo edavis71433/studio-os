@@ -23,6 +23,7 @@ import { stampFirstSent } from '../lib/pay_link.ts';
 import { moneyState, moneyBuckets } from '../lib/money_state.ts';
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
+import { RETURNED_SELECT, returnedPayments } from '../lib/money_returns.ts';   // sales items 126, 127
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
 import { readReservedJsonOrThrow, readReservedJson, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { normalizeGoalAi, goalProgress } from '../lib/sales_ai.ts';
@@ -235,6 +236,8 @@ export async function handleSalesDeleted(site: SiteRow, cors: Record<string, str
     failed.push(key); return [];
   };
   const labelsP = loadStageLabels(site.id).catch(() => null);
+  // builder item 241: a deleted customer, and whether their website went to the Trash with them
+  const deletedCustomersP = import('./customers.ts').then((m) => m.deletedCustomers(site.id)).catch(() => null);
   const [deals, contacts, todos] = await Promise.all([
     read('deals', `presence_deals?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,title,stage,expected_value_cents,contact_id,deleted_at&order=deleted_at.desc&limit=200`),
     // merged_into lands with APPLY-0168; before it, every removed contact is a plain delete
@@ -256,8 +259,11 @@ export async function handleSalesDeleted(site: SiteRow, cors: Record<string, str
   const customer = new Map(customers.map((k: any) => [String(k.id), String(k.name || k.email || '')]));
   const onDeal = new Map(todoDeals.map((d: any) => [String(d.id), d]));
   const labels = await labelsP;
+  const goneCustomers = await deletedCustomersP;
+  if (goneCustomers === null) failed.push('customers');
   return json({ data: {
     days: DELETED_DAYS,
+    customers: goneCustomers || [],
     deals: deals.map((d: any) => ({ id: d.id, title: String(d.title || 'Untitled deal'), stage: d.stage, stage_label: (labels && labels[d.stage]) || DEFAULT_STAGE_LABEL[d.stage as Stage] || d.stage, value_cents: Number(d.expected_value_cents) || 0, person: who.get(String(d.contact_id || '')) || '', deleted_at: d.deleted_at })),
     contacts: contacts.map((c: any) => ({ id: c.id, name: String(c.name || c.email || 'Contact'), email: String(c.email || ''), company: String(c.company || ''), deleted_at: c.deleted_at })),
     // item 85: a to-do for a person or a customer names them and opens their record; one of your own, the To-dos page
@@ -925,7 +931,12 @@ export async function loadReceivables(site: SiteRow, todayYmd?: string) {
   // days — rides along so the band can show all four states from ONE list.
   // Best-effort: a failed read here drops the Paid bucket, never the band.
   const since = new Date(Date.now() - PAID_WINDOW_DAYS * 86400_000).toISOString();
-  const paidRows = rows(await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${encodeURIComponent(since)}&select=id,title,amount_cents,status,paid_at,deal_id&order=paid_at.desc&limit=300`).catch(() => ({ json: [] })));
+  // sales items 126, 127: what came back through Stripe rides along, so the bucket counts what
+  // was kept (APPLY-0233; before it, the old shape)
+  const paidQ = (sel: string) => svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${encodeURIComponent(since)}&select=${sel}&order=paid_at.desc&limit=300`).catch(() => ({ ok: false, json: [] }));
+  let paidR: { ok: boolean; json?: unknown } = await paidQ('id,title,amount_cents,status,paid_at,deal_id,refunded_cents,dispute_status');
+  if (!paidR.ok) paidR = await paidQ('id,title,amount_cents,status,paid_at,deal_id');
+  const paidRows = rows(paidR);
   const dealIds = [...new Set([...invs, ...paidRows].map((i: any) => i.deal_id).filter(Boolean))];
   const dealById: Record<string, string> = {};
   // Oct 2026 studio audit (change 10): each item also names the deal's CUSTOMER
@@ -943,7 +954,7 @@ export async function loadReceivables(site: SiteRow, todayYmd?: string) {
   // `overdue` stays for older page builds. Today re-runs the same mirrored formula
   // against the studio's local day, so its chips and the record's agree.
   const items = invs.map((i: any) => ({ id: i.id, number: i.number ?? null, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, due_date: i.due_date, status: 'open', processing_since: i.processing_since || null, state: moneyState(i, today), overdue: moneyState(i, today) === 'overdue', deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '', stripe_url: i.stripe_url || null, client_id: customerOf(i.deal_id).client_id, customer_site_id: customerOf(i.deal_id).site_id }));
-  const paid = paidRows.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, status: 'paid', state: 'paid', paid_at: i.paid_at, deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '' }));
+  const paid = paidRows.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, status: 'paid', state: moneyState({ ...i, status: 'paid' }, today), refunded_cents: Number(i.refunded_cents) || 0, dispute_status: i.dispute_status || null, paid_at: i.paid_at, deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '' }));
   const buckets = moneyBuckets([...items, ...paid], today);
   // total_cents = what is still WAITING on a client (upcoming + overdue) — a
   // processing payment is on its way, not due; it has its own number.
@@ -1017,7 +1028,7 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   // answers 1,000 rows at most): paid invoices, and retainer charges, which are only ever a
   // deal event. Either read failing marks revenue unavailable, never a number that is low.
   const pages = async (key: string, path: string, order: string) => { const r = await svcPages(path, order).catch(() => null); if (!r) { failed.add(key); return []; } return r.rows; };
-  const [paid, retainerEvents, deals, subs, rcv] = await Promise.all([
+  const [paid, retainerEvents, deals, subs, rcv, returnedRows] = await Promise.all([
     pages('revenue', `presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${encodeURIComponent(since24)}&select=amount_cents,paid_at`, 'paid_at'),
     pages('revenue', `presence_deal_events?site_id=eq.${site.id}&kind=eq.invoice_paid&detail->>retainer=eq.true&created_at=gte.${encodeURIComponent(since24)}&select=kind,detail,created_at`, 'created_at'),
     // item 69: found_via rides along; before APPLY-0143 the same read without it
@@ -1028,6 +1039,8 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
     })(),
     read('enquiries', `presence_form_submissions?site_id=eq.${site.id}&spam=is.false&created_at=gte.${encodeURIComponent(since365)}&select=id,source_page,status,created_at&limit=5000`),
     loadReceivables(site).catch(() => { failed.add('overdue'); return null; }),
+    // sales items 126, 127: refunds made in Stripe and disputes lost, off the month they happened
+    pages('revenue', `presence_money_returns?site_id=eq.${site.id}&counted_cents=gt.0&counted_at=gte.${encodeURIComponent(since24)}&select=${RETURNED_SELECT}`, 'counted_at'),
   ]);
   // when each open deal last moved INTO its current stage
   const open = deals.filter((d: any) => REPORT_OPEN_STAGES.includes(String(d.stage)) && !d.converted_client_id);
@@ -1048,7 +1061,7 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   const dealsOff = failed.has('deals');   // the pipeline and won/lost reports both stand on the deals read
   return json({ data: {
     generated_at: now,
-    revenue: failed.has('revenue') ? { unavailable: true } : revenueByMonth(paid, now, retainerPayments(retainerEvents)),
+    revenue: failed.has('revenue') ? { unavailable: true } : revenueByMonth(paid, now, retainerPayments(retainerEvents), returnedPayments(returnedRows)),
     pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now, await labelsP, await chancesP), partial: failed.has('stages') },
     outcomes: dealsOff ? { unavailable: true } : { ...wonAndLost(deals, now, 365, closedAt), partial: failed.has('closes') },
     enquiries: failed.has('enquiries') ? { unavailable: true } : enquiriesBySource(subs, becameDeal, now),
@@ -1250,7 +1263,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
   if (!deal) return json({ error: 'not_found', message: 'That deal is no longer here.' }, 404, cors);
   if (req.method === 'GET') {
     const stageNamesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
-    const [contact, proposals, contracts, events, invoices, estimates, recurring, paidEvents] = await Promise.all([
+    const [contact, proposals, contracts, events, invoices, estimates, recurring, paidEvents, returned] = await Promise.all([
       // sales item 81: the address their invoices print — the contact's own (item 89's column), when it is there
       deal.contact_id ? svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes,address&limit=1`).then((r) => r.ok ? r : svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes&limit=1`)) : Promise.resolve({ json: [] }),
       // first_viewed_at/expires_at land with migration 0107 — tolerant fetch so the
@@ -1269,13 +1282,15 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       // as the proposals read above) so the record's Billing tab never blanks.
       // item 107: recurring_id rides along (0145) so the record can tell what's left of the proposal
       // sales items 77 and 81: the invoice's number and how a recorded payment came in (APPLY-0167)
-      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note&order=due_date.asc.nullsfirst,created_at.asc`); /* before APPLY-0188: without the private note */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
+      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note,refunded_cents,dispute_status&order=due_date.asc.nullsfirst,created_at.asc`); /* sales items 126, 127: before APPLY-0233, without what came back */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note&order=due_date.asc.nullsfirst,created_at.asc`); /* before APPLY-0188: without the private note */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
       // item 47: the deal's estimates and recurring invoices — both [] before APPLY-0145
       import('./estimates.ts').then((m) => m.estimatesForDeal(site.id, id)).catch(() => []),
       import('./recurring_invoices.ts').then((m) => m.recurringForDeal(site.id, id)).catch(() => []),
       // item 108 (J4): every payment on the deal, beyond the 80 newest events above —
       // a retainer charge is only ever an event, so this is where it is counted
       svc(`presence_deal_events?deal_id=eq.${id}&site_id=eq.${site.id}&kind=eq.invoice_paid&select=kind,detail,created_at&order=created_at.desc&limit=1000`).catch(() => ({ ok: false, json: [] })),
+      // sales items 126, 127: each refund and dispute on the deal's payments (APPLY-0233; [] before it)
+      import('../commerce/charge_returns.ts').then((m) => m.returnsForDeal(site.id, id)).catch(() => []),
     ]);
     const eventRows = rows(events);
     // Oct 2026 benchmark (item 2): every invoice row carries its money state from
@@ -1295,7 +1310,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     const proposalRows = rows(proposals).map((p: any) => ({ ...p, total_cents: proposalTotals(p.line_items).total_cents }));
     // item 108 (J4): the retainer's payments, for Paid. null = couldn't read them (never a false $0)
     const retainer_paid = (paidEvents as any)?.ok ? retainerPaid(rows(paidEvents as any)) : null;
-    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: proposalRows, contracts: rows(contracts), events: eventRows, timeline, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows, estimates, recurring, retainer_paid } }, 200, cors);
+    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: proposalRows, contracts: rows(contracts), events: eventRows, timeline, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows, estimates, recurring, retainer_paid, returns: returned } }, 200, cors);
   }
   if (req.method === 'PATCH') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -1980,7 +1995,8 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
  *                         charged, and the deal ledger records who voided what.
  *    paid               → NEVER. 409. Money changed hands; a paid invoice is a
  *                         financial record and a receipt the client is holding.
- *                         Refunds are Stripe's job, not a status rewrite.
+ *                         Refunds are Stripe's job, not a status rewrite: one made
+ *                         there reaches the invoice by itself (sales item 126).
  *    void               → IDEMPOTENT 200 (`already: true`), the same shape
  *                         handleSalesProposalDecide / handleSalesContractSign use
  *                         for "you already got what you asked for". Nothing is
@@ -2001,10 +2017,10 @@ export async function handleSalesInvoiceVoid(site: SiteRow, principal: Principal
   if (!invR.ok) invR = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,deal_id,status,title,amount_cents,purpose,stripe_payment_link_id&limit=1`);
   const inv = rows(invR)[0];
   if (!inv) return json({ error: 'not_found', message: 'That invoice is no longer here.' }, 404, cors);
-  if (inv.status === 'paid') return json({ error: 'already_paid', message: 'This invoice is paid — it’s a financial record and stays. Refund it in Stripe if the money needs to go back.' }, 409, cors);
+  if (inv.status === 'paid') return json({ error: 'already_paid', message: 'This invoice is paid — it’s a financial record and stays. Refund it in Stripe if the money needs to go back, and the invoice will show it.' }, 409, cors);
   // Oct 2026 (item 2): the client already paid and Stripe is settling it — voiding
   // now would leave money landing on a withdrawn invoice. Wait for it to land.
-  if (inv.status === 'open' && inv.processing_since) return json({ error: 'processing', message: 'The client has already paid this — the payment is settling with Stripe. Let it land, then refund it in Stripe if the money needs to go back.' }, 409, cors);
+  if (inv.status === 'open' && inv.processing_since) return json({ error: 'processing', message: 'The client has already paid this — the payment is settling with Stripe. Let it land, then refund it in Stripe if the money needs to go back, and the invoice will show it.' }, 409, cors);
   if (inv.status === 'void') return json({ data: { ok: true, id, status: 'void' }, already: true }, 200, cors);
   const up = await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&select=id,deal_id`,
     { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'void', updated_at: nowIso() }) });
@@ -3172,7 +3188,7 @@ export async function provisionCustomerAccount(opts: {
  *
  *  Idempotent (site_id is the PK, on_conflict merge). Best-effort: a customer is
  *  still successfully added if this write fails. Returns the stored host. */
-async function recordExistingWebsite(
+export async function recordExistingWebsite(
   siteId: string, plan: PlanKey, websiteUrl: string, principal: Principal, label: string,
 ): Promise<string | null> {
   try {
@@ -3372,16 +3388,21 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   const businessNameIn = clean(b.business_name, 120);
   if (!email || !validEmail(email)) return json({ error: 'validation', message: 'Enter the customer’s email — that’s where their sign-in invitation goes.' }, 422, cors);
   const businessName = businessNameIn || name || (email.split('@')[0] || 'New customer');
-  const mode = b.mode === 'connect' ? 'connect' : 'provision';
+  // builder item 241: 'save' is Add a customer's (the customer and nothing else); 'connect' is the
+  // Customers CSV import's (the person in the contacts); 'provision' sets them up now (Duplicate site)
+  // The box sends 'connect' with save: true, which a server from before item 241 reads as connect
+  // (a contact, nobody emailed) in the time between the pages going live and the deploy.
+  const mode = b.mode === 'save' || (b.mode === 'connect' && b.save === true) ? 'save' : b.mode === 'connect' ? 'connect' : 'provision';
   const portalUrl = `${siteUrl()}/portal.html?studio=${site.id}`;   // builder list item 59: the sign-in page shows this studio's name and logo
 
   // ── B) CONNECT BY EMAIL — record intent; provision NOTHING ──────────────────
-  if (mode === 'connect') {
+  //    (and SAVE, builder item 241: the same for an account that already exists)
+  if (mode === 'connect' || mode === 'save') {
     const existing = await findClientByEmail(email);
     if (existing && existing.id !== site.client_id && !(await isCustomerOfStudio(site.id, existing.id))) {
       // S1: someone else's account — ask, don't take
       if (!(await askToConnect(site, principal, email, businessName))) return requestUnavailable(cors);
-      return json({ data: { mode: 'connect', requested: true, pending: true, connected: false, email, message: NEEDS_ACCEPTANCE_LINE } }, 200, cors);
+      return json({ data: { mode, requested: true, pending: true, connected: false, email, message: NEEDS_ACCEPTANCE_LINE } }, 200, cors);
     }
     if (existing) {
       // Already this studio's customer → (re)connect: idempotent, nothing taken.
@@ -3396,8 +3417,10 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
         const r = await bridgeCustomerToStudio({ agencySiteId: site.id, clientId, customerSiteId: customerSite?.id || null, label: businessName });
         projectId = r.projectId; bridged = r.bridged; ownedElsewhere = r.ownedElsewhere;
       }
-      return json({ data: { mode: 'connect', connected: true, created: false, client_id: clientId, site_id: customerSite?.id || null, project_id: projectId, managed, bridged, owned_elsewhere: ownedElsewhere, portal_url: portalUrl, message: 'Connected to their workspace.' } }, 200, cors);
+      return json({ data: { mode, connected: true, created: false, client_id: clientId, site_id: customerSite?.id || null, project_id: projectId, managed, bridged, owned_elsewhere: ownedElsewhere, portal_url: portalUrl, message: 'Connected to their workspace.' } }, 200, cors);
     }
+    // builder item 241: Add a customer saves the customer and nothing else (routes/customers.ts)
+    if (mode === 'save') return (await import('./customers.ts')).saveNewCustomer(site, { email, name, businessName: businessNameIn, label: businessName }, cors);
     // No account yet → they're saved to the studio's contacts, and nothing else happens.
     // Nobody signs up by themselves (builder item 199), so the studio sets them up from
     // Add a customer when it's ready; no marker waits for a sign-up.

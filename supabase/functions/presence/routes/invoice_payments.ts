@@ -147,7 +147,7 @@ export async function handleInvoicePaymentUndo(req: Request, site: SiteRow, prin
   if (!got.ok) return unavailable(cors);
   const row = got.row;
   if (!row) return json({ error: 'not_found', message: 'That payment is no longer here.' }, 404, cors);
-  if (row.status !== 'paid' || !row.paid_method) return json({ error: 'bad_state', message: row.status === 'paid' ? 'That was paid online. Refund it in Stripe if the money needs to go back.' : 'That invoice isn’t marked paid.' }, 409, cors);
+  if (row.status !== 'paid' || !row.paid_method) return json({ error: 'bad_state', message: row.status === 'paid' ? 'That was paid online. Refund it in Stripe if the money needs to go back, and the invoice will show it.' : 'That invoice isn’t marked paid.' }, 409, cors);
   if (row.payment_for) {
     const parent = (await loadInvoice(site.id, String(row.payment_for))).row;
     if (!parent || parent.status !== 'open') return json({ error: 'bad_state', message: 'The rest of that invoice was paid or voided since, so this part payment stays. Undo that first.' }, 409, cors);

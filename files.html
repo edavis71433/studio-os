@@ -21,7 +21,7 @@
   }
   *{box-sizing:border-box;margin:0}
   /* the reset above also took the browser's margin:auto off a modal <dialog>, so
-     every question on this page (askConfirm, askPrompt, folders, repeats) opened in
+     every question on this page (the shell's, folders, repeats, the Trash's) opened in
      the top-left corner — put the centring back, with the slide-over's own dim */
   dialog{margin:auto} dialog::backdrop{background:rgba(27,21,37,.42)}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
@@ -279,8 +279,6 @@
   .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
   .tags .chip{min-height:0}   /* labels to read, not buttons: the shell's 44px touch floor made them tall ovals on a phone */
   .chip{font-size:12px;background:var(--p-soft);color:var(--p);padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:999px}
-  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:var(--dds-r,8px);font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;transition:all var(--dds-t-base,200ms) var(--dds-ease,ease-out);z-index:50}
-  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
   /* items 56 + 115: the storage meter — the same limits the upload door refuses on */
   .store{margin-top:var(--dds-s2,8px);display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--faint)}
   .storebar{flex:0 0 160px;height:6px;border-radius:999px;background:var(--line);overflow:hidden}
@@ -397,17 +395,15 @@
 
 <div class="scrim" id="scrim"></div>
 <aside class="panel" id="panel" aria-label="File details" role="dialog" aria-modal="true"></aside>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <input type="file" id="picker" accept="image/jpeg,image/png,image/webp,application/pdf" multiple hidden>
 <input type="file" id="replacer" accept="image/jpeg,image/png,image/webp,application/pdf" hidden>
 
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 // builder item 165: on a phone the header's other actions sit in a sheet behind ⋯; picking one puts the sheet away
 document.addEventListener('click',(e)=>{const m=e.target&&e.target.closest?e.target.closest('.dds-ph-more'):null;if(!m||!e.target.closest('button,a'))return;try{if(m.matches(':popover-open'))m.hidePopover();}catch(_){/* no popover support: there is no sheet */}});
@@ -415,10 +411,9 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope(),'x-region':FN_REGION});
 // the shared (path, method, body) shape — same as leads/contacts/crm (E3: this
 // page used to flip the first two args, a standing bug factory at every call site)
-async function api(path,method,body){const r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body===undefined?undefined:JSON.stringify(body)});return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+const api=(path,method,body)=>ddsApi(path,{method,body,scope:scope()});
 const IC={
   all:'<path d="M3 5h7l2 2h9v11a2 2 0 0 1-2 2H3z" fill="none" stroke="currentColor" stroke-width="1.6"/>',
   photo:'<rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.7" fill="currentColor"/><path d="M4 18l5-5 4 4 3-3 4 4" fill="none" stroke="currentColor" stroke-width="1.6"/>',
@@ -570,31 +565,7 @@ function railN(key){
   return RAILN[key];
 }
 
-function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
-// Small styled confirm — replaces native confirm(), matching the app's surfaces
-// (same pattern as connections.html / visual-studio.html). Resolves true/false.
-function askConfirm(title, body, okLabel){
-  return new Promise((resolve)=>{
-    const dlg=document.createElement('dialog');
-    dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
-    const box=document.createElement('div'); box.style.cssText='padding:20px';
-    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
-    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
-    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
-    const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
-      b.style.cssText=primary
-        ?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:var(--on-p,#fff);border-radius:999px;padding:8px 16px;cursor:pointer'
-        :'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
-      return b; };
-    const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
-    row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
-    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
-    cancel.addEventListener('click',()=>finish(false));
-    ok.addEventListener('click',()=>finish(true));
-    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(false); });
-    dlg.showModal(); setTimeout(()=>ok.focus(),20);
-  });
-}
+const toast=(m,kind,action)=>ddsToast(m,kind,action);   // the shell's one toast: 'err' shows a failure as one
 function bytes(n){if(!n)return'';if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(0)+' KB';return(n/1048576).toFixed(1)+' MB';}
 // the meter's sizes run to gigabytes, and a whole number reads "1 GB", not "1.0 GB"
 function bigBytes(n){
@@ -622,23 +593,23 @@ function folderNames(){
 function openFolder(name){S.col='folder';S.folder=name;S.q='';S.selected.clear();S.selectMode=false;return load(false,true);}
 async function newFolder(){
   const n=S.selected.size;
-  const raw=await askPrompt('New folder',n?`The ${n} selected file${n===1?'':'s'} go into it.`:'Add files to it once it’s made — it keeps once a file is in it.','Create','e.g. Menu photos');
+  const raw=await ddsAsk({title:'New folder',text:n?`The ${n} selected file${n===1?'':'s'} go into it.`:'Add files to it once it’s made — it keeps once a file is in it.',placeholder:'e.g. Menu photos',yes:'Create',max:80});
   const name=cleanFolder(raw);if(!name)return;
   if(n){
     const r=await api('/assets/bulk','POST',{action:'collection',ids:[...S.selected],collection:name});
-    if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t move those files');return;}
+    if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t move those files','err');return;}
   }else if(!folderNames().includes(name))S.newFolders.push(name);
   return openFolder(name);
 }
 async function renameFolder(){
   const from=S.folder;
-  const raw=await askPrompt('Rename this folder','Its files move with it.','Rename','Folder name',folderLabel(from));
+  const raw=await ddsAsk({title:'Rename this folder',text:'Its files move with it.',placeholder:'Folder name',value:folderLabel(from),yes:'Rename',max:80});
   const to=cleanFolder(raw);if(!to||to===from||to===folderLabel(from))return;
   if(!(S.counts[from]>0)&&S.newFolders.includes(from)){   // still empty: only this page knows it
     S.newFolders=S.newFolders.map(x=>x===from?to:x);return openFolder(to);
   }
   const r=await api('/assets/folders/move','POST',{from,to});
-  if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t rename that folder');return;}
+  if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t rename that folder','err');return;}
   S.newFolders=S.newFolders.filter(x=>x!==from);
   toast('Renamed to “'+folderLabel(to)+'”');
   return openFolder(to);
@@ -646,10 +617,10 @@ async function renameFolder(){
 async function removeFolder(){
   const from=S.folder;const n=S.countsOk?(S.counts[from]||0):null;
   const files=n?`Its ${n} file${n===1?'':'s'} stay in Files — only the folder goes.`:'Its files stay in Files — only the folder goes.';
-  if(!(await askConfirm('Remove the folder “'+folderLabel(from)+'”?',files,'Remove folder')))return;
+  if(!(await ddsConfirm('Remove the folder “'+folderLabel(from)+'”?',files,'Remove folder',{danger:true})))return;
   if(n!==0||!S.newFolders.includes(from)){
     const r=await api('/assets/folders/move','POST',{from,to:''});
-    if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t remove that folder');return;}
+    if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t remove that folder','err');return;}
   }
   S.newFolders=S.newFolders.filter(x=>x!==from);
   S.col='all';S.folder='';
@@ -688,32 +659,6 @@ function askFolder(title,body,opts){
     inp.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();submit();}});
     dlg.addEventListener('cancel',(e)=>{e.preventDefault();finish(null);});
     dlg.showModal();setTimeout(()=>{const first=box.querySelector('.fopt');(first||inp).focus();},20);
-  });
-}
-// Small styled text prompt — matches askConfirm; resolves the trimmed string, or null on cancel/empty.
-function askPrompt(title, body, okLabel, placeholder, value){
-  return new Promise((resolve)=>{
-    const dlg=document.createElement('dialog');
-    dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)';
-    const box=document.createElement('div'); box.style.cssText='padding:20px';
-    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-weight:600;margin-bottom:6px'; box.appendChild(h);
-    if(body){ const p=document.createElement('div'); p.textContent=body; p.style.cssText='font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px'; box.appendChild(p); }
-    const inp=document.createElement('input'); inp.type='text'; inp.placeholder=placeholder||''; inp.maxLength=80; inp.value=value||'';
-    inp.setAttribute('aria-label',title);
-    inp.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--bg,#faf8f5);color:inherit;font:inherit;font-size:14px'; box.appendChild(inp);
-    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:14px';
-    const mk=(label,primary)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label;
-      b.style.cssText=primary?'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--p,#5b3fa0);background:var(--p,#5b3fa0);color:var(--on-p,#fff);border-radius:999px;padding:8px 16px;cursor:pointer':'font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer';
-      return b; };
-    const cancel=mk('Cancel',false); const ok=mk(okLabel||'OK',true);
-    row.appendChild(cancel); row.appendChild(ok); box.appendChild(row); dlg.appendChild(box); document.body.appendChild(dlg);
-    let done=false; const finish=(v)=>{ if(done)return; done=true; try{dlg.close();}catch(e){} dlg.remove(); resolve(v); };
-    const submit=()=>{ const v=inp.value.trim(); finish(v||null); };
-    cancel.addEventListener('click',()=>finish(null));
-    ok.addEventListener('click',submit);
-    inp.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } });
-    dlg.addEventListener('cancel',(e)=>{ e.preventDefault(); finish(null); });
-    dlg.showModal(); setTimeout(()=>{ inp.focus(); if(value)inp.select(); },20);
   });
 }
 
@@ -789,7 +734,7 @@ async function load(soft,browse){
   await CTX_READY;   // the first load starts with the who-am-I read, and draws once both are in
   if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
   if(!a.ok){
-    if(soft&&S.loadedOnce){toast('Couldn’t refresh just now.');return;}
+    if(soft&&S.loadedOnce){toast('Couldn’t refresh just now.','err');return;}
     // absorb a successful collections read even here — the trouble surface's
     // rail shows real counts when it can, count-less when it can't
     if(col&&col.ok){S.countsOk=true;S.counts=buildCounts(col.body.data||[]);}
@@ -932,7 +877,7 @@ function renderStock(){
     <p style="margin:2px 0 12px;color:var(--faint);font-size:12.5px">${note}</p>
     <div class="grid">${grid}</div></div></div>`;
   wireRail();
-  const srf=$('refreshBtn'); if(srf)srf.addEventListener('click',()=>{loadStock().then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.'));});
+  const srf=$('refreshBtn'); if(srf)srf.addEventListener('click',()=>{loadStock().then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.','err'));});
   // no sq.focus() here — auto-stealing focus on every render broke keyboard flow
   // through the rail (the render is reached from rail clicks, not just typing)
   const sq=$('sq'); if(sq){ sq.addEventListener('keydown',e=>{if(e.key==='Enter'){S.stockQ=sq.value.trim();loadStock();}}); }
@@ -954,8 +899,8 @@ async function addStock(id,alt,credit,btn){
   if(btn){btn.disabled=true;btn.textContent='Adding…';}
   const r=await api('/stock/import','POST',{stock_id:id,alt_text:alt,credit:credit});
   if(r.ok){toast('Added to your Files');if(btn){btn.textContent='Added ✓';}}
-  else if(r.status===503){toast('Stock library isn’t enabled yet');if(btn){btn.disabled=false;btn.textContent='Add to my files';}}
-  else{toast((r.body&&r.body.message)||'Could not add that photo');if(btn){btn.disabled=false;btn.textContent='Add to my files';}}
+  else if(r.status===503){toast('Stock library isn’t enabled yet','err');if(btn){btn.disabled=false;btn.textContent='Add to my files';}}
+  else{toast((r.body&&r.body.message)||'Could not add that photo','err');if(btn){btn.disabled=false;btn.textContent='Add to my files';}}
 }
 // ── the sort and the columns must agree ─────────────────────────────────────
 // Both sortable columns can VANISH: Status when the plan has no approval step and
@@ -1189,7 +1134,7 @@ function wire(){
   const q=$('q');if(q){let t;q.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{S.q=q.value;load(false,true);},280);};}
   // ↻ refresh: soft — a failure toasts and keeps the list (leads.html contract);
   // these re-renders also restore focus to their control (the rosters' pattern)
-  const rf=$('refreshBtn');if(rf)rf.onclick=()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.'));
+  const rf=$('refreshBtn');if(rf)rf.onclick=()=>load(true).then(()=>{const nr=$('refreshBtn');if(nr)nr.focus();}).catch(()=>toast('Couldn’t refresh just now.','err'));
   const dt=$('dispTable');if(dt)dt.onclick=()=>{if(DISPLAY!=='table'){setDisplay('table');const nb=$('dispTable');if(nb)nb.focus();}};
   const dg=$('dispGrid');if(dg)dg.onclick=()=>{if(DISPLAY!=='grid'){setDisplay('grid');const nb=$('dispGrid');if(nb)nb.focus();}};
   // sortable column headers — click toggles asc/desc (aria-sort on the <th>);
@@ -1213,10 +1158,10 @@ function togglePick(id){ if(S.selected.has(id))S.selected.delete(id); else S.sel
 // same tag/collection/status logic server-side; here we just gather the input.
 async function onBulk(action){
   if(action==='all'){ const all=S.selected.size>=S.assets.length; S.selected=all?new Set():new Set(S.assets.map(a=>a.id)); return render(); }
-  const ids=[...S.selected]; if(!ids.length){toast('Select some files first');return;}
+  const ids=[...S.selected]; if(!ids.length){toast('Select some files first','err');return;}
   if(action==='download')return bulkDownload(ids);
   const body={action,ids};
-  if(action==='tag'){ const tag=await askPrompt('Add a tag','This tag is added to '+ids.length+' file'+(ids.length===1?'':'s')+'.','Add tag','e.g. summer, hero'); if(!tag)return; body.tag=tag; }
+  if(action==='tag'){ const tag=await ddsAsk({title:'Add a tag',text:'This tag is added to '+ids.length+' file'+(ids.length===1?'':'s')+'.',placeholder:'e.g. summer, hero',yes:'Add tag',max:80}); if(!tag)return; body.tag=tag; }
   else if(action==='collection'){
     // item 56: one tap on a folder you have, a new name, or out of folders altogether
     const inOne=ids.some(id=>{const a=S.assets.find(x=>x.id===id);return a&&a.collection;});
@@ -1224,13 +1169,13 @@ async function onBulk(action){
     if(!pick)return;
     if(pick.clear)body.clear=true; else body.collection=pick.name;
   }
-  else if(action==='archive'){ if(!(await askConfirm('Archive '+ids.length+' file'+(ids.length===1?'':'s')+'?','Archived files leave your library view but aren’t deleted — you can restore them from Archive.','Archive')))return; }
+  else if(action==='archive'){ if(!(await ddsConfirm('Archive '+ids.length+' file'+(ids.length===1?'':'s')+'?','Archived files leave your library view but aren’t deleted — you can restore them from Archive.','Archive')))return; }
   const r=await api('/assets/bulk','POST',body);
-  if(!r.ok){toast((r.body&&r.body.message)||'Could not apply that');return;}
+  if(!r.ok){toast((r.body&&r.body.message)||'Could not apply that','err');return;}
   const d=r.body.data||{}; const done=d.applied||0; const miss=(d.missing||[]).length;
   const verb=action==='tag'?'Tagged':action==='collection'?'Moved':action==='archive'?'Archived':'Approved';
   const where=action==='collection'?(body.clear?' out of folders':` to “${folderLabel(body.collection)}”`):'';
-  toast(done?`${verb} ${done} file${done===1?'':'s'}${where}${miss?` · ${miss} skipped`:''}`:'Nothing changed');
+  toast(done?`${verb} ${done} file${done===1?'':'s'}${where}${miss?` · ${miss} skipped`:''}`:'Nothing changed',done?'ok':'err');
   S.selected.clear(); S.selectMode=false; load();
 }
 // Bulk Download: one signed URL per file, saved via anchor clicks. Non-destructive,
@@ -1243,7 +1188,7 @@ async function bulkDownload(ids){
     if(url){const a=document.createElement('a');a.href=url;a.download='';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();ok++;}
     else fail++;
   }
-  toast(fail?(ok?`Downloaded ${ok} · ${fail} failed`:'Downloads failed — try again in a moment'):`Downloaded ${ok} file${ok===1?'':'s'}`);
+  toast(fail?(ok?`Downloaded ${ok} · ${fail} failed`:'Downloads failed — try again in a moment'):`Downloaded ${ok} file${ok===1?'':'s'}`,fail?'err':'ok');
 }
 
 /* ── honest previews ─────────────────────────────────────────────────────────
@@ -1434,7 +1379,7 @@ async function setPrivate(id,on,ctl){
     if(S.current&&S.current.asset.id===id){S.current.asset.client_private=on?true:undefined;renderDetail();}
     load(true);
   }else{
-    toast((r.body&&r.body.message)||'Could not change that');
+    toast((r.body&&r.body.message)||'Could not change that','err');
     if(ctl){ctl.checked=!on;ctl.disabled=false;}
   }
 }
@@ -1585,8 +1530,8 @@ async function editPhoto(tab){
   }
   // the ORIGINAL's own bytes: thumb is a small re-encode, so it's never the source
   const src=d.thumb_fallback||d.download_url;
-  if(!src){toast('Couldn’t open this photo for editing — try again in a moment.');return;}
-  let ed;try{ed=await loadEditor();}catch(_){toast('The photo editor didn’t load. Check your connection and try again.');return;}
+  if(!src){toast('Couldn’t open this photo for editing — try again in a moment.','err');return;}
+  let ed;try{ed=await loadEditor();}catch(_){toast('The photo editor didn’t load. Check your connection and try again.','err');return;}
   if(!S.current||S.current.asset.id!==a.id)return;   // the panel moved on while it loaded
   const res=await ed.open({src,fallbackSrc:d.download_url,name:a.name,mime:a.mime,startTab:tab,removeBackground:tab==='background',cutout:d.cutout_available?()=>cutoutOf(a.id):null,onSave:(out)=>saveEdited(a,out)});
   if(!res||!res.saved||!res.value)return;
@@ -1599,7 +1544,7 @@ async function editPhoto(tab){
 // takes a minute or two. Resolves the Blob, or {error} for the editor to say.
 const CUTOUT_POLL_MS=2500,CUTOUT_POLLS=72;   // three minutes at most
 async function cutoutOf(id){
-  const call=(path,method)=>fetch(FN+path,{method,headers:H()});
+  const call=(path,method)=>ddsApi.raw(path,{method,scope:scope()});
   const fail='The cut-out didn’t come through, so nothing changed. Try again in a moment.';
   let r;try{r=await call('/assets/'+id+'/cutout','POST');}catch(_){return{error:'The cut-out couldn’t start. Check your connection and try again.'};}
   for(let i=0;;i++){
@@ -1639,27 +1584,27 @@ async function setSiteIcon(id,isIc){
   if(isIc){toast('Already your site icon');return;}
   const r=await api('/settings','PUT',{icon_media_id:id});
   if(r.ok){toast('Set as your site icon — publish to apply');const b=document.querySelector('#social-slot .icbtn');if(b)b.textContent='✓ This is your site icon';}
-  else toast((r.body&&r.body.message)||'Could not set the site icon');
+  else toast((r.body&&r.body.message)||'Could not set the site icon','err');
 }
 async function setShareImage(id,isOg){
   if(isOg){toast('Already your share image');return;}
   const r=await api('/settings','PUT',{og_media_id:id});
   if(r.ok){toast('Set as your share image — publish to apply');const slot=$('social-slot');if(slot){const b=slot.querySelector('.ogbtn');if(b){b.textContent='✓ This is your share image';b.setAttribute('onclick',`setShareImage('${id}',true)`);}}}
-  else toast((r.body&&r.body.message)||'Could not set share image');
+  else toast((r.body&&r.body.message)||'Could not set share image','err');
 }
 async function saveDetail(){
   const a=S.current.asset;
   const body={name:$('f-name').value,collection:$('f-col').value,caption:$('f-cap').value,tags:$('f-tags').value.split(',').map(s=>s.trim()).filter(Boolean)};
   const alt=$('f-alt');if(alt)body.alt_text=alt.value;
   const r=await api('/assets/'+a.id,'PATCH',body);
-  if(r.ok){toast('Saved');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not save');
+  if(r.ok){toast('Saved');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not save','err');
 }
 // Bug hunt D11: in Favorites, a file let go of its star but stayed on the list and in the
 // count until a reload, and a star that failed to save said nothing.
 async function toggleFav(id){
   const a=S.assets.find(x=>x.id===id);const next=!(a&&a.favorite);
   const r=await api('/assets/'+id,'PATCH',{favorite:next});
-  if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t save that star. Try again in a moment.');return;}
+  if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t save that star. Try again in a moment.','err');return;}
   const row=S.full.find(x=>x.id===id)||a;
   if(row&&row.favorite!==next&&!row.client_private&&RAILN.fav!==undefined)RAILN.fav=Math.max(0,RAILN.fav+(next?1:-1));
   if(row)row.favorite=next;if(a)a.favorite=next;
@@ -1669,28 +1614,28 @@ async function toggleFav(id){
 }
 async function setAssetStatus(id,action){
   const r=await api('/assets/'+id+'/status','POST',{action});
-  if(r.ok){toast(action==='archive'?'Archived':'Restored');closeDetail();load();}else toast((r.body&&r.body.message)||'Not allowed');
+  if(r.ok){toast(action==='archive'?'Archived':'Restored');closeDetail();load();}else toast((r.body&&r.body.message)||'Not allowed','err');
 }
-async function duplicate(id){const r=await api('/assets/'+id+'/duplicate','POST');if(r.ok){toast('Duplicated');closeDetail();load();}else toast('Could not duplicate');}
-async function download(id){const r=await api('/assets/'+id+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener');else toast('Could not prepare download');}
-async function rollback(id){if(!(await askConfirm('Restore the previous version?','This puts the earlier file back everywhere it was used.','Restore')))return;const r=await api('/assets/'+id+'/rollback','POST');if(r.ok){toast('Previous version restored'+(r.body.data.requires_publish?' — publish to go live':''));closeDetail();load();}else toast((r.body&&r.body.message)||'Nothing to undo');}
-function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60){const w=Math.floor(d/7);return w+(w===1?' week':' weeks')+' ago';}const mo=Math.floor(d/30);return mo+(mo===1?' month':' months')+' ago';}
+async function duplicate(id){const r=await api('/assets/'+id+'/duplicate','POST');if(r.ok){toast('Duplicated');closeDetail();load();}else toast('Could not duplicate','err');}
+async function download(id){const r=await api('/assets/'+id+'/download');if(r.ok&&r.body.data&&r.body.data.url)window.open(r.body.data.url,'_blank','noopener');else toast('Could not prepare download','err');}
+async function rollback(id){if(!(await ddsConfirm('Restore the previous version?','This puts the earlier file back everywhere it was used.','Restore',{danger:true})))return;const r=await api('/assets/'+id+'/rollback','POST');if(r.ok){toast('Previous version restored'+(r.body.data.requires_publish?' — publish to go live':''));closeDetail();load();}else toast((r.body&&r.body.message)||'Nothing to undo','err');}
+const when=(iso)=>ddsDate.ago(iso);   // calendar days (the shell's): it counted 24-hour blocks, so last night's file read "today"
 async function decideFile(id,action){
-  if(action==='reject'&&!(await askConfirm('Ask for changes?','This keeps the current version live and sets the proposed replacement aside.','Ask for changes')))return;
+  if(action==='reject'&&!(await ddsConfirm('Ask for changes?','This keeps the current version live and sets the proposed replacement aside.','Ask for changes')))return;
   const r=await api('/assets/'+id+'/status','POST',{action});
   if(r.ok){toast(action==='approve'?('Approved'+(r.body.data&&r.body.data.requires_publish?' — publish to go live':'')):'Sent back for changes');closeDetail();load();}
-  else toast((r.body&&r.body.message)||'Could not do that');
+  else toast((r.body&&r.body.message)||'Could not do that','err');
 }
 async function del(id){
   // the SAME places the panel lists (the server refuses on them too)
   const uses=(S.current&&S.current.asset&&S.current.asset.id===id&&S.current.usage)||[];
-  if(uses.length){toast('This file is in use ('+uses[0].label+(uses.length>1?' and '+(uses.length-1)+' more':'')+') — remove it there first, or archive it.');return;}
+  if(uses.length){toast('This file is in use ('+uses[0].label+(uses.length>1?' and '+(uses.length-1)+' more':'')+') — remove it there first, or archive it.','err');return;}
   const cur=S.current&&S.current.asset&&S.current.asset.id===id?S.current:null;
   const name=cur?cur.asset.name:'this file';
   // a server without the Trash (before its update goes live) still deletes for good: say that, as before
   const forGood=typeof S.trashCount!=='number';
   if(forGood){
-    if(!(await askConfirm('Delete this file permanently?','This cannot be undone.','Delete')))return;
+    if(!(await ddsConfirm('Delete this file permanently?','This cannot be undone.','Delete',{danger:true})))return;
   }else{
     // item 218: Delete moves the file to the Trash for 30 days, and says so, and what the live site does
     const until=new Date(Date.now()+S.trashDays*86400000).toLocaleDateString('en-US',{month:'long',day:'numeric'});
@@ -1699,12 +1644,12 @@ async function del(id){
     if(!(await askQuestion({icon:'trash',title:'Move “'+name+'” to the Trash?',points,ok:'Move to the Trash',okClass:'dark',okIcon:'trash'})))return;
   }
   const r=await api('/assets/'+id,'DELETE');
-  if(forGood){if(r.ok){toast('Deleted');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not delete');return;}
-  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t move to the Trash. Try again.');return;}
+  if(forGood){if(r.ok){toast('Deleted');closeDetail();load();}else toast((r.body&&r.body.message)||'Could not delete','err');return;}
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t move to the Trash. Try again.','err');return;}
   closeDetail();load();
   undoToast('“'+name+'” is in the Trash.',async()=>{
     const b=await api('/assets/'+id+'/put-back','POST');
-    if(b.ok){toast('“'+name+'” is back in Files.');load();}else toast((b.body&&b.body.message)||'That didn’t come back. It’s in the Trash.');
+    if(b.ok){toast('“'+name+'” is back in Files.');load();}else toast((b.body&&b.body.message)||'That didn’t come back. It’s in the Trash.','err');
   });
 }
 
@@ -1807,7 +1752,7 @@ async function loadTrash(soft){
   await CTX_READY;
   let r;try{r=await api('/assets/trash');}catch(_){r={ok:false,body:{}};}
   if(gen!==REQ_SEQ)return;
-  if(!r.ok){if(soft&&S.trash){toast('Couldn’t refresh just now.');return;}S.trashState='error';return renderTrash();}
+  if(!r.ok){if(soft&&S.trash){toast('Couldn’t refresh just now.','err');return;}S.trashState='error';return renderTrash();}
   const d=(r.body&&r.body.data)||{};
   S.trash=Array.isArray(d.files)?d.files:[];S.trashDays=Number(d.days)||30;
   S.trashState=d.available===false?'off':'ok';
@@ -1827,7 +1772,7 @@ async function trashPutBack(id,btn){
   const f=(S.trash||[]).find(x=>x.id===id);if(!f)return;
   if(btn)btn.disabled=true;
   const r=await api('/assets/'+id+'/put-back','POST');
-  if(!r.ok){if(btn)btn.disabled=false;toast((r.body&&r.body.message)||'That didn’t come back. Try again.');return;}
+  if(!r.ok){if(btn)btn.disabled=false;toast((r.body&&r.body.message)||'That didn’t come back. Try again.','err');return;}
   toast('“'+f.name+'” is back in Files.');
   trashFocusAfter(id);
 }
@@ -1841,7 +1786,7 @@ async function trashForever(id){
   if(!(await askQuestion({tone:'bad',icon:'alert',title:'Delete “'+f.name+'” for good?',points:[['It can’t be put back.'],['An older version of your site that used it can’t bring it back.']],ok:'Delete for good',okClass:'danger'})))return;
   const r=await api('/assets/'+id+'/forever','DELETE');
   if(r.status===409&&r.body&&r.body.error==='still_live'){f.live=true;renderTrash();return askStillLive(f);}
-  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t delete. It’s still in the Trash; try again.');return;}
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t delete. It’s still in the Trash; try again.','err');return;}
   toast('“'+f.name+'” is deleted for good.');
   trashFocusAfter(id);
 }
@@ -1943,7 +1888,7 @@ async function uploadFiles(files){
   toast(fail
     ?(ok?`Uploaded ${ok} · ${fail} failed${skipNote}`:(firstErr||'Uploads failed — nothing was added'))
     :ok?`Uploaded ${ok} file${ok===1?'':'s'}${skipNote}`
-    :skipped?`Nothing new — ${skipped===1?'that file is':'those files are'} already in Files`:`Uploaded ${ok} files`);
+    :skipped?`Nothing new — ${skipped===1?'that file is':'those files are'} already in Files`:`Uploaded ${ok} files`,fail?'err':'ok');
   if(ok)await load();
   if(openAfter)openDetail(openAfter);
 }
@@ -1953,15 +1898,15 @@ $('replacer').onchange=async(e)=>{
   const old=S.current.asset;
   const _n=(S.current.usage||[]).length;   // every place where-used lists is repointed (item 115)
   const _extra=_n?` This updates it in ${_n} place${_n===1?'':'s'}.`:'';
-  if(!(await askConfirm('Replace this file?',`Replace “${old.name}” with ${file.name}.`+_extra,'Replace')))return;
+  if(!(await ddsConfirm('Replace this file?',`Replace “${old.name}” with ${file.name}.`+_extra,'Replace',{danger:true})))return;
   const isDoc=file.type==='application/pdf';const dims=await dimsOf(file);
   const alt=isDoc?old.name:(old.alt_text||old.name);
   const up=await api('/media/upload-url','POST',{mime:file.type,bytes:file.size,alt_text:alt,width:dims.width,height:dims.height,content_hash:(await fileHash(file))||undefined});
-  if(!up.ok){toast((up.body&&up.body.message)||'Upload could not start');return;}
+  if(!up.ok){toast((up.body&&up.body.message)||'Upload could not start','err');return;}
   const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type},body:file});
-  if(!put.ok){toast('Upload failed');return;}
+  if(!put.ok){toast('Upload failed','err');return;}
   const r=await api('/assets/'+old.id+'/replace','POST',{with:up.body.data.media_id});
-  if(r.ok){toast(r.body.data&&r.body.data.pending?'Sent for approval — it goes live once approved':('Replaced'+(r.body.data.requires_publish?' — publish to go live':'')));closeDetail();load();}else toast((r.body&&r.body.message)||'Replace failed');
+  if(r.ok){toast(r.body.data&&r.body.data.pending?'Sent for approval — it goes live once approved':('Replaced'+(r.body.data.requires_publish?' — publish to go live':'')));closeDetail();load();}else toast((r.body&&r.body.message)||'Replace failed','err');
 };
 // drag & drop
 ['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,(e)=>{if(!S.canEdit)return;e.preventDefault();const d=$('drop');if(d)d.classList.add('on');}));

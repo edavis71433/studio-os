@@ -221,44 +221,39 @@ test.describe('Contacts list view', () => {
 
 // ── SS6 (C4/C5/D7): customers gets Add-a-customer + unscoped read + search ───
 test.describe('Customers — SS6 quick wins', () => {
-  test('C4 — "+ Add a customer" (contacts’ dialog, ported): provision POSTs /sales/customers and shows the invite outcome', async ({ page }) => {
+  test('C4 — "+ Add a customer" (the one box): saves the customer, says so, and offers their profile (builder item 241)', async ({ page }) => {
     await pinTable('dds-display:customers')(page);
+    let sent: unknown = null;
     await installApp(page, { api: {
       '/studio/customers': CUSTOMERS,
-      '/sales/customers': { data: { created: true, invited: true, portal_url: 'https://x.example/portal.html' } },
+      'POST /sales/customers': (b: unknown) => { sent = b; return { data: { mode: 'save', saved: true, created: true, client_id: 'cccccccc-1234-4234-8234-cccccccccccc', email: 'jane@acmebakery.com' } }; },
     } });
     await page.goto('/customers.html');
     await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
-    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog focuses Name a beat after opening — a fill() racing it lands in the wrong field
-    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
+    await expect(page.locator('#cu-name')).toBeFocused();   // the box focuses Name a beat after opening — a fill() racing it lands in the wrong field
     await page.locator('#cu-name').fill('Jane Doe');
     await page.locator('#cu-biz').fill('Acme Bakery');
     await page.locator('#cu-email').fill('jane@acmebakery.com');
-    const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/sales/customers'));
     await page.locator('#cu-submit').click();
-    // exactly what handleSalesAddCustomer reads: mode/name/business_name/email/edition
-    expect((await post).postDataJSON()).toEqual({ mode: 'provision', name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com', edition: 'presence' });
-    await expect(page.locator('#cust-done')).toContainText('Invitation sent');
-    await expect(page.locator('#cust-done')).toContainText('jane@acmebakery.com');
+    await expect(page.locator('#cust-done')).toContainText('Saved to your customers');
+    expect(sent).toEqual({ mode: 'connect', save: true, name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com' });
+    await expect(page.locator('#cust-done')).toContainText('Acme Bakery is on your Customers list. No website yet, and nothing was emailed.');
+    await expect(page.locator('#cust-done').getByRole('link', { name: 'Open their profile' })).toHaveAttribute('href', '/crm.html?client_id=cccccccc-1234-4234-8234-cccccccccccc');
   });
 
-  test('C4 — builder item 199: "Just save them for now" is the default; setting them up is the other choice', async ({ page }) => {
+  test('C4 — builder items 199 and 241: the box only saves; no choice to set them up, no sign-up or price page', async ({ page }) => {
     await pinTable('dds-display:customers')(page);
     await installApp(page, { api: { '/studio/customers': CUSTOMERS } });
     await page.goto('/customers.html');
     await (await headerAction(page, '#addCust')).click();
     const dlg = page.locator('#custDlg');
     await expect(dlg).toBeVisible();
-    await expect(dlg.locator('input[name="cumode"]')).toHaveCount(2);
-    await expect(dlg.getByRole('radio', { name: /Just save them for now/ })).toBeChecked();   // Eric (Nov 15): no website unless asked
+    await expect(dlg.locator('input[type=radio], select')).toHaveCount(0);   // Eric (Nov 15): adding a customer starts nothing
     await expect(dlg).not.toContainText('sign up themselves');
     await expect(dlg.locator('a[href*="pricing"], #cu-signup')).toHaveCount(0);
-    await expect(dlg.locator('#cu-biz')).toBeHidden();   // saving needs only who they are
-    await expect(page.locator('#cu-submit')).toHaveText('Save');
-    await dlg.getByRole('radio', { name: /Set up their website and invite them/ }).check();
-    await expect(dlg.locator('#cu-biz')).toBeVisible();
-    await expect(page.locator('#cu-submit')).toHaveText('Set up + invite');
+    await expect(dlg.getByLabel('Business name (optional)')).toBeVisible();   // Create website fills it in later
+    await expect(page.locator('#cu-submit')).toHaveText('Save customer');
   });
 
   test('D7 — a stray ?client= cannot blank the roster: /studio/customers is asked UNSCOPED', async ({ page }) => {
@@ -425,16 +420,15 @@ test.describe('Contacts — Manage fields (A1)', () => {
 // tests above pin that page; this pins contacts' own copy of the dialog with
 // the roster table behind it, so the regression can't sneak back per-page.
 test.describe('Contacts — the Add-a-customer dialog on phones (SS6 pin)', { tag: '@layout' }, () => {
-  test('provision submits over the pinned roster table: POST /sales/customers lands and the done panel renders', async ({ page }) => {
+  test('saving submits over the pinned roster table: POST /sales/customers lands and the done panel renders', async ({ page }) => {
     await pinTable('dds-display:contacts')(page);
     await installApp(page, { api: {
       '/sales/contacts': CONTACTS,
-      '/sales/customers': { data: { created: true, invited: true, portal_url: 'https://x.example/portal.html' } },
+      '/sales/customers': { data: { mode: 'save', saved: true, created: true, client_id: 'cccccccc-8888-4888-8888-cccccccccccc', email: 'jane@acmebakery.com' } },
     } });
     await page.goto('/contacts.html');
     await (await headerAction(page, '#addCust')).click();
     await expect(page.locator('#custDlg')).toBeVisible();
-    await page.locator('input[name="cumode"][value="provision"]').check();   // the taller choice: it must still fit
     // the open dialog must fit the DEVICE viewport — the broken geometry sized
     // it against the widened layout viewport, pushing Save out of reach
     const vp = page.viewportSize()!;
@@ -448,23 +442,21 @@ test.describe('Contacts — the Add-a-customer dialog on phones (SS6 pin)', { ta
     await page.locator('#cu-email').fill('jane@acmebakery.com');
     const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/sales/customers'));
     await page.locator('#cu-submit').click();
-    expect((await post).postDataJSON()).toEqual({ mode: 'provision', name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com', edition: 'presence' });
-    await expect(page.locator('#cust-done')).toContainText('jane@acmebakery.com');
+    expect((await post).postDataJSON()).toEqual({ mode: 'connect', save: true, name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com' });
+    await expect(page.locator('#cust-done')).toContainText('Saved to your customers');
     await expect(page.locator('#custDlg')).toBeVisible();   // the done panel replaces the form in-dialog
   });
 });
 
-// ── SS6 — the Add-a-customer dialog tells the truth (both copies) ────────────
-// (a) The roster refresh after a SUCCESSFUL provision is best-effort: its
-//     failure must never repaint the success as "we couldn't set them up".
-// (b) handleSalesAddCustomer returns invited:false when the invitation email
-//     fails — the done panel must say so instead of "Invitation sent".
+// ── SS6 — the Add a customer box tells the truth ───────────────────────────
+// The list refresh after a SUCCESSFUL save is best-effort: its failure must never
+// repaint the success as "we couldn't save them". (Invitations moved to the customer's
+// profile with builder item 241; their invited:false honesty is pinned in customers-241.spec.ts.)
 test.describe('Dialog honesty — customers + contacts (SS6)', () => {
-  const PROVISION_OK = { data: { created: true, invited: true, portal_url: 'https://x.example/portal.html' } };
-  const PROVISION_NO_EMAIL = { data: { created: true, invited: false, portal_url: 'https://x.example/portal.html' } };
+  const SAVED = { data: { mode: 'save', saved: true, created: true, client_id: 'cccccccc-9999-4999-8999-cccccccccccc', email: 'jane@acmebakery.com' } };
 
   // the boot load serves the roster; every later read dies on the network —
-  // exactly the refresh-after-provision failure under test
+  // exactly the refresh-after-save failure under test
   const failRefresh = (page: import('@playwright/test').Page, re: RegExp) => {
     let reads = 0;
     return page.route(re, (route) => {
@@ -474,72 +466,59 @@ test.describe('Dialog honesty — customers + contacts (SS6)', () => {
     });
   };
 
-  test('customers — a failed refresh after a successful provision stays a success (soft toast, never "couldn’t set them up")', async ({ page }) => {
+  test('customers — a failed refresh after a successful save stays a success (soft toast, never "couldn’t save them")', async ({ page }) => {
     await pinTable('dds-display:customers')(page);
-    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/sales/customers': PROVISION_OK } });
+    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/sales/customers': SAVED } });
     await failRefresh(page, /\/functions\/v1\/presence\/studio\/customers(\?|$)/);
     await page.goto('/customers.html');
     await expect(page.locator('tbody tr')).toHaveCount(3);
     await (await headerAction(page, '#addCust')).click();
-    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
-    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
+    await expect(page.locator('#cu-name')).toBeFocused();   // the box's 20ms autofocus — let it land before filling
     await page.locator('#cu-email').fill('jane@acmebakery.com');
     await page.locator('#cu-submit').click();
-    // the provision SUCCEEDED — the panel says so, and the refresh failure
-    // surfaces only as the soft couldn't-refresh line
-    await expect(page.locator('#cust-done')).toContainText('Invitation sent');
+    // the save SUCCEEDED — the panel says so, and the refresh failure surfaces only as the soft couldn't-refresh line
+    await expect(page.locator('#cust-done')).toContainText('Saved to your customers');
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t refresh' }).first()).toBeVisible();
-    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t set them up' })).toHaveCount(0);
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t save them' })).toHaveCount(0);
   });
 
-  test('contacts — the same refresh honesty on its copy of the dialog', async ({ page }) => {
+  test('contacts — the same refresh honesty, from the same box', async ({ page }) => {
     await pinTable('dds-display:contacts')(page);
-    await installApp(page, { api: { '/sales/contacts': CONTACTS, '/sales/customers': PROVISION_OK } });
+    await installApp(page, { api: { '/sales/contacts': CONTACTS, '/sales/customers': SAVED } });
     await failRefresh(page, /\/functions\/v1\/presence\/sales\/contacts(\?|$)/);
     await page.goto('/contacts.html');
     await expect(page.locator('tbody tr')).toHaveCount(2);
     await (await headerAction(page, '#addCust')).click();
-    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
-    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
+    await expect(page.locator('#cu-name')).toBeFocused();   // the box's 20ms autofocus — let it land before filling
     await page.locator('#cu-email').fill('jane@acmebakery.com');
     await page.locator('#cu-submit').click();
-    await expect(page.locator('#cust-done')).toContainText('Invitation sent');
+    await expect(page.locator('#cust-done')).toContainText('Saved to your customers');
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t refresh' }).first()).toBeVisible();
-    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t set them up' })).toHaveCount(0);
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'couldn’t save them' })).toHaveCount(0);
   });
 
-  test('customers — invited:false renders the honest outcome: account created, the email didn’t send, share the link', async ({ page }) => {
-    await pinTable('dds-display:customers')(page);
-    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/sales/customers': PROVISION_NO_EMAIL } });
-    await page.goto('/customers.html');
-    await (await headerAction(page, '#addCust')).click();
-    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
-    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
-    await page.locator('#cu-name').fill('Jane Doe');
-    await page.locator('#cu-email').fill('jane@acmebakery.com');
-    await page.locator('#cu-submit').click();
-    const done = page.locator('#cust-done');
-    await expect(done).toContainText('the invitation email couldn’t be sent');
-    await expect(done).not.toContainText('Invitation sent to');
-    // the portal link is already in the done panel — the honest line points at it
-    await expect(done.locator('a.link')).toHaveAttribute('href', 'https://x.example/portal.html');
-  });
-
-  test('contacts — the same invited:false honesty on its copy of the dialog', async ({ page }) => {
-    await pinTable('dds-display:contacts')(page);
-    await installApp(page, { api: { '/sales/contacts': CONTACTS, '/sales/customers': PROVISION_NO_EMAIL } });
-    await page.goto('/contacts.html');
-    await (await headerAction(page, '#addCust')).click();
-    await expect(page.locator('#cu-name')).toBeFocused();   // the dialog's 20ms autofocus — let it land before filling
-    await page.locator('input[name="cumode"][value="provision"]').check();   // saving is the default since Nov 15; this test sets them up
-    await page.locator('#cu-name').fill('Jane Doe');
-    await page.locator('#cu-email').fill('jane@acmebakery.com');
-    await page.locator('#cu-submit').click();
-    const done = page.locator('#cust-done');
-    await expect(done).toContainText('the invitation email couldn’t be sent');
-    await expect(done).not.toContainText('Invitation sent to');
-    await expect(done.locator('a.link')).toHaveAttribute('href', 'https://x.example/portal.html');
-  });
+  // Builder item 101: the box's failures reach the shell's toast as failures
+  // (the pages used to pass toast:(m)=>toast(m), which dropped the flag).
+  for (const p of [
+    { url: '/customers.html', display: 'dds-display:customers', api: { '/studio/customers': CUSTOMERS }, rows: 3 },
+    { url: '/contacts.html', display: 'dds-display:contacts', api: { '/sales/contacts': CONTACTS }, rows: 2 },
+  ]) {
+    test(`${p.url.slice(1, -5)} — a save that fails shows as a failure, and Save can be pressed again`, async ({ page }) => {
+      await pinTable(p.display)(page);
+      await installApp(page, { api: p.api });
+      await page.route(/\/functions\/v1\/presence\/sales\/customers(\?|$)/, (r) => r.request().method() === 'POST'
+        ? r.fulfill({ status: 500, contentType: 'application/json', body: '{}' })
+        : r.fallback());
+      await page.goto(p.url);
+      await expect(page.locator('tbody tr')).toHaveCount(p.rows);
+      await (await headerAction(page, '#addCust')).click();
+      await expect(page.locator('#cu-name')).toBeFocused();
+      await page.locator('#cu-email').fill('jane@acmebakery.com');
+      await page.locator('#cu-submit').click();
+      await expect(page.locator('.dds-toast.err')).toContainText('couldn’t save them');
+      await expect(page.locator('#cu-submit')).toBeEnabled();
+    });
+  }
 });
 
 // ── Oct 2026 nav cut: Customers is its own place again (the roster with its
@@ -561,41 +540,33 @@ test.describe('Customers — the agency member gets the roster (no forward since
     await expect(page.locator('#main')).toContainText('Acme Bakery');
     expect(new URL(page.url()).pathname).toBe('/customers.html');
   });
-  // Oct 2026 studio audit, change 4: the rosters' copies of the dialog offer "Start
-  // from" a kit only when the caller IS an agency (ddsContext.is_agency) — a plain
-  // studio owner has no kits and never sees the field.
+  // Builder item 241: Add a customer only saves them. A kit starts a website from New site
+  // (sites.html), so no copy of the box offers a kit or a set-up choice, and none reads the kits.
   const KITS = { data: [{ id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa', name: 'Restaurant starter' }] };
-  test('customers (drilled agency) — the Start-from kit select lists /agency/kits; a plain owner never sees it', async ({ page }) => {
+  const savesOnly = async (page: import('@playwright/test').Page, path: string, api: Record<string, unknown>) => {
+    const kitReads: string[] = [];
+    page.on('request', (r) => { if (r.url().includes('/agency/kits')) kitReads.push(r.url()); });
+    await installApp(page, { api });
+    await page.goto(path);
+    await (await headerAction(page, '#addCust')).click();
+    const dlg = page.locator('#custDlg');
+    await expect(dlg).toBeVisible();
+    await expect(dlg.locator('#cu-name')).toBeVisible();
+    await expect(dlg.locator('#cu-email')).toBeVisible();
+    await expect(dlg.locator('#cu-submit')).toHaveText('Save customer');
+    await expect(dlg.locator('#cu-kit, #cu-kit-wrap, input[name="cumode"], #cu-edition, #cu-website, #cu-signup')).toHaveCount(0);
+    expect(kitReads).toEqual([]);
+  };
+  test('customers: the box saves only, for a drilled agency and a plain owner alike, with no kit choice', async ({ page }) => {
     await pinTable('dds-display:customers')(page);
-    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/agency/kits': KITS, '/portal/context': agencyCtx({ site_id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'Acme Bakery' }) } });
-    await page.goto('/customers.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
-    await (await headerAction(page, '#addCust')).click();
-    await page.locator('input[name="cumode"][value="provision"]').check();   // the kit comes with setting them up
-    await expect(page.locator('#cu-kit-wrap')).toBeVisible();
-    await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
-    await expect(page.locator('#cu-signup')).toHaveCount(0);    // builder item 199: no sign-up link at all
-    // the owner's copy: no agency, no field — even with kits fixtured
-    await installApp(page, { api: { '/studio/customers': CUSTOMERS, '/agency/kits': KITS } });
-    await page.goto('/customers.html');
-    await (await headerAction(page, '#addCust')).click();
-    await expect(page.locator('#custDlg')).toBeVisible();
-    await page.locator('input[name="cumode"][value="provision"]').check();
-    await expect(page.locator('#cu-kit-wrap')).toBeHidden();
+    await savesOnly(page, '/customers.html?client=aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+      { '/studio/customers': CUSTOMERS, '/agency/kits': KITS, '/portal/context': agencyCtx({ site_id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'Acme Bakery' }) });
+    await savesOnly(page, '/customers.html', { '/studio/customers': CUSTOMERS, '/agency/kits': KITS });
   });
-  test('contacts — the same gate on its copy: agency sees the kit field, owner does not', async ({ page }) => {
+  test('contacts: its copy of the box saves only too, agency or owner', async ({ page }) => {
     await pinTable('dds-display:contacts')(page);
-    await installApp(page, { api: { '/sales/contacts': CONTACTS, '/agency/kits': KITS, '/portal/context': agencyCtx() } });
-    await page.goto('/contacts.html');
-    await (await headerAction(page, '#addCust')).click();
-    await page.locator('input[name="cumode"][value="provision"]').check();   // the kit comes with setting them up
-    await expect(page.locator('#cu-kit-wrap')).toBeVisible();
-    await expect(page.locator('#cu-kit option')).toHaveText(['No kit — start empty', 'Restaurant starter']);
-    await installApp(page, { api: { '/sales/contacts': CONTACTS, '/agency/kits': KITS } });
-    await page.goto('/contacts.html');
-    await (await headerAction(page, '#addCust')).click();
-    await expect(page.locator('#custDlg')).toBeVisible();
-    await page.locator('input[name="cumode"][value="provision"]').check();
-    await expect(page.locator('#cu-kit-wrap')).toBeHidden();
+    await savesOnly(page, '/contacts.html', { '/sales/contacts': CONTACTS, '/agency/kits': KITS, '/portal/context': agencyCtx() });
+    await savesOnly(page, '/contacts.html', { '/sales/contacts': CONTACTS, '/agency/kits': KITS });
   });
   test('drilled into a client (?client=) it stays, as the way UP to the roster', async ({ page }) => {
     await pinTable('dds-display:customers')(page);

@@ -59,7 +59,10 @@ test.describe('Deleting a deal can be undone (item 83)', () => {
 });
 
 // ── the Recently deleted page (drawn in Figma, section 263:865) ──
-const ago = (d: number) => new Date(Date.now() - d * 86400000).toISOString();
+// The fixtures' days are fixed in 2026, and the list's test pins the page's clock there: from January
+// a day from another year carries its year ("was due Nov 6, 2026", the shell's ddsDate.short, item 101).
+const NOW = Date.parse('2026-11-16T18:00:00Z');
+const ago = (d: number) => new Date(NOW - d * 86400000).toISOString();
 const DELETED = { data: {
   days: 30, partial: [],
   deals: [
@@ -72,6 +75,7 @@ const DELETED = { data: {
 test.describe('The Recently deleted page (item 83)', () => {
   test('lists what was deleted, newest first; the chips narrow it; Restore brings each back and says where', async ({ page }) => {
     const sent: Sent[] = [];
+    await page.clock.setFixedTime(new Date(NOW));
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/deleted': DELETED } });
     await page.route((u) => /\/sales\/(deals\/[^/]+\/restore|contacts\/[^/]+\/restore|deal-tasks\/[^/]+)$/.test(u.pathname), (route) => {
       const r = route.request();
@@ -88,7 +92,7 @@ test.describe('The Recently deleted page (item 83)', () => {
     await expect(rows.nth(0).locator('.dw')).toHaveText('Deleted 3 days ago');
     await expect(rows.nth(2).locator('.dw')).toHaveText('Deleted 2 weeks ago');
     await expect(page.locator('.kchip')).toHaveText([/All\s*4/, /Deals\s*2/, /Contacts\s*1/, /To-dos\s*1/]);
-    await expect(page.locator('.note')).toContainText('After 30 days things leave this list. Websites you moved to the trash are on Sites.');
+    await expect(page.locator('.note')).toContainText('After 30 days things leave this list. Websites you moved to the trash stay there for 90 days, on Sites.');
     await page.locator('.kchip', { hasText: 'Deals' }).click();
     await expect(rows).toHaveCount(2);
     await expect(page.locator('.kchip', { hasText: 'Deals' })).toHaveAttribute('aria-pressed', 'true');
@@ -115,7 +119,7 @@ test.describe('The Recently deleted page (item 83)', () => {
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/deleted': { data: { days: 30, partial: [], deals: [], contacts: [], todos: [] } } } });
     await page.goto('/recently-deleted.html');
     await expect(page.locator('.empty h2')).toHaveText('Nothing deleted in the last 30 days');
-    await expect(page.locator('.empty')).toContainText('When you delete a deal, a contact or a to-do, it waits here for 30 days so you can bring it back.');
+    await expect(page.locator('.empty')).toContainText('When you delete a customer, a deal, a contact or a to-do, it waits here for 30 days so you can bring it back.');
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/deleted': { data: { ...DELETED.data, partial: ['todos'] } } } });
     await page.goto('/recently-deleted.html');
     await expect(page.locator('.partial')).toHaveText('We couldn’t read your deleted to-dos just now, so this may not be everything. Refresh to try again.');

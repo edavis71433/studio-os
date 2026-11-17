@@ -634,6 +634,12 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
           .then((r) => r.ok ? r : svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${AS}&select=name,company,email,phone&limit=1`)).then(one) : Promise.resolve(null),
       ]);
       if (c) header = { name: c.name || c.email || 'Client', company: '', email: c.email || c.contact_email || '', phone: '', status: 'customer' };
+      // builder item 241: a customer saved but not yet invited has no email on their record (nobody owns it yet);
+      // the person's own address is on their contact, so the header and Email reach them
+      if (c && !header.email && AS) {
+        const pc = one(await svc(`presence_contacts?site_id=eq.${AS}&client_id=eq.${clientId}&deleted_at=is.null&select=email&order=created_at.asc&limit=1`).catch(() => ({ json: [] })));
+        if (pc && pc.email) header = { ...header, email: String(pc.email) };
+      }
       // item 22 (second half) + item 49: lead with the business, name the person
       // beside it — the record's own contact first, else the won deal's
       if (c) {

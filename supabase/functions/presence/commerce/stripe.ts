@@ -14,21 +14,47 @@
 // it a call gets the account's default of the day, and one press of "Upgrade" in
 // Stripe's Workbench would change the shape of every answer with nobody told.
 import { STRIPE_API_VERSION } from './stripe_shape.ts';
+import { stripeKeyKind } from './stripe_key.ts';
 
 const STRIPE_SECRET = Deno.env.get('STRIPE_SECRET') || '';
 const SITE_URL = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
 
 export function stripeConfigured(): boolean { return !!STRIPE_SECRET; }
+/** Restricted or full-power, live or test, read from the key's prefix (sales item 131).
+ *  The key itself stays in this file. */
+export const heldKeyKind = () => stripeKeyKind(STRIPE_SECRET);
 
-async function stripeReq(path: string, params: Record<string, string>, idem?: string, method: 'POST' | 'GET' | 'DELETE' = 'POST'): Promise<any> {
+/** The one place this file talks to Stripe, so every call names the version (sales
+ *  item 128). Answers the status and Stripe's JSON; a network failure throws. */
+async function stripeFetch(path: string, params: Record<string, string>, method: 'POST' | 'GET' | 'DELETE', idem?: string, timeoutMs?: number): Promise<{ status: number; body: any }> {
   const h: Record<string, string> = { Authorization: `Bearer ${STRIPE_SECRET}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Stripe-Version': STRIPE_API_VERSION };
   if (idem) h['Idempotency-Key'] = idem;
   const qs = (method === 'GET' || method === 'DELETE') && Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
-  const url = `https://api.stripe.com/v1/${path}${qs}`;
-  const r = await fetch(url, { method, headers: h, body: method === 'POST' ? new URLSearchParams(params).toString() : undefined });
-  const j = await r.json();
-  if (!r.ok) throw new Error((j && j.error && j.error.message) || `stripe ${r.status}`);
+  const r = await fetch(`https://api.stripe.com/v1/${path}${qs}`, { method, headers: h, body: method === 'POST' ? new URLSearchParams(params).toString() : undefined, ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}) });
+  return { status: r.status, body: await r.json().catch(() => null) };
+}
+
+async function stripeReq(path: string, params: Record<string, string>, idem?: string, method: 'POST' | 'GET' | 'DELETE' = 'POST'): Promise<any> {
+  const { status, body: j } = await stripeFetch(path, params, method, idem);
+  if (status < 200 || status >= 300) throw new Error((j && j.error && j.error.message) || `stripe ${status}`);
+  if (!j) throw new Error(`stripe ${status}: an answer that couldn’t be read`);
   return j;
+}
+
+/** One question to Stripe whose answer is only its status (sales item 131, the key
+ *  check in commerce/stripe_key.ts). A 403 from Stripe names the permission the key
+ *  lacks ("Having the 'rak_payout_write' permission would allow this request"); that
+ *  name is the only thing kept from the answer. Stripe's message also quotes part of
+ *  the key and the account, so neither is ever passed on. Never throws: a network
+ *  failure is status 0. */
+export async function stripeProbe(method: 'GET' | 'POST' | 'DELETE', path: string, params: Record<string, string> = {}): Promise<{ status: number; lacks: string | null }> {
+  if (!STRIPE_SECRET) return { status: 0, lacks: null };
+  try {
+    const { status, body } = await stripeFetch(path, params, method, undefined, 10_000);
+    const said = String((body && body.error && body.error.message) || '');
+    const m = status === 403 ? said.match(/'(rak_[a-z_]+)'/) : null;
+    return { status, lacks: m ? m[1] : null };
+  } catch { return { status: 0, lacks: null }; }
 }
 
 /** Cancel a subscription immediately (stops future billing). Keeps the Stripe
@@ -40,6 +66,22 @@ export async function cancelSubscription(subId: string): Promise<{ ok: boolean; 
   try { await stripeReq(`subscriptions/${encodeURIComponent(subId)}`, {}, undefined, 'DELETE'); return { ok: true }; }
   catch (e) { const m = String((e as Error).message || e); if (/no such subscription|already canceled|resource_missing/i.test(m)) return { ok: true }; return { ok: false, error: m }; }
 }
+
+/** The ways a client can pay (sales item 132, the Nov 15 2026 Stripe review, finding 6).
+ *  A link that names none offers whatever is switched on in Stripe's settings, which on
+ *  a dollar invoice was card, Link, bank, Klarna, Cash App Pay and Amazon Pay. Klarna
+ *  costs about twice a card and no client has used it, so every link now names exactly:
+ *    card             a card, and the wallets switched on in Stripe's settings, which come
+ *                     under card (Apple Pay is on; Google Pay was off when this was written, Nov 16 2026)
+ *    link             Link, Stripe's saved-details checkout
+ *    us_bank_account  a US bank payment (ACH); dollars only, so it is left off any other currency
+ *  A method switched on in Stripe for something else can't appear on an invoice by
+ *  surprise. Adding one later means adding it here. */
+export function payMethodTypes(currency?: string): string[] {
+  return String(currency || 'usd').toLowerCase() === 'usd' ? ['card', 'link', 'us_bank_account'] : ['card', 'link'];
+}
+const payMethodParams = (currency?: string): Record<string, string> =>
+  Object.fromEntries(payMethodTypes(currency).map((t, i) => [`payment_method_types[${i}]`, t]));
 
 /** A one-time SERVICE invoice payment link (a deposit / project charge). A Payment
  *  Link (NOT a 24h Checkout session), so it never expires — a customer can pay
@@ -70,6 +112,7 @@ export async function createServicePaymentLink(p: { amountCents: number; currenc
   const link = await stripeReq('payment_links', {
     'line_items[0][price]': String(price.id),
     'line_items[0][quantity]': '1',
+    ...payMethodParams(p.currency),
     'metadata[presence_invoice_id]': p.invoiceId,
     'metadata[kind]': 'service_invoice',
     'payment_intent_data[metadata][presence_invoice_id]': p.invoiceId,
@@ -122,6 +165,7 @@ export async function createServiceRetainerLink(p: { productName: string; amount
   const link = await stripeReq('payment_links', {
     'line_items[0][price]': String(price.id),
     'line_items[0][quantity]': '1',
+    ...payMethodParams('usd'),   // the same ways to pay as an invoice; each later charge uses the one approved here
     'metadata[purpose]': 'service_retainer',
     'metadata[kind]': 'service_retainer',
     'metadata[deal_id]': p.dealId,
@@ -181,4 +225,110 @@ export async function retrieveSubscription(subId: string): Promise<any> {
 
 export async function retrieveCheckoutSession(sessionId: string): Promise<any> {
   return await stripeReq(`checkout/sessions/${encodeURIComponent(sessionId)}`, { 'expand[0]': 'subscription' }, undefined, 'GET');
+}
+
+// ── Refunds and disputes (sales items 126, 127) ─────────────────────────────
+// Read-only. A refund or a dispute made in Stripe reaches Studio OS as an event;
+// commerce/charge_returns.ts reads the charge and its refunds, or the dispute, fresh
+// from here rather than trusting what the event carried, so events that arrive late
+// or out of order still land on Stripe's latest word. Each throws on a Stripe error
+// (the caller answers "try again" and Stripe sends the event again).
+
+/** One charge: its payment intent, amounts (amount, amount_captured, amount_refunded),
+ *  refunded / disputed, how it was paid (payment_method_details.type). */
+export async function retrieveCharge(id: string): Promise<any> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  return await stripeReq(`charges/${encodeURIComponent(id)}`, {}, undefined, 'GET');
+}
+
+/** Every refund on one charge, newest first (a charge holds far fewer than 100). */
+export async function listChargeRefunds(chargeId: string): Promise<any[]> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  const r = await stripeReq('refunds', { charge: chargeId, limit: '100' }, undefined, 'GET');
+  return Array.isArray(r?.data) ? r.data : [];
+}
+
+/** One dispute: amount, status, reason, evidence_details.due_by, and the balance
+ *  transactions that took the money (and Stripe's fee) and gave it back. */
+export async function retrieveDispute(id: string): Promise<any> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  return await stripeReq(`disputes/${encodeURIComponent(id)}`, {}, undefined, 'GET');
+}
+
+/** The disputes on one charge (a charge can be disputed once). */
+export async function listChargeDisputes(chargeId: string): Promise<any[]> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  const r = await stripeReq('disputes', { charge: chargeId, limit: '10' }, undefined, 'GET');
+  return Array.isArray(r?.data) ? r.data : [];
+}
+
+/** One payment intent: its metadata (presence_invoice_id, set on every pay link's
+ *  payment) and latest_charge. */
+export async function retrievePaymentIntent(id: string): Promise<any> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  return await stripeReq(`payment_intents/${encodeURIComponent(id)}`, {}, undefined, 'GET');
+}
+
+/** The Stripe invoice a payment intent paid, or '' when it paid none (a pay link's
+ *  payment). Since 2025-03-31.basil a charge no longer names its invoice; Stripe's
+ *  invoice payments list does. This is how a retainer charge is found. */
+export async function invoiceForPaymentIntent(paymentIntentId: string): Promise<string> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  const r = await stripeReq('invoice_payments', { 'payment[type]': 'payment_intent', 'payment[payment_intent]': paymentIntentId, limit: '1' }, undefined, 'GET');
+  const first = Array.isArray(r?.data) ? r.data[0] : null;
+  const inv = first?.invoice;
+  return String((typeof inv === 'string' ? inv : inv?.id) || '');
+}
+
+// ── What reached the bank: fees and payouts, for the bookkeeper file (sales item 133) ──
+// Read only. Stripe keeps its fee from each payment and pays the rest out in batches,
+// so each payment has a balance transaction (amount, fee, net) and each payout lists
+// the balance transactions it carried. These reads feed lib/stripe_ledger.ts.
+
+/** Every page of a Stripe list, up to `maxPages` of 100; `more` says Stripe had more
+ *  than that. Throws when Stripe can't be read, so a short list is never taken for a
+ *  whole one. */
+async function listAll(path: string, params: Record<string, string>, maxPages: number): Promise<{ data: any[]; more: boolean }> {
+  const data: any[] = [];
+  let after = '';
+  for (let page = 0; page < maxPages; page++) {
+    const res = await stripeReq(path, { ...params, limit: '100', ...(after ? { starting_after: after } : {}) }, undefined, 'GET');
+    const got = Array.isArray(res?.data) ? res.data : [];
+    data.push(...got);
+    after = String(got.length ? got[got.length - 1]?.id || '' : '');
+    if (!res?.has_more || !after) return { data, more: false };
+  }
+  return { data, more: true };
+}
+
+/** Each payment Stripe took between two moments (unix seconds), with the charge it came
+ *  from: a charge carries its PaymentIntent's notes, so presence_invoice_id names the
+ *  invoice. A card is type charge, a bank payment type payment. */
+export async function listPaymentBalanceTransactions(fromSec: number, toSec: number, maxPages = 10): Promise<{ data: any[]; more: boolean }> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  const span = { 'created[gte]': String(Math.floor(fromSec)), 'created[lt]': String(Math.floor(toSec)), 'expand[]': 'data.source' };
+  const [cards, banks] = await Promise.all(['charge', 'payment'].map((type) => listAll('balance_transactions', { ...span, type }, maxPages)));
+  return { data: [...cards.data, ...banks.data], more: cards.more || banks.more };
+}
+
+/** Payouts due to arrive between two moments (unix seconds). */
+export async function listPayouts(fromSec: number, toSec: number, maxPages = 5): Promise<{ data: any[]; more: boolean }> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  return await listAll('payouts', { 'arrival_date[gte]': String(Math.floor(fromSec)), 'arrival_date[lt]': String(Math.floor(toSec)) }, maxPages);
+}
+
+/** What one automatic payout carried: its balance transactions, each naming its source. */
+export async function listPayoutTransactions(payoutId: string, maxPages = 5): Promise<{ data: any[]; more: boolean }> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  return await listAll('balance_transactions', { payout: String(payoutId) }, maxPages);
+}
+
+/** The PaymentIntent that paid a Stripe invoice (a retainer's monthly charge), or ''. */
+export async function paymentIntentForInvoice(stripeInvoiceId: string): Promise<string> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  const res = await stripeReq('invoice_payments', { invoice: String(stripeInvoiceId), limit: '10' }, undefined, 'GET');
+  const rows = Array.isArray(res?.data) ? res.data : [];
+  const paid = rows.find((x: any) => x?.status === 'paid' && x?.payment?.type === 'payment_intent') || rows.find((x: any) => x?.payment?.type === 'payment_intent');
+  const pi = paid?.payment?.payment_intent;
+  return String((typeof pi === 'string' ? pi : pi?.id) || '');
 }

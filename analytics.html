@@ -173,8 +173,6 @@
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:50px auto}
   @media (prefers-reduced-motion:no-preference){.spin{animation:sp .8s linear infinite}}
   @keyframes sp{to{transform:rotate(360deg)}}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:var(--dds-s3,12px) var(--dds-s5,20px);border-radius:var(--dds-r-lg,10px);font-size:14px;opacity:0;transition:var(--dds-t-base,200ms) var(--dds-ease,ease-out);pointer-events:none;z-index:40}
-  .toast.show{opacity:1}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   /* print: the chrome hides, cards never break mid-page, "Print this summary" offers the path */
   .print{margin-top:var(--dds-s7,32px);text-align:center}
@@ -333,6 +331,8 @@
   /* a phone: the panel sits across the screen, above the bottom bar */
   @media (max-width:560px){.dpanel{position:fixed;left:16px;right:16px;top:auto;bottom:88px;width:auto}}
   @media print{.dates,.qx,.qpop{display:none!important}}
+  /* builder item 98: a card's link is a 44px tap on a touch screen */
+  @media (pointer:coarse){.card-h a.lk,.stat .k a{display:inline-flex;align-items:center;min-height:44px}.stat .k a{margin-left:12px}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -340,14 +340,12 @@
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 // builder item 165: on a phone the header's other actions sit in a sheet behind ⋯; picking one puts the sheet away
 document.addEventListener('click',(e)=>{const m=e.target&&e.target.closest?e.target.closest('.dds-ph-more'):null;if(!m||!e.target.closest('button,a'))return;try{if(m.matches(':popover-open'))m.hidePopover();}catch(_){/* no popover support: there is no sheet */}});
@@ -366,11 +364,11 @@ sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_tok
 // ?view=website: the builder's Analytics tab. The website band on its own, since a
 // site tab isn't where someone comes for the studio's pipeline.
 const WEBSITE_VIEW=new URLSearchParams(location.search).get('view')==='website';
-async function api(path){const r=await fetch(FN+path,{headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope(),'x-region':FN_REGION}});return r.ok?{ok:true,body:await r.json().catch(()=>({}))}:{ok:false,status:r.status};}
-function toast(m){if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+const api=(path)=>ddsApi(path,{scope:scope()});
+const toast=(m,kind,action)=>ddsToast(m,kind,action);   // the shell's one toast: 'err' shows a failure as one
 
 // ── formatting (all money is cents; everything tabular-nums) ──
-const money=(c)=>{const v=(c||0)/100;return '$'+v.toLocaleString(undefined,Number.isInteger(v)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2});};   // final pass, batch C: one money format (whole dollars, or with cents)
+const money=(c)=>ddsMoney(c||0);   // the shell's one money format (whole dollars, or with cents); a missing amount reads $0
 const num=(n)=>(Number(n)||0).toLocaleString();
 // hash-aware, matching shell.js — a fragment target like /presence.html#publish
 // must become /presence.html?client=X#publish, never /presence.html#publish?client=X
@@ -424,7 +422,7 @@ function gscQual(period){
   return n?' · in '+n:'';
 }
 function asOf(iso){const d=iso?new Date(iso):new Date();const t=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});const sameDay=d.toDateString()===new Date().toDateString();return (sameDay?'today, ':d.toLocaleDateString([],{month:'short',day:'numeric'})+', ')+t;}
-function shortDate(iso){const d=new Date(iso);return Number.isNaN(d.getTime())?'':d.toLocaleDateString([],{month:'short',day:'numeric'});}
+function shortDate(iso){return ddsDate.short(iso);}
 const initials=(s)=>String(s||'').split(/[\s—–-]+/).filter(Boolean).slice(0,2).map(w=>{const ch=Array.from(w)[0]||'';const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'·';   // batch C: an emoji or "ß" stays whole
 const pageName=(path)=>{if(!path||path==='/')return'Home';const seg=String(path).split('?')[0].split('#')[0].split('/').filter(Boolean).pop()||'Home';const w=seg.replace(/\.(html?|php)$/i,'').replace(/[-_]+/g,' ');return w.charAt(0).toUpperCase()+w.slice(1);};
 
@@ -982,7 +980,7 @@ function paintGlance(rep){
   const rv=rep.revenue,o=rep.outcomes,pl=rep.pipeline;
   // the revenue chart
   const revBody=(rv&&!rv.unavailable&&Array.isArray(rv.months)&&rv.months.length)
-    ?((rv.total_this_year||rv.total_last_year)?revenueChart(rv,12)+revenueChart(rv,6)+`<p class="chartnote">Paid invoices and retainer payments by the month they were paid · last 12 months ${esc(money(rv.total_this_year))}${rv.retainer_this_year?`, ${esc(money(rv.retainer_this_year))} of it from retainers`:''} · the year before ${esc(money(rv.total_last_year))}</p>`:emptyState('No payments yet','Invoices and retainer payments over the last two years will chart here, against the year before.'))
+    ?((rv.total_this_year||rv.total_last_year)?revenueChart(rv,12)+revenueChart(rv,6)+`<p class="chartnote">Paid invoices and retainer payments by the month they were paid · last 12 months ${esc(money(rv.total_this_year))}${rv.retainer_this_year?`, ${esc(money(rv.retainer_this_year))} of it from retainers`:''}${rv.returned_this_year?`, after ${esc(money(rv.returned_this_year))} refunded or lost to disputes`:''} · the year before ${esc(money(rv.total_last_year))}</p>`:emptyState('No payments yet','Invoices and retainer payments over the last two years will chart here, against the year before.'))
     :'<p class="muted">This chart couldn’t load just now — Refresh tries again.</p>';
   // the pipeline as it stands
   let pipeBody;
@@ -1267,7 +1265,7 @@ function renderPortfolio(d,roster){
   $('main').innerHTML=h;
   loadReports();
   const rb=$('refreshBtn');if(rb)rb.addEventListener('click',()=>{REP_STALE=true;loadPortfolio(true).then(()=>{const b=$('refreshBtn');if(b)b.focus();});});
-  const pr=$('printRep');if(pr)pr.addEventListener('click',()=>{if($('repPrint'))printReport();else toast('Your reports are still loading — try again in a moment.');});
+  const pr=$('printRep');if(pr)pr.addEventListener('click',()=>{if($('repPrint'))printReport();else toast('Your reports are still loading — try again in a moment.','err');});
   // row click drills into the client's scoped Business dashboard; the name link
   // inside carries the keyboard/AT path, so plain rows stay non-focusable
   document.querySelectorAll('.tscroll tr[data-drill]').forEach(tr=>tr.addEventListener('click',(e)=>{
@@ -1299,7 +1297,7 @@ async function loadDash(soft,nextPeriod,nextDates){
   if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale
   if(!r.ok){
     if(r.status===401){signedOut();return;}   // session ended mid-visit — not a toast loop
-    if(soft&&DASH){toast('Couldn’t refresh just now.');return;}
+    if(soft&&DASH){toast('Couldn’t refresh just now.','err');return;}
     if(r.status===403){$('main').innerHTML=`<div class="center"><h2>Analytics lives in your full workspace.</h2></div>`;return;}
     if(r.status===404){warming();return;}
     trouble();return;
@@ -1307,7 +1305,7 @@ async function loadDash(soft,nextPeriod,nextDates){
   const data=r.body.data||{};
   // belt-and-braces: if the server echoes a period, it must be the one we asked
   // for — otherwise this response can't honestly label the board
-  if(data.period&&data.period!==period){if(period==='custom')toast('Those dates couldn’t be shown. Pick dates from the last ten years, up to today.');return;}
+  if(data.period&&data.period!==period){if(period==='custom')toast('Those dates couldn’t be shown. Pick dates from the last ten years, up to today.','err');return;}
   if(dates&&data.window&&(data.window.from!==dates.from||data.window.to!==dates.to))return;
   PERIOD=period;   // commit only now — render below derives the pressed segment from it
   DATES=dates;
@@ -1336,7 +1334,7 @@ async function loadPortfolio(soft){
   if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale
   if(!r.ok){
     if(r.status===401){signedOut();return;}
-    if(soft&&PF){toast('Couldn’t refresh just now.');return;}
+    if(soft&&PF){toast('Couldn’t refresh just now.','err');return;}
     if(r.status===403){await loadDash();return;}   // context said agency, portfolio says no — fall back to the business dashboard
     if(r.status===404){warming();return;}
     trouble();return;
@@ -1349,7 +1347,7 @@ async function loadPortfolio(soft){
   // honest couldn't-load line.
   const roster=(a&&a.ok&&Array.isArray(a.body.data))?a.body.data:null;
   if(roster!==null)ROSTER=roster;
-  else if(soft&&ROSTER)toast('Couldn’t refresh the customer list just now.');
+  else if(soft&&ROSTER)toast('Couldn’t refresh the customer list just now.','err');
   else ROSTER=null;
   renderPortfolio(PF,ROSTER);
 }

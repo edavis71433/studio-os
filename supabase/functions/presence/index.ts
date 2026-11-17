@@ -829,6 +829,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   // Add an EXISTING customer directly — no deal/sign/convert ceremony. Studio-gated
   // like every /sales/* route (relationship feature + the reviewer boundary above).
   if (route === '/sales/customers' && method === 'POST') return handleSalesAddCustomer(req, site, principal, cors);
+  if (route.startsWith('/sales/customers/')) {   // builder item 241: a customer's profile, Invite to their portal, Delete and Restore
+    const r = await (await import('./routes/customers.ts')).handleCustomerRoute(req, route, method, site, principal, cors);
+    if (r) return r;
+  }
   // The studio's own services catalog (name + price) that proposal line items are
   // picked from — studio-gated like every /sales/* route (relationship feature + the
   // reviewer boundary above), site-scoped to the studio issuing proposals.
@@ -939,6 +943,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // Zelle): all of the invoice or part of it, and Undo for one recorded by mistake.
     m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/payment(\/undo)?$/);
     if (m && method === 'POST') return m[2] ? handleInvoicePaymentUndo(req, site, principal, m[1], cors) : handleInvoicePayment(req, site, principal, m[1], cors);
+    // Sales item 127: the proof Studio OS holds for a disputed payment, in one zip (lazy: rarely needed)
+    m = route.match(/^\/sales\/disputes\/([0-9a-f-]{36})\/proof$/);
+    if (m && method === 'GET') return (await import('./routes/dispute_proof.ts')).handleDisputeProof(req, site, principal, m[1], cors);
     // Retainer (recurring SERVICE billing) — set up / cancel a "$X every month/
     // year" on a deal. A separate service-purpose Stripe subscription, distinct
     // from the SaaS subscription (frozen billing boundary). Studio-gated & site-scoped.

@@ -182,18 +182,9 @@ const page = (p) => Deno.readTextFileSync(new URL(`../../${p}`, import.meta.url)
   ok('the response tells the caller which address was stored',
     /external_domain: externalDomain/.test(sales));
 
-  for (const p of ['customers.html', 'contacts.html']) {
-    const h = page(p);
-    ok(`${p}: the dialog asks where their existing website lives`,
-      /id="cu-website"/.test(h) && /Their existing website address/.test(h));
-    ok(`${p}: the field appears exactly when a site exists somewhere we don't host (build-elsewhere, monitor)`,
-      /function cuAsksWebsite\(\)\{const v=\$\('cu-edition'\)\.value;return v==='business_os_only'\|\|v==='presence_monitor';\}/.test(h)
-      && /cu-website-wrap'\);if\(w\)w\.style\.display=cuAsksWebsite\(\)\?'':'none'/.test(h));
-    ok(`${p}: the address is actually submitted to /sales/customers`,
-      /website_url:\(cuAsksWebsite\(\)/.test(h));
-    ok(`${p}: the hint is honest about which numbers this unlocks and which it doesn’t`,
-      /whoever hosts it/.test(h) && /Visitor counts still can’t come from here/.test(h));
-  }
+  // builder item 241: Add a customer saves the customer and nothing else, so it no longer asks where their
+  // website lives. A site that lives somewhere else is kept from their profile ("Their site lives somewhere
+  // else?"), through the same recordExistingWebsite: driven in customers_241_test.mjs and customers-241.spec.ts.
 }
 
 // ═══ 7. the analytics page renders the distinction ═════════════════════════

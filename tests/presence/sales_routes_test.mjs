@@ -953,25 +953,19 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
     ok('signup-closed: the reply reads nothing (no body, no email lookup, no account made)', /function signupClosed\(cors: Record<string, string>\) \{\n  return json\(SIGNUP_CLOSED, 410, cors\);\n\}/.test(commerce) && !/createAuthUser\(|findClientByEmail\(/.test(commerce));
   }
 
-  // ── UI: contacts.html "Add a customer": no sign-up choice; saving is the default (builder item 199) ──
+  // ── UI: the one Add a customer box (customer-add.js, builder item 102; Home, Customers and
+  //    Contacts each kept a copy before): no sign-up choice; saving is the default (builder item 199) ──
   {
-    const contacts = read('contacts.html');
-    ok('ui: no sign-up wording, sign-up link or price page in the dialog', !/cu-signup|sign up themselves|pricing\.html/.test(contacts));
-    ok('ui: saving is the default (mode connect, name and email only); setting up sends mode provision', /value="connect" checked/.test(contacts) && /const body=mode==='connect'\?\{mode:'connect',name:name\|\|undefined,email\}:\{mode:'provision',/.test(contacts));
-    ok('ui: distinct success states — request sent / already set up / invitation sent', /heading='Request sent'/.test(contacts) && /already have a workspace/.test(contacts) && /Invitation sent to/.test(contacts));
+    const box = read('customer-add.js');
+    const dlg = box.slice(box.indexOf("'<dialog id=\"custDlg\""), box.indexOf("'</dialog>'"));   // the box's own markup
+    ok('ui: no sign-up wording, sign-up link or price page in the box', !/cu-signup|sign up themselves|pricing\.html/.test(box));
+    ok('ui: saving sends who they are, as connect with save (builder item 241: the customer and nothing else)', /var body = \{ mode: 'connect', save: true, name: name \|\| undefined, business_name: business_name \|\| undefined, email: email \};/.test(box) && !/mode: 'provision'/.test(box));
+    ok('ui: distinct outcomes — request sent / connected again / already yours / saved', /heading = 'Request sent'/.test(box) && /heading = 'Connected again'/.test(box) && /heading = 'Already your customer'/.test(box) && /heading = 'Saved to your customers'/.test(box));
+    ok('the box: no "set their password" and no set-up or plan anywhere in it', !/set their password|Set up \+ invite|never pay for software/.test(dlg));
+    ok('the box says what saving does', /Saves them to your customers\. No website is made and nobody is emailed\. Their profile has Create website and Invite to their portal for when you’re ready\./.test(dlg));
+    for (const p of ['agency.html', 'customers.html', 'contacts.html']) ok(`${p}: no sign-up wording, sign-up link or price page (builder item 199)`, !/cu-signup|cu-connect-only|sign up themselves|pricing\.html/.test(read(p)));
+    ok('the box: no starter kit (a kit starts a website, from New site)', !/cu-kit/.test(dlg));
   }
-
-  // ── Oct 2026 studio audit, change 4 — the dialog is honest and needs no password,
-  //    on all THREE hand-synced copies (agency.html is the home; the rosters keep theirs)
-  for (const p of ['agency.html', 'customers.html', 'contacts.html']) {
-    const h = read(p);
-    const di = h.indexOf('<dialog id="custDlg"'), dlg = h.slice(di, h.indexOf('</dialog>', di) + 9);
-    ok(`${p}: no "set their password" anywhere in the dialog or its done screen`, !/set their password/.test(h) && /Adding them creates their client workspace and their site, and emails them a sign-in link\./.test(dlg) && /They’ll sign in from the email and land in their client portal\./.test(h));
-    ok(`${p}: the dialog says what adding does (workspace + site + sign-in link, never pay for software)`, /Adding them creates their client workspace and their site, and emails them a sign-in link\. You bill them for your work the usual way — they never pay for software here\./.test(dlg));
-    ok(`${p}: no sign-up wording, sign-up link or price page (builder item 199)`, !/cu-signup|cu-connect-only|sign up themselves|pricing\.html/.test(h));
-    ok(`${p}: "Start from" kit select (default "No kit — start empty")`, /id="cu-kit-wrap"/.test(dlg) && /<select id="cu-kit"><option value="">No kit — start empty<\/option><\/select>/.test(dlg));
-  }
-
 }
 
 // ═══ Covered in the browser by: ═══

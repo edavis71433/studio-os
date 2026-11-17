@@ -4058,6 +4058,9 @@ function pgOpenSettings(startRef) {
     const m = pgModel(), e = pgEntry(m, ref); if (!e || !e.pg) { close(); return; }
     const pg = e.pg, slug = pg.slug || "", custom = !!slug;
     const putBack = pgTyping(box);   // item 245: drawn again when a save lands, it keeps what's being typed
+    // ...and "Who can see it" stays the same part, drawn again: a new one began with the Password
+    // field closed, so a Password just chosen vanished, with what was being typed in it
+    const access = box.querySelector('.pg-group[data-group="access"]');
     box.textContent = "";
     box.appendChild(el("h3", "dc-modal-h", pg.title + " settings"));
     box.appendChild(el("p", "pg-where", seoHost() + pg.path));
@@ -4073,7 +4076,7 @@ function pgOpenSettings(startRef) {
       box.appendChild(pgField("Page name", name));
       box.appendChild(pgField("Page address", addr, "Its link: yoursite.com/" + slug + "/. If you change it, visitors to the old link are sent to the new one."));
       // items 48 and 120: who can see it, and the header and footer
-      box.appendChild(pgAccessGroup(slug, paint));
+      box.appendChild(access && access.__pgFor === slug ? access.__pgDraw() : pgAccessGroup(slug));
       box.appendChild(pgChromeGroup(slug));
     } else {
       box.appendChild(el("p", "dc-modal-sub", pg.key === "home"
@@ -4305,6 +4308,10 @@ function pgAccessGroup(slug) {
     draw(); putBack();
     if (was && !g.contains(document.activeElement)) { const pw = g.querySelector('input[type="password"]'); if (pw) { try { pw.focus({ preventScroll: true }); } catch (_) {} } }   // their field went: the one it now asks for
   });
+  // item 245: the panel drawn again (a new page name landing) draws this same part again, so it
+  // keeps the Password field it has open and why the last try didn't save, and a password saving
+  // meanwhile finishes on the part that's on screen
+  g.__pgFor = slug; g.__pgDraw = () => { draw(); return g; };
   return g;
 }
 function pgChromeGroup(slug) {

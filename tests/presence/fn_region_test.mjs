@@ -91,15 +91,22 @@ const LEFT = [
       (signedIn(lit) ? missing : left).push(`${f}: ${lit}`);
     }
   }
-  ok('the scan finds the studio\'s calls (the shell, the pages, the sign-in doors)', checked >= 50, String(checked));
+  // builder item 101: the signed-in pages call through the shell's one API helper (shell-kit.js ddsApi), so the
+  // scan finds its one header literal there, plus the editor, the client portal and the sign-in doors
+  ok('the scan finds the studio\'s calls (the shell\'s API helper, the editor, the portal, the sign-in doors)', checked >= 15, String(checked));
   ok('every signed-in call asks for Oregon (x-region)', missing.length === 0, missing.map((m) => m.slice(0, 160)).join('\n      '));
   const want = LEFT.map(([f, lit]) => `${f}: ${lit}`);
   ok('the only call with no sign-in that doesn\'t ask is the fixed answer (the push key)',
     left.length === want.length && want.every((w) => left.includes(w)), left.filter((l) => !want.includes(l)).map((l) => l.slice(0, 160)).join('\n      '));
-  for (const f of ['shell.js', 'today.html', 'sites.html', 'pipeline.html', 'crm.html', 'presence.html', 'client.html', 'studio.html', 'portal.html', 'set-password.html']) {
+  for (const f of ['shell-kit.js', 'presence.html', 'client.html', 'studio.html', 'portal.html', 'set-password.html']) {
     const signed = keyedLiterals(src[f]).filter(signedIn);
     ok(`${f} asks on each of its signed-in calls`, signed.length > 0 && signed.every(asks));
   }
+  // …and a page on the shell's helpers sends no signed-in call of its own: they all go through ddsApi, which asks
+  // (tests/e2e/fn-region.spec.ts watches a page send it on every read). The editor keeps its own until its split.
+  const kitPages = files.filter((f) => f.endsWith('.html') && src[f].includes('src="/shell-kit.js"') && f !== 'presence.html');
+  const ownCalls = kitPages.filter((f) => keyedLiterals(src[f]).some(signedIn));
+  ok('the pages on the shell\'s helpers make no signed-in call of their own', kitPages.length >= 25 && ownCalls.length === 0, ownCalls.join(', '));
   ok('with no sign-in: an approval, a signature and the sign-in page\'s studio name ask',
     keyedLiterals(src['approve.html']).every(asks) && keyedLiterals(src['sign.html']).every(asks)
     && src['portal.html'].includes("fetch(FN + '/presence/public/studio/' + id + '/brand', { headers: { apikey: SUPABASE_KEY, 'x-region': FN_REGION } })"));
@@ -110,7 +117,7 @@ const LEFT = [
 // ── 2. one value, and production only where a page can point at staging ──────
 {
   const defs = files.flatMap((f) => [...src[f].matchAll(/\bFN_REGION\s*[=:]\s*(['"])([^'"]*)\1/g)].map((m) => `${f}=${m[2]}`));
-  ok('every page names the same region: us-west-2, the database\'s', defs.length >= 35 && defs.every((d) => d.endsWith('=us-west-2')), defs.filter((d) => !d.endsWith('=us-west-2')).join(', '));
+  ok('every page names the same region: us-west-2, the database\'s (the shell\'s API helper among them)', defs.length >= 5 && defs.includes('shell-kit.js=us-west-2') && defs.every((d) => d.endsWith('=us-west-2')), defs.filter((d) => !d.endsWith('=us-west-2')).join(', '));
   const values = files.flatMap((f) => [...src[f].matchAll(/(['"])x-region\1\s*:\s*([^,}\s]+)/g)].map((m) => `${f}: ${m[2]}`));
   ok('every header takes its value from that one constant', values.length > 0 && values.every((v) => /: (FN_REGION|CONFIG\.FN_REGION|"us-west-2")$/.test(v)), values.filter((v) => !/: (FN_REGION|CONFIG\.FN_REGION|"us-west-2")$/.test(v)).join(', '));
   ok('the pages that can point at staging are known', ['presence.html', 'booking.html', 'draft.html', 'join.html', 'review.html', 'spam.html', 'unsubscribe.html'].every((f) => ENV_SWITCH.includes(f)), ENV_SWITCH.join(', '));

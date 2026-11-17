@@ -418,7 +418,7 @@
     <div class="row2"><button type="button" id="ne-cancel">Not now</button><button type="submit" class="primary" id="ne-go">Log enquiry</button></div>
   </form>
 </dialog>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── The studio Inbox — a split-view console (Salesforce Split View anatomy,  ──
 // dds skin; redesign slice 2). LEFT: one list pane of every conversation that
@@ -437,9 +437,8 @@
 // Open · New · All chips, the kind filter, Newest/Oldest and "New enquiry".
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // item 71: an emailed reply shows its words; the quoted earlier email folds behind "Show earlier email" (shell.js ddsQuote)
@@ -454,15 +453,15 @@ function replyReach(it){
 let TOKEN="";
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
 // a dropped connection answers like a refusal (status 0) instead of throwing, so a
-// greyed Send, Save or status control gets its button back and says why (bug hunt C6)
-const NET_MSG='That didn’t go through — check your connection and try again.';
-async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':(new URLSearchParams(location.search).get('client')||''),'x-region':FN_REGION},body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,body:{message:NET_MSG}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function when(iso){if(!iso)return'';const d=Math.floor((Date.now()-Date.parse(iso))/86400000);if(d<=0)return'today';if(d===1)return'yesterday';if(d<7)return d+' days ago';if(d<60){const w=Math.floor(d/7);return w+(w===1?' week':' weeks')+' ago';}const mo=Math.floor(d/30);return mo+(mo===1?' month':' months')+' ago';}
+// greyed Send, Save or status control gets its button back and says why (bug hunt C6):
+// the shell's one API helper does that for every page now
+const api=(path,method,body)=>ddsApi(path,{method,body,scope:new URLSearchParams(location.search).get('client')||''});
+const when=(iso)=>ddsDate.ago(iso);   // calendar days (the shell's): it counted 24-hour blocks, so last night's enquiry read "today"
 // ── one icon set (Oct 2026 experience review): the shell's 2px-stroke SVGs, never an emoji as a control's icon ──
 const SI={cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',eye:'<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',sparkles:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',inbox:'<path d="M3 13l2-8h14l2 8v6H3z"/><path d="M3 13h5l1.5 3h5L16 13h5"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',phone:'<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>',check:'<path d="M5 12l5 5 9-10"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',flag:'<path d="M5 21V4"/><path d="M5 4h12l-2 4 2 4H5"/>'};
 const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
 const KIND={quote:'Quote request',booking:'Booking request',contact:'Message'};
-const toast=(m,k)=>{if(window.ddsToast)window.ddsToast(m,k);};
+const toast=(m,kind,action)=>ddsToast(m,kind,action);   // the shell's one toast: 'err' shows a failure as one
 // item 54: the badge reads `who` (the name alone) — "Marco · 4 messages" gave "E·"
 // a word's first letter, digit or emoji: "Eric (test)" reads ET, never E( — an emoji or "ß" stays whole (batch C)
 const initialsOf=(name)=>esc((name||'?').trim().split(/\s+/).map(w=>Array.from(w).find(ch=>/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(ch))||'').filter(Boolean).slice(0,2).map(ch=>{const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?');
@@ -1110,7 +1109,7 @@ document.addEventListener('click',async(e)=>{
   const it=ITEMS.find(x=>x.id===SEL);if(!it||!it.lead_id)return;
   const w=window.open('about:blank','_blank');if(w)w.opener=null;
   const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id)+'/files/'+encodeURIComponent(b.getAttribute('data-lfile')));
-  if(!r.ok||!r.body.data||!r.body.data.url){if(w)w.close();toast((r.body&&r.body.message)||'That file couldn’t be opened just now.');return;}
+  if(!r.ok||!r.body.data||!r.body.data.url){if(w)w.close();toast((r.body&&r.body.message)||'That file couldn’t be opened just now.','err');return;}
   if(w)w.location.href=r.body.data.url;else location.href=r.body.data.url;
 });
 function paneSpam(host,it){
@@ -1127,7 +1126,7 @@ function paneSpam(host,it){
   b.addEventListener('click',async()=>{
     b.disabled=true;
     const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{spam:false});
-    if(!r.ok){toast('That didn’t update.');b.disabled=false;return;}
+    if(!r.ok){toast('That didn’t update.','err');b.disabled=false;return;}
     toast('Back in your enquiries, and that address is no longer marked as spam.');
     SPAM=(SPAM||[]).filter(x=>x.lead_id!==it.lead_id);
     ITEMS=ITEMS.filter(x=>x.id!==it.id);SEL='';
@@ -1252,7 +1251,7 @@ async function paneMessage(host,it){
       const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
       const rr=await api(reply,'POST',d.reply_to?{body,audience:'client'}:{body});
       if(rr.ok){ta.value='';toast('Sent.');repliedTo(it,'You replied — waiting on them');paneMessage(host,it);}
-      else{toast((rr.body&&rr.body.message)||'Couldn’t send.');btn.disabled=false;}
+      else{toast((rr.body&&rr.body.message)||'Couldn’t send.','err');btn.disabled=false;}
     };
     insertSavedReplies('msgBody');   // C3: the saved-reply picker, when any exist
   }else{
@@ -1372,7 +1371,7 @@ async function setSupportField(it,field,value,ctl){
   ctl.disabled=true;
   const r=await api('/support/'+encodeURIComponent(it.support_id),'PATCH',{[field]:value||null});
   ctl.disabled=false;
-  if(!r.ok){ctl.value=prev||'';toast((r.body&&r.body.message)||'That didn’t save — try again in a moment.');return;}
+  if(!r.ok){ctl.value=prev||'';toast((r.body&&r.body.message)||'That didn’t save — try again in a moment.','err');return;}
   if(field==='priority'){it.priority=value;toast('Priority: '+(PRIO_LABEL[value]||value)+'.');}
   else{it.assigned_to=value||'';toast(value?(whoHas(value)==='You'?'It’s yours now.':whoHas(value)+' owns it now.'):'Nobody has it now.');}
   renderList();
@@ -1393,7 +1392,7 @@ async function setSupportStatus(host,it,to,ctl){
     if(to==='resolved'||to==='closed'){ITEMS=ITEMS.filter(x=>x.id!==it.id);SEL='';renderList();renderPane();renderConsole();bumpBell();return true;}
     renderList();paneSupport(host,it);return true;
   }
-  toast((pr.body&&pr.body.message)||'That didn’t update — refresh and try again.');
+  toast((pr.body&&pr.body.message)||'That didn’t update — refresh and try again.','err');
   paneSupport(host,it);return false;
 }
 // the shell's bell re-reads /portal/context on its own cadence; nudge it now so
@@ -1414,7 +1413,7 @@ async function paneSupport(host,it){
     st.disabled=true;
     const r=await api('/projects/'+encodeURIComponent(it.project_id)+'/tasks','POST',{title:String(it.preview||'Support request').slice(0,200),client_visible:false});
     if(r.ok){toast('Added to their project’s tasks.');st.textContent='Task added ✓';}
-    else{toast((r.body&&r.body.message)||'Couldn’t add that task.');st.disabled=false;}
+    else{toast((r.body&&r.body.message)||'Couldn’t add that task.','err');st.disabled=false;}
   });
   let r;
   try{r=await api('/support/'+encodeURIComponent(it.support_id));}
@@ -1466,7 +1465,7 @@ async function paneSupport(host,it){
     const ta=$('supBody');const body=(ta.value||'').trim();if(!body){ta.focus();return;}
     const btns=[...$('supForm').querySelectorAll('button')];btns.forEach(b=>b.disabled=true);
     const rr=await api('/support/'+encodeURIComponent(it.support_id)+'/messages','POST',{body});
-    if(!rr.ok){toast((rr.body&&rr.body.message)||'Couldn’t send.');btns.forEach(b=>b.disabled=false);return;}
+    if(!rr.ok){toast((rr.body&&rr.body.message)||'Couldn’t send.','err');btns.forEach(b=>b.disabled=false);return;}
     ta.value='';
     if(andResolve){await setSupportStatus(host,it,'resolved');return;}   // its own toast says resolved
     toast('Sent.');repliedTo(it);paneSupport(host,it);
@@ -1496,7 +1495,7 @@ function paneApproval(host,it){
   // pane — list scroll and console state survive — then re-run the loaders so
   // the feed-derived counts catch up. Never location.reload(), which nuked the
   // whole console (view, collapse, scroll, drafts).
-  const decideInbox=async(path,decision,btn)=>{btn.disabled=true;try{const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved.':'Set aside — nothing changed.');ITEMS=ITEMS.filter(x=>x.id!==it.id);TOTAL=inboxCount();SEL='';renderList();renderPane();refresh();return;}}catch(_){ }toast('That didn’t go through — try again.');btn.disabled=false;};
+  const decideInbox=async(path,decision,btn)=>{btn.disabled=true;try{const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved.':'Set aside — nothing changed.');ITEMS=ITEMS.filter(x=>x.id!==it.id);TOTAL=inboxCount();SEL='';renderList();renderPane();refresh();return;}}catch(_){ }toast('That didn’t go through — try again.','err');btn.disabled=false;};
   host.querySelectorAll('[data-fapprove]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fapprove'),'approve',b)));
   host.querySelectorAll('[data-fdecline]').forEach(b=>b.addEventListener('click',()=>decideInbox(b.getAttribute('data-fdecline'),'abandon',b)));
 }
@@ -1579,13 +1578,13 @@ function paneLead(host,it){
     const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{note:body});
     ns.disabled=false;
     if(r.ok){l.note=body?{body,at:new Date().toISOString()}:null;const at=$('leadNoteAt');if(at)at.textContent=body?'Saved just now':'';toast(body?'Note saved.':'Note cleared.');}
-    else toast('Couldn’t save the note just now — try again in a moment.');
+    else toast('Couldn’t save the note just now — try again in a moment.','err');
   });
   // item 87: Stop follow-ups (the enquiry and its status stay as they are)
   const fs=$('leadFuStop');if(fs)fs.addEventListener('click',async()=>{
     fs.disabled=true;
     const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{followups:'off'});
-    if(!r.ok){fs.disabled=false;toast('Couldn’t stop them just now — try again in a moment.');return;}
+    if(!r.ok){fs.disabled=false;toast('Couldn’t stop them just now — try again in a moment.','err');return;}
     l.followups={...(l.followups||{}),off:true,next:null};toast('Stopped. No more automatic follow-ups to them.');paneLead(host,it);
   });
   // the quiet fallback still takes the enquiry off "new" (as the old Reply link did)
@@ -1595,7 +1594,7 @@ function paneLead(host,it){
     // one send for both buttons; true when it went
     const sendLeadReply=async(btn,label)=>{
       const ta=$('leadBody');const body=(ta.value||'').trim();
-      if(!body||body===leadGreeting(l).trim()){toast('Write your reply first.');ta.focus();return false;}
+      if(!body||body===leadGreeting(l).trim()){toast('Write your reply first.','err');ta.focus();return false;}
       // C12: both send buttons grey while either is sending — one reply, one email
       const both=[$('leadSend'),$('leadSendDeal')].filter(Boolean);
       both.forEach((b)=>{b.disabled=true;});btn.textContent='Sending…';
@@ -1608,7 +1607,7 @@ function paneLead(host,it){
         clearLeadNudge(it.lead_id);   // …and its "waiting for a reply" nudge leaves now, not on the next load
         return true;
       }
-      toast((r.body&&r.body.message)||'Couldn’t send that — nothing went out. Try again, or use your email app.');
+      toast((r.body&&r.body.message)||'Couldn’t send that — nothing went out. Try again, or use your email app.','err');
       both.forEach((b)=>{b.disabled=false;});btn.textContent=label;
       return false;
     };
@@ -1666,7 +1665,7 @@ function clearLeadNudge(leadId){
 async function setLeadStatus(it,status,btn){
   if(btn)btn.disabled=true;
   const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{status});
-  if(!r.ok){toast('That didn’t update.');if(btn)btn.disabled=false;return;}
+  if(!r.ok){toast('That didn’t update.','err');if(btn)btn.disabled=false;return;}
   toast(status==='not_a_fit'?'Marked not a fit — it’s off your list.':status==='replied'?'Marked replied.':'Marked read.');
   leadMarked(it,status);
 }
@@ -1682,7 +1681,7 @@ function askDeleteLead(it,btn){
   go.addEventListener('click',async()=>{
     go.disabled=true;keep.disabled=true;go.textContent='Deleting…';
     const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'DELETE');
-    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through. Try again in a moment.');go.disabled=false;keep.disabled=false;go.textContent='Delete for good';return;}
+    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through. Try again in a moment.','err');go.disabled=false;keep.disabled=false;go.textContent='Delete for good';return;}
     toast(files?'Deleted, with the files that came with it.':'Deleted.');
     leadMarked(it,'deleted');
   });
@@ -1691,7 +1690,7 @@ function askDeleteLead(it,btn){
 async function markSpam(it,btn){
   btn.disabled=true;
   const r=await api('/forms/inbox/'+encodeURIComponent(it.lead_id),'POST',{spam:true});
-  if(!r.ok){toast('That didn’t update.');btn.disabled=false;return;}
+  if(!r.ok){toast('That didn’t update.','err');btn.disabled=false;return;}
   toast('Moved to Spam. More from this address goes there too.');
   SPAM=null;   // item 140: the Spam chip reads it again
   leadMarked(it,'spam');
@@ -1712,7 +1711,7 @@ function openConvert(it){
     const email=$('conv-email').value.trim(); const biz=$('conv-biz').value.trim()||l.name||'';
     try{
       const r=await api('/sales/customers','POST',{email,name:l.name||'',business_name:biz,source_submission_id:id});
-      if(!r.ok){go.disabled=false;go.textContent='Make customer';toast((r.body&&r.body.message)||'Couldn’t set them up just now.');return;}
+      if(!r.ok){go.disabled=false;go.textContent='Make customer';toast((r.body&&r.body.message)||'Couldn’t set them up just now.','err');return;}
       const d=r.body&&r.body.data||{};
       if(d.requested){   // final pass S1: their account isn't yours yet — they're asked, nothing else happens
         go.disabled=false; go.textContent='Make customer'; dlg.close();
@@ -1733,7 +1732,7 @@ function openConvert(it){
       leadMarked(it,'converted');
       const href=d.site_id?('/crm.html?client='+encodeURIComponent(d.site_id)):(d.client_id?('/crm.html?client_id='+encodeURIComponent(d.client_id)):'/customers.html');
       setTimeout(()=>{location.href=href;},800);
-    }catch(_){go.disabled=false;go.textContent='Make customer';toast('Couldn’t set them up just now.');}
+    }catch(_){go.disabled=false;go.textContent='Make customer';toast('Couldn’t set them up just now.','err');}
   };
 }
 // "New enquiry" — a phone or walk-in enquiry becomes a contact (+ a manual deal)
@@ -1747,11 +1746,11 @@ function openNew(){
     e.preventDefault();
     const name=$('ne-name').value.trim(),email=$('ne-email').value.trim(),phone=$('ne-phone').value.trim(),msg=$('ne-msg').value.trim();
     const found_via=$('ne-found').value;   // item 69: "How did they find you?" (saved on the person and the deal)
-    if(!name&&!email&&!phone){toast('A name, email, or phone is enough to start.');return;}
+    if(!name&&!email&&!phone){toast('A name, email, or phone is enough to start.','err');return;}
     const go=$('ne-go'); go.disabled=true; go.textContent='Logging…';
     try{
       const c=await api('/sales/contacts','POST',{name,email,phone,notes:msg?('Enquiry: '+msg):'',found_via});
-      if(!c.ok){go.disabled=false;go.textContent='Log enquiry';toast((c.body&&c.body.message)||'Couldn’t log that just now.');return;}
+      if(!c.ok){go.disabled=false;go.textContent='Log enquiry';toast((c.body&&c.body.message)||'Couldn’t log that just now.','err');return;}
       const contactId=c.body&&c.body.data&&c.body.data.id;
       let dealId=null;
       if($('ne-deal').checked){
@@ -1762,7 +1761,7 @@ function openNew(){
       toast(dealId?'Logged — they’re in your pipeline.':'Logged — they’re in Customers.');
       const href=dealId?('/crm.html?deal='+encodeURIComponent(dealId)+'&tab=deal'):(contactId?('/crm.html?contact='+encodeURIComponent(contactId)):'/contacts.html');
       setTimeout(()=>{location.href=scoped(href);},800);
-    }catch(_){go.disabled=false;go.textContent='Log enquiry';toast('Couldn’t log that just now.');}
+    }catch(_){go.disabled=false;go.textContent='Log enquiry';toast('Couldn’t log that just now.','err');}
   };
 }
 // Prefill the reply so responding is one tap
@@ -1783,7 +1782,7 @@ async function createDeal(it,btn){
     const fv=foundOf(l),found=fv?{found_via:fv}:{};   // item 89: "How did they find you?", from their visit or picked
     if(l.email){const c=await api('/sales/contacts','POST',{name:l.name||'',email:l.email,phone:l.phone||'',...found});if(c.ok)contactId=c.body&&c.body.data&&c.body.data.id;}
     const d=await api('/sales/deals','POST',{title,contact_id:contactId,source:'website_form',source_submission_id:id,...found});
-    if(!d.ok){toast(d.status===403?'The pipeline is part of your plan’s business tools — an upgrade adds it.':((d.body&&d.body.message)||'Couldn’t start that deal.'));btn.disabled=false;return;}
+    if(!d.ok){toast(d.status===403?'The pipeline is part of your plan’s business tools — an upgrade adds it.':((d.body&&d.body.message)||'Couldn’t start that deal.'),'err');btn.disabled=false;return;}
     const dealId=d.body&&d.body.data&&d.body.data.id;
     // reflect converted state locally + suppress navigation on already_converted
     // (idempotent: the server returns the existing deal on a repeat)
@@ -1791,7 +1790,7 @@ async function createDeal(it,btn){
     toast(d.body&&d.body.already_converted?'This enquiry is already in your pipeline.':'Added to your pipeline.');
     leadMarked(it,String(l.status||'new')==='new'?'read':String(l.status));
     if(dealId&&!(d.body&&d.body.already_converted))setTimeout(()=>{location.href=scoped('/crm.html?deal='+dealId+'&tab=deal');},800);
-  }catch(_){toast('Couldn’t start that deal.');btn.disabled=false;}
+  }catch(_){toast('Couldn’t start that deal.','err');btn.disabled=false;}
 }
 
 // ── data load / refresh ───────────────────────────────────────────────────────
@@ -1824,7 +1823,7 @@ async function refresh(){
   let ok=false;
   try{ok=await loadData();}catch(_){ok=false;}   // a network-level reject must still fire the toast
   if(ok==='stale')return;   // a newer refresh owns the page
-  if(!ok){toast('Couldn’t refresh just now.');return;}
+  if(!ok){toast('Couldn’t refresh just now.','err');return;}
   DRAFT=snapComposer();   // an in-progress reply survives the pane rebuild (restored by the pane loaders)
   if(SEL&&!ITEMS.some(x=>x.id===SEL))SEL='';
   renderLenses();   // a resolved thread can retire a lens option — repaint them off the fresh feed
