@@ -2393,9 +2393,9 @@ textarea.stk-in{line-height:1.55;resize:vertical}
 .dc-blkbar .stk-del{color:var(--clay)}
 @media(max-width:760px){html.dc-edit.dc-blkpick:not(.plan-watch) #dcDock{visibility:hidden}}
 /* builder item 98: on a touch screen every control on Edit mode's bar is a full 44px tap.
-   The bar keeps its size: its padding gives the room (54 - 10, and 50 - 6 on a phone). */
+   The bar keeps its height: its padding gives the room (54 - 10, and 50 - 6 on a phone). */
 @media (pointer:coarse){
-  html.dc-edit:not(.plan-watch) .dc-bar{padding-top:5px;padding-bottom:5px}
+  html.dc-edit:not(.plan-watch) .dc-bar{padding:5px;gap:4px}   /* tighter gaps pay for the wider device switch: the bar still fits beside the dock */
   html.dc-edit .dc-bar .dc-actbtn,html.dc-edit .dc-bar .pillbtn,html.dc-edit:not(.plan-watch) .dc-bar .dc-switch{height:44px}
   html.dc-edit .dc-bar .dc-actbtn.dc-icon,html.dc-edit #btnEditExit{min-width:44px}
   html.dc-edit:not(.plan-watch) .dc-bar .dpdevseg{padding:0}
