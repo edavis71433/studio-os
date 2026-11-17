@@ -196,6 +196,8 @@ html.dds-embed #detailWrap{padding-top:0}
   .pb-cta{margin-top:12px;text-align:center;border-radius:999px;padding:10px;font-weight:600;font-size:13.5px;background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff)}
   .pb-foot{font-size:12px;margin:8px 2px 0}
   @media (pointer:coarse){.pb-chip{min-height:44px}}
+  /* builder item 98: "see who →" in the Outstanding tile is a 44px tap on a touch screen; the tile stays its size */
+  @media (pointer:coarse){#arOpen{position:relative;z-index:1;padding:16px 0}}
 </style>
 <style>
   /* Page skin = the shell's --dds-* tokens (shell.css is the canonical palette;

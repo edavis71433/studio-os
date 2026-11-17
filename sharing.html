@@ -73,6 +73,10 @@
   .muted{color:var(--soft);font-size:14px}a.link{color:var(--p);text-decoration:none;font-weight:500}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:var(--dds-s8,40px) auto}
   @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation:none}.sw,.sw::after{transition:none}}
+  /* builder item 98: a switch is a 44px tap on a touch screen; the track keeps its size (the rest is clear border) */
+  @media (pointer:coarse){
+    .sw{border:11px solid transparent;border-left-width:2px;border-right-width:2px;background-clip:padding-box;box-sizing:content-box}
+  }
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>

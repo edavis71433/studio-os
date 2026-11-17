@@ -256,6 +256,8 @@
         + '.dds-fclear{font:inherit;font-size:13px;font-weight:600;border:0;background:none;color:var(--p,#5b3fa0);padding:5px 8px;cursor:pointer;min-height:32px}'
         // …and on a phone every control here is at least 44px, the pick cell included
         + '@media (max-width:767px){td.pick,th.pick{width:44px;min-width:44px}td.pick input,th.pick input{width:22px;height:22px}.dds-bulk button,.dds-bulk select,.dds-confirm button{min-height:44px}.dds-colmenu label{min-height:44px}.dds-askin select,.dds-askin input,.dds-fchip,.dds-fclear{min-height:44px}.dds-askin input[type=text]{min-width:0;flex:1 1 160px}}'
+        // builder item 98: a touch tablet too (wider than a phone, the same finger)
+        + '@media (pointer:coarse){.dds-bulk button,.dds-bulk select,.dds-confirm button,.dds-colmenu label,.dds-askin select,.dds-askin input,.dds-fchip,.dds-fclear{min-height:44px}}'
         // Safari draws a native drop-down at its own height whatever min-height says — the bulk bar's is drawn here, arrow included
         + '.dds-bulk select{-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 fill=%27none%27 stroke=%27%236b6478%27 stroke-width=%271.6%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:10px 6px}'
         + '.dds-sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}'
@@ -267,6 +269,8 @@
         + '.dds-tags .chip,.dds-tag{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;line-height:1.3;color:var(--p,#5b3fa0);background:var(--p-soft,#efe9fa);border-radius:999px;padding:3px 10px;white-space:nowrap}'
         + '.dds-tags .chip button{font:inherit;font-size:11px;line-height:1;color:inherit;background:none;border:0;padding:2px;margin-right:-4px;cursor:pointer;min-width:20px;min-height:20px}'
         + 'button.dds-tag{border:0;cursor:pointer;font-family:inherit}button.dds-tag:hover{text-decoration:underline}'
+        // builder item 98: on a touch screen a tag is a 44px tap; the pill keeps its size (the extra is clear border)
+        + '@media (pointer:coarse){button.dds-tag{border:11px solid transparent;border-left-width:0;border-right-width:0;background-clip:padding-box;min-width:44px;justify-content:center}}'
         + '@media (pointer:coarse){.dds-tags .chip button{min-width:32px;min-height:32px}}'
         // item 86: the import's matching step
         + '.dds-csvfile{margin:10px 0 8px;font-size:13px;color:var(--soft,#5c5468)}'
@@ -3314,7 +3318,39 @@
       if (!el.getAttribute('role')) el.setAttribute('role', 'button');
       if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
     }
+    scrollCues();
   }
+  // ── Builder item 98: a row that scrolls sideways shows it ──────────────────────
+  // A list's table on a phone, Pipeline's stage chips, a page's filter chips: the row
+  // fades out at the edge that has more (shell.css .dds-cue-r / .dds-cue-l), and a row
+  // of chips gets a round arrow at its end that moves it along. Only a "half-cut
+  // button" said there was more, and only to someone who already guessed.
+  var CUE_ROWS = '.tscroll, .rscroll, .board-scroll, .stabs, .bchips, #filters, .chips:not(.dds-tags .chips), .qtabs, .pcols, .dds-ph-tabs, .dds-fchips, [data-scrollcue]';
+  var CUE_CHIPS = '.stabs, .bchips, #filters, .chips:not(.dds-tags .chips), .qtabs, .dds-ph-tabs, .dds-fchips, [data-scrollcue="chips"]';
+  function cueOne(el) {
+    var max = el.scrollWidth - el.clientWidth, more = max > 2 && getComputedStyle(el).overflowX !== 'visible';
+    el.classList.toggle('dds-cue-r', more && el.scrollLeft < max - 2);
+    el.classList.toggle('dds-cue-l', more && el.scrollLeft > 2);
+  }
+  function scrollCues() {
+    var rows = document.querySelectorAll(CUE_ROWS);
+    for (var i = 0; i < rows.length; i++) {
+      var el = rows[i];
+      if (!el.__ddsCue) {
+        el.__ddsCue = true;
+        el.addEventListener('scroll', (function (row) { return function () { cueOne(row); }; })(el), { passive: true });
+      }
+      // the arrow: a span, not a button, so a page that wires every button in its chip row never takes it for a chip;
+      // it is a pointer's way along (a keyboard moves through the chips themselves), so it stays out of the reading order
+      if (el.matches(CUE_CHIPS) && !el.querySelector(':scope > .dds-cue-more')) {
+        var a = document.createElement('span'); a.className = 'dds-cue-more'; a.setAttribute('aria-hidden', 'true');
+        a.addEventListener('click', (function (row) { return function (e) { e.preventDefault(); e.stopPropagation(); row.scrollBy({ left: Math.max(120, row.clientWidth * 0.7), behavior: 'smooth' }); }; })(el));
+        el.appendChild(a);
+      }
+      cueOne(el);
+    }
+  }
+  window.addEventListener('resize', function () { try { scrollCues(); } catch (_) { /* a cue must never break the page */ } });
   var pending = false;
   function schedule() { if (pending) return; pending = true; (window.requestAnimationFrame || setTimeout)(function () { pending = false; enhance(); }); }
   // Enter/Space activates a click-handler element (delegated → covers re-renders).

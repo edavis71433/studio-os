@@ -198,6 +198,13 @@
     .cust .facts,.cust .nofacts{grid-column:4}
     .cust .cacts{grid-column:3/5;justify-content:flex-start;margin-top:4px}
   }
+  /* builder item 98: on a phone the facts go under the name. Beside it, one row with two facts
+     ("Owes $800", "1 request waiting") widened the shared facts column and every name shrank to a letter */
+  @media (max-width:600px){
+    .clist{grid-template-columns:0 40px minmax(0,1fr) 0}
+    .cust .facts,.cust .nofacts{grid-column:3;justify-content:flex-start;flex-wrap:wrap}
+    .cust .cacts{grid-column:3}
+  }
   /* beside the preview the list keeps what tells rows apart: the preview has
      the record and the website, so the row actions and the email go */
   @media (min-width:1180px){

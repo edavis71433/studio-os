@@ -331,6 +331,8 @@
   /* a phone: the panel sits across the screen, above the bottom bar */
   @media (max-width:560px){.dpanel{position:fixed;left:16px;right:16px;top:auto;bottom:88px;width:auto}}
   @media print{.dates,.qx,.qpop{display:none!important}}
+  /* builder item 98: a card's link is a 44px tap on a touch screen */
+  @media (pointer:coarse){.card-h a.lk,.stat .k a{display:inline-flex;align-items:center;min-height:44px}.stat .k a{margin-left:12px}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>

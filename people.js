@@ -99,6 +99,8 @@
       '.pp-what{background:var(--dds-bg,#f4f3f9);border-radius:12px;padding:12px 14px;font-size:12.5px;color:var(--dds-soft,#55526a)}.pp-what b{color:var(--dds-ink,#171522)}.pp-what ul{margin:6px 0 0;padding-left:18px}',
       '.pp-load{padding:30px 0;text-align:center;color:var(--dds-faint,#69667d)}',
       '@media (max-width:640px){.pp{padding:18px 16px 22px}.pp-btn,.pp-sel{min-height:44px}.pp-row{flex-wrap:wrap}.pp-row .pp-who{flex-basis:calc(100% - 44px)}}',
+      // builder item 98: on a touch screen each is a 44px tap (last, so it wins over the sizes above)
+      '@media (pointer:coarse){.pp-link,.pp-btn,.pp-sel{min-height:44px}}'
     ].join('');
     document.head.appendChild(st);
   }
