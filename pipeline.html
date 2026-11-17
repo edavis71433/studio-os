@@ -211,10 +211,9 @@ html.dds-embed #detailWrap{padding-top:0}
     --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
-  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) —
-     the Path's current chevron sits on the same var(--p) fill (same fix in crm.html) */
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn:not(.ghost),:root:not([data-theme="light"]) .path button.pstep.current{color:#171320}}
-  :root[data-theme="dark"] .btn:not(.ghost),:root[data-theme="dark"] .path button.pstep.current{color:#171320}
+  /* dark mode: the light accent fill needs dark ink (#fff on #b79ceb fails contrast) */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn:not(.ghost){color:#171320}}
+  :root[data-theme="dark"] .btn:not(.ghost){color:#171320}
   *{box-sizing:border-box;margin:0}
   body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-text-size-adjust:100%}
   .wrap{max-width:var(--dds-w-app,1280px);margin:0 auto;padding:var(--dds-s7,32px) var(--dds-s5,20px) 80px}
@@ -329,51 +328,7 @@ html.dds-embed #detailWrap{padding-top:0}
   .tl-mt{font-size:12px;color:var(--faint);margin-top:2px;font-variant-numeric:tabular-nums}
   a{color:var(--p)}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
-  /* ── Path (Lightning chevrons, dds skin) — kept in sync with crm.html by hand
-        (its .pathcard/.pstep/.path-guide/.path-confirm/.terminal-chip block):
-        same shapes, same done/current/todo + won/lost terminal states, same
-        interactivity rules (only the current step + the one legal back-target). ── */
-  .pathrow{display:flex;gap:var(--dds-s3,12px);align-items:center;flex-wrap:wrap}
-  .path{display:flex;flex:1 1 340px;min-width:0}
-  .path button.pstep{flex:1;min-width:0;border:none;font-family:inherit;font-size:12.5px;font-weight:500;padding:var(--dds-s2,8px) var(--dds-s4,16px);cursor:default;
-    background:var(--card);color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:0;
-    clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%,11px 50%)}
-  .path button.pstep:first-child{clip-path:polygon(0 0,calc(100% - 11px) 0,100% 50%,calc(100% - 11px) 100%,0 100%);border-radius:var(--dds-r,8px) 0 0 var(--dds-r,8px)}
-  .path button.pstep:last-child{clip-path:polygon(0 0,100% 0,100% 100%,0 100%,11px 50%);border-radius:0 var(--dds-r,8px) var(--dds-r,8px) 0}
-  .path button.pstep.done{background:var(--good-soft);color:var(--good)}
-  .path button.pstep.canback{cursor:pointer}
-  .path button.pstep.canback:hover{filter:brightness(.96)}
-  .path button.pstep.current{background:var(--p);color:#fff;cursor:pointer}
-  .path button.pstep.current:hover{filter:brightness(1.06)}
-  .path button.pstep.lost-terminal{background:var(--warn-soft);color:var(--warn)}
-  .path-side{display:flex;align-items:center;gap:10px;flex:0 0 auto}
-  .path-guide{margin-top:10px;font-size:13.5px;color:var(--soft)}
-  .path-guide b{color:var(--ink);font-weight:600}
-  /* sales item 124: what to do now, under the stage bar (the same block as crm.html's) */
-  .stage-note{display:flex;gap:18px;align-items:flex-start;margin-top:12px;padding:18px 22px 18px 24px;border-radius:16px;background:var(--p-soft);border-left:5px solid var(--p);box-shadow:0 6px 18px -6px rgba(27,21,37,.08)}
-  .stage-note .sn-ic{flex:0 0 auto;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,#7a5bd6,var(--p))}
-  .stage-note .sn-body{flex:1;min-width:0}
-  .stage-note .sn-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .stage-note h3{font-family:var(--serif);font-weight:600;font-size:19px;line-height:1.25;margin:0;color:var(--ink)}
-  .stage-note .sn-chip{font-size:12px;font-weight:600;color:var(--p);background:var(--card);border-radius:999px;padding:3px 10px}
-  .stage-note .sn-fact{margin:10px 0 0;padding:9px 12px;border-radius:10px;background:var(--good-soft);color:var(--good);font-size:14px}
-  .stage-note .sn-fact b{font-weight:600}
-  .stage-note .sn-steps{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
-  .stage-note .sn-steps li{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;line-height:1.45;color:var(--ink)}
-  .stage-note .sn-ck{flex:0 0 auto;margin-top:1px;color:var(--p)}
-  .stage-note .sn-foot{margin:10px 0 0;font-size:12.5px;color:var(--faint)}
-  .stage-note .sn-edit{flex:0 0 auto;font:inherit;font-size:13px;font-weight:600;border:1px solid var(--dds-line-strong,#d6d4e2);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 14px;min-height:36px;cursor:pointer}
-  .stage-note .sn-edit:hover{background:var(--card);border-color:var(--p)}
-  .stage-note .sn-text{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:14.5px;line-height:1.6;padding:12px 14px;margin-top:10px;border:2px solid color-mix(in srgb,var(--p) 45%,transparent);border-radius:10px;background:var(--card);color:var(--ink);resize:vertical}
-  .stage-note .sn-text:focus{outline:2px solid var(--p);outline-offset:1px}
-  .stage-note .sn-help{font-size:12.5px;color:var(--soft);margin:8px 0 0}
-  .stage-note .sn-acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
-  .stage-note .sn-reset{margin-left:auto;font:inherit;font-size:13px;font-weight:600;color:var(--p);background:none;border:none;padding:6px 0;cursor:pointer}
-  @media (max-width:640px){.stage-note{flex-wrap:wrap;gap:12px;padding:16px}.stage-note .sn-ic{width:36px;height:36px}.stage-note .sn-edit{width:100%;min-height:44px}.stage-note .sn-reset{margin-left:0}}
-  .path-confirm{margin-top:10px;display:flex;gap:var(--dds-s2,8px);align-items:center;font-size:13.5px;flex-wrap:wrap}
-  .terminal-chip{font-size:12px;font-weight:700;border-radius:999px;padding:var(--dds-s1,4px) var(--dds-s3,12px)}
-  .terminal-chip.won{background:var(--good-soft);color:var(--good)}
-  .terminal-chip.lost{background:var(--warn-soft);color:var(--warn)}
+  /* ── the deal stage bar and its What to do now note: deal-path.js brings their rules (builder item 102) ── */
   /* View toggle (List · Board · Table) */
   .viewtog{display:inline-flex;gap:var(--dds-s1,4px)}
   /* ── Table view: sortable columns; the table scrolls in its OWN container ── */
@@ -515,7 +470,7 @@ html.dds-embed #detailWrap{padding-top:0}
   @media (max-width:640px){.payform .pf-chip span{min-height:44px}}
   @media(max-width:560px){#detailInner .dhead,#detailInner .dbody{padding-left:16px;padding-right:16px}#detailInner #dtitle{font-size:24px}}
   /* ── Oct 2026 review: the deal page in the record's idiom. The lifecycle bar
-     is crm.html's "Visual refresh" .path rules, copied by hand (same DOM, same
+     is the record's own, from deal-path.js (builder item 102: one copy, the same
      ✓ done / current / canback / lost-terminal states the spec pins); a tab
      strip (Overview · Billing · Activity) sits over the EXISTING sections and
      only toggles `hidden`; Overview is two columns — details + to-dos, with a
@@ -523,17 +478,6 @@ html.dds-embed #detailWrap{padding-top:0}
      is unchanged. ── */
   #detailInner .sec.life{padding:var(--dds-s3,12px) var(--dds-s4,16px) var(--dds-s4,16px)}
   #detailInner .sec.life>h3{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}   /* the bar speaks for itself; the heading stays for the outline + the unit pin */
-  .path{gap:6px;flex:1 1 520px}
-  .path .pstep,.path button.pstep,.path button.pstep:first-child,.path button.pstep:last-child{flex:1;min-width:0;border:none;border-top:5px solid #e1e1e8;border-radius:3px 3px 0 0;background:transparent;color:var(--faint);font-family:inherit;font-size:12px;font-weight:500;padding:var(--dds-s2,8px) var(--dds-s1,4px) 0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;clip-path:none;cursor:default;line-height:1.3}
-  .path .pstep.done,.path button.pstep.done{border-top-color:var(--good);background:transparent;color:var(--soft)}
-  .path .pstep.current,.path button.pstep.current{border-top-color:var(--p);background:transparent;color:var(--p);font-weight:600;cursor:pointer}
-  .path button.pstep.current:hover{filter:none;color:var(--p-deep,var(--p))}
-  .path button.pstep.canback{cursor:pointer} .path button.pstep.canback:hover{filter:none;color:var(--ink)}
-  .path button.pstep.lost-terminal,.path .pstep.lost-terminal{border-top-color:var(--warn);background:transparent;color:var(--warn)}
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .path button.pstep.current{color:var(--p)}}
-  :root[data-theme="dark"] .path button.pstep.current{color:var(--p)}
-  .path-guide{margin-top:10px;font-size:13px}
-  .terminal-chip{font-weight:600;padding:var(--dds-s1,4px) 10px;font-size:12px}
   /* Second walk (Nov 8, item 58): on a phone the first deal sat below a whole
      screen of stacked number tiles and two lines of stage chips. The numbers go
      in one short row (no icons) and the chips in one row that scrolls sideways. */
@@ -552,7 +496,6 @@ html.dds-embed #detailWrap{padding-top:0}
   }
   @media (max-width:360px){.stats{grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr))}}   /* batch C: too narrow for four in a row */
   @media (max-width:767px){#seeWon{min-height:44px}}   /* batch C: 44px on a phone */
-  @media (max-width:640px){.path{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}.path .pstep,.path button.pstep{flex:0 0 auto;min-width:96px}}
   #detailInner .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 var(--dds-s4,16px);overflow-x:auto;-webkit-overflow-scrolling:touch}
   #detailInner .tabs button{border:none;background:transparent;box-shadow:none;font-family:inherit;font-size:13.5px;font-weight:500;color:var(--soft);padding:var(--dds-s2,8px) var(--dds-s3,12px);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:0;white-space:nowrap;transition:var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
   #detailInner .tabs button:hover{color:var(--ink);background:transparent}
@@ -671,7 +614,9 @@ html.dds-embed #detailWrap{padding-top:0}
   </div>
 </dialog>
 
-<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script>
+<script src="/deal-path.js"></script>
+<script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
@@ -975,26 +920,18 @@ const LINKS={};
 // proposal line-item dropdown can offer them + auto-fill the price. CURRENT_DEAL
 // lets "Manage services" refresh the open deal after a save.
 let SERVICES=[],CURRENT_DEAL=null;
-// Path state (kept in sync with crm.html by hand): the guidance strip toggle +
-// the pending one-back confirmation.
+// Path state (each page keeps its own; the bar itself is deal-path.js): the guidance
+// strip toggle + the pending one-back confirmation.
 let GUIDE_OPEN=true,PENDING_BACK='';
 // sales item 124: each stage's "what to do now" note (GET /sales/stages notes; null until read, or when it couldn't be)
 let STAGE_NOTES=null,STAGE_NOTES_CUSTOM={},NOTE_EDIT=false,DRAWER_PATH_REPAINT=null;
-const SN_FLAG='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg>';
-const SN_CK='<svg class="sn-ck" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9.5"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>';
 // The studio's note for the deal's stage under its stage bar, with the one line the deal
-// itself knows above it (signed, so convert). Kept in step with crm.html's stageNoteHtml.
+// itself knows above it (signed, so convert). Its markup and keys are the record's own (deal-path.js).
 function stageNoteHtml(stage,fact){
-  const text=STAGE_NOTES&&STAGE_NOTES[stage];
-  if(!text&&!fact)return'';   // the deal's own fact (signed: convert them) shows even when the notes couldn't be read
-  const label=stageLabel(stage),mine=!!(STAGE_NOTES_CUSTOM&&STAGE_NOTES_CUSTOM[stage]);
-  const body=!text?'':NOTE_EDIT
-    ?`<label class="sr-only" for="snText">What to do now at ${esc(label)}, one step a line</label><textarea id="snText" class="sn-text" rows="${Math.min(9,Math.max(3,text.split('\n').length+1))}">${esc(text)}</textarea>
-      <p class="sn-help">One step a line, up to eight. Everyone on your team sees this on every deal at ${esc(label)}.</p>
-      <div class="sn-acts"><button type="button" class="btn" id="snSave">Save for every deal</button><button type="button" class="btn ghost" id="snCancel">Cancel</button>${mine?'<button type="button" class="sn-reset" id="snReset">Put back the starter note</button>':''}</div>`
-    :`<ul class="sn-steps">${text.split('\n').map(l=>`<li>${SN_CK}<span>${esc(l)}</span></li>`).join('')}</ul>
-      <p class="sn-foot">${mine?'Your studio’s note':'A starter note'} for every deal at ${esc(label)}. Tap ${esc(label)} on the bar to hide it.</p>`;
-  return `<section class="stage-note" aria-labelledby="snHead"><span class="sn-ic">${SN_FLAG}</span><div class="sn-body"><div class="sn-head"><h3 id="snHead">What to do now</h3><span class="sn-chip">${esc(label)}</span></div>${fact?`<p class="sn-fact"><b>${esc(fact.tip)}</b> ${fact.convert?`<a href="#" id="guideConvert" style="color:var(--p);font-weight:600">${esc(fact.action)} ↓</a>`:esc(fact.action)}</p>`:''}${body}</div>${NOTE_EDIT||!text?'':'<button type="button" class="sn-edit" id="snEdit" data-needs="configure">Edit note</button>'}</section>`;
+  // the deal's own fact (signed: convert them) shows even when the notes couldn't be read; Convert is this page's link
+  return ddsDealPath.noteHtml({stage,label:stageLabel(stage),text:STAGE_NOTES&&STAGE_NOTES[stage],mine:!!(STAGE_NOTES_CUSTOM&&STAGE_NOTES_CUSTOM[stage]),editing:NOTE_EDIT,
+    fact:fact&&{tip:fact.tip,action:fact.action,html:fact.convert?`<a href="#" id="guideConvert" style="color:var(--p);font-weight:600">${esc(fact.action)} ↓</a>`:undefined},
+    buttons:{save:'btn',cancel:'btn ghost'}});
 }
 async function saveStageNote(stage,text,btn){
   if(btn)btn.disabled=true;
@@ -1006,12 +943,7 @@ async function saveStageNote(stage,text,btn){
   const e=$('snEdit');if(e)e.focus();
 }
 function wireStageNote(stage,repaint){
-  const ed=$('snEdit');if(ed)ed.onclick=()=>{NOTE_EDIT=true;repaint();const t=$('snText');if(t){t.focus();t.setSelectionRange(t.value.length,t.value.length);}};
-  const cancel=()=>{NOTE_EDIT=false;repaint();const e=$('snEdit');if(e)e.focus();};
-  const cn=$('snCancel');if(cn)cn.onclick=cancel;
-  const sv=$('snSave');if(sv)sv.onclick=()=>saveStageNote(stage,$('snText').value,sv);
-  const rs=$('snReset');if(rs)rs.onclick=()=>saveStageNote(stage,'',rs);
-  const tx=$('snText');if(tx)tx.onkeydown=(e)=>{if(e.key==='Escape'){e.preventDefault();cancel();}else if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();if(sv)sv.click();}};
+  ddsDealPath.wireNote({stage,repaint,setEditing:(v)=>{NOTE_EDIT=v;},save:saveStageNote});
 }
 // ── Oct 2026 review: the deal page's tab strip. Overview (details, to-dos, a
 // Money card) · Billing (proposals, agreement, invoices, retainer, convert) ·
@@ -3324,8 +3256,8 @@ async function openDeal(id){
     // only VALID next stages (mirrors lib/sales_lifecycle.ts); 'won' is convert-only
     const NEXT={lead:['qualified','lost'],qualified:['proposal','lead','lost'],proposal:['contract','qualified','lost'],contract:['won','proposal','lost'],won:[],lost:['lead']};
     const nextStages=(NEXT[d.stage]||[]).filter(s=>s!=='won');
-    // The button stack became the Path chevron bar (renderDrawerPath below —
-    // kept in sync with crm.html by hand). "Mark as lost" stays the separated,
+    // The button stack became the stage bar (renderDrawerPath below, the record's
+    // own from deal-path.js). "Mark as lost" stays the separated,
     // quiet action so it can't be fat-fingered; a lost deal keeps its Reopen.
     const signedNow=(data.contracts||[]).some(k=>k.status==='signed');
     DEAL_FACTS={stage:d.stage,signed:signedNow,converted:!!d.converted_client_id};
@@ -3645,29 +3577,19 @@ async function openDeal(id){
       if(j<0)return;e.preventDefault();
       showDealTab(tabsEls[j].dataset.dtab,{focus:true});
     });
-    // ── Path: the chevron stage bar — kept in sync with crm.html by hand (its
-    // renderPath/moveStage: same markup, same done ✓/current/todo + won/lost
-    // terminal states, same interactivity rules — ONLY the current step (the
-    // guidance toggle) and the ONE legal BOARD_NEXT back-target are interactive;
-    // everything else is tabindex="-1" + aria-disabled. Forward advances via the
+    // ── Path: the stage bar, the record's own (deal-path.js, builder item 102: the
+    // same markup, done ✓/current/todo + won/lost states and the same rule: ONLY
+    // the current step (the guidance toggle) and the ONE legal BOARD_NEXT
+    // back-target can be pressed; everything else is tabindex="-1" + aria-disabled). Forward advances via the
     // EXISTING stage POST; won stays convert-only — at contract+signed the side
     // button just points at the existing "Convert to customer" section below. ──
     const pathMove=async(to,btn)=>{if(!to)return;if(btn)btn.disabled=true;try{await api('/sales/deals/'+id+'/stage','POST',{to});PENDING_BACK='';toast('Moved to '+stageLabel(to));openDeal(id);load();}catch(e){toast(nice(e),true);if(btn)btn.disabled=false;renderDrawerPath();}};
     const renderDrawerPath=()=>{
       const host=$('pathHost'); if(!host)return;
       const stage=(d.converted_client_id&&d.stage!=='lost')?'won':String(d.stage);
-      const terminal=stage==='won'||stage==='lost';
       const curIdx=PATH_STEPS.indexOf(stage);
-      const steps=PATH_STEPS.map((s,i)=>{
-        const done=stage==='won'||(curIdx>-1&&i<curIdx);
-        const current=s===stage;
-        const canBack=!terminal&&(BOARD_NEXT[stage]||[]).includes(s)&&done;
-        const cls=(done?'done':current?'current':(stage==='lost'?'lost-terminal':''))+(canBack?' canback':'');
-        const state=done?'complete':current?'current stage':'upcoming';
-        const attrs=canBack?'':current?` aria-expanded="${GUIDE_OPEN?'true':'false'}"`:' tabindex="-1" aria-disabled="true"';
-        const hint=canBack?'. Activate to move the deal back here.':current?'. Activate to show or hide the stage guidance.':'';
-        return `<button type="button" class="pstep ${cls}" data-pstep="${s}"${attrs} aria-label="${esc(stageLabel(s))} — ${state}${hint}">${done?'✓ ':''}${esc(stageLabel(s))}</button>`;
-      }).join('');
+      // the four sales steps: one shared bar (deal-path.js, builder item 102), the same as the record's
+      const steps=ddsDealPath.steps({stage,next:BOARD_NEXT,label:stageLabel,guideOpen:GUIDE_OPEN});
       // item 124: the one fact the deal knows (signed, so convert) rides above the studio's note
       const fact=((stage==='contract'&&signedNow)||(stage==='won'&&!d.converted_client_id))?{tip:'They’ve signed.',action:'Convert them to a customer to start the project',convert:true}:null;
       const fwd=(BOARD_NEXT[stage]||[])[0];

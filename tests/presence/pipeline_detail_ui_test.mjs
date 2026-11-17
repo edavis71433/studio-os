@@ -35,11 +35,11 @@ ok('a11y: an in-view refresh re-lands focus on the deal title', /if\(wasOpen\)\{
 ok('board: a stage move re-renders the OPEN deal via the panel (not a dialog.open check)', /if\(!\$\('detailWrap'\)\.hidden&&CURRENT_DEAL===id\)openDeal\(id\)/.test(pipe));
 
 // ═══ redesign slice 3: the Path chevron bar replaces the "Move stage" stack ═══
-ok('Path: chevron bar renders in the drawer (pathHost + pstep steps)', /id="pathHost"/.test(pipe) && /data-pstep=/.test(pipe) && /pstep \$\{cls\}/.test(pipe));
-ok('Path: kept in sync with crm.html by hand (the hand-copy contract)', /kept in sync with crm\.html by hand/.test(pipe) && /const PATH_STEPS=\['lead','qualified','proposal','contract'\]/.test(pipe));
-ok('Path: the stage note’s fact line renders BOTH tip and action (sales item 124; the :694 suggested_action bug stays fixed)', /esc\(fact\.tip\)/.test(pipe) && /esc\(fact\.action\)/.test(pipe) && !/g\.suggested_action/.test(pipe));
+ok('Path: the bar renders in the drawer from the shared one (pathHost + deal-path.js, item 102)', /id="pathHost"/.test(pipe) && /ddsDealPath\.steps\(\{stage,next:BOARD_NEXT,label:stageLabel,guideOpen:GUIDE_OPEN\}\)/.test(pipe) && /<script src="\/deal-path\.js"><\/script>/.test(pipe));
+ok('Path: the record draws the same shared bar (no hand-kept copy left)', /ddsDealPath\.steps\(/.test(read('crm.html')) && !/kept in sync with crm\.html by hand/.test(pipe) && /const PATH_STEPS=\['lead','qualified','proposal','contract'\]/.test(pipe));
+ok('Path: the stage note’s fact line hands BOTH tip and action to the shared note (sales item 124; the :694 suggested_action bug stays fixed)', /fact:fact&&\{tip:fact\.tip,action:fact\.action,/.test(pipe) && !/g\.suggested_action/.test(pipe));
 ok('Path: forward = "Mark stage complete" via the EXISTING stage POST', /Mark stage complete/.test(pipe) && /\/stage','POST',\{to\}/.test(pipe));
-ok('Path: non-interactive steps leave the tab order (tabindex=-1 + aria-disabled)', /tabindex="-1" aria-disabled="true"/.test(pipe));
+ok('Path: non-interactive steps leave the tab order (tabindex=-1 + aria-disabled)', /tabindex="-1" aria-disabled="true"/.test(read('deal-path.js')));
 ok('Path: won stays convert-only — contract+signed points at the EXISTING Convert section', /id="pathConvert"/.test(pipe) && /signedNow/.test(pipe));
 ok('Path: won/lost terminal chips render', /terminal-chip won/.test(pipe) && /terminal-chip lost/.test(pipe));
 ok('Path: "Mark as lost" stays the separated quiet action + lost keeps Reopen', /id="markLost"/.test(pipe) && /data-stage="lead">Reopen this deal/.test(pipe));

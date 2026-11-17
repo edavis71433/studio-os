@@ -14,6 +14,8 @@ import { ga4PropertyPath, ga4RunReportBody, ga4RecentWindow, parseGa4Report, par
 import { GBP_READ_MASK, autoPickGbp, gbpAccountPath, gbpLocationPath, gbpPerformanceQuery, gbpProblem, gbpWaitingOnStudio, parseGbpAccounts, parseGbpLocation, parseGbpLocations, parseGbpPerformance, parseGbpReviews, type GbpLocation } from '../lib/gbp.ts';
 import { gscDomainFor } from '../lib/gsc.ts';
 import { syncGscForSite } from '../ops/gsc_sync.ts';
+import { stripeAccountNumbers, STRIPE_WINDOW_DAYS } from './stripe_account.ts';
+import { STRIPE_API_VERSION } from '../commerce/stripe_shape.ts';
 
 // The one normalized shape. Every field optional — the evidence provider reads
 // whatever a given adapter could supply. Plain business quantities, never raw
@@ -26,6 +28,8 @@ export interface NormalizedConnected {
   upcoming_appointments?: number; contacts?: number;
   subscribers?: number; open_rate?: number;
   revenue?: number; payments?: number;
+  // a business's own Stripe (sales item 134): money in its currency over window_days
+  refunded?: number; paid_out?: number; payouts?: number; currency?: string; window_days?: number;
   tags_installed?: number;       // Google Tag Manager — measurement tags present
   managed_assets?: number;       // Meta Business — pages/accounts managed
   listing_verified?: number;     // Apple Business Connect — 1 if the place card is claimed/verified
@@ -65,7 +69,9 @@ export const NORMALIZERS: Record<string, (raw: any, label: string) => Normalized
   salesforce: (r, label) => ({ label, contacts: num(r?.totalSize) }),
   mailchimp: (r, label) => ({ label, subscribers: num(r?.stats?.member_count ?? r?.total_items), open_rate: num(r?.stats?.open_rate) }),
   klaviyo: (r, label) => ({ label, subscribers: num(r?.data?.[0]?.attributes?.profile_count) }),
-  stripe_connect: (r, label) => ({ label, payments: num(r?.data?.length), revenue: num(r?.total) }),
+  // sales item 134: readStripeAccount below folds the last 30 days (connected/stripe_account.ts)
+  stripe_connect: (r, label) => ({ label, payments: num(r?.payments), revenue: num(r?.revenue), refunded: num(r?.refunded), paid_out: num(r?.paid_out), payouts: num(r?.payouts),
+    ...(typeof r?.currency === 'string' && r.currency ? { currency: r.currency } : {}), window_days: num(r?.window_days) }),
   square: (r, label) => ({ label, payments: num(r?.payments?.length), revenue: num(r?.total) }),
   // Google Tag Manager — how many measurement tags/containers are installed.
   google_tag_manager: (r, label) => ({ label, tags_installed: num(r?.tag?.length ?? r?.container?.length ?? r?.account?.length) }),
@@ -90,7 +96,6 @@ const READ_ENDPOINT: Record<string, string> = {
   calendly: 'https://api.calendly.com/scheduled_events',
   hubspot: 'https://api.hubapi.com/crm/v3/objects/contacts?limit=1',
   mailchimp: 'https://us1.api.mailchimp.com/3.0/lists',
-  stripe_connect: 'https://api.stripe.com/v1/charges?limit=100',
   square: 'https://connect.squareup.com/v2/payments',
   // ── A1 completion: the remaining intentionally-started providers ──
   // Documented base endpoints; account-specific parameters (business id, site
@@ -263,10 +268,44 @@ export async function readGscConnection(siteId: string): Promise<StrategyRead> {
   return res.attention ? { ok: false, attention: res.attention } : { ok: false, status: res.status ?? 0 };
 }
 
+/** A business's own Stripe (sales item 134): every charge and payout of the last 30
+ *  days, a page of 100 at a time, folded into what went through, less refunds, and what
+ *  reached the bank. The first reader asked for charges?limit=100 and read a `total`
+ *  Stripe never sends. Read only; names the Stripe version these shapes are read in. */
+export async function readStripeAccount(_siteId: string, token: string, now: Date = new Date()): Promise<StrategyRead> {
+  const nowSec = Math.floor(now.getTime() / 1000);
+  const since = String(nowSec - STRIPE_WINDOW_DAYS * 86400);
+  const list = async (path: string, params: Record<string, string>, maxPages: number): Promise<{ ok: true; data: any[]; more: boolean } | { ok: false; status: number }> => {
+    const data: any[] = [];
+    let after = '';
+    for (let page = 0; page < maxPages; page++) {
+      const qs = new URLSearchParams({ ...params, limit: '100', ...(after ? { starting_after: after } : {}) });
+      const r = await fetch(`https://api.stripe.com/v1/${path}?${qs}`, { headers: { Authorization: `Bearer ${token}`, 'Stripe-Version': STRIPE_API_VERSION, accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+      if (!r.ok) return { ok: false, status: r.status };
+      const j = await r.json().catch(() => ({}));
+      const got = Array.isArray(j?.data) ? j.data : [];
+      data.push(...got);
+      after = got.length ? String(got[got.length - 1]?.id || '') : '';
+      if (!j?.has_more || !after) return { ok: true, data, more: false };
+    }
+    return { ok: true, data, more: true };
+  };
+  const [charges, payouts] = await Promise.all([
+    list('charges', { 'created[gte]': since }, 10),
+    list('payouts', { 'arrival_date[gte]': since }, 3),
+  ]);
+  if (!charges.ok) return { ok: false, status: charges.status };
+  if (!payouts.ok) return { ok: false, status: payouts.status };
+  // more than 1,000 charges in a month: the numbers would be short, so say so rather than show them
+  if (charges.more) return { ok: false, attention: 'This Stripe account takes more payments than Studio OS reads in one go, so its numbers aren’t shown.', quiet: true };
+  return { ok: true, raw: stripeAccountNumbers(charges.data, payouts.data, nowSec) };
+}
+
 export const READ_STRATEGIES: Record<string, (siteId: string, token: string) => Promise<StrategyRead>> = {
   google_analytics: (siteId, token) => readGa4(siteId, token),
   google_business_profile: (siteId, token) => readGbp(siteId, token),
   google_search_console: (siteId) => readGscConnection(siteId),
+  stripe_connect: (siteId, token) => readStripeAccount(siteId, token),   // sales item 134
 };
 
 // Normalize raw JSON for a provider (pure, defensive). Exported for tests.
