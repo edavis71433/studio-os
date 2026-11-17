@@ -18,12 +18,11 @@ const BOX_PAGES = [
 async function boxAsSeen(page: Page) {
   const dlg = page.locator('#custDlg');
   await expect(dlg).toBeVisible();
-  await dlg.getByRole('radio', { name: /Set up their website and invite them/ }).check();   // shows every field
   return dlg.evaluate((d) => ({
-    labels: [...d.querySelectorAll('label[for]')].map((l) => (l.textContent || '').trim()),
-    choices: [...d.querySelectorAll('input[type=radio]')].map((r) => (r.closest('label')?.textContent || '').replace(/\s+/g, ' ').trim()),
-    kinds: [...d.querySelectorAll('#cu-edition option')].map((o) => (o as HTMLOptionElement).value),
-    notes: [...d.querySelectorAll('.note')].map((n) => (n.textContent || '').trim()),
+    labels: [...d.querySelectorAll('label[for]')].map((l) => (l.textContent || '').replace(/\s+/g, ' ').trim()),
+    choices: d.querySelectorAll('input[type=radio], select').length,
+    lead: (d.querySelector('.cu-lead')?.textContent || '').trim(),
+    button: (d.querySelector('#cu-submit')?.textContent || '').trim(),
   }));
 }
 
@@ -39,36 +38,55 @@ test('Home, Customers and Contacts open the very same Add a customer box', async
   }
   expect(seen.Customers).toEqual(seen.Home);
   expect(seen.Contacts).toEqual(seen.Home);
-  const home = seen.Home as { labels: string[]; kinds: string[] };
-  expect(home.labels).toEqual(['Their name', 'Email', 'Business name', 'What kind of work is this?', 'Start from', 'Their existing website address']);
-  expect(home.kinds).toEqual(['presence', 'business_os_only', 'business_os_no_site', 'presence_monitor']);
+  const home = seen.Home as { labels: string[]; choices: number; button: string };
+  expect(home.labels).toEqual(['Their name', 'Business name (optional)', 'Email']);   // builder item 241: the customer and nothing else
+  expect(home.choices).toBe(0);
+  expect(home.button).toBe('Save customer');
 });
 
 for (const p of BOX_PAGES) {
-  test(`${p.where}: setting someone up sends the plan the server knows, and the list is read again after`, async ({ page }) => {
+  test(`${p.where}: saving sends who they are, and the list is read again after`, async ({ page }) => {
     let sent: Record<string, unknown> | null = null;
-    await installApp(page, { api: { ...p.api, 'POST /sales/customers': (b: Record<string, unknown>) => { sent = b; return { data: { created: true, client_id: 'cl-9', site_id: 's-9', invited: true, portal_url: 'https://example.test/portal.html?studio=x' } }; } } });
+    await installApp(page, { api: { ...p.api, 'POST /sales/customers': (b: Record<string, unknown>) => { sent = b; return { data: { mode: 'save', saved: true, created: true, client_id: 'cccccccc-6666-4666-8666-cccccccccccc' } }; } } });
     await page.goto(p.path);
     await (await headerAction(page, p.open)).first().click();
     const reads: string[] = [];
     page.on('request', (r) => { const u = new URL(r.url()); if (r.method() === 'GET' && u.pathname.endsWith('/presence' + p.list)) reads.push(u.pathname); });
     const dlg = page.locator('#custDlg');
     await expect(page.locator('#cu-name')).toBeFocused();
-    await dlg.getByRole('radio', { name: /Set up their website and invite them/ }).check();
     await page.locator('#cu-name').fill('Rosa Lind');
-    await page.locator('#cu-email').fill('rosa@lindcafe.example');
     await page.locator('#cu-biz').fill('Lind Café');
-    await page.locator('#cu-edition').selectOption('business_os_no_site');   // no site work: the server's Business OS plan, no address asked
-    await expect(page.locator('#cu-website')).toBeHidden();
+    await page.locator('#cu-email').fill('rosa@lindcafe.example');
     await page.locator('#cu-submit').click();
-    await expect(page.locator('#cust-done')).toContainText('Invitation sent to rosa@lindcafe.example.');
-    expect(sent).toEqual({ mode: 'provision', name: 'Rosa Lind', business_name: 'Lind Café', email: 'rosa@lindcafe.example', edition: 'business_os_only' });
-    await expect(page.locator('#cust-done').getByRole('link', { name: 'Their sign-in page →' })).toHaveAttribute('href', 'https://example.test/portal.html?studio=x');
-    await expect.poll(() => reads.length).toBeGreaterThan(0);   // the page's own list, read again once they were added
-    await page.locator('#cu-close').click();
+    await expect(page.locator('#cust-done')).toContainText('Saved to your customers');
+    expect(sent).toEqual({ mode: 'connect', save: true, name: 'Rosa Lind', business_name: 'Lind Café', email: 'rosa@lindcafe.example' });
+    await expect.poll(() => reads.length).toBeGreaterThan(0);   // the page's own list, read again once they were saved
+    await page.locator('#cust-done').getByRole('button', { name: 'Add another' }).click();
+    await expect(page.locator('#cu-name')).toBeFocused();
+    await expect(page.locator('#cu-name')).toHaveValue('');
+    await page.keyboard.press('Escape');
     await expect(dlg).toBeHidden();
   });
 }
+
+// Builder item 241, the deploy gap: the pages go live on merge and the server only with the deploy
+// after it. Until then the older server answers the box's 'connect' as a contact saved, and the box
+// says exactly that: no "Saved to your customers", no profile to open, nothing set up.
+test('Customers: an older server keeps them as a contact, and the box says so', async ({ page }) => {
+  let sent: Record<string, unknown> | null = null;
+  await installApp(page, { api: { '/studio/customers': { data: [] }, 'POST /sales/customers': (b: Record<string, unknown>) => { sent = b; return { data: { mode: 'connect', pending: true, connected: false, email: 'rosa@lindcafe.example', contact_id: 'cccccccc-7777-4777-8777-cccccccccccc' } }; } } });
+  await page.goto('/customers.html');
+  await (await headerAction(page, '#addCust')).first().click();
+  await page.locator('#cu-name').fill('Rosa Lind');
+  await page.locator('#cu-email').fill('rosa@lindcafe.example');
+  await page.locator('#cu-submit').click();
+  const done = page.locator('#cust-done');
+  await expect(done.locator('h3')).toHaveText('Saved to your contacts');
+  await expect(done).toContainText('Rosa Lind is in your contacts. No website yet, and nothing was emailed.');
+  await expect(done.locator('#cu-open')).toHaveCount(0);
+  await expect(done.getByRole('button', { name: 'Done' })).toBeFocused();
+  expect(sent).toEqual({ mode: 'connect', save: true, name: 'Rosa Lind', email: 'rosa@lindcafe.example' });
+});
 
 // ── one deal stage bar ──
 const CLIENT = 'cccccccc-3333-4333-8333-cccccccccccc';

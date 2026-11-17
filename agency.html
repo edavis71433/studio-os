@@ -1047,7 +1047,7 @@ function renderTop(){
       <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Home</h1></div><p class="dds-ph-line" id="phLine">${esc(headLine())}</p></div>
       <div class="dds-ph-acts"><button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
         <div class="dds-ph-more" id="phMore" popover><a class="btn ghost" id="weekBtn" href="/week.html" data-noscope="1">Plan my week</a></div>
-        <button type="button" class="btn primary dds-ph-fill" id="addCust" title="Set up a customer with their own workspace and a sign-in invitation">+ Add a customer</button></div></div></header>
+        <button type="button" class="btn primary dds-ph-fill" id="addCust" title="Save a customer. Their website and their portal invite come later, from their profile.">+ Add a customer</button></div></div></header>
     <div class="tgrid"><div class="top hero"><div class="hrow"><span class="hdate">${esc(todayWords())}</span><span class="sep" aria-hidden="true">·</span><div class="brand">${esc((ME&&ME.agency)||'Your agency')}</div><span class="rolebadge">● ${esc(roleWords(ME&&ME.role))}</span></div>
     <p class="hi">${esc(greetWord())}</p><p class="hsub" id="heroSub"></p><div class="hchips" id="heroChips"></div></div>
     <aside class="todaycard" id="todayCard" aria-labelledby="todayHead"><h2 id="todayHead"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Today</h2><div id="todayRows"><p class="tq">Looking…</p></div></aside></div>`;
@@ -1311,17 +1311,17 @@ async function mountStudio(){
 //    own way (reads can come from the early batch), and this IS the agency's home, so its
 //    starter kits are offered. ──
 const ADD=window.ddsAddCustomer.mount({request:(m,p,b)=>m==='GET'?api(p):apiSend(m,p,b),toast,isAgency:async()=>true,done:()=>load(true)});
-function openAddCustomer(setUp){ADD.open(setUp);}   // setUp===true opens on setting them up (a click passes an event)
+function openAddCustomer(){ADD.open();}
 // ⌘K's "Add a customer" lands here as /agency.html#add (lib/navigation.ts) — open the
 // dialog and clear the hash, so Back or a reload never reopens it. Boot calls it once
 // the member is known; a hash change while already on the home opens it too.
 function openFromHash(){
-  // ⌘K's "Starter kits" lands on /agency.html#kits: the kits card left the home,
-  // so it opens Add a customer on setting them up, where "Start from a kit" lives
-  if(location.hash!=='#add'&&location.hash!=='#kits')return;
-  const kits=location.hash==='#kits';
+  // an old link to #kits: starter kits live on Templates (item 166), and a kit starts a website from New site
+  // there, not from Add a customer, which saves the customer and nothing else (builder item 241)
+  if(location.hash==='#kits'){location.replace('/templates.html');return;}
+  if(location.hash!=='#add')return;
   try{history.replaceState(null,'',location.pathname+location.search);}catch(_){/* */}
-  if(ME)openAddCustomer(kits);
+  if(ME)openAddCustomer();
 }
 window.addEventListener('hashchange',openFromHash);
 
@@ -1337,7 +1337,7 @@ async function boot(){
     if(!me.ok){trouble();return;}
     ME=me.body.data||{};
     renderTop();
-    openFromHash();   // ⌘K → /agency.html#add (or #kits)
+    openFromHash();   // ⌘K → /agency.html#add
     loadSetup();     // sales item 105: the setup strip reads on its own; nothing waits on it
     const needs=mountNeeds();   // what needs the studio — reads alongside the roster; re-paints Status/Next when it lands
     // final pass (Nov 8, batch B): the studio strip reads alongside the roster and

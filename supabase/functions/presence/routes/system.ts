@@ -21,6 +21,7 @@ import { runMonthlyReports } from '../ops/monthly_report.ts';
 import { runAiChecks } from '../ops/ai_checks.ts';
 import { runRankGridScans } from '../ops/rank_grid_scans.ts';
 import { runSiteTrashPurge } from '../ops/site_trash.ts';
+import { runCustomerTrashSweep } from '../ops/customer_trash.ts';
 import { runFileTrashPurge } from '../ops/file_trash.ts';
 import { runDuePosts } from '../ops/scheduled_posts.ts';
 import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runReviewRequests, runProspectNurture, runSupportAging, runAgreementRenewalReminders, runBookingReminders, runBookingFollowups, runEmailAuthNudges, runApexDriftWatch, runApprovalReminders } from '../commerce/lifecycle.ts';
@@ -404,6 +405,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['rank_grids', () => runRankGridScans(1)],   // builder list item 185: one switched-on client's monthly map rank grid at most (a few seconds a search)
             ['site_trash', () => runSiteTrashPurge(10)],   // builder list item 154: a site 90 days in a studio's trash is deleted for good
             ['file_trash', () => runFileTrashPurge(100)],   // builder list item 218: a file 30 days in a site's Trash is deleted for good, unless the live site still shows it
+            ['customer_trash', () => runCustomerTrashSweep(20)],   // builder list item 241: a customer 30 days in Recently deleted is let go; a bare record goes for good
             ['email_auth', () => runEmailAuthNudges(20)],   // DNS #5: escalate persistent SPF/DMARC/DKIM gaps to one owner nudge
             ['apex_drift', () => runApexDriftWatch(10)],    // DNS: verify the apex still points home; surface drift as a finding
             ['retention', () => runRetentionSweep()],
@@ -468,6 +470,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       await step('rank_grids', () => runRankGridScans(1));                         // builder list item 185: one switched-on client's monthly map rank grid at most (month claimed first)
       await step('site_trash', () => runSiteTrashPurge(10));                       // builder list item 154: a site 90 days in a studio's trash is deleted for good
       await step('file_trash', () => runFileTrashPurge(100));                      // builder list item 218: a file 30 days in a site's Trash is deleted for good, unless the live site still shows it
+      await step('customer_trash', () => runCustomerTrashSweep(20));               // builder list item 241: a customer 30 days in Recently deleted is let go; a bare record goes for good
       const emailAuth = await step('email_auth', () => runEmailAuthNudges(20));     // DNS #5: escalate persistent SPF/DMARC/DKIM gaps → one owner nudge
       const apexDrift = await step('apex_drift', () => runApexDriftWatch(10));       // DNS: verify the apex still points home; surface drift as a finding
       const leads = await step('leads', () => runLeadFollowups(20));               // CRM: nudge un-replied leads, once per lead

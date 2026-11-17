@@ -236,6 +236,8 @@ export async function handleSalesDeleted(site: SiteRow, cors: Record<string, str
     failed.push(key); return [];
   };
   const labelsP = loadStageLabels(site.id).catch(() => null);
+  // builder item 241: a deleted customer, and whether their website went to the Trash with them
+  const deletedCustomersP = import('./customers.ts').then((m) => m.deletedCustomers(site.id)).catch(() => null);
   const [deals, contacts, todos] = await Promise.all([
     read('deals', `presence_deals?site_id=eq.${site.id}&deleted_at=gte.${since}&select=id,title,stage,expected_value_cents,contact_id,deleted_at&order=deleted_at.desc&limit=200`),
     // merged_into lands with APPLY-0168; before it, every removed contact is a plain delete
@@ -257,8 +259,11 @@ export async function handleSalesDeleted(site: SiteRow, cors: Record<string, str
   const customer = new Map(customers.map((k: any) => [String(k.id), String(k.name || k.email || '')]));
   const onDeal = new Map(todoDeals.map((d: any) => [String(d.id), d]));
   const labels = await labelsP;
+  const goneCustomers = await deletedCustomersP;
+  if (goneCustomers === null) failed.push('customers');
   return json({ data: {
     days: DELETED_DAYS,
+    customers: goneCustomers || [],
     deals: deals.map((d: any) => ({ id: d.id, title: String(d.title || 'Untitled deal'), stage: d.stage, stage_label: (labels && labels[d.stage]) || DEFAULT_STAGE_LABEL[d.stage as Stage] || d.stage, value_cents: Number(d.expected_value_cents) || 0, person: who.get(String(d.contact_id || '')) || '', deleted_at: d.deleted_at })),
     contacts: contacts.map((c: any) => ({ id: c.id, name: String(c.name || c.email || 'Contact'), email: String(c.email || ''), company: String(c.company || ''), deleted_at: c.deleted_at })),
     // item 85: a to-do for a person or a customer names them and opens their record; one of your own, the To-dos page
@@ -3183,7 +3188,7 @@ export async function provisionCustomerAccount(opts: {
  *
  *  Idempotent (site_id is the PK, on_conflict merge). Best-effort: a customer is
  *  still successfully added if this write fails. Returns the stored host. */
-async function recordExistingWebsite(
+export async function recordExistingWebsite(
   siteId: string, plan: PlanKey, websiteUrl: string, principal: Principal, label: string,
 ): Promise<string | null> {
   try {
@@ -3383,16 +3388,21 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   const businessNameIn = clean(b.business_name, 120);
   if (!email || !validEmail(email)) return json({ error: 'validation', message: 'Enter the customer’s email — that’s where their sign-in invitation goes.' }, 422, cors);
   const businessName = businessNameIn || name || (email.split('@')[0] || 'New customer');
-  const mode = b.mode === 'connect' ? 'connect' : 'provision';
+  // builder item 241: 'save' is Add a customer's (the customer and nothing else); 'connect' is the
+  // Customers CSV import's (the person in the contacts); 'provision' sets them up now (Duplicate site)
+  // The box sends 'connect' with save: true, which a server from before item 241 reads as connect
+  // (a contact, nobody emailed) in the time between the pages going live and the deploy.
+  const mode = b.mode === 'save' || (b.mode === 'connect' && b.save === true) ? 'save' : b.mode === 'connect' ? 'connect' : 'provision';
   const portalUrl = `${siteUrl()}/portal.html?studio=${site.id}`;   // builder list item 59: the sign-in page shows this studio's name and logo
 
   // ── B) CONNECT BY EMAIL — record intent; provision NOTHING ──────────────────
-  if (mode === 'connect') {
+  //    (and SAVE, builder item 241: the same for an account that already exists)
+  if (mode === 'connect' || mode === 'save') {
     const existing = await findClientByEmail(email);
     if (existing && existing.id !== site.client_id && !(await isCustomerOfStudio(site.id, existing.id))) {
       // S1: someone else's account — ask, don't take
       if (!(await askToConnect(site, principal, email, businessName))) return requestUnavailable(cors);
-      return json({ data: { mode: 'connect', requested: true, pending: true, connected: false, email, message: NEEDS_ACCEPTANCE_LINE } }, 200, cors);
+      return json({ data: { mode, requested: true, pending: true, connected: false, email, message: NEEDS_ACCEPTANCE_LINE } }, 200, cors);
     }
     if (existing) {
       // Already this studio's customer → (re)connect: idempotent, nothing taken.
@@ -3407,8 +3417,10 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
         const r = await bridgeCustomerToStudio({ agencySiteId: site.id, clientId, customerSiteId: customerSite?.id || null, label: businessName });
         projectId = r.projectId; bridged = r.bridged; ownedElsewhere = r.ownedElsewhere;
       }
-      return json({ data: { mode: 'connect', connected: true, created: false, client_id: clientId, site_id: customerSite?.id || null, project_id: projectId, managed, bridged, owned_elsewhere: ownedElsewhere, portal_url: portalUrl, message: 'Connected to their workspace.' } }, 200, cors);
+      return json({ data: { mode, connected: true, created: false, client_id: clientId, site_id: customerSite?.id || null, project_id: projectId, managed, bridged, owned_elsewhere: ownedElsewhere, portal_url: portalUrl, message: 'Connected to their workspace.' } }, 200, cors);
     }
+    // builder item 241: Add a customer saves the customer and nothing else (routes/customers.ts)
+    if (mode === 'save') return (await import('./customers.ts')).saveNewCustomer(site, { email, name, businessName: businessNameIn, label: businessName }, cors);
     // No account yet → they're saved to the studio's contacts, and nothing else happens.
     // Nobody signs up by themselves (builder item 199), so the studio sets them up from
     // Add a customer when it's ready; no marker waits for a sign-up.

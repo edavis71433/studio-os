@@ -170,6 +170,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     'DELETE /broadcasts/lists/[A-Za-z0-9-]{6,40}',   // sales review items 31 + 39: removing a picked list
     `POST /sales/contacts/imports/${ID}/undo`,   // sales review item 86: undoing an import takes the people it added off the list
     `POST /sales/contacts/${ID}/(merge|unmerge)`,   // items 86 + 105: a merge folds one record away (and its undo brings it back)
+    `POST /sales/customers/${ID}/delete`,   // builder item 241: a customer added by mistake leaves Customers (their website to the Trash or kept)
   ]],
   ['configure', [
     'PUT /sales/stages',   // sales review item 38: renaming the studio's deal stages is a setting
@@ -267,6 +268,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `PATCH /sales/prospects/${ID}`,
     `PATCH /sales/(contacts|deals|deal-tasks)/${ID}`,
     `POST /sales/(contacts|deals)/${ID}/restore`,   // sales item 83: bringing back a deleted deal loses nothing, like a contact
+    `POST /sales/customers/${ID}/(restore|invite|website)`,   // builder item 241: a deleted customer comes back; their portal invite, like the deal's resend-invite; the address of a site they keep elsewhere
     'PUT /sales/services',
     `POST /sales/deals/${ID}/(stage|activity|tasks|proposals|contracts|convert|resend-invite|invoice|schedule|retainer|send|estimates|recurring)`,
     `POST /sales/estimates/${ID}/(send|proposal|invoice)`,   // sales review item 47: send an estimate, or turn it into a proposal or an invoice (drafts)
