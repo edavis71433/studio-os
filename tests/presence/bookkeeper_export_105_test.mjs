@@ -54,7 +54,7 @@ eq('every payment in the days, oldest first: a recorded one, a part payment, a r
   [['10/02/2026', '0009', 'Card or bank, through Stripe', '70.00'], ['10/12/2026', '0022', 'Zelle', '500.00'], ['10/15/2026', '', 'Card or bank, through Stripe', '200.00'], ['10/20/2026', '0022', 'Check', '1000.00']]);
 ok('a part payment says so, under its invoice', pay.rows[1][3] === 'Balance (part payment)' && pay.rows[1][1] === 'Ana Ruiz');
 ok('a retainer charge names its deal', pay.rows[2][3] === 'Retainer: Care plan' && pay.rows[2][1] === 'Blue Finch Café');
-ok('the note printed on the receipt rides along', pay.rows[3][6] === 'Check #1042');
+ok('the note printed on the receipt rides along, last (sales item 133 put Stripe fee, You kept and Paid out on before it)', pay.rows[3][A.PAYMENT_HEAD.indexOf('Note')] === 'Check #1042' && A.PAYMENT_HEAD.at(-1) === 'Note');
 eq('payment totals', [pay.payments, pay.cents], [4, 177000]);
 const rm = A.exportReadMe(P, inv, pay, false);
 ok('READ-ME: what is in it and how to bring it into QuickBooks', rm.includes('2 invoices issued in these days, $4,500.00 billed') && rm.includes('4 payments received') && rm.includes('Settings, then Import data, then Invoices') && rm.includes('100 invoices at a time'));

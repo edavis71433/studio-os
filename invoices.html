@@ -155,7 +155,7 @@
 <dialog id="expDlg" aria-labelledby="expH">
   <form class="dbody" method="dialog" id="expForm">
     <h2 id="expH">Export for your bookkeeper</h2>
-    <p class="muted">One zip with two spreadsheets. QuickBooks Online, Xero, Google Sheets and Excel all read them.</p>
+    <p class="muted">One zip of spreadsheets. QuickBooks Online, Xero, Google Sheets and Excel all read them.</p>
     <div class="eper" role="group" aria-label="Which days">
       <button type="button" class="echip" data-per="year" aria-pressed="true">This year</button><button type="button" class="echip" data-per="lastyear" aria-pressed="false">Last year</button><button type="button" class="echip" data-per="month" aria-pressed="false">This month</button><button type="button" class="echip" data-per="lastmonth" aria-pressed="false">Last month</button><button type="button" class="echip" data-per="pick" aria-pressed="false">Pick dates</button>
     </div>
@@ -163,6 +163,7 @@
     <ul class="efiles">
       <li><b>invoices.csv</b>Every invoice sent in those days, one row per line: number, customer, dates and amounts.<span class="how">QuickBooks Online: Settings, Import data, Invoices</span></li>
       <li><b>payments.csv</b>Every payment that came in: the day, who paid, which invoice, how, and the amount. Retainer payments included.<span class="how">For matching what came into the bank</span></li>
+      <li id="expPayouts" hidden><b>payouts.csv</b>Each deposit Stripe sent you, with what made it up. payments.csv then shows Stripe’s fee on each payment, what you kept and the day it was paid out.<span class="how">For matching your bank statement</span></li>
     </ul>
     <p class="muted" style="margin-top:12px;font-size:13px">Nothing is sent anywhere. Only this download.</p>
     <p class="err" id="expErr" role="alert" hidden></p>
@@ -389,6 +390,8 @@ function expRange(){
 }
 function openExport(btn){
   EXP_BACK=btn;$('expErr').hidden=true;
+  // sales item 133: Stripe's fees and payouts come with the platform's own studio, whose Stripe takes the payments
+  (window.ddsContext?window.ddsContext():Promise.reject()).then((c)=>{$('expPayouts').hidden=!(c&&c.is_operator&&!(c.scope&&c.scope.site_id));}).catch(()=>{$('expPayouts').hidden=true;});
   if(!$('expFrom').value){const r=expRange();$('expFrom').value=r.from;$('expTo').value=r.to;}
   $('expDlg').showModal();
   const on=document.querySelector('#expDlg [data-per][aria-pressed="true"]');if(on)on.focus();
