@@ -127,7 +127,7 @@ const DEFERRED = {
     'The Lists API returns list objects without profile_count; the normalizer reads data[0].attributes.profile_count and would always find nothing.',
   // ── Payments ──
   stripe_connect:
-    'charges?limit=100 has no `total` field, so revenue is always undefined and payments is "up to the last 100 charges" presented as a payment count.',
+    'The read is right since sales item 134 (the last 30 days, paid less refunded, and payouts), but no Stripe Connect app is registered (no CONNECTED_STRIPE_CONNECT_CLIENT_ID/_SECRET) and it has never read a real account.',
   square:
     'ListPayments has no `total` field either — same defect as stripe_connect: a revenue figure with nothing behind it.',
 };
