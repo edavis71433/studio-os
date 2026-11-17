@@ -15,7 +15,7 @@ import { serializeDraft } from '../lib/serializer.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { fetchVariants } from '../lib/media.ts';
 import { putBackUsed, putBackWhatTheDraftUses } from '../lib/media_trash.ts';
-import { deployFileMap, netlifyConfigured, setSitePassword, getSite, digestFiles, sameFiles } from '../lib/netlify.ts';
+import { deployFileMap, netlifyConfigured, setSitePassword, getSite, digestFiles, sameFiles, listDeploys } from '../lib/netlify.ts';
 import type { DeployFile, NetlifySiteInfo } from '../lib/netlify.ts';
 import { withForwarding } from '../lib/domain_notify.ts';
 import { mergeSecurityHeaders, mergeAssetCaching } from '../lib/security_headers.ts';
@@ -65,6 +65,32 @@ export async function liveDeployFiles(siteId: string): Promise<{ deployId: strin
   return row?.netlify_deploy_id && files && typeof files === 'object' && !Array.isArray(files) ? { deployId: String(row.netlify_deploy_id), files: files as Record<string, string> } : null;
 }
 
+// ── The offline mark follows the host (G10) ──────────────────────────────────
+// presence_sites.offline_at says visitors see the "temporarily offline" holding page. Take
+// offline sets it once the page is sent; a deploy of a real version going live lifts it.
+/** The title Take offline's deploy carries on the host, so it can be found there again. */
+export const OFFLINE_PAGE_TITLE = 'offline holding page';
+/** Netlify's states for a deploy it hasn't finished: it can still go live. */
+const UNFINISHED_DEPLOY = new Set(['new', 'enqueued', 'building', 'uploading', 'uploaded', 'preparing', 'prepared', 'processing', 'processed', 'retrying']);
+/** A holding page still unfinished this long after it was sent is taken as stuck for good. */
+export const HOLDING_PAGE_WAIT_MS = 15 * 60_000;
+export const OFFLINE_IN_PROGRESS = 'Your site is still going offline. Give it a minute, then try again.';
+
+/** Is a Take offline's holding page still on its way? Take offline marks the site once the page
+ *  is sent, even when the host hasn't finished it by the time the request stops waiting
+ *  (lib/netlify.ts, DEPLOY_POLL_MS), so only a site marked offline can have one. A deploy sent
+ *  now would race it: if the holding page landed last, visitors would get it while the site
+ *  read online. Any doubt (no mark, no column before 0111, the host's list unreadable) is a no.
+ *  By site id, so the scheduler can ask before it claims a due row (ops/scheduler.ts). */
+export async function holdingPageOnItsWay(siteId: string, nowMs = Date.now()): Promise<boolean> {
+  const cur = await svc(`presence_sites?id=eq.${siteId}&select=offline_at,netlify_site_id&limit=1`).catch(() => null);
+  const row = cur?.ok && Array.isArray(cur.json) ? cur.json[0] : null;
+  if (!row?.offline_at || !row.netlify_site_id) return false;
+  const list = await listDeploys(String(row.netlify_site_id), 10).catch(() => null);
+  const page = list?.ok ? list.deploys.find((d) => d.title === OFFLINE_PAGE_TITLE) : undefined;   // the newest: the host lists newest first
+  return !!page && UNFINISHED_DEPLOY.has(page.state) && nowMs - Date.parse(page.created_at) < HOLDING_PAGE_WAIT_MS;
+}
+
 /** The answer when the live site already had every file: nothing was sent. */
 export function unchangedMessage(kind: 'publish' | 'restore'): string {
   return kind === 'restore'
@@ -100,6 +126,8 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // Item 214: while publishing is locked, nothing goes live, by this or any other route
   const locked = await lockStop(site.id, publishActorKind(principal));
   if (locked) return json(locked.body, locked.status, cors);
+  // G10: wait for a holding page still on its way, as Take offline waits for a publish in flight
+  if (await holdingPageOnItsWay(site.id)) return json({ error: 'offline_in_progress', message: OFFLINE_IN_PROGRESS }, 409, cors);
 
   // ── M5: per-stage telemetry via structured logging (reuses the logging floor —
   //    no new monitoring system, no DB migration). `st` holds cumulative ms from
@@ -713,11 +741,13 @@ export async function handleCheckpointRestore(req: Request, site: SiteRow, princ
 // on-brand, noindex holding page over the live site through the SAME Netlify
 // deploy machinery every publish uses. Reversible by POST /site/online (restores
 // the last live version through the ONE pipeline) or by any ordinary publish
-// (runPipeline clears offline_at when a deploy goes live). Provenance-logged.
+// (runPipeline clears offline_at once the live version is up: a deploy going live,
+// or found up already; lib/deploy_reconcile.ts does for a deploy that finished
+// after its request, and a staff rollback to a live version does). Provenance-logged.
 
 /** Core take-offline, shared by the route and the scheduler (kind='offline'
  *  rows on presence_scheduled_publishes — G5's "unpublish at" leg). */
-export async function takeSiteOffline(site: SiteRow, principal: Principal): Promise<{ ok: true } | { ok: false; error: string; message: string; status: number }> {
+export async function takeSiteOffline(site: SiteRow, principal: Principal): Promise<{ ok: true; pending?: boolean } | { ok: false; error: string; message: string; status: number }> {
   if (PUBLISH_BLOCKED_STATES.includes(site.status)) return { ok: false, error: 'lifecycle_blocked', message: 'This site is archived and can’t be changed. Contact your studio to reactivate it.', status: 409 };
   if (site.status === 'paused' && principal.kind !== 'staff' && principal.kind !== 'system') return { ok: false, error: 'site_paused', message: 'Your site is currently paused. Contact your studio first.', status: 409 };
   const locked = await lockStop(site.id, publishActorKind(principal));   // item 214: the live site stays as it is
@@ -745,8 +775,12 @@ export async function takeSiteOffline(site: SiteRow, principal: Principal): Prom
   ]);
   const id0 = ident.json?.[0] || {};
   const html = renderOfflinePage({ businessName: id0.business_name, accent: brand.accent, email: id0.email, phone: id0.phone });
-  const dep = await deployFileMap(site.netlify_site_id, offlineFileMap(html), { title: 'offline holding page' });
+  const dep = await deployFileMap(site.netlify_site_id, offlineFileMap(html), { title: OFFLINE_PAGE_TITLE });
   if (!dep.ok) return { ok: false, error: 'deploy_failed', message: 'That didn’t go through — your live site is unchanged.', status: 502 };
+  // The host hadn't finished the page when the wait ran out: it is on its way, so the site is
+  // marked now, publishes wait for it (holdingPageOnItsWay), and if the host gives up on it,
+  // the next Bring back online finds the live version still up and lifts the mark.
+  const pending = dep.state !== 'ready';
 
   const mark = await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ offline_at: new Date().toISOString() }) });
   if (!mark.ok) {
@@ -756,14 +790,15 @@ export async function takeSiteOffline(site: SiteRow, principal: Principal): Prom
     return { ok: false, error: 'write_failed', message: 'The offline page may be up, but we couldn’t record it. Publish to bring your site back, or try again.', status: 502 };
   }
   await writeChangeEvent({ siteId: site.id, entityType: 'site', entityId: null, action: 'update', summary: `Took the website offline${principal.kind === 'system' ? ' on schedule' : ''} — visitors see a simple “temporarily offline” page. Every version is kept.`, principal, provenance: 'human', fields: ['offline_at'] });
-  console.log(JSON.stringify({ evt: 'site_offline', site_id: site.id, deploy_id: dep.deployId || null }));
-  return { ok: true };
+  console.log(JSON.stringify({ evt: 'site_offline', site_id: site.id, deploy_id: dep.deployId || null, state: dep.state || null }));
+  return pending ? { ok: true, pending: true } : { ok: true };
 }
 
 /** POST /site/offline — take the site offline (holding page over live). */
 export async function handleTakeOffline(site: SiteRow, principal: Principal, cors: Record<string, string>) {
   const r = await takeSiteOffline(site, principal);
   if (!r.ok) return json({ error: r.error, message: r.message }, r.status, cors);
+  if (r.pending) return json({ data: { ok: true, offline: true, pending: true, message: 'Your site is going offline. The host is still putting up the simple “temporarily offline” page, which can take a minute. Nothing was deleted, and publishing brings everything back.' } }, 200, cors);
   return json({ data: { ok: true, offline: true, message: 'Your site is offline. Visitors see a simple “temporarily offline” page — nothing was deleted, and publishing brings everything back.' } }, 200, cors);
 }
 
@@ -781,7 +816,8 @@ export async function handleBackOnline(site: SiteRow, principal: Principal, cors
   const s = snap.json?.[0];
   if (!s) return json({ error: 'not_restorable', message: 'No kept version is available to bring back — publish your draft instead.' }, 410, cors);
   const snapshot: Snapshot = { content: s.content, content_contract_version: s.content_contract_version, template_slug: s.template_slug, template_version: s.template_version, created_at: s.created_at, dev_customization: s.dev_customization ?? null };
-  // runPipeline clears offline_at the moment the deploy goes live — one invariant, one place.
+  // runPipeline clears offline_at once the live version is up (sent now, or found up already),
+  // and waits first for a holding page still on its way.
   return runPipeline(site, principal, 'restore', { snapshot, snapshotId: row.snapshot_id, mediaManifest: s.media_manifest || [] }, 'Brought the website back online', cors);
 }
 

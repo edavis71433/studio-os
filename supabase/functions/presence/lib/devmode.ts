@@ -102,6 +102,7 @@ export function projectFiles(templateSlug: string, templateVersion: string): Arr
     { path: 'styles/custom.css', kind: 'css', editable: true },
     { path: 'blocks/custom.html', kind: 'html', editable: true },
     { path: `templates/${templateSlug}/${templateVersion}/render.ts`, kind: 'template', editable: false },
+    { path: 'lib/template_kit.ts', kind: 'template', editable: false },   // the drawing every built-in template shares (item 103)
     { path: `templates/${templateSlug}/${templateVersion}/manifest.json`, kind: 'template', editable: false },
     { path: 'assets/media', kind: 'asset', editable: true },
   ];

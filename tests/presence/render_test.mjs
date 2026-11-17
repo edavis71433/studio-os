@@ -228,7 +228,9 @@ let _hp = 0;
 // so a hostile slug is unreachable in production — keep them valid here, exactly
 // as prod does, to test the real threat (hostile DISPLAY content) not a fiction.
 // The sections' kinds, ids and switches are the serializer's to refuse in the same way.
-const CONTENT_KEYS = new Set(['slug']);
+// A photo's file paths are the server's own too (lib/serializer.ts variantPath:
+// /img/<hash>-<width>.webp), never words an owner types.
+const CONTENT_KEYS = new Set(['slug', 'w400', 'w800', 'w1600']);
 const SECTION_KEYS = new Set(['type', 'id', 'style', 'size', 'side', 'aspect', 'kind', 'network']);
 const keepContent = (key) => CONTENT_KEYS.has(key);
 const keepSection = (key) => SECTION_KEYS.has(key) || /_ids?$/.test(key || '');
