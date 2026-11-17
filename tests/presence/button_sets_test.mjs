@@ -10,10 +10,11 @@ import { renderSnapshot, renderForBuilder, listTemplates, FIXED_COLOR_TEMPLATES 
 import { validateThemeTokens } from '../../supabase/functions/presence/lib/devmode.ts';
 import { contrastRatio, mix } from '../../supabase/functions/presence/lib/brand_kit.ts';
 import { BUTTON_SETS, FORM_STYLES, buttonSetOf, formStyleOf, applyButtonStyles, buttonStyle, siteColours, buttonChoice, contrast, mixHex } from '../../supabase/functions/presence/lib/site_buttons.ts';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); if (!p) console.log(`FAIL  ${n}${note ? ' — ' + note : ''}`); };
-const PAGE = Deno.readTextFileSync(new URL('../../presence.html', import.meta.url));
+const PAGE = editorSource();
 
 // ── the settings ──
 ok('five sets and three form styles', BUTTON_SETS.join() === 'filled,outline,pill,square,underline' && FORM_STYLES.join() === 'line,soft,round');

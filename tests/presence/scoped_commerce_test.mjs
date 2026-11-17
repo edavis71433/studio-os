@@ -14,6 +14,7 @@
 //   · un-scoped: the same routes answer exactly as before, with no audit row
 //
 //   deno run --allow-read --allow-env tests/presence/scoped_commerce_test.mjs
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 Deno.env.set('SUPABASE_URL', 'http://stub.local');
 Deno.env.set('SERVICE_ROLE_KEY', 'SERVICE-KEY');
 Deno.env.set('SUPABASE_ANON_KEY', 'ANON-KEY');
@@ -505,7 +506,7 @@ for (const [method, route, body, status] of [['GET', '/commerce/plans', undefine
   ok('index: scoped /commerce reaches its handler only after the data path is built', at('const db = siteDb(jwt, site, principal);') > 0 && at('handleScopedCommerce(req, db,') > at('const db = siteDb(jwt, site, principal);'));
   ok('index: …and before the first ordinary route', at('handleScopedCommerce(req, db,') > 0 && at('handleScopedCommerce(req, db,') < at("if (route === '/site' && method === 'GET')"));
 
-  const pres = read('presence.html');
+  const pres = editorSource();
   ok('presence: billing and deletion are gone from the builder, Settings owns them', !/mountBillingCard|mountDeletionCard/.test(pres));
   ok('presence: so are the plan card and the welcome', /if \(!studioInClient\(\)\) \{\s*renderFirstRun\(\);\s*renderPlanNotice\(\);/.test(pres));
   ok('presence: a payment notice goes to the billing card on Settings', /payment_trouble:\s*\{[^}]*settings\.html#billing/.test(pres) && /account_lapsed:\s*\{[^}]*settings\.html#billing/.test(pres));

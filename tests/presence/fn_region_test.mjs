@@ -23,15 +23,17 @@
 //   • the server allows the header on the answers these calls get.
 //   deno run --allow-read --allow-env tests/presence/fn_region_test.mjs
 import { corsFor, visitorCors } from '../../supabase/functions/_shared/cors.ts';
+import { editorSource, EDITOR_FILES } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const ROOT = new URL('../../', import.meta.url);
-const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
+const read = (p) => { if (p === 'presence.html') return editorSource(); return Deno.readTextFileSync(new URL(p, ROOT)); };   // builder item 38: the editor is four files now
 const results = [];
 const ok = (n, p, d = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${!p && d ? `\n      ${d}` : ''}`); };
 
 // the files the site serves from its root: pages and their shared scripts
 const INTERNAL = new Set(['email-signature.html', 'styleguide.html', 'a11y.html', 'provision.html']);
-const files = [...Deno.readDirSync(ROOT)].filter((e) => e.isFile && /\.(html|js)$/.test(e.name) && !INTERNAL.has(e.name)).map((e) => e.name).sort();
+// builder item 38: the editor's two scripts are read as part of presence.html (editorSource), not apart
+const files = [...Deno.readDirSync(ROOT)].filter((e) => e.isFile && /\.(html|js)$/.test(e.name) && !INTERNAL.has(e.name) && (e.name === 'presence.html' || !EDITOR_FILES.includes(e.name))).map((e) => e.name).sort();
 const src = Object.fromEntries(files.map((f) => [f, read(f)]));
 
 // The old marketing pages' lead forms send our key to clever-api, one write each, from the

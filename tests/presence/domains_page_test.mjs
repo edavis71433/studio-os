@@ -6,6 +6,7 @@
 // all its records, or write down whose account it is in. The rules first, then the
 // daily check writing the new facts against a stubbed registry, and the wiring. The
 // routes themselves are tested in studio_sites_test (section 9).
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL: 'https://app.example', RESEND_KEY: 're_test_unused', NETLIFY_AUTH_TOKEN: 'nf-test' })) Deno.env.set(k, v);
 
 const results = [];
@@ -255,7 +256,7 @@ const { mailHealth, domainHistory } = await import(`${P}/agency/sites.ts`);
   ok('the daily check and the sheet write a lookup the same way', /\.\.\.lookupPatch\(look\)/.test(read('supabase/functions/presence/commerce/lifecycle.ts')) && /lookupPatch\(await rdapLookupDetailed\(site\.custom_domain\)\)/.test(read('supabase/functions/presence/routes/admin.ts')));
   const dp = read('domains.html');
   ok('the studio panel reads a guide first, inside the client’s site, then puts it on their page', /apiSend\('POST','\/foundations\/prepare',\{\.\.\.helpBody\(goal\),preview:true\},scopeFor\(d\)\)/.test(dp) && /apiSend\('POST','\/foundations\/prepare',helpBody\(goal\),scopeFor\(d\)\)/.test(dp) && /'x-dds-scope-site':d\.site_id/.test(dp));   // item 174: helpBody adds Gmail's provider
-  const pr = read('presence.html');
+  const pr = editorSource();
   ok('the client’s sheet looks the typed domain up, names the company in step 1, offers the guides and shows every record', /"\/foundations\/domain\/lookup\?name=" \+ encodeURIComponent\(v\)/.test(pr) && /s1\.dataset\.step = "provider"/.test(pr) && /\["registrar_care", "Make sure it renews by itself"\]/.test(pr) && /all\.dataset\.records = "all"/.test(pr));
 }
 

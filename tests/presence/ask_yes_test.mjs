@@ -4,8 +4,9 @@
 // the question on a phone, and stops the whole page while it's up. 22 questions in the builder
 // used it. They ask through askYes now; the page keeps running while one is up, so the places
 // that picked something out before asking look it up again after.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
-const html = Deno.readTextFileSync(new URL('presence.html', ROOT));
+const html = editorSource();
 const results = [];
 const ok = (n, p, note = '') => { results.push(p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
 

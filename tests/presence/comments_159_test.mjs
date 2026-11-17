@@ -5,6 +5,7 @@
 // the name they typed and one picture (checked by its first bytes, kept privately),
 // the studio's list shows the name and a short-lived link (never the stored path), and
 // on a database without migration 0183 notes still save and read, without either.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', PREVIEW_LINK_SECRET: 'test-secret-159' })) Deno.env.set(k, v);
 const SC = await import('../../supabase/functions/presence/lib/section_comments.ts');
 const C = await import('../../supabase/functions/presence/routes/comments.ts');
@@ -115,7 +116,7 @@ const post = (body) => C.handleTokenComment(new Request('https://fn.example/p/s/
 
 // ── the editor and the database step ──
 {
-  const page = read('presence.html');
+  const page = editorSource();
   ok('a thread can show Open, Done or All, Open first while any note is open', /\["open", "Open \(" \+ t\.open_count \+ "\)"\], \["done", "Done \(" \+ done \+ "\)"\], \["all", "All"\]/.test(page) && /const show = CM_FILTER \|\| \(t\.open_count \? "open" : "all"\);/.test(page));
   ok('a client’s name shows beside “Client”', /c\.author_kind === "client" && c\.author_name\) who\.appendChild\(el\("span", "cm-name", c\.author_name\)\)/.test(page));
   ok('a note’s picture shows and opens full size', /const a = el\("a", "cm-pic"\); a\.href = c\.picture\.url; a\.target = "_blank"; a\.rel = "noopener";/.test(page));

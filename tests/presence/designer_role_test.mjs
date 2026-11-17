@@ -18,6 +18,7 @@
 //   · every role's sentence, and the migration that lets the role exist.
 //
 //   deno run --allow-read --allow-env --allow-net tests/presence/designer_role_test.mjs
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 for (const [k, v] of Object.entries({
   SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY',
   SITE_URL: 'https://studio.example', APP_URL: 'https://app.studio.example', RESEND_KEY: 're_test',
@@ -402,7 +403,7 @@ globalThis.fetch = async (url, init = {}) => {
   for (const need of ['publish', 'approve', 'design', 'business']) ok(`css: data-needs="${need}" goes for a role lacking it`, css.includes(`html[data-dds-lacks~="${need}"] [data-needs="${need}"]`));
   ok('css: the bell goes with the business; the page\'s own content goes outside the role', css.includes('html[data-dds-lacks~="business"] #dds-bell') && css.includes('html.dds-notyours body > :not([id^="dds-"])'));
   ok('css: a note for someone who can\'t publish shows in Publish\'s place', css.includes('html[data-dds-lacks~="publish"] [data-if-lacks="publish"][hidden]{display:inline-flex!important}'));
-  const builder = read('presence.html');
+  const builder = editorSource();
   ok('builder: all three Publish buttons are marked, each with its pill', ['id="btnPublish" type="button" data-needs="publish"', 'id="dcBtnPublish" data-needs="publish"', 'id="dockPublish" aria-pressed="false" data-needs="publish"', 'id="btnWaitPub" type="button" hidden data-if-lacks="publish"', 'id="dcBtnWait" hidden data-if-lacks="publish"', 'id="dockWait" aria-pressed="false" hidden data-if-lacks="publish"'].every((m) => builder.includes(m)));
   ok('builder: the publish step never opens for a role that can\'t publish', /function openRitual\(opts\) \{\n  if \(window\.ddsLacks && window\.ddsLacks\("publish"\)\) \{ openWaitNote\(\); return; \}/.test(builder));
   ok('builder: launching, scheduling, rolling back and publishing a preview are marked; approving a launch too', ['acts.lastChild.dataset.needs = "approve"; }', 'acts.lastChild.dataset.needs = "publish";   // builder item 220: a Designer goes live only when their seat says so', 'acts.lastChild.dataset.needs = "publish"; }', 'acts.lastChild.dataset.needs = "publish";   // builder item 220\n'].every((m) => builder.includes(m)));

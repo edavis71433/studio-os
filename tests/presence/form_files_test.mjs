@@ -9,6 +9,7 @@
 // new and seen against sent. Part C: the spreadsheet (form-answers.js), and the hooks in
 // the editor and the Inbox.
 import { installFakePostgrest } from './fake_pgrst.mjs';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
 const ok = (n, p, note = '') => { results.push(!!p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
@@ -174,7 +175,7 @@ const GOOD = { name: 'Ana', email: 'ana@customer.example', details: 'The gutter 
   ok('…commas and quotes stay inside their cell', lines[2].includes('"Old one, ""quoted"", with, commas"') && lines[2].endsWith(',Replied'));
   ok('…named for the form and the day', /^request-a-quote-answers-\d{4}-\d{2}-\d{2}\.csv$/.test(fileName('Request a quote')));
   ok('seen and sent, in words', seenLine({ seen: 214, sent: 9 }) === 'In the last 30 days about 214 visitors saw it and 9 sent it (4.2%).' && /couldn’t be counted/.test(seenLine({ seen: null, sent: 2 })) && /No visits to its page were counted/.test(seenLine({ seen: 0, sent: 0 })));
-  const ed = read('presence.html');
+  const ed = editorSource();
   ok('editor: “Photo or file” is a field type, and each form has Answers', ed.includes('["file", "Photo or file"]') && ed.includes('const ans = el("button", "ff-btn", "Answers");') && ed.includes('s.src = "/form-answers.js?v=1"') && ed.includes('get: (route) => api("GET", route)'));
   const ib = read('inbox.html');
   ok('Inbox: an enquiry’s files, each opened by its own ten-minute link', ib.includes('${leadFilesHtml(l)}') && ib.includes("api('/forms/inbox/'+encodeURIComponent(it.lead_id)+'/files/'+encodeURIComponent(b.getAttribute('data-lfile')))") && ib.includes('Sent with it:'));

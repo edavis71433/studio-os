@@ -5,6 +5,7 @@
 // suggest the matches, and the rules publishing keeps (500 at most, no chains, no
 // loops) hold, so an import never leaves a site that won't publish.
 import * as R from '../../supabase/functions/presence/lib/redirect_import.ts';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${p || !note ? '' : ' — ' + note}`); };
@@ -126,7 +127,7 @@ const rowOf = (plan, line) => plan.rows.find((r) => r.line === line);
   ok('the list and the single add both allow 500', /limit=\$\{REDIRECT_CAP\}`\)/.test(src) && /length >= REDIRECT_CAP\)/.test(src) && !/capped at 50/.test(src));
   ok('the old site is read only through the public-address guard, and never this site itself', /assertPublicHttpUrl\(u\)/.test(src) && /fetchPublic\(/.test(src) && /error: 'same_site'/.test(src));
   ok('GET /redirects/suggest is a read, before the forward-by-id routes', /route === '\/redirects\/suggest' && method === 'GET'\) return handleRedirectSuggest/.test(idx) && idx.indexOf("'/redirects/suggest'") < idx.indexOf('route.match(/^\\/redirects\\/([0-9a-f-]{36})$/)'));
-  const page = read('presence.html');
+  const page = editorSource();
   ok('the editor checks the list first and brings in only what it checked', /api\("POST", "\/redirects", \{ list: text, dry_run: true \}\)/.test(page) && /api\("POST", "\/redirects", \{ list: checked \}\)/.test(page) && /checked !== ta\.value/.test(page));
   ok('it reads the old site’s pages through the suggest route', /api\("GET", "\/redirects\/suggest\?from=" \+ encodeURIComponent\(v\)\)/.test(page));
 }

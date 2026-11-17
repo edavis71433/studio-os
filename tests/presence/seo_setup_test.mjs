@@ -8,8 +8,9 @@
 // Pure filesystem; no DOM, no network.
 //
 //   deno run --allow-read tests/presence/seo_setup_test.mjs
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
-const html = await Deno.readTextFile(new URL('presence.html', ROOT));
+const html = await editorSource();
 
 function extractFn(src, name) {
   const start = src.indexOf('function ' + name + '(');

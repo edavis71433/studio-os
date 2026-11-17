@@ -2,6 +2,7 @@
 //   deno run --allow-read --allow-env tests/presence/optimistic_lock_test.mjs
 // Pure optimistic-lock logic + the reused "what will change" diff engine +
 // structural wiring. No network.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const L = await import('../../supabase/functions/presence/lib/optimistic_lock.ts');
 const { readIfMatch, preconditionOutcome, staleConflictBody, guardStaleDraft, movesDraft, noteDraftBefore, withDraftVersion, DRAFT_VERSION_HEADER } = L;
 const D = await import('../../supabase/functions/presence/lib/diff.ts');
@@ -85,7 +86,7 @@ const content = (over = {}) => ({ identity: { business_name: 'Cafe' }, locations
   const room = read('supabase/functions/presence/routes/room.ts');
   ok('wiring: /changes exposes draft_hash (the version to publish with)', /draft_hash: st\.draftHash/.test(room) && /computeDraftHash\(snapshot\)/.test(room));
 
-  const html = read('presence.html');
+  const html = editorSource();
   ok('wiring: the editor sends If-Match through the ONE shared api() helper', /const version = named !== undefined \? named : S\.draftHash;/.test(html) && /"If-Match": version/.test(html));
   ok('wiring: the editor handles a stale_draft 409 (reload latest, never overwrite)', /error === "stale_draft"/.test(html) && /scheduleChangesRefresh\(\);\s+const lc = j\.last_change/.test(html));
   // a write waiting behind a refused one was built without the other person's change

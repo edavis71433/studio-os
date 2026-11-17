@@ -6,6 +6,7 @@
 // keyboard on load. Only Restaurant Classic said "Open now", and it said "Closed now" with
 // no hours entered. Favicons ignored the site's colours (Aurora wore Business Classic's
 // green). The sitemap dated every page to the last publish.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const results = [];
@@ -82,7 +83,7 @@ for (const s of SLUGS) {
 
 // ═══ the builder ═══
 {
-  const p = read('presence.html');
+  const p = editorSource();
   ok('the canvas toolbar shows only in Edit mode', /if \(IPE \|\| DC_MODE !== "edit"\) return;/.test(p));
   ok('in Comments mode the Contents rows keep their comment badge but offer no editing', (p.match(/if \(!CM_ON\) row\.appendChild\(acts\);/g) || []).length === 3);
   const d = read('developer.html');

@@ -7,13 +7,14 @@
 // by docs/design/audit/walks/ and pinned in tests/e2e (schedule/inbox/shell/cms).
 import { leadFollowupNoticeKey, leadIdOfNoticePeriod } from '../../supabase/functions/presence/lib/commercial.ts';
 import { buildNav } from '../../supabase/functions/presence/lib/navigation.ts';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
 
-const presence = read('presence.html');
+const presence = editorSource();
 const inbox = read('inbox.html');
 const workspace = read('supabase/functions/presence/routes/workspace.ts');
 const notice = read('supabase/functions/presence/lib/notice.ts');

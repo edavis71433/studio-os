@@ -13,6 +13,7 @@
 //     domain starts again;
 //   · the client's "I need to get one" guide warns about the renewal price.
 //   deno run --allow-read --allow-env --allow-net tests/presence/domain_access_222_test.mjs
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 Deno.env.set('SUPABASE_URL', 'http://stub.local');
 Deno.env.set('SERVICE_ROLE_KEY', 'service-key');
 Deno.env.set('RESEND_KEY', 'test-resend-key');
@@ -181,7 +182,7 @@ const ASK = { company: 'Namecheap', invite: 'hello@davisdigital.studio', note: '
 
 // ═══ 3. the pages ═══
 {
-  const pres = read('presence.html');
+  const pres = editorSource();
   const need = pres.slice(pres.indexOf('needPanel.dataset.need = "domain";'), pres.indexOf('const BUY = ['));
   ok('"I need to get one": warns to check the renewal price before buying, before the buy line', /Check the renewal price before you buy/.test(need) && /The first year is often cheap/.test(need) && need.indexOf('renewal price') < need.indexOf('Buy it in your own name'));
 }

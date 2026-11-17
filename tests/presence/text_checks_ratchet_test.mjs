@@ -20,7 +20,8 @@ const DIR = new URL('./', import.meta.url);
 const ALLOWED_FILE = new URL('text_checks_allowed.json', DIR);
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const READS = String.raw`Deno\.readTextFile(?:Sync)?`;
+// editorSource() (tests/presence/editor_source.mjs) reads the website editor's four files as one (builder item 38)
+const READS = String.raw`(?:Deno\.readTextFile(?:Sync)?|editorSource)`;
 
 // How many `ok(` lines in a suite test text it read from a file. A file's text is bound
 // to a name (`const sales = read('…')` or `= Deno.readTextFileSync(…)`), and a check uses

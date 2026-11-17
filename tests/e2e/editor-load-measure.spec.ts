@@ -23,7 +23,10 @@ import { API, PAGE_HTML, SECTIONS, SETTINGS } from './helpers/editor';
 test.skip(!process.env.MEASURE_EDITOR, 'a measurement, run by hand (MEASURE_EDITOR=1)');
 test.skip(({ browserName }) => browserName !== 'chromium', 'slowing the processor needs Chromium');
 
-const BASE = process.env.MEASURE_BASE || 'http://127.0.0.1:4729';
+// one build, or several to compare taken in turns (MEASURE_BASES=before=http://…,after=http://…), so a
+// busy machine slows each of them alike
+const BASES: Array<[string, string]> = (process.env.MEASURE_BASES || `this=${process.env.MEASURE_BASE || 'http://127.0.0.1:4729'}`)
+  .split(',').map((b) => b.split('=') as [string, string]);
 const RUNS = Number(process.env.MEASURE_RUNS || 5);
 const API_MS = Number(process.env.MEASURE_API_MS || 450);
 
@@ -55,7 +58,8 @@ const OBSERVE = () => {
   try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.name === 'first-contentful-paint') w.__fcp = e.startTime; }).observe({ type: 'paint', buffered: true }); } catch { /* not Chromium */ }
 };
 
-const kind = (u: string) => /\/functions\/v1\/presence/.test(u) ? 'api' : u.startsWith(BASE) ? 'page' : 'other';
+const kind = (u: string) => /\/functions\/v1\/presence/.test(u) ? 'api' : BASES.some(([, b]) => u.startsWith(b)) ? 'page' : 'other';
+const local = (u: string) => BASES.reduce((x, [, b]) => x.replace(b, ''), u);
 
 async function quiet(page: Page, reqs: Map<string, Req>, ms = 2000, cap = 30_000) {
   const t0 = Date.now();
@@ -70,7 +74,7 @@ async function quiet(page: Page, reqs: Map<string, Req>, ms = 2000, cap = 30_000
   }
 }
 
-async function openOnce(context: BrowserContext, profile: Profile) {
+async function openOnce(context: BrowserContext, profile: Profile, BASE: string) {
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
   const reqs = await watchNetwork(cdp);
@@ -112,7 +116,7 @@ async function openOnce(context: BrowserContext, profile: Profile) {
     requests: all.length - asks.length, pageFiles: page_.length, apiCalls: api.length, preflights: asks.length, other: all.length - page_.length - api.length - asks.length,
     pageBytes: sum(page_, 'bytes'), pageRaw: sum(page_, 'raw'),
     scriptRaw: sum(page_.filter((r) => r.type === 'Script' || /\.m?js(\?|$)/.test(r.url)), 'raw'),
-    files: page_.map((r) => `${r.url.replace(BASE, '')} ${r.bytes}`),
+    files: page_.map((r) => `${local(r.url)} ${r.bytes}`),
     apis: api.map((r) => `${r.method} ${r.url.replace(/^.*\/functions\/v1\/presence/, '')}`),
   };
   // Edit site: from the press to the canvas drawn and its toolbar wired
@@ -128,7 +132,7 @@ async function openOnce(context: BrowserContext, profile: Profile) {
 // signed out (no page.route, so the browser keeps files the way it would): open the editor, go
 // to another app page, come back, and see which of the page's own files the return downloads
 // again, asks about again (a 304), or takes from what the browser kept.
-async function secondVisit(context: BrowserContext) {
+async function secondVisit(context: BrowserContext, BASE: string) {
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
   await page.goto(BASE + '/presence');
@@ -142,7 +146,7 @@ async function secondVisit(context: BrowserContext) {
   const own = [...reqs.values()].filter((r) => kind(r.url) === 'page' && !/\/presence$/.test(r.url));
   await page.close();
   return {
-    all: own.map((r) => `${r.status} ${r.cached ? 'kept' : 'net'} ${r.url.replace(BASE, '')}`),
+    all: own.map((r) => `${r.status} ${r.cached ? 'kept' : 'net'} ${local(r.url)}`),
     fetched: own.filter((r) => !r.cached && r.status === 200).length,
     rechecked: own.filter((r) => r.status === 304).length,
     kept: own.filter((r) => r.cached).length,
@@ -150,25 +154,32 @@ async function secondVisit(context: BrowserContext) {
 }
 
 test('measure how the editor loads', async ({ browser }) => {
-  test.setTimeout(30 * 60_000);
-  const out: Record<string, unknown> = {};
+  test.setTimeout(60 * 60_000);
+  const out: Record<string, Record<string, unknown>> = {};
   for (const profile of Object.keys(PROFILES) as Profile[]) {
-    const runs = [];
+    const runs: Record<string, Array<Awaited<ReturnType<typeof openOnce>>>> = {};
     for (let i = 0; i < RUNS; i++) {
-      const context = await browser.newContext({ ...PROFILES[profile].context, serviceWorkers: 'block' });
-      runs.push(await openOnce(context, profile));
-      await context.close();
+      for (const [name, base] of BASES) {   // in turns, so a busy moment slows each alike
+        const context = await browser.newContext({ ...PROFILES[profile].context, serviceWorkers: 'block' });
+        (runs[name] ||= []).push(await openOnce(context, profile, base));
+        await context.close();
+      }
     }
-    const med = (k: string) => { const v = runs.map((r) => (r as unknown as Record<string, number>)[k]).sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
-    out[profile] = {
-      median: Object.fromEntries(['fcp', 'shown', 'usable', 'tbt', 'longTasks', 'editOpen', 'requests', 'pageFiles', 'apiCalls', 'preflights', 'other', 'pageBytes', 'pageRaw', 'scriptRaw'].map((k) => [k, med(k)])),
-      runs: runs.map(({ files, apis, ...r }) => r),
-      files: runs[0].files, apis: runs[0].apis,
-    };
+    for (const [name] of BASES) {
+      const rs = runs[name];
+      const med = (k: string) => { const v = rs.map((r) => (r as unknown as Record<string, number>)[k]).sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
+      (out[name] ||= {})[profile] = {
+        median: Object.fromEntries(['fcp', 'shown', 'usable', 'tbt', 'longTasks', 'editOpen', 'requests', 'pageFiles', 'apiCalls', 'preflights', 'other', 'pageBytes', 'pageRaw', 'scriptRaw'].map((k) => [k, med(k)])),
+        runs: rs.map(({ files, apis, ...r }) => r),
+        files: rs[0].files, apis: rs[0].apis,
+      };
+    }
   }
-  const ctx = await browser.newContext({ serviceWorkers: 'block' });
-  out.secondVisit = await secondVisit(ctx);
-  await ctx.close();
+  for (const [name, base] of BASES) {
+    const ctx = await browser.newContext({ serviceWorkers: 'block' });
+    out[name].secondVisit = await secondVisit(ctx, base);
+    await ctx.close();
+  }
   const json = JSON.stringify(out, null, 2);
   if (process.env.MEASURE_OUT) writeFileSync(process.env.MEASURE_OUT, json);
   console.log(json);

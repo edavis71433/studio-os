@@ -7,6 +7,7 @@ import { draftSectionHtml, buildSnapshot } from '../../supabase/functions/presen
 import { getTemplate, renderSnapshot, listTemplates, latestTemplateVersion } from '../../supabase/functions/presence/lib/render.ts';
 import { withSampleWords } from '../../supabase/functions/presence/lib/sample_words.ts';
 import { SAMPLE_BLOCKS, FILE_ID } from '../../scripts/thumbnails/samples.ts';
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -78,7 +79,7 @@ const LIST = [
 // photos the drawing lists (presence.html dcLiveNow, routes/preview.ts). So each type, from the
 // picker's own sample, draws as one stamped element, lists every photo it shows, and is byte
 // for byte the section the draft preview draws from the same list.
-const PAGE = Deno.readTextFileSync(new URL('../../presence.html', import.meta.url));
+const PAGE = editorSource();
 const defs = PAGE.slice(PAGE.indexOf('const BLOCK_DEFS = ['), PAGE.indexOf('\n];', PAGE.indexOf('const BLOCK_DEFS = [')));
 const offered = [...defs.matchAll(/\{ type: "([a-z_]+)", name: "/g)].map((m) => m[1]);
 const unsampled = offered.filter((t) => !SAMPLE_BLOCKS[t]);

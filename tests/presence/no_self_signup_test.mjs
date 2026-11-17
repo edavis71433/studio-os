@@ -11,6 +11,7 @@
 //     the partner set-up pack is retired (finding 47).
 //
 //   deno run --allow-read --allow-env tests/presence/no_self_signup_test.mjs
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 Deno.env.set('SUPABASE_URL', 'http://stub.local');
 Deno.env.set('SERVICE_ROLE_KEY', 'SERVICE-KEY');
 Deno.env.set('SUPABASE_ANON_KEY', 'ANON-KEY');
@@ -98,7 +99,7 @@ async function ask(method, route, body) {
 
 // ═══ 5. nothing else links the old price page for a plan ═══
 {
-  const presence = read('presence.html');
+  const presence = editorSource();
   const fn = presence.slice(presence.indexOf('const NOTICE_ACTION = {'), presence.indexOf('// Only alerts about this website or this account reach the website page.'));
   ok('the builder\'s plan card opens Settings → Your plan, never the old price page', !/pricing\.html/.test(fn) && (fn.match(/settings\.html#billing/g) || []).length >= 7);
   const life = read('supabase/functions/presence/commerce/lifecycle.ts');

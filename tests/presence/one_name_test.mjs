@@ -6,8 +6,9 @@
 // on a restaurant's phone "Menu" is also the dishes); updates were "broadcasts";
 // customers were "clients". This keeps the old names off the pages and out of the
 // server's own sentences. Comments and code names can keep them.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
-const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
+const read = (p) => { if (p === 'presence.html') return editorSource(); return Deno.readTextFileSync(new URL(p, ROOT)); };   // builder item 38: the editor is four files now
 const results = [];
 const ok = (n, p, note = '') => { results.push(p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
 
@@ -34,7 +35,7 @@ for (const [file, olds] of CHECKS) {
   for (const old of olds) ok(`${file}: no "${old}"`, !src.includes(old));
 }
 // and the new names are where the old ones were
-const presence = read('presence.html');
+const presence = editorSource();
 ok('Edit mode’s past-versions button says Versions', /data-dcmode="timewarp"[^>]*><span class="dc-dk-l">Versions<\/span><\/button>/.test(presence));   // the dock item: an icon is drawn in front of the word at run time
 ok('the phone dock’s button is named for the sheet it opens', /data-tab="sections" aria-pressed="false">Sections<\/button>/.test(presence) && /<h2>Sections<\/h2>/.test(presence));
 ok('Find anything takes the places’ names from the menu', /function findPlaces\(\) \{\s*return SITE_TABS\.filter/.test(presence) && /\["design", "Edit site"\]/.test(presence));

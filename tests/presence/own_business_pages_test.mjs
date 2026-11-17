@@ -18,6 +18,7 @@
 //   · a context that names neither (an older server) → the shell decides, as it does for itself
 //
 //   deno run --allow-read tests/presence/own_business_pages_test.mjs
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const results = [];
@@ -209,7 +210,7 @@ const conn = read('connections.html');
 }
 
 // ── presence.html: its own context (S.ctx), the shell's, else the shell's memory ──
-const pres = read('presence.html');
+const pres = editorSource();
 {
   const src = grab(pres, /function studioInClient\(\) \{[\s\S]*?\n\}/, 'presence studioInClient');
   matrix('website editor', (c) => new Function('location', 'S', 'window', `${src}\nreturn studioInClient();`)({ search: search(c) }, { ctx: c.ctx }, { ...c.win }), [...CASES, ODD]);

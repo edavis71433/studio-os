@@ -6,6 +6,7 @@
 // studio", connections.ts logs the operator, migration 0133 + its apply pack
 // widen the CHECKs, and the two pages carry the scoped copy while the owner's
 // copy stays byte-identical. No network, no database.
+import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 const AK = await import('../../supabase/functions/presence/lib/actor_kind.ts');
 const { actsForClient, publishActorKind, changeActorKind, connectionActorKind, studioActed, lastPublishDetail, actorKindCheckViolation, legacyActorKind } = AK;
 
@@ -123,7 +124,7 @@ ok('degrade: operator → staff (still the studio\'s hand); everything else unto
 
 // ═══ 8. the pages ═══
 {
-  const html = read('presence.html');
+  const html = editorSource();
   ok('presence.html: scopedClientName reads ?client= + the shell context\'s scope.name', /function scopedClientName\(\)/.test(html) && /window\.__ddsContext, sc = c && c\.scope/.test(html));
   ok('presence.html: scoped ritual title names the client\'s site', /Here’s what changes on \$\{possessive\(forClient\)\} site/.test(html));
   ok('presence.html: scoped intro — THEIR customers, THEIR site, YOU decide', /read exactly as their customers will experience \$\{c\.count === 1 \? "it" : "them"\}\. Their live site stays as it is until you decide\./.test(html));
