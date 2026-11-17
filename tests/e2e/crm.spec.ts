@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installApp, pressButton } from './helpers/app';
+import { installApp, onAsk, pressButton } from './helpers/app';
 import { settled } from './helpers/app';
 import { headerAction } from './helpers/page-header';
 
@@ -960,7 +960,7 @@ test.describe('Client record — editing and removing the contact', () => {
     // Playwright's auto-dismiss and the second dialog arrives already handled.
     const seen: string[] = [];
     let answer: 'dismiss' | 'accept' = 'dismiss';
-    page.on('dialog', (d) => { seen.push(d.message()); answer === 'accept' ? d.accept() : d.dismiss(); });
+    await onAsk(page, (q) => { seen.push(q); return answer === 'accept'; });
 
     // FIRST: back out. The dry run has already happened; nothing else may write.
     await page.locator('#ec-del').click();

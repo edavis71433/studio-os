@@ -387,6 +387,36 @@ html.dds-embed .dds-waffle{display:none!important}
   html.dds-side .dds-toast{max-width:min(460px,calc(100vw - var(--dds-side-w) - var(--dds-side-gap) * 2 - 32px))}
 }
 
+/* ── The one styled confirm and its small prompt (shell-kit.js ddsConfirm and
+   ddsAsk, builder item 101). The builder's question dialog (item 33), for the
+   whole product: a card on a dimmed page, the question in bold, what it means
+   below, Cancel and the answer as pills. A question that removes, sends or
+   replaces something has a red answer and starts on Cancel. */
+dialog.dds-dlg{border:none;border-radius:var(--dds-r-xl,20px);padding:0;width:min(440px,calc(100% - 32px));max-height:calc(100% - 32px);overflow:auto;
+  background:var(--dds-card,#fff);color:var(--dds-ink,#171522);box-shadow:var(--dds-shadow-pop);font-family:var(--dds-sans)}
+dialog.dds-dlg::backdrop{background:rgba(23,21,34,.45)}
+.dds-dlg form{margin:0;padding:22px 22px 18px}
+.dds-dlg .dlg-t{margin:0 0 6px;font-family:var(--dds-sans);font-size:17px;font-weight:700;line-height:1.35;letter-spacing:-.01em}
+.dds-dlg .dlg-d{margin:0;font-size:14px;line-height:1.55;color:var(--dds-soft);white-space:pre-line}
+.dds-dlg .dlg-q{margin:0;font-size:15px;line-height:1.55;white-space:pre-line}
+.dds-dlg .dlg-l{display:block;margin:14px 0 6px;font-size:13px;font-weight:600;color:var(--dds-soft)}
+.dds-dlg .dds-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:0}
+.dds-dlg input{display:block;width:100%;box-sizing:border-box;margin-top:14px;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--dds-line-strong);border-radius:var(--dds-r-sm,8px);background:var(--dds-card);color:inherit}
+.dds-dlg .dlg-l + input{margin-top:0}
+.dds-dlg .dlg-row{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:20px}
+.dds-dlg .dlg-row button{font:inherit;font-size:14px;font-weight:600;line-height:1.2;border-radius:999px;padding:10px 18px;min-height:44px;cursor:pointer;
+  border:1px solid var(--dds-line-strong);background:var(--dds-card);color:var(--dds-ink)}
+.dds-dlg .dlg-row .ask-ok{background:var(--dds-grad-btn);border-color:transparent;color:var(--dds-on-p)}
+.dds-dlg.danger .dlg-row .ask-ok{background:var(--dds-bad);color:var(--dds-card)}
+.dds-dlg .dlg-row button:focus-visible{outline:2px solid var(--dds-p);outline-offset:2px}
+@media (max-width:480px){.dds-dlg .dlg-row button{flex:1 1 40%}}
+
+/* ── The sign-in has run out (shell-kit.js): once, under the top bar, with the way back ── */
+#dds-signin-again{position:fixed;top:var(--dds-shell-h,54px);left:0;right:0;z-index:2147483003;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 14px;
+  padding:8px 16px;background:var(--dds-bad-soft);color:var(--dds-bad);font-family:var(--dds-sans);font-size:14px;font-weight:600;line-height:1.4;text-align:center;box-shadow:var(--dds-shadow)}
+#dds-signin-again .go{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:999px;background:var(--dds-bad);color:var(--dds-card);text-decoration:none;font-weight:700}
+#dds-signin-again .go:focus-visible{outline:2px solid var(--dds-ink);outline-offset:2px}
+
 /* Legacy alias tokens — a few components referenced --dds-accent; keep them
    pointing at the real palette so dark mode never falls back to light values. */
 :root{--dds-accent:var(--dds-p);--dds-accent-soft:var(--dds-p-soft)}
@@ -485,6 +515,39 @@ html.dds-embed .dds-waffle{display:none!important}
     background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 fill=%27none%27 stroke=%27%236b6478%27 stroke-width=%271.6%27/%3E%3C/svg%3E");
     background-repeat:no-repeat; background-position:right 11px center; background-size:10px 6px; }
 }
+
+/* 4c) Builder item 98 (Nov 16): the rest of the floor, found by pressing around every control
+      on a touch screen (tests/e2e/tap-targets-98.spec.ts): the shell's brand mark, an icon
+      button as wide as it is tall, a field as tall as a button, and a link that stands on its
+      own (a link inside a sentence may stay the size of its words). */
+@media (pointer:coarse){
+  .dds-brand{ min-height:44px; }
+  html.dds-app .lbtn,html.dds-app .cardmenu button{ min-width:44px; text-align:center; }
+  html.dds-app input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  html.dds-app textarea{ min-height:44px; }
+  html.dds-app .rfoot a,html.dds-app .allc,html.dds-app .linkish,html.dds-app .dds-ph-trail a{ display:inline-flex; align-items:center; min-height:44px; }
+  html.dds-app .fchips button,html.dds-app .link-btn,html.dds-app .dds-ph-trail a{ min-width:44px; justify-content:center; }
+  #dds-mbar a,#dds-mbar button{ min-height:44px; }
+  html .dds-ph-pick{ min-height:44px; }
+  /* a page's filled button, its link-buttons, Home's Snooze and This week rows, the header's overflow items */
+  html.dds-app button.primary,html.dds-app .qlink,html.dds-app .dds-ph-more > *{ min-height:44px; }
+  html.dds-app .linkbtn{ display:inline-flex; align-items:center; min-height:44px; }
+  html.dds-app .todaycard a{ min-height:44px; align-items:center; }
+}
+
+/* 4d) Builder item 98: a row that scrolls sideways shows it (shell.js scrollCues). The row fades
+      out at the edge that has more; a row of chips also gets a round arrow at its end, which
+      stays in place while the row moves, and goes once the end is in view. */
+.dds-cue-r{ -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 56px),transparent); mask-image:linear-gradient(to right,#000 calc(100% - 56px),transparent); }
+.dds-cue-l{ -webkit-mask-image:linear-gradient(to left,#000 calc(100% - 56px),transparent); mask-image:linear-gradient(to left,#000 calc(100% - 56px),transparent); }
+.dds-cue-l.dds-cue-r{ -webkit-mask-image:linear-gradient(to right,transparent,#000 56px,#000 calc(100% - 56px),transparent); mask-image:linear-gradient(to right,transparent,#000 56px,#000 calc(100% - 56px),transparent); }
+/* a chip row keeps its arrow solid: the fade stops where the arrow starts */
+.dds-cue-r:has(> .dds-cue-more){ -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 96px),transparent calc(100% - 48px),#000 calc(100% - 48px)); mask-image:linear-gradient(to right,#000 calc(100% - 96px),transparent calc(100% - 48px),#000 calc(100% - 48px)); }
+.dds-cue-l.dds-cue-r:has(> .dds-cue-more){ -webkit-mask-image:linear-gradient(to right,transparent,#000 56px,#000 calc(100% - 96px),transparent calc(100% - 48px),#000 calc(100% - 48px)); mask-image:linear-gradient(to right,transparent,#000 56px,#000 calc(100% - 96px),transparent calc(100% - 48px),#000 calc(100% - 48px)); }
+.dds-cue-more{ display:none; }
+.dds-cue-r > .dds-cue-more{ display:grid; place-items:center; position:sticky; right:0; flex:0 0 44px; width:44px; height:44px; margin-left:auto; align-self:center;
+  border-radius:999px; background:var(--dds-card,#fff); color:var(--dds-p); box-shadow:0 2px 8px rgba(23,21,34,.16); cursor:pointer; z-index:1; }
+.dds-cue-r > .dds-cue-more::before{ content:""; width:9px; height:9px; border:solid currentColor; border-width:2.4px 2.4px 0 0; transform:translateX(-2px) rotate(45deg); border-radius:1px; }
 
 /* 5) Page-local toasts sit behind the mobile bar; lift them centrally (shell.css
       loads only on app pages, so this is scoped to the app). */

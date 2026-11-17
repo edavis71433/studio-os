@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, onAsk } from './helpers/app';
 
 // Sales items 107 and 108 (the Nov 10 bug hunt's J findings): the record's Billing tab
 // tells the truth and shows all the money.
@@ -53,7 +53,7 @@ test.describe('item 107 — Billing tells the truth', () => {
     const open = { id: INV_OPEN, title: 'Logo add-on', amount_cents: 30000, purpose: 'service', status: 'open', stripe_url: 'https://pay.example/o', due_date: '2099-12-01', created_at: '2026-11-01T12:00:00Z' };
     await installApp(page, { api: API({ invoices: [open] }) });
     await page.route(`**/functions/v1/presence/sales/invoices/${INV_OPEN}/void`, (route) => route.fulfill(json({ data: { ok: true, id: INV_OPEN, status: 'void', link_deactivated: false } })));
-    page.on('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
     await billing(page).getByRole('button', { name: 'Void' }).click();
     const t = toastWith(page, 'may still be live');
@@ -167,14 +167,14 @@ test.describe('item 108 — the record shows all the money', () => {
     const asked: string[] = [];
     await page.route(`**/functions/v1/presence/sales/recurring/${REC}/skip`, (route) => { asked.push('skip'); return route.fulfill(json({ data: { next_on: '2100-01-01' } })); });
     let confirmText = '';
-    page.on('dialog', (d) => { confirmText = d.message(); d.accept(); });
+    await onAsk(page, (q) => { confirmText = q; return true; });
     await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
     const row = page.locator('#bRecurring .rrow');
     await expect(row).toContainText('Website care · $150 every month');
     await expect(row).toContainText('2 sent');
     await row.getByRole('button', { name: 'Skip this one' }).click();
     await expect.poll(() => asked.length).toBe(1);
-    expect(confirmText).toContain('Skip the Dec 1 invoice?');
+    expect(confirmText).toContain('Skip the Dec 1, 2099 invoice?');   // builder item 101: a date in another year says its year
     await expect(toastWith(page, 'Skipped — the next one goes out Jan 1')).toBeVisible();
   });
 

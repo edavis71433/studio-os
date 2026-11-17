@@ -83,13 +83,12 @@
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
-<script src="/vendor/supabase-js-2.45.4.js"></script>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
-const FN=SUPABASE_URL+"/functions/v1/presence";
-const FN_REGION='us-west-2';   // run the server beside the database (Oregon), not nearest the visitor: see shell.js
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="",DATA=null,SHOW='all';
@@ -100,20 +99,15 @@ const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // (ddsScopeInfo, once its context is in); without it, the address decides, as before.
 const SHELL_READY=document.readyState==='loading'?new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true})):Promise.resolve();   // shell.js (deferred) is in by DOMContentLoaded. Made now, while the page parses: after an await, readyState can already say 'interactive' with shell.js still on its way
 async function inClientNow(){const id=scope();if(!id)return false;await SHELL_READY;if(window.ddsContext)await window.ddsContext().catch(()=>null);return window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)?!!window.ddsScopeInfo():true;}
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'x-dds-user-jwt':TOKEN,'x-dds-scope-site':scope(),'x-region':FN_REGION});
-async function api(path,method,body){let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,body:{}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
-function toast(m,bad,action){if(window.ddsToast)return void ddsToast(m,bad?'err':'ok',action);}
+const api=(path,method,body)=>ddsApi(path,{method,body,scope:scope()});   // every read and save carries the address's business
+const toast=(m,bad,action)=>ddsToast(m,bad?'err':'ok',action);   // the shell's one toast
 const ICON={customer:'<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',deal:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',todo:'<path d="M5 12l5 5 9-10"/>',contact:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21.5 20"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'};
 const svg=(k)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICON[k]}</svg>`;
-const money=(c)=>c?'$'+(c/100).toLocaleString('en-US',{minimumFractionDigits:c%100?2:0,maximumFractionDigits:2}):'';
-const niceDay=(s)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';};
-// "Deleted 3 days ago", by the local calendar day
-function ago(iso){
-  const t=Date.parse(iso||'');if(!isFinite(t))return'';
-  const day=(ms)=>{const d=new Date(ms);return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());};
-  const n=Math.round((day(Date.now())-day(t))/86400000);
-  if(n<=0)return'Deleted today';if(n===1)return'Deleted yesterday';if(n<7)return`Deleted ${n} days ago`;if(n<14)return'Deleted last week';return`Deleted ${Math.floor(n/7)} weeks ago`;
-}
+const money=(c)=>ddsMoney(c);   // the shell's one money format: no amount is left out, $0 reads $0
+const niceDay=(s)=>{const m=/^\d{4}-\d{2}-\d{2}/.exec(String(s||''));return m?ddsDate.short(m[0]):'';};   // the shell's day words: "Nov 3", with the year when it isn't this one
+// "Deleted 3 days ago", by the local calendar day: the shell's words (ddsDate.ago) after "Deleted"; a time
+// a little ahead of this device's clock is still today
+function ago(iso){const w=ddsDate.ago(iso);return w?'Deleted '+(w==='soon'?'today':w):'';}
 // one list of everything, newest first, each row saying what it is
 function rowsOf(d){
   const out=[];

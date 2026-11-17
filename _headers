@@ -164,6 +164,9 @@
 # the app shell every signed-in page loads (the menu, the bell, search)
 /shell.js
   Cache-Control: no-cache, must-revalidate
+# the shell's shared helpers (builder item 101): loaded before each page's own script
+/shell-kit.js
+  Cache-Control: no-cache, must-revalidate
 /shell.css
   Cache-Control: no-cache, must-revalidate
 # "+ Create" (create.js) — the shell loads it on idle; same policy as shell.js

@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, onAsk } from './helpers/app';
 
 // "The price is typed once and flows to the end", the page halves of
 // tests/presence/sales_price_flow_test.mjs that pipeline.spec.ts and sign.spec.ts didn't
@@ -67,7 +67,7 @@ test.describe('deal drawer: the money-blank warning on every way out', () => {
     await expect.poll(async () => (await conBody(page).inputValue()).length, { timeout: 7000 }).toBeGreaterThan(1000);   // the package seeds itself first
     await conBody(page).fill(MONEY_BLANKS);
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await onAsk(page, (q) => { msg = q; return false; });
     await page.locator('#conForm .row2 .btn:not(.ghost)').click();                      // Save & send for signature →
     await expect(page.locator('.dds-toast')).toContainText('Not sent — set the deal value in Details first.');
     expect(msg).toContain('the deal has no value set');
@@ -75,7 +75,7 @@ test.describe('deal drawer: the money-blank warning on every way out', () => {
     expect(seen).toEqual([]);                                                           // not even saved as a draft
     await expect(conBody(page)).toHaveValue(MONEY_BLANKS);                               // the form is as he left it
     // it warns, it never blocks: yes saves the draft, then sends it
-    page.once('dialog', (d) => d.accept());
+    await onAsk(page, () => true);
     await page.locator('#conForm .row2 .btn:not(.ghost)').click();
     await expect.poll(() => seen.map((w) => `${w.method} ${w.path}`)).toEqual([`POST /sales/deals/${DEAL}/contracts`, 'POST /sales/contracts/k-new/send']);
     expect(seen[0].body).toMatchObject({ body: MONEY_BLANKS });
@@ -89,7 +89,7 @@ test.describe('deal drawer: the money-blank warning on every way out', () => {
     const seen = await writesTo(page);
     await page.goto(`/pipeline.html?deal=${DEAL}&dtab=billing`);
     let msg = '';
-    page.once('dialog', (d) => { msg = d.message(); d.dismiss(); });
+    await onAsk(page, (q) => { msg = q; return false; });
     await page.locator('#sendBothBtn').click();
     await expect(page.locator('.dds-toast')).toContainText('Not sent — set the deal value in Details first.');
     expect(msg).toContain('the deal has no value set');

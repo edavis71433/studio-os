@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { installApp } from './helpers/app';
+import { installApp, onAsk } from './helpers/app';
 
 // Sales items 77, 81 and 82 (Nov 10 review): a payment made by check, cash, bank transfer
 // or Zelle is recorded on the invoice (all of it, or a part), and undone if it was a
@@ -113,7 +113,7 @@ test.describe('item 77 — record a payment on the record', () => {
     const undone: string[] = [];
     await page.route(`**/functions/v1/presence/sales/invoices/${PAID}/payment/undo`, (route) => { undone.push(route.request().method()); return route.fulfill(json({ data: { undone: true, part: false, fresh_link: true, moved_back: 'contract' } })); });
     let asked = '';
-    page.on('dialog', (d) => { asked = d.message(); d.accept(); });
+    await onAsk(page, (q) => { asked = q; return true; });
     await recordBilling(page);
     const row = invRow(page, PAID);
     await expect(row).toContainText('#0012 · Deposit');

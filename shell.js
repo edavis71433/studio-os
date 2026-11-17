@@ -13,13 +13,7 @@
   var SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
   var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
   var FN = SUPABASE_URL + "/functions/v1/presence";
-  // x-region: run the server beside the database in Oregon, not in the region nearest the
-  // visitor. From the east coast each of the small database calls behind one answer crossed
-  // the country: about 1 s an answer, 0.4 s beside the database (client.html, Nov 15 2026).
-  // A signed-in call always gains: the server checks who is asking against the database
-  // before anything else. The push key reads no database, so asking would only add a trip.
-  // Only for our own functions: Storage uploads and other hosts don't allow the header.
-  var FN_REGION = 'us-west-2';
+  // The calls themselves go through shell-kit.js (window.ddsApi), which says why they carry x-region.
   var TOKEN = "";
 
   // ── Appearance: every app page ships light + dark tokens keyed on
@@ -139,12 +133,7 @@
     var hash = '', h = href, hi = h.indexOf('#'); if (hi >= 0) { hash = h.slice(hi); h = h.slice(0, hi); }
     return h + (h.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(s) + hash;
   }
-  function api(path) {
-    var s = scopeId();
-    return fetch(FN + path, { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': s, 'x-region': FN_REGION } })
-      .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, status: r.status, body: b }; }).catch(function () { return { ok: r.ok, status: r.status, body: {} }; }); })
-      .catch(function () { return { ok: false, status: 0, body: {} }; });
-  }
+  function api(path) { return window.ddsApi(path); }   // shell-kit.js: the one API helper
 
   // ── THE shared API helper for app pages ──────────────────────────────────────
   // Every app page historically defines its own api() fetch wrapper (~28 copies);
@@ -175,16 +164,9 @@
     window.ddsOpenEditor(a.href);
   }, true);
 
-  // opts.scope: '' sends a request without the client in the address (sales item 91: the studio's
-  // own book, read and written from inside a client, as crm.html's apiAg does)
-  window.ddsApi = function (path, opts) {
-    opts = opts || {};
-    var init = { method: opts.method || 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': opts.scope !== undefined ? opts.scope : scopeId(), 'x-region': FN_REGION } };
-    if (opts.body !== undefined) init.body = typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
-    return fetch(FN + path, init)
-      .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, status: r.status, body: b }; }).catch(function () { return { ok: r.ok, status: r.status, body: {} }; }); })
-      .catch(function () { return { ok: false, status: 0, body: {} }; });
-  };
+  // The one API helper (window.ddsApi), the toast, the styled confirm, money and dates live in
+  // shell-kit.js (builder item 101), which every page loads before its own script and this one.
+  // opts.scope: '' sends a request without the client in the address (sales item 91).
 
   // ── An emailed reply's quoted earlier email (item 71, Nov 2026). A client who
   //    answers by email sends back the whole thread under their words ("On Sun,
@@ -248,19 +230,15 @@
     function style() {
       if (styled) return; styled = true;
       var st = document.createElement('style');
-      st.textContent = '.dds-ask{border:none;border-radius:12px;padding:0;width:min(420px,calc(100% - 32px));background:var(--card,#fff);color:var(--ink,#1b1525);box-shadow:0 20px 60px rgba(0,0,0,.3)}'
-        + '.dds-ask::backdrop{background:rgba(27,21,37,.4)}.dds-ask form{padding:20px}.dds-ask h2{margin:0 0 10px;font-size:17px}'
-        + '.dds-ask label{display:block;font-size:13px;color:var(--soft,#5c5468);margin-bottom:6px}.dds-ask input{width:100%;box-sizing:border-box;font:inherit;font-size:15px;padding:9px 12px;border:1px solid var(--line,#e6e1ee);border-radius:8px;background:var(--card,#fff);color:inherit}'
-        + '.dds-ask .row{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.dds-ask button{font:inherit;font-size:14px;font-weight:600;border-radius:8px;padding:8px 16px;cursor:pointer;border:1px solid var(--line,#e6e1ee);background:var(--card,#fff);color:inherit}.dds-ask button[value=ok]{background:var(--p,#5b3fa0);border-color:var(--p,#5b3fa0);color:#fff}'
-        + '.dds-colmenu{position:absolute;z-index:40;top:calc(100% + 4px);left:0;min-width:200px;background:var(--card,#fff);border:1px solid var(--line,#e6e1ee);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:8px}'
+      st.textContent = '.dds-colmenu{position:absolute;z-index:40;top:calc(100% + 4px);left:0;min-width:200px;background:var(--card,#fff);border:1px solid var(--line,#e6e1ee);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:8px}'
         + '.dds-colmenu label{display:flex;align-items:center;gap:8px;padding:7px 8px;font-size:14px;border-radius:6px;cursor:pointer}.dds-colmenu label:hover{background:var(--p-soft,#efe9fa)}.dds-colmenu input{width:16px;height:16px}'
         + '.dds-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 10px;padding:8px 12px;border:1px solid var(--p,#5b3fa0);border-radius:10px;background:var(--p-soft,#efe9fa);font-size:13.5px}'
         + '.dds-bulk b{margin-right:4px}.dds-bulk button,.dds-bulk select{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:5px 12px;min-height:32px;border:1px solid var(--line,#e6e1ee);background:var(--card,#fff);color:var(--ink,#1b1525);cursor:pointer}'
         + '.dds-bulk .go{background:var(--p,#5b3fa0);border-color:var(--p,#5b3fa0);color:#fff}.dds-bulk .clr{border-color:transparent;background:none;color:var(--p,#5b3fa0)}'
         + 'td.pick,th.pick{width:34px;padding-right:0!important;cursor:pointer}td.pick input,th.pick input{width:17px;height:17px;cursor:pointer}'
         // final pass (Nov 8, batch C): white on the dark theme's light purple read 2.3:1 — dark text on the filled buttons
-        + '@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .dds-ask button[value=ok],:root:not([data-theme="light"]) .dds-bulk .go,:root:not([data-theme="light"]) .dds-confirm .go{color:#171320}}'
-        + ':root[data-theme="dark"] .dds-ask button[value=ok],:root[data-theme="dark"] .dds-bulk .go,:root[data-theme="dark"] .dds-confirm .go{color:#171320}'
+        + '@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .dds-bulk .go,:root:not([data-theme="light"]) .dds-confirm .go{color:#171320}}'
+        + ':root[data-theme="dark"] .dds-bulk .go,:root[data-theme="dark"] .dds-confirm .go{color:#171320}'
         // …a confirm that asks in place, where the button was
         + '.dds-confirm{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px 8px}.dds-confirm .q{font-weight:600}'
         + '.dds-confirm button{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:5px 12px;min-height:32px;border:1px solid var(--line,#e6e1ee);background:var(--card,#fff);color:var(--ink,#1b1525);cursor:pointer}'
@@ -278,6 +256,8 @@
         + '.dds-fclear{font:inherit;font-size:13px;font-weight:600;border:0;background:none;color:var(--p,#5b3fa0);padding:5px 8px;cursor:pointer;min-height:32px}'
         // …and on a phone every control here is at least 44px, the pick cell included
         + '@media (max-width:767px){td.pick,th.pick{width:44px;min-width:44px}td.pick input,th.pick input{width:22px;height:22px}.dds-bulk button,.dds-bulk select,.dds-confirm button{min-height:44px}.dds-colmenu label{min-height:44px}.dds-askin select,.dds-askin input,.dds-fchip,.dds-fclear{min-height:44px}.dds-askin input[type=text]{min-width:0;flex:1 1 160px}}'
+        // builder item 98: a touch tablet too (wider than a phone, the same finger)
+        + '@media (pointer:coarse){.dds-bulk button,.dds-bulk select,.dds-confirm button,.dds-colmenu label,.dds-askin select,.dds-askin input,.dds-fchip,.dds-fclear{min-height:44px}}'
         // Safari draws a native drop-down at its own height whatever min-height says — the bulk bar's is drawn here, arrow included
         + '.dds-bulk select{-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 viewBox=%270 0 10 6%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 fill=%27none%27 stroke=%27%236b6478%27 stroke-width=%271.6%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:10px 6px}'
         + '.dds-sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}'
@@ -289,6 +269,8 @@
         + '.dds-tags .chip,.dds-tag{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;line-height:1.3;color:var(--p,#5b3fa0);background:var(--p-soft,#efe9fa);border-radius:999px;padding:3px 10px;white-space:nowrap}'
         + '.dds-tags .chip button{font:inherit;font-size:11px;line-height:1;color:inherit;background:none;border:0;padding:2px;margin-right:-4px;cursor:pointer;min-width:20px;min-height:20px}'
         + 'button.dds-tag{border:0;cursor:pointer;font-family:inherit}button.dds-tag:hover{text-decoration:underline}'
+        // builder item 98: on a touch screen a tag is a 44px tap; the pill keeps its size (the extra is clear border)
+        + '@media (pointer:coarse){button.dds-tag{border:11px solid transparent;border-left-width:0;border-right-width:0;background-clip:padding-box;min-width:44px;justify-content:center}}'
         + '@media (pointer:coarse){.dds-tags .chip button{min-width:32px;min-height:32px}}'
         // item 86: the import's matching step
         + '.dds-csvfile{margin:10px 0 8px;font-size:13px;color:var(--soft,#5c5468)}'
@@ -329,28 +311,15 @@
         });
       }).catch(function () { return null; });
     }
-    // ── a small named prompt (a <dialog>, never window.prompt) ──
+    // ── a small named prompt: the shell's one prompt (shell-kit.js ddsAsk), never window.prompt ──
     function ask(o) {
-      style(); o = o || {};
-      return new Promise(function (resolve) {
-        var d = document.createElement('dialog'); d.className = 'dds-ask'; d.setAttribute('aria-labelledby', 'ddsAskH');
-        d.innerHTML = '<form method="dialog"><h2 id="ddsAskH"></h2><label for="ddsAskIn"></label><input id="ddsAskIn" maxlength="60" autocomplete="off"><div class="row"><button type="button" value="cancel">Cancel</button><button type="submit" value="ok"></button></div></form>';
-        d.querySelector('h2').textContent = o.title || 'Name it';
-        d.querySelector('label').textContent = o.label || 'Name';
-        d.querySelector('button[value=ok]').textContent = o.ok || 'Save';
-        var inp = d.querySelector('input'); inp.value = o.value || '';
-        // batch C: focus goes back where it came from (it was left on <body>). Safari never
-        // focuses a clicked button, so a page names its button (o.back) rather than trusting it
-        var done = false, back = pickBack(o.back, document.activeElement);
-        function finish(v) {
-          if (done) return; done = true; try { d.close(); } catch (_) { } d.remove(); resolve(v);
-          if (back && back.isConnected && back.focus) try { back.focus(); } catch (_) { /* */ }
-        }
-        d.querySelector('form').addEventListener('submit', function (e) { e.preventDefault(); var v = inp.value.trim(); if (!v) { inp.focus(); return; } finish(v); });
-        d.querySelector('button[value=cancel]').addEventListener('click', function () { finish(null); });
-        d.addEventListener('cancel', function (e) { e.preventDefault(); finish(null); });
-        document.body.appendChild(d);
-        if (d.showModal) d.showModal(); inp.focus(); inp.select();
+      o = o || {};
+      // batch C: focus goes back where it came from (it was left on <body>). Safari never
+      // focuses a clicked button, so a page names its button (o.back) rather than trusting it
+      var back = pickBack(o.back, document.activeElement);
+      return window.ddsAsk({ title: o.title || 'Name it', label: o.label || 'Name', yes: o.ok || 'Save', value: o.value || '', max: 60 }).then(function (v) {
+        if (back && back.isConnected && back.focus) try { back.focus(); } catch (_) { /* */ }
+        return v;
       });
     }
     // ── the column picker: a checkbox per column; the first column always shows ──
@@ -1505,8 +1474,8 @@
     try { if (ctxUid) localStorage.setItem(LAST_KEY, JSON.stringify({ uid: ctxUid, site_id: id })); } catch (_) { /* */ }
     var withId = function (path) { return b['default'] ? path : path + (path.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(id); };
     if (b.role === 'client_reviewer') { location.href = withId('/portal.html'); return; }
-    fetch(FN + '/portal/context', { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': b['default'] ? '' : id, 'x-region': FN_REGION } })
-      .then(function (r) { return r.ok ? r.json() : null; })
+    window.ddsApi('/portal/context', { scope: b['default'] ? '' : id })
+      .then(function (r) { return r.ok ? r.body : null; })
       .then(function (j) {
         var land = j && j.data && j.data.landing;
         if (!land || !SAFE_HREF.test(land)) { if (window.ddsToast) window.ddsToast('That business wouldn’t open just now. Try again in a moment.', 'err'); return; }
@@ -1525,8 +1494,8 @@
   function siteRows() {
     if (SWITCH_ROWS) return Promise.resolve(SWITCH_ROWS);
     if (SWITCH_LOADING) return SWITCH_LOADING;
-    SWITCH_LOADING = fetch(FN + '/agency/sites', { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-dds-scope-site': '', 'x-region': FN_REGION } })
-      .then(function (r) { return r.ok ? r.json() : null; })
+    SWITCH_LOADING = window.ddsApi('/agency/sites', { scope: '' })
+      .then(function (r) { return r.ok ? r.body : null; })
       .then(function (b) { if (!b || !Array.isArray(b.data)) return null; SWITCH_ROWS = b.data; return SWITCH_ROWS; })   // a failed read is said, never "no sites"; the next open tries again
       .catch(function () { return null; })
       .then(function (rows) { SWITCH_LOADING = null; return rows; });
@@ -2549,7 +2518,7 @@
           var ep = existing.endpoint;
           return existing.unsubscribe().then(function () {
             pushOn = false;
-            return fetch(FN + '/push/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-region': FN_REGION }, body: JSON.stringify({ endpoint: ep }) }).then(function () { window.ddsToast && window.ddsToast('Notifications turned off'); closeProfile(); });
+            return window.ddsApi('/push/unsubscribe', { method: 'POST', scope: '', body: { endpoint: ep } }).then(function () { window.ddsToast && window.ddsToast('Notifications turned off'); closeProfile(); });
           });
         }
         // turn ON — fetch the VAPID key, request permission, subscribe, save.
@@ -2562,7 +2531,7 @@
               if (perm !== 'granted') { window.ddsToast && window.ddsToast('Notifications need permission — allow them in your browser.', 'err'); return; }
               return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(key) }).then(function (sub) {
                 var j2 = sub.toJSON();
-                return fetch(FN + '/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY, 'x-dds-user-jwt': TOKEN, 'x-region': FN_REGION }, body: JSON.stringify({ endpoint: j2.endpoint, keys: j2.keys }) })
+                return window.ddsApi('/push/subscribe', { method: 'POST', scope: '', body: { endpoint: j2.endpoint, keys: j2.keys } })
                   .then(function () { pushOn = true; window.ddsToast && window.ddsToast('Notifications on — we’ll ping you when something needs you.'); closeProfile(); });
               });
             });
@@ -3040,23 +3009,7 @@
       (onRetry ? '<button type="button" class="retry" data-dds-retry>Try again</button>' : '') + '</div>';
     if (onRetry) { var b = host.querySelector('[data-dds-retry]'); if (b) b.addEventListener('click', onRetry); }
   };
-  // Phase 4 (delete safety): an optional third argument {label, onClick} adds ONE
-  // action to the toast — "Undo" after a removal. A toast with an action stays
-  // up longer and is clickable; plain toasts are unchanged.
-  window.ddsToast = function (message, kind, action) {
-    var t = el('<div class="dds-toast ' + (kind === 'err' ? 'err' : 'ok') + '" role="status" aria-live="polite"><span class="ico">' + (kind === 'err' ? '!' : '✓') + '</span><span class="t"></span></div>');
-    t.querySelector('.t').textContent = String(message == null ? '' : message);
-    var ms = kind === 'err' ? 5200 : 3200;
-    if (action && action.label && typeof action.onClick === 'function') {
-      var a = document.createElement('button'); a.type = 'button'; a.className = 'act'; a.textContent = String(action.label);
-      a.addEventListener('click', function () { try { action.onClick(); } finally { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 250); } });
-      t.appendChild(a); t.classList.add('has-act'); ms = 8000;
-    }
-    document.body.appendChild(t);
-    requestAnimationFrame(function () { t.classList.add('show'); });
-    setTimeout(function () { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 250); }, ms);
-    return t;
-  };
+  // window.ddsToast lives in shell-kit.js (builder item 101): ddsToast(message, 'err' | 'ok', { label, onClick }).
 
   // ── Offline awareness (B-5): a save that silently dies mid-edit is data loss
   // to a non-technical owner. One central banner: appears offline, retracts on
@@ -3365,7 +3318,39 @@
       if (!el.getAttribute('role')) el.setAttribute('role', 'button');
       if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
     }
+    scrollCues();
   }
+  // ── Builder item 98: a row that scrolls sideways shows it ──────────────────────
+  // A list's table on a phone, Pipeline's stage chips, a page's filter chips: the row
+  // fades out at the edge that has more (shell.css .dds-cue-r / .dds-cue-l), and a row
+  // of chips gets a round arrow at its end that moves it along. Only a "half-cut
+  // button" said there was more, and only to someone who already guessed.
+  var CUE_ROWS = '.tscroll, .rscroll, .board-scroll, .stabs, .bchips, #filters, .chips:not(.dds-tags .chips), .qtabs, .pcols, .dds-ph-tabs, .dds-fchips, [data-scrollcue]';
+  var CUE_CHIPS = '.stabs, .bchips, #filters, .chips:not(.dds-tags .chips), .qtabs, .dds-ph-tabs, .dds-fchips, [data-scrollcue="chips"]';
+  function cueOne(el) {
+    var max = el.scrollWidth - el.clientWidth, more = max > 2 && getComputedStyle(el).overflowX !== 'visible';
+    el.classList.toggle('dds-cue-r', more && el.scrollLeft < max - 2);
+    el.classList.toggle('dds-cue-l', more && el.scrollLeft > 2);
+  }
+  function scrollCues() {
+    var rows = document.querySelectorAll(CUE_ROWS);
+    for (var i = 0; i < rows.length; i++) {
+      var el = rows[i];
+      if (!el.__ddsCue) {
+        el.__ddsCue = true;
+        el.addEventListener('scroll', (function (row) { return function () { cueOne(row); }; })(el), { passive: true });
+      }
+      // the arrow: a span, not a button, so a page that wires every button in its chip row never takes it for a chip;
+      // it is a pointer's way along (a keyboard moves through the chips themselves), so it stays out of the reading order
+      if (el.matches(CUE_CHIPS) && !el.querySelector(':scope > .dds-cue-more')) {
+        var a = document.createElement('span'); a.className = 'dds-cue-more'; a.setAttribute('aria-hidden', 'true');
+        a.addEventListener('click', (function (row) { return function (e) { e.preventDefault(); e.stopPropagation(); row.scrollBy({ left: Math.max(120, row.clientWidth * 0.7), behavior: 'smooth' }); }; })(el));
+        el.appendChild(a);
+      }
+      cueOne(el);
+    }
+  }
+  window.addEventListener('resize', function () { try { scrollCues(); } catch (_) { /* a cue must never break the page */ } });
   var pending = false;
   function schedule() { if (pending) return; pending = true; (window.requestAnimationFrame || setTimeout)(function () { pending = false; enhance(); }); }
   // Enter/Space activates a click-handler element (delegated → covers re-renders).

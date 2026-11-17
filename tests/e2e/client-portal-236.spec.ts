@@ -11,7 +11,8 @@ const S1 = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', S2 = 'bbbbbbbb-2222-4222-8222
 const ADDRESS = `https://app.example/portal.html?studio=cccccccc-3333-4333-8333-cccccccccccc`;
 const json = (status: number, body: unknown) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
 const daysAgo = (d: number) => new Date(Date.now() - d * 86400000).toISOString();
-const dayWords = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+// the shell's one date format (builder item 101): "Nov 4", and "Dec 20, 2026" for a day in another year
+const dayWords = (iso: string) => { const d = new Date(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' as const } : {}) }); };
 
 const AGENCY_CTX = (over: Record<string, unknown> = {}) => ({ data: {
   site_role: 'business_owner', edition: 'presence', edition_key: 'studio_os', edition_name: 'Studio OS', edition_features: ALL_FEATURES,
