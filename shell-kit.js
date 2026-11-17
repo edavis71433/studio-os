@@ -160,7 +160,8 @@
   // ── The one toast ───────────────────────────────────────────────────────────
   //   ddsToast(message, kind, action) — kind 'err' (or 'error', 'bad', true) is a
   //   failure: it shows "!" and stays up longer; anything else is a success.
-  //   action { label, onClick } adds one button ("Undo") and keeps it up 8 s.
+  //   action { label, onClick, ms } adds one button ("Undo") and keeps it up 8 s
+  //   (or ms). A toast never covers one that holds a button, or a tip that's up: it sits just above.
   function isBad(kind) { return kind === 'err' || kind === 'error' || kind === 'bad' || kind === true; }
   function toast(message, kind, action) {
     var bad = isBad(kind);
@@ -173,14 +174,30 @@
     if (action && action.label && typeof action.onClick === 'function') {
       var a = document.createElement('button'); a.type = 'button'; a.className = 'act'; a.textContent = String(action.label);
       a.addEventListener('click', function () { try { action.onClick(); } finally { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 250); } });
-      t.appendChild(a); t.classList.add('has-act'); ms = 8000;
+      t.appendChild(a); t.classList.add('has-act'); ms = action.ms > 0 ? action.ms : 8000;
     }
     onBody(function () {
       document.body.appendChild(t);
+      liftAbove(t);
       requestAnimationFrame(function () { t.classList.add('show'); });
       setTimeout(function () { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 250); }, ms);
     });
     return t;
+  }
+
+  // A toast that holds a button stays up long enough to press it; one that comes
+  // after it, where it would cover it, goes just above it, so the button (Undo) is
+  // never covered. The same for a tip that's up where the toast would land (the
+  // editor's first-visit tip in Edit mode, on a phone).
+  function liftAbove(t) {
+    var me = t.getBoundingClientRect(), top = Infinity;
+    Array.prototype.forEach.call(document.querySelectorAll('.dds-toast.has-act, .dds-hint'), function (o) {
+      if (o === t || !o.classList.contains('show')) return;
+      var r = o.getBoundingClientRect();
+      if (!r.height || r.right <= me.left || r.left >= me.right || r.bottom <= me.top || r.top >= me.bottom) return;   // not in its way
+      if (r.top < top) top = r.top;
+    });
+    if (top !== Infinity) t.style.bottom = Math.max(0, Math.round(window.innerHeight - top + 12)) + 'px';   // 12: clear of it while it slides in
   }
 
   // ── The one styled confirm, and its small prompt ────────────────────────────
@@ -241,7 +258,7 @@
         d.querySelector('form').addEventListener('submit', function (e) {
           e.preventDefault();
           if (!field) { finish(true); return; }
-          var v = inp.value.trim();
+          var v = o.password ? inp.value : inp.value.trim();   // a password is never trimmed
           if (!v && o.required !== false) { inp.focus(); return; }
           finish(v);
         });

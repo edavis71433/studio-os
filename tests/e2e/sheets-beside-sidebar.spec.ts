@@ -100,7 +100,7 @@ test.describe('sheets and covers on the website workspace start beside the sideb
     { name: 'the sections sheet', url: '/presence.html#business', ready: '#view-business.on', open: (p) => p.evaluate(() => (window as any).openSheet('sectionsScrim')), box: '#sectionsScrim .sheetcard' },
     { name: 'the publish ritual', url: '/presence.html#publish', box: '#ritualWrap h1' },
     { name: 'page settings', url: '/presence.html#pages', ready: '#view-pages.on', open: (p) => p.evaluate(() => (window as any).pgOpenSettings({ href: '/' })), box: '#pageSettings .dc-modal' },
-    { name: 'a toast with a button', url: '/presence.html#pages', ready: '#view-pages.on', box: '#toasts .toast',
+    { name: 'a toast with a button', url: '/presence.html#pages', ready: '#view-pages.on', box: '.dds-toast.has-act',
       open: (p) => p.evaluate(() => (window as any).toastAction('Deleted “Gallery”. It’s kept 30 days in Recently deleted pages, and Undo brings it straight back.', 'Undo', () => {}, 20000)) },
     { name: 'the preview', url: '/presence.html?view=preview', box: '#stage' },
   ];

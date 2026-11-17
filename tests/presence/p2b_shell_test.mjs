@@ -13,7 +13,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 {
   const h = editorSource();
   ok('presence.html includes the shared shell (css + js)', /<link[^>]+href="\/shell\.css"/.test(h) && /<script[^>]+src="\/shell\.js"/.test(h));
-  ok('presence.html routes toasts through the shared ddsToast (shared success/error/conflict state)', /typeof window\.ddsToast === "function"/.test(h) && /window\.ddsToast\(msg, bad \? "err" : "ok"\)/.test(h));
+  ok('presence.html routes toasts through the shared ddsToast (shared success/error/conflict state)', /window\.ddsToast\(msg, bad \? "err" : "ok"\)/.test(h) && !/\$\("toasts"\)/.test(h) && /function toastAction\(msg, label, fn, ms\) \{\s*return window\.ddsToast\(msg, "ok", \{ label, onClick: fn, ms: ms \|\| 20000 \}\);/.test(h));   // builder item 101: no toast of its own, the action toast too
   // PR #16: the page's own rail + wordmark are gone; it pre-stamps html.dds-side so the
   // shell's sidebar is the one navigation (no duplicate wordmark can exist).
   ok('presence.html uses the shell sidebar and carries no wordmark of its own', /<html[^>]*class="dds-side"/.test(h) && !/class="wordmark"/.test(h));

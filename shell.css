@@ -370,7 +370,7 @@ html.dds-embed .dds-waffle{display:none!important}
   background:none;border:none;color:var(--dds-p);text-decoration:underline;padding:0;white-space:nowrap}
 
 .dds-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(8px);
-  max-width:min(460px,calc(100vw - 32px));padding:var(--dds-s3) var(--dds-s5);border-radius:var(--dds-r-xl);box-shadow:var(--dds-shadow);
+  width:max-content;max-width:min(460px,calc(100vw - 32px));   /* max-content: from left:50% it otherwise had half the screen, a 195px column on a phone */padding:var(--dds-s3) var(--dds-s5);border-radius:var(--dds-r-xl);box-shadow:var(--dds-shadow);
   font-family:var(--dds-sans);font-size:14px;font-weight:500;display:flex;align-items:center;gap:10px;
   opacity:0;transition:opacity var(--dds-t-base) var(--dds-ease),transform var(--dds-t-base) var(--dds-ease);z-index:2147483200;color:#fff}
 .dds-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}

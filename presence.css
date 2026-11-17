@@ -1070,7 +1070,7 @@ html.dc-edit:not(.plan-watch) .ritualwrap.as-card .ritual{max-width:none;margin:
 html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important;z-index:80 !important}
 @media(max-width:760px){
   .topbar #btnEditSite,.topbar #btnUndoTop,.topbar #btnRedoTop{display:inline-flex}
-  html.dc-edit:not(.plan-watch) .toasts{bottom:92px}   /* clear of the dock */
+  html.dc-edit:not(.plan-watch) .dds-toast{bottom:92px}   /* the shell's toast, clear of the dock */
   html.dc-edit:not(.plan-watch) .dds-hint{bottom:172px !important}   /* above the dock and the messages */
 }
 /* more tabs than room: fade the edge so the rest read as there */
@@ -1664,7 +1664,14 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
    toasts. Edit mode hides the shell, so there they keep the whole screen. */
 @media (min-width:761px){html.dds-side.dds-has-shell{--page-left:calc(var(--dds-side-w) + var(--dds-side-gap) * 2)}}
 html.dc-edit:not(.plan-watch).dds-side{--page-left:0px}
-html.dds-side .scrim,html.dds-side .ritualwrap,html.dds-side .dc-modal-scrim,html.dds-side .toasts{left:var(--page-left,0px)}
+html.dds-side .scrim,html.dds-side .ritualwrap,html.dds-side .dc-modal-scrim{left:var(--page-left,0px)}
+/* builder item 101: the editor's toasts are the shell's; they centre on the page beside the sidebar,
+   and on the whole screen in Edit mode, where the sidebar steps aside */
+@media (min-width:761px){html.dds-side .dds-toast.dds-toast{left:calc(50% + var(--page-left,0px) / 2)}}
+/* in Edit mode the toast keeps the editor's own compact size, so it stays under the tip a first visit shows */
+html.dc-edit:not(.plan-watch) .dds-toast{font-size:13px;padding:10px 16px;gap:12px;max-width:min(720px,calc(100vw - 32px))}
+html.dc-edit:not(.plan-watch) .dds-toast .ico{display:none}
+html.dc-edit:not(.plan-watch) .dds-toast .act{white-space:nowrap}
 .stagebar{flex:none;display:flex;align-items:flex-end;gap:var(--dds-s6,24px);padding:var(--dds-s4,16px) var(--dds-s7,32px) 0;color:rgba(239,234,247,.7)}
 .stagebar .back{font-size:13px;color:rgba(239,234,247,.75);padding-bottom:10px}
 .stagebar .back:hover{color:#efeaf7}
@@ -1704,11 +1711,6 @@ html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 .sheetcard .body{margin:var(--dds-s6,24px) 0}
 .sheetcard .foot{display:flex;gap:var(--dds-s6,24px);justify-content:flex-end;align-items:baseline}
 
-/* toasts */
-.toasts{position:fixed;bottom:calc(84px + 16px);left:0;right:0;padding:0 var(--dds-s4,16px);z-index:120;display:flex;flex-direction:column;gap:var(--dds-s2,8px);align-items:center;pointer-events:none}
-@media(min-width:761px){.toasts{bottom:28px}}
-.toast{background:var(--ink);color:var(--paper);padding:10px var(--dds-s4,16px);border-radius:var(--r-lg);font-size:13px;box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));max-width:88vw}
-.toast.bad{background:var(--clay)}
 
 /* empty / loading / gate */
 .estate{padding:44px var(--dds-s2,8px);max-width:560px}

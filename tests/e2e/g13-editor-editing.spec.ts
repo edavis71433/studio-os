@@ -254,7 +254,7 @@ test.describe('G13 in-place canvas text editor — editing in place: enter, comm
     await frame.locator('[data-dds-core="hero"]').dblclick();
     await expect(frame.locator('[contenteditable]')).toHaveCount(0); // nothing became editable
     await expect(page.locator('html')).toHaveClass(/dc-edit/);       // and no surprise jump out of Edit mode
-    await page.locator('.toast').getByRole('button', { name: 'Edit them there' }).click();
+    await page.locator('.dds-toast').getByRole('button', { name: 'Edit them there' }).click();
     await expect(page.locator('#view-business')).toBeVisible();      // hero → the Business tab
   });
 
