@@ -202,7 +202,7 @@ async function checkKey(){
   b.disabled=true; b.textContent='Checking with Stripe…';
   const r=await api('/admin/stripe-key');
   b.disabled=false; b.textContent='Check again';
-  if(r.status===429){ toast((r.body&&r.body.message)||'That was checked a moment ago.'); return; }
+  if(r.status===429){ toast((r.body&&r.body.message)||'That was checked a moment ago.','err'); return; }
   renderKey(r.ok&&r.body?r.body.data:null);
 }
 

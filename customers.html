@@ -975,7 +975,7 @@ window.addEventListener('dds:created',()=>{if(!TOKEN)return;load().catch(()=>{})
 // ── ADD A CUSTOMER: the one box, shared with Home and Contacts (customer-add.js, builder
 //    item 102; it was three copies kept in sync by hand). Starter kits are offered when this
 //    sign-in runs an agency. ──
-const ADD=window.ddsAddCustomer.mount({request:(m,p,b)=>api(p,m,b),toast:(m)=>toast(m),
+const ADD=window.ddsAddCustomer.mount({request:(m,p,b)=>api(p,m,b),toast,
   isAgency:async()=>{const c=window.ddsContext?await window.ddsContext():(await api('/portal/context')).body.data;return !!(c&&c.is_agency);},
   done:()=>load()});
 function openAddCustomer(){ADD.open();}
