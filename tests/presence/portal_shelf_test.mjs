@@ -42,11 +42,11 @@ globalThis.fetch = realFetch;
 // ── The page half: the shelf's pure helpers, mirrored verbatim from client.html
 // (the checks below fail the moment the page's copy drifts). ──
 function fmtMoney(n){n=Number(n)||0;return'$'+n.toLocaleString('en-US',{minimumFractionDigits:Number.isInteger(n)?0:2,maximumFractionDigits:2});}
-const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue'};
+const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue',refunded:'Refunded',disputed:'Disputed',lost:'Dispute lost'};
 function moneyState(i,todayYmd,pending){
   if(!i)return'';
   const s=String(i.status||'open');
-  if(s==='paid')return'paid';
+  if(s==='paid'){const d=String(i.dispute_status||'');if(d==='open')return'disputed';if(d==='lost')return'lost';const a=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);const r=Number(i.refunded_cents)||0;return r>0&&r>=a?'refunded':'paid';}
   if(s==='void'||s==='canceled')return'';
   if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
   const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
@@ -80,9 +80,11 @@ function shelfRows(invoices,docs,snaps,reports,todayYmd,pending,now){
     const amt=whole?(st==='paid'?fmtMoney(whole):st?fmtMoney(i.amount)+' left of '+fmtMoney(whole):fmtMoney(i.amount)):i.amount?fmtMoney(i.amount):'';
     const pay=(st==='upcoming'||st==='overdue')&&/^https:\/\//.test(String(i.pay_url||''))?i.pay_url:'';
     const view=shelfUrl(i.view_url);
-    const info=[amt,st==='paid'?(i.paid_at?'paid '+shelfDay(i.paid_at,now):'paid'):st==='processing'?'':st?(i.due_date?'due '+shelfDay(i.due_date,now):''):'withdrawn'].filter(Boolean).join(' · ');
+    // sales items 126, 127: a payment that came back keeps its paid day; a part refund says how much went back
+    const back=st==='refunded'||st==='disputed'||st==='lost';
+    const info=[amt,(st==='paid'||back)?(i.paid_at?'paid '+shelfDay(i.paid_at,now):'paid')+(st==='paid'&&Number(i.refunded_cents)>0?' · '+fmtMoney(Number(i.refunded_cents)/100)+' refunded':''):st==='processing'?'':st?(i.due_date?'due '+shelfDay(i.due_date,now):''):'withdrawn'].filter(Boolean).join(' · ');
     const act=st==='paid'?(view?{verb:'Receipt',href:view}:null):st==='processing'?{note:'processing',inv:i}:!st?null:pay?{verb:'Pay',href:pay,pay:true}:view?{verb:'View',href:view}:{note:'details'};
-    rows.push({cat:'invoices',kind:i.number?'Invoice '+i.number:'Invoice',title:i.name||'Invoice',info,when:String(i.created_at||i.due_date||''),chip:st?MONEY_WORD[st]:'Voided',tone:st==='paid'?'sig':st==='overdue'?'od':st==='processing'?'pr':st?'':'mute',act,
+    rows.push({cat:'invoices',kind:i.number?'Invoice '+i.number:'Invoice',title:i.name||'Invoice',info,when:String(i.created_at||i.due_date||''),chip:st?(st==='lost'?'Returned':MONEY_WORD[st]):'Voided',tone:st==='paid'?'sig':st==='overdue'?'od':st==='processing'?'pr':st?'':'mute',act,
       parts:parts.map(p=>({amount:Number(p.amount)||0,paid_at:p.paid_at,method:String(p.method||''),view:shelfUrl(p.view_url)}))});
   }
   for(const d of (docs||[])){
@@ -123,7 +125,7 @@ const PAGE = Deno.readTextFileSync(new URL('../../client.html', import.meta.url)
 for (const f of [fmtMoney, moneyState, isClientUpload, approvalForFile, shelfDate, shelfDay, shelfMonth, shelfUrl, shelfRows, shelfGroups, shelfCounts, shelfOwe]) {
   ok(`mirror: client.html defines ${f.name} verbatim`, PAGE.includes(String(f)));
 }
-ok('mirror: MONEY_WORD and CLIENT_UPLOAD_NOTE verbatim', PAGE.includes("const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue'};") && PAGE.includes("const CLIENT_UPLOAD_NOTE='Uploaded by the client';"));
+ok('mirror: MONEY_WORD and CLIENT_UPLOAD_NOTE verbatim', PAGE.includes("const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue',refunded:'Refunded',disputed:'Disputed',lost:'Dispute lost'};") && PAGE.includes("const CLIENT_UPLOAD_NOTE='Uploaded by the client';"));
 
 const NOW = new Date(2026, 10, 11, 12, 0, 0), TODAY = '2026-11-11';
 const row = (rows, title) => rows.find((r) => r.title === title);
@@ -172,6 +174,20 @@ const row = (rows, title) => rows.find((r) => r.title === title);
   ok('item 120: open, it says what is left of the whole', parted[0].info.startsWith('$1,000 left of $1,500 · due '), parted[0].info);
   ok('item 120: paid, it says the whole', parted[1].info.startsWith('$900 · paid '), parted[1].info);
   ok('item 120: its parts ride along, a part with no id is dropped, and only a safe link is kept', parted[0].parts.length === 1 && parted[0].parts[0].view === 'https://docs.example/p1' && parted[0].parts[0].method === 'Check' && parted[1].parts[0].view === '', JSON.stringify(parted.map((x) => x.parts)));
+  {
+    // sales items 126, 127: money that came back through Stripe, in the client's words
+    const back = shelfRows([
+      { id: 'r1', number: '#0013', name: 'Website build', amount: 1000, status: 'paid', paid_at: '2026-11-02T15:00:00Z', refunded_cents: 100000, view_url: 'https://docs.example/r1' },
+      { id: 'r2', number: '#0014', name: 'Logo set', amount: 500, status: 'paid', paid_at: '2026-11-03T15:00:00Z', refunded_cents: 20000, view_url: 'https://docs.example/r2' },
+      { id: 'r3', number: '#0015', name: 'Hosting', amount: 300, status: 'paid', paid_at: '2026-11-04T15:00:00Z', dispute_status: 'lost' },
+      { id: 'r4', number: '#0016', name: 'Photos', amount: 400, status: 'paid', paid_at: '2026-11-05T15:00:00Z', dispute_status: 'open' },
+    ], [], [], [], TODAY, [], NOW);
+    const by = (t) => back.find((x) => x.title === t);
+    ok('items 126, 127: Refunded, Paid with what came back, Returned and Disputed, each with its paid day and no Pay',
+      by('Website build').chip === 'Refunded' && /paid Nov 2/.test(by('Website build').info)
+      && by('Logo set').chip === 'Paid' && /paid Nov 3 · \$200 refunded/.test(by('Logo set').info) && by('Logo set').act.verb === 'Receipt'
+      && by('Hosting').chip === 'Returned' && by('Photos').chip === 'Disputed' && back.every((x) => !(x.act && x.act.pay)), JSON.stringify(back.map((x) => [x.title, x.chip, x.info])));
+  }
   ok('item 120: an invoice without parts has an empty list', shelfRows([{ id: 'x', name: 'A', amount: 5, status: 'open', created_at: '2026-11-01' }], [], [], [], TODAY, [], NOW)[0].parts.length === 0);
   const r = shelfRows([], docs, [], [], TODAY, [], NOW);
   const s1 = row(r, 'Website agreement'), s2 = row(r, 'Care agreement');

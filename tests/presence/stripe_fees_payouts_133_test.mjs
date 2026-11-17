@@ -79,7 +79,7 @@ const P = { from: '2026-10-01', to: '2026-10-31' };
     { id: INV_D, number: 44, title: 'Photos', amount_cents: 10000, status: 'paid', paid_at: '2026-10-29T18:00:00Z', paid_method: '', business: 'Harbor Dental' },
   ];
   const ret = [{ amount_cents: 25000, paid_at: '2026-10-15T16:00:00Z', customer: 'Blue Finch Café', deal_title: 'Care plan', stripe_invoice: 'in_R1' }];
-  const pay = A.paymentExportRows(items, ret, P, 420, look);
+  const pay = A.paymentExportRows(items, ret, P, 420, [], look);   // the 5th is items 126/127's money that went back
   const col = (name) => A.PAYMENT_HEAD.indexOf(name);
   const pick = (r) => [r[col('Invoice')], r[col('Amount')], r[col('Stripe fee')], r[col('You kept')], r[col('Paid out on')]];
   eq('the header: the three new columns sit after Amount, the note stays last', A.PAYMENT_HEAD, ['Date', 'Customer', 'Invoice', 'For', 'How it was paid', 'Amount', 'Stripe fee', 'You kept', 'Paid out on', 'Note']);
@@ -93,6 +93,11 @@ const P = { from: '2026-10-01', to: '2026-10-31' };
   ok('the note still rides along, last', pay.rows[2][col('Note')] === 'Check #77');
   eq('totals for the READ-ME: fees, kept, and how many Stripe had no fee for', [pay.fee_cents, pay.kept_cents, pay.fees_missing], [4505, 220495, 1]);
   const none = A.paymentExportRows(items, ret, P, 420);
+  // with items 126/127: a refund is a minus row that fills the same ten columns, and isn't a payment Stripe took a fee on
+  const withBack = A.paymentExportRows(items, ret, P, 420, [{ kind: 'refund', amount_cents: 5000, at: '2026-10-25T16:00:00Z', customer: 'Harbor Dental', invoice_no: '0041', what: 'Website build' }], look);
+  const refundRow = withBack.rows.find((r) => r[col('Amount')] === '-50.00');
+  ok('a refund row has all ten columns: no fee of its own, kept is the minus amount, never paid out', !!refundRow && refundRow.length === A.PAYMENT_HEAD.length && refundRow[col('Stripe fee')] === '' && refundRow[col('You kept')] === '-50.00' && refundRow[col('Paid out on')] === '', JSON.stringify(refundRow));
+  ok('and the fees and what was kept stay those of the payments', withBack.fee_cents === pay.fee_cents && withBack.kept_cents === pay.kept_cents && withBack.returned === 1 && withBack.returned_cents === 5000);
   ok('without Stripe read, a Stripe payment\'s columns are blank and nothing is counted missing', none.rows.find((r) => r[col('Invoice')] === '0041')[col('Stripe fee')] === '' && none.fees_missing === 0 && none.rows.find((r) => r[col('Invoice')] === '0042')[col('You kept')] === '500.00');
   const rm = A.exportReadMe(P, { invoices: 0, cents: 0 }, pay, false, { payouts: 2, cents: 256908, capped: false });
   ok('READ-ME: the fees, what was kept, and the deposits', rm.includes('Stripe kept $45.05 in fees from the ones it took, so you kept $2,204.95.') && rm.includes('payouts.csv   2 payouts from Stripe due in these days, $2,569.08 arrived.') && rm.includes('Paid out on says which deposit carried each payment'), rm);
