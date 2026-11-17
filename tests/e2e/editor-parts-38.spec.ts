@@ -78,6 +78,18 @@ test.describe('the editor in parts (item 38)', () => {
     expect(await partIn(page)).toBe(true);
   });
 
+  test('closing the tab during an unsaved hours change warns before Edit mode’s part is in', async ({ page }) => {
+    // the warning covers the whole editor's unsaved changes, not only Edit mode's (found on the phone in CI)
+    const part = await holdPart(page);
+    try {
+      await openEditor(page, '#business');
+      await page.locator('#hoursGrid input[type=checkbox]').first().click();
+      const warned = await page.evaluate(() => { const e = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; });
+      expect(warned).toBe(true);
+      expect(await partIn(page)).toBe(false);
+    } finally { part.release(); }
+  });
+
   test('Undo works on the Business tab before Edit mode’s part is in', async ({ page }) => {
     const part = await holdPart(page);
     const saves: Array<Record<string, unknown>> = [];

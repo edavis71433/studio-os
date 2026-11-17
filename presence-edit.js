@@ -3,8 +3,6 @@
 // It runs in the same global scope as presence-core.js, after it: everything there is already
 // defined. Its functions replace the stand-ins presence-core.js keeps for them, and its own
 // set-up below (the canvas's frame, the panels' buttons, the keys) runs as it loads.
-// Item 78: the hours and the closed note wait 0.6s before saving too, so they count.
-const detailsPending = () => Object.keys(debounceFns).some((k) => /^(identity|location):|^(hours|closednote)$/.test(k));
 // One own page's stored settings, changed in one write (undefined takes a setting off).
 // Item 121: the page a broken link shows: one of the owner's own pages (slug), or none (""), the
 // ready-made page. One save marks that page and clears the mark from every other.
@@ -4802,12 +4800,6 @@ function exitEditMode(to) {   // to: the tab to land on (the Pages card's "Chang
   go(to || EDIT_RETURN);
 }
 function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTrayPanel(); closeSettingsPanel(); closeCommentsPanel(); if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; } }
-(function keyTitles() {
-  const k = (mac, pc) => (KEY_MAC ? mac : pc);
-  ["btnUndo", "btnUndoTop"].forEach((id) => { const b = $(id); if (b) b.title = "Undo (" + k("⌘Z", "Ctrl+Z") + ")"; });
-  ["btnRedo", "btnRedoTop"].forEach((id) => { const b = $(id); if (b) b.title = "Redo (" + k("⇧⌘Z", "Ctrl+Shift+Z") + ")"; });
-  [["btnPagesClose", "Done (Esc)"], ["btnTrayClose", "Done (Esc): the page gets the whole screen"], ["btnCommentsClose", "Close (Esc)"]].forEach(([id, t]) => { const b = $(id); if (b) b.title = t; });
-})();
 // Item 38: the rest are Edit mode's own buttons, wired as its part (presence-edit.js) loads.
 (function initDesignPanels() {
   const on = (id, fn) => { const b = $(id); if (b) b.addEventListener("click", fn); };
@@ -6508,9 +6500,6 @@ function ipeFieldLabel(path) {
   const segs = String(path || '').split('.').filter((sg) => !/^\d+$/.test(sg));
   return segs[segs.length - 1] || 'text';
 }
-
-// ── the session (one at a time; parent-scope state like every canvas control) ──
-let IPE = null;                 // { doc, el, sec, path, md, orig, prev, busy, base, dirty }
 let IPE_LIVE_MSG = null;        // review fix 8: a save-outcome announcement that must survive the repaint
 // The in-place save IS the canvas auto-save, debounced ~1.2s so a burst of
 // field commits collapses into ONE saveBlocks (= one undo checkpoint). If the
@@ -6544,10 +6533,6 @@ function ipeSaveNow() {
   });
 }
 function ipeCanvasDoc() { try { const f = $('designPreview'); return f ? f.contentDocument : null; } catch (_) { return null; } }
-window.addEventListener('beforeunload', (e) => {
-  if (IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT || (IPE && IPE.dirty) || BLOCKS_SAVING || SETTINGS_TURNS || DRAFT_WRITES_OUT || blocksDirty()
-    || (IDE && IDE.el.textContent !== IDE.orig) || IDE_SAVING || detailsPending()) { e.preventDefault(); e.returnValue = ''; }
-});
 function ipeAnnounce(doc, msg) {   // screen-reader announcement of enter/exit
   try {
     let lv = doc.getElementById('dds-ipe-live');
@@ -6849,8 +6834,6 @@ const IDE_FIELDS = {
   "identity.service_area": { input: "f-service_area", max: 200, label: "where you work" },
   "identity.description": { input: "f-description", max: 600, label: "your description" },
 };
-let IDE = null;
-let IDE_SAVING = null;   // words just typed, on their way to the server; the canvas holds its redraw till they land
 function ideStart(doc, el) {
   const path = el.getAttribute("data-pr"), spec = IDE_FIELDS[path];
   if (!spec || DC_MODE !== "edit" || doc !== dcFrameDoc()) return false;

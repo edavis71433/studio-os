@@ -904,6 +904,8 @@ function debounceFlush(prefix) {
     return Promise.resolve().then(fn).catch(() => {});
   }));
 }
+// Item 78: the hours and the closed note wait 0.6s before saving too, so they count.
+const detailsPending = () => Object.keys(debounceFns).some((k) => /^(identity|location):|^(hours|closednote)$/.test(k));
 // An inline editor (a menu item, a question, a testimonial, an update) saves each
 // field as you leave it. Done just closes it, once anything pending has landed.
 function editorAutosave(ed, read, patch, close) {
@@ -8967,6 +8969,12 @@ function pcPane(id, label) {
 function pcLeaveTo(view) { closePagesCard(false); exitEditMode(view); }
 // Item 125: tooltips name their keys, in this computer's words (⌘ on a Mac or an iPad, Ctrl elsewhere).
 const KEY_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || "");
+(function keyTitles() {
+  const k = (mac, pc) => (KEY_MAC ? mac : pc);
+  ["btnUndo", "btnUndoTop"].forEach((id) => { const b = $(id); if (b) b.title = "Undo (" + k("⌘Z", "Ctrl+Z") + ")"; });
+  ["btnRedo", "btnRedoTop"].forEach((id) => { const b = $(id); if (b) b.title = "Redo (" + k("⇧⌘Z", "Ctrl+Shift+Z") + ")"; });
+  [["btnPagesClose", "Done (Esc)"], ["btnTrayClose", "Done (Esc): the page gets the whole screen"], ["btnCommentsClose", "Close (Esc)"]].forEach(([id, t]) => { const b = $(id); if (b) b.title = t; });
+})();
 // The bar's Undo, Redo, Publish and Done, and Ctrl/⌘+Z, work on every tab: one undo history for
 // the whole editor. The rest of Edit mode's buttons are wired by its own part (initDesignPanels).
 (function initEditorBar() {
@@ -9098,12 +9106,21 @@ function dcCaptureScroll() { const d = dcFrameDoc(); DC_SCROLL = (d && d.default
 // two never disagree; each action carries its key when it has one. On a Windows computer
 // Ctrl stands for ⌘ and Alt for ⌥. A null in the list is a line between groups.
 const DCK = KEY_MAC ? { mod: "⌘", alt: "⌥", shift: "⇧", del: "⌫" } : { mod: "Ctrl", alt: "Alt", shift: "Shift", del: "Delete" };
+
+// ── the session (one at a time; parent-scope state like every canvas control) ──
+let IPE = null;                 // { doc, el, sec, path, md, orig, prev, busy, base, dirty }
 let IPE_SAVE_T = null, IPE_SAVE_PENDING = false;
 // Review fix 10 (finding 11): a committed edit inside the 1.2s debounce
 // window — or a PUT still in flight, or a session holding unsaved typing —
 // must not die silently with a closed tab. The browser shows its own generic
 // prompt; nothing is blocked outright.
 let IPE_SAVE_INFLIGHT = false;
+window.addEventListener('beforeunload', (e) => {
+  if (IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT || (IPE && IPE.dirty) || BLOCKS_SAVING || SETTINGS_TURNS || DRAFT_WRITES_OUT || blocksDirty()
+    || (IDE && IDE.el.textContent !== IDE.orig) || IDE_SAVING || detailsPending()) { e.preventDefault(); e.returnValue = ''; }
+});
+let IDE = null;
+let IDE_SAVING = null;   // words just typed, on their way to the server; the canvas holds its redraw till they land
 function dcBlockSections(main) {
   const out = [];
   Array.prototype.forEach.call(main.querySelectorAll(":scope > section, :scope > nav.block-toc"), (el2) => {
