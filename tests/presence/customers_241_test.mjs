@@ -247,5 +247,19 @@ ok('save: someone with their own account elsewhere is asked, never taken', asked
 ok('gate: deleting a customer needs delete', memberWriteNeeds(`/sales/customers/${STUDIO}/delete`, 'POST') === 'delete');
 ok('gate: restoring, inviting and keeping the address of a site elsewhere are everyday edits', ['restore', 'invite', 'website'].every((w) => memberWriteNeeds(`/sales/customers/${STUDIO}/${w}`, 'POST') === 'edit'));
 
+// ═══ 8. The deploy gap ═══
+// The pages go live on merge and this server only with the deploy after it. The box sends
+// 'connect' with save: true, which a server from before item 241 reads as connect (a contact,
+// nobody emailed) instead of "set up their website and invite them". This one saves the customer.
+{
+  db.reset(base());
+  const logins = outside.logins.length, mails = outside.mails.length;
+  const viaBox = await add({ mode: 'connect', save: true, name: 'Ivy Chen', business_name: 'Ivy Florals', email: 'ivy@florals.example' });
+  const id = viaBox.body?.data?.client_id;
+  ok('gap: what the box sends saves the customer here, with no website, sign-in or email', viaBox.status === 201 && viaBox.body?.data?.mode === 'save' && viaBox.body?.data?.saved === true && T().presence_service_links.some((l) => l.customer_client_id === id && l.status === 'active') && !T().presence_sites.some((s) => s.client_id === id) && outside.logins.length === logins && outside.mails.length === mails, JSON.stringify(viaBox.body));
+  const plain = await add({ mode: 'connect', name: 'Oz', email: 'oz@plain.example' });
+  ok('gap: connect without save still only saves a contact (the CSV import), no customer record', plain.status === 200 && plain.body?.data?.mode === 'connect' && plain.body?.data?.connected === false && T().presence_contacts.some((c) => c.email === 'oz@plain.example' && !c.client_id) && T().clients.length === 3, JSON.stringify(plain.body));
+}
+
 console.log(`\n════ CUSTOMERS, ONE STEP AT A TIME (builder item 241): ${pass}/${pass + fail} ${fail ? 'FAILED' : 'PASSED'} ════`);
 if (fail) { console.log('Failed:\n  ' + failed.join('\n  ')); Deno.exit(1); }

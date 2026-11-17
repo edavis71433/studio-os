@@ -209,7 +209,7 @@ test.describe('the plan\'s count (builder item 198)', () => {
     await dlg.locator('#cu-email').fill('new@person.example');
     await dlg.locator('#cu-submit').click();
     await expect(dlg.locator('#cust-done')).toContainText('Saved to your customers');
-    expect(sent).toMatchObject({ mode: 'save', email: 'new@person.example' });
+    expect(sent).toMatchObject({ mode: 'connect', save: true, email: 'new@person.example' });
     await expect(dlg.locator('#cu-full')).toHaveCount(0);
   });
 });

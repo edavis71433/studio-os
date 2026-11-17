@@ -445,6 +445,6 @@ test.describe('Contacts — Add a customer saves the customer', () => {
     await page.locator('#cu-email').fill('jane@acmebakery.com');
     await page.locator('#cu-submit').click();
     await expect(page.locator('#cust-done')).toContainText('Saved to your customers');
-    expect(posted).toEqual({ mode: 'save', name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com' });
+    expect(posted).toEqual({ mode: 'connect', save: true, name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com' });
   });
 });

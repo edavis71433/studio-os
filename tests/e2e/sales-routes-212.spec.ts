@@ -78,7 +78,7 @@ test.describe('Add a customer on Contacts (sales routes, item 212)', () => {
     await dlg.getByLabel('Business name (optional)').fill('Acme Bakery');
     await page.locator('#cu-submit').click();
     await expect.poll(() => posts.length).toBe(1);
-    expect(posts[0]).toEqual({ mode: 'save', name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.example' });
+    expect(posts[0]).toEqual({ mode: 'connect', save: true, name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.example' });
     const done = page.locator('#cust-done');
     await expect(done.locator('h3')).toHaveText('Saved to your customers');
     // the same person again: the server says they're already a customer, and so does the box

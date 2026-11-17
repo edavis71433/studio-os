@@ -93,7 +93,11 @@
     if (!email) { toastWith(O, 'Enter their email to save them.', true); $('cu-email').focus(); return; }
     var btn = $('cu-submit'); btn.disabled = true; btn.textContent = 'Saving…';
     var failed = function (m) { toastWith(O, m || 'We couldn’t save them just now.', true); btn.disabled = false; btn.textContent = 'Save customer'; };
-    var body = { mode: 'save', name: name || undefined, business_name: business_name || undefined, email: email };
+    // The pages go live on merge and the server only with the deploy that follows. A server from
+    // before item 241 reads every mode but 'connect' as "set up their website and invite them",
+    // so the box asks for 'connect' with save: true. This server saves the customer; an older one
+    // only saves them to the contacts and emails nobody.
+    var body = { mode: 'connect', save: true, name: name || undefined, business_name: business_name || undefined, email: email };
     return Promise.resolve().then(function () { return O.request('POST', '/sales/customers', body); }).then(function (r) {
       if (!r || !r.ok) {
         failed(r && r.status === 403 ? 'Customers are part of your plan’s business tools — an upgrade adds them.' : (r && r.body && r.body.message) || '');
@@ -122,6 +126,10 @@
     } else if (d.already) {
       heading = 'Already your customer';
       line = who + ' is already on your Customers list. Nothing new was made.';
+    } else if (d.mode === 'connect') {
+      // an older server's answer, in the minutes before the deploy: a contact, not a customer yet
+      heading = 'Saved to your contacts';
+      line = who + ' is in your contacts. No website yet, and nothing was emailed.';
     } else {
       heading = 'Saved to your customers';
       line = who + ' is on your Customers list. No website yet, and nothing was emailed.';

@@ -83,7 +83,7 @@ for (const d of DIALOGS) {
     await expect(done).toContainText('Saved to your customers');
     await expect(done).toContainText('Ana Ruiz is on your Customers list. No website yet, and nothing was emailed.');
     await expect(done).not.toContainText('Invitation sent');
-    expect(sent).toEqual({ mode: 'save', name: 'Ana Ruiz', email: 'ana@harbor.example' });   // builder item 241: the customer and nothing else
+    expect(sent).toEqual({ mode: 'connect', save: true, name: 'Ana Ruiz', email: 'ana@harbor.example' });   // builder item 241: the customer and nothing else
   });
 }
 

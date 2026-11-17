@@ -59,7 +59,7 @@ for (const p of BOX_PAGES) {
     await page.locator('#cu-email').fill('rosa@lindcafe.example');
     await page.locator('#cu-submit').click();
     await expect(page.locator('#cust-done')).toContainText('Saved to your customers');
-    expect(sent).toEqual({ mode: 'save', name: 'Rosa Lind', business_name: 'Lind Café', email: 'rosa@lindcafe.example' });
+    expect(sent).toEqual({ mode: 'connect', save: true, name: 'Rosa Lind', business_name: 'Lind Café', email: 'rosa@lindcafe.example' });
     await expect.poll(() => reads.length).toBeGreaterThan(0);   // the page's own list, read again once they were saved
     await page.locator('#cust-done').getByRole('button', { name: 'Add another' }).click();
     await expect(page.locator('#cu-name')).toBeFocused();
@@ -68,6 +68,25 @@ for (const p of BOX_PAGES) {
     await expect(dlg).toBeHidden();
   });
 }
+
+// Builder item 241, the deploy gap: the pages go live on merge and the server only with the deploy
+// after it. Until then the older server answers the box's 'connect' as a contact saved, and the box
+// says exactly that: no "Saved to your customers", no profile to open, nothing set up.
+test('Customers: an older server keeps them as a contact, and the box says so', async ({ page }) => {
+  let sent: Record<string, unknown> | null = null;
+  await installApp(page, { api: { '/studio/customers': { data: [] }, 'POST /sales/customers': (b: Record<string, unknown>) => { sent = b; return { data: { mode: 'connect', pending: true, connected: false, email: 'rosa@lindcafe.example', contact_id: 'cccccccc-7777-4777-8777-cccccccccccc' } }; } } });
+  await page.goto('/customers.html');
+  await (await headerAction(page, '#addCust')).first().click();
+  await page.locator('#cu-name').fill('Rosa Lind');
+  await page.locator('#cu-email').fill('rosa@lindcafe.example');
+  await page.locator('#cu-submit').click();
+  const done = page.locator('#cust-done');
+  await expect(done.locator('h3')).toHaveText('Saved to your contacts');
+  await expect(done).toContainText('Rosa Lind is in your contacts. No website yet, and nothing was emailed.');
+  await expect(done.locator('#cu-open')).toHaveCount(0);
+  await expect(done.getByRole('button', { name: 'Done' })).toBeFocused();
+  expect(sent).toEqual({ mode: 'connect', save: true, name: 'Rosa Lind', email: 'rosa@lindcafe.example' });
+});
 
 // ── one deal stage bar ──
 const CLIENT = 'cccccccc-3333-4333-8333-cccccccccccc';

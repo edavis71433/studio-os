@@ -75,7 +75,7 @@ async function ask(method, route, body) {
   // Eric (Nov 15), builder item 241: adding a customer saves them and nothing else, so there's no choice to make
   ok('the box saves the customer: no choice to set them up, and it says what saving does', !/type="radio"|<select/.test(dlg) && /Saves them to your customers\. No website is made and nobody is emailed\./.test(dlg));
   for (const p of ['agency.html', 'customers.html', 'contacts.html']) ok(`${p}: the page sends no one to the old price page`, !/pricing\.html/.test(read(p)));
-  ok('saving sends who they are and their business, as mode save; never a set-up', /var body = \{ mode: 'save', name: name \|\| undefined, business_name: business_name \|\| undefined, email: email \};/.test(box) && !/mode: 'provision'/.test(box));
+  ok('saving sends who they are and their business, as connect with save; never a set-up', /var body = \{ mode: 'connect', save: true, name: name \|\| undefined, business_name: business_name \|\| undefined, email: email \};/.test(box) && !/mode: 'provision'/.test(box));
 }
 {
   const c = read('customers.html');

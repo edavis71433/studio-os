@@ -78,5 +78,5 @@ test('Customers: adding someone whose account isn\'t yours says "Request sent"',
   await expect(page.locator('#cust-done')).toContainText('Request sent');
   await expect(page.locator('#cust-done')).toContainText('they need to say yes first');
   await expect(page.locator('#cust-done')).not.toContainText('Their sign-in page');
-  expect(sent).toMatchObject({ mode: 'save', email: 'sam@harbor.test' });   // builder item 241: the box saves; someone else's account is still asked, never taken
+  expect(sent).toMatchObject({ mode: 'connect', save: true, email: 'sam@harbor.test' });   // builder item 241: the box saves; someone else's account is still asked, never taken
 });

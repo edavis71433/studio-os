@@ -237,7 +237,7 @@ test.describe('Customers — SS6 quick wins', () => {
     await page.locator('#cu-email').fill('jane@acmebakery.com');
     await page.locator('#cu-submit').click();
     await expect(page.locator('#cust-done')).toContainText('Saved to your customers');
-    expect(sent).toEqual({ mode: 'save', name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com' });
+    expect(sent).toEqual({ mode: 'connect', save: true, name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com' });
     await expect(page.locator('#cust-done')).toContainText('Acme Bakery is on your Customers list. No website yet, and nothing was emailed.');
     await expect(page.locator('#cust-done').getByRole('link', { name: 'Open their profile' })).toHaveAttribute('href', '/crm.html?client_id=cccccccc-1234-4234-8234-cccccccccccc');
   });
@@ -442,7 +442,7 @@ test.describe('Contacts — the Add-a-customer dialog on phones (SS6 pin)', { ta
     await page.locator('#cu-email').fill('jane@acmebakery.com');
     const post = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/sales/customers'));
     await page.locator('#cu-submit').click();
-    expect((await post).postDataJSON()).toEqual({ mode: 'save', name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com' });
+    expect((await post).postDataJSON()).toEqual({ mode: 'connect', save: true, name: 'Jane Doe', business_name: 'Acme Bakery', email: 'jane@acmebakery.com' });
     await expect(page.locator('#cust-done')).toContainText('Saved to your customers');
     await expect(page.locator('#custDlg')).toBeVisible();   // the done panel replaces the form in-dialog
   });

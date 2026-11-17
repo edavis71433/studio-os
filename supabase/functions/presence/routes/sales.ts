@@ -3375,7 +3375,9 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   const businessName = businessNameIn || name || (email.split('@')[0] || 'New customer');
   // builder item 241: 'save' is Add a customer's (the customer and nothing else); 'connect' is the
   // Customers CSV import's (the person in the contacts); 'provision' sets them up now (Duplicate site)
-  const mode = b.mode === 'connect' ? 'connect' : b.mode === 'save' ? 'save' : 'provision';
+  // The box sends 'connect' with save: true, which a server from before item 241 reads as connect
+  // (a contact, nobody emailed) in the time between the pages going live and the deploy.
+  const mode = b.mode === 'save' || (b.mode === 'connect' && b.save === true) ? 'save' : b.mode === 'connect' ? 'connect' : 'provision';
   const portalUrl = `${siteUrl()}/portal.html?studio=${site.id}`;   // builder list item 59: the sign-in page shows this studio's name and logo
 
   // ── B) CONNECT BY EMAIL — record intent; provision NOTHING ──────────────────

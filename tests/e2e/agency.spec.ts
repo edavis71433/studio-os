@@ -605,7 +605,7 @@ test.describe('Agency home — one home, one roster', () => {
     await page.locator('#cu-email').fill('jo@parkflorist.example');
     await page.locator('#cu-submit').click();
     await expect(page.locator('#cust-done')).toContainText('Saved to your customers');
-    expect(sent).toEqual({ mode: 'save', name: 'Jo Park', business_name: 'Park Florist', email: 'jo@parkflorist.example' });
+    expect(sent).toEqual({ mode: 'connect', save: true, name: 'Jo Park', business_name: 'Park Florist', email: 'jo@parkflorist.example' });
     await expect(page.locator('#cust-done')).toContainText('Park Florist is on your Customers list. No website yet, and nothing was emailed.');
     await expect(page.locator('#cust-done').getByRole('link', { name: 'Open their profile' })).toHaveAttribute('href', '/crm.html?client_id=cccccccc-9999-4999-8999-cccccccccccc');
   });
