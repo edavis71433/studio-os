@@ -34,7 +34,7 @@ ok('it answers exactly the kinds something still sends', JSON.stringify(answered
   `extra: ${answered.filter((k) => !SENT_BY[k]).join(', ') || 'none'}; missing: ${Object.keys(SENT_BY).filter((k) => !answered.includes(k)).join(', ') || 'none'}`);
 // a page only counts as a sender if the public build ships it
 const build = read('scripts/build-public.sh');
-const unshipped = new Set([...build.matchAll(/for f in ([^;]+); do\s*\n\s*rm -f "dist\/\$f"/g)].flatMap((m) => m[1].trim().split(/\s+/)));
+const unshipped = new Set([...build.matchAll(/for f in ([^;]+); do\s*\n\s*rm -f "(?:dist|\$OUT)\/\$f"/g)].flatMap((m) => m[1].trim().split(/\s+/)));
 ok('the retired pages are still left out of the build (so they send nothing)', ['audit.html', 'ai-critique.html', 'report-card.html', 'buy-audit.html', 'provision.html'].every((f) => unshipped.has(f)));
 for (const [kind, senders] of Object.entries(SENT_BY)) {
   const found = senders.filter((f) => { try { return new RegExp(`['"]${kind}['"]`).test(read(f)) || (kind === 'version' && /"type":"version"/.test(read(f))); } catch { return false; } });

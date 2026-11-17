@@ -134,8 +134,8 @@ ok('helper: isUniqueViolation reads the Postgres code', E.isUniqueViolation({ st
   ok('K1: booking and review contacts are stored lower-cased', /email: normEmail\(v\.booking\.email\)/.test(read('routes/booking.ts')) && /email: normEmail\(v\.review\.email\)/.test(read('routes/reviews.ts')));
   ok('K1: the enquiry form keeps its email lower-cased', /const email = clip\(body\?\.email, 200\)\.toLowerCase\(\)/.test(read('lib/commercial.ts')));
   ok('K1: the enquiry reply’s contact is lower-cased and matched case-blind', /const email = normEmail\(emailIn\);\n\s*const hit = await svc\(`presence_contacts\?site_id=eq\.\$\{siteId\}&\$\{emailMatch\(email\)\}/.test(read('routes/commercial.ts')));
-  const sales = read('routes/sales.ts');
-  ok('K6: a convert rolled back unlinks the contact from the customer it removed', /if \(createdClient\) \{ await svc\(`clients\?id=eq\.\$\{clientId\}`, \{ method: 'DELETE' \}\)[\s\S]{0,400}presence_contacts\?site_id=eq\.\$\{site\.id\}&client_id=eq\.\$\{clientId\}`, \{ method: 'PATCH', body: JSON\.stringify\(\{ client_id: null \}\)/.test(sales));
+  // K6's convert rollback (the contact unlinked from the customer it removed) is run for real in
+  // sales_routes_test.mjs, section 6: “the account and sign-in it made are removed, the contact unlinked”
 }
 
 console.log(`\n════ CONTACTS + CUSTOMERS (item 110): ${pass}/${pass + fail} PASSED ════`);

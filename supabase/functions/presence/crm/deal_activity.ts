@@ -89,6 +89,11 @@ export function usd(cents: unknown): string {
   return (n < 0 ? '−$' : '$') + (Math.abs(n) / 100).toLocaleString('en-US', whole ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** "$2,916" when a decision filled in the deal's value (value_backfilled_cents), else "". Pure. */
+function valueFilled(d: Record<string, unknown>): string {
+  return Number(d.value_backfilled_cents) > 0 ? usd(d.value_backfilled_cents) : '';
+}
+
 /** Plain-language label for a SYSTEM deal event (mirrors pipeline.html's evtLabel
  *  so the merged server timeline reads identically to the legacy History strip). */
 export function describeSystemEvent(row: any): string {
@@ -96,7 +101,10 @@ export function describeSystemEvent(row: any): string {
   const k = row?.kind;
   if (k === 'stage_change' && row?.to_stage) return 'Moved to ' + (STAGE_LABEL[row.to_stage] || row.to_stage);
   // sales item 88: a decline says what would make it a yes; a signature names the studio's countersigner too
-  if (k === 'proposal_decided' && d.decision) return d.decision === 'accepted' ? 'Proposal accepted' : 'Proposal declined' + (declineWords(d.reason, d.note) ? ' — ' + declineWords(d.reason, d.note) : '');
+  // sales item 136: an accept that filled in the deal's value says so, since the price change is part
+  // of the record (value_backfilled_cents rides the event, routes/sales.ts). It said only "Proposal accepted".
+  if (k === 'proposal_decided' && d.decision) return d.decision === 'accepted' ? 'Proposal accepted' + (valueFilled(d) ? ' — deal value set to ' + valueFilled(d) : '') : 'Proposal declined' + (declineWords(d.reason, d.note) ? ' — ' + declineWords(d.reason, d.note) : '');
+  if (k === 'estimate_decided' && d.decision === 'approved' && valueFilled(d)) return estimateEventLine(k, d) + ' (deal value set to ' + valueFilled(d) + ')';   // item 136: an approved estimate fills it too
   if (k === 'contract_signed' && d.signer) return 'Agreement signed — ' + d.signer + (d.countersigned_by ? ', countersigned by ' + d.countersigned_by : '');
   if (k === 'client_question') return 'They asked' + (d.on === 'contract' ? ' about the agreement' : d.on === 'estimate' ? ' about the estimate' : ' about the proposal') + (d.text ? ': “' + String(d.text).slice(0, 140) + (String(d.text).length > 140 ? '…' : '') + '”' : '');
   if (k === 'invoice_sent' && d.amount_cents && d.recurring_id) return 'Recurring invoice sent' + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '') + (d.period ? ` (${d.period})` : '');   // item 47

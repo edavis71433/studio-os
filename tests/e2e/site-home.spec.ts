@@ -912,7 +912,7 @@ test.describe('the Search tab and its neighbours say what is true (item 95)', ()
   });
   test('a paused plan’s message reaches the owner without the page’s own tag', async ({ page }) => {
     await mount(page, '/presence.html');
-    await page.route('**/functions/v1/presence/site', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'paused', message: 'Your plan is paused. Your live site stays up.' }) }));
+    await page.route(/\/functions\/v1\/presence\/site(\?|$)/, (route) => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'paused', message: 'Your plan is paused. Your live site stays up.' }) }));
     await page.reload();
     await expect(page.locator('#gate')).toContainText('Paused for now');
     await expect(page.locator('#gate')).toContainText('Your plan is paused. Your live site stays up.');
@@ -1603,7 +1603,7 @@ test.describe('the website editor reads what it shows, when it shows it (item 84
     // Load again with the site's own record slow: nothing the Overview shows waits for it.
     let siteAnswered = false;
     const asked: string[] = [];
-    await page.route('**/functions/v1/presence/site', async (route: Route) => { await new Promise((r) => setTimeout(r, 800)); siteAnswered = true; return route.fallback(); });
+    await page.route(/\/functions\/v1\/presence\/site(\?|$)/, async (route: Route) => { await new Promise((r) => setTimeout(r, 800)); siteAnswered = true; return route.fallback(); });
     page.on('request', (r) => { if (!siteAnswered && r.url().includes('/functions/v1/presence')) asked.push(new URL(r.url()).pathname.replace(/^.*\/functions\/v1\/presence/, '')); });
     const reads = readsOf(page);
     await page.reload();

@@ -88,9 +88,9 @@ const checksOf = (id) => world.checks.filter((c) => c.site === id).length;
   eq('the next tick checks the published site, and only that one', [checksOf(B), checksOf(A), checksOf(C)], [before + 1, 8, 8]);
   now += 15 * MIN; await S.runOperationsCycle({});
   eq('and not again on the tick after', checksOf(B), before + 1);
-  const pub = read(`${P}/routes/publish.ts`), rec = read(`${P}/lib/deploy_reconcile.ts`);
+  const pub = read(`${P}/routes/publish.ts`);
   ok('a publish that goes live asks for the check', /if \(live\) await checkSoon\(site\.id\);/.test(pub));
-  ok('so does one that goes live later, found by the reconcile', /last_published_at: nowIso[\s\S]{0,600}await checkSoon\(p\.site_id\);/.test(rec));
+  // one that goes live later, found by the reconcile, asks for it too: run for real in offline_cleared_243_test.mjs
 }
 
 // ── 3. a failed check is tried again in an hour, not a day later and not every tick ──

@@ -201,6 +201,9 @@ async function main() {
     const dec = evs(DEAL, 'proposal_decided');
     ok('the change is on the deal’s record: the decision event carries value_backfilled_cents', dec.length === 1 && dec[0].site_id === SITE_A && dec[0].detail.decision === 'accepted' && dec[0].detail.value_backfilled_cents === 291600, JSON.stringify(dec));
     ok('the deal moves on to the agreement stage', row('presence_deals', DEAL).stage === 'contract');
+    // sales item 136: the deal's history (the record's timeline, read through the real route) says so
+    const story = (await asA('GET', `/sales/deals/${DEAL}`)).body?.data?.timeline || [];
+    ok('the deal’s history says the value was filled in: “Proposal accepted — deal value set to $2,916”', story.some((it) => it.text === 'Proposal accepted — deal value set to $2,916'), JSON.stringify(story.map((it) => it.text)));
     const now = '2026-08-10T12:00:00.000Z';
     const summary = summarizePipeline([{ stage: 'won', expected_value_cents: row('presence_deals', DEAL).expected_value_cents, converted_at: '2026-08-09T00:00:00.000Z' }], now);
     ok('a deal won after that rolls up the filled value (never $0 again)', summary.won_month.value_cents === 291600 && summary.won_month.count === 1, `won_month=${summary.won_month.value_cents}`);
@@ -210,6 +213,8 @@ async function main() {
     world({ presence_deals: [dealRow(DEAL, SITE_A, { expected_value_cents: 500000 })], presence_proposals: [propRow(PROP, DEAL, SITE_A, 'sent', LINES_DT)] });
     r = await decide(PROP, await tok('proposal', PROP));
     ok('a value the studio set by hand is never overwritten, and the event says nothing was filled', r.status === 200 && row('presence_deals', DEAL).expected_value_cents === 500000 && evs(DEAL, 'proposal_decided').length === 1 && !('value_backfilled_cents' in evs(DEAL, 'proposal_decided')[0].detail), short(r));
+    const kept = (await asA('GET', `/sales/deals/${DEAL}`)).body?.data?.timeline || [];
+    ok('…and its history says only “Proposal accepted”, naming no value', kept.some((it) => it.text === 'Proposal accepted') && !kept.some((it) => /deal value set to/.test(it.text)), JSON.stringify(kept.map((it) => it.text)));
 
     world({ presence_deals: [dealRow(DEAL, SITE_A)], presence_proposals: [propRow(PROP, DEAL, SITE_A, 'sent', [{ label: 'Platform build', qty: 2, unit_cents: 75_000_000 }])] });
     r = await decide(PROP, await tok('proposal', PROP));
@@ -568,15 +573,6 @@ async function main() {
     r = await newDeal({ source_submission_id: SUB_B });
     made = T('presence_deals').find((x) => x.id === r.body?.data?.id);
     ok('another studio’s enquiry id links nothing: no words copied, no link kept, their enquiry untouched', r.status === 201 && made?.source_submission_id === null && made.notes === '' && snap('presence_form_submissions', SUB_B) === theirs && !evs(made.id, 'created')[0]?.detail.enquiry, JSON.stringify(made));
-  }
-
-  // ═══ Kept as text: a product bug (see the report) ═══
-  {
-    // evtLabel in pipeline.html is never called: the drawer's history is the server's timeline
-    // (crm/deal_activity.ts describeSystemEvent), which says "Proposal accepted" without the value,
-    // so this line words nothing on screen today. Kept until the drawer shows the filled value again.
-    const pipe = read('pipeline.html');
-    ok('pipeline.html’s event label surfaces the backfilled value', /value_backfilled_cents\?' — deal value set to '\+money\(d\.value_backfilled_cents\)/.test(pipe));
   }
 
   const passed = results.filter((x) => x.p).length;
