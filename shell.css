@@ -500,7 +500,7 @@ dialog.dds-dlg::backdrop{background:rgba(23,21,34,.45)}
       lifts the record's 32px action buttons, tabs and filters on phones. */
 @media (pointer:coarse){
   .btn,a.btn,a.act,a.reply,.chip,button.pri,[role="button"]:not(.dds-ic):not(.dds-waffle){ min-height:44px; }
-  .dds-ic,html.dds-side.dds-app .dds-ic,html.dds-side.dds-app #dds-waffle{ width:44px; height:44px; }
+  .dds-ic,html.dds-side.dds-app .dds-ic,html.dds-side .dds-ic.dds-ic,html.dds-side.dds-app #dds-waffle{ width:44px; height:44px; }   /* .dds-ic.dds-ic: the website editor's page has no dds-app (builder item 98) */
   html.dds-side .dds-nav .sec > .it,html.dds-side .dds-nav .sec .menu a,html.dds-side #dds-search{ min-height:44px; }
   html.dds-app .lbtn,html.dds-app .rowact,html.dds-app .abtn,html.dds-app .seg button,html.dds-app .fchips button,
   html.dds-app .filters button,html.dds-app .managerow button,html.dds-app .cardmenu button,html.dds-app .tdone,

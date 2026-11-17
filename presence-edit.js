@@ -7073,6 +7073,9 @@ function dcInjectCanvas(doc, main, live) {
       ".dc-ins .dc-ins-pill{opacity:0;transition:opacity var(--dds-t-fast,120ms) var(--dds-ease,ease-out);position:relative;z-index:1;display:inline-flex;align-items:center;gap:6px;font:600 12px/1 var(--ddsdc-sans);color:var(--ddsdc-on-p);background:var(--ddsdc-p) var(--ddsdc-grad);border:none;border-radius:999px;padding:7px 14px 7px 11px;cursor:pointer;box-shadow:0 6px 16px -8px rgba(var(--ddsdc-p-rgb),.8);white-space:nowrap}" +
       ".dc-ins .dc-ins-pill svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}" +
       ".dc-ins:hover .dc-ins-pill,.dc-ins:focus-within .dc-ins-pill{opacity:1}" +
+      // builder item 98: on a touch screen the section's tools and the add-a-section line are full 44px taps
+      // (the line keeps its look: a clear strip 14px past each edge takes the tap)
+      "@media (pointer:coarse){#dds-dc-bar .dc-b{width:44px;height:44px}#dds-dc-bar .dc-addblk{width:auto}.dc-ins{z-index:2}.dc-ins::after{content:'';position:absolute;left:0;right:0;top:-14px;bottom:-14px}}" +
       ".dc-ins.dc-drop-active{height:22px}" +
       ".dc-ins.dc-drop-active::before{border-top:4px solid var(--ddsdc-p)}" +
       ".dc-ins.dc-drop-active .dc-ins-pill{opacity:1}" +

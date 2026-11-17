@@ -3325,8 +3325,8 @@
   // fades out at the edge that has more (shell.css .dds-cue-r / .dds-cue-l), and a row
   // of chips gets a round arrow at its end that moves it along. Only a "half-cut
   // button" said there was more, and only to someone who already guessed.
-  var CUE_ROWS = '.tscroll, .rscroll, .board-scroll, .stabs, .bchips, #filters, .chips:not(.dds-tags .chips), .qtabs, .pcols, .dds-ph-tabs, .dds-fchips, [data-scrollcue]';
-  var CUE_CHIPS = '.stabs, .bchips, #filters, .chips:not(.dds-tags .chips), .qtabs, .dds-ph-tabs, .dds-fchips, [data-scrollcue="chips"]';
+  var CUE_ROWS = '.tscroll, .rscroll, .board-scroll, .stabs, .bchips, #filters, .chips:not(.dds-tags .chips), .qtabs, .pcols, .dds-ph-tabs, .dds-fchips, .tray-chips, [data-scrollcue]';
+  var CUE_CHIPS = '.stabs, .bchips, #filters, .chips:not(.dds-tags .chips), .qtabs, .dds-ph-tabs, .dds-fchips, .tray-chips, [data-scrollcue="chips"]';   // .tray-chips: the website editor's Add card (builder item 98)
   function cueOne(el) {
     var max = el.scrollWidth - el.clientWidth, more = max > 2 && getComputedStyle(el).overflowX !== 'visible';
     el.classList.toggle('dds-cue-r', more && el.scrollLeft < max - 2);
