@@ -2094,7 +2094,7 @@ body.pd-dragging *{cursor:grabbing !important}
 .dpdevseg button:focus-visible{outline:2px solid var(--plum,#5b3fa0);outline-offset:2px}
 /* Preview / Timewarp: the same frame with ALL editing chrome withheld — the
    injector is never called, the FAB hides, and the page scrolls like a visitor's
-   (link/submit navigation is guarded inside the document, dcGuardViewNav). */
+   (link/submit navigation is guarded inside the document in every mode, dcGuardNav). */
 .dp-frame.dc-view iframe{pointer-events:auto}
 #designCanvas.dc-mode-view .dc-fab{display:none}
 /* …and the toolbar's editing actions withdraw too (Undo/Redo, Content tree,
@@ -7034,6 +7034,10 @@ function pgOpenSettings(startRef) {
   const paint = () => {
     const m = pgModel(), e = pgEntry(m, ref); if (!e || !e.pg) { close(); return; }
     const pg = e.pg, slug = pg.slug || "", custom = !!slug;
+    const putBack = pgTyping(box);   // item 245: drawn again when a save lands, it keeps what's being typed
+    // ...and "Who can see it" stays the same part, drawn again: a new one began with the Password
+    // field closed, so a Password just chosen vanished, with what was being typed in it
+    const access = box.querySelector('.pg-group[data-group="access"]');
     box.textContent = "";
     box.appendChild(el("h3", "dc-modal-h", pg.title + " settings"));
     box.appendChild(el("p", "pg-where", seoHost() + pg.path));
@@ -7049,7 +7053,7 @@ function pgOpenSettings(startRef) {
       box.appendChild(pgField("Page name", name));
       box.appendChild(pgField("Page address", addr, "Its link: yoursite.com/" + slug + "/. If you change it, visitors to the old link are sent to the new one."));
       // items 48 and 120: who can see it, and the header and footer
-      box.appendChild(pgAccessGroup(slug, paint));
+      box.appendChild(access && access.__pgFor === slug ? access.__pgDraw() : pgAccessGroup(slug));
       box.appendChild(pgChromeGroup(slug));
     } else {
       box.appendChild(el("p", "dc-modal-sub", pg.key === "home"
@@ -7102,9 +7106,39 @@ function pgOpenSettings(startRef) {
     const done = el("button", "dc-modal-cancel pg-done", "Done"); done.type = "button"; done.addEventListener("click", close);
     foot.appendChild(done);
     box.appendChild(foot);
+    putBack();
   };
   paint();
   pgFocusFirst(box);
+}
+// Item 245: a settings panel drawn again while someone is in it (a read or a save landing) used
+// to drop what they were typing and their place. pgTyping(host), called just before the panel is
+// drawn again, notes each field whose words were changed since it was drawn and the field with
+// the focus, by the name on the field. The function it returns, called once the panel is drawn,
+// puts the words and the focus (caret and all) back; a field given its words back that way saves
+// them when it's left, as typing would have, and one that isn't drawn again saves them at once.
+function pgTyping(host) {
+  const nameOf = (f) => { const l = (f.id && host.querySelector('label[for="' + f.id + '"]')) || f.closest("label"); return String((l && l.textContent) || f.getAttribute("aria-label") || "").trim(); };
+  const fields = () => Array.from(host.querySelectorAll("input,textarea,select")).filter((f) => !/^(hidden|button|submit|file|radio)$/.test(f.type) && nameOf(f));
+  const words = (f) => f.tagName === "TEXTAREA" || (f.tagName === "INPUT" && f.type !== "checkbox");
+  const act = document.activeElement;
+  const kept = fields().map((f) => {
+    let sel = null; if (f === act && words(f)) { try { sel = [f.selectionStart, f.selectionEnd]; } catch (_) {} }
+    return { el: f, name: nameOf(f), value: f.value, typed: words(f) && f.__pgDrawn !== undefined && f.value !== f.__pgDrawn, focus: f === act, sel };
+  }).filter((k) => k.typed || k.focus);
+  return () => {
+    const now = fields(); now.forEach((f) => { f.__pgDrawn = f.value; });
+    kept.forEach((k) => {
+      const f = now.find((x) => nameOf(x) === k.name);
+      if (!f) { if (k.typed) k.el.dispatchEvent(new Event("change")); return; }
+      if (k.typed && f.value !== k.value) {
+        f.value = k.value;
+        f.dispatchEvent(new Event("input", { bubbles: true }));   // what reads it as it's typed (a count, the Google preview) follows
+        f.addEventListener("blur", () => { if (f.value !== f.__pgDrawn) f.dispatchEvent(new Event("change")); }, { once: true });
+      }
+      if (k.focus) { try { f.focus({ preventScroll: true }); if (k.sel && k.sel[0] != null) f.setSelectionRange(k.sel[0], k.sel[1]); } catch (_) {} }
+    });
+  };
 }
 // ── Items 48 and 120: who can see an own page, and its header and footer ──
 // Who can see it is three cards and one sentence. Password asks for the password first and
@@ -7162,13 +7196,15 @@ function pgSetPage(slug, patch, okMsg) {
 function pgAccessGroup(slug) {
   const g = el("div", "pg-group"); g.dataset.group = "access";
   let asking = false, msg = "";   // the password field is open; why the last try didn't save
+  // Item 196 (review finding 30): a page copied from another site keeps its setting, never its
+  // password, so it said "Password saved" and was quietly left off the live site. It asks for one.
+  const unsetOf = (page) => page.access === "password" && (!page.lock || !!(PG_LOCKS && !PG_LOCKS.has(String(page.lock))));
+  let drawnUnset = null;   // item 245: what the last draw showed, so a read that changes nothing redraws nothing
   const draw = (focusOn) => {
     const page = dcPageObj(slug); if (!page) return;
     const now = page.access === "password" || page.access === "private" ? page.access : "everyone";
     const shown = asking ? "password" : now;
-    // Item 196 (review finding 30): a page copied from another site keeps its setting, never its
-    // password, so it said "Password saved" and was quietly left off the live site. It asks for one.
-    const unset = now === "password" && (!page.lock || (PG_LOCKS && !PG_LOCKS.has(String(page.lock))));
+    const unset = unsetOf(page); drawnUnset = unset;
     g.textContent = "";
     g.appendChild(el("h4", "pg-h", "Who can see it"));
     const row = el("div", "pg-access"); row.setAttribute("role", "group"); row.setAttribute("aria-label", "Who can see it");
@@ -7222,6 +7258,7 @@ function pgAccessGroup(slug) {
       if (focusOn === "pw") setTimeout(() => { try { pw.focus({ preventScroll: true }); box.scrollIntoView({ block: "nearest" }); } catch (_) {} }, 0);
     }
     if (focusOn === "cards") { const b = row.querySelector('[aria-pressed="true"]'); if (b) { try { b.focus({ preventScroll: true }); } catch (_) {} } }
+    g.querySelectorAll("input,textarea").forEach((f) => { f.__pgDrawn = f.value; });   // item 245: as drawn, so a redraw can tell what's typed since
   };
   const pick = async (key) => {
     const page = dcPageObj(slug); if (!page) return;
@@ -7252,7 +7289,20 @@ function pgAccessGroup(slug) {
   };
   draw();
   const first = dcPageObj(slug);
-  if (!PG_LOCKS && first && first.access === "password") pgLocksRead().then(() => { if (g.isConnected && !asking) draw(); });   // item 196: is its password this site's?
+  if (!PG_LOCKS && first && first.access === "password") pgLocksRead().then(() => {   // item 196: is its password this site's?
+    // Item 245: the answer used to draw the group again under someone typing in it: the words in
+    // Heading went unsaved and the Password field lost its focus. It redraws only when it changes
+    // what's shown (the password isn't this site's), keeping what's being typed and where.
+    const page = dcPageObj(slug);
+    if (!g.isConnected || asking || !page || unsetOf(page) === drawnUnset) return;
+    const was = g.contains(document.activeElement), putBack = pgTyping(g);
+    draw(); putBack();
+    if (was && !g.contains(document.activeElement)) { const pw = g.querySelector('input[type="password"]'); if (pw) { try { pw.focus({ preventScroll: true }); } catch (_) {} } }   // their field went: the one it now asks for
+  });
+  // item 245: the panel drawn again (a new page name landing) draws this same part again, so it
+  // keeps the Password field it has open and why the last try didn't save, and a password saving
+  // meanwhile finishes on the part that's on screen
+  g.__pgFor = slug; g.__pgDraw = () => { draw(); return g; };
   return g;
 }
 function pgChromeGroup(slug) {
@@ -7275,6 +7325,9 @@ function pgChromeGroup(slug) {
 // The first field takes the cursor, as it always has (a pane with none: All pages).
 function pgFocusFirst(box) {
   setTimeout(() => {
+    // item 245: someone already pressing or typing in the panel keeps their place (a quick press on
+    // Password lost its field to the page name, put here a moment later)
+    if (box.contains(document.activeElement)) return;
     const f = box.querySelector("input,select") || (PAGES_OPEN && $("pcBack"));
     if (f) { try { f.focus({ preventScroll: true }); } catch (_) {} }
   }, 30);
@@ -9872,8 +9925,8 @@ $("btnAgainGo").addEventListener("click", async () => {
   } catch (err) { toast(nice(err), true); }
   btn.disabled = false; btn.textContent = "Publish this version";
 });
-async function readPublishLock() {
-  try { S.publishLock = (await api("GET", "/site/publish-lock")).data || null; }
+async function readPublishLock(known) {   // known: the lock the start-up read brought (item 37)
+  try { S.publishLock = known !== undefined ? known : (await api("GET", "/site/publish-lock")).data || null; }
   catch (_) { /* a hiccup, or a server from before: no lock is shown, and the server still refuses */ }
   renderPublishButton(); renderPublishLock();
   if (S.publishesRead) renderVersionList();
@@ -9983,6 +10036,30 @@ function fillSingles() {
   paintBizShort();
   renderSearchPreview();
 }
+// Item 37: the site and the editor's six lists, and whether publishing is locked, in ONE read
+// (GET /site?with=…); each part is what its own read answers, refused where that read would be.
+// A server from before answers the site alone, with no parts: then each is read on its own, as
+// before, and so is a part the answer leaves out. OPENED_LOCK: the lock that read brought, if any.
+const OPEN_PARTS = ["offerings", "faqs", "testimonials", "posts", "media", "settings", "publish_lock"];
+let OPENED_LOCK;
+async function openReads(soft, tagged) {
+  OPENED_LOCK = undefined;
+  const one = await api("GET", "/site?with=" + OPEN_PARTS.join(",")).catch(() => null);
+  const parts = one && one.parts;
+  const part = (name, path) => {
+    const p = parts && parts[name];
+    if (!p) return soft(api("GET", path));
+    if ("data" in p) return Promise.resolve({ data: p.data });
+    const err = new Error(p.error || "read_failed"); err.status = p.status;
+    return soft(Promise.reject(err));
+  };
+  if (parts && parts.publish_lock && "data" in parts.publish_lock) OPENED_LOCK = parts.publish_lock.data || null;
+  return Promise.all([
+    parts ? Promise.resolve(one) : tagged("site", api("GET", "/site")),
+    part("offerings", "/offerings"), part("faqs", "/faqs"), part("testimonials", "/testimonials"), part("posts", "/posts"),
+    part("media", "/media"), part("settings", "/settings"),
+  ]);
+}
 const SHELL_LOADED = document.readyState === "loading" ? new Promise((r) => document.addEventListener("DOMContentLoaded", r, { once: true })) : Promise.resolve();
 async function refreshAll() {
   // The website-content reads are TOLERANT: a plan without the website feature
@@ -9998,16 +10075,12 @@ async function refreshAll() {
   // Item 84: the Overview's own two reads go out with the first wave, not after it.
   const todayFirst = Promise.all([api("GET", "/health"), readChanges()]);
   todayFirst.catch(() => {});   // loadToday reports a failure
-  const [siteR, off, faq, tes, pos, med, set, ctxR] = await Promise.all([
-    tagged("site", api("GET", "/site")),
-    soft(api("GET", "/offerings")), soft(api("GET", "/faqs")), soft(api("GET", "/testimonials")), soft(api("GET", "/posts")),
-    soft(api("GET", "/media")), soft(api("GET", "/settings")),
-    // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
-    // Item 84: this script runs before the deferred shell.js, so window.ddsContext usually
-    // didn't exist yet and the page read the context a second time. The shell has run by
-    // DOMContentLoaded; its handoff waits for its own read, or gives up after 2.5 s.
-    SHELL_LOADED.then(() => (window.ddsContext ? window.ddsContext().then((d) => ({ data: d })) : Promise.reject())).catch(() => api("GET", "/portal/context").catch(() => null)),
-  ]);
+  // PERF: reuse the shell's /portal/context (window.ddsContext) — fall back to our own read.
+  // Item 84: this script runs before the deferred shell.js, so window.ddsContext usually
+  // didn't exist yet and the page read the context a second time. The shell has run by
+  // DOMContentLoaded; its handoff waits for its own read, or gives up after 2.5 s.
+  const ctxP = SHELL_LOADED.then(() => (window.ddsContext ? window.ddsContext().then((d) => ({ data: d })) : Promise.reject())).catch(() => api("GET", "/portal/context").catch(() => null));
+  const [[siteR, off, faq, tes, pos, med, set], ctxR] = await Promise.all([openReads(soft, tagged), ctxP]);
   S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
   S.offerings = off.data || []; S.faqs = faq.data || []; S.testimonials = tes.data || []; S.posts = pos.data || [];
   S.media = med.data || []; S.settings = set.data || {};
@@ -10021,7 +10094,7 @@ async function refreshAll() {
   applyEditionGating();
   carryScopeOnLinks();
   applyVocab();
-  readPublishLock();   // item 214: the bar's Publish says Locked while publishing is locked
+  readPublishLock(OPENED_LOCK);   // item 214: the bar's Publish says Locked while publishing is locked
   fillSingles(); await loadToday(todayFirst);
  
   renderOfferings(); renderFaqs(); renderTes(); renderPosts(); renderMediaGrid($("mediaGrid"), true);
@@ -15567,13 +15640,34 @@ async function dcSetMode(mode) {
   // or when leaving a landed Timewarp, whose past render must give way to the draft.
   if (wasView !== isView || twWasLoaded) refreshDesignPreview();
 }
-// View modes read like a visitor: the page scrolls freely, but links and forms
-// never navigate the canvas away (the same spirit as the stage's link guard).
-function dcGuardViewNav(doc) {
+// Links and forms never navigate the canvas away, in any mode (the same spirit as the stage's
+// link guard): view modes read like a visitor and the page scrolls freely; in Edit mode a press
+// keeps its editing meaning (the menu opens the Pages card, a tap picks a section) and the
+// browser never follows the link. Item 244: Edit mode had no guard of its own.
+function dcGuardNav(doc) {
   try {
+    if (!doc || doc.__dcNavGuard) return;   // once per document: dcWatchNav and the load both bring it
+    doc.__dcNavGuard = true;
     doc.addEventListener("click", (e) => { const a = e.target && e.target.closest && e.target.closest("a"); if (a) e.preventDefault(); }, true);
     doc.addEventListener("submit", (e) => e.preventDefault(), true);
   } catch (_) { /* guard is best-effort; pointer events stay scoped to the frame */ }
+}
+// Item 244: a page written to the canvas can be pressed before its load event, which waits for
+// its pictures, and the guard used to come only at load: every save draws the canvas again, so
+// on a slow connection a press on the business name while a photo was still coming loaded
+// another page into the canvas. For 300 frames after each write (a few seconds; the new page is
+// in the canvas within a few), every frame guards whatever document is there before the browser
+// paints it, so a page is guarded before anyone can see it, let alone press it. The load guards
+// it too. Counting from the write, not the load, means a page whose photos never come doesn't
+// keep the watch running, and an older page's load landing just after a write can't cut short
+// the watch for the new one.
+function dcWatchNav(frame) {
+  let watch = 0, left = 0;   // frames still to watch since the last write
+  const look = () => {
+    try { dcGuardNav(frame.contentDocument); } catch (_) {}
+    watch = --left > 0 ? requestAnimationFrame(look) : 0;
+  };
+  new MutationObserver(() => { left = 300; if (!watch) watch = requestAnimationFrame(look); }).observe(frame, { attributes: true, attributeFilter: ["srcdoc"] });
 }
 // Timewarp: picking a date calls the EXISTING route History's version tools use
 // (renderVersionTools — identical fetch shape), then renders that kept version
@@ -20463,6 +20557,7 @@ function dcTreeSelect(el2, row) {
 // a chrome failure never breaks the proof.
 (function installDesignCanvas() {
   const frame = $("designPreview"); if (!frame) return;
+  dcWatchNav(frame);   // item 244: a page is guarded from the moment it's in the canvas, not from its load
   frame.addEventListener("load", () => {
     let doc; try { doc = frame.contentDocument; } catch (_) { return; }
     if (!doc || !doc.body) return;
@@ -20472,13 +20567,15 @@ function dcTreeSelect(el2, row) {
     frame.inert = false;
     const wrap = frame.closest(".dp-frame");
     frame.removeAttribute("aria-hidden");   // the canvas is interactive (Edit) or readable (view modes), not decorative
+    // Item 244: in every mode a link or a form on the page leaves the canvas on the draft. In
+    // Edit mode the business name in the header (a section's buttons, the footer's links) loaded
+    // the editor's own address into the frame, on every device. This runs BEFORE the #main
+    // check: even a document without the landmark (an error page, an old kept version) gets it.
+    dcGuardNav(doc);
     // Slice D: Preview / Timewarp withhold ALL editing chrome — the injector is
     // simply never called; the page scrolls, links/forms are guarded read-only.
-    // This runs BEFORE the #main check: even a document without the landmark (an
-    // error page, an old kept version) must get the nav guard and the right class.
     if (DC_MODE === "timewarp") {
       if (wrap) { wrap.classList.remove("dc-live"); wrap.classList.add("dc-view"); }
-      dcGuardViewNav(doc);
       return;
     }
     if (wrap) { wrap.classList.remove("dc-view"); wrap.classList.add("dc-live"); }

@@ -9,6 +9,9 @@
 //                 line goes in as one line of what it billed, its lines in the description.
 //   payments.csv  every payment that came in: invoices paid, part payments recorded by
 //                 hand, and retainer charges (only ever a deal event), with how each came.
+//                 Money that went back is a row with a minus amount on the day it went:
+//                 a refund made in Stripe, a dispute lost, Stripe's dispute fee (sales
+//                 items 126, 127).
 //   READ-ME.txt   what is in it, and how to bring it into QuickBooks.
 // Pure: routes/accounting_export.ts reads the rows; these shape them.
 import { invoiceLines } from './documents.ts';
@@ -85,10 +88,16 @@ export function invoiceExportRows(items: BookRow[], p: ExportPeriod, tzo = 0): {
 
 export const PAYMENT_HEAD = ['Date', 'Customer', 'Invoice', 'For', 'How it was paid', 'Amount', 'Note'];
 export interface RetainerCharge { amount_cents: number; paid_at: string; customer: string; deal_title: string }
+/** Money that went back (sales items 126, 127): a refund made in Stripe or a dispute lost,
+ *  on the day it happened, or Stripe's dispute fee, on the day Stripe took it. `what` is
+ *  the invoice's or the retainer's name; `invoice_no` its number ('' for a retainer). */
+export interface MoneyBack { kind: 'refund' | 'dispute' | 'fee'; amount_cents: number; at: string; customer: string; invoice_no: string; what: string; bank?: boolean }
 /** payments.csv: every payment that came in during the period, oldest first. A paid invoice's
  *  own row is its last payment (what was left after any parts); each part payment is a row
- *  of its own, under its invoice's number; each retainer charge is a row. Pure. */
-export function paymentExportRows(items: BookRow[], retainers: RetainerCharge[], p: ExportPeriod, tzo = 0): { rows: string[][]; payments: number; cents: number } {
+ *  of its own, under its invoice's number; each retainer charge is a row; each refund, dispute
+ *  lost and dispute fee is a row with a minus amount. `payments` and `cents` count what came
+ *  in; `returned` and `returned_cents` what went back. Pure. */
+export function paymentExportRows(items: BookRow[], retainers: RetainerCharge[], p: ExportPeriod, tzo = 0, back: MoneyBack[] = []): { rows: string[][]; payments: number; cents: number; returned: number; returned_cents: number } {
   const byId = new Map(items.map((i) => [String(i.id), i]));
   const rows: Array<{ at: string; row: string[]; cents: number }> = [];
   for (const i of items) {
@@ -105,18 +114,27 @@ export function paymentExportRows(items: BookRow[], retainers: RetainerCharge[],
     if (!inPeriod(day, p) || !(r.amount_cents > 0)) continue;
     rows.push({ at: r.paid_at, cents: r.amount_cents, row: [usDate(day), r.customer || 'Customer', '', `Retainer${r.deal_title ? ': ' + r.deal_title : ''}`.slice(0, 200), 'Card or bank, through Stripe', dollars(r.amount_cents), ''] });
   }
+  for (const r of back) {
+    const day = localYmd(r.at, tzo);
+    if (!inPeriod(day, p) || !(r.amount_cents > 0)) continue;
+    const label = r.kind === 'refund' ? 'Refund' : r.kind === 'dispute' ? 'Dispute lost' : 'Stripe dispute fee';
+    const how = r.kind === 'refund' ? 'Refunded through Stripe' : r.kind === 'dispute' ? (r.bank ? 'Bank dispute, through Stripe' : 'Card dispute, through Stripe') : 'Stripe fee';
+    rows.push({ at: r.at, cents: -r.amount_cents, row: [usDate(day), r.customer || 'Customer', r.invoice_no, `${label}: ${r.what || 'Invoice'}`.slice(0, 200), how, dollars(-r.amount_cents), ''] });
+  }
   rows.sort((a, b) => a.at.localeCompare(b.at));
-  return { rows: rows.map((r) => r.row), payments: rows.length, cents: rows.reduce((a, r) => a + r.cents, 0) };
+  const ins = rows.filter((r) => r.cents >= 0), outs = rows.filter((r) => r.cents < 0);
+  return { rows: rows.map((r) => r.row), payments: ins.length, cents: ins.reduce((a, r) => a + r.cents, 0), returned: outs.length, returned_cents: -outs.reduce((a, r) => a + r.cents, 0) };
 }
 
 /** READ-ME.txt: what the two files hold and how to bring them into QuickBooks Online. */
-export function exportReadMe(p: ExportPeriod, inv: { invoices: number; cents: number }, pay: { payments: number; cents: number }, partial: boolean): string {
+export function exportReadMe(p: ExportPeriod, inv: { invoices: number; cents: number }, pay: { payments: number; cents: number; returned?: number; returned_cents?: number }, partial: boolean): string {
   const money = (c: number) => '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return [
     `Export for your bookkeeper: ${usDate(p.from)} to ${usDate(p.to)}`,
     '',
     `invoices.csv  ${inv.invoices} invoice${inv.invoices === 1 ? '' : 's'} issued in these days, ${money(inv.cents)} billed. One row per line.`,
     `payments.csv  ${pay.payments} payment${pay.payments === 1 ? '' : 's'} received in these days, ${money(pay.cents)} in all, retainer charges included.`,
+    ...(pay.returned ? [`              ${pay.returned} row${pay.returned === 1 ? '' : 's'} of money that went back, ${money(pay.returned_cents || 0)} in all: refunds made in Stripe, disputes lost and Stripe's dispute fees, each with a minus amount on the day it went.`] : []),
     ...(partial ? ['', 'Note: this studio has more invoices than one export reads (2,000). The oldest ones are left out; pick a shorter stretch of days to get them.'] : []),
     '',
     'Bringing invoices.csv into QuickBooks Online:',

@@ -620,6 +620,8 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   const convert = (b = {}) => res(S.handleSalesConvert(req('POST', `/sales/deals/${DEAL_C}/convert`, b), siteA, studioA, DEAL_C, cors));
   const dealC = () => row('presence_deals', DEAL_C);
   const accountByEmail = () => db.tables.clients.filter((c) => c.email === EMAIL);
+  // sales item 137: the old contacts row a new sign-in is tied to (createContactAndClient's)
+  const oldContactRows = () => (db.tables.contacts || []).filter((c) => c.email === EMAIL);
   const PROVISIONING = ['clients', 'contacts', 'presence_entitlements', 'presence_sites', 'presence_identity', 'presence_brand_profile', 'presence_first_run'];
   const provisioned = () => PROVISIONING.filter((t) => wrote(t, 'POST').length);
 
@@ -689,12 +691,14 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   knob.before = ({ method, path, body }) => { if (method === 'PATCH' && path.startsWith('/rest/v1/presence_deals?') && body?.converted_client_id && !dealC().converted_client_id) dealC().converted_client_id = OTHER_CLIENT; };
   const lostRace = await convert();
   ok('when another convert finishes first, this one answers with that customer, never overwrites it, and removes the account it made', lostRace.status === 200 && lostRace.body.data.idempotent === true && lostRace.body.data.client_id === OTHER_CLIENT && dealC().converted_client_id === OTHER_CLIENT && accountByEmail().length === 0 && authDeletes().length === 1, lostRace.text.slice(0, 200));
+  ok('…and leaves no row behind in the old contacts table (sales item 137)', wrote('contacts', 'POST').length === 1 && oldContactRows().length === 0, JSON.stringify(oldContactRows()));
 
   // a failure part way: only what this convert made is taken back, and the deal is let go
   const failProvisioning = () => db.failMethod.set('presence_entitlements', 'POST');
   world(convertible()); failProvisioning();
   const f1 = await convert();
   ok('provisioning fails for a new customer: 502, the account it made is deleted and its sign-in removed, the deal is let go', f1.status === 502 && f1.body.error === 'provision_incomplete' && accountByEmail().length === 0 && authDeletes().length === 1 && signIns.size === 0 && dealC().converted_at === null && dealC().converted_client_id === null, f1.text);
+  ok('…and its row in the old contacts table goes with them, nothing left behind (sales item 137)', wrote('contacts', 'POST').length === 1 && oldContactRows().length === 0, JSON.stringify(oldContactRows()));
   world(both(convertible(), theirAccount)); failProvisioning();
   const f2 = await convert();
   ok('provisioning fails for a customer it reused: their account and site stay, nothing is deleted, the deal is let go', f2.status === 502 && !!row('clients', EXISTING) && !!row('presence_sites', EXISTING_SITE) && wrote('clients', 'DELETE').length === 0 && authDeletes().length === 0 && dealC().converted_at === null, f2.text);
@@ -708,6 +712,7 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   world(convertible()); clash();
   const f5 = await convert();
   ok('the customer is already another deal\'s (the stamp is refused): 409, the account and sign-in it made are removed, the contact unlinked, the deal let go', f5.status === 409 && f5.body.error === 'convert_conflict' && accountByEmail().length === 0 && authDeletes().length === 1 && row('presence_contacts', CT_C).client_id === null && dealC().converted_at === null, f5.text);
+  ok('…and no row is left in the old contacts table (sales item 137)', wrote('contacts', 'POST').length === 1 && oldContactRows().length === 0, JSON.stringify(oldContactRows()));
   world(both(convertible(), theirAccount)); clash();
   const f6 = await convert();
   ok('…and for a reused customer the same refusal deletes nothing of theirs', f6.status === 409 && !!row('clients', EXISTING) && wrote('clients', 'DELETE').length === 0 && authDeletes().length === 0 && dealC().converted_at === null, f6.text);

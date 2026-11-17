@@ -230,7 +230,7 @@ const FULL = { x: 0, y: 0, w: 1, h: 1 };
   ok('the old AI button is gone from the page; its server route stays', !/api\([^)]*remove-background/.test(files) && !files.includes('removeBg(') && read('supabase/functions/presence/index.ts').includes('/remove-background$/'));
   const pageV = (/s\.src='\/image-editor\.js\?v=(\d+)'/.exec(files) || [])[1], edV = (/\bversion: (\d+),/.exec(ed) || [])[1];
   ok('the editor loads on first use, its ?v= the editor’s own version (to bust the day-long cache)', !!pageV && pageV === edV && pageV === String(E.version), `page v=${pageV}, editor ${edV}`);
-  ok('the public build copies the editor (every root .js)', read('scripts/build-public.sh').includes('cp ./*.js dist/'));
+  ok('the public build copies the editor (every root .js)', /cp \.\/\*\.js (dist|"\$OUT")\//.test(read('scripts/build-public.sh')));   // "$OUT": dist/, or a test's own folder (builder item 142)
   ok('an edited copy says what it came from, with a way back', files.includes('An edited copy of “') && files.includes('data-open-orig="${esc(edFrom)}"') && files.includes("openDetail(b.dataset.openOrig)"));
   ok('the editor itself only ever READS: one fetch, for the photo, and no upload of its own', (ed.match(/fetch\(/g) || []).length === 1 && !/method:\s*'(PUT|POST|PATCH|DELETE)'/.test(ed));
   ok('Escape stays inside the editor wherever focus is (the panel behind closes on Escape)', ed.includes("if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation();") && ed.includes("document.addEventListener('keydown', onKey, true);") && ed.includes("document.removeEventListener('keydown', onKey, true);"));

@@ -32,9 +32,10 @@ import { applyButtonStyles } from './site_buttons.ts';
 // slug → version → { manifest, code loader }. Render resolution goes through this
 // ONE boundary and is memoized. The manifests are small and load with the function,
 // so getTemplate stays SYNCHRONOUS for everything that only reads a manifest (the
-// catalog, media limits, contract checks). A template's drawing code (render.ts,
-// about 50 KB each) loads the first time something draws with it and stays loaded
-// for the life of the worker (builder list item 107; lib/lazy.ts is the same
+// catalog, media limits, contract checks). A template's drawing code (its render.ts,
+// 10 to 13 KB of its own look, and lib/template_kit.ts, the one drawing all eight
+// share since builder list item 103) loads the first time something draws with it
+// and stays loaded for the life of the worker (builder list item 107; lib/lazy.ts is the same
 // stand-in the router uses for its rarely used route groups). Drawing is therefore
 // async: renderSnapshot and renderForBuilder return a promise. Keep each import()
 // specifier a string literal: that is what puts the file in the deploy bundle and
