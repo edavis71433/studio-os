@@ -96,7 +96,7 @@ const nowMs = Date.parse(NOW);
   ok('+ Invoice: an already-sent one asks (already_open), never re-sends', /error: 'already_open'/.test(inv));
   ok('both send routes say when the email was held back (double_tap)', (sales.match(/double_tap: doubleTap/g) || []).length === 2);
   const deal = sales.slice(sales.indexOf('export async function handleSalesDeal('), sales.indexOf('export async function handleSalesDealActivity('));
-  ok('the deal read counts the retainer’s payments beside the deal', /kind=eq\.invoice_paid/.test(deal) && /retainer_paid = .*retainerPaid\(/.test(deal) && /retainer_paid \}/.test(deal));
+  ok('the deal read counts the retainer’s payments beside the deal', /kind=eq\.invoice_paid/.test(deal) && /retainer_paid = .*retainerPaid\(/.test(deal) && /retainer_paid(?:, returns: returned)? \}/.test(deal));
   ok('the deal read carries recurring_id (what’s left leaves recurring out)', /processing_since,recurring_id&order/.test(deal));
   const crm = read('supabase/functions/presence/routes/crm.ts');
   ok('the record’s activity knows who logged each call', /actor: String\(ev\.actor \|\| ''\)/.test(crm) && /mapConversationItem\(m, principal\.email \|\| ''\)/.test(crm));

@@ -124,7 +124,8 @@ const unzip = (bytes) => {
 {
   ok('crc32: the standard check value ("123456789" → CBF43926)', Z.crc32(new TextEncoder().encode('123456789')) === 0xCBF43926);
   ok('csv: commas, quotes and line breaks are quoted', Z.csvCell('a,b') === '"a,b"' && Z.csvCell('say "hi"') === '"say ""hi"""' && Z.csvCell('two\nlines') === '"two\nlines"' && Z.csvCell(null) === '');
-  ok('csv: a cell that starts like a formula is kept as text', Z.csvCell('=SUM(A1)') === "'=SUM(A1)" && Z.csvCell('+1') === "'+1" && Z.csvCell('@x') === "'@x" && Z.csvCell('-2') === "'-2");
+  ok('csv: a cell that starts like a formula is kept as text', Z.csvCell('=SUM(A1)') === "'=SUM(A1)" && Z.csvCell('+1') === "'+1" && Z.csvCell('@x') === "'@x" && Z.csvCell('-2+3') === "'-2+3" && Z.csvCell('-1e5') === "'-1e5");
+  ok('csv: a plain negative amount stays a number a spreadsheet adds up (sales item 133)', Z.csvCell('-99.00') === '-99.00' && Z.csvCell('-2') === '-2' && Z.csvCell(-15) === '-15');
   ok('csv: a byte-order mark for Excel, CRLF line ends', Z.toCsv(['A', 'B'], [[1, 'x']]) === '﻿A,B\r\n1,x\r\n');
   const zipped = Z.zipStore([{ name: 'a.csv', data: new TextEncoder().encode('one') }, { name: 'café.txt', data: new TextEncoder().encode('two ✓') }]);
   const files = unzip(zipped);

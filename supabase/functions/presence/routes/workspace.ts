@@ -442,6 +442,11 @@ export const noticeHrefFor = (n: { kind: string; period?: string | null }): stri
   // open that deal's Billing, where the retainer and its charges are
   const retainer = (n.kind === 'invoice_paid' || n.kind === 'retainer_status') ? /^retainer:([0-9a-f-]{36}):/i.exec(String(n.period || '')) : null;
   if (retainer) return `/pipeline.html?deal=${retainer[1]}&dtab=billing`;
+  // sales items 126, 127: a refund's or a dispute's line (refund, refundfailed, dispute,
+  // disputewon, disputelost:<deal id>:<Stripe id>) opens that deal's Billing, where the
+  // invoice reads Refunded or Disputed, with the proof and the way to answer in Stripe
+  const back = (n.kind === 'invoice_paid' || n.kind === 'invoice_void_paid') ? /^(refund|refundfailed|dispute|disputewon|disputelost):([0-9a-f-]{36}):/i.exec(String(n.period || '')) : null;
+  if (back) return `/pipeline.html?deal=${back[2]}&dtab=billing`;
   return base;
 };
 
