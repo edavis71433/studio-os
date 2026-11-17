@@ -352,3 +352,42 @@ export async function createCardUpdateSession(p: { customerId: string; returnUrl
   if (!/^https:\/\//.test(String(s?.url || ''))) throw new Error('no_session_url');
   return { url: String(s.url) };
 }
+
+// ── The daily check against Stripe (sales item 130) ──────────────────────────
+// Reads only. Stripe sends each change as a message, and one that never lands (our
+// server down for more than the three days Stripe keeps trying, a retry dropped) was
+// never noticed. commerce/stripe_check.ts asks Stripe directly, once a day for each
+// open invoice and each retainer, with these.
+
+/** Every payment Stripe holds for one of our invoices, whichever link it came through:
+ *  the pay link puts presence_invoice_id on the payment it makes. Stripe's search can
+ *  lag a new payment by a minute, which a daily check never minds. */
+export async function searchInvoicePayments(invoiceId: string): Promise<any[]> {
+  const r = await stripeReq('payment_intents/search', { query: `metadata['presence_invoice_id']:'${invoiceId.replace(/'/g, '')}'`, limit: '10' }, undefined, 'GET');
+  return Array.isArray(r?.data) ? r.data : [];
+}
+
+/** A subscription's paid invoices since a moment (unix seconds): a retainer's charges. */
+export async function listSubscriptionPaidInvoices(subId: string, sinceSec: number): Promise<any[]> {
+  const r = await stripeReq('invoices', { subscription: subId, status: 'paid', 'created[gte]': String(Math.max(0, Math.floor(sinceSec))), limit: '24' }, undefined, 'GET');
+  return Array.isArray(r?.data) ? r.data : [];
+}
+
+/** The finished checkouts of one pay link: a retainer's approval, when its message was lost. */
+export async function listLinkCompletedSessions(linkId: string): Promise<any[]> {
+  const r = await stripeReq('checkout/sessions', { payment_link: linkId, status: 'complete', limit: '10' }, undefined, 'GET');
+  return Array.isArray(r?.data) ? r.data : [];
+}
+
+/** Refunds Stripe made since a moment (unix seconds), newest first: the daily check hands
+ *  each one's charge to commerce/charge_returns.ts, for a refund whose message was lost. */
+export async function listRecentRefunds(sinceSec: number): Promise<any[]> {
+  const r = await stripeReq('refunds', { 'created[gte]': String(Math.max(0, Math.floor(sinceSec))), limit: '100' }, undefined, 'GET');
+  return Array.isArray(r?.data) ? r.data : [];
+}
+
+/** Disputes opened since a moment (unix seconds), newest first: the same, for a dispute. */
+export async function listRecentDisputes(sinceSec: number): Promise<any[]> {
+  const r = await stripeReq('disputes', { 'created[gte]': String(Math.max(0, Math.floor(sinceSec))), limit: '100' }, undefined, 'GET');
+  return Array.isArray(r?.data) ? r.data : [];
+}

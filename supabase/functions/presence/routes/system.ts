@@ -28,6 +28,7 @@ import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, r
 import { runScheduledBroadcasts } from '../lib/broadcast.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
+import { runStripeCheck } from '../commerce/stripe_check.ts';   // sales item 130: the daily check against Stripe
 import { summarizeHealthCenter } from '../lib/health_center.ts';
 import { timingSafeEqual } from '../../_shared/hmac.ts';
 import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
@@ -334,6 +335,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'lifecycle') return json({ data: await runLifecycleSweep(limit) }, 200, cors); // Phase RL: trial expiry + lifecycle comms
       if (task === 'deletion') return json({ data: await runDeletionSweep(limit) }, 200, cors);   // P2-E W2: execute eligible account deletions
       if (task === 'reconcile_billing') return json({ data: await runBillingReconcile(limit) }, 200, cors);   // P2-E W7: correct entitlement drift vs Stripe
+      if (task === 'stripe_check') return json({ data: await runStripeCheck(limit ? { invoices: limit, retainers: limit, receipts: limit } : {}) }, 200, cors);   // sales item 130
       if (task === 'gsc_sync') {
         // Ledgered like the tick groups: the daily pg_cron job's response is
         // discarded by pg_net, so without a ledger row a persistently failing
@@ -379,6 +381,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
           ],
           revenue: [
             ['reconcile_billing', () => runBillingReconcile(30)],
+            ['stripe_check', () => runStripeCheck()],   // sales item 130: a few invoices and retainers asked about each tick, each once a day, before the reminders
             ['lifecycle', () => runLifecycleSweep(limit)],
             ['deletion', () => runDeletionSweep(25)],
             ['leads', () => runLeadFollowups(20)],
@@ -461,6 +464,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       // enforcement (W9) acts on Stripe-fresh state (a recovered customer already
       // had grace_until cleared) rather than possibly-stale data.
       const reconcile_billing = await step('reconcile_billing', () => runBillingReconcile(30));
+      await step('stripe_check', () => runStripeCheck());                           // sales item 130: what a lost Stripe message missed, before the invoice reminders ask a client who paid
       const lifecycle = await step('lifecycle', () => runLifecycleSweep(limit));   // Phase RL: the revenue lifecycle
       const deletion = await step('deletion', () => runDeletionSweep(25));         // P2-E W2: eligible account deletions
       const digest = await step('digest', () => runWeeklyDigest());                // CP-3: the Monday routine (7-day dedupe)

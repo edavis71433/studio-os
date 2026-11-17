@@ -269,10 +269,39 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
   if (!UUID_RE.test(invoiceId)) {
     return json({ error: 'bad_request' }, 400, cors);
   }
+  return json({ data: await invoicePaidEcho(invoiceId) }, 200, cors);
+}
+
+// ── The client's receipt goes out once (sales item 130) ─────────────────────
+// It used to ride the studio's notice: sent only when that notice was new. When the
+// main server was down while the webhook worked, the webhook wrote the notice itself
+// (its floor), so when the echo finally ran the notice was old and the receipt never
+// went out. Now whoever claims presence_invoices.receipt_sent_at first sends it, the
+// echo here or the daily check (commerce/stripe_check.ts) for one the echo missed.
+// 'unknown': the column isn't there yet (before APPLY-0235), so the receipt rides the
+// notice as before.
+async function claimReceipt(invoiceId: string): Promise<{ gate: 'claimed' | 'taken' | 'unknown'; at: string }> {
+  const at = new Date().toISOString();
+  const r = await svc(`presence_invoices?id=eq.${invoiceId}&status=eq.paid&receipt_sent_at=is.null&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ receipt_sent_at: at }) }).catch(() => ({ ok: false, json: null }));
+  if (!r.ok) return { gate: 'unknown', at };
+  return { gate: Array.isArray(r.json) && r.json.length ? 'claimed' : 'taken', at };
+}
+/** A receipt that didn't go out lets go of its claim, so the daily check tries again. */
+async function releaseReceipt(invoiceId: string, at: string): Promise<void> {
+  await svc(`presence_invoices?id=eq.${invoiceId}&receipt_sent_at=eq.${encodeURIComponent(at)}`, { method: 'PATCH', body: JSON.stringify({ receipt_sent_at: null }) }).catch(() => {});
+}
+
+/** Everything a paid invoice owes the people around it: the studio's line, push and email
+ *  (once, on the line's created flag), the client's receipt (once, on its own claim), the
+ *  deposit's checklist tick and the deal's move to Won (both safe to repeat). The webhook
+ *  reaches it through POST /commerce/invoice-paid; the daily check calls it directly for a
+ *  payment whose message never came, and for a receipt that never went out. An id only:
+ *  the invoice is re-read here, so no caller can assert an amount or a payee. */
+export async function invoicePaidEcho(invoiceId: string): Promise<Record<string, unknown>> {
   const inv = (await svc(`presence_invoices?id=eq.${invoiceId}&status=eq.paid&select=id,site_id,deal_id,title,amount_cents,purpose&limit=1`)).json?.[0];
-  if (!inv) return json({ data: { ignored: true, reason: 'not_paid_or_unknown' } }, 200, cors);
+  if (!inv) return { ignored: true, reason: 'not_paid_or_unknown' };
   const clientId = (await svc(`presence_sites?id=eq.${encodeURIComponent(String(inv.site_id))}&select=client_id&limit=1`)).json?.[0]?.client_id;
-  if (!clientId) return json({ data: { ignored: true, reason: 'no_owner_client' } }, 200, cors);
+  if (!clientId) return { ignored: true, reason: 'no_owner_client' };
 
   // A DEPOSIT IS NOT A SEPARATE FLOW — it is presence_invoices.purpose='deposit'
   // (0086). It is, however, a different SENTENCE: "Deposit — $500 from Jordan
@@ -347,16 +376,20 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
       // Item 115: the offer, as a link — nothing sends unless the operator presses the button there.
       (isDeposit ? '' : `<p style="color:#555">A customer who just paid is the best person to ask for a review — <a href="${base}/presence.html#reviews">open Reviews to send the ask</a>${who ? ` to ${esc(who)}` : ''}.</p>`),
       isDeposit ? 'deposit_paid' : 'invoice_paid', { label: unconverted ? 'Convert them in your workspace' : 'Open it in your workspace', href: link });
+  }
 
-    // ── THE CLIENT'S RECEIPT (audit long-tail) ────────────────────────────────
-    // payment-success.html promises "a receipt is on its way to your email" —
-    // and until now only Eric got mail. This is the biggest trust moment in the
-    // client's whole engagement; it must not be silence. Branded on the studio's
-    // own brand, transactional (their own payment → critical), send-once on the
-    // SAME fresh gate as the operator email, and honest when it can't send:
-    // no resolvable client email → a loud warn, never a quiet skip.
+  // ── THE CLIENT'S RECEIPT (audit long-tail) ────────────────────────────────
+  // payment-success.html promises "a receipt is on its way to your email" —
+  // and until now only Eric got mail. This is the biggest trust moment in the
+  // client's whole engagement; it must not be silence. Branded on the studio's
+  // own brand, transactional (their own payment → critical), send-once on its own
+  // claim (sales item 130: claimReceipt above), and honest when it can't send:
+  // no resolvable client email → a loud warn, never a quiet skip.
+  {
+    const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+    const claim = payerEmail ? await claimReceipt(String(inv.id)) : { gate: 'taken' as const, at: '' };
     try {
-      if (payerEmail) {
+      if (payerEmail && (claim.gate === 'claimed' || (claim.gate === 'unknown' && fresh))) {
         const [{ sendEmail }, { loadEmailBrand, EMAIL_BRAND_DEFAULT, emailBand, emailFacts }] = await Promise.all([
           import('../commerce/account.ts'),
           import('../lib/email_brand.ts'),
@@ -390,10 +423,12 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
           `<p>${isDeposit ? 'The deposit is in and the work can begin.' : 'The invoice is settled — nothing else is needed from you.'} ${told}, and everything updates on its own.</p>` +
           `<p style="color:#666;font-size:.9rem">${attachments ? 'Your receipt is attached as a PDF. ' : ''}Keep this email for your records.</p>`,
           brand, { critical: true, asBusiness: true, siteId: String(inv.site_id), ...(attachments ? { attachments } : {}) });
-      } else {
+      } else if (!payerEmail) {
         console.warn(`[invoice-paid] no client email resolvable for invoice ${inv.id} (deal ${inv.deal_id || 'none'}) — the payer gets no receipt; add an email to the deal's contact`);
       }
     } catch (e) { console.warn(`[invoice-paid] client receipt failed for ${inv.id}: ${String((e as Error)?.message || e)} (non-fatal)`); }
+    // a receipt that didn't go out lets go of its claim: the daily check sends it later
+    if (claim.gate === 'claimed' && !receipted) await releaseReceipt(String(inv.id), claim.at);
   }
 
   // A paid DEPOSIT is checklist step 2, and it ticks itself. Idempotent (the
@@ -429,7 +464,7 @@ async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>)
   // `notice` = told just now; `already` = a retry, the operator was told before.
   // notice:false + already:false means the operator has NOT been told — the
   // webhook reads exactly these flags and writes its own in-app floor then.
-  return json({ data: { notice: fresh, already: outcome === 'exists', emailed, receipted, ticked, moved } }, 200, cors);
+  return { notice: fresh, already: outcome === 'exists', emailed, receipted, ticked, moved };
 }
 
 async function handleBillingSync(req: Request, cors: Record<string, string>): Promise<Response> {

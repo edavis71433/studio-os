@@ -118,6 +118,9 @@ const TERMINAL_OK = [
   { kind: 'invoice_void_paid', marker: "returnPeriod('refundfailed'", why: 'refundfailed:<deal>:<Stripe refund id> — a refund fails once; trying again in Stripe makes a new refund with a new id' },
   { kind: 'invoice_void_paid', marker: "returnPeriod('dispute'", why: 'dispute:<deal>:<Stripe dispute id> — a dispute opens once; one reopened on appeal is told under :again, so its line is never swallowed by the first' },
   { kind: 'invoice_void_paid', marker: "returnPeriod('disputelost'", why: 'disputelost:<deal>:<Stripe dispute id> — a dispute is lost once; turned round on appeal and lost again is told under :again' },
+  // sales item 130: the daily check tells a payment whose message was lost the way the webhook tells it (item 116)
+  { kind: 'invoice_void_paid', marker: 'payamount:', why: 'payamount:<invoice>:<Stripe payment id> — a payment is for one amount and is told once; another payment has its own id' },
+  { kind: 'invoice_void_paid', marker: 'paidtwice:', why: 'paidtwice:<invoice>:<Stripe payment id> — each extra payment on an invoice is told once; another extra payment has its own id' },
 ];
 const clearedRaises = raises.filter((r) => r.kind && clearedKinds.has(r.kind));
 ok('A0: cleared-kind raise sites exist to check (>= 8)', clearedRaises.length >= 8, `found ${clearedRaises.length}`);
