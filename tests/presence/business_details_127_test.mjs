@@ -119,7 +119,9 @@ const MAIN = { address_line1: '12 Main St', address_line2: '', city: 'Burbank', 
   const SITE = { baseUrl: 'https://marlows.example', brand: { credit: 'Site by Davis Digital Studio' } };
   const SHORT = 'What we do, where we do it, and what we are known for, in one line.';
   const lds = (html) => [...String(html).matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
-  const meta = (html, attr, name) => (String(html).match(new RegExp(`<meta ${attr}="${name}" content="([^"]*)"`)) || [])[1];
+  // a meta tag's content as a browser reads it (an apostrophe is drawn as &#39;)
+  const unesc = (s) => s?.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&#39;', "'").replaceAll('&amp;', '&');
+  const meta = (html, attr, name) => unesc((String(html).match(new RegExp(`<meta ${attr}="${name}" content="([^"]*)"`)) || [])[1]);
   for (const slug of TEMPLATES) {
     const fx = fullFixture(slug);
     const files = await renderSnapshot(fx, SITE);

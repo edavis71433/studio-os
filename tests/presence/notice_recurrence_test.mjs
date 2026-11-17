@@ -113,6 +113,11 @@ const TERMINAL_OK = [
   { kind: 'lead_followup', marker: 'enqfollow:', why: 'enqfollow:<enquiry>:<1|2> — each of an enquiry\'s two follow-ups goes once, ever, by design; a new enquiry mints a new id' },
   { kind: 'deal_followup', marker: 'expiry:', why: 'expiry:<proposal or estimate> — one note a week before it runs out, once per document; a revised proposal is a new document with a new id' },
   { kind: 'deal_followup', marker: 'reviewAskPeriod(', why: 'reviewask:<project id> — list item 29 asks a finished project\'s client for a review once, ever, by design (a silent ledger row); a reopened and re-finished project is not asked twice' },
+  // sales items 116, 126, 127: the money lines, cleared once Stripe has done what they asked (commerce/charge_returns.ts)
+  { kind: 'invoice_void_paid', marker: 'bouncedPeriod(', why: 'bounced:<invoice>:g<link number> (item 116) — every bounce moves the invoice to a new pay link number, so a second bounce is a new key' },
+  { kind: 'invoice_void_paid', marker: "returnPeriod('refundfailed'", why: 'refundfailed:<deal>:<Stripe refund id> — a refund fails once; trying again in Stripe makes a new refund with a new id' },
+  { kind: 'invoice_void_paid', marker: "returnPeriod('dispute'", why: 'dispute:<deal>:<Stripe dispute id> — a dispute opens once; one reopened on appeal is told under :again, so its line is never swallowed by the first' },
+  { kind: 'invoice_void_paid', marker: "returnPeriod('disputelost'", why: 'disputelost:<deal>:<Stripe dispute id> — a dispute is lost once; turned round on appeal and lost again is told under :again' },
 ];
 const clearedRaises = raises.filter((r) => r.kind && clearedKinds.has(r.kind));
 ok('A0: cleared-kind raise sites exist to check (>= 8)', clearedRaises.length >= 8, `found ${clearedRaises.length}`);

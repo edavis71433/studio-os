@@ -225,11 +225,12 @@ globalThis.fetch = realFetch;
   const { renderSnapshot } = await import('../../supabase/functions/presence/lib/render.ts');
   const SITE = { baseUrl: 'https://vermilionandvine.example' };
   for (const slug of TEMPLATES) {
-    const files = await renderSnapshot(fullFixture(slug), SITE);
-    const list = String(files['updates/index.html'] || ''), post = String(files['updates/winter-menu-2026/index.html'] || ''), cat = String(files['updates/category/events/index.html'] || '');
+    const fx = fullFixture(slug), [first, second] = fx.content.posts;   // each template's sample is its own business (item 103)
+    const files = await renderSnapshot(fx, SITE);
+    const list = String(files['updates/index.html'] || ''), post = String(files[`updates/${first.slug}/index.html`] || ''), cat = String(files['updates/category/events/index.html'] || '');
     ok(`F1 ${slug}: the list has All and each category as links, the current one marked`, /<nav class="post-cats" aria-label="Categories"><a href="\/updates\/" aria-current="page">All<\/a><a href="\/updates\/category\/events\/">Events<\/a><a href="\/updates\/category\/news\/">News<\/a><\/nav>/.test(list) || /<nav class="post-cats" aria-label="Categories"><a href="\/updates\/" aria-current="page">All<\/a><a href="\/updates\/category\/news\/">News<\/a><a href="\/updates\/category\/events\/">Events<\/a><\/nav>/.test(list));
     ok(`F2 ${slug}: each post in the list says its category and who wrote it`, list.includes('<p class="post-kicker">Events</p>') && list.includes('By Sam Ortiz · <time'));
-    ok(`F3 ${slug}: a category's page lists only its posts, and marks itself`, cat.includes('<h1>Events</h1>') && cat.includes('Wine dinner on the patio') && !cat.includes('Winter menu is live') && cat.includes('href="/updates/category/events/" aria-current="page"'));
+    ok(`F3 ${slug}: a category's page lists only its posts, and marks itself`, cat.includes('<h1>Events</h1>') && cat.includes(second.title) && !cat.includes(first.title) && cat.includes('href="/updates/category/events/" aria-current="page"'));
     ok(`F4 ${slug}: the post: its category, byline, the photo in its text with its caption, and the author`, post.includes('<p class="post-kicker">News</p>') && post.includes('By Maria Lopez · <time') && /<figure class="post-fig">[\s\S]*?<figcaption>Before the doors open<\/figcaption><\/figure>/.test(post) && post.includes('<p class="post-author-name">Written by Maria Lopez</p>') && post.includes('More in News'));
     ok(`F5 ${slug}: Google is told it's a blog post by its author`, /"@type":"BlogPosting"/.test(post) && /"author":\{"@type":"Person","name":"Maria Lopez"\}/.test(post) && /"articleSection":"News"/.test(post));
     ok(`F6 ${slug}: the category pages are in the sitemap and the feed names the category`, String(files['sitemap.xml']).includes('/updates/category/news/</loc>') && /<category>News<\/category>/.test(String(files['feed.xml'])));

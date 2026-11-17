@@ -86,7 +86,10 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   const SEL = 'id,title,description,amount_cents,status,due_date,paid_at,stripe_url,created_at,site_id';
   // sales item 120 (code pass finding 56): the invoice's number, and which invoice a part
   // payment paid toward (APPLY-0167), so the portal reads like the client's own copies
-  let r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since,number,payment_for,paid_method&order=created_at.desc&limit=200`);
+  // sales items 126, 127: what came back through Stripe (APPLY-0233), so a refunded or disputed
+  // invoice reads as one; before it, the shapes below
+  let r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since,number,payment_for,paid_method,refunded_cents,dispute_status&order=created_at.desc&limit=200`);
+  if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since,number,payment_for,paid_method&order=created_at.desc&limit=200`);
   if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since&order=created_at.desc&limit=200`);
   if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL}&order=created_at.desc&limit=200`);
   // Builder list item 179, part four: each invoice on the client's papers shelf opens
@@ -108,6 +111,7 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
       id: i.id, name: clean(i.title, 200), description: clean(i.description, 1000), number: invoiceNo(i.number),
       amount: (Number(i.amount_cents) || 0) / 100, status: i.status, state, due_date: i.due_date, paid_at: i.paid_at,
       processing_since: i.processing_since || null,
+      refunded_cents: Number(i.refunded_cents) || 0, dispute_status: i.dispute_status || null,
       // Only an invoice that is still WAITING on payment is payable: never a paid
       // one, never a voided one (POST /sales/invoices/:id/void withdraws it — a
       // not-paid test would hand the client a live pay button for it), and never

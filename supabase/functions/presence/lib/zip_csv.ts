@@ -5,10 +5,12 @@
 
 /** One CSV cell: quoted when it holds a comma, quote or line break; a cell that
  *  starts like a formula (= + - @, or a tab/return) gets a leading apostrophe so
- *  a spreadsheet shows it as text instead of running it. */
+ *  a spreadsheet shows it as text instead of running it. A plain negative number
+ *  ("-99.00", a refund or a fee taken off) is a number, not a formula, so it stays one
+ *  a spreadsheet can add up (sales item 133); "-2+3" is still kept as text. */
 export function csvCell(v: unknown): string {
   let s = v === null || v === undefined ? '' : String(v);
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  if (/^[=+\-@\t\r]/.test(s) && !/^-\d+(\.\d+)?$/.test(s)) s = "'" + s;
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 /** A whole CSV: a header row, then one row per record, CRLF line ends, and a

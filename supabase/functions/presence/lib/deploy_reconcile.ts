@@ -51,6 +51,10 @@ export async function reconcileOnePublish(p: InflightPublish, nowMs: number): Pr
   if (outcome === 'live') {
     await svc(`presence_publishes?id=eq.${p.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', completed_at: nowIso }) });
     await svc(`presence_sites?id=eq.${p.site_id}`, { method: 'PATCH', body: JSON.stringify({ status: 'live', last_published_at: nowIso }) });
+    // item 243: a deploy of real content going live is being online, as in routes/publish.ts.
+    // A slow Bring back online (or a publish over the offline page) finishes here, and left the
+    // site marked Offline for good. Best-effort: a database without 0111 never fails the above.
+    await svc(`presence_sites?id=eq.${p.site_id}`, { method: 'PATCH', body: JSON.stringify({ offline_at: null }) }).catch(() => {});
     // item 90: the timed-section sweep works out the new snapshot's next instant (best-effort; see routes/publish.ts)
     await svc(`presence_sites?id=eq.${p.site_id}`, { method: 'PATCH', body: JSON.stringify({ next_window_at: null }) }).catch(() => {});
     await checkSoon(p.site_id);   // item 206: the next tick checks the health of what just went live

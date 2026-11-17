@@ -262,3 +262,10 @@
   Access-Control-Allow-Origin: *
 /thumbs/*
   Cache-Control: public, max-age=86400
+
+# Builder item 142: the app's scripts and styles as scripts/pack-public.mjs publishes them, under
+# /v/<fingerprint>/. The fingerprint comes from the file's contents, so a changed file gets a new
+# address and the old one is never asked for again: a year, and no re-check on any page view.
+# This rule stays last, so no rule above it (/*.js, /*.css) can shorten it.
+/v/*
+  Cache-Control: public, max-age=31536000, immutable
