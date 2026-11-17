@@ -165,7 +165,7 @@ test.describe('a section’s Layout tab draws the section itself each way (build
     await tile(page, 'Compact strip').click();
     await expect.poll(() => blocksWrite(writes)?.[1]?.variant, { timeout: 8000 }).toBe('strip');
     // nothing went wrong out loud: a sketch is an honest picture of the choice
-    await expect(page.locator('.toast, #toasts .toast').filter({ hasText: 'draw that section' })).toHaveCount(0);
+    await expect(page.locator('.dds-toast').filter({ hasText: 'draw that section' })).toHaveCount(0);
   });
 
   test('@layout the pictures fill the card on every screen, with readable names and big targets', async ({ page }) => {

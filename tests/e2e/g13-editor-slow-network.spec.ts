@@ -66,7 +66,7 @@ test.describe('G13 in-place canvas text editor — the same page changes on a sl
     await answerAsks(page);
     await openAbout(page, frame);
     await pageMenu(page, 'Contact', 'Delete page');
-    const undo = page.locator('.toast').getByRole('button', { name: 'Undo' });
+    const undo = page.locator('.dds-toast').getByRole('button', { name: 'Undo' });
     await expect(undo).toBeVisible();
     await expect(pill(page, 'Contact')).toHaveCount(0);
     const { sent, release } = await holdPuts(page);

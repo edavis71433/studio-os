@@ -49,8 +49,8 @@ if (phone && touch) {
   const missing = [...phoneSel].filter((s) => !touchSel.has(s));
   ok(`every control the phone floor lifts is lifted on any touch screen (${phoneSel.size} selectors)`, phoneSel.size >= 6 && missing.length === 0);
   if (missing.length) console.log('   missing from the touch block:', missing.join(' | '));
-  ok('touch: the shell icons are 44 × 44, and the sidebar\'s own sizes are outranked (html.dds-side.dds-app)',
-    /\.dds-ic,html\.dds-side\.dds-app \.dds-ic,html\.dds-side\.dds-app #dds-waffle\{\s*width:44px;\s*height:44px;\s*\}/.test(touch));
+  ok('touch: the shell icons are 44 × 44, and the sidebar\'s own sizes are outranked (html.dds-side.dds-app, and the website editor\'s page, which has no dds-app: builder item 98)',
+    /\.dds-ic,html\.dds-side\.dds-app \.dds-ic,html\.dds-side \.dds-ic\.dds-ic,html\.dds-side\.dds-app #dds-waffle\{\s*width:44px;\s*height:44px;\s*\}/.test(touch));
   ok('touch: the sidebar\'s rows and its search are 44px', /html\.dds-side \.dds-nav \.sec > \.it/.test(touch) && /html\.dds-side #dds-search/.test(touch));
   for (const sel of ['.lbtn', '.rowact', '.abtn', '.seg button', '.crow button', '#viewBtn', '[role="tab"]'])
     ok(`touch: ${sel} gets the floor (scoped to the app)`, touchSel.has('html.dds-app ' + sel));

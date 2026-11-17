@@ -13,6 +13,7 @@ import { editorSource } from './editor_source.mjs';   // builder item 38: the ed
 const ROOT = new URL('../../', import.meta.url);
 const src = editorSource();
 const lines = src.split('\n');
+const shellCss = Deno.readTextFileSync(new URL('shell.css', ROOT));
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; } else { fail++; console.log('FAIL  ' + n); } };
 
@@ -55,7 +56,7 @@ for (const [why] of ALLOWED) ok(`an allowed kind is still in use (else drop it f
 
 // the editor's leftovers from before item 36 stay on the shared settings
 ok('the domain change button’s words follow the filled-button ink (they were white on a light purple in the dark look)', src.includes('background:var(--plum,#5b3fa0);color:var(--fill-ink);border-radius:999px;padding:8px 16px;cursor:pointer";'));
-ok('the questions’ danger button is clay, not a written red', /border:1px solid var\(--clay\);background:var\(--clay\);color:var\(--fill-ink\)/.test(src));
+ok('the questions’ danger button is a colour setting, not a written red (the shell’s question since builder item 101)', /\.dds-dlg\.danger \.dlg-row \.ask-ok\{background:var\(--dds-bad\)/.test(shellCss));
 ok('the contrast check’s chips use the good and bad settings', src.includes('"background:var(--sage-soft);color:var(--sage)" : "background:var(--clay-soft);color:var(--clay)"'));
 ok('the filled button’s gradient is one setting: written out only in it and in the canvas’s back-up', lines.filter((l) => l.includes('linear-gradient(135deg,#6d3fd4 0%,#7a4bdd 100%)') && !/--plum-grad:|v\("--dds-grad-btn"/.test(l)).length === 0 && (src.match(/var\(--plum-grad\)/g) || []).length >= 3);
 

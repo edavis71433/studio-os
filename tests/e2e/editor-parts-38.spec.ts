@@ -70,7 +70,7 @@ test.describe('the editor in parts (item 38)', () => {
     await openEditor(page);
     await expect(page.locator('#ssStatus')).not.toBeEmpty();
     await page.locator('#btnEditSite').click();
-    await expect(page.locator('.toast, [role="status"], [role="alert"]').filter({ hasText: 'didn’t load' }).first()).toBeVisible();
+    await expect(page.locator('.dds-toast, [role="status"], [role="alert"]').filter({ hasText: 'didn’t load' }).first()).toBeVisible();
     expect(await partIn(page)).toBe(false);
     part.allow();
     await page.evaluate(() => (window as unknown as { go: (v: string) => void }).go('design'));

@@ -145,7 +145,7 @@ test.describe('G13 in-place canvas text editor — changing page with an edit op
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'Worth keeping');
     await openPages(page); await pill(page, 'About').locator('.pp-menu').click();
     await page.locator('.pp-pop-item', { hasText: 'Delete page' }).click();
-    await page.locator('.toast').getByRole('button', { name: 'Undo' }).click();
+    await page.locator('.dds-toast').getByRole('button', { name: 'Undo' }).click();
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'restored' }).first()).toBeVisible();
     const restored = puts[puts.length - 1] as Paged;
     expect(restored.pages?.[0].blocks[0].subtitle).toBe('Worth keeping');

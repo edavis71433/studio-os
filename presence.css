@@ -387,7 +387,7 @@ h1.doc{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.
 .pg-lrow .cnt{min-width:0;margin:0;text-align:right}
 .pg-sub{margin:16px 0 8px;font-size:12.5px;font-weight:600;color:var(--ink)}
 .pg-where{margin:-4px 0 4px;font-size:12.5px;color:var(--ink-2);overflow-wrap:anywhere}
-@media(max-width:760px){.pg-row .ic,.pg-row .hb-chip{display:none}.pg-row .t{flex:1 1 120px}.pg-grab{width:36px;height:44px}.pg-gear{width:44px;height:44px}}
+@media(max-width:760px){.pg-row .ic{display:none}.pg-row .hb-chip{font-size:0;gap:0;padding:6px;border:0;background:none}.pg-row .hb-chip .d{width:9px;height:9px;background:currentColor}.pg-row .t{flex:1 1 120px}.pg-grab{width:36px;height:44px}.pg-gear{width:44px;height:44px}}
 html:not(.is-studio) #dcModeSeg [data-dcmode="timewarp"]{display:none}
 .tg-try{font:inherit;font-size:12.5px;padding:6px 12px;border:1px solid var(--hair);border-radius:var(--r);background:none;color:var(--ink-2);cursor:pointer}
 .tg-try:hover{color:var(--ink);border-color:var(--ink-3)}
@@ -1070,11 +1070,10 @@ html.dc-edit:not(.plan-watch) .ritualwrap.as-card .ritual{max-width:none;margin:
 html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important;z-index:80 !important}
 @media(max-width:760px){
   .topbar #btnEditSite,.topbar #btnUndoTop,.topbar #btnRedoTop{display:inline-flex}
-  html.dc-edit:not(.plan-watch) .toasts{bottom:92px}   /* clear of the dock */
+  html.dc-edit:not(.plan-watch) .dds-toast{bottom:92px}   /* the shell's toast, clear of the dock */
   html.dc-edit:not(.plan-watch) .dds-hint{bottom:172px !important}   /* above the dock and the messages */
 }
 /* more tabs than room: fade the edge so the rest read as there */
-@media(max-width:1280px){.hb-tabs{padding-right:32px;-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent)}}
 /* ── a phone: the bar is Exit, the page, Undo, Redo and Publish; the dock is a pill
    along the bottom with Pages, Add, Styles, Photos and More; the cards are sheets ── */
 @media(max-width:760px){
@@ -1664,7 +1663,14 @@ html.dds-has-shell.dds-has-ctxbar .stage{top:calc(var(--dds-shell-h) + var(--dds
    toasts. Edit mode hides the shell, so there they keep the whole screen. */
 @media (min-width:761px){html.dds-side.dds-has-shell{--page-left:calc(var(--dds-side-w) + var(--dds-side-gap) * 2)}}
 html.dc-edit:not(.plan-watch).dds-side{--page-left:0px}
-html.dds-side .scrim,html.dds-side .ritualwrap,html.dds-side .dc-modal-scrim,html.dds-side .toasts{left:var(--page-left,0px)}
+html.dds-side .scrim,html.dds-side .ritualwrap,html.dds-side .dc-modal-scrim{left:var(--page-left,0px)}
+/* builder item 101: the editor's toasts are the shell's; they centre on the page beside the sidebar,
+   and on the whole screen in Edit mode, where the sidebar steps aside */
+@media (min-width:761px){html.dds-side .dds-toast.dds-toast{left:calc(50% + var(--page-left,0px) / 2)}}
+/* in Edit mode the toast keeps the editor's own compact size, so it stays under the tip a first visit shows */
+html.dc-edit:not(.plan-watch) .dds-toast{font-size:13px;padding:10px 16px;gap:12px;max-width:min(720px,calc(100vw - 32px))}
+html.dc-edit:not(.plan-watch) .dds-toast .ico{display:none}
+html.dc-edit:not(.plan-watch) .dds-toast .act{white-space:nowrap}
 .stagebar{flex:none;display:flex;align-items:flex-end;gap:var(--dds-s6,24px);padding:var(--dds-s4,16px) var(--dds-s7,32px) 0;color:rgba(239,234,247,.7)}
 .stagebar .back{font-size:13px;color:rgba(239,234,247,.75);padding-bottom:10px}
 .stagebar .back:hover{color:#efeaf7}
@@ -1704,11 +1710,6 @@ html.dc-edit:not(.plan-watch) .scrim{z-index:96}
 .sheetcard .body{margin:var(--dds-s6,24px) 0}
 .sheetcard .foot{display:flex;gap:var(--dds-s6,24px);justify-content:flex-end;align-items:baseline}
 
-/* toasts */
-.toasts{position:fixed;bottom:calc(84px + 16px);left:0;right:0;padding:0 var(--dds-s4,16px);z-index:120;display:flex;flex-direction:column;gap:var(--dds-s2,8px);align-items:center;pointer-events:none}
-@media(min-width:761px){.toasts{bottom:28px}}
-.toast{background:var(--ink);color:var(--paper);padding:10px var(--dds-s4,16px);border-radius:var(--r-lg);font-size:13px;box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));max-width:88vw}
-.toast.bad{background:var(--clay)}
 
 /* empty / loading / gate */
 .estate{padding:44px var(--dds-s2,8px);max-width:560px}
@@ -2391,3 +2392,32 @@ textarea.stk-in{line-height:1.55;resize:vertical}
 .dc-blkbar[hidden]{display:none}
 .dc-blkbar .stk-del{color:var(--clay)}
 @media(max-width:760px){html.dc-edit.dc-blkpick:not(.plan-watch) #dcDock{visibility:hidden}}
+/* builder item 98: on a touch screen every control on Edit mode's bar is a full 44px tap.
+   The bar keeps its height: its padding gives the room (54 - 10, and 50 - 6 on a phone). */
+@media (pointer:coarse){
+  html.dc-edit:not(.plan-watch) .dc-bar{padding:5px;gap:4px}   /* tighter gaps pay for the wider device switch: the bar still fits beside the dock */
+  html.dc-edit .dc-bar .dc-actbtn,html.dc-edit .dc-bar .pillbtn,html.dc-edit:not(.plan-watch) .dc-bar .dc-switch{height:44px}
+  html.dc-edit .dc-bar .dc-actbtn.dc-icon,html.dc-edit #btnEditExit{min-width:44px}
+  html.dc-edit:not(.plan-watch) .dc-bar .dpdevseg{padding:0}
+  html.dc-edit:not(.plan-watch) .dc-bar .dpdevseg button{width:44px;height:44px}
+}
+@media (pointer:coarse) and (max-width:760px){html.dc-edit:not(.plan-watch) .dc-bar{padding-top:3px;padding-bottom:3px}}
+/* builder item 98: the editor's tabs on a touch screen: every button, field and switch is a full
+   44px tap (the sidebar's site menu, the top bar, Edit, the gear and the handle on each page, the
+   writing toolbar, the fields, the switches) */
+@media (pointer:coarse){
+  html.dds-side .dds-nav .sec .site-menu .navitem,html.dds-side .dds-nav .sec .site-menu .grp{min-height:44px}
+  .pillbtn,#findInput{min-height:44px}
+  .quietact,.textact{min-height:44px;display:inline-flex;align-items:center}
+  .rtbtn{min-height:44px;min-width:44px}
+  .view input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),.view select{min-height:44px}
+  .pg-grab,.pg-gear{width:44px;height:44px}
+  .closedrow{display:flex;align-items:center;gap:8px;min-height:44px;padding-left:16px;margin-left:-16px}   /* the switch's label takes the tap all round it */
+  .view .field select{height:44px}   /* a select keeps its fixed height over a min-height */
+  .tabhelp::after{inset:-13px}   /* the help button's clear ring: a full 44px round its 20px circle and border */
+  .biz-card button{min-height:44px}
+  .biz-card .hrow .closedlab{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;margin:0 -16px}   /* a day's Closed box: its label takes the tap */
+}
+/* the editor keeps the sidebar's class on a phone, where the shell's search kept its 150px and its words:
+   the header ran 40px off the screen and Account sat outside it (found by item 98's walk) */
+@media (max-width:760px){html.dds-side .dds-search{min-width:44px;justify-content:center}html.dds-side .dds-search span:not(:first-child),html.dds-side .dds-search kbd{display:none}}

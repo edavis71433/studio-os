@@ -123,27 +123,13 @@ const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls)
 const icoBtn = (name, label, cls, size) => { const b = el("button", cls); b.type = "button"; b.innerHTML = uiIcon(name, size || 16); b.setAttribute("aria-label", label); b.title = label; return b; };
 // Says who can, where a role without configure would otherwise find a sentence and nothing to press.
 const askOwner = (cls, text) => { const n = el("div", cls, text); n.hidden = true; n.dataset.ifLacks = "configure"; return n; };
-// A small masked/text dialog — replaces native prompt() (no cleartext passwords, and
-// it matches the app's styled surfaces). Resolves the entered value, or null on cancel.
+// A small typed answer (or a masked password) in place of the browser's prompt(): the shell's
+// one styled prompt since builder item 101 (shell-kit.js ddsAsk). Resolves the entered value, or
+// null on cancel. Empty is an answer here (some fields say "leave it empty"); a password is
+// never trimmed; a link can be long.
 function askText(title, opts) {
   opts = opts || {};
-  return new Promise((resolve) => {
-    const dlg = el("dialog"); dlg.style.cssText = "border:none;border-radius:14px;padding:0;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)";
-    const form = el("form"); form.style.cssText = "padding:20px";
-    const h = el("div", null, title); h.style.cssText = "font-weight:600;margin-bottom:6px"; form.appendChild(h);
-    if (opts.hint) { const hh = el("div", null, opts.hint); hh.style.cssText = "font-size:13px;color:var(--soft,#6b6478);margin-bottom:10px"; form.appendChild(hh); }
-    const inp = el("input"); inp.type = opts.password ? "password" : "text"; if (opts.value) inp.value = opts.value; if (opts.placeholder) inp.placeholder = opts.placeholder;
-    inp.style.cssText = "width:100%;font:inherit;font-size:16px;padding:9px 12px;border:1px solid var(--line,#ddd);border-radius:9px;outline:none;box-sizing:border-box"; form.appendChild(inp);
-    const row = el("div"); row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;margin-top:14px";
-    const cancel = el("button", null, "Cancel"); cancel.type = "button"; cancel.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer";
-    const ok = el("button", null, opts.ok || "Save"); ok.type = "submit"; ok.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);border-radius:999px;padding:8px 16px;cursor:pointer";
-    row.appendChild(cancel); row.appendChild(ok); form.appendChild(row); dlg.appendChild(form); document.body.appendChild(dlg);
-    let done = false; const finish = (v) => { if (done) return; done = true; try { dlg.close(); } catch (e) {} dlg.remove(); resolve(v); };
-    cancel.addEventListener("click", () => finish(null));
-    form.addEventListener("submit", (e) => { e.preventDefault(); finish(inp.value); });
-    dlg.addEventListener("cancel", (e) => { e.preventDefault(); finish(null); });
-    dlg.showModal(); setTimeout(() => inp.focus(), 20);
-  });
+  return window.ddsAsk({ title, text: opts.hint, value: opts.value, placeholder: opts.placeholder, password: !!opts.password, yes: opts.ok || "Save", required: false, max: opts.max || 4096 });
 }
 // Builder item 194 (Nov 12 review, findings 19, 23 and 26). One record, shown the way a provider's
 // form wants it: the name is "@", "www" or "_dmarc", never the full name (most forms add the
@@ -257,28 +243,18 @@ function askDomainChange(old) {
     dlg.showModal(); setTimeout(() => inp.focus(), 20);
   });
 }
-// A styled yes/no question in place of the browser's confirm() (item 33). The browser's box
-// can't be styled, reads like a system warning, and on a phone shows the site's address over
-// the question. Resolves true for the main button, false for Cancel or Escape. A question about
-// removing or replacing something (danger) starts on Cancel, so Enter never takes the risky path.
-let ASK_YES_N = 0;
+// A styled yes/no question in place of the browser's confirm() (item 33): the shell's one
+// styled question since builder item 101 (shell-kit.js ddsConfirm). The browser's box can't be
+// styled, reads like a system warning, and on a phone shows the site's address over the
+// question. A message written "The question? What it means." shows the question as the title
+// and the rest under it, line breaks kept (so does a first paragraph and the rest). Resolves
+// true for the main button, false for Cancel or Escape. A question about removing or replacing
+// something (danger) starts on Cancel, so Enter never takes the risky path, and its button is red.
 function askYes(message, opts) {
   opts = opts || {};
-  return new Promise((resolve) => {
-    const dlg = el("dialog", "ask-yes"); dlg.style.cssText = "border:none;border-radius:14px;padding:0;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(30,19,56,.28);background:var(--card,#fff);color:var(--ink,#1b1525)";
-    const form = el("form"); form.style.cssText = "padding:20px";
-    const msg = el("div", "ask-msg", message); msg.id = "askYesMsg" + (++ASK_YES_N); msg.style.cssText = "white-space:pre-line;font-size:15px;line-height:1.5"; form.appendChild(msg);
-    dlg.setAttribute("aria-labelledby", msg.id);
-    const row = el("div"); row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px";
-    const cancel = el("button", "ask-cancel", opts.cancel || "Cancel"); cancel.type = "button"; cancel.style.cssText = "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#1b1525);border-radius:999px;padding:8px 15px;cursor:pointer";
-    const ok = el("button", "ask-ok", opts.ok || "OK"); ok.type = "submit"; ok.style.cssText = opts.danger ? "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--clay);background:var(--clay);color:var(--fill-ink);border-radius:999px;padding:8px 16px;cursor:pointer" : "font:inherit;font-size:13px;font-weight:600;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);border-radius:999px;padding:8px 16px;cursor:pointer";
-    row.appendChild(cancel); row.appendChild(ok); form.appendChild(row); dlg.appendChild(form); document.body.appendChild(dlg);
-    let done = false; const finish = (v) => { if (done) return; done = true; try { dlg.close(); } catch (e) {} dlg.remove(); resolve(v); };
-    cancel.addEventListener("click", () => finish(false));
-    form.addEventListener("submit", (e) => { e.preventDefault(); finish(true); });
-    dlg.addEventListener("cancel", (e) => { e.preventDefault(); finish(false); });
-    dlg.showModal(); (opts.danger ? cancel : ok).focus();
-  });
+  const m = String(message ?? ""), q = m.search(/\?\s/), para = m.indexOf("\n\n");
+  const ends = [q > 0 ? q + 1 : 0, para > 0 ? para : 0].filter(Boolean), cut = ends.length ? Math.min(...ends) : -1;   // the question or the first paragraph, whichever ends first
+  return window.ddsConfirm({ title: cut > 0 ? m.slice(0, cut).trim() : m, text: cut > 0 ? m.slice(cut).trim() : "", yes: opts.ok || "OK", no: opts.cancel || "Cancel", danger: !!opts.danger });
 }
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 // Phase SEARCH: client-side tag parse — mirrors lib/search_index.ts normalizeTags
@@ -298,18 +274,15 @@ function splitTags(raw) {
 const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const fmtDay = (iso) => new Date(iso).toLocaleDateString("en-US", { weekday: "long" });
 function toast(msg, bad) {
-  // P2-B: prefer the ONE shared toast (success/error/conflict) from the shell;
-  // fall back to the local toast if the shell hasn't loaded. Same call sites,
-  // including the M9 stale-draft conflict path — now a consistent shared state.
-  if (bad && STALE_TOAST && STALE_TOAST.parentNode && STALE_TOAST.firstChild && STALE_TOAST.firstChild.textContent === msg) return;   // offered with its button already
-  if (typeof window.ddsToast === "function") { window.ddsToast(msg, bad ? "err" : "ok"); return; }
-  const t = el("div", "toast" + (bad ? " bad" : ""), msg);
-  $("toasts").appendChild(t);
-  setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity var(--dds-t-slow,320ms) var(--dds-ease,ease-out)"; setTimeout(() => t.remove(), 450); }, bad ? 5200 : 2800);
+  // P2-B: the ONE shared toast (success or failure) from the shell; since builder item 101 the
+  // editor keeps no toast of its own (shell-kit.js ddsToast loads before this file).
+  if (bad && STALE_TOAST && STALE_TOAST.isConnected && STALE_TOAST.textContent.includes(msg)) return;   // offered with its button already
+  window.ddsToast(msg, bad ? "err" : "ok");
 }
 // Wave-1 G7: a toast that carries ONE action (Undo a page delete, Load the latest
-// after an edit conflict). Always local (never ddsToast — it can't hold a button);
-// stays up `ms` (default 20s) so the action is genuinely reachable.
+// after an edit conflict): the shell's toast with its one button (builder item 101);
+// stays up `ms` (default 20s) so the action is genuinely reachable, and a later toast
+// sits above it instead of covering it.
 // A save refused because the site changed elsewhere is refused again until the page
 // loads that change, whichever save it was. So every such refusal offers the one way
 // out, once while it's up, from apiSend; a caller's own copy of the sentence is dropped.
@@ -328,16 +301,7 @@ async function loadLatest() {
   } catch (e2) { toast(nice(e2), true); }
 }
 function toastAction(msg, label, fn, ms) {
-  const t = el("div", "toast");
-  t.style.cssText = "display:flex;gap:12px;align-items:center;pointer-events:auto";
-  t.appendChild(el("span", null, msg));
-  const b = el("button", null, label); b.type = "button";
-  b.style.cssText = "font:inherit;font-size:12.5px;font-weight:700;padding:4px 12px;border-radius:999px;border:1px solid color-mix(in srgb,currentColor 75%,transparent);background:transparent;color:inherit;cursor:pointer;white-space:nowrap";
-  b.addEventListener("click", () => { t.remove(); fn(); });
-  t.appendChild(b);
-  $("toasts").appendChild(t);
-  setTimeout(() => { if (!t.parentNode) return; t.style.opacity = "0"; t.style.transition = "opacity var(--dds-t-slow,320ms) var(--dds-ease,ease-out)"; setTimeout(() => t.remove(), 450); }, ms || 20000);
-  return t;
+  return window.ddsToast(msg, "ok", { label, onClick: fn, ms: ms || 20000 });
 }
 /* ══ Rich-text writing toolbar ═══════════════════════════════════════════════
    Owner need: "normal website writing tools" on the long-form fields — Heading,
@@ -5910,7 +5874,7 @@ async function shareDraftLink() {
     let copied = false;
     try { await navigator.clipboard.writeText(url); copied = true; } catch (_) { /* clipboard can be blocked */ }
     if (copied) toast(`Draft link copied — read-only, works until ${until}. Text it to anyone.`);
-    else { window.prompt(`Your read-only draft link (works until ${until}) — copy it:`, url); }
+    else { askText(`Your read-only draft link, until ${until}. Copy it:`, { value: url, ok: "Done" }); }   // the clipboard was refused: the link, selected, to copy by hand
   } catch (err) { toast(nice(err), true); }
   SHARE_DRAFT_BUSY = false;
 }
@@ -5978,7 +5942,7 @@ async function openOnPhone() {
       note.hidden = false; copy.disabled = false;
       copy.onclick = async () => {
         try { await navigator.clipboard.writeText(link.url); toast("Link copied"); }
-        catch (_) { window.prompt("Copy the link to your draft:", link.url); }
+        catch (_) { askText("Copy the link to your draft:", { value: link.url, ok: "Done" }); }
       };
     } catch (err) {
       if (shut) return;

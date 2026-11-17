@@ -24,7 +24,7 @@ async function planWrites(page: Page, plan: Record<string, Answer>) {
   });
   return { writes, unplanned };
 }
-const toast = (page: Page, text: string) => page.locator('.dds-toast, #toasts .toast').filter({ hasText: text });
+const toast = (page: Page, text: string) => page.locator('.dds-toast').filter({ hasText: text });
 
 // ── the publish page (as tests/e2e/schedule.spec.ts mounts it) ──
 const CTX = { data: {

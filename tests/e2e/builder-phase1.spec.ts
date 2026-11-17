@@ -507,11 +507,11 @@ test.describe('what a real site showed', () => {
     const h1 = frame.locator('[data-dds-core="hero"] h1');
     await h1.dispatchEvent('dblclick');
     await expect(page.locator('html')).toHaveClass(/dc-edit/);
-    const toast = page.locator('.toast').filter({ hasText: 'Business' }).first();
+    const toast = page.locator('.dds-toast').filter({ hasText: 'Business' }).first();
     await expect(toast).toBeVisible();
     // readable, and clear of the on-screen tip that's still up on a first visit
     await expect(page.locator('.dds-hint.show')).toBeVisible();
-    const [m, tip] = await page.evaluate(() => [document.querySelector('.toast')!, document.querySelector('.dds-hint.show')!].map((n) => { const r = n.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, width: r.width }; }));
+    const [m, tip] = await page.evaluate(() => [document.querySelector('.dds-toast')!, document.querySelector('.dds-hint.show')!].map((n) => { const r = n.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, width: r.width }; }));
     expect(m.width).toBeGreaterThan(260);                            // it used to be squeezed into a narrow column on a phone
     expect(m.bottom <= tip.top || tip.bottom <= m.top).toBe(true);
     // the same for a stamped field inside a core section, which takes the in-place path first
