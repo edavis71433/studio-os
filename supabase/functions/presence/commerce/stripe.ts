@@ -279,3 +279,56 @@ export async function invoiceForPaymentIntent(paymentIntentId: string): Promise<
   const inv = first?.invoice;
   return String((typeof inv === 'string' ? inv : inv?.id) || '');
 }
+
+// ── What reached the bank: fees and payouts, for the bookkeeper file (sales item 133) ──
+// Read only. Stripe keeps its fee from each payment and pays the rest out in batches,
+// so each payment has a balance transaction (amount, fee, net) and each payout lists
+// the balance transactions it carried. These reads feed lib/stripe_ledger.ts.
+
+/** Every page of a Stripe list, up to `maxPages` of 100; `more` says Stripe had more
+ *  than that. Throws when Stripe can't be read, so a short list is never taken for a
+ *  whole one. */
+async function listAll(path: string, params: Record<string, string>, maxPages: number): Promise<{ data: any[]; more: boolean }> {
+  const data: any[] = [];
+  let after = '';
+  for (let page = 0; page < maxPages; page++) {
+    const res = await stripeReq(path, { ...params, limit: '100', ...(after ? { starting_after: after } : {}) }, undefined, 'GET');
+    const got = Array.isArray(res?.data) ? res.data : [];
+    data.push(...got);
+    after = String(got.length ? got[got.length - 1]?.id || '' : '');
+    if (!res?.has_more || !after) return { data, more: false };
+  }
+  return { data, more: true };
+}
+
+/** Each payment Stripe took between two moments (unix seconds), with the charge it came
+ *  from: a charge carries its PaymentIntent's notes, so presence_invoice_id names the
+ *  invoice. A card is type charge, a bank payment type payment. */
+export async function listPaymentBalanceTransactions(fromSec: number, toSec: number, maxPages = 10): Promise<{ data: any[]; more: boolean }> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  const span = { 'created[gte]': String(Math.floor(fromSec)), 'created[lt]': String(Math.floor(toSec)), 'expand[]': 'data.source' };
+  const [cards, banks] = await Promise.all(['charge', 'payment'].map((type) => listAll('balance_transactions', { ...span, type }, maxPages)));
+  return { data: [...cards.data, ...banks.data], more: cards.more || banks.more };
+}
+
+/** Payouts due to arrive between two moments (unix seconds). */
+export async function listPayouts(fromSec: number, toSec: number, maxPages = 5): Promise<{ data: any[]; more: boolean }> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  return await listAll('payouts', { 'arrival_date[gte]': String(Math.floor(fromSec)), 'arrival_date[lt]': String(Math.floor(toSec)) }, maxPages);
+}
+
+/** What one automatic payout carried: its balance transactions, each naming its source. */
+export async function listPayoutTransactions(payoutId: string, maxPages = 5): Promise<{ data: any[]; more: boolean }> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  return await listAll('balance_transactions', { payout: String(payoutId) }, maxPages);
+}
+
+/** The PaymentIntent that paid a Stripe invoice (a retainer's monthly charge), or ''. */
+export async function paymentIntentForInvoice(stripeInvoiceId: string): Promise<string> {
+  if (!STRIPE_SECRET) throw new Error('not_configured');
+  const res = await stripeReq('invoice_payments', { invoice: String(stripeInvoiceId), limit: '10' }, undefined, 'GET');
+  const rows = Array.isArray(res?.data) ? res.data : [];
+  const paid = rows.find((x: any) => x?.status === 'paid' && x?.payment?.type === 'payment_intent') || rows.find((x: any) => x?.payment?.type === 'payment_intent');
+  const pi = paid?.payment?.payment_intent;
+  return String((typeof pi === 'string' ? pi : pi?.id) || '');
+}
