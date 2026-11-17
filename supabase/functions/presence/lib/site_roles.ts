@@ -271,6 +271,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /sales/customers/${ID}/(restore|invite|website)`,   // builder item 241: a deleted customer comes back; their portal invite, like the deal's resend-invite; the address of a site they keep elsewhere
     'PUT /sales/services',
     `POST /sales/deals/${ID}/(stage|activity|tasks|proposals|contracts|convert|resend-invite|invoice|schedule|retainer|send|estimates|recurring)`,
+    `POST /sales/deals/${ID}/retainer/card-link`,   // sales item 129: emailing the client Stripe's page for a new card is like sending an invoice
+    `POST /client/retainers/${ID}/card`,   // sales item 129: a new card keeps the business's retainer paid; it stops and changes nothing owed
     `POST /sales/estimates/${ID}/(send|proposal|invoice)`,   // sales review item 47: send an estimate, or turn it into a proposal or an invoice (drafts)
     `PATCH /sales/recurring/${ID}`,
     `POST /sales/recurring/${ID}/(pause|resume|skip)`,

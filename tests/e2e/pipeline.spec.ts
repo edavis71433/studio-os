@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { installApp, onAsk } from './helpers/app';
+import { installApp, onAsk, pressButton } from './helpers/app';
 import { installIosFocusSemantics } from './helpers/ios-focus';
 
 // Pipeline (redesign slice 3): a 3-way List · Board · Table display (persisted),
@@ -2405,5 +2405,50 @@ test.describe('Pipeline — the record’s Payment schedule link, ?tab=, #outsta
     await page.goto(`/pipeline.html?deal=${DEAL}&dtab=billing`);
     await page.locator('#sendDeposit').click();
     await expect(page.locator('#invForm button[type="submit"]')).toHaveText('Request deposit');
+  });
+});
+
+// ── Sales item 129 (Stripe review, finding 3): a retainer card that didn't go through ──
+// The studio's line used to say "send a fresh authorization link", which the deal refuses
+// while the retainer is past due. The Retainer box now says the charge failed, and Email the
+// card link sends the client Stripe's own page for a new card.
+test.describe('deal page — a retainer card that didn’t go through (sales item 129)', () => {
+  const PAST_DUE = { status: 'past_due', amount_cents: 50000, interval: 'month', stripe_subscription_id: 'sub_1', stripe_customer_id: 'cus_1', checkout_url: null, created_at: '2026-10-01T00:00:00Z' };
+  const withRetainer = (retainer: unknown) => ({ ...TAB_API, [`/sales/deals/${WON_DEAL}`]: { data: { ...WON_DETAIL.data, deal: { ...WON_DETAIL.data.deal, retainer } } } });
+  const retainerBox = (page: import('@playwright/test').Page) => page.locator('#detailInner .sec').filter({ has: page.getByRole('heading', { name: 'Retainer', exact: true }) });
+
+  test('the Retainer box says the charge failed, and Email the card link sends the client Stripe’s page', async ({ page }) => {
+    const sent: unknown[] = [];
+    await installApp(page, { api: { ...withRetainer(PAST_DUE), [`POST /sales/deals/${WON_DEAL}/retainer/card-link`]: (body: unknown) => { sent.push(body); return { data: { emailed: true, to: 'j•••@example.com', url: 'https://app.example/card.html?t=x' } }; } } });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}&dtab=billing`);
+    const box = retainerBox(page);
+    await expect(box).toContainText('Payment overdue');
+    await expect(box).toContainText('The last charge didn’t go through. Stripe tries the card again over the next few days.');
+    await expect(box).not.toContainText('authorization link');
+    const email = box.getByRole('button', { name: 'Email the card link' });
+    await pressButton(email);
+    await expect(page.locator('.dds-toast')).toContainText('Card link emailed to j•••@example.com');
+    expect(sent).toHaveLength(1);
+    await expect(email).toBeEnabled();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test('no email on the contact: nothing is sent, the link is copied, and the words say so', async ({ page }) => {
+    await installApp(page, { api: { ...withRetainer({ ...PAST_DUE, status: 'active' }), [`POST /sales/deals/${WON_DEAL}/retainer/card-link`]: { data: { emailed: false, reason: 'no_email', url: 'https://app.example/card.html?t=x' } } } });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}&dtab=billing`);
+    const box = retainerBox(page);
+    await expect(box).toContainText('Active');
+    await expect(box).not.toContainText('The last charge didn’t go through.');
+    await pressButton(box.getByRole('button', { name: 'Email the card link' }));
+    await expect(page.locator('.dds-toast')).toContainText('There’s no email on the contact, so the card link is copied. Send it to them yourself.');
+  });
+
+  test('a retainer waiting for approval, or one Stripe hasn’t named a customer for, offers no card link', async ({ page }) => {
+    await installApp(page, { api: withRetainer({ ...PAST_DUE, status: 'pending', stripe_customer_id: null, stripe_subscription_id: null, checkout_url: 'https://pay.example/r' }) });
+    await page.goto(`/pipeline.html?deal=${WON_DEAL}&dtab=billing`);
+    await expect(retainerBox(page)).toContainText('Awaiting the client’s authorization');
+    await expect(retainerBox(page).getByRole('button', { name: 'Copy authorization link' })).toBeVisible();
+    await expect(page.locator('#retCardLink')).toHaveCount(0);
   });
 });

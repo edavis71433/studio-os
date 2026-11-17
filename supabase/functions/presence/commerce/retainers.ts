@@ -115,25 +115,48 @@ export function retainerNoticePeriod(dealId: string, transition: 'past_due' | 'c
   return `${retainerNoticePeriodPrefix(dealId)}${transition}:w${w}`;
 }
 
-/** The studio's plain voice: what happened, which client/deal, what to do. Pure. */
-export function retainerNoticeCopy(transition: 'past_due' | 'canceled', dealTitle: string, amountCents: number, interval: string): { headline: string; body: string; subject: string; html: string } {
+/** The studio's plain voice: what happened, which client/deal, what to do. Pure.
+ *
+ *  Sales item 129: the failed-card line used to say "send the client a fresh
+ *  authorization link from the deal", which the deal refuses while the retainer is
+ *  past due. It now says what works: Email the card link on the deal (Stripe's own
+ *  page for a new card), or the client does it from their portal. `reason` is
+ *  Stripe's cancellation_details.reason on a retainer that ended: 'payment_failed'
+ *  means every retry failed and Stripe stopped it. */
+export function retainerNoticeCopy(transition: 'past_due' | 'canceled', dealTitle: string, amountCents: number, interval: string, reason?: string): { headline: string; body: string; subject: string; html: string } {
   const name = (dealTitle || '').trim() || 'a retainer client';
   const amt = '$' + ((Number(amountCents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
   const per = interval === 'year' ? 'year' : 'month';
+  const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
   if (transition === 'past_due') {
     return {
-      headline: `A retainer payment didn’t go through — ${name}`,
-      body: `The ${amt}/${per} retainer didn’t collect this cycle. Stripe retries automatically — if it keeps failing, the client’s card likely needs updating. The work agreement itself hasn’t changed.`,
-      subject: `A retainer payment didn’t go through — ${name}`,
-      html: `<p>The <b>${amt}/${per}</b> retainer for <b>${name}</b> didn’t collect this cycle.</p><p>Stripe retries automatically over the next few days. If it keeps failing, the client’s card needs updating — open the subscription in Stripe to see the attempts, or send the client a fresh authorization link from the deal.</p>`,
+      headline: `A retainer card didn’t go through: ${name}`,
+      body: `The ${amt} a ${per} charge didn’t go through. Stripe tries the card again over the next few days. To fix it sooner, press Email the card link on the deal: the client puts in a new card on Stripe’s own page. They can also do it from their portal. If every try fails, Stripe ends the retainer.`,
+      subject: `A retainer card didn’t go through: ${name}`,
+      html: `<p>The <b>${amt} a ${per}</b> retainer charge for <b>${esc(name)}</b> didn’t go through.</p><p>Stripe tries the card again over the next few days. To fix it sooner, open the deal and press <b>Email the card link</b>: the client puts in a new card on Stripe’s own page, and Stripe uses it for the next try. They can also do it from their portal.</p><p>If every try fails, Stripe ends the retainer.</p>`,
+    };
+  }
+  if (reason === 'payment_failed') {
+    return {
+      headline: `A retainer ended after its card kept failing: ${name}`,
+      body: `Stripe tried the ${amt} a ${per} charge several times, then ended the retainer. It won’t charge again. To start it again, set up the retainer again from the deal: the client approves it with a card that works.`,
+      subject: `A retainer ended after its card kept failing: ${name}`,
+      html: `<p>Stripe tried the <b>${amt} a ${per}</b> retainer charge for <b>${esc(name)}</b> several times, then ended the retainer. It won’t charge again.</p><p>To start it again, open the deal and set up the retainer again: the client approves it with a card that works.</p>`,
     };
   }
   return {
     headline: `A retainer ended — ${name}`,
     body: `The ${amt}/${per} retainer has been canceled in Stripe and won’t bill again. If that’s expected, nothing to do. If not, a fresh authorization link from the deal restarts it.`,
     subject: `A retainer ended — ${name}`,
-    html: `<p>The <b>${amt}/${per}</b> retainer for <b>${name}</b> has been canceled in Stripe and won’t bill again.</p><p>If you and the client agreed to wrap up, nothing to do. If this is a surprise, open the deal and send a fresh authorization link to restart it.</p>`,
+    html: `<p>The <b>${amt}/${per}</b> retainer for <b>${esc(name)}</b> has been canceled in Stripe and won’t bill again.</p><p>If you and the client agreed to wrap up, nothing to do. If this is a surprise, open the deal and send a fresh authorization link to restart it.</p>`,
   };
+}
+
+/** Can the client put in a new card for this retainer (sales item 129)? Only a live
+ *  one, and only once Stripe has named its customer (the approval did that). Pure. */
+export function retainerCardFixable(r: Partial<RetainerState> | null | undefined): boolean {
+  if (!r || typeof r !== 'object') return false;
+  return (r.status === 'active' || r.status === 'past_due') && !!String(r.stripe_customer_id || '');
 }
 
 // ── A SECOND APPROVAL (sales item 117, Nov 12 2026 review, finding 5) ────────
@@ -183,6 +206,7 @@ export function retainerPortalView(deal: { id: string; title?: unknown; retainer
     since: r.created_at || null, next_charge: status === 'active' ? (r.current_period_end || null) : null, canceled_at: r.canceled_at || null,
     approve_url: status === 'pending' ? String(r.checkout_url) : null,
     can_cancel: status === 'active' || status === 'past_due',
+    can_update_card: retainerCardFixable(r),   // sales item 129: Stripe's page for a new card
     charges: charges.slice(0, 24),
   };
 }
@@ -408,7 +432,9 @@ export async function applyRetainerSync(type: string, obj: any): Promise<{ synce
           await clearNoticePrefix(clientId, 'retainer_status', retainerNoticePeriodPrefix(dealId));
         } else {
           const title = String((deal as { title?: string }).title || '').slice(0, 80);
-          const copy = retainerNoticeCopy(change, title, Number(next.amount_cents) || 0, String(next.interval || 'month'));
+          // sales item 129: an ending says why when Stripe gave up on a failing card
+          const reason = change === 'canceled' ? String(obj?.cancellation_details?.reason || '') : '';
+          const copy = retainerNoticeCopy(change, title, Number(next.amount_cents) || 0, String(next.interval || 'month'), reason);
           const fresh = await raiseNotice({
             siteId, clientId, kind: 'retainer_status',
             period: retainerNoticePeriod(dealId, change, Date.now()),
@@ -416,11 +442,9 @@ export async function applyRetainerSync(type: string, obj: any): Promise<{ synce
           });
           if (fresh) {
             const { emailOperator } = await import('../lib/service_bridge.ts');
-            const href = next.stripe_subscription_id
-              ? `https://dashboard.stripe.com/subscriptions/${next.stripe_subscription_id}`
-              : `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/pipeline.html?deal=${dealId}`;
-            emailOperator(siteId, copy.subject, copy.html, 'retainer_status',
-              { label: change === 'past_due' ? 'Open it in Stripe' : 'Open the deal', href }).catch(() => {});
+            // the fix is on the deal now (Email the card link, or set it up again), not in Stripe
+            const href = `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/pipeline.html?deal=${dealId}&dtab=billing`;
+            emailOperator(siteId, copy.subject, copy.html, 'retainer_status', { label: 'Open the deal', href }).catch(() => {});
           }
         }
       }

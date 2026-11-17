@@ -298,6 +298,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'GET') return (await import('./routes/studio_brand.ts')).handlePublicStudioBrand(m[1], cors);
   }
 
+  // ── Sales item 129: the link a client gets to put in a new card for their retainer —
+  //    PUBLIC, pre-auth, authorized ONLY by the link's own signature (a 'card' token
+  //    that names one deal; routes/retainer_card.ts). It opens Stripe's card page. ──
+  if (route === '/retainer-card' && method === 'POST') return (await import('./routes/retainer_card.ts')).handleRetainerCardOpen(req, cors);
+
   // ── Pitch pack (sales item 113): PUBLIC, pre-auth, authorized by the pack's own
   //    unguessable token (routes/pitch_pack.ts). Read-only; pitch.html renders it. ──
   {
@@ -953,6 +958,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleSalesRetainer(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/retainer\/cancel$/);
     if (m && method === 'POST') return handleSalesRetainerCancel(req, site, principal, m[1], cors);
+    // sales item 129: email the client a link to Stripe's page for a new card
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/retainer\/card-link$/);
+    if (m && method === 'POST') return (await import('./routes/retainer_card.ts')).handleSalesRetainerCardLink(req, site, principal, m[1], cors);
     // Renewal/expiry date on a SIGNED agreement → the 'agreement_renewal' owner
     // reminder before it lapses (never an auto-renew). Site-scoped like every /sales/*.
     m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/term$/);
@@ -1103,6 +1111,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   { // sales item 117: the client cancels their own retainer (an owner's call: 'delete' in lib/site_roles.ts)
     const m = route.match(/^\/client\/retainers\/([0-9a-f-]{36})\/cancel$/);
     if (m && method === 'POST') return (await import('./routes/client_retainers.ts')).handleClientRetainerCancel(req, site, principal, m[1], cors);
+    // sales item 129: Update your card, Stripe's own page for a new card ('edit': it keeps the retainer paid)
+    const c = route.match(/^\/client\/retainers\/([0-9a-f-]{36})\/card$/);
+    if (c && method === 'POST') return (await import('./routes/retainer_card.ts')).handleClientRetainerCard(req, site, principal, c[1], cors);
   }
   if (route === '/client/documents' && method === 'GET') return handleClientDocuments(req, site, principal, cors);
   // item 179: the monthly reports that went out, for the client's Documents shelf
