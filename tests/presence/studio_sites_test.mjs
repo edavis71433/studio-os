@@ -162,6 +162,7 @@ const OWN = 'e5e5e5e5-e5e5-4e5e-8e5e-e5e5e5e5e5e5', ARCH = 'f6f6f6f6-f6f6-4f6f-8
 const C1 = 'c1000000-0000-4000-8000-000000000001', C2 = 'c2000000-0000-4000-8000-000000000002', C3 = 'c3000000-0000-4000-8000-000000000003', CN = 'c4000000-0000-4000-8000-000000000004', CO = 'c5000000-0000-4000-8000-000000000005';
 const SNAP = '5a5a5a5a-5a5a-4a5a-8a5a-5a5a5a5a5a5a';
 const fixture = JSON.parse(await Deno.readTextFile(new URL('../../supabase/functions/presence/templates/business-classic/1.0.0/fixture.json', import.meta.url)));
+const FIRST_PHOTO = fixture.content.offerings.find((o) => o.media).media.variants.w800.replace(/-800\.webp$/, '');   // the sample's welcome photo, e.g. /img/<name>
 let T, writes;
 // the routes read the real clock, so their fixtures are dated from it
 const LIVE = Date.now();
@@ -203,7 +204,7 @@ function reset() {
     presence_sales_templates: [],
     presence_publishes: [{ id: 'p1', site_id: S1, status: 'live', snapshot_id: SNAP, created_at: '2026-10-20T00:00:00Z' }],
     presence_snapshots: [{ id: SNAP, site_id: S1, content: fixture.content, content_contract_version: fixture.content_contract_version, template_slug: fixture.template_slug, template_version: fixture.template_version, created_at: fixture.created_at, dev_customization: null,
-      media_manifest: [{ media_id: 'm1', storage_path: 'presence-media/s1/leeks.jpg', variants: [400, 800, 1600].map((w) => ({ name: `w${w}`, width: w, format: 'webp', output_path: `/img/leeks-${w}.webp` })) }] }],
+      media_manifest: [{ media_id: 'm1', storage_path: 'presence-media/s1/leeks.jpg', variants: [400, 800, 1600].map((w) => ({ name: `w${w}`, width: w, format: 'webp', output_path: `${FIRST_PHOTO}-${w}.webp` })) }] }],
     presence_offerings: [
       { site_id: S1, name: 'Tasting menu', category: 'Dinner', description: 'Seven courses', price_text: '$90', sort_order: 0, deleted_at: null, is_visible: true },
       { site_id: S1, name: 'Hidden one', category: 'Dinner', description: '', price_text: '', sort_order: 1, deleted_at: null, is_visible: false },
@@ -314,7 +315,7 @@ async function call(member, method, route, body, { jwt = 'jwt-studio', principal
   reset();
   const t = await call(asMember(), 'GET', `/agency/sites/${S1}/thumb`);
   const html = t.body.data?.html || '';
-  ok('thumb: a live site\'s home page comes back drawn from its live version', t.status === 200 && t.body.data.version === 'live' && /Vermilion/.test(html));
+  ok('thumb: a live site\'s home page comes back drawn from its live version', t.status === 200 && t.body.data.version === 'live' && html.includes(fixture.content.identity.business_name.split(' ')[0]));
   ok('thumb: self-contained and inert — the stylesheet inlined, no scripts, no srcsets, no external links', /<style>/.test(html) && !/<script/i.test(html) && !/srcset=/.test(html) && !/<link[^>]+stylesheet/.test(html));
   ok('thumb: the photo is ONE signed size (800px), not all of them', /src="\/storage\/v1\/object\/sign\/presence-media\/s1\/leeks\.jpg\?token=t"/.test(html) && writes.filter((w) => w.table === 'storage:sign').length === 1);
   ok('thumb: a site we only watch has nothing of ours to draw', (await call(asMember(), 'GET', `/agency/sites/${S2}/thumb`)).body.error === 'hosted_elsewhere');

@@ -581,6 +581,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   await noteDraftBefore(req, route, site);
 
   // 5. router — exact routes only
+  // builder item 37: ?with= adds the editor's start-up reads, each as its own route answers it
+  if (route === '/site' && method === 'GET' && new URL(req.url).searchParams.has('with')) { const { handleSiteOpen } = await import('./routes/site_open.ts'); return handleSiteOpen(req, db, site, principal, siteRole, new URL(req.url).searchParams.get('with') || '', cors); }
   if (route === '/site' && method === 'GET') return handleGetSite(db, site, cors);
   if (route === '/site/templates' && method === 'GET') return handleTemplatesList(site, cors);            // Phase CP-1
   if (route === '/search/health' && method === 'GET') return handleSearchHealth(site, cors);              // Phase SD

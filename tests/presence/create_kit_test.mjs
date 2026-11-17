@@ -268,7 +268,7 @@ const headers = read('_headers');
 // pin: _headers is the cache contract Netlify serves; without no-cache a deploy leaves browsers on a stale create.js
 ok('/create.js revalidates like shell.js', /\n\/create\.js\n  Cache-Control: no-cache, must-revalidate\n/.test(headers));
 // pin: the public build allowlist; create.js ships only because build-public.sh copies every root .js
-ok('the public build copies it (every root .js)', /cp \.\/\*\.js dist\//.test(read('scripts/build-public.sh')));
+ok('the public build copies it (every root .js)', /cp \.\/\*\.js (dist|"\$OUT")\//.test(read('scripts/build-public.sh')));   // "$OUT": dist/, or a test's own folder (builder item 142)
 // pin: env(safe-area-inset-bottom) is 0 in every test browser, so the room under the phone sheet's button for the iPhone's home bar can't be measured; the rule is the contract
 ok('a phone sheet keeps room for the home bar under its button', /\.dds-cr\.sheet \.cr-foot\{padding:12px 16px calc\(12px \+ env\(safe-area-inset-bottom,0px\)\)\}/.test(css));
 

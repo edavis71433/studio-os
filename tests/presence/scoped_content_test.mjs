@@ -527,7 +527,9 @@ for (const w of WRITES) {
 
   const handed = [...idx.matchAll(/\b(handle\w+)\((?:req, )?db,/g)].map((m) => m[1]).sort();
   // item 154: handleDeletedPageRestore writes the pages through this path, as handlePageDuplicate does
-  const EXPECTED = ['handleBrandProfileGet', 'handleBrandProfilePut', 'handleBrandReportGet', 'handleBrandReportList', 'handleCoachList', 'handleCollection', 'handleDeletedPageRestore', 'handleFoundationsPlans', 'handleGetIdentity', 'handleGetSite', 'handleKnowledgeList', 'handleLocation', 'handleMomentsList', 'handlePageDuplicate', 'handlePutIdentity', 'handleReviewGet', 'handleReviewList', 'handleScopedCommerce', 'handleSettings', 'handleWriterGet', 'handleWriterList'].sort();
+  // builder item 37: handleSiteOpen (GET /site?with=) only hands it on to handleGetSite, handleCollection
+  // and handleSettings, each on this list (routes/site_open.ts makes no query of its own)
+  const EXPECTED = ['handleBrandProfileGet', 'handleBrandProfilePut', 'handleBrandReportGet', 'handleBrandReportList', 'handleCoachList', 'handleCollection', 'handleDeletedPageRestore', 'handleFoundationsPlans', 'handleGetIdentity', 'handleGetSite', 'handleKnowledgeList', 'handleLocation', 'handleMomentsList', 'handlePageDuplicate', 'handlePutIdentity', 'handleReviewGet', 'handleReviewList', 'handleScopedCommerce', 'handleSettings', 'handleSiteOpen', 'handleWriterGet', 'handleWriterList'].sort();
   ok('index: the handlers on this path are exactly the audited list', JSON.stringify(handed) === JSON.stringify(EXPECTED), handed.join(','));
 
   const reviewerRoutes = idx.split('\n').filter((l) => /'\/portal\/(context|feed)'|\/decide\$\/|\/status\$\/|\/foundations\/plans\/\[|\/launches\/\[/.test(l) || /handle(PortalContext|PortalFeed|FoundationsDecide|WriteDecide|AssetStatus|LaunchDecide)\(/.test(l));
