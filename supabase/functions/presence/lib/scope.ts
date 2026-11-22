@@ -123,7 +123,7 @@ async function clientName(siteId: string): Promise<string> {
  *  a studio uses (lib/workspace.ts resolveHeldBusiness). Never a studio scope. */
 export interface HeldBusiness { site: SiteRow; member: { site_id: string; role: SiteRole } | null }
 export type ScopeResult =
-  | { ok: true; site: SiteRow; scoped: { site_id: string; name: string } }
+  | { ok: true; site: SiteRow; scoped: { site_id: string; name: string }; agency_id?: string | null }
   | { ok: true; site: SiteRow; held: HeldBusiness }
   | { ok: false; status: number; reason: string };
 
@@ -190,5 +190,13 @@ export async function resolveScopedSite(jwt: string, requestedSiteId: string, au
   if (!site) { await finish({ ok: false, status: 404, reason: 'deleted' }, agencyId, ''); return { ok: false, status: 404, reason: 'deleted' }; }
   const name = await clientName(requestedSiteId);
   await finish({ ok: true, status: 200, reason: 'ok' }, agencyId, name);
-  return { ok: true, site, scoped: { site_id: requestedSiteId, name } };
+  return { ok: true, site, scoped: { site_id: requestedSiteId, name }, agency_id: agencyId };
+}
+
+/** Builder item 401: a request that learned its scope from memory (lib/who_asks.ts) still
+ *  records its own visit, allowed or denied, after its response. The reason is the scope
+ *  decision's ('ok' for an allowed one). Best-effort, like every audit write here. */
+export function recordScopedVisit(audit: AuditCtx | undefined, agencyId: string | null, clientSiteId: string, clientName: string, reason: string): void {
+  const dec: ScopeDecision = reason === 'ok' ? { ok: true, status: 200, reason: 'ok' } : { ok: false, status: 403, reason };
+  afterResponseOrNow(logScopedAccess(buildScopeAuditRow({ audit, agencyId, clientSiteId: isScopeId(clientSiteId) ? clientSiteId : '00000000-0000-0000-0000-000000000000', clientName, outcome: dec.ok ? 'allowed' : 'denied', reason: auditReason(dec.reason) }))).catch(() => {});
 }

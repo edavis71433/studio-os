@@ -30,6 +30,30 @@ export const TENANT_ID = '00000000-0000-0000-0000-000000000001'; // DDS = tenant
 // bounded at 5s vs. the token's own 3600s validity). Failure is NOT cached.
 const AUTH_MEMO_TTL_MS = 5_000;
 const authMemo = new Map<string, { user: any; at: number }>();
+/** Builder item 401: no call out of here waits longer than this. A stalled database or
+ *  GoTrue used to hang every request for as long as the platform allowed. */
+export const AUTH_TIMEOUT_MS = 10_000;
+const limited = () => AbortSignal.timeout(AUTH_TIMEOUT_MS);
+
+// ── Who is asking, remembered for a minute (builder item 401) ────────────────
+// The staff-or-client chain below (GoTrue, memberships, contacts, clients, seats) ran on
+// every signed-in request: 4 to 6 trips before the request's own work, and a page that
+// opens with seven calls ran it seven times. Now one worker remembers a token's answer
+// for WHO_ASKS_TTL_MS, keyed by the token, and calls that arrive while it is being looked
+// up share the one lookup. Only a staff or client answer is kept: a refusal is looked up
+// again every time, as before. Any write in this worker to a table the answer rests on
+// (authChanged, called by presence/lib/db.ts) forgets everything at once; a change made
+// elsewhere bites within the minute, where it used to bite at once.
+export const WHO_ASKS_TTL_MS = 60_000;
+let AUTH_EPOCH = 0;
+/** The count of writes this worker made to the tables a sign-in rests on. */
+export function authEpoch(): number { return AUTH_EPOCH; }
+/** This worker wrote to such a table: every remembered answer is forgotten. */
+export function authChanged(): void { AUTH_EPOCH++; whoMemo.clear(); }
+/** Forget every remembered answer (tests). */
+export function forgetWhoAsks(): void { whoMemo.clear(); }
+type Identity = Omit<Principal, 'requestId'>;
+const whoMemo = new Map<string, { at: number; epoch: number; p: Promise<Identity> }>();
 
 /** The claims of a token GoTrue has already accepted (read only, never trusted on their own). */
 export function jwtClaims(jwt: string): Record<string, unknown> | null {
@@ -54,7 +78,7 @@ export async function authUser(jwt: string): Promise<any | null> {
   const hit = authMemo.get(jwt);
   if (hit && Date.now() - hit.at < AUTH_MEMO_TTL_MS) return hit.user;
   try {
-    const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` } });
+    const uRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${jwt}` }, signal: limited() });
     if (!uRes.ok) return null;
     const user = await uRes.json();
     if (!user || !user.id) return null;
@@ -88,7 +112,7 @@ export async function verifyStaff(req: Request): Promise<
     const r = await fetch(
       `${SB_URL}/rest/v1/memberships?user_id=eq.${encodeURIComponent(String(user.id))}` +
         `&select=tenant_id,role&limit=1`,
-      { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` } },
+      { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` }, signal: limited() },
     );
     if (!r.ok) return null;                                       // lookup failed => deny
     const rows = await r.json();
@@ -127,7 +151,7 @@ export async function staffRevocation(userId: string, jwt: string): Promise<null
     const r = await fetch(
       `${SB_URL}/rest/v1/memberships?user_id=eq.${encodeURIComponent(userId)}` +
         `&select=updated_at,tenant_id,tenants(state)&limit=1`,
-      { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` } },
+      { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` }, signal: limited() },
     );
     if (!r.ok) return { code: 'revocation_check_failed', status: 401 };
     const rows = await r.json();
@@ -197,6 +221,72 @@ export function jwtIatMs(jwt: string): number | null {
   }
 }
 
+
+/** The token's identity: staff, a client, or signed in but unscoped (never a throw). */
+async function identityOf(req: Request, jwt: string): Promise<Identity> {
+  const now = Date.now();
+  const hit = whoMemo.get(jwt);
+  if (hit && hit.epoch === AUTH_EPOCH && now - hit.at < WHO_ASKS_TTL_MS) return hit.p;
+  const p = lookupIdentity(req, jwt);
+  whoMemo.set(jwt, { at: now, epoch: AUTH_EPOCH, p });
+  const who = await p;
+  if (who.kind !== 'staff' && who.kind !== 'client') { if (whoMemo.get(jwt)?.p === p) whoMemo.delete(jwt); }
+  else if (whoMemo.size > 500) { for (const [k, v] of whoMemo) { if (now - v.at >= WHO_ASKS_TTL_MS) whoMemo.delete(k); } if (whoMemo.size > 500) whoMemo.delete(whoMemo.keys().next().value as string); }
+  return who;
+}
+async function lookupIdentity(req: Request, jwt: string): Promise<Identity> {
+  const pub: Identity = { kind: 'public', userId: null, tenantId: null, role: null, email: null, jwt: null };
+  try {
+
+    // staff first — reuse the existing fail-closed membership check
+    const staff = await verifyStaff(req);
+    if (staff) return { kind: 'staff', userId: staff.userId, tenantId: staff.tenantId, role: staff.role, email: staff.email || null, jwt };
+
+    // otherwise validate the token and see if it belongs to a client (portal user)
+    const user: any = await authUser(jwt);   // memoized — verifyStaff above already resolved it
+    if (!user || !user.id) return { ...pub, jwt };
+
+    const uid = String(user.id);
+    const email = (user.email ? String(user.email) : '').toLowerCase();
+    const svc = { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` };
+    try {
+      // client linkage: a contact carrying this auth_user_id, or a client row by email.
+      // tenantId comes from the owning client record (falls back to DDS #1).
+      let tenantId: string | null = null;
+      const cr = await fetch(`${SB_URL}/rest/v1/contacts?auth_user_id=eq.${encodeURIComponent(uid)}&select=id&limit=1`, { headers: svc, signal: limited() });
+      const contacts = cr.ok ? await cr.json() : [];
+      if (Array.isArray(contacts) && contacts.length) {
+        const clr = await fetch(`${SB_URL}/rest/v1/clients?contact_id=eq.${encodeURIComponent(contacts[0].id)}&select=tenant_id&limit=1`, { headers: svc, signal: limited() });
+        const cls = clr.ok ? await clr.json() : [];
+        if (Array.isArray(cls) && cls.length) tenantId = cls[0].tenant_id ? String(cls[0].tenant_id) : null;
+      }
+      if (tenantId === null && email) {
+        const clr = await fetch(`${SB_URL}/rest/v1/clients?or=(email.eq.${encodeURIComponent(email)},contact_email.eq.${encodeURIComponent(email)})&select=tenant_id&limit=1`, { headers: svc, signal: limited() });
+        const cls = clr.ok ? await clr.json() : [];
+        if (Array.isArray(cls) && cls.length) { tenantId = cls[0].tenant_id ? String(cls[0].tenant_id) : TENANT_ID; }
+      }
+      if (tenantId !== null) {
+        return { kind: 'client', userId: uid, tenantId, role: 'client', email: email || null, jwt };
+      }
+      // MEMBERSHIP fallback: an invited workspace member (e.g. a client_reviewer
+      // added via sharing) has no contacts/clients row of their own — their only
+      // linkage is presence_site_members. Without this they 401 at the door and
+      // the whole share-with-a-reviewer feature is unreachable. Their in-site
+      // powers stay fail-closed (resolveSiteRole + the reviewer boundary).
+      const mm = await fetch(`${SB_URL}/rest/v1/presence_site_members?status=eq.active&or=(user_id.eq.${encodeURIComponent(uid)},email.eq.${encodeURIComponent(email)})&select=id&limit=1`, { headers: svc, signal: limited() });
+      const members = mm.ok ? await mm.json() : [];
+      if (Array.isArray(members) && members.length) {
+        return { kind: 'client', userId: uid, tenantId: TENANT_ID, role: 'client', email: email || null, jwt };
+      }
+    } catch (_) { /* fall through */ }
+
+    // valid token but neither staff nor a known client — authenticated but unscoped
+    return { ...pub, userId: uid, email: email || null, jwt };
+  } catch (_) {
+    return pub;
+  }
+}
+
 export async function resolvePrincipal(req: Request, body: any): Promise<Principal> {
   const requestId = (crypto as any).randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2);
   const pub: Principal = { kind: 'public', userId: null, tenantId: null, role: null, email: null, jwt: null, requestId };
@@ -216,51 +306,7 @@ export async function resolvePrincipal(req: Request, body: any): Promise<Princip
     }
     const jwt = req.headers.get('x-dds-user-jwt') || '';
     if (!jwt) return pub; // no token => public, zero I/O
-
-    // staff first — reuse the existing fail-closed membership check
-    const staff = await verifyStaff(req);
-    if (staff) return { kind: 'staff', userId: staff.userId, tenantId: staff.tenantId, role: staff.role, email: staff.email || null, jwt, requestId };
-
-    // otherwise validate the token and see if it belongs to a client (portal user)
-    const user: any = await authUser(jwt);   // memoized — verifyStaff above already resolved it
-    if (!user || !user.id) return { ...pub, jwt };
-
-    const uid = String(user.id);
-    const email = (user.email ? String(user.email) : '').toLowerCase();
-    const svc = { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` };
-    try {
-      // client linkage: a contact carrying this auth_user_id, or a client row by email.
-      // tenantId comes from the owning client record (falls back to DDS #1).
-      let tenantId: string | null = null;
-      const cr = await fetch(`${SB_URL}/rest/v1/contacts?auth_user_id=eq.${encodeURIComponent(uid)}&select=id&limit=1`, { headers: svc });
-      const contacts = cr.ok ? await cr.json() : [];
-      if (Array.isArray(contacts) && contacts.length) {
-        const clr = await fetch(`${SB_URL}/rest/v1/clients?contact_id=eq.${encodeURIComponent(contacts[0].id)}&select=tenant_id&limit=1`, { headers: svc });
-        const cls = clr.ok ? await clr.json() : [];
-        if (Array.isArray(cls) && cls.length) tenantId = cls[0].tenant_id ? String(cls[0].tenant_id) : null;
-      }
-      if (tenantId === null && email) {
-        const clr = await fetch(`${SB_URL}/rest/v1/clients?or=(email.eq.${encodeURIComponent(email)},contact_email.eq.${encodeURIComponent(email)})&select=tenant_id&limit=1`, { headers: svc });
-        const cls = clr.ok ? await clr.json() : [];
-        if (Array.isArray(cls) && cls.length) { tenantId = cls[0].tenant_id ? String(cls[0].tenant_id) : TENANT_ID; }
-      }
-      if (tenantId !== null) {
-        return { kind: 'client', userId: uid, tenantId, role: 'client', email: email || null, jwt, requestId };
-      }
-      // MEMBERSHIP fallback: an invited workspace member (e.g. a client_reviewer
-      // added via sharing) has no contacts/clients row of their own — their only
-      // linkage is presence_site_members. Without this they 401 at the door and
-      // the whole share-with-a-reviewer feature is unreachable. Their in-site
-      // powers stay fail-closed (resolveSiteRole + the reviewer boundary).
-      const mm = await fetch(`${SB_URL}/rest/v1/presence_site_members?status=eq.active&or=(user_id.eq.${encodeURIComponent(uid)},email.eq.${encodeURIComponent(email)})&select=id&limit=1`, { headers: svc });
-      const members = mm.ok ? await mm.json() : [];
-      if (Array.isArray(members) && members.length) {
-        return { kind: 'client', userId: uid, tenantId: TENANT_ID, role: 'client', email: email || null, jwt, requestId };
-      }
-    } catch (_) { /* fall through */ }
-
-    // valid token but neither staff nor a known client — authenticated but unscoped
-    return { ...pub, userId: uid, email: email || null, jwt };
+    return { ...(await identityOf(req, jwt)), requestId };
   } catch (_) {
     return pub; // NEVER throw from the resolver
   }
