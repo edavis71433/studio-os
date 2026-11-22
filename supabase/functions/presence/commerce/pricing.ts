@@ -7,8 +7,13 @@
 
 export interface ModelPrice { inputPerM: number; outputPerM: number; }
 
+import { SMALL_MODEL, SMALL_MODEL_PRICE } from '../../_shared/ai_model.ts';
+
 // Verify against the provider's current pricing before relying on the totals.
+// Builder item 409: the small model every in-app call runs on since Nov 22 2026, and the
+// one it ran on before, so the rows metered under the old name still price right.
 export const MODEL_PRICES: Record<string, ModelPrice> = {
+  [SMALL_MODEL]: { ...SMALL_MODEL_PRICE },
   'claude-haiku-4-5-20251001': { inputPerM: 1.00, outputPerM: 5.00 },
 };
 export const DEFAULT_TEXT_PRICE: ModelPrice = { inputPerM: 1.00, outputPerM: 5.00 }; // fallback for an unlisted text model
