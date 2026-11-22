@@ -2,6 +2,7 @@ import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
 import { galleryPayload } from '../../supabase/functions/presence/lib/design_gallery.ts';
 import { openingsPayload, KIND_OPENINGS } from '../../supabase/functions/presence/lib/kind_openings.ts';
+import { mountCanvas, SETTINGS } from './helpers/editor';
 
 // The openings made for a kind of business (Figma section B, Nov 22 2026): in + New site, a salon,
 // a home services business and a restaurant or café each see three ways to open first, as pictures
@@ -180,5 +181,64 @@ test.describe('+ New site: the openings made for a kind of business', () => {
       const over = await dlg.locator('#new-openings').evaluate((el) => el.scrollWidth - el.clientWidth);
       expect(over).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+// The editor: each opening's own setting stays the owner's to change, beside the layout it goes with
+// (Styles, the Looks tab): what sits on the photo, where the colour panel's photo sits, and whether
+// Type only's big words are on a band of colour or on the page.
+async function styles(page: Page, layout: string, tokens: Record<string, string> = {}) {
+  const writes: Array<Record<string, string>> = [];
+  let saved = { ...tokens };
+  await mountCanvas(page, {
+    settings: { ...SETTINGS, hero_layout: layout, cover_media_id: 'm-1' },
+    beforeGoto: async (p) => {
+      await p.route('**/functions/v1/presence/dev/customization', (route: Route) => {
+        if (route.request().method() === 'PUT') { saved = route.request().postDataJSON().theme_tokens || {}; writes.push(saved); }
+        return route.fulfill(json({ data: { theme_tokens: saved, custom_css: '', custom_html: '', allowed_tokens: [], can_edit_css: false } }));
+      });
+    },
+  });
+  await page.evaluate(() => (window as any).openSettingsPanel('styles'));
+  await page.locator('#stylesSeg [data-stab="looks"]').click();
+  return { writes, row: page.locator('#designCard #heroSide') };
+}
+test.describe('Styles: each opening’s own setting, beside its layout', () => {
+  test('words over the photo: the card on the photo, saved as the opening sets it, and taken off again', async ({ page }) => {
+    const { writes, row } = await styles(page, 'photo', { hero_card: 'today' });
+    await expect(row.getByRole('button')).toHaveText(['Nothing', 'A form asking for an estimate', 'Today’s hours and booking ✓']);
+    await row.getByRole('button', { name: 'Nothing', exact: true }).click();
+    await expect.poll(() => writes.at(-1)).toEqual({});
+    await expect(page.getByText('On the photo: Nothing. Publish to see it live.')).toBeVisible();
+    await page.locator('#stylesSeg [data-stab="looks"]').click();
+    await page.locator('#designCard #heroSide').getByRole('button', { name: 'A form asking for an estimate', exact: true }).click();
+    await expect.poll(() => writes.at(-1)).toEqual({ hero_card: 'estimate' });
+  });
+
+  test('the colour panel: the photo on the left or the right', async ({ page }) => {
+    const { writes, row } = await styles(page, 'panel', { hero_photo: 'left', accent: '#123456' });
+    await expect(row.getByRole('button')).toHaveText(['On the right', 'On the left ✓']);
+    await row.getByRole('button', { name: 'On the right', exact: true }).click();
+    await expect.poll(() => writes.at(-1)).toEqual({ accent: '#123456' });
+  });
+
+  test('Type only: on a band of colour or on the page, and the line under the layouts says which', async ({ page }) => {
+    const { writes, row } = await styles(page, 'type', { hero_band: 'off' });
+    await expect(row.getByRole('button')).toHaveText(['A band of your colour', 'The page itself ✓']);
+    await expect(page.locator('#designCard #heroSays')).toContainText('Your tagline in big words on the page itself');
+    await row.getByRole('button', { name: 'A band of your colour', exact: true }).click();
+    await expect.poll(() => writes.at(-1)).toEqual({});
+    await page.locator('#stylesSeg [data-stab="looks"]').click();
+    await expect(page.locator('#designCard #heroSays')).toContainText('Your tagline in big words on a band of your colour');
+  });
+
+  test('the other layouts have no such row; on a touch screen each choice is a full 44px tap', async ({ page }) => {
+    const { row } = await styles(page, 'editorial');
+    await expect(row).toHaveCount(0);
+    if (!test.info().project.use.hasTouch) return;
+    const again = await styles(page, 'photo');
+    const heights = await again.row.getByRole('button').evaluateAll((bs) => bs.map((b) => b.getBoundingClientRect().height));
+    expect(heights).toHaveLength(3);
+    for (const h of heights) expect(h).toBeGreaterThanOrEqual(44);
   });
 });

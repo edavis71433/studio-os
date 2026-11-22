@@ -564,8 +564,9 @@ function dcPatchTokens(tokens) {
 // A pick shows at once and saves behind. The next pick builds on it before it has saved,
 // so two quick picks keep both; a failed save puts the page back if nothing came after.
 let TOKENS_SEQ = 0;
-// Item 333: what a ready-made look sets that the server draws (lib/site_looks.ts), so the canvas is drawn again.
-const LOOK_DRAWN = ["look", "scheme", "heading_case", "heading_weight", "button_radius", "button_shadow"];
+// Item 333: what a ready-made look sets that the server draws (lib/site_looks.ts), so the canvas is drawn again;
+// and the openings' own settings, which change what the welcome section draws (lib/template_kit.ts).
+const LOOK_DRAWN = ["look", "scheme", "heading_case", "heading_weight", "button_radius", "button_shadow", "hero_card", "hero_photo", "hero_band"];
 async function saveTokens(change, msg) {
   if (DESIGN_TOKENS && DESIGN_TOKENS.scheme && !("scheme" in change) && ["accent", "accent_dark", "ink", "soft", "bg"].some((k) => k in change)) change = { ...DARK_LOOK_CLEAR, ...change };   // item 333
   const before = DESIGN_TOKENS, next = { ...DESIGN_TOKENS };
@@ -656,9 +657,19 @@ function heroLayoutSays(v) {
   const noPhoto = photo ? "" : " Until your site has a photo, it opens as Type only.";
   if (v === "panel") return "Your tagline as the headline, on a soft tint of your colour, with your photo running to the edge." + noPhoto;
   if (v === "editorial") return "Your tagline as a big centred headline, then up to three of your photos in a row. It reads best with the Centered header." + noPhoto;
-  if (v === "type") return "Your tagline in big words on a band of your colour, then the facts your site has: reviews, today’s hours, your phone and the places you serve.";
+  if (v === "type") return "Your tagline in big words " + ((DESIGN_TOKENS || {}).hero_band === "off" ? "on the page itself" : "on a band of your colour") + ", then the facts your site has: reviews, today’s hours, your phone and the places you serve.";
   return "";
 }
+// The openings made for a kind of business (lib/kind_openings.ts) start a site with one more choice
+// beside its layout; each is a style setting the server draws, and each can be changed here: a card
+// on the welcome photo, the colour panel's photo side, Type only on the page or on its band.
+const CARD_OPTS = [["Nothing", ""], ["A form asking for an estimate", "estimate"], ["Today’s hours and booking", "today"]];
+const HERO_SIDES = {
+  photo: { key: "hero_card", label: "On the photo", opts: CARD_OPTS },
+  "photo-light": { key: "hero_card", label: "On the photo", opts: CARD_OPTS },
+  panel: { key: "hero_photo", label: "Where the photo sits", opts: [["On the right", ""], ["On the left", "left"]] },
+  type: { key: "hero_band", label: "Behind the words", opts: [["A band of your colour", ""], ["The page itself", "off"]] },
+};
 function pillRow(host, label, opts, isOn, onPick, style) {
   const wrapEl = el("div"); wrapEl.style.cssText = "margin-top:12px";
   wrapEl.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:6px" }));
@@ -1102,6 +1113,11 @@ async function mountDesignCard(fresh = true) {
   heroPills.classList.add("ins-heros");   // a full 44px tap on a touch screen (presence.css)
   const heroSays = heroLayoutSays(heroNow);
   if (heroSays) heroPills.parentNode.appendChild(Object.assign(el("p", "hint", heroSays), { id: "heroSays" }));
+  const side = HERO_SIDES[heroNow];
+  if (side) {
+    const sideRow = stab(pillRow(card, side.label, side.opts, (o) => String(T[side.key] || "") === o[1], (o) => saveTokens({ [side.key]: o[1] }, side.label + ": " + o[0])), "looks");
+    sideRow.classList.add("ins-heros"); sideRow.id = "heroSide";   // a full 44px tap on a touch screen, as the layouts
+  }
   stab(navStyleRow(card), "looks");
   // item 158: a gentle "appear on scroll" (lib/site_motion.ts), and the site's own small icon (lib/site_icon.ts)
   stab(motionRow(card, T), "looks");   // item 302: four choices, each shown moving
