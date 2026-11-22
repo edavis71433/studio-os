@@ -237,7 +237,8 @@ try {
     const r = await handleFormSubmit(new Request(`https://fn.example/forms/${SALON}`, json({ name: 'Sam Rivera', email: 'sam@customer.example', message: 'Do you do weddings?' })), SALON, {});
     await settle(w, 2);
     const ack = sentTo(w, 'sam@customer.example');
-    ok('enquiry: the acknowledgement replies to the salon, not the inbound door that drops strangers', r.status === 200 && ack.length === 1 && ack[0].reply_to === 'hello@salon.example', JSON.stringify(ack.map((x) => x.reply_to)));
+    // sales item 142 (Nov 22 2026): the acknowledgement makes the writer a contact first, so the inbound door no longer drops them, and it answers to the Inbox (the site's own door), not the owner's mailbox: a reply then lands on the enquiry and stops the follow-ups
+    ok('enquiry: the acknowledgement makes the writer a contact and replies to the Inbox door, not the salon’s own mailbox', r.status === 200 && ack.length === 1 && ack[0].reply_to !== 'hello@salon.example', JSON.stringify(ack.map((x) => x.reply_to)));
     const alert = sentTo(w, 'hello@salon.example');
     ok('enquiry: the owner’s "New contact from your website" alert keeps the platform’s reply-to', alert.length === 1 && alert[0].reply_to === PLATFORM, JSON.stringify(alert.map((x) => [x.subject, x.reply_to])));
   }

@@ -40,6 +40,9 @@ import { supportAgingDue, supportAgingPeriod, SUPPORT_AGING_DAYS } from '../lib/
 import { editionFromPlan, EDITION_DEFS } from './editions.ts';
 import { sendEmail } from './account.ts';
 import { emailOperator, emailBridgedCustomer, ownerReplyTo } from '../lib/service_bridge.ts';
+import { ensureLeadContact } from '../lib/lead_contact.ts';   // sales item 142
+import { studioZones, localClock, morningYet } from '../lib/studio_clock.ts';   // sales item 152
+import { invoiceNotSent } from '../lib/money_state.ts';   // sales item 141
 import { approvalReminderDue, approvalReminderCopy, approvalOverduePeriod, approvalOverdueCopy } from '../lib/approvals.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice, clearNotice, dealFollowupPeriod, leadFollowupPeriod, noticeWeekBucket } from '../lib/notice.ts';
@@ -583,10 +586,10 @@ export async function runEnquiryFollowups(limit = 20): Promise<{ sent: number }>
   // the widest window any site can ask for: a second follow-up on day 30, for a week
   const from = new Date(now - 37 * DAY_MS).toISOString();
   const to = new Date(now - 1 * DAY_MS).toISOString();
-  const q = await svc(`presence_form_submissions?spam=is.false&status=in.(new,read,replied)&created_at=gte.${encodeURIComponent(from)}&created_at=lte.${encodeURIComponent(to)}&select=id,site_id,form_kind,name,email,message,status,spam,created_at,fields&order=created_at.desc&limit=${limit * 10}`);
+  const q = await svc(`presence_form_submissions?spam=is.false&status=in.(new,read,replied)&created_at=gte.${encodeURIComponent(from)}&created_at=lte.${encodeURIComponent(to)}&select=id,site_id,form_kind,name,email,phone,message,status,spam,created_at,fields&order=created_at.desc&limit=${limit * 10}`);
   if (!q.ok) return { sent: 0 };
   const cache = new Map<string, AutomationSettings>();
-  type Sub = { id: string; site_id: string; form_kind?: string; name?: string; email?: string; message?: string; status?: string; spam?: boolean; created_at: string; fields?: any };
+  type Sub = { id: string; site_id: string; form_kind?: string; name?: string; email?: string; phone?: string; message?: string; status?: string; spam?: boolean; created_at: string; fields?: any };
   const candidates: Array<{ sub: Sub; cfg: FollowupSettings }> = [];
   for (const sub of (Array.isArray(q.json) ? q.json : []) as Sub[]) {
     if (!sub.email) continue;
@@ -612,15 +615,20 @@ export async function runEnquiryFollowups(limit = 20): Promise<{ sent: number }>
       headline: `Follow-up ${step} sent — ${who}`, body: step === 1 ? 'Their enquiry went quiet, so the first follow-up went out in your words.' : 'The second and last follow-up went out. Nothing more goes on its own.' });
     if (!fresh) continue;   // this one already went: never twice
     try {
-      const [ident, brand, replyTo] = await Promise.all([
+      // Sales item 142 (Nov 22 2026 review): the person becomes a contact BEFORE the follow-up
+      // goes, the way a hand-written reply does, and the email answers to the Inbox (siteId,
+      // sendEmail's default), so "yes, call me" lands on the enquiry, stops the series and
+      // moves the row to needs reply. It used to answer to the owner's own mailbox, where the
+      // stop check (followupSignals) could never see it.
+      await ensureLeadContact(sub.site_id, String(sub.email), String(sub.name || ''), String(sub.phone || '')).catch(() => {});
+      const [ident, brand] = await Promise.all([
         svc(`presence_identity?site_id=eq.${sub.site_id}&select=business_name&limit=1`),
         loadEmailBrand(sub.site_id),
-        ownerReplyTo(sub.site_id),
       ]);
       const business = String(ident.json?.[0]?.business_name || '').trim() || brand.name;
       const mail = followupEmail(step, { name: sub.name, business, words: cfg.words[step - 1], message: sub.message });
       // a follow-up is an ask, not a receipt: not critical, so it carries the unsubscribe and an unsubscribe stops it
-      const ok = await sendEmail(String(sub.email), mail.subject, mail.html, brand, { asBusiness: true, siteId: sub.site_id, replyTo });
+      const ok = await sendEmail(String(sub.email), mail.subject, mail.html, brand, { asBusiness: true, siteId: sub.site_id });
       if (ok) { sent++; await noteFollowupOnEnquiry(sub.site_id, sub.id, step, new Date().toISOString()); }
     } catch { /* the ledger row stands: a failed send is never retried into a double */ }
   }
@@ -1016,12 +1024,15 @@ export async function runSupportAging(limit = 20): Promise<{ nudged: number }> {
 // deal's contact; the owner gets the notice on the same rail.
 /** Item 209: how many open invoices the reminder sweep reads at once, and at most how many pages a run. */
 export const INVOICE_PAGE = 200, INVOICE_PAGES = 25;
-export async function runInvoiceReminders(limit = 20): Promise<{ reminded: number }> {
+export async function runInvoiceReminders(limit = 20, nowMs = Date.now()): Promise<{ reminded: number }> {
   // Studio audit 2026-10, change 10: three reminders per invoice (−7 · due · +N),
   // behind the per-site switch "Remind unpaid invoices …" (benchmark item 6),
   // default OFF (migration 0134). invoiceReminderSlot is the pure schedule; the
   // notice ledger is the send-once gate per leg.
-  const today = new Date().toISOString().slice(0, 10);
+  // Sales item 152 (Nov 22 2026 review): each leg is judged on the STUDIO's own day and goes
+  // out in its morning (lib/studio_clock.ts), the way recurring invoices do. The UTC day took
+  // "Due today" out at about 4 pm the day before in Burbank. `today` (UTC) only bounds the read.
+  const today = new Date(nowMs).toISOString().slice(0, 10);
   // A payment that is PROCESSING (ACH settling — processing_since, migration
   // 0132) is not unpaid: nudging that client would be wrong. Tolerant: before
   // the migration the filter 400s, so fall back to the pre-0132 query.
@@ -1056,11 +1067,14 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
     }
     // Which leg (if any) each invoice is on today — only for sites with the switch on.
     const due: Array<{ inv: typeof candidates[number]; slot: InvoiceReminderSlot }> = [];
+    const zones = await studioZones(candidates.map((c) => String(c.site_id)));
     for (const inv of candidates) {
       if (!inv.stripe_url) continue;
+      const local = localClock(zones.get(String(inv.site_id)), nowMs);
+      if (!morningYet(local)) continue;   // sales item 152: not before 9 in the studio's morning
       const auto = await automationSettingsFor(inv.site_id, settingsCache);
       if (!auto.invoice_reminders) continue;
-      const slot = invoiceReminderSlot(inv, today, auto.invoice_remind_after_days, auto.invoice_overdue_repeat);
+      const slot = invoiceReminderSlot(inv, local.ymd, auto.invoice_remind_after_days, auto.invoice_overdue_repeat);
       if (slot) due.push({ inv, slot });
     }
     // Drop already-sent legs up front (the wide window + filter avoids the
@@ -1073,7 +1087,7 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
       const periods = due.map(({ inv, slot }) => `"${invoiceReminderPeriod(inv.id, slot)}"${slot === 'after' || slot === 'again' ? `,"invremind:${inv.id}","${invoiceReminderPeriod(inv.id, 'after')}"` : ''}`).join(',');
       const seen = await svc(`presence_plan_notices?kind=eq.deal_followup&period=in.(${periods})&select=period,created_at&limit=${due.length * 4}`);
       const doneAt = new Map(((seen.json as Array<{ period: string; created_at?: string }>) || []).map((r) => [r.period, String(r.created_at || '')]));
-      fresh = due.map(({ inv, slot }) => ({ inv, slot: legToSend(slot, doneAt.get(invoiceReminderPeriod(inv.id, 'after')) ?? doneAt.get(`invremind:${inv.id}`) ?? null, Date.now()) }))
+      fresh = due.map(({ inv, slot }) => ({ inv, slot: legToSend(slot, doneAt.get(invoiceReminderPeriod(inv.id, 'after')) ?? doneAt.get(`invremind:${inv.id}`) ?? null, nowMs) }))
         .filter((x): x is { inv: typeof candidates[number]; slot: InvoiceReminderSlot } => x.slot !== null)
         .filter(({ inv, slot }) => !doneAt.has(invoiceReminderPeriod(inv.id, slot)) && !(slot === 'after' && doneAt.has(`invremind:${inv.id}`))).slice(0, limit - tried);
     }
@@ -1139,7 +1153,76 @@ export async function runInvoiceReminders(limit = 20): Promise<{ reminded: numbe
     await sweep(q.json as Candidate[]);
     if (q.json.length < INVOICE_PAGE) break;
   }
+  await runDraftInvoiceNudges(nowMs, limit).catch(() => {});   // sales item 141: "Part 2 is due Friday. Send it?"
   return { reminded };
+}
+
+// ── An invoice nobody sent, whose date is near (sales item 141, Nov 22 2026 review) ──
+// The later parts of a payment plan, an estimate billed as an invoice and a plan set
+// up on the deal are all made unsent, and nothing ever sent them: no email on the
+// date, no reminder (reminders skip an invoice with no link) and no word to the
+// studio until it read Overdue. Three days before such an invoice's date, and once
+// more on it, the studio gets one Needs-you line: "Part 2 is due Friday. Send it?".
+// The line is keyed by the invoice and its date, so it is raised once; sending or
+// voiding the invoice takes its reminder prefix down like every other invoice line.
+export const DRAFT_NUDGE_DAYS = 3;
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+/** Is a draft's date close enough to ask about: within DRAFT_NUDGE_DAYS ahead, or already
+ *  passed (an unsent part never stops mattering). Pure. */
+export function draftNudgeDue(inv: { due_date?: unknown; status?: unknown; stripe_url?: unknown; first_sent_at?: unknown; link_gen?: unknown; processing_since?: unknown; payment_for?: unknown }, localYmd: string): boolean {
+  if (!invoiceNotSent(inv) || inv.payment_for) return false;
+  const due = ymdOf(inv.due_date);
+  if (!due || !/^\d{4}-\d{2}-\d{2}$/.test(localYmd)) return false;
+  return daysFromTo(localYmd, due) <= DRAFT_NUDGE_DAYS;
+}
+/** "Friday", "today", "tomorrow", or "Dec 5" (with the year when it isn't this one); a passed
+ *  date reads "was due Monday". Pure. */
+export function draftDueWords(dueYmd: string, localYmd: string): string {
+  const d = daysFromTo(localYmd, dueYmd);
+  const when = new Date(Date.parse(dueYmd + 'T00:00:00Z'));
+  const day = DAY_NAMES[when.getUTCDay()];
+  const date = `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][when.getUTCMonth()]} ${when.getUTCDate()}${dueYmd.slice(0, 4) !== localYmd.slice(0, 4) ? ', ' + dueYmd.slice(0, 4) : ''}`;
+  if (d === 0) return 'is due today';
+  if (d === 1) return 'is due tomorrow';
+  if (d > 1 && d <= 6) return `is due ${day}`;
+  if (d > 6) return `is due ${date}`;
+  if (d === -1) return 'was due yesterday';
+  if (d >= -6) return `was due ${day}`;
+  return `was due ${date}`;
+}
+export const draftNudgePeriod = (invoiceId: string, dueYmd: string): string => `invremind:${invoiceId}:draft:${dueYmd}`;
+/** What the studio reads. Pure. */
+export function draftNudgeCopy(title: string, amount: string, dueYmd: string, localYmd: string): { headline: string; body: string } {
+  const name = (title || '').trim() || 'An invoice';
+  return {
+    headline: `${name} ${draftDueWords(dueYmd, localYmd)}. Send it?`,
+    body: `${name} (${amount}) was never sent: it has no pay link and the client hasn’t seen it. Open the deal and press Send on it, or void it if it isn’t needed.`,
+  };
+}
+export async function runDraftInvoiceNudges(nowMs = Date.now(), limit = 20): Promise<{ raised: number }> {
+  // the widest net any zone can need: dated up to four UTC days ahead; the local check decides
+  const to = new Date(nowMs + (DRAFT_NUDGE_DAYS + 1) * 86400_000).toISOString().slice(0, 10);
+  const q = await svc(`presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=is.null&first_sent_at=is.null&link_gen=eq.0&processing_since=is.null&payment_for=is.null&due_date=not.is.null&due_date=lte.${to}&select=id,site_id,deal_id,title,amount_cents,purpose,due_date,status,stripe_url,first_sent_at,link_gen,processing_since,payment_for&order=due_date.asc&limit=${Math.max(1, limit) * 5}`).catch(() => ({ ok: false, json: null }));
+  if (!q.ok || !Array.isArray(q.json)) return { raised: 0 };   // before APPLY-0188 there is no such column, and nothing to ask
+  const drafts = q.json as Array<{ id: string; site_id: string; deal_id?: string | null; title?: string; amount_cents?: unknown; purpose?: string; due_date: string }>;
+  if (!drafts.length) return { raised: 0 };
+  const zones = await studioZones(drafts.map((d) => String(d.site_id)));
+  const siteClient = new Map<string, string>();
+  let raised = 0;
+  for (const inv of drafts) {
+    if (raised >= limit) break;
+    const local = localClock(zones.get(String(inv.site_id)), nowMs);
+    if (!draftNudgeDue(inv, local.ymd)) continue;
+    if (!siteClient.has(inv.site_id)) siteClient.set(inv.site_id, String((await svc(`presence_sites?id=eq.${inv.site_id}&select=client_id&limit=1`)).json?.[0]?.client_id || ''));
+    const clientId = siteClient.get(inv.site_id) || '';
+    if (!clientId) continue;
+    const due = ymdOf(inv.due_date) || '';
+    const amount = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const copy = draftNudgeCopy(String(inv.title || (inv.purpose === 'deposit' ? 'Deposit' : 'Invoice')), amount, due, local.ymd);
+    const fresh = await raiseNotice({ siteId: inv.site_id, clientId, kind: 'deal_followup', period: draftNudgePeriod(inv.id, due), headline: copy.headline, body: copy.body });
+    if (fresh) raised++;
+  }
+  return { raised };
 }
 
 // ── PP-2 / CP-3.1: the annual renewal heads-up ───────────────────────────────

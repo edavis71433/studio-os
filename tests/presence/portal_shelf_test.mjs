@@ -49,6 +49,7 @@ function moneyState(i,todayYmd,pending){
   if(s==='paid'){const d=String(i.dispute_status||'');if(d==='open')return'disputed';if(d==='lost')return'lost';const a=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);const r=Number(i.refunded_cents)||0;return r>0&&r>=a?'refunded':'paid';}
   if(s==='void'||s==='canceled')return'';
   if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
+  if(i.not_sent===true)return'draft';
   const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
   return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
 }
@@ -125,7 +126,7 @@ const PAGE = Deno.readTextFileSync(new URL('../../client.html', import.meta.url)
 for (const f of [fmtMoney, moneyState, isClientUpload, approvalForFile, shelfDate, shelfDay, shelfMonth, shelfUrl, shelfRows, shelfGroups, shelfCounts, shelfOwe]) {
   ok(`mirror: client.html defines ${f.name} verbatim`, PAGE.includes(String(f)));
 }
-ok('mirror: MONEY_WORD and CLIENT_UPLOAD_NOTE verbatim', PAGE.includes("const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue',refunded:'Refunded',disputed:'Disputed',lost:'Dispute lost'};") && PAGE.includes("const CLIENT_UPLOAD_NOTE='Uploaded by the client';"));
+ok('mirror: MONEY_WORD and CLIENT_UPLOAD_NOTE verbatim', PAGE.includes("const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue',refunded:'Refunded',disputed:'Disputed',lost:'Dispute lost',draft:'Not sent yet'};") && PAGE.includes("const CLIENT_UPLOAD_NOTE='Uploaded by the client';"));
 
 const NOW = new Date(2026, 10, 11, 12, 0, 0), TODAY = '2026-11-11';
 const row = (rows, title) => rows.find((r) => r.title === title);

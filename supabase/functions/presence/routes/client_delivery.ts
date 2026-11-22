@@ -18,7 +18,7 @@ import { canDecideApproval, isDecision } from '../lib/approvals.ts';
 import { normalizeAnswers, isSupportPriority, composeServiceBrief } from '../lib/intake.ts';
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
-import { moneyState, moneyBuckets } from '../lib/money_state.ts';
+import { moneyState, moneyBuckets, invoiceNotSent } from '../lib/money_state.ts';
 import { isStudioSide, studioDenied, loadApprovals, clearApprovalOverdue } from './projects.ts';
 import { signDocToken, invoiceNo, type DocKind } from '../lib/documents.ts';
 import { nestPartPayments, PAY_METHOD_LABEL, type PayMethod } from '../lib/invoice_billing.ts';
@@ -89,7 +89,9 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   // payment paid toward (APPLY-0167), so the portal reads like the client's own copies
   // sales items 126, 127: what came back through Stripe (APPLY-0233), so a refunded or disputed
   // invoice reads as one; before it, the shapes below
-  let r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since,number,payment_for,paid_method,refunded_cents,dispute_status&order=created_at.desc&limit=200`);
+  // sales item 141: first_sent_at and link_gen (APPLY-0188) tell an invoice the studio never sent, which the client doesn't see
+  let r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since,number,payment_for,paid_method,refunded_cents,dispute_status,first_sent_at,link_gen&order=created_at.desc&limit=200`);
+  if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since,number,payment_for,paid_method,refunded_cents,dispute_status&order=created_at.desc&limit=200`);
   if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since,number,payment_for,paid_method&order=created_at.desc&limit=200`);
   if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL},processing_since&order=created_at.desc&limit=200`);
   if (!r.ok) r = await svc(`presence_invoices?customer_client_id=eq.${me}&deleted_at=is.null&select=${SEL}&order=created_at.desc&limit=200`);
@@ -106,7 +108,8 @@ export async function handleClientBilling(_req: Request, site: SiteRow, _princip
   // just-came-back-from-Stripe case; `state` on the wire is the server's word.
   const today = nowIso().slice(0, 10);
   // a part payment sits under the invoice it paid toward, never beside it as a second paid invoice
-  const list = await Promise.all(nestPartPayments(rows(r)).map(async (i) => {
+  // sales item 141: an invoice nobody sent is the studio's draft, not something the client owes
+  const list = await Promise.all(nestPartPayments(rows(r).filter((i: any) => !invoiceNotSent(i))).map(async (i) => {
     const state = moneyState(i, today);
     return {
       id: i.id, name: clean(i.title, 200), description: clean(i.description, 1000), number: invoiceNo(i.number),

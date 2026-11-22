@@ -8,7 +8,7 @@
 // loads the row, the brand and the context; same input, same bytes.
 import { PdfDoc, rgb, textWidth, wrapText, type PdfFont, type Rgb } from './pdf.ts';
 import {
-  money, utcStamp, invoiceNo, dayLabel, paidLine, partyLines, invoiceLines, invoiceDocLabel, mixHex,
+  money, utcStamp, invoiceNo, dayLabel, paidLine, partyLines, invoiceLines, invoiceDocLabel, mixHex, invoiceReturnWords,
   type DocBrand, type DocContext, type DocKind,
 } from './documents.ts';
 import { splitLineItems, computeProposalTotals, subtotalOf } from './sales_lifecycle.ts';
@@ -174,6 +174,8 @@ export function invoicePdf(v: any, brandIn?: Partial<DocBrand> | null, ctx?: Doc
   if (v?.created_at) details.push('Issued ' + dayLabel(v.created_at, tz));
   if (!paid && !voided) details.push(settling ? 'Payment on its way' : v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt');
   if (paid) details.push(paidLine(v, tz));
+  const back = invoiceReturnWords(v, ctx);   // sales item 145: a refund or a dispute after the payment
+  if (back.state) details.push(back.line);
   if (voided) details.push('Voided: no longer payable');
   if (ctx?.forWhat) details.push('For ' + ctx.forWhat);
   const payments = (Array.isArray(ctx?.payments) ? ctx!.payments! : []).filter((p) => Number(p?.amount_cents) > 0);
@@ -191,7 +193,8 @@ export function invoicePdf(v: any, brandIn?: Partial<DocBrand> | null, ctx?: Doc
     { label: paid ? 'Total paid' : voided ? 'Total (voided)' : settling ? 'Payment on its way' : 'Amount due', amount: money(paid ? billed : amount, currency), bold: true },
   ];
   table(f, rows, totals, paid ? GOOD_BG : t.tint, 'WHAT THIS COVERS');
-  if (paid) panel(f, [paidLine(v, tz), ...payments.map((p) => 'Earlier part payment: ' + paidLine(p, tz))], { bg: GOOD_BG, color: GOOD, bold: true });
+  if (paid && back.state && back.state !== 'part') panel(f, [back.pill + '. ' + back.line, paidLine(v, tz)], { bg: [0.953, 0.933, 0.941], color: [0.639, 0.259, 0.227], bold: true });
+  else if (paid) panel(f, [paidLine(v, tz), ...payments.map((p) => 'Earlier part payment: ' + paidLine(p, tz)), ...(back.state === 'part' ? [back.line] : [])], { bg: GOOD_BG, color: GOOD, bold: true });
   if (!paid && !voided && !settling && v?.stripe_url) {
     const url = String(v.stripe_url);
     f.para('Pay securely online:', { font: 'B', size: 10 });

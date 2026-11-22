@@ -76,7 +76,7 @@ const ago = (d) => new Date(NOW - d * DAY).toISOString();
   ok('ack: the owner\'s words get their own line after the greeting', a.sentence === 'Hi Sam,\n\nWe read every message.' && a.subject === 'We got your message — Corner Café');
   ok('ack: no words → the standard sentence, unchanged', enquiryAckCopy({ name: 'Sam' }).sentence === 'Hi Sam — ' + ENQUIRY_ACK_SENTENCE.charAt(0).toLowerCase() + ENQUIRY_ACK_SENTENCE.slice(1));
   const commercial = read('supabase/functions/presence/routes/commercial.ts');
-  ok('ack: both form paths pass the message, and the email quotes it', /acknowledgeEnquiry\(siteId, \{ name: fv\.sub\.name, email: fv\.sub\.email, message: fv\.sub\.message \}\)/.test(commercial) && /quoteBlock\(sub\.message\)/.test(commercial) && /words: auto\.auto_ack_message/.test(commercial));
+  ok('ack: both form paths pass the message, and the email quotes it', /acknowledgeEnquiry\(siteId, \{ name: fv\.sub\.name, email: fv\.sub\.email, phone: fv\.sub\.phone, message: fv\.sub\.message \}\)/.test(commercial) && /quoteBlock\(sub\.message\)/.test(commercial) && /words: auto\.auto_ack_message/.test(commercial));
 }
 
 // ═══ 5. the second overdue reminder ═══
@@ -113,7 +113,7 @@ const ago = (d) => new Date(NOW - d * DAY).toISOString();
   ok('inbox: the follow-ups show on the enquiry, with Stop follow-ups', /function followupHtml\(l\)/.test(inbox) && /\$\{followupHtml\(l\)\}/.test(inbox) && /api\('\/forms\/inbox\/'\+encodeURIComponent\(it\.lead_id\),'POST',\{followups:'off'\}\)/.test(inbox));
   const life = read('supabase/functions/presence/commerce/lifecycle.ts');
   ok('lifecycle: the follow-ups ride the leads step, the expiry note the documents step', /const followups = \(await runEnquiryFollowups\(limit\)/.test(life) && /const expiry = \(await runQuoteExpiryReminders\(limit\)/.test(life));
-  ok('lifecycle: a follow-up is sent only after its ledger row is new, and is not critical', /period: `enqfollow:\$\{sub\.id\}:\$\{step\}`, status: 'dismissed'/.test(life) && /if \(!fresh\) continue;   \/\/ this one already went: never twice/.test(life) && /mail\.html, brand, \{ asBusiness: true, siteId: sub\.site_id, replyTo \}\)/.test(life));
+  ok('lifecycle: a follow-up is sent only after its ledger row is new, and is not critical', /period: `enqfollow:\$\{sub\.id\}:\$\{step\}`, status: 'dismissed'/.test(life) && /if \(!fresh\) continue;   \/\/ this one already went: never twice/.test(life) && /mail\.html, brand, \{ asBusiness: true, siteId: sub\.site_id \}\)/.test(life));
   const mig = read('supabase/migrations/0175_follow_ups_recipes.sql');
   ok('0175: the auto-reply defaults on for new rows; every new switch off', /alter column auto_ack_enquiries set default true/.test(mig) && /enquiry_followups boolean not null default false/.test(mig) && /invoice_overdue_repeat boolean not null default false/.test(mig) && /quote_expiry_reminders boolean not null default false/.test(mig));
   ok('0175: an apply pack with a check', /select column_name, data_type, column_default/.test(read('docs/presence/APPLY-0175-prod.sql')));

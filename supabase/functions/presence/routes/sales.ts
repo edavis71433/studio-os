@@ -20,7 +20,9 @@ import { applyPlaceholders, buildPlaceholderValues, depositSplit } from '../lib/
 import { raiseNotice, clearNotice, clearNoticePrefix, dealFollowupPeriodPrefix, dealFollowupLegacyPeriod } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
 import { stampFirstSent } from '../lib/pay_link.ts';
-import { moneyState, moneyBuckets } from '../lib/money_state.ts';
+import { moneyState, moneyBuckets, invoiceNotSent, SENT_INVOICE_FILTER } from '../lib/money_state.ts';
+import { studioZone } from '../lib/studio_clock.ts';   // sales item 152
+import { ownStripeRefused, OWN_STRIPE_MESSAGE } from '../commerce/own_stripe.ts';   // sales item 149
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
 import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { RETURNED_SELECT, returnedPayments } from '../lib/money_returns.ts';   // sales items 126, 127
@@ -333,7 +335,8 @@ async function contactFilterIds(siteId: string, more: string, order: string, lf:
   const [dealsR, eventsR, invR, orderedR, personR] = await Promise.all([
     svc(`presence_deals?site_id=eq.${siteId}&contact_id=not.is.null&select=id,contact_id,deleted_at&limit=${CONTACT_FILTER_CAP}`),
     lf.quiet ? svc(`presence_deal_events?site_id=eq.${siteId}&kind=eq.note&created_at=gte.${encodeURIComponent(cutoff)}&select=deal_id,detail,created_at&limit=${CONTACT_FILTER_CAP}`) : Promise.resolve(null),
-    lf.owes ? svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status,processing_since&limit=2000`)
+    lf.owes ? svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&${SENT_INVOICE_FILTER}&select=deal_id,customer_client_id,status,processing_since&limit=2000`)   // sales item 141: sent ones only
+      .then((r) => r.ok ? r : svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status,processing_since&limit=2000`))
       .then((r) => r.ok ? r : svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status&limit=2000`)) : Promise.resolve(null),
     svc(`presence_contacts?site_id=eq.${siteId}${more}&select=id&order=${order}&limit=${CONTACT_FILTER_CAP}`),
     // item 85: a call, email or meeting logged for the person with no deal counts too (APPLY-0173;
@@ -859,7 +862,7 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
     // AR rollup — "who owes me money" across every deal, in one place (a Salesforce
     // gap: invoices were only ever visible one-deal-at-a-time). Open invoices only;
     // processing_since (migration 0132) with the pre-0132 fallback.
-    (async () => { let q = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=amount_cents,due_date,processing_since&limit=1000`); if (!q.ok) q = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=amount_cents,due_date&limit=1000`); return q; })(),
+    (async () => { let q = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&${SENT_INVOICE_FILTER}&select=amount_cents,due_date,processing_since&limit=1000`); /* sales item 141: an invoice nobody sent is not owed yet; before APPLY-0188 the plain reads */ if (!q.ok) q = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=amount_cents,due_date,processing_since&limit=1000`); if (!q.ok) q = await svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=amount_cents,due_date&limit=1000`); return q; })(),
   ]);
   if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t total your pipeline just now.' }, 502, cors);
   const deals = rows(r);
@@ -913,8 +916,10 @@ export async function loadReceivables(site: SiteRow, todayYmd?: string) {
   // sales item 81: the invoice's number rides along (APPLY-0167), so Who owes you can name it.
   // Each older shape is tried in turn, and the pages after the first keep the shape that worked.
   const page = (sel: string, off: number) => svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.open&select=${sel}&order=due_date.asc.nullslast,created_at.asc,id.asc&limit=${RECEIVABLES_PAGE}&offset=${off}`);
-  let sel = `${SEL},processing_since,number`;
+  // sales item 141: first_sent_at and link_gen (APPLY-0188) tell an invoice nobody sent yet
+  let sel = `${SEL},processing_since,number,first_sent_at,link_gen`;
   let invR = await page(sel, 0);
+  if (!invR.ok) { sel = `${SEL},processing_since,number`; invR = await page(sel, 0); }
   if (!invR.ok) { sel = `${SEL},processing_since`; invR = await page(sel, 0); }
   if (!invR.ok) { sel = SEL; invR = await page(sel, 0); }
   // final pass (Nov 8, batch D): open invoices that couldn't be read are a failure, never an
@@ -953,7 +958,8 @@ export async function loadReceivables(site: SiteRow, todayYmd?: string) {
   // page's local day when it sent ?today= (item 65), else the server's UTC day.
   // `overdue` stays for older page builds. Today re-runs the same mirrored formula
   // against the studio's local day, so its chips and the record's agree.
-  const items = invs.map((i: any) => ({ id: i.id, number: i.number ?? null, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, due_date: i.due_date, status: 'open', processing_since: i.processing_since || null, state: moneyState(i, today), overdue: moneyState(i, today) === 'overdue', deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '', stripe_url: i.stripe_url || null, client_id: customerOf(i.deal_id).client_id, customer_site_id: customerOf(i.deal_id).site_id }));
+  // sales item 141: a draft (never sent) is not owed: it stays on its deal's Billing tab with its Send button, and off this list
+  const items = invs.filter((i: any) => !invoiceNotSent(i)).map((i: any) => ({ id: i.id, number: i.number ?? null, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, due_date: i.due_date, status: 'open', processing_since: i.processing_since || null, state: moneyState(i, today), overdue: moneyState(i, today) === 'overdue', deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '', stripe_url: i.stripe_url || null, client_id: customerOf(i.deal_id).client_id, customer_site_id: customerOf(i.deal_id).site_id }));
   const paid = paidRows.map((i: any) => ({ id: i.id, title: String(i.title || 'Invoice'), amount_cents: Number(i.amount_cents) || 0, status: 'paid', state: moneyState({ ...i, status: 'paid' }, today), refunded_cents: Number(i.refunded_cents) || 0, dispute_status: i.dispute_status || null, paid_at: i.paid_at, deal_id: i.deal_id || null, deal: i.deal_id ? (dealById[String(i.deal_id)] || '') : '' }));
   const buckets = moneyBuckets([...items, ...paid], today);
   // total_cents = what is still WAITING on a client (upcoming + overdue) — a
@@ -1061,7 +1067,8 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   const dealsOff = failed.has('deals');   // the pipeline and won/lost reports both stand on the deals read
   return json({ data: {
     generated_at: now,
-    revenue: failed.has('revenue') ? { unavailable: true } : revenueByMonth(paid, now, retainerPayments(retainerEvents), returnedPayments(returnedRows)),
+    // sales item 152: months are cut on the studio's own day (its location's zone, Pacific without one)
+    revenue: failed.has('revenue') ? { unavailable: true } : revenueByMonth(paid, now, retainerPayments(retainerEvents), returnedPayments(returnedRows), await studioZone(site.id)),
     pipeline: dealsOff ? { unavailable: true } : { ...dealsByStage(deals, lastMoveInto, now, await labelsP, await chancesP), partial: failed.has('stages') },
     outcomes: dealsOff ? { unavailable: true } : { ...wonAndLost(deals, now, 365, closedAt), partial: failed.has('closes') },
     enquiries: failed.has('enquiries') ? { unavailable: true } : enquiriesBySource(subs, becameDeal, now),
@@ -1163,7 +1170,8 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
       // for the list's "Owes you money" filter. null = couldn't tell (the filter then says so)
       try {
         const ids = deals.map((d: any) => d.id).filter(Boolean);
-        let ir = await svc(`presence_invoices?site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&deal_id=in.(${ids.join(',')})&select=deal_id,amount_cents,status,processing_since&limit=1000`);
+        let ir = await svc(`presence_invoices?site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&${SENT_INVOICE_FILTER}&deal_id=in.(${ids.join(',')})&select=deal_id,amount_cents,status,processing_since&limit=1000`);   // sales item 141: sent ones only
+        if (!ir.ok) ir = await svc(`presence_invoices?site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&deal_id=in.(${ids.join(',')})&select=deal_id,amount_cents,status,processing_since&limit=1000`);
         if (!ir.ok) ir = await svc(`presence_invoices?site_id=eq.${site.id}&status=eq.open&deleted_at=is.null&deal_id=in.(${ids.join(',')})&select=deal_id,amount_cents,status&limit=1000`);
         if (!ir.ok) throw new Error('invoices');
         const owed: Record<string, number> = {};
@@ -1252,6 +1260,25 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
   return json({ error: 'method_not_allowed' }, 405, cors);
 }
 
+/** Sales item 139: what still has to be settled before a deal may be deleted, in the words the
+ *  Delete button shows ("Cancel the retainer and void invoice #0012 first"), or '' when nothing.
+ *  A sent invoice is one with a pay link, a first-sent day, an earlier link, or a payment settling
+ *  (the same rule as lib/money_state.ts invoiceNotSent); a draft nobody sent goes with the deal.
+ *  A read that fails refuses too: "delete, and hope" is the wrong default for money. */
+export async function moneyStillRunning(siteId: string, dealId: string, retainer: unknown): Promise<string> {
+  const parts: string[] = [];
+  const r = retainer && typeof retainer === 'object' ? retainer as { status?: unknown; extra_subscription_ids?: unknown[] } : null;
+  if (r && (r.status === 'active' || r.status === 'past_due' || r.status === 'pending' || (Array.isArray(r.extra_subscription_ids) && r.extra_subscription_ids.length))) parts.push(r.status === 'pending' ? 'cancel the retainer that is waiting for approval' : 'cancel the retainer');
+  let q = await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&payment_for=is.null&select=id,number,title,stripe_url,first_sent_at,link_gen,processing_since&order=created_at.asc&limit=50`);
+  if (!q.ok) q = await svc(`presence_invoices?deal_id=eq.${dealId}&site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=id,number,title,stripe_url,processing_since&order=created_at.asc&limit=50`);
+  if (!q.ok) return 'We couldn’t check this deal’s invoices just now, so it wasn’t deleted. Try again in a moment.';
+  const sent = rows(q).filter((i: any) => !invoiceNotSent(i));
+  if (sent.length) parts.push(`void ${sent.length === 1 ? 'invoice ' + (invoiceNo(sent[0].number) || `“${String(sent[0].title || 'Invoice').slice(0, 40)}”`) : `its ${sent.length} unpaid invoices`}`);
+  if (!parts.length) return '';
+  const what = parts.join(' and ');
+  return `This deal still has money running. ${what.charAt(0).toUpperCase() + what.slice(1)} first, then delete it.`;
+}
+
 export async function loadDeal(siteId: string, id: string) {
   const r = await svc(`presence_deals?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=*&limit=1`);
   return rows(r)[0] || null;
@@ -1282,7 +1309,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       // as the proposals read above) so the record's Billing tab never blanks.
       // item 107: recurring_id rides along (0145) so the record can tell what's left of the proposal
       // sales items 77 and 81: the invoice's number and how a recorded payment came in (APPLY-0167)
-      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note,refunded_cents,dispute_status&order=due_date.asc.nullsfirst,created_at.asc`); /* sales items 126, 127: before APPLY-0233, without what came back */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note&order=due_date.asc.nullsfirst,created_at.asc`); /* before APPLY-0188: without the private note */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
+      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note,refunded_cents,dispute_status,first_sent_at,link_gen&order=due_date.asc.nullsfirst,created_at.asc`); /* sales item 141: first_sent_at and link_gen say whether it ever went out */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note,refunded_cents,dispute_status&order=due_date.asc.nullsfirst,created_at.asc`); /* sales items 126, 127: before APPLY-0233, without what came back */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note&order=due_date.asc.nullsfirst,created_at.asc`); /* before APPLY-0188: without the private note */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
       // item 47: the deal's estimates and recurring invoices — both [] before APPLY-0145
       import('./estimates.ts').then((m) => m.estimatesForDeal(site.id, id)).catch(() => []),
       import('./recurring_invoices.ts').then((m) => m.recurringForDeal(site.id, id)).catch(() => []),
@@ -1297,7 +1324,8 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     // the one formula (lib/money_state.ts, server UTC day); the record re-runs the
     // mirrored formula against the studio's local day for its chips.
     const invToday = nowIso().slice(0, 10);
-    const invoiceRows = rows(invoices).map((i: any) => ({ ...i, processing_since: i.processing_since || null, state: moneyState(i, invToday) }));
+    // sales item 141: not_sent rides along so every page's mirror of the formula reads a draft as one
+    const invoiceRows = rows(invoices).map((i: any) => { const row = { ...i, processing_since: i.processing_since || null, not_sent: invoiceNotSent(i) }; return { ...row, state: moneyState(row, invToday) }; });
     // ONE reverse-chronological timeline: manual activities (call/email/meeting/
     // dated note) + system events live in the same presence_deal_events table, so
     // they merge by EFFECTIVE time (occurred_at for a back-dated log). `events`
@@ -1372,6 +1400,13 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     // pattern every other soft-deleted entity uses (0074 partial indexes).
     // A converted/won deal is NOT deletable (it produced a real customer).
     if (deal.stage === 'converted' || deal.converted_at) return json({ error: 'won_deal', message: 'This deal became a customer — it can’t be deleted. Manage the customer from Projects.' }, 409, cors);
+    // Sales item 139 (Nov 22 2026 review): deleting only hid the deal, and its money kept running:
+    // an unpaid sent invoice stayed open with a live pay link (and reminders, with the switch on),
+    // and a retainer kept charging in Stripe while every read here skipped the deleted deal, so
+    // the charges went unrecorded and the Cancel button was gone with the deal. Refuse while
+    // the deal has a sent, unpaid invoice or a waiting or live retainer, and say which.
+    const running = await moneyStillRunning(site.id, id, deal.retainer);
+    if (running) return json({ error: 'money_running', message: running }, 409, cors);
     const del = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ deleted_at: new Date().toISOString() }) });
     if (!del.ok || !rows(del)[0]) return json({ error: 'write_failed' }, 502, cors);
     // A deal that left the pipeline can't still be "waiting on you" — runDealFollowups
@@ -1566,9 +1601,30 @@ export async function handleSalesServices(req: Request, site: SiteRow, principal
  *  pure and unit-tested. Both reads are best-effort: a template must still draft
  *  when identity or the contact can't be read, degrading to readable text rather
  *  than leaving a literal {{token}} in something a client is asked to sign. */
+/** Sales item 144 (Nov 22 2026 review): the price an agreement prints and its deposit is
+ *  minted from. The deal's typed value used to fill them, and the proposal's total only
+ *  flowed into the deal when that value was empty, so a deal typed at $3,000 with a proposal
+ *  accepted at $3,450 got an agreement for $3,000 and a $1,500 deposit. The newest proposal
+ *  the client has seen (accepted first, else sent; never a draft or a revised-away one) wins;
+ *  with none, the deal's value as before. `differs` says the two disagree, for the warning. */
+export async function dealPriceCents(siteId: string, deal: { id?: unknown; expected_value_cents?: unknown } | null): Promise<{ cents: number; from: 'proposal' | 'deal'; proposal_cents: number | null; differs: boolean }> {
+  const typed = Math.max(0, Math.trunc(Number(deal?.expected_value_cents)) || 0);
+  if (!deal?.id || !UUID_RE.test(String(deal.id))) return { cents: typed, from: 'deal', proposal_cents: null, differs: false };
+  const list = rows(await svc(`presence_proposals?deal_id=eq.${deal.id}&site_id=eq.${siteId}&status=in.(accepted,sent)&deleted_at=is.null&select=status,line_items&order=created_at.desc&limit=20`).catch(() => ({ ok: false, json: [] })))
+    .filter((x: any) => !splitLineItems(x.line_items).meta.superseded_by);
+  const p = list.find((x: any) => x.status === 'accepted') || list.find((x: any) => x.status === 'sent');
+  if (!p) return { cents: typed, from: 'deal', proposal_cents: null, differs: false };
+  const total = Math.min(1_000_000_00, proposalTotals(p.line_items).total_cents);
+  if (!(total > 0)) return { cents: typed, from: 'deal', proposal_cents: null, differs: false };
+  return { cents: total, from: 'proposal', proposal_cents: total, differs: typed > 0 && typed !== total };
+}
+
 async function fillPlaceholders(siteId: string, deal: any, text: string): Promise<string> {
   let contact: { name?: string; company?: string } | null = null;
   let studioName = '';
+  // sales item 144: the proposal's total fills the fee, deposit and balance when the client has one
+  const price = await dealPriceCents(siteId, deal).catch(() => null);
+  if (price && price.from === 'proposal') deal = { ...deal, expected_value_cents: price.cents };
   try { if (deal.contact_id) contact = rows(await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${siteId}&select=name,company&limit=1`))[0] || null; } catch { /* best-effort */ }
   try { studioName = rows(await svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`))[0]?.business_name || ''; } catch { /* best-effort */ }
   // sales item 106: a proposal paid in parts rewrites the standard half-and-half passages
@@ -1753,6 +1809,7 @@ export function firstNameOf(name: unknown): string {
 export async function handleSalesInvoice(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
   if (!stripeConfigured()) return json({ error: 'unavailable', message: 'Connect Stripe before sending invoices.' }, 503, cors);
+  if (ownStripeRefused(site.id, principal)) return json({ error: 'not_your_stripe', message: OWN_STRIPE_MESSAGE }, 403, cors);   // sales item 149
   const deal = await loadDeal(site.id, dealId);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { /* body optional */ }
@@ -1871,6 +1928,7 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
  *  a second, double-billing money source. */
 export async function handleSalesSchedule(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
+  if (ownStripeRefused(site.id, principal)) return json({ error: 'not_your_stripe', message: OWN_STRIPE_MESSAGE }, 403, cors);   // sales item 149
   if (!stripeConfigured()) return json({ error: 'unavailable', message: 'Connect Stripe before setting up a payment plan.' }, 503, cors);
   const deal = await loadDeal(site.id, dealId);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
@@ -1939,6 +1997,7 @@ export async function handleSalesSchedule(req: Request, site: SiteRow, principal
 export async function handleSalesInvoiceSend(req: Request, site: SiteRow, principal: Principal, invoiceId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(invoiceId)) return json({ error: 'bad_request' }, 400, cors);
   if (!stripeConfigured()) return json({ error: 'unavailable', message: 'Connect Stripe before sending invoices.' }, 503, cors);
+  if (ownStripeRefused(site.id, principal)) return json({ error: 'not_your_stripe', message: OWN_STRIPE_MESSAGE }, 403, cors);   // sales item 149
   const inv = rows(await svc(`presence_invoices?id=eq.${invoiceId}&site_id=eq.${site.id}&deleted_at=is.null&select=*&limit=1`))[0];
   if (!inv) return json({ error: 'not_found', message: 'That invoice is no longer here.' }, 404, cors);
   if (inv.status !== 'open') return json({ error: 'bad_state', message: inv.status === 'paid' ? 'That stage is already paid.' : 'That invoice isn’t open.' }, 409, cors);
@@ -2089,6 +2148,7 @@ async function emailRetainerLink(siteId: string, dealId: string, url: string, am
 export async function handleSalesRetainer(req: Request, site: SiteRow, principal: Principal, dealId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(dealId)) return json({ error: 'bad_request' }, 400, cors);
   if (!stripeConfigured()) return json({ error: 'unavailable', message: 'Connect Stripe before setting up a retainer.' }, 503, cors);
+  if (ownStripeRefused(site.id, principal)) return json({ error: 'not_your_stripe', message: OWN_STRIPE_MESSAGE }, 403, cors);   // sales item 149
   const deal = await loadDeal(site.id, dealId);
   if (!deal) return json({ error: 'not_found' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -2106,6 +2166,12 @@ export async function handleSalesRetainer(req: Request, site: SiteRow, principal
     return json({ data: { retainer: prior, url: prior.checkout_url, reused: true } }, 200, cors);
   }
   const now = nowIso();
+  // Sales item 140 (Nov 22 2026 review): a waiting retainer being replaced (a different amount or
+  // term) kept its old link live, so the old email could still start charges at the old price.
+  // The old link is switched off first; when Stripe won't confirm that, the set-up stops here.
+  if (prior && prior.status === 'pending' && prior.stripe_payment_link_id && !(await deactivatePaymentLink(String(prior.stripe_payment_link_id)))) {
+    return json({ error: 'old_link_live', message: 'The earlier retainer link couldn’t be switched off with Stripe just now, so nothing was changed. Try again in a moment.' }, 502, cors);
+  }
   // Seed a PENDING marker FIRST — this write gates on the 0096 column, so BEFORE
   // any Stripe object is created it fails fast on a pre-migration environment
   // (never an orphan subscription). Idempotent shape via mergeRetainerState.
@@ -2150,8 +2216,12 @@ export async function handleSalesRetainerCancel(req: Request, site: SiteRow, pri
       const r = await cancelSubscription(id);
       if (!r.ok) return json({ error: 'cancel_failed', message: 'We couldn’t cancel the retainer with Stripe just now — please try again.', detail: r.error }, 502, cors);
     }
-  } else if (prior.stripe_payment_link_id) {
-    await deactivatePaymentLink(String(prior.stripe_payment_link_id));   // pending: kill the link so no one authorizes it
+  }
+  if (prior.status === 'pending' && prior.stripe_payment_link_id) {
+    // pending: kill the link so no one authorizes it (also when an old link's approval is running as an
+    // extra beside it). Sales item 140: the answer used to be thrown away, so a link Stripe never
+    // switched off still read "cancelled" and could be approved later.
+    if (!(await deactivatePaymentLink(String(prior.stripe_payment_link_id)))) return json({ error: 'cancel_failed', message: 'We couldn’t switch the retainer link off with Stripe just now, so it is still live. Try again in a moment.' }, 502, cors);
   }
   const next = { ...mergeRetainerState(prior, { status: 'canceled', canceled_at: prior.canceled_at || now }, now), extra_subscription_ids: [] };
   const up = await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${site.id}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ retainer: next }) });
@@ -2306,6 +2376,11 @@ export async function handleSalesDealSend(req: Request, site: SiteRow, principal
   return json({ data: { proposal, contract, deposit }, url, emailed, sent }, 200, cors);
 }
 
+/** Sales item 160: does any other proposal on the deal say it was revised from this one? Pure. */
+export function supersededByNewer(id: string, others: Array<{ id?: unknown; line_items?: unknown }>): boolean {
+  return (others || []).some((o) => String(o?.id || '') !== id && String(splitLineItems(o?.line_items).meta.revised_from || '') === id);
+}
+
 /** Public (token) OR authed proposal decision. */
 export async function handleSalesProposalDecide(req: Request, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
@@ -2325,6 +2400,15 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
   // A revised (superseded) proposal's old link can NEVER be accepted — the studio
   // replaced it with a newer version (the enforcement point for revise/supersede).
   if (splitLineItems(p.line_items).meta.superseded_by) return json({ error: 'superseded', message: 'This proposal was replaced by a newer version — ask your studio for the latest.' }, 409, cors);
+  // Sales item 160 (Nov 22 2026 review): Revise stamps the old one "superseded" as a best-effort
+  // write, so when that one write failed the old link could still be accepted. The new version
+  // always names the one it revised (meta.revised_from), so a newer version on the same deal
+  // that names THIS proposal refuses the accept too. A read that fails refuses as well.
+  if (decision === 'accepted') {
+    const later = await svc(`presence_proposals?deal_id=eq.${p.deal_id}&site_id=eq.${tok.site_id}&deleted_at=is.null&id=neq.${id}&select=id,line_items&limit=50`);
+    if (!later.ok) return json({ error: 'unavailable', message: 'We couldn’t check this proposal just now. Try again in a moment.' }, 503, cors);
+    if (supersededByNewer(id, rows(later))) return json({ error: 'superseded', message: 'This proposal was replaced by a newer version — ask your studio for the latest.' }, 409, cors);
+  }
   // Expired proposals can't be ACCEPTED (declining is always allowed). expires_at is
   // present only after migration 0107 — undefined here is simply "no expiry".
   if (decision === 'accepted' && p.expires_at && String(p.expires_at) < nowIso()) return json({ error: 'expired', message: 'This proposal has expired — ask your studio to send an updated one.' }, 409, cors);
@@ -2498,7 +2582,8 @@ async function ensureDepositForContractSend(site: SiteRow, principal: Principal,
     if (!first && !/deposit/i.test(String(contract.body || ''))) return { minted: false };   // the document made no deposit promise
     const deal = await loadDeal(site.id, dealId);
     if (!deal) return { minted: false };
-    const deposit_cents = first ? first.amount_cents : depositSplit(deal.expected_value_cents).deposit_cents;
+    // sales item 144: the deposit is half of what the agreement printed, the proposal's total when there is one
+    const deposit_cents = first ? first.amount_cents : depositSplit((await dealPriceCents(site.id, deal).catch(() => null))?.cents ?? deal.expected_value_cents).deposit_cents;
     if (deposit_cents < 50) return { minted: false, warning: 'no_value' };         // the doc printed "[50% deposit]" — the deal needs a value
     if (!stripeConfigured()) return { minted: false };
     // AT MOST ONCE, EVER — any prior deposit row (open, paid, OR void) means the
@@ -2910,6 +2995,9 @@ export async function docRow(kind: DocKind, id: string, siteId: string): Promise
   if (kind === 'invoice') {
     const base = 'id,deal_id,title,description,amount_cents,currency,purpose,status,stripe_url,due_date,paid_at,created_at';
     // processing_since (0132): the page says "Payment on its way" while a bank payment settles (sales item 118)
+    // sales item 145: what came back after the payment (APPLY-0233), so the page and PDF never say "Paid in full" after a refund
+    const withBack = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines,processing_since,refunded_cents,dispute_status&limit=1`);
+    if (withBack !== undefined) return withBack;
     const full = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines,processing_since&limit=1`);
     return full !== undefined ? full : ((await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base}&limit=1`)) || null);
   }

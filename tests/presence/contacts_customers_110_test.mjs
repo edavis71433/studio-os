@@ -112,7 +112,7 @@ ok('helper: isUniqueViolation reads the Postgres code', E.isUniqueViolation({ st
 // ═══ K6: "Owes you" reads every open invoice ═══
 {
   const invs = [];
-  for (let i = 0; i < 1100; i++) invs.push({ id: `cccccccc-0000-4000-8000-${String(i).padStart(12, '0')}`, site_id: SITE, title: `Invoice ${i}`, amount_cents: 1000, status: 'open', due_date: '2026-12-01', deal_id: null, created_at: '2026-10-01T00:00:00Z', deleted_at: null });
+  for (let i = 0; i < 1100; i++) invs.push({ id: `cccccccc-0000-4000-8000-${String(i).padStart(12, '0')}`, site_id: SITE, title: `Invoice ${i}`, amount_cents: 1000, status: 'open', stripe_url: 'https://pay.example/x', due_date: '2026-12-01', deal_id: null, created_at: '2026-10-01T00:00:00Z', deleted_at: null });
   db.reset({ presence_invoices: invs });
   const out = await S.loadReceivables(site, '2026-11-11');
   ok('K6: 1,100 open invoices are all counted (was the first 300)', out.items.length === 1100 && out.total_cents === 1100 * 1000, `items=${out.items.length}`);
@@ -133,7 +133,7 @@ ok('helper: isUniqueViolation reads the Postgres code', E.isUniqueViolation({ st
   ok('K1: no "is there one already?" contact lookup compares the email exactly', exact.length === 0, exact.join(', '));
   ok('K1: booking and review contacts are stored lower-cased', /email: normEmail\(v\.booking\.email\)/.test(read('routes/booking.ts')) && /email: normEmail\(v\.review\.email\)/.test(read('routes/reviews.ts')));
   ok('K1: the enquiry form keeps its email lower-cased', /const email = clip\(body\?\.email, 200\)\.toLowerCase\(\)/.test(read('lib/commercial.ts')));
-  ok('K1: the enquiry reply’s contact is lower-cased and matched case-blind', /const email = normEmail\(emailIn\);\n\s*const hit = await svc\(`presence_contacts\?site_id=eq\.\$\{siteId\}&\$\{emailMatch\(email\)\}/.test(read('routes/commercial.ts')));
+  ok('K1: the enquiry reply’s contact is lower-cased and matched case-blind', /const email = normEmail\(emailIn\);\n\s*if \(!email\) return;\n\s*const hit = await svc\(`presence_contacts\?site_id=eq\.\$\{siteId\}&\$\{emailMatch\(email\)\}/.test(read('lib/lead_contact.ts')));
   // K6's convert rollback (the contact unlinked from the customer it removed) is run for real in
   // sales_routes_test.mjs, section 6: “the account and sign-in it made are removed, the contact unlinked”
 }

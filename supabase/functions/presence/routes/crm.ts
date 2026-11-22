@@ -23,6 +23,7 @@ import { loadProfile, loadTimeline, listNotes, addNote, setNotePinned, deleteNot
 import { filterTimeline, relationshipSummary, isAudience, cleanNoteBody } from '../crm/contract.ts';
 import { mapConversationItem, mapSiteEvent, mapDealEvent, mapDoneTask, mergeActivity, buildUpcoming, type ActivityItem } from '../crm/activity.ts';
 import { svc } from '../lib/db.ts';
+import { SENT_INVOICE_FILTER } from '../lib/money_state.ts';
 import { linksForCustomer, healUnstampedSupport } from '../lib/service_bridge.ts';
 import { resolveSite } from '../lib/site.ts';
 import { resolveMemberSite } from '../lib/workspace.ts';
@@ -519,7 +520,9 @@ export async function handleCrmActivity(req: Request, jwt: string, site: SiteRow
     const readInvoices = async (): Promise<any[]> => {
       const invFilter = dealId ? `deal_id=eq.${dealId}` : `customer_client_id=eq.${conv.clientId}`;
       // processing_since lands with migration 0132 (tolerant: pre-0132 shape second)
-      let ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id,processing_since&limit=100`);
+      // sales item 141: an invoice nobody sent is not owed (SENT_INVOICE_FILTER; before APPLY-0188 the plain read)
+      let ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&${SENT_INVOICE_FILTER}&select=id,title,amount_cents,due_date,status,deal_id,processing_since&limit=100`);
+      if (!ir.ok) ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id,processing_since&limit=100`);
       if (!ir.ok) ir = await svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=id,title,amount_cents,due_date,status,deal_id&limit=100`);
       return arr(ir);
     };
@@ -683,7 +686,7 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
         const invFilter = dealId ? `deal_id=eq.${dealId}` : `customer_client_id=eq.${clientId}`;
         const [dv, inv] = await Promise.all([
           dealId ? svc(`presence_deals?id=eq.${dealId}&site_id=eq.${AS}&select=stage,expected_value_cents,next_step&limit=1`).then(one) : Promise.resolve(null),
-          (dealId || clientId) ? svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=amount_cents&limit=100`).then(arr) : Promise.resolve([] as any[]),
+          (dealId || clientId) ? svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&${SENT_INVOICE_FILTER}&select=amount_cents&limit=100`).then((r) => r.ok ? arr(r) : svc(`presence_invoices?site_id=eq.${AS}&${invFilter}&status=eq.open&deleted_at=is.null&select=amount_cents&limit=100`).then(arr)) : Promise.resolve([] as any[]),   // sales item 141
         ]);
         if (dv) { if (dv.expected_value_cents) highlights.value_cents = Number(dv.expected_value_cents) || 0; if (dv.stage) highlights.stage = String(dv.stage); if (dv.next_step) highlights.next_step = String(dv.next_step); }
         const owed = inv.reduce((a: number, i: any) => a + (Number(i.amount_cents) || 0), 0);
