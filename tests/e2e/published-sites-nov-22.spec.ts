@@ -1,6 +1,6 @@
 import { test, expect, Route } from '@playwright/test';
 import { SHELL_CSS, SHELL_CRITICAL, SHELL_NOSCRIPT, MENU_JS, menuButtonHtml } from '../../supabase/functions/presence/lib/site_shell';
-import { BLOCK_JS } from '../../supabase/functions/presence/lib/site_blocks';
+import { BLOCK_JS, BLOCK_CSS } from '../../supabase/functions/presence/lib/site_blocks';
 import { NAV_DROPDOWN_CSS } from '../../supabase/functions/presence/lib/site_nav';
 
 // Builder items 288, 294, 298 and 307 (Nov 22 2026 review), on a visitor's page scrolled and pressed for
@@ -14,7 +14,7 @@ const GALLERY = `<section class="block wrap block-gallery v-zoom" id="gallery"><
 const CAROUSEL = `<section class="block wrap block-carousel" id="slides"><div class="carousel" tabindex="0" role="group" aria-roledescription="carousel" aria-label="Image carousel"><div class="cr-track">${[1, 2, 3].map((i) => `<figure class="cr-slide"><img src="/img/${i}.webp" alt="Slide ${i}" width="400" height="300" loading="lazy"></figure>`).join('')}</div></div><p class="cr-hint">Swipe or scroll →</p></section>`;
 // the few template rules the shell builds on (a sticky header, the row, a gallery grid, a scrolling track)
 const BASE_CSS = `body{margin:0;font-family:system-ui,sans-serif}.wrap{max-width:1080px;margin:0 auto;padding:0 24px}header.site{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;z-index:20}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:15px;padding-bottom:15px;flex-wrap:wrap}nav.primary ul{display:flex;gap:2px;list-style:none;margin:0;padding:0}nav.primary a{display:inline-block;padding:9px 14px;text-decoration:none;color:#333}.sitesearch{display:flex;border:1px solid #ddd;border-radius:999px;padding:5px 12px;max-width:200px}.sitesearch input{border:0;width:100%}.block{padding:60px 0}.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.gallery img{width:100%;height:auto;display:block}.lb{display:none;position:fixed;inset:0;z-index:9999;margin:0;padding:20px;background:rgba(12,10,16,.93);flex-direction:column;align-items:center;justify-content:center}.lb:target{display:flex}.lb-bg{position:absolute;inset:0}.lb-close,.lb-prev,.lb-next{color:#fff;position:relative}.cr-track{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory}.cr-slide{flex:0 0 100%;scroll-snap-align:center;margin:0}.cr-slide img{width:100%;display:block}`;
-const PAGE = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${SHELL_CRITICAL}</style><style>${BASE_CSS}${NAV_DROPDOWN_CSS}${SHELL_CSS}</style>${SHELL_NOSCRIPT}</head><body>
+const PAGE = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${SHELL_CRITICAL}</style><style>${BASE_CSS}${BLOCK_CSS}${NAV_DROPDOWN_CSS}${SHELL_CSS}</style>${SHELL_NOSCRIPT}</head><body>
 <a class="skip" href="#main">Skip to main content</a>
 <header class="site"><div class="wrap nav"><a class="brand" href="/">Marlow’s Kitchen</a>${menuButtonHtml()}<div class="site-menu" id="site-menu"><nav class="primary" aria-label="Main">${MENU}</nav><form class="sitesearch" role="search" action="/search/" method="get"><input type="search" name="q" aria-label="Search this site" placeholder="Search"></form></div></div></header>
 <main id="main"><section class="hero wrap" style="height:900px"><h1>Marlow’s Kitchen</h1><a class="btn" href="#gallery">See the gallery</a></section>${GALLERY}${CAROUSEL}<section class="block wrap" id="last" style="height:1200px"><h2>The end</h2></section></main>
@@ -116,11 +116,13 @@ test.describe('the gallery’s zoom view and the carousel (builder items 298 and
     await expect(page.locator('#lb-0-1 .lb-close')).toBeFocused();
     const steps = await page.evaluate(() => history.length);
     await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(300);   // the address changes, then the view follows
     await expect(page.locator('#lb-0-2')).toBeVisible();
     await page.keyboard.press('ArrowLeft');
+    await page.waitForTimeout(300);
     await expect(page.locator('#lb-0-1')).toBeVisible();
     expect(await page.evaluate(() => history.length)).toBe(steps);   // moving replaced the address
-    for (let i = 0; i < 4; i++) await page.keyboard.press('Tab');
+    for (let i = 0; i < 4; i++) await page.keyboard.press('Tab');   // Safari's Tab skips links; focus that lands outside comes back to Close
     expect(await page.evaluate(() => !!document.activeElement?.closest('.lb'))).toBe(true);
     await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Shift+Tab');
     expect(await page.evaluate(() => !!document.activeElement?.closest('.lb'))).toBe(true);

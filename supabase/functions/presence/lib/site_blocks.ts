@@ -2724,7 +2724,8 @@ a.ff-el.btn{display:inline-flex;align-items:center;justify-content:center;text-a
 // ── Item 298: the few lines of script the gallery's zoom view and the carousel use ──
 // Appended by the shell (lib/template_kit.ts) to a page that has either. The zoom view is still
 // the CSS :target technique, so it works with scripts off; with them, Escape closes it, the arrow
-// keys and a swipe move between photos, the keyboard stays inside it (item 307), and moving or
+// keys and a swipe move between photos, the keyboard stays inside it (item 307: Tab wraps, and focus
+// that lands outside, as Safari's Tab sends it, comes back to Close), and moving or
 // closing replaces the address instead of adding a step to the Back button. The carousel gets
 // Previous and Next buttons and a dot per slide; the track still swipes and scrolls as before.
 // First-party and still: the site's content rule names it by its fingerprint (lib/site_csp.ts).
@@ -2737,8 +2738,9 @@ export const BLOCK_JS = '(function(){function go(h){location.replace(h)}'
   + 'document.addEventListener("keydown",function(e){var lb=last;if(!lb)return;'
   + 'if(e.key==="Escape"){e.preventDefault();go(lb.querySelector(".lb-close").getAttribute("href"));return}'
   + 'if(e.key==="ArrowLeft"||e.key==="ArrowRight"){var n=lb.querySelector(e.key==="ArrowLeft"?".lb-prev":".lb-next");if(n){e.preventDefault();go(n.getAttribute("href"))}return}'
-  + 'if(e.key==="Tab"){var f=lb.querySelectorAll("a[href]:not([tabindex=\\"-1\\"])");if(!f.length)return;var a0=f[0],a1=f[f.length-1];'
-  + 'if(e.shiftKey&&document.activeElement===a0){e.preventDefault();a1.focus()}else if(!e.shiftKey&&document.activeElement===a1){e.preventDefault();a0.focus()}}});'
+  + 'if(e.key==="Tab"){var f=lb.querySelectorAll("a[href]:not([tabindex=\\"-1\\"])");if(!f.length)return;e.preventDefault();var i=[].indexOf.call(f,document.activeElement);'
+  + 'f[e.shiftKey?(i<=0?f.length-1:i-1):(i<0||i>=f.length-1?0:i+1)].focus()}});'
+  + 'document.addEventListener("focusin",function(e){if(last&&!last.contains(e.target)){var c=last.querySelector(".lb-close");if(c)c.focus()}});'
   + 'var x0=null;document.addEventListener("touchstart",function(e){if(last)x0=e.touches[0].clientX},{passive:true});'
   + 'document.addEventListener("touchend",function(e){if(!last||x0===null)return;var dx=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(dx)<40)return;var n=last.querySelector(dx>0?".lb-prev":".lb-next");if(n)go(n.getAttribute("href"))},{passive:true})}'
   + '[].forEach.call(document.querySelectorAll(".block-carousel .carousel"),function(c){var t=c.querySelector(".cr-track"),s=t?t.querySelectorAll(".cr-slide"):[];if(s.length<2)return;'

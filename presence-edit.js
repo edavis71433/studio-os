@@ -4081,7 +4081,7 @@ function renderHFCard(which) {
     if (ph) {
       const vr = el("div", "hf-row"), vm = el("button", "dc-modal-cancel", "View the phone menu"); vm.type = "button"; vm.id = "hfViewMenu";
       vm.addEventListener("click", () => { if (ph.getAttribute("aria-pressed") !== "true") ph.click(); setTimeout(() => dcMenuToggle(true), 320); });
-      vr.appendChild(vm); vr.appendChild(el("span", "hf-says", "On a phone, visitors see your name and a Menu button; the menu and the search box open under it."));
+      vr.appendChild(vm); vr.appendChild(el("span", "hint", "On a phone, visitors see your name and a Menu button; the menu and the search box open under it."));
       host.appendChild(vr);
     }
     const mr = el("div", "hf-row"), n = (typeof pgModel === "function" ? pgModel().menu.length : 0);

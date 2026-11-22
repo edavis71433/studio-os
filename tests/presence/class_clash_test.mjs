@@ -58,6 +58,8 @@ const OWNERS = {
   'map-dir': ['both', 'the Map section’s directions link; the shell makes it a full-height tap on a phone (item 306)'],
   'nl-consent': ['both', 'the sign-up box’s tick; the shell makes it a full-height tap on a phone (item 306)'],
   'nl-form': ['both', 'the sign-up box; the shell sizes its tick on a phone (item 306)'],
+  'veil-dark': ['both', 'item 292: the veil over a photo, on a section (the sections draw it) and on the welcome section (the shell draws it)'],
+  'veil-light': ['both', 'item 292: the light veil, the same two places'],
 };
 
 // ── reading markup and stylesheets ──
