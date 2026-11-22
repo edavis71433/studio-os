@@ -646,8 +646,8 @@
     <!-- builder item 350 (Nov 22 review): a short name in the portal's address, saved on its own
          (PUT /agency/portal { slug }); the long address keeps working. -->
     <div class="swrow pw-note" id="portalSlugRow">
-      <div class="t"><b><label for="portalSlug">Your portal’s address</label><span id="portalSlugSaved"></span></b><div class="how" id="portalSlugHow">A short name clients can read out or type, like your studio’s name. Letters, numbers and hyphens.</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px"><span class="how" id="portalSlugBase" style="margin:0"></span><input id="portalSlug" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="your-studio" aria-label="Short name" style="flex:1 1 180px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;min-height:44px"><button type="button" class="btn sm" id="portalSlugSave">Save</button></div>
+      <div class="t"><b><label for="portalSlug">Your portal’s address</label><span id="portalSlugSaved"></span></b><div class="how" id="portalSlugHow">A short name clients can read out or type, like your studio’s name. Letters, numbers and hyphens. Changes save as you go.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px"><span class="how" id="portalSlugBase" style="margin:0"></span><input id="portalSlug" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="your-studio" aria-label="Short name" style="flex:1 1 180px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;min-height:44px"></div>
         <div class="how" id="portalSlugAddr" style="margin-top:6px"></div></div>
     </div>
     <!-- builder items 247 and 335 (direction A, Eric's pick): the portal wears the studio's look. The
@@ -2401,16 +2401,18 @@ async function paintSlug() {   // item 350
   const inp = $('portalSlug'); if (!inp) return;
   const base = (location.origin || '') + '/portal/';
   $('portalSlugBase').textContent = base;
-  if (d) { if (document.activeElement !== inp) inp.value = d.slug || ''; $('portalSlugAddr').textContent = 'Today: ' + (d.address || ''); }
-  inp.disabled = portalLocked(); $('portalSlugSave').disabled = portalLocked();
+  if (d) { if (document.activeElement !== inp) { inp.value = d.slug || ''; inp.dataset.kept = inp.value; } $('portalSlugAddr').textContent = 'Today: ' + (d.address || ''); }
+  inp.disabled = portalLocked();
 }
 async function saveSlug() {
-  const inp = $('portalSlug'), btn = $('portalSlugSave'); if (!inp || portalLocked()) return;
-  btn.disabled = true;
-  const r = await api('/agency/portal', 'PUT', { slug: inp.value.trim() });
-  btn.disabled = false;
+  const inp = $('portalSlug'); if (!inp || portalLocked() || inp.dataset.saving) return;
+  const want = inp.value.trim();
+  if (want === (inp.dataset.kept || '')) return;   // item 165: nothing changed, nothing sent
+  inp.dataset.saving = '1';
+  const r = await api('/agency/portal', 'PUT', { slug: want });
+  delete inp.dataset.saving;
   if (!r.ok || !r.body || !r.body.data) { toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
-  inp.value = r.body.data.slug || ''; $('portalSlugAddr').textContent = 'Today: ' + (r.body.data.address || '');
+  inp.value = r.body.data.slug || ''; inp.dataset.kept = inp.value; $('portalSlugAddr').textContent = 'Today: ' + (r.body.data.address || '');
   $('portalSlugSaved').innerHTML = '<span class="nsaved" role="status">Saved</span>';
   toast(r.body.data.slug ? 'Your portal’s address is ' + r.body.data.address : 'Back to the long address.');
 }
@@ -2468,11 +2470,15 @@ async function saveReply() {
 function wirePortal() {
   const ta = $('portalWelcome');
   if (ta.dataset.wired) return; ta.dataset.wired = '1';
+<<<<<<< HEAD
   $('portalCoverPick').addEventListener('click', openCoverPicker);   // items 247/335
   $('portalCoverClear').addEventListener('click', () => saveLook({ cover_media_id: null }));
   $('portalCoverClose').addEventListener('click', () => { const d = $('portalCoverDlg'); if (d.close) d.close(); else d.removeAttribute('open'); });
   $('portalFont').addEventListener('change', () => saveLook({ heading_font: $('portalFont').value }));
   $('portalSlugSave').addEventListener('click', saveSlug);   // item 350
+=======
+  $('portalSlug').addEventListener('change', saveSlug);   // item 350; item 165: saves when you leave the box, no Save button
+>>>>>>> claude/portal-nov-22
   $('portalSlug').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveSlug(); } });
   $('portalReplyWithin').addEventListener('change', saveReply);   // item 353
   $('portalReplyHours').addEventListener('change', saveReply);
