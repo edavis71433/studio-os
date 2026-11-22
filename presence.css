@@ -2466,6 +2466,7 @@ textarea.stk-in{line-height:1.55;resize:vertical}
   .view .field select{height:44px}   /* a select keeps its fixed height over a min-height */
   .tabhelp::after{inset:-13px}   /* the help button's clear ring: a full 44px round its 20px circle and border */
   .biz-card button{min-height:44px}
+  #designCard .ins-heros button{min-height:44px}   /* builder item 330: the front-page layouts */
   .biz-card .hrow .closedlab{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;margin:0 -16px}   /* a day's Closed box: its label takes the tap */
 }
 /* the editor keeps the sidebar's class on a phone, where the shell's search kept its 150px and its words:

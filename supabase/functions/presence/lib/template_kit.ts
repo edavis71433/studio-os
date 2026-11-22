@@ -24,6 +24,7 @@ import { searchBoxHtml, searchPageBody, searchClientScript, searchIndexJson, nor
 import { postListBody, postPageBody, postLd, postCategories, categoryPath, postPageCount, postListPath, POST_CSS, type PostDraw } from './post_render.ts';
 import { contactPlace, footerPlace, ldPlaces, PLACE_CSS } from './place_render.ts';
 import { SHELL_CSS, SHELL_CRITICAL, SHELL_NOSCRIPT, MENU_JS, menuButtonHtml } from './site_shell.ts';
+import { isNewOpening, openingCss, type OpeningKind } from './template_openings.ts';
 
 /** The site's script file: the phone menu (lib/site_shell.ts) and the gallery and carousel (lib/site_blocks.ts). */
 export const SITE_JS = `${MENU_JS}\n${BLOCK_JS}`;
@@ -411,6 +412,107 @@ function heroPanel(c: SnapshotContent, v: IndustryVocab): string {
   return rows ? `<aside class="hero-panel" aria-label="At a glance"><p class="hp-title">At a glance</p>${rows}</aside>` : '';
 }
 
+// ═════════ the three openings builder item 330 adds (lib/template_openings.ts) ═════════
+// 'panel': two halves, the words on a soft tint of the accent, the photo running to the
+// page's edge (a phone shows the words first, then the photo). 'editorial': a big centred
+// headline and line, the buttons, then up to three photos in a row. 'type': big words on a
+// band of the accent with a row of facts. In all three the headline is the tagline when there
+// is one (the business name stays in the header and the page title), else the name; the line
+// under it is the short description. 'panel' and 'editorial' need a photo: without one they
+// open as 'type', so no empty photo box is ever drawn. Every fact is one the site really has:
+// the places it serves, its phone, today's open-or-closed line (the strip's own script fills
+// it) and, when the home page shows its reviews, their average and count. Nothing is made up.
+
+export interface Opening { kind: OpeningKind; photos: MediaRef[] }
+const drawable = (m: MediaRef | null | undefined): m is MediaRef =>
+  !!m && !!m.variants && !!(m.variants.w800 || m.variants.w400 || Object.values(m.variants)[0]);
+
+/** The opening a site asked for, as it can be drawn: its photos (the cover, then the offerings'
+ *  and the updates' photos, each once, three at most). Null for every other layout. Pure. */
+export function openingOf(c: SnapshotContent): Opening | null {
+  const want = c.settings?.hero_layout;
+  if (!isNewOpening(want)) return null;
+  const photos: MediaRef[] = [], seen = new Set<string>();
+  for (const m of [c.settings?.cover, ...bySort(c.offerings).map((o) => o.media), ...c.posts.map((p) => p.hero)]) {
+    if (!drawable(m)) continue;
+    const key = String(m.variants.w800 || m.variants.w400 || Object.values(m.variants)[0]);
+    if (seen.has(key)) continue;
+    seen.add(key); photos.push(m);
+    if (photos.length === 3) break;
+  }
+  if (want === 'panel' && photos.length) return { kind: 'panel', photos: photos.slice(0, 1) };
+  if (want === 'editorial' && photos.length) return { kind: 'editorial', photos };
+  return { kind: 'type', photos: [] };
+}
+
+/** The welcome section of a new opening, and the strip under it (which leaves out what the
+ *  opening already shows: the open-or-closed line, and the phone in 'type'). */
+function openingWelcome(op: Opening, c: SnapshotContent, v: IndustryVocab, words: Words, blocks: RenderedBlock[], strip: string, showMail: boolean): { welcome: string; strip: string } {
+  const i = c.identity, l = loc0(c);
+  const { tel, mail } = contactBits(c);
+  const maps = mapsHref(c);
+  const tagline = (i.tagline || '').trim();
+  const headline = tagline || i.business_name;
+  const h1 = `<h1${[...headline].length > 60 ? ' class="op-long"' : ''}${pr(tagline ? 'identity.tagline' : 'identity.business_name')}>${esc(headline)}</h1>`;
+  const short = (i.short_description || '').trim();
+  const line = short ? `<p class="op-line"${pr('identity.short_description')}>${esc(short)}</p>` : '';
+  const area = (i.service_area || '').trim();
+  const kicker = area ? `<p class="kicker"${pr('identity.service_area')}>${esc(area)}</p>` : '';
+  const book = safeHref(i.booking_url || ''), order = safeHref(i.ordering_url || '');
+  const ctas = `<div class="cta-row">${[
+    book ? `<a class="btn" href="${attr(book)}" rel="noopener">${esc(v.primaryAction)}</a>` : '',
+    order ? `<a class="btn${book ? ' ghost' : ''}" href="${attr(order)}" rel="noopener">Order online</a>` : '',
+    !book && !order ? `<a class="btn" href="${attr(v.offeringPath)}">${esc(words.seeOfferings(v.offeringLabel))}</a>` : '',
+    book || order ? '<a class="btn ghost" href="/contact/">Contact us</a>' : '',
+  ].join('')}</div>`;
+  // today's open-or-closed line: only for a site with opening hours, and only in one place on the page
+  const hours = !!l && (l.hours || []).some((d) => !d.closed && (d.intervals || []).length > 0);
+  const openNow = '<span id="open-now" class="open-now" aria-live="polite"></span>';
+  // the reviews: only when the home page shows its reviews wall, the honest average and count of the approved ones
+  const wall = blocks.find((b) => b.type === 'reviews_wall');
+  const agg = wall && homeSectionOrder(c, blocks.map((b) => b.key)).includes(wall.key)
+    ? ((c.settings?.blocks || []).find((b) => b.type === 'reviews_wall') as { aggregate?: { count?: unknown; average?: unknown } } | undefined)?.aggregate : undefined;
+  const count = Math.trunc(Number(agg?.count)), average = Number(agg?.average);
+  const rated = count >= 1 && Number.isFinite(average) && average > 0 && average <= 5;
+  const avg = rated ? (average % 1 === 0 ? String(average) : average.toFixed(1)) : '';
+  const fromReviews = `out of 5 from ${count} review${count === 1 ? '' : 's'}`;
+  const stripOf = (withTel: boolean) => {
+    const items = [
+      l && !goesOut(c) && l.address_line1 ? `<span${pr('location.address')}>${esc(l.address_line1)}${l.city ? `, ${esc(l.city)}` : ''}</span>` : '',
+      withTel && tel ? `<span>${tel}</span>` : '',
+      showMail && mail ? `<span>${mail}</span>` : '',
+      maps ? `<span><a href="${attr(maps)}" rel="noopener">Get directions</a></span>` : '',
+    ].filter(Boolean);
+    return items.length ? `<div class="strip"><div class="wrap">${items.join('')}</div></div>` : '';
+  };
+  const core = 'data-dds-core="hero" data-dds-movable';
+  if (op.kind === 'panel') {
+    const proof = [rated ? `<span><span aria-hidden="true">★ </span>${esc(avg)} ${fromReviews}</span>` : '', hours ? openNow : ''].join('');
+    return {
+      welcome: `<section class="hero op op-panel" ${core}><div class="op-words"><div class="op-in">${kicker}${h1}${line}${ctas}${proof ? `<p class="op-proof">${proof}</p>` : ''}</div></div><div class="op-photo">${img(op.photos[0], '(max-width:760px) 100vw, 50vw', false, '', true)}</div></section>`,
+      strip: stripOf(true),
+    };
+  }
+  if (op.kind === 'editorial') {
+    const n = op.photos.length;
+    const sizes = (k: number) => n === 1 ? '(max-width:1100px) 100vw, 1080px' : n === 2 ? '(max-width:640px) 50vw, 540px' : k === 0 ? '(max-width:640px) 100vw, 360px' : '(max-width:640px) 50vw, 360px';
+    const photos = op.photos.map((m, k) => `<div class="op-ph">${img(m, sizes(k), k > 0, '', true)}</div>`).join('');
+    return { welcome: `<section class="hero op op-editorial" ${core}><div class="wrap op-words">${kicker}${h1}${line}${ctas}</div><div class="wrap op-photos n${n}">${photos}</div></section>`, strip };
+  }
+  // 'type': the places it serves sit in the facts, so there is no line above the headline
+  const fact = (big: string, label: string, region = '', small = false) => `<li class="op-fact"${region}><span class="op-big${small ? ' op-s' : ''}">${big}</span><span class="op-lb">${label}</span></li>`;
+  const facts = [
+    rated ? fact(esc(avg), fromReviews) : '',
+    hours ? fact(openNow, '<a href="/contact/">See all hours</a>') : '',
+    tel ? fact(tel, 'Call us') : '',
+    area ? fact(esc(area), 'Places we serve', pr('identity.service_area'), [...area].length > 22) : '',
+  ].join('');
+  return {
+    welcome: `<section class="hero op op-type" ${core}><div class="wrap op-words">${h1}${line}${ctas}${facts ? `<ul class="op-facts">${facts}</ul>` : ''}</div></section>`,
+    strip: stripOf(false),
+  };
+}
+
 // Phase CP-2 (DS-2): home sections — owner-chosen order + visibility, structured.
 // Phase T-BLOCKS: enabled structured blocks (block_<type>) join the same order/
 // visibility machinery — they default after the core sections, reorderable/hideable.
@@ -427,7 +529,7 @@ export function homeSectionOrder(c: SnapshotContent, blockKeys: string[] = []): 
   return [...lead, ...chosen, ...rest].filter((k) => !hidden.has(k));
 }
 
-function homeBody(look: TemplateLook, c: SnapshotContent, v: IndustryVocab, words: Words, blocks: RenderedBlock[] = []): string {
+function homeBody(look: TemplateLook, c: SnapshotContent, v: IndustryVocab, words: Words, blocks: RenderedBlock[] = [], op: Opening | null = null): string {
   const i = c.identity;
   const panel = look.hero === 'panel', plain = !!look.classic?.plainWelcome;
   // The welcome photo: the owner's cover first, then the first offering or update photo.
@@ -472,7 +574,10 @@ function homeBody(look: TemplateLook, c: SnapshotContent, v: IndustryVocab, word
 </div></div>` : '';
   const photoSizes = look.classic?.heroPhotoSizes || '(max-width: 1000px) 100vw, 960px';
   let welcome: string;
-  if (usePhoto) {
+  let heroStrip = strip;   // item 330: a new opening keeps what it shows itself out of the strip under it
+  if (op) {
+    ({ welcome, strip: heroStrip } = openingWelcome(op, c, v, words, blocks, strip, showMail));
+  } else if (usePhoto) {
     welcome = `<section class="hero hero-photo ${photoVeil}" data-dds-core="hero" data-dds-movable><div class="hero-bg" aria-hidden="true">${img(hero, '100vw', false, '', true)}</div><div class="wrap hero-copy">${heroText}</div>
 </section>`;
   } else if (panel) {
@@ -490,7 +595,7 @@ ${(() => {
   const parts: Record<string, string> = {
     hero: `
 ${welcome}
-${strip}`,
+${heroStrip}`,
     about: i.description ? `<section class="block wrap" data-dds-core="about"><h2>About us</h2><p${pr('identity.description')}>${esc(i.description)}</p></section>` : '',   // no description, no lone "About us" heading
     offerings: featured.length ? `<section class="block alt" data-dds-core="offerings"><div class="wrap">${featuredOfferings(look, featured, v)}</div></section>` : '',
     testimonials: tst.length ? `<section class="block wrap" data-dds-core="testimonials"><h2>${esc(words.reviews)}</h2><div class="cards">${tst.map((t) => `
@@ -572,7 +677,9 @@ export function makeRender(look: TemplateLook): RenderFn {
 
     // Append the dropdown-nav CSS only when the owner set a custom nav → sites without
     // one keep the exact same stylesheet + hash (byte-identical).
-    const effCss = look.css + POST_CSS + PLACE_CSS + SHELL_CSS + (c.settings?.nav?.length ? '\n' + NAV_DROPDOWN_CSS : '');
+    // Item 330: the same for the three new openings: their rules ride only on a site drawn with one.
+    const op = openingOf(c);
+    const effCss = look.css + POST_CSS + PLACE_CSS + SHELL_CSS + (c.settings?.nav?.length ? '\n' + NAV_DROPDOWN_CSS : '') + (op ? '\n' + openingCss(op.kind) : '');
     const cssPath = `/assets/site-${fnv(effCss)}.css`;
     files[`assets/site-${fnv(effCss)}.css`] = effCss;
     // Items 288 and 298: the site's one script file (the phone menu and the header's height, the
@@ -648,7 +755,7 @@ export function makeRender(look: TemplateLook): RenderFn {
     // only) onto the ONE business node — home only, where the reviews_wall is visible.
     const rSchema = reviewsSchema(c.settings?.blocks, snapshot.created_at);
     const ldBizHome = rSchema ? { ...ldBiz, ...rSchema } : ldBiz;
-    page('/', { title: siteTitle, description: siteDesc, ...(i.short_description ? { shareDescription: i.short_description } : {}), ld: [ldBizHome, ...ldPlaces(c, site, v.schemaType), ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(look, c, v, words, blocks) });
+    page('/', { title: siteTitle, description: siteDesc, ...(i.short_description ? { shareDescription: i.short_description } : {}), ld: [ldBizHome, ...ldPlaces(c, site, v.schemaType), ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(look, c, v, words, blocks, op) });
     page(v.offeringPath, { ...seoOv('offerings', `${v.offeringLabel} — ${i.business_name}`, words.offeringsDescription(v.offeringLabel, i.business_name)), ld: [ldOfferings(c, site, v)], ogImage: ogImg, active: 'offerings', body: offeringsBody(look, c, v) });
     if (noidx.has('offerings')) markNoindex(`${v.offeringPath.replace(/^\/|\/$/g, '')}/index.html`);
     page('/about/', { ...seoOv('about', `About — ${i.business_name}`, siteDesc), ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c, words) });

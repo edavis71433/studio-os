@@ -624,6 +624,18 @@ function navStyleRow(host, after, label) {
   return pillRow(host, label || "Header", [["Standard", ""], ["Centered", "centered"]], (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
     async (o) => { try { await settingsPut({ nav_style: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); if (after) after(); } catch (err) { toast(nice(err), true); } });
 }
+// Item 330: what the picked front-page layout does, in a line, for the three new ones. 'panel' and
+// 'editorial' need a photo (the cover, a service's or a published update's); without one the site
+// opens as Type only, and the line says so.
+function heroLayoutSays(v) {
+  const st = S.settings || {};
+  const photo = !!st.cover_media_id || (S.offerings || []).some((o) => o.media_id && o.is_visible !== false) || (S.posts || []).some((p) => p.status === "published" && p.hero_media_id);
+  const noPhoto = photo ? "" : " Until your site has a photo, it opens as Type only.";
+  if (v === "panel") return "Your tagline as the headline, on a soft tint of your colour, with your photo running to the edge." + noPhoto;
+  if (v === "editorial") return "Your tagline as a big centred headline, then up to three of your photos in a row. It reads best with the Centered header." + noPhoto;
+  if (v === "type") return "Your tagline in big words on a band of your colour, then the facts your site has: reviews, today’s hours, your phone and the places you serve.";
+  return "";
+}
 function pillRow(host, label, opts, isOn, onPick, style) {
   const wrapEl = el("div"); wrapEl.style.cssText = "margin-top:12px";
   wrapEl.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:6px" }));
@@ -1015,9 +1027,15 @@ async function mountDesignCard(fresh = true) {
   // DS-6/DS-7: layout choices — every template family renders both variants,
   // each in its own visual voice, so the controls show for all templates (G2).
   // item 292: words over the welcome photo, under a dark veil or a light one
-  const heroRow = [["Classic", ""], ["Photo beside text", "split"], ["Words over the photo", "photo"], ["Words over a light photo", "photo-light"]];
-  stab(pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
-    async (o) => { try { await settingsPut({ hero_layout: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } }), "looks");
+  // item 330: three more, each its own layout (lib/template_openings.ts HERO_LAYOUTS has the same names)
+  const heroRow = [["Classic", ""], ["Photo beside text", "split"], ["Words over the photo", "photo"], ["Words over a light photo", "photo-light"],
+    ["Split: words on a colour panel", "panel"], ["Centred editorial", "editorial"], ["Type only", "type"]];
+  const heroNow = String((S.settings && S.settings.hero_layout) || "");
+  const heroPills = stab(pillRow(card, "Front-page layout", heroRow, (o) => heroNow === o[1],
+    async (o) => { try { await settingsPut({ hero_layout: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + ". Publish to apply."); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } }), "looks");
+  heroPills.classList.add("ins-heros");   // a full 44px tap on a touch screen (presence.css)
+  const heroSays = heroLayoutSays(heroNow);
+  if (heroSays) heroPills.parentNode.appendChild(Object.assign(el("p", "hint", heroSays), { id: "heroSays" }));
   stab(navStyleRow(card), "looks");
   // item 158: a gentle "appear on scroll" (lib/site_motion.ts), and the site's own small icon (lib/site_icon.ts)
   stab(motionRow(card, T), "looks");   // item 302: four choices, each shown moving
@@ -7076,6 +7094,7 @@ const IDE_FIELDS = {
   "identity.tagline": { input: "f-tagline", max: 140, label: "your tagline" },
   "identity.service_area": { input: "f-service_area", max: 200, label: "where you work" },
   "identity.description": { input: "f-description", max: 600, label: "your description" },
+  "identity.short_description": { input: "f-short_description", max: 150, label: "your short description" },   // item 330: the line under a new opening's headline
 };
 function ideStart(doc, el) {
   const path = el.getAttribute("data-pr"), spec = IDE_FIELDS[path];
