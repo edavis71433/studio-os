@@ -18,8 +18,10 @@
 //   staging days), ANON_KEY, SERVICE_KEY. TENANT_A defaults to the DDS tenant.
 //
 // Its old-server calls use request kinds a page still sends (builder item 213 removed
-// the rest): partnership_list is a staff route, partnership_delete an owner's, concierge
-// a public route with a rate limit, and rec_generate a staff route with one.
+// the rest): partnership_list is a staff route, partnership_delete an owner's, lead_intake
+// a public route with a rate limit (sent with no message, it is refused before anything is
+// written, and still counted: builder item 392 took the help chat out), and rec_generate a
+// staff route with one.
 
 const URL_ = Deno.env.get('STAGING_URL')!;
 const ANON = Deno.env.get('ANON_KEY')!;
@@ -204,8 +206,8 @@ async function run() {
   const staleBody = await (await fetch(fn, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-dds-user-jwt': bStaffJwt }, body: JSON.stringify({ type: 'partnership_list' }) })).json().catch(() => ({}));
   check('stale/revoked token -> 401 membership_revoked', staleStatus === 401 && (staleBody as { error?: string }).error === 'membership_revoked');
   // rate limited: exceed the public per-IP limit
-  for (let i = 0; i < 14; i++) await callFn(null, { type: 'concierge', messages: [] });
-  check('rate-limited request -> 429', (await callFn(null, { type: 'concierge', messages: [] })) === 429);
+  for (let i = 0; i < 14; i++) await callFn(null, { type: 'lead_intake' });   // no message: refused (400), counted
+  check('rate-limited request -> 429', (await callFn(null, { type: 'lead_intake' })) === 429);
 
   console.log('\n[F] audit rows for rejections carry a valid request_id');
   // clear, trigger exactly one auth_failure, confirm exactly one row w/ uuid request_id
@@ -222,7 +224,7 @@ async function run() {
   // fresh B-staff token (previous is revoked); staff rate-limited route -> tenant bucket
   const bStaffFresh = await mint(emails.bStaff);
   await callFn(bStaffFresh, { type: 'rec_generate' });    // staff, rate-limited
-  await callFn(null, { type: 'concierge', messages: [] }); // public, rate-limited
+  await callFn(null, { type: 'lead_intake' }); // public, rate-limited (no message: nothing written)
   const buckets = await (await fetch(rest('rate_limit_state?select=bucket_key'), { headers: svcH })).json();
   const keys = (buckets as { bucket_key: string }[]).map((b) => b.bucket_key);
   check('staff route created a tenant bucket (t:B)', keys.some((k) => k === `t:${TENANT_B}`));
