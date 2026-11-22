@@ -157,7 +157,7 @@ const draftReads = () => db.log.filter((c) => c.method === 'GET' && c.url.starts
     presence_sites: [offSite, ...onSites].map((id, i) => ({ id, client_id: `cl${i}` })),
     presence_plan_notices: [],
   });
-  const r = await quiet(() => runInvoiceReminders(20));
+  const r = await quiet(() => runInvoiceReminders(20, Date.parse('2026-11-18T20:00:00Z')));   // sales item 152: the sweep takes a clock; noon in Burbank, past its 9 am gate
   const claims = db.tables.presence_plan_notices.filter((n) => onSites.includes(n.site_id));
   ok(`invoice reminders: invoices past the first ${INVOICE_PAGE} are reached`, OFF > INVOICE_PAGE && r.reminded === ON && claims.length === ON, `${r.reminded} ${claims.length}`);
   // the draft nudge (sales item 141) makes its own read of unsent invoices; the sweep's pages are the rest

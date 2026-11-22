@@ -35,6 +35,9 @@ const { handleCommerce } = await import(`${P}/routes/commerce.ts`);
 const { bouncedNoticeCopy, bouncedPeriod } = await import(`${P}/routes/invoice_bounced.ts`);
 const { handleInvoicePayment, handleInvoicePaymentUndo } = await import(`${P}/routes/invoice_payments.ts`);
 const { validatePayment } = await import(`${P}/lib/invoice_billing.ts`);
+// Sales item 152: the sweep sends from 9 in the studio's morning, so it takes a clock. Noon Pacific
+// on today's UTC day (the fixtures' day), or a run before 9 am in Burbank reminds nobody.
+const NOW = Date.parse(`${new Date().toISOString().slice(0, 10)}T20:00:00Z`);
 const { runInvoiceReminders, invoiceReminderSlot, invoiceReminderCopy, invoiceReminderOperatorBody, invoiceReminderPeriod, invoiceReminderFailedPeriod } = await import(`${P}/commerce/lifecycle.ts`);
 const { applyRetainerSync, isExtraSubscription, retainerSubscriptionIds, retainerPortalView, retainerTwicePeriod } = await import(`${P}/commerce/retainers.ts`);
 const { handleSalesRetainer, handleSalesRetainerCancel } = await import(`${P}/routes/sales.ts`);
@@ -175,7 +178,7 @@ const intent = (over = {}) => ({ id: 'pi_1', object: 'payment_intent', amount: 2
   ok('bounce, hop down: the studio still gets its line, saying to press Send', !!nb && nb.kind === 'invoice_void_paid' && /press Send/.test(nb.body));
   // …and the reminder sweep is the net: it makes the link the hop couldn't
   hopDown = false; row().first_sent_at = '2026-10-01T18:00:00Z';
-  await runInvoiceReminders(20);
+  await runInvoiceReminders(20, NOW);
   ok('bounce, hop down: the reminder sweep makes the missing link, under the same number', /^https:\/\/pay\.example\/new-/.test(String(row().stripe_url)) && links().some((c) => c.key === `plink-${INV}-g1`));
   ok('bounce, hop down: and its reminder carries that link', world.mail.some((x) => x.html.includes(String(row().stripe_url))));
 }
@@ -246,7 +249,7 @@ const undo = async (id) => { const r = await handleInvoicePaymentUndo(req(`/sale
   ok('part payment: the old link is switched off', world.stripe.some((c) => c.path === '/v1/payment_links/plink_old' && c.body.active === 'false'));
   // the reminder sweep sees it: it has a link, and it is still owed
   row().first_sent_at = '2026-10-01T18:00:00Z';
-  const swept = await runInvoiceReminders(20);
+  const swept = await runInvoiceReminders(20, NOW);
   ok('part payment: the rest is chased (a reminder goes, for what is left, with the fresh link)', swept.reminded === 1 && world.mail.some((x) => /\$1,500\.00/.test(x.subject) && x.html.includes(String(row().stripe_url))), JSON.stringify(world.mail.map((x) => x.subject)));
   const part = world.invoices.find((x) => x.payment_for === INV);
   const u = await undo(part.id);
@@ -342,16 +345,16 @@ const subEvent = (id, over = {}) => ({ id, object: 'subscription', status: 'acti
 // ═══ 118 · a reminder is sent only once the email left (finding 8) ═══
 {
   seed([invoice({ first_sent_at: '2026-10-01T18:00:00Z' })]); emailOk = false;
-  const r = await runInvoiceReminders(20);
+  const r = await runInvoiceReminders(20, NOW);
   const leg = invoiceReminderPeriod(INV, 'after');
   ok('email down: the reminder is NOT counted or recorded as sent', r.reminded === 0 && !world.notices.some((x) => x.period === leg), JSON.stringify(world.notices));
   const nf = world.notices.find((x) => x.period === invoiceReminderFailedPeriod(INV, 'after'));
   ok('email down: the studio is told it didn’t send, and that we’ll try again', !!nf && nf.status === 'active' && /^Reminder didn’t send/.test(nf.headline) && /try again/.test(nf.body) && !/We nudged/.test(nf.body));
   emailOk = true; world.mail = [];
-  const r2 = await runInvoiceReminders(20);
+  const r2 = await runInvoiceReminders(20, NOW);
   ok('next run: it is tried again, sent, and now recorded', r2.reminded === 1 && world.mail.length === 1 && world.notices.some((x) => x.period === leg && x.status === 'active' && /^Still unpaid/.test(x.headline)));
   ok('next run: the "didn’t send" line is taken down', world.notices.find((x) => x.period === invoiceReminderFailedPeriod(INV, 'after')).status === 'dismissed');
-  const r3 = await runInvoiceReminders(20);
+  const r3 = await runInvoiceReminders(20, NOW);
   ok('a reminder that went never goes twice', r3.reminded === 0 && world.mail.length === 1);
   ok('the failed line sits under the invoice’s reminder prefix, so paying or voiding clears it', invoiceReminderFailedPeriod(INV, 'due').startsWith(`invremind:${INV}:`));
   ok('"the third and last" only where there are three: an invoice with no due date gets two', /the second automatic reminder and the last/.test(invoiceReminderOperatorBody('after', true, true)) && /the third automatic reminder and the last/.test(invoiceReminderOperatorBody('after', true, false)) && /One more goes in a week/.test(invoiceReminderOperatorBody('after', true, false, true)) && /no client email/.test(invoiceReminderOperatorBody('after', false, true)));
