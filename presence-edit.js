@@ -2004,7 +2004,9 @@ function mountBlocksCard() {
 // Phase T-STYLE: a section's "look" (background / width / spacing / alignment) is
 // orthogonal to its content. The per-type editors below rebuild their block object
 // from their own fields, so carry the chosen look across every rebuild.
-function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.style) o.style = p.style; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p.anchor) o.anchor = p.anchor; if (p && p._clEdit) o._clEdit = p._clEdit; return o; }
+// Builder item 253: the lock rides along too, so a change to any field of a locked section keeps
+// it locked (the client's save was refused and their words lost; the studio's quietly unlocked it).
+function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.style) o.style = p.style; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p.anchor) o.anchor = p.anchor; if (p && p._clEdit) o._clEdit = p._clEdit; if (p && p.lock) o.lock = p.lock; return o; }
 // Wave-1 G4: per-block STYLE VARIANTS — 2–3 curated looks per section type, rendered
 // by the shared block engine (mirrors site_blocks.ts BLOCK_VARIANTS; the server
 // re-validates, unknown values fall back to the default). The default is stored as
@@ -3413,6 +3415,9 @@ async function putForms() {
 }
 // Forms follow the same rule as sections: a difference from the last save is saved.
 let FORMS_SAVE_T = null;
+// Builder item 251: a form edit in its 0.7 s wait, on its way, or failed (the close-tab warning asks)
+function formsPending() { return FORMS_SAVE_T != null || !!FORMS_SAVING || !!(FORMS_WORK && JSON.stringify(FORMS_WORK) !== FORMS_BASE); }
+if (typeof SAVE_PARTS !== "undefined") SAVE_PARTS.push({ pending: formsPending, retry: formsSaveNow });   // the core's close-tab warning and retry (items 250, 251)
 function formsSaveSoon(ms) { clearTimeout(FORMS_SAVE_T); FORMS_SAVE_T = setTimeout(formsSaveNow, ms === undefined ? 700 : ms); }
 async function formsSaveNow() {
   clearTimeout(FORMS_SAVE_T); FORMS_SAVE_T = null;
@@ -6647,11 +6652,13 @@ function ipeStart(doc, fieldEl, secEl) {
       sel.removeAllRanges(); sel.addRange(r);
     }
   } catch (_) {}
-  ipeAnnounce(doc, 'Editing ' + ipeFieldLabel(path) + '. ' + (md ? 'Control Enter saves' : 'Enter saves') + ', Escape cancels.');
+  ipeAnnounce(doc, 'Editing ' + ipeFieldLabel(path) + '. ' + (md ? 'Control Enter' : 'Enter') + ' or Escape saves and leaves the box; Undo takes it back.');
 }
 function ipeKeydown(e) {
   if (!IPE) return;
-  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ipeCancel(); return; }
+  // Builder item 255: Escape keeps what was typed and leaves the box (Undo takes it back). It used
+  // to throw the words away with no message and nothing to redo.
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ipeCommit(); return; }
   if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
     const k2 = String(e.key || '').toLowerCase();
     // the browser's NATIVE bold/italic would inject DOM shapes the markdown
@@ -6933,7 +6940,7 @@ function ideStart(doc, el) {
 }
 function ideKeydown(e) {
   if (e.key === "Enter") { e.preventDefault(); ideEnd(true); }
-  else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); ideEnd(false); }
+  else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); ideEnd(true); }   // item 255: Escape keeps the words too
   else if (IDE && e.key.length === 1 && !e.metaKey && !e.ctrlKey && IDE.el.textContent.length >= IDE.spec.max) {
     const sel = IDE.doc.getSelection();
     if (!sel || sel.isCollapsed) e.preventDefault();   // full: typing over a selection still works

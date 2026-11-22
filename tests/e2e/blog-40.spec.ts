@@ -28,7 +28,7 @@ const SITE = { data: {
   location: { timezone: 'America/Los_Angeles', city: 'Burbank' }, voice: {}, offerings: [], faqs: [], testimonials: [], posts: [],
 } };
 
-interface World { posts: Array<Record<string, unknown>>; calls: Array<{ method: string; path: string; body: Record<string, unknown> | null }>; settings: Record<string, unknown> }
+interface World { posts: Array<Record<string, unknown>>; calls: Array<{ method: string; path: string; body: Record<string, unknown> | null }>; settings: Record<string, unknown>; failSaves?: boolean }
 async function open(page: Page, hash = '#updates'): Promise<World> {
   const w: World = {
     posts: [
@@ -58,7 +58,7 @@ async function open(page: Page, hash = '#updates'): Promise<World> {
     const pm = path.match(/^\/posts\/([0-9a-f-]{36})(?:\/(publish|unpublish|email-draft))?$/);
     if (path === '/posts' && m === 'GET') return json(200, { data: w.posts });
     if (path === '/posts' && m === 'POST') { const row = { id: id(99), excerpt: '', hero_media_id: null, published_at: null, tags: [], noindex: false, category: '', author: '', body_md: '', ...body, updated_at: new Date().toISOString() }; w.posts.unshift(row); return json(201, { data: row }); }
-    if (pm && !pm[2] && m === 'PATCH') { const row = w.posts.find((p) => p.id === pm[1]); Object.assign(row || {}, body); return json(200, { data: row }); }
+    if (pm && !pm[2] && m === 'PATCH') { if (w.failSaves) return json(500, { error: 'boom', message: 'The database blinked.' }); const row = w.posts.find((p) => p.id === pm[1]); Object.assign(row || {}, body); return json(200, { data: row }); }
     if (pm && pm[2] === 'publish') { const row = w.posts.find((p) => p.id === pm[1])!; row.status = 'published'; row.published_at = row.published_at && row.status !== 'scheduled' ? row.published_at : new Date().toISOString(); return json(200, { data: { status: 'live', live: true, url: `https://marlows.example/updates/${row.slug}/` } }); }
     if (pm && pm[2] === 'unpublish') { const row = w.posts.find((p) => p.id === pm[1])!; row.status = 'draft'; return json(200, { data: { status: 'draft', live: false, message: 'It’s off your site and back in your drafts.' } }); }
     if (pm && m === 'DELETE') { w.posts = w.posts.filter((p) => p.id !== pm[1]); return json(200, { data: { ok: true } }); }
@@ -94,6 +94,11 @@ test.beforeEach(async ({ page }) => {
       set(fn) { real = function (this: unknown, ...a: unknown[]) { if (a[1] === 'err') w.__errToasts.push(String(a[0])); return fn.apply(this, a); }; } });
   });
 });
+// a test that makes saves fail on purpose clears the toasts it expected before the check below
+const clearErrToasts = async (page: Page) => {
+  expect(await page.evaluate(() => (window as unknown as { __errToasts?: string[] }).__errToasts ?? [])).toEqual(['The database blinked.', 'The database blinked.']);
+  await page.evaluate(() => { (window as unknown as { __errToasts: string[] }).__errToasts = []; });
+};
 test.afterEach(async ({ page }) => {
   expect((page as unknown as { __errors: string[] }).__errors).toEqual([]);
   expect(await page.evaluate(() => (window as unknown as { __errToasts?: string[] }).__errToasts ?? [])).toEqual([]);   // [] on a test skipped before the page opened
@@ -164,6 +169,46 @@ test.describe('Blog: writing a post', () => {
     await page.keyboard.press('Escape');
     await expect(studio(page)).toHaveCount(0);
     await expect(page.locator('.bl-card').first().locator('.bl-title')).toHaveText('Holiday hours');
+  });
+
+  // Builder item 251: the screen used to close after one failed save, and the words went with it
+  test('after a failed save the screen stays open: Try again sends the words, Leave anyway is a choice', async ({ page }) => {
+    const w = await open(page);
+    await page.locator('#btnAddPost').click();
+    await expect(studio(page)).toBeVisible();
+    await page.locator('.bs-title').fill('Holiday hours');
+    await expect.poll(() => lastPatch(w, id(99))?.body?.title).toBe('Holiday hours');
+    w.failSaves = true;
+    await page.locator('.bs-body').click();
+    await page.keyboard.type('We close early on the 24th.');
+    await expect(page.locator('.bs-state')).toContainText('Not saved, try again');
+    // the close-tab warning counts the unsaved words
+    expect(await page.evaluate(() => { const e = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; })).toBe(true);
+    await page.keyboard.press('Escape');
+    const ask = page.locator('dialog.ask-yes[open]');
+    await expect(ask).toContainText('This post isn’t saved yet');
+    w.failSaves = false;
+    await ask.getByRole('button', { name: 'Try again' }).click();
+    await expect(studio(page)).toHaveCount(0);   // saved, so it closed
+    expect(lastPatch(w, id(99))?.body?.body_md).toBe('We close early on the 24th.');
+    expect(w.posts.find((p) => p.id === id(99))?.body_md).toBe('We close early on the 24th.');
+    await clearErrToasts(page);   // the failed saves said so, on purpose
+  });
+
+  test('…and Leave anyway closes it without the words', async ({ page }) => {
+    const w = await open(page);
+    await page.locator('#btnAddPost').click();
+    await expect(studio(page)).toBeVisible();
+    w.failSaves = true;
+    await page.locator('.bs-title').fill('Holiday hours');
+    await expect(page.locator('.bs-state')).toContainText('Not saved, try again');
+    await page.locator('.bs-back').click();
+    const ask = page.locator('dialog.ask-yes[open]');
+    await expect(ask).toContainText('This post isn’t saved yet');
+    await ask.getByRole('button', { name: 'Leave anyway' }).click();
+    await expect(studio(page)).toHaveCount(0);
+    expect(w.posts.find((p) => p.id === id(99))?.title).not.toBe('Holiday hours');
+    await clearErrToasts(page);   // the failed saves said so, on purpose
   });
 
   test('a heading and bold are kept as the post’s own markdown', async ({ page }) => {

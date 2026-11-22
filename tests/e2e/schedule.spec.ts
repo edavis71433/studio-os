@@ -83,6 +83,30 @@ test.describe('Scheduling — one place, inside Publish', () => {
     expect(new Date(body.scheduled_for).getTime()).toBeGreaterThan(Date.now());
   });
 
+  // Builder item 249: when the offline leg failed, a second press scheduled a second publish
+  test('a failed "take offline later" leaves the publish scheduled once; the next press sets only the offline time', async ({ page }) => {
+    const posts: Array<{ kind: string }> = [];
+    let failOffline = true;
+    await installApp(page, { api: PRESENCE });
+    await page.route('**/functions/v1/presence/schedule', (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      const body = route.request().postDataJSON() as { kind: string };
+      posts.push(body);
+      if (body.kind === 'offline' && failOffline) { failOffline = false; return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed', message: 'That didn’t save — please try again.' }) }); }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ok: true, id: 'sc-' + posts.length, scheduled_for: '2026-12-24T18:00:00Z', kind: body.kind, message: 'Scheduled.' } }) });
+    });
+    await page.goto('/presence.html#schedule');
+    const rit = page.locator('#ritualWrap');
+    await rit.getByText('Also take the site offline later (optional)').click();
+    await expect(rit.getByLabel('Take the site offline at')).toBeVisible();
+    await rit.getByRole('button', { name: 'Schedule it' }).click();
+    await expect(rit.getByRole('button', { name: 'Set the offline time' })).toBeVisible();
+    await expect(page.locator('.dds-toast').last()).toContainText('The publish is scheduled. The offline time didn’t save');
+    await expect(rit.getByLabel('Publish these changes at')).toBeDisabled();
+    await rit.getByRole('button', { name: 'Set the offline time' }).click();
+    await expect.poll(() => posts.map((p) => p.kind)).toEqual(['publish', 'offline', 'offline']);
+  });
+
   test('what is already scheduled is listed with its own Cancel', async ({ page }) => {
     await installApp(page, { api: { ...PRESENCE, '/schedule': ONE, 'POST /schedule/sc-1/cancel': { data: { ok: true, message: 'Canceled.' } } } });
     await page.goto('/presence.html#publish');
