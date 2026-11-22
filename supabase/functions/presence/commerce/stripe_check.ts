@@ -48,6 +48,7 @@ const RETURNS_CAP = 50;
 
 export interface StripeCheckResult {
   invoices_checked: number; invoices_paid: number;
+  processing_checked: number; processing_bounced: number;   // stuck on Processing (sales item 159)
   retainers_checked: number; retainers_fixed: number; charges_found: number;
   receipts_sent: number;
   returns_checked: number; returns_found: number;   // refunds and disputes (sales items 126, 127)
@@ -56,7 +57,7 @@ export interface StripeCheckResult {
   skipped_no_stripe?: true;    // no Stripe key here
   skipped_not_set_up?: true;   // before APPLY-0235
 }
-const zero = (): StripeCheckResult => ({ invoices_checked: 0, invoices_paid: 0, retainers_checked: 0, retainers_fixed: 0, charges_found: 0, receipts_sent: 0, returns_checked: 0, returns_found: 0, stripe_unanswered: 0, errors: 0 });
+const zero = (): StripeCheckResult => ({ invoices_checked: 0, invoices_paid: 0, processing_checked: 0, processing_bounced: 0, retainers_checked: 0, retainers_fixed: 0, charges_found: 0, receipts_sent: 0, returns_checked: 0, returns_found: 0, stripe_unanswered: 0, errors: 0 });
 const idOf = (v: unknown): string => String((typeof v === 'string' ? v : (v && typeof v === 'object' ? (v as { id?: unknown }).id : '')) || '');
 const rowsOf = (r: { json?: unknown }) => (Array.isArray((r as any)?.json) ? (r as any).json : []) as any[];
 const money = (c: unknown) => '$' + ((Number(c) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
@@ -79,6 +80,25 @@ export function retainerDrift(r: Partial<RetainerState>, sub: any): boolean {
   const end = subscriptionPeriodEnd(sub);
   const iso = end ? new Date(end * 1000).toISOString() : null;
   return !!iso && iso !== (r.current_period_end || null);
+}
+
+/** Sales item 159 (Nov 22 2026 review): an invoice that has read Processing for days. Only
+ *  Stripe's "failed" or "paid" message cleared it, and a lost "bounced" message left it stuck
+ *  with Send, Void and Record a payment all refused and no Pay button for the client. What
+ *  Stripe's payments for it say now, newest first: one that succeeded settles it (`pay`); the
+ *  newest having failed (cancelled, or back to needing a payment method, or carrying a payment
+ *  error) means a bounce; still processing, or nothing found, means wait. Pure. */
+export const PROCESSING_DAYS = 4;
+export function stuckPaymentVerdict(invoiceId: string, payments: any[]): { verdict: 'paid' | 'failed' | 'processing' | 'unknown'; pay: any | null } {
+  const ours = (payments || []).filter((p) => p && String(p?.metadata?.presence_invoice_id || '') === invoiceId)
+    .sort((a, b) => (Number(b.created) || 0) - (Number(a.created) || 0));
+  const won = ours.filter((p) => p.status === 'succeeded').sort((a, b) => (Number(a.created) || 0) - (Number(b.created) || 0))[0];
+  if (won) return { verdict: 'paid', pay: won };
+  const newest = ours[0];
+  if (!newest) return { verdict: 'unknown', pay: null };
+  const st = String(newest.status || '');
+  if (st === 'canceled' || st === 'requires_payment_method' || !!newest.last_payment_error) return { verdict: 'failed', pay: newest };
+  return { verdict: st === 'processing' ? 'processing' : 'unknown', pay: newest };
 }
 
 /** Which of an invoice's payments settles it: the first one Stripe took, for this invoice. Pure. */
@@ -180,6 +200,38 @@ async function checkOpenInvoices(out: StripeCheckResult, n: number, nowMs: numbe
     }
     const st = await svc(`presence_invoices?id=eq.${enc(inv.id)}&status=eq.open`, { method: 'PATCH', body: JSON.stringify({ stripe_checked_at: new Date(nowMs).toISOString() }) }).catch(() => ({ ok: false }));
     if ((st as { ok?: boolean }).ok !== true) out.errors++;
+  }
+}
+
+// ── 1b. invoices stuck on Processing (sales item 159) ────────────────────────
+async function checkStuckProcessing(out: StripeCheckResult, nowMs: number): Promise<void> {
+  const before = new Date(nowMs - PROCESSING_DAYS * DAY_MS).toISOString();
+  const q = await svc(`presence_invoices?status=eq.open&processing_since=not.is.null&processing_since=lt.${enc(before)}&deleted_at=is.null&select=id,site_id,deal_id,title,amount_cents,currency,purpose,status,processing_since,link_gen&order=processing_since.asc&limit=10`).catch(() => ({ ok: false, json: null }));
+  if (!q.ok) { out.errors++; return; }
+  for (const inv of rowsOf(q)) {
+    out.processing_checked++;
+    let payments: any[] = [];
+    try { payments = await searchInvoicePayments(String(inv.id)); } catch { out.stripe_unanswered++; continue; }   // asked again next tick
+    const { verdict, pay } = stuckPaymentVerdict(String(inv.id), payments);
+    if (verdict === 'paid') {
+      const r = await settleFoundPayment(inv, pay, nowMs);
+      if (r === 'error') out.errors++; else if (r === 'paid') out.invoices_paid++;
+      continue;
+    }
+    if (verdict !== 'failed') continue;   // still settling, or Stripe's search hasn't caught up: wait
+    // the bounce, the way the webhook does it (stripe-webhook/index.ts bouncePresenceInvoice): open
+    // again, the spent link off the row, the link number moved on, then the three things after it
+    const gen = Math.max(0, Math.trunc(Number(inv.link_gen) || 0)) + 1;
+    const moved = await svc(`presence_invoices?id=eq.${enc(inv.id)}&status=eq.open&processing_since=not.is.null&select=id`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ processing_since: null, stripe_url: null, stripe_payment_link_id: null, link_gen: gen, updated_at: new Date(nowMs).toISOString() }),
+    }).catch(() => ({ ok: false, json: null }));
+    if (!moved.ok) { out.errors++; continue; }
+    if (!rowsOf(moved).length) continue;   // something else moved it first
+    out.processing_bounced++;
+    console.error(`[stripe-check] invoice ${inv.id} read Processing since ${inv.processing_since} and Stripe says its payment failed (${pay?.id || '?'}): open again, as a bounce`);
+    const { tellBounced } = await import('../routes/invoice_bounced.ts');
+    await tellBounced(String(inv.id)).catch((e) => { out.errors++; console.warn(`[stripe-check] after the bounce of ${inv.id}: ${String((e as Error)?.message || e)}`); });
   }
 }
 
@@ -313,13 +365,14 @@ async function checkReturns(out: StripeCheckResult, nowMs: number): Promise<void
 /** Every tick: a few open invoices, a few retainers and a few missed receipts, each at
  *  most once a day, and the week's refunds and disputes once a day. Bounded so a tick
  *  stays quick; with nothing due it only reads. */
-export async function runStripeCheck(limits: { invoices?: number; retainers?: number; receipts?: number; returns?: number } = {}, nowMs: number = Date.now()): Promise<StripeCheckResult> {
+export async function runStripeCheck(limits: { invoices?: number; retainers?: number; receipts?: number; returns?: number; processing?: number } = {}, nowMs: number = Date.now()): Promise<StripeCheckResult> {
   const out = zero();
   if (!stripeConfigured()) return { ...out, skipped_no_stripe: true };
   // before APPLY-0235 the check has nowhere to keep what it asked: it does nothing
   const ready = await svc('presence_stripe_checks?select=subject&limit=1').catch(() => ({ ok: false }));
   if ((ready as { ok?: boolean }).ok !== true) return { ...out, skipped_not_set_up: true };
   await checkOpenInvoices(out, limits.invoices ?? 4, nowMs);
+  if (limits.processing !== 0) await checkStuckProcessing(out, nowMs);   // sales item 159
   await checkRetainers(out, limits.retainers ?? 3, nowMs);
   await sendMissedReceipts(out, limits.receipts ?? 3, nowMs);
   if (limits.returns !== 0) await checkReturns(out, nowMs);

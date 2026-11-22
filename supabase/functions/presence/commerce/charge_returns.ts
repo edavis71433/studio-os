@@ -43,6 +43,7 @@
 import { svc } from '../lib/db.ts';
 import { raiseNoticeDetailed, clearNotice } from '../lib/notice.ts';
 import { UUID_RE } from '../lib/uuid.ts';
+import { monthIn, studioZone } from '../lib/studio_clock.ts';   // sales item 152
 import { retrieveCharge, listChargeRefunds, retrieveDispute, listChargeDisputes, retrievePaymentIntent, invoiceForPaymentIntent, stripeConfigured } from './stripe.ts';
 
 export interface ReturnSync { ok: boolean; found: 'invoice' | 'extra' | 'retainer' | 'none'; invoice_id: string | null; changed: boolean }
@@ -55,8 +56,9 @@ const rows = (r: { json?: unknown }) => (Array.isArray((r as { json?: unknown })
 const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
 export const usd = (c: unknown) => '$' + ((Number(c) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-/** "November", the month revenue takes it off in (revenue months are UTC). Pure. */
-export const monthOf = (at: string | null): string => { const t = Date.parse(String(at || '')); return Number.isFinite(t) ? MONTHS[new Date(t).getUTCMonth()] : 'this month'; };
+/** "November", the month revenue takes it off in: the studio's own month when its zone is
+ *  given (sales item 152), UTC's without one. Pure. */
+export const monthOf = (at: string | null, tz?: string | null): string => { const t = Date.parse(String(at || '')); if (!Number.isFinite(t)) return 'this month'; const k = tz ? monthIn(at, tz) : ''; return k ? MONTHS[Number(k.slice(5)) - 1] : MONTHS[new Date(t).getUTCMonth()]; };
 /** "Nov 30" (with the year when it isn't this one): a deadline as Stripe gave it, in UTC. Pure. */
 export function dueDay(at: string | null, nowIso = new Date().toISOString()): string {
   const t = Date.parse(String(at || '')); if (!Number.isFinite(t)) return '';
@@ -415,7 +417,7 @@ async function tellRefunds(m: Match, charge: any, fresh: any[], failedNow: any[]
     const full = m.applies === 'invoice' ? n(m.inv?.refunded_cents) >= n(m.inv?.amount_cents) && n(m.inv?.amount_cents) > 0 : whole;
     const emailed = await emailRefund(m, p, { amount, full: whole }, bank, paid);
     if (emailed) await svc(`presence_money_returns?id=eq.${row.id}`, { method: 'PATCH', body: JSON.stringify({ client_emailed: true }) }).catch(() => {});
-    const copy = refundLineCopy({ applies: m.applies, what, who: p.who, amount, counted: n(row.counted_cents), full, whole, month: monthOf(row.counted_at), emailed, hasEmail: !!p.email, bank, pending: row.status === 'pending', partLeft: n(m.inv?.refunded_cents) });
+    const copy = refundLineCopy({ applies: m.applies, what, who: p.who, amount, counted: n(row.counted_cents), full, whole, month: monthOf(row.counted_at, await studioZone(m.siteId)), emailed, hasEmail: !!p.email, bank, pending: row.status === 'pending', partLeft: n(m.inv?.refunded_cents) });
     await raiseNoticeDetailed({ siteId: m.siteId, clientId: p.studioClientId, kind: 'invoice_paid', period: returnPeriod('refund', m.dealId, String(row.stripe_id)), headline: copy.headline, body: copy.body });
     await historyLine(m, { refund: true, stripe_refund: String(row.stripe_id), amount_cents: amount, full: whole, applies_to: m.applies });
   }
@@ -533,7 +535,7 @@ export async function syncDispute(disputeId: string): Promise<ReturnSync> {
         await clearNotice(p.studioClientId, 'invoice_void_paid', returnPeriod('dispute', m.dealId, disputeId, true));
         const lost = outcome === 'lost';
         if (!lost) await clearNotice(p.studioClientId, 'invoice_void_paid', returnPeriod('disputelost', m.dealId, disputeId));   // turned round after all
-        const copy = disputeClosedCopy({ what, who: p.who, amount, fee, outcome: lost ? 'lost' : 'won', inquiry: String(d.status) === 'warning_closed', month: monthOf(now), counted: counted > 0 });
+        const copy = disputeClosedCopy({ what, who: p.who, amount, fee, outcome: lost ? 'lost' : 'won', inquiry: String(d.status) === 'warning_closed', month: monthOf(now, await studioZone(m.siteId)), counted: counted > 0 });
         // lost is money gone and a Needs you line; won (or a question closed) is an update
         if (lost) await raiseNoticeDetailed({ siteId: m.siteId, clientId: p.studioClientId, kind: 'invoice_void_paid', period: returnPeriod('disputelost', m.dealId, disputeId, again), headline: copy.headline, body: copy.body });
         else await raiseNoticeDetailed({ siteId: m.siteId, clientId: p.studioClientId, kind: 'invoice_paid', period: returnPeriod('disputewon', m.dealId, disputeId, again), headline: copy.headline, body: copy.body });

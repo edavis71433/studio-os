@@ -328,7 +328,7 @@ async function recordPayment(session: any, md: Record<string, string>, status: s
     kind: md.kind || (session.mode === 'subscription' ? 'subscription' : 'one_time'),
     status,
     description: md.description || null,
-    invoice_id: md.invoice_id || null,
+    invoice_id: md.invoice_id || md.presence_invoice_id || null,   // sales item 147: a service invoice's payment keeps the payer's email against that invoice
     client_id: md.client_id || null,
   });
   if (!ok) console.error(`[stripe-webhook] could not record payment in stripe_payments (non-fatal, session ${session.id || '?'})`);

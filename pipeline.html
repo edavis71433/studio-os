@@ -667,11 +667,12 @@ function moneyState(i,todayYmd,pending){
   if(s==='paid'){const d=String(i.dispute_status||'');if(d==='open')return'disputed';if(d==='lost')return'lost';const a=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);const r=Number(i.refunded_cents)||0;return r>0&&r>=a?'refunded':'paid';}
   if(s==='void'||s==='canceled')return'';
   if(i.processing_since||(pending&&pending.indexOf(String(i.id))>=0))return'processing';
+  if(i.not_sent===true)return'draft';
   const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(i.due_date||''));
   return(m&&todayYmd&&m[0]<String(todayYmd))?'overdue':'upcoming';
 }
-const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue',refunded:'Refunded',disputed:'Disputed',lost:'Dispute lost'};
-const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad',refunded:'',disputed:'bad',lost:'bad'};
+const MONEY_WORD={paid:'Paid',processing:'Processing',upcoming:'Upcoming',overdue:'Overdue',refunded:'Refunded',disputed:'Disputed',lost:'Dispute lost',draft:'Not sent yet'};
+const MONEY_TONE={paid:'good',processing:'info',upcoming:'',overdue:'bad',refunded:'',disputed:'bad',lost:'bad',draft:''};
 function moneyBuckets(list,todayYmd,pending){
   const b={paid:{count:0,cents:0},processing:{count:0,cents:0},upcoming:{count:0,cents:0},overdue:{count:0,cents:0}};
   for(const i of(Array.isArray(list)?list:[])){const st=moneyState(i,todayYmd,pending);if(st!=='paid'&&st!=='processing'&&st!=='upcoming'&&st!=='overdue')continue;const c=typeof i.amount_cents==='number'?i.amount_cents:Math.round((Number(i.amount)||0)*100);b[st].count++;b[st].cents+=st==='paid'?Math.max(0,c-(Number(i.refunded_cents)||0)):c;}
@@ -689,7 +690,7 @@ function dueState(ymd,today){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd|
 function dayAtNoon(ymd){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd||''));return m?new Date(+m[1],+m[2]-1,+m[3],12).toISOString():undefined;}
 const invState=(v)=>moneyState(v,localYmd());
 // upcoming / overdue = still waiting on the client; paid, processing and void are not
-const invWaits=(v)=>{const st=invState(v);return st==='upcoming'||st==='overdue';};
+const invWaits=(v)=>{const st=invState(v);return st==='upcoming'||st==='overdue'||st==='draft';};   // sales item 141: a draft still takes Send, Void and a payment by hand
 // the chip itself: the state word in its one tone; a voided row says so, quietly
 const moneyChip=(v)=>{const st=invState(v);return st?`<span class="stage ${MONEY_TONE[st]}" data-money="${st}">${MONEY_WORD[st]}</span>`:'<span class="stage void" data-money="void">Voided</span>';};
 // money0: the same, with zero (or nothing) as "$0"
@@ -1038,6 +1039,25 @@ function docPlaceholderValues(d,c,biz,now){
   };
 }
 const fillDocPlaceholders=(text,vals)=>{let out=String(text==null?'':text);for(const k of Object.keys(vals)){out=out.replace(new RegExp('\\{\\{\\s*'+k+'\\s*\\}\\}','g'),()=>vals[k]);}return out;};
+// Sales item 144 (Nov 22 2026 review): the price the agreement prints is the proposal the client
+// has seen (accepted first, else sent; never a draft or a revised-away one), the same rule the
+// server's dealPriceCents uses; the deal's typed value only when there is no such proposal. The
+// deal typed at $3,000 with a proposal accepted at $3,450 got an agreement for $3,000.
+function proposalPriceCents(proposals){
+  const list=(proposals||[]).filter(p=>p&&!splitPropLI(p.line_items).meta.superseded_by).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+  const p=list.find(x=>x.status==='accepted')||list.find(x=>x.status==='sent');
+  if(!p)return null;
+  const t=Math.trunc(Number(propTotals(p.line_items).total))||0;
+  return t>0?t:null;
+}
+// the deal as the filler should see it: its value replaced by the proposal's total when there is one
+function dealForDocs(d,proposals){const c=proposalPriceCents(proposals);return c?Object.assign({},d,{expected_value_cents:c}):d;}
+// Before Send: the deal's typed value differs from the proposal the agreement is priced from
+async function confirmPriceMismatch(d,proposals){
+  const c=proposalPriceCents(proposals);const typed=Math.trunc(Number(d&&d.expected_value_cents))||0;
+  if(!c||!typed||typed===c)return true;
+  return ddsConfirm({title:'The deal’s value doesn’t match the proposal',text:'The agreement and its deposit are priced from the proposal the client saw ('+money(c)+'). The deal’s value in Details says '+money(typed)+'.\n\nIf the proposal is right, send it as it is and the deal’s value will follow once they accept. If the deal is right, send a revised proposal first.',yes:'Send at '+money(c),danger:true});
+}
 
 /* ==== agreement packages: start (extracted + EXECUTED by tests/presence/agreement_packages_test.mjs) ==== */
 // ── The studio's standard agreement — ONE PER PACKAGE ───────────────────
@@ -3405,7 +3425,7 @@ async function openDeal(id){
     const openDsp=(data.returns||[]).filter(r=>r.kind==='dispute'&&r.status==='open');
     // Outstanding = what still WAITS on the client (upcoming + overdue, the one
     // formula); a settling payment is "processing" — on its way, not outstanding.
-    const openInv=invs.filter(invWaits);
+    const openInv=invs.filter(v=>invWaits(v)&&invState(v)!=='draft');   // sales item 141: a draft nobody sent is not outstanding
     const openC=openInv.reduce((a,b)=>a+(b.amount_cents||0),0);
     const procInv=invs.filter(v=>invState(v)==='processing');
     const procC=procInv.reduce((a,b)=>a+(b.amount_cents||0),0);
@@ -3519,7 +3539,7 @@ async function openDeal(id){
             const name=v.payment_for?esc('Part payment'+(parent&&invNo(parent.number)?' toward '+invNo(parent.number):'')):(invNo(v.number)?esc(invNo(v.number))+' · ':'')+esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
             const partPaid=(data.invoices||[]).filter(x=>x.payment_for===v.id&&x.status==='paid').reduce((a,b)=>a+(b.amount_cents||0),0);   // item 77
             const paidish=st==='paid'||st==='refunded'||st==='disputed'||st==='lost';   // sales items 126, 127: still a payment, with what came back after it
-            const when=paidish?(v.paid_at?` · ${esc(PAY_WORDS[v.paid_method]||'paid')} ${esc(evtDate(v.paid_at))}`:'')+(v.paid_note?' · '+esc(v.paid_note):'')+(v.paid_private_note?' · <span title="Only you see this. It is not on their receipt.">private: '+esc(v.paid_private_note)+'</span>':''):st==='processing'?' · payment on its way':waits?(v.due_date?` · due ${esc(v.due_date)}`:/ · when the work is done$/.test(v.title||'')?'':' · due now')+(partPaid?` · ${money(partPaid)} paid so far`:'')+(v.stripe_url?'':(partPaid?' · send it for a link for what’s left':' · not sent yet')):'';
+            const when=paidish?(v.paid_at?` · ${esc(PAY_WORDS[v.paid_method]||'paid')} ${esc(evtDate(v.paid_at))}`:'')+(v.paid_note?' · '+esc(v.paid_note):'')+(v.paid_private_note?' · <span title="Only you see this. It is not on their receipt.">private: '+esc(v.paid_private_note)+'</span>':''):st==='processing'?' · payment on its way':waits?(v.due_date?` · due ${esc(v.due_date)}`:/ · when the work is done$/.test(v.title||'')?'':' · due now')+(partPaid?` · ${money(partPaid)} paid so far`:'')+(v.stripe_url?'':(partPaid?' · send it for a link for what’s left':st==='draft'?'':' · not sent yet')):'';
             const payBtn=waits?` <button class="btn ghost" data-pay-inv="${esc(JSON.stringify({id:v.id,amount_cents:v.amount_cents,number:v.number||null}))}" data-email="${c&&c.email?'1':''}" data-first="${esc((String(c&&c.name||'').trim().split(/\s+/)[0])||'')}" title="Paid by check, cash, bank transfer or Zelle? Mark it paid here">Record payment</button>`:'';
             const undoBtn=(st==='paid'&&v.paid_method)?` <button class="btn ghost" data-needs="delete" data-undo-pay="${v.id}" data-part="${v.payment_for?'1':''}" title="Recorded by mistake? The invoice goes back to unpaid" aria-label="Undo the payment on ${name}">Undo</button>`:'';
             const acts=undoBtn+payBtn+(waits?` <button class="btn ghost" data-send-inv="${v.id}">${v.stripe_url?'Resend':'Send'}</button>${v.stripe_url?` <button class="btn ghost" data-copy-pay="${esc(v.stripe_url)}">Copy link</button>`:''} <button class="btn ghost" data-needs="delete" data-void-inv="${v.id}" title="${v.stripe_url?'Withdraw this invoice — the payment link stops working and the unpaid reminder clears':'Withdraw this invoice — it was raised in error'}" aria-label="Void invoice ${name}">Void</button>`:'');
@@ -3756,6 +3776,7 @@ async function openDeal(id){
         if(!(await confirmBlanks(k.body))){toast('Not sent — fill in the blanks, then send it.',true);return;}
         if(!(await confirmMoneyBlanks(k.body))){toast('Not sent — set the deal value in Details first.',true);return;}
         if(!(await confirmHalfAndHalf(k.body,dealParts(data.proposals)))){toast('Not sent — make the agreement’s payment wording match the parts first.',true);return;}
+        if(!(await confirmPriceMismatch(d,data.proposals))){toast('Not sent — make the deal’s value and the proposal agree first.',true);return;}
       }else if(!(await ddsConfirm({title:'Send it as it stands?',text:'This agreement’s text isn’t loaded here, so its fill-in blanks can’t be checked.\n\nOpen it with View / print to read it first, or send it as it stands.',yes:'Send as it stands',danger:true}))){
         toast('Not sent — open it with View / print to check it first.',true);return;
       }
@@ -3769,6 +3790,7 @@ async function openDeal(id){
         if(!(await confirmBlanks(k.body))){toast('Not sent — fill in the blanks, then send it.',true);return;}
         if(!(await confirmMoneyBlanks(k.body))){toast('Not sent — set the deal value in Details first.',true);return;}
         if(!(await confirmHalfAndHalf(k.body,dealParts(data.proposals)))){toast('Not sent — make the agreement’s payment wording match the parts first.',true);return;}
+        if(!(await confirmPriceMismatch(d,data.proposals))){toast('Not sent — make the deal’s value and the proposal agree first.',true);return;}
       }else if(!(await ddsConfirm({title:'Send it as it stands?',text:'This agreement’s text isn’t loaded here, so its fill-in blanks can’t be checked.\n\nOpen it with View / print to read it first, or send it as it stands.',yes:'Send as it stands',danger:true}))){
         toast('Not sent — open it with View / print to check it first.',true);return;
       }
@@ -3994,6 +4016,7 @@ async function openDeal(id){
           if(!(await confirmBlanks(v.body)))throw new Error('Not sent — fill in the blanks, then send it.');
           if(!(await confirmMoneyBlanks(v.body)))throw new Error('Not sent — set the deal value in Details first.');
           if(!(await confirmHalfAndHalf(v.body,dealParts(data.proposals))))throw new Error('Not sent — make the agreement’s payment wording match the parts first.');
+          if(!(await confirmPriceMismatch(d,data.proposals)))throw new Error('Not sent — make the deal’s value and the proposal agree first.');
           const cid=await saveCon(v);await sendContractById(cid);}}});
       // An agreement form should never open as a blank page. PRECEDENCE:
       //   1. a restored draft — his own unsaved words always win (ddsDraftRestore
@@ -4037,7 +4060,7 @@ async function openDeal(id){
         bodyEl.style.minHeight='260px'; // a full-page agreement — let it breathe
         (async()=>{
           const biz=await bizName().catch(()=>'');
-          const vals=docPlaceholderValues(d,c,biz); VALS=vals;   // the chooser needs these too
+          const vals=docPlaceholderValues(dealForDocs(d,data.proposals),c,biz); VALS=vals;   // the chooser needs these too (sales item 144: priced from the proposal)
           if(bodyEl.value)return;
           if(conTpls.length){   // 2 — his own saved wording beats ours
             try{const r=await api('/sales/templates?with_body=contract');const t=(r.data||[])[0];
@@ -4051,7 +4074,7 @@ async function openDeal(id){
       }else if(bodyEl){
         // A restored draft won, but the chooser still has to work — give it the
         // values it needs without touching what he typed.
-        (async()=>{const biz=await bizName().catch(()=>'');VALS=docPlaceholderValues(d,c,biz);})();
+        (async()=>{const biz=await bizName().catch(()=>'');VALS=docPlaceholderValues(dealForDocs(d,data.proposals),c,biz);})();
       }
     };
     // saved templates: one-tap draft-from-template + save-as-template

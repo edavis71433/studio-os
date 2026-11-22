@@ -10,7 +10,7 @@ import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { UUID_RE } from '../lib/uuid.ts';
-import { moneyState } from '../lib/money_state.ts';
+import { moneyState, invoiceNotSent } from '../lib/money_state.ts';
 import { invoiceNo } from '../lib/documents.ts';
 import { callerToday } from '../lib/sales_lifecycle.ts';
 
@@ -33,7 +33,8 @@ export async function readInvoiceBook(site: SiteRow, today: string, more = false
   const base = 'id,title,amount_cents,purpose,status,due_date,paid_at,created_at,deal_id,customer_client_id,stripe_url';
   // number, how it was paid and part payments land with APPLY-0167; processing_since with 0132;
   // what came back through Stripe with APPLY-0233 (sales items 126, 127)
-  const shapes = [`${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status${more ? ',lines' : ''}`, `${base},processing_since,number,paid_method,paid_note,payment_for${more ? ',lines' : ''}`, `${base},processing_since`, base];
+  // sales item 141: first_sent_at and link_gen (APPLY-0188) say whether an invoice ever went out
+  const shapes = [`${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status,first_sent_at,link_gen${more ? ',lines' : ''}`, `${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status${more ? ',lines' : ''}`, `${base},processing_since,number,paid_method,paid_note,payment_for${more ? ',lines' : ''}`, `${base},processing_since`, base];
   const page = (sel: string, off: number) => svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&select=${sel}&order=created_at.desc,id.desc&limit=${PAGE}&offset=${off}`);
   let sel = shapes[0], r = await page(sel, 0);
   for (let i = 1; !r.ok && i < shapes.length; i++) { sel = shapes[i]; r = await page(sel, 0); }
@@ -50,10 +51,15 @@ export async function readInvoiceBook(site: SiteRow, today: string, more = false
   const dealRows = (await Promise.all(chunk(ids('deal_id')).map((c) => svc(`presence_deals?id=in.(${c.join(',')})&site_id=eq.${site.id}&select=id,title,contact_id,converted_client_id`).then(rows).catch(() => [] as any[])))).flat();
   const contactIds = [...new Set(dealRows.map((d: any) => String(d.contact_id || '')).filter((x: string) => UUID_RE.test(x)))];
   const clientIds = [...new Set([...ids('customer_client_id'), ...dealRows.map((d: any) => String(d.converted_client_id || '')).filter((x: string) => UUID_RE.test(x))])];
-  const [people, customers] = await Promise.all([
+  // sales item 152: each refund or lost dispute with the day it happened, so the page takes it off that month, not the month the invoice was paid (APPLY-0233; [] before it)
+  const returnedQ = svc(`presence_money_returns?site_id=eq.${site.id}&applies_to=eq.invoice&counted_cents=gt.0&select=invoice_id,counted_cents,counted_at,kind&order=counted_at.asc&limit=2000`).then((r) => r.ok ? rows(r) : []).catch(() => [] as any[]);
+  const [people, customers, returnedRows] = await Promise.all([
     Promise.all(chunk(contactIds).map((c) => svc(`presence_contacts?id=in.(${c.join(',')})&site_id=eq.${site.id}&select=id,name,email,company`).then(rows).catch(() => [] as any[]))).then((x) => x.flat()),
     Promise.all(chunk(clientIds).map((c) => svc(`clients?id=in.(${c.join(',')})&select=id,name,email`).then(rows).catch(() => [] as any[]))).then((x) => x.flat()),
+    returnedQ,
   ]);
+  const returnedBy = new Map<string, Array<{ cents: number; at: string; kind: string }>>();
+  for (const r of returnedRows) { const k = String(r.invoice_id || ''); if (!k) continue; const l = returnedBy.get(k) || []; l.push({ cents: Number(r.counted_cents) || 0, at: String(r.counted_at || ''), kind: String(r.kind || 'refund') }); returnedBy.set(k, l); }
   const byId = <T,>(list: any[]) => new Map<string, T>(list.map((x: any) => [String(x.id), x]));
   const deal = byId<any>(dealRows), person = byId<any>(people), customer = byId<any>(customers);
   const items = all.map((i: any) => {
@@ -62,13 +68,16 @@ export async function readInvoiceBook(site: SiteRow, today: string, more = false
     const k = customer.get(String(i.customer_client_id || (d && d.converted_client_id) || ''));
     return {
       id: i.id, number: i.number ?? null, number_label: invoiceNo(i.number), title: String(i.title || ''), purpose: i.purpose || 'invoice',
-      amount_cents: Number(i.amount_cents) || 0, status: String(i.status || 'open'), state: moneyState(i, today),
+      amount_cents: Number(i.amount_cents) || 0, status: String(i.status || 'open'), not_sent: invoiceNotSent(i), state: moneyState({ ...i, not_sent: invoiceNotSent(i) }, today),
       due_date: i.due_date || null, issued_at: i.created_at, paid_at: i.paid_at || null, paid_method: i.paid_method || '',
       processing: !!i.processing_since, payment_for: i.payment_for || null, has_link: !!i.stripe_url,
       refunded_cents: Number(i.refunded_cents) || 0, dispute_status: i.dispute_status || null,
       deal_id: i.deal_id || null, deal_title: d ? String(d.title || '') : '',
       business: k ? String(k.name || k.email || '') : (p && p.company ? String(p.company) : ''),
       person: p ? String(p.name || p.email || '') : '',
+      // sales item 148: the page's Record a payment box offers a receipt only when there is someone to email
+      has_email: !!(p && p.email), first: p ? String(p.name || '').trim().split(/\s+/)[0] || '' : '',
+      returned: returnedBy.get(String(i.id)) || [],
       ...(more ? { paid_note: String(i.paid_note || ''), lines: Array.isArray(i.lines) ? i.lines : [] } : {}),
     };
   });

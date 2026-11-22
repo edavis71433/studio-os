@@ -74,14 +74,26 @@ export async function partPayments(siteId: string, invoiceId: string): Promise<D
   } catch { return []; }
 }
 
+/** Sales item 145: the refunds and lost disputes counted against an invoice (presence_money_returns,
+ *  APPLY-0233), each with its day, oldest first. [] before the table exists or when nothing came back. */
+export async function invoiceReturns(siteId: string, invoiceId: string): Promise<Array<{ cents: number; at: string | null; kind: string }>> {
+  if (!UUID_RE.test(invoiceId)) return [];
+  try {
+    const r = await svc(`presence_money_returns?invoice_id=eq.${invoiceId}&site_id=eq.${siteId}&applies_to=eq.invoice&counted_cents=gt.0&select=counted_cents,counted_at,kind&order=counted_at.asc&limit=50`);
+    return r.ok ? rows(r).map((x) => ({ cents: Number(x.counted_cents) || 0, at: x.counted_at || null, kind: String(x.kind || 'refund') })) : [];
+  } catch { return []; }
+}
+
 /** Everything one document needs around its row, read side by side. */
 export async function docContextFor(siteId: string, kind: 'proposal' | 'contract' | 'invoice' | 'estimate', row: any, extra: Partial<DocContext> = {}): Promise<DocContext> {
   const dealId = row?.deal_id;
-  const [studio, billTo, payments, deal] = await Promise.all([
+  const [studio, billTo, payments, deal, returned] = await Promise.all([
     studioParty(siteId),
     billToForDeal(siteId, dealId),
     kind === 'invoice' && row?.id ? partPayments(siteId, String(row.id)) : Promise.resolve([] as DocPayment[]),
     UUID_RE.test(String(dealId || '')) ? first(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=title&limit=1`) : Promise.resolve(null),
+    // sales item 145: only when money came back (the row says so), so a plain receipt costs no extra read
+    kind === 'invoice' && row?.id && (Number(row?.refunded_cents) > 0 || row?.dispute_status) ? invoiceReturns(siteId, String(row.id)) : Promise.resolve([] as Array<{ cents: number; at: string | null; kind: string }>),
   ]);
-  return { studio: studio.party, tz: studio.tz, billTo, payments, forWhat: deal?.title ? String(deal.title) : null, ...extra };
+  return { studio: studio.party, tz: studio.tz, billTo, payments, forWhat: deal?.title ? String(deal.title) : null, returned, ...extra };
 }

@@ -187,7 +187,7 @@ const world = () => ({
   const w = world();
   w.presence_deals[0].contact_id = cid(1);
   w.presence_invoices = [
-    { id: INV(1), site_id: SITE, number: 12, title: 'Website, half up front', amount_cents: 150000, purpose: 'deposit', status: 'open', due_date: day(-6), deal_id: did(1), customer_client_id: null, created_at: ago(20), deleted_at: null },
+    { id: INV(1), site_id: SITE, number: 12, title: 'Website, half up front', amount_cents: 150000, purpose: 'deposit', status: 'open', due_date: day(-6), deal_id: did(1), customer_client_id: null, created_at: ago(20), deleted_at: null, stripe_url: 'https://pay.example/dep', first_sent_at: ago(20) },   // sent (sales item 141: an unsent one is a draft, never overdue)
     { id: INV(2), site_id: SITE, number: 13, title: 'Monthly care', amount_cents: 9000, purpose: 'invoice', status: 'paid', paid_at: ago(3), paid_method: 'check', deal_id: null, customer_client_id: CUST, created_at: ago(10), deleted_at: null },
     { id: INV(3), site_id: SITE, number: null, title: 'Part payment', amount_cents: 50000, status: 'paid', paid_at: ago(1), paid_method: 'zelle', payment_for: INV(1), deal_id: did(1), created_at: ago(1), deleted_at: null },
     { id: INV(4), site_id: SITE, number: 14, title: 'Mistake', amount_cents: 100, status: 'void', deal_id: null, created_at: ago(5), deleted_at: null },

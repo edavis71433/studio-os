@@ -3,8 +3,11 @@
 // against last year, open deals by stage with days in stage, won and not a fit
 // (won by where the deal came from, not a fit by the reason given), enquiries by
 // the page they came from, and overdue invoices. No report builder (decision 7).
-// Pure: the route reads the rows, these shape them. All dates are UTC.
+// Pure: the route reads the rows, these shape them. Dates are UTC unless a report is
+// handed the studio's zone (sales item 152: revenue by month cuts months on the studio's
+// own day, the way the Invoices page and the bookkeeper file do).
 import { foundViaLabel } from './found_via.ts';
+import { monthIn } from './studio_clock.ts';
 
 const DAY = 86400000;
 const n = (v: unknown) => Number(v) || 0;
@@ -26,13 +29,15 @@ export interface RevenueMonth { month: string; label: string; this_year: number;
  *  `returned` (sales items 126, 127): money that went back, a refund made in Stripe or a
  *  dispute lost, each taken off the month it happened (lib/money_returns.ts reads them);
  *  one on a retainer charge comes off the retainer part too. Each month says how much. */
-export function revenueByMonth(paid: Array<{ amount_cents?: unknown; paid_at?: unknown }>, nowIso: string, retainer: Array<{ amount_cents?: unknown; paid_at?: unknown }> = [], returned: Array<{ amount_cents?: unknown; paid_at?: unknown; retainer?: unknown }> = []) {
+export function revenueByMonth(paid: Array<{ amount_cents?: unknown; paid_at?: unknown }>, nowIso: string, retainer: Array<{ amount_cents?: unknown; paid_at?: unknown }> = [], returned: Array<{ amount_cents?: unknown; paid_at?: unknown; retainer?: unknown }> = [], tz: string | null = null) {
   const byMonth = new Map<string, number>(), retByMonth = new Map<string, number>(), backByMonth = new Map<string, number>();
-  const add = (into: Map<string, number>, p: { amount_cents?: unknown; paid_at?: unknown }, sign = 1) => { const k = ym(p?.paid_at); if (/^\d{4}-\d{2}$/.test(k)) into.set(k, (into.get(k) || 0) + sign * n(p.amount_cents)); };
+  // sales item 152: with a zone, each payment lands in the month of the studio's own day; without one, UTC as before
+  const monthKey = (iso: unknown) => tz === null ? ym(iso) : monthIn(iso, tz);
+  const add = (into: Map<string, number>, p: { amount_cents?: unknown; paid_at?: unknown }, sign = 1) => { const k = monthKey(p?.paid_at); if (/^\d{4}-\d{2}$/.test(k)) into.set(k, (into.get(k) || 0) + sign * n(p.amount_cents)); };
   for (const p of paid || []) add(byMonth, p);
   for (const p of retainer || []) { add(byMonth, p); add(retByMonth, p); }
   for (const p of returned || []) { add(byMonth, p, -1); add(backByMonth, p); if (p?.retainer === true) add(retByMonth, p, -1); }
-  const end = ym(nowIso);
+  const end = tz === null ? ym(nowIso) : monthIn(nowIso, tz) || ym(nowIso);
   const months: RevenueMonth[] = [];
   for (let i = 11; i >= 0; i--) {
     const k = shiftMonth(end, -i);
