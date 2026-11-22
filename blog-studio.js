@@ -520,8 +520,17 @@ ${host.canDelete && !host.canDelete() ? "" : `<button type="button" class="bs-da
 
     /* closing */
     async function close(removed) {
-      if (closed) return; closed = true;
-      if (!removed) await settle();
+      if (closed) return;
+      if (!removed) {
+        await settle();
+        // Builder item 251: the screen used to close after one failed save and the words went with
+        // it. It stays open: Try again sends them once more; Leave anyway is the writer's own choice.
+        if (failed && again) {
+          const leave = window.ddsConfirm ? await window.ddsConfirm({ title: "This post isn’t saved yet", text: "The last save didn’t go through, so the words you wrote since are only here. Try again, or leave and lose them.", yes: "Leave anyway", no: "Try again", danger: true }) : false;
+          if (!leave) { await settle(); if (failed && again) { label(); return; } }
+        }
+      }
+      closed = true;
       document.removeEventListener("keydown", onKey, true);
       root.remove(); OPEN = null; document.documentElement.classList.remove("bs-open");
       host.onClose(removed ? null : p);
@@ -539,7 +548,8 @@ ${host.canDelete && !host.canDelete() ? "" : `<button type="button" class="bs-da
 
     paintCover(); paintByline(); paintCard(); label();
     setTimeout(() => { grow(); (title.value ? body : title).focus(); }, 0);
-    OPEN = { close, post: p, flush: settle };
+    // retry: send what failed (the Try again line, `online`); dirty: words not on the server yet
+    OPEN = { close, post: p, flush: settle, retry: () => { if (again && !saving) { clearTimeout(timer); flush(); } }, dirty: () => !!(again || saving) };
     return OPEN;
   }
   window.DDSBlogStudio = { open, mdToHtml, htmlToMd, zonedToUtc, utcToZoned, whenWords, slugify, current: () => OPEN };

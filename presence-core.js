@@ -14,7 +14,7 @@
 const DDS_PART_SRC = {"edit":"/presence-edit.js?v=1"};
 const DDS_PART_AT = {};
 // every stand-in, so a call can tell whether the part has replaced it yet
-const DDS_STANDINS = new Set([mountEditCards, mountDesignCard, linkPick, dcDeletePage, dcSavePageName, openSettingsPanel, mountBlocksCard, applyTemplateFromGallery, dcAddPage, openTrayPanel, dcPageMenu, dcDuplicatePage, dcClearPage, stylesTab, dcOpenPage, pcEverySub, dcSaveNav, dcSwitchPage, ipeCommit, closePagesCard, closeSettingsPanel, dcSavePendingEdits, dcSyncPageSwitch, pagesBarReveal, dcRefreshTree, renderPagesBar, dcSyncLiveChip, renderBlocksCard, refreshDesignPreview, exitEditMode, dcLiveFromPanel, dcLiveSoon, formsLoad, remountSectionsCard, renderBlockTray, mountTemplateGallery]);
+const DDS_STANDINS = new Set([mountEditCards, mountDesignCard, linkPick, dcDeletePage, dcSavePageName, openSettingsPanel, mountBlocksCard, applyTemplateFromGallery, dcAddPage, openTrayPanel, dcPageMenu, dcDuplicatePage, dcClearPage, stylesTab, dcOpenPage, pcEverySub, dcSaveNav, dcSwitchPage, ipeCommit, closePagesCard, closeSettingsPanel, dcClipSet, dcSavePendingEdits, dcSyncPageSwitch, pagesBarReveal, dcRefreshTree, renderPagesBar, dcSyncLiveChip, renderBlocksCard, refreshDesignPreview, exitEditMode, dcLiveFromPanel, dcLiveSoon, formsLoad, remountSectionsCard, renderBlockTray, mountTemplateGallery]);
 function ddsPartIn(name) { return !!(window.__ddsParts && window.__ddsParts[name]); }
 // Load a part (once); answers when it is in. A failed load can be tried again.
 function ddsPart(name) {
@@ -71,6 +71,12 @@ function dcSwitchPage(...a) { return ddsStub("edit", "dcSwitchPage", a, true); }
 function ipeCommit(...a) { return ddsStub("edit", "ipeCommit", a, false); }
 function closePagesCard(...a) { return ddsStub("edit", "closePagesCard", a, false); }
 function closeSettingsPanel(...a) { return ddsStub("edit", "closeSettingsPanel", a, false); }
+function dcClipSet(...a) { return ddsStub("edit", "dcClipSet", a, false); }
+// Builder items 250 and 251: a part of the editor with saves of its own (the forms card, in the
+// Edit part) tells the core here: pending() says whether something is still waiting or failed
+// (the close-tab warning asks), retry() sends it again (`online`, the sign-in, Try again).
+const SAVE_PARTS = [];
+function partsPending() { return SAVE_PARTS.some((h) => { try { return !!h.pending(); } catch (_) { return false; } }); }
 // Before Edit mode's part is in, nothing on the canvas waits to be saved; what's typed on the
 // Business tab still goes first, as it always did.
 async function dcSavePendingEdits(keepSession) {
@@ -293,12 +299,27 @@ function offerLoadLatest(msg) {
 }
 async function loadLatest() {
   STALE_TOAST = null;
+  // Builder item 278: "your unsaved edit was set aside" used to mean dropped. The first section
+  // that differs from the last save goes on the editor's clipboard, so it can be pasted back.
+  const kept = dcUnsavedBlock();
   try {
     await refreshAll();
     BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null; dcResetHistory();
     renderBlocksCard(); renderPagesBar(); refreshDesignPreview();
-    toast("Loaded the latest version — your unsaved edit was set aside, reapply what you still want");
+    if (kept) { dcClipSet(kept); toast("Loaded the latest version. Your unsaved section is on the clipboard — paste it back from the Add button."); }
+    else toast("Loaded the latest version." + (kept ? " Your unsaved edit was set aside." : ""));
   } catch (e2) { toast(nice(e2), true); }
+}
+// the first section on the page whose words differ from the last saved list (a deep copy, never locked)
+function dcUnsavedBlock() {
+  try {
+    if (typeof blocksDirty !== "function" || !blocksDirty()) return null;
+    const last = JSON.parse(DC_HIST_LAST) || [], cur = BLOCKS_WORK || [];
+    const i = cur.findIndex((b, k) => b && JSON.stringify(b) !== JSON.stringify(last[k]));
+    if (i < 0) return null;
+    const copy = JSON.parse(JSON.stringify(cur[i])); delete copy._clEdit; delete copy.lock;
+    return copy;
+  } catch (_) { return null; }
 }
 function toastAction(msg, label, fn, ms) {
   return window.ddsToast(msg, "ok", { label, onClick: fn, ms: ms || 20000 });
@@ -418,6 +439,8 @@ const lcWho = (lc) => {
 // reviewed. The server keeps the same list (lib/optimistic_lock.ts).
 const DRAFT_WRITE = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|pages\/(?:duplicate|from-saved)|media|stock\/import|redirects|site\/template|content-library|dev\/customization|dev\/brand-kit|restore-to-draft)(?:[/?]|$)|^\/reviews\/[^/]+\/|^\/publishes\/checkpoints\/[^/]+\/restore$|^\/writer\/drafts\/[^/]+\/accept$|^\/pages\/deleted\/[^/]+\/restore$/;
 let DRAFT_LINE = Promise.resolve(), DRAFT_WRITES_OUT = 0;
+const SAVE_LIMIT_MS = 20000;   // builder item 252; window.DDS_SAVE_LIMIT_MS overrides it (tests)
+const SAVE_LIMIT_ROUTES = /^\/(?:settings|identity|location|offerings|testimonials|faqs|posts|redirects|dev\/customization)(?:[/?]|$)/;
 let WRITES_ANSWERED = 0;   // readChanges: has a write been answered since this read left?
 const READS_BY_POST = /^\/preview\/section$/;   // sent by POST for its body, but moves nothing
 let DRAFT_SEED = false;    // readChanges: the state was just loaded whole, so take the version with it
@@ -426,7 +449,9 @@ let REVIEWED = null;       // the version Publish's review read, which /publish 
 // names the version that was reviewed).
 async function api(method, route, body, named) {
   const undoRec = undoPlan(method, route, body);   // reads the state BEFORE this write
-  if (!navigator.onLine) { const e = new Error("You look offline. Everything you saved is safe — it’ll be here when you’re back."); e.offline = true; throw e; }
+  // Builder item 250: honest about THIS change: it isn't saved, and it goes when the connection
+  // returns (retryFailedSaves runs on `online`)
+  if (!navigator.onLine) { const e = new Error("This change isn’t saved yet. We’ll send it when you’re back online."); e.offline = true; throw e; }
   const send = () => apiSend(method, route, body, undoRec, named);
   if (method === "GET" || !DRAFT_WRITE.test(route)) return send();
   DRAFT_WRITES_OUT++;
@@ -437,7 +462,10 @@ async function api(method, route, body, named) {
 async function apiSend(method, route, body, undoRec, named) {
   const { data } = await sb.auth.getSession();
   const jwt = data?.session?.access_token;
-  if (!jwt) { showGate("Please sign in", "Your room uses your usual sign-in. Sign in and come straight back.", true); throw new Error("no-session"); }
+  // Builder item 271: a sign-in that lapsed mid-edit used to swap the editor for "Please sign in",
+  // with the unsaved work out of reach. The page stays as it is; a card over it asks for the
+  // sign-in, and what was waiting goes out once it's back (signInLapsed).
+  if (!jwt) { signInLapsed(); const e = new Error("Your sign-in ran out. Sign in again and your changes will be sent."); e.noSession = true; throw e; }
   // M9 optimistic locking: echo the draft version (M3 hash) on writes so a stale
   // edit is refused, never silently overwriting a newer one. One place → every
   // save is protected consistently, no duplicated logic.
@@ -446,12 +474,23 @@ async function apiSend(method, route, body, undoRec, named) {
   // cleared the "last edit by someone else" line.
   const mut = method !== "GET" && !READS_BY_POST.test(route);
   const version = named !== undefined ? named : S.draftHash;
+  // Builder item 252: a save that stalls on a weak connection held up every save behind it
+  // with no time limit (the browser ends a dead request after minutes). A quick save gets
+  // about 20 seconds, then it's failed and the retry from item 250 takes over. Only the
+  // quick writes: a publish, a restore or a photo upload can honestly take longer. A timed-out
+  // save may still have landed: the next write then hears "stale draft" and offers Load the latest.
+  const timed = mut && SAVE_LIMIT_ROUTES.test(route) && typeof AbortController === "function" ? new AbortController() : null;
+  const limitT = timed ? setTimeout(() => timed.abort(), Number(window.DDS_SAVE_LIMIT_MS) || SAVE_LIMIT_MS) : null;
   const r = await fetch(FN + route, {
     method,
     headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ENV.anon, "x-dds-user-jwt": jwt, "x-dds-scope-site": (new URLSearchParams(location.search).get('client')||''),
       ...REGION_HEADER, ...(mut && version ? { "If-Match": version } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
-  }).finally(() => { if (mut) WRITES_ANSWERED++; });
+    ...(timed ? { signal: timed.signal } : {}),
+  }).catch((err) => {
+    if (timed && timed.signal.aborted) { const e = new Error("That save took too long, so it was stopped. Nothing was lost — it’ll be tried again."); e.timeout = true; throw e; }
+    throw err;
+  }).finally(() => { clearTimeout(limitT); if (mut) WRITES_ANSWERED++; });
   const text = await r.text();
   let j = null; try { j = JSON.parse(text); } catch {}
   if (!r.ok) {
@@ -542,6 +581,44 @@ const S = { site: null, identity: null, location: null, settings: null,
   draftHash: null /* M9: current M3 draft version, sent as If-Match on writes */ };
 const DAYS = [["mon","Monday"],["tue","Tuesday"],["wed","Wednesday"],["thu","Thursday"],["fri","Friday"],["sat","Saturday"],["sun","Sunday"]];
 const changedIds = () => new Set((S.changes?.changes || []).map((c) => c.entity_id).filter(Boolean));
+
+// Builder item 271: the sign-in lapsed while editing (a laptop asleep for hours, a sign-out in
+// another tab). The page is kept exactly as it is; this card asks for the sign-in in a new tab
+// and sends what was waiting once it's back. The stub sign-in (tests) never fires a change
+// event, so the card's own button checks too.
+let LAPSE_DLG = null;
+function signInLapsed() {
+  if (LAPSE_DLG && LAPSE_DLG.isConnected && LAPSE_DLG.open) return;
+  const d = document.createElement("dialog"); d.className = "dds-dlg ask-yes"; d.id = "lapseDlg";
+  d.innerHTML = `<form method="dialog"><div class="ask-msg"><h2 class="dlg-t" id="lapseTitle">Your sign-in ran out</h2><p class="dlg-d">Your page is kept exactly as it is, and nothing here is lost. Sign in again in a new tab, then come back: whatever was waiting to save goes out by itself.</p></div><div class="dlg-row"><button type="button" class="ask-cancel" id="lapseRetry">I’m signed in again</button><a class="ask-ok" id="lapseGo" href="/studio.html" target="_blank" rel="noopener">Sign in</a></div></form>`;
+  d.setAttribute("aria-labelledby", "lapseTitle");
+  d.querySelector("form").addEventListener("submit", (e) => e.preventDefault());
+  d.querySelector("#lapseRetry").addEventListener("click", async () => {
+    const { data } = await sb.auth.getSession();
+    if (data && data.session) { signedInAgain(); return; }
+    toast("Not signed in yet — sign in in the other tab, then press this again.", true);
+  });
+  document.body.appendChild(d); LAPSE_DLG = d;
+  try { d.showModal(); } catch (_) { d.setAttribute("open", ""); }
+}
+function signedInAgain() {
+  if (LAPSE_DLG) { try { LAPSE_DLG.close(); } catch (_) {} LAPSE_DLG.remove(); LAPSE_DLG = null; }
+  toast("Signed in — sending what was waiting.");
+  retryFailedSaves();
+}
+try { sb.auth.onAuthStateChange((_evt, session) => { if (session && session.access_token && LAPSE_DLG && LAPSE_DLG.open) signedInAgain(); }); } catch (_) {}
+// Builder item 250: what failed to save is sent again — when the connection returns, when the
+// sign-in is back, or when the "Not saved · Try again" line is pressed. Each kind of save keeps
+// its own "still waiting" state, so this only has to ask each to go now.
+function retryFailedSaves() {
+  if (!navigator.onLine) { toast("Still offline — it’ll go when the connection returns.", true); return; }
+  debounceFlush("");   // business details (a failed one is put back in the waiting list)
+  if (typeof blocksDirty === "function" && blocksDirty() && !BLOCKS_SAVING) blocksSaveNow();
+  SAVE_PARTS.forEach((h) => { try { if (h.pending()) h.retry(); } catch (_) {} });   // the forms card, and any part with saves of its own
+  const bs = window.DDSBlogStudio && window.DDSBlogStudio.current && window.DDSBlogStudio.current();
+  if (bs && bs.retry) bs.retry();
+}
+window.addEventListener("online", () => setTimeout(retryFailedSaves, 400));
 
 /* ── gate ── */
 function showGate(title, msg, showBtn, retry) {
@@ -894,7 +971,17 @@ function whisper(id, state) {
   w.classList.toggle("bad", state === "failed");
   w.classList.toggle("idle", !state);   // the resting line can step aside when the bar is short of room
   const idle = id === "topWhisper" || id === "dcWhisper" ? "Everything saved" : "";
-  w.textContent = state === "saving" ? "Saving…" : state === "saved" ? "Saved just now" : state === "failed" ? "Not saved, try again" : state === "unsaved" ? "Unsaved changes" : state || idle;
+  w.textContent = state === "saving" ? "Saving…" : state === "saved" ? "Saved just now" : state === "failed" ? "Not saved · Try again" : state === "unsaved" ? "Unsaved changes" : state || idle;
+  // Builder item 250: "Not saved" was plain words with nothing to press. While it's failed, the
+  // line is a button that sends the waiting changes again (the same as `online` does).
+  if (state === "failed") { w.setAttribute("role", "button"); w.tabIndex = 0; w.title = "Send what didn’t save"; }
+  else { w.removeAttribute("role"); w.removeAttribute("tabindex"); w.removeAttribute("title"); }
+  if (!w._retry) {
+    w._retry = true;
+    const go = () => { if (w.classList.contains("bad")) { whisper(id, "saving"); retryFailedSaves(); } };
+    w.addEventListener("click", go);
+    w.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  }
   if (state === "saved") setTimeout(() => { if (w.textContent === "Saved just now") { w.textContent = idle; w.classList.remove("ok"); w.classList.add("idle"); } }, 2600);
 }
 document.querySelectorAll("[data-sing]").forEach((inp) => {
@@ -902,14 +989,22 @@ document.querySelectorAll("[data-sing]").forEach((inp) => {
     const sing = inp.dataset.sing, field = inp.dataset.field;
     const wid = sing === "identity" ? "save-identity" : "save-location";
     whisper(wid, "saving"); whisper("topWhisper", "saving");
-    debounce(sing + ":" + field, async () => {
+    const key = sing + ":" + field;
+    const run = async () => {
       try {
         await api("PUT", sing === "identity" ? "/identity" : "/location", { [field]: inp.value });
         S[sing] = { ...(S[sing] || {}), [field]: inp.value };   // the next undo step needs what's saved now
         whisper(wid, "saved"); whisper("topWhisper", "saved");
         scheduleChangesRefresh();
-      } catch (err) { whisper(wid, ""); whisper("topWhisper", "failed"); toast(nice(err), true); }
-    }, 700);
+      } catch (err) {
+        whisper(wid, ""); whisper("topWhisper", "failed"); toast(nice(err), true);
+        // Builder item 250: a failed details save was forgotten, so the close-tab warning stayed
+        // quiet and nothing sent it later. It waits again (unless newer typing replaced it) for
+        // Try again, `online` or the next flush.
+        if (!debounceFns[key]) debounceFns[key] = run;
+      }
+    };
+    debounce(key, run, 700);
   });
 });
 
@@ -1505,7 +1600,7 @@ function loadBlogStudio() {
   if (window.DDSBlogStudio) return Promise.resolve(window.DDSBlogStudio);
   // Bump ?v= whenever blog-studio.js changes: browsers keep a .js file for a day.
   if (!BLOG_STUDIO) BLOG_STUDIO = new Promise((res, rej) => {
-    const sc = document.createElement("script"); sc.src = "/blog-studio.js?v=1";
+    const sc = document.createElement("script"); sc.src = "/blog-studio.js?v=2";
     sc.onload = () => window.DDSBlogStudio ? res(window.DDSBlogStudio) : rej(new Error("missing"));
     sc.onerror = () => rej(new Error("load"));
     document.head.appendChild(sc);
@@ -5641,7 +5736,7 @@ async function runPublish(btn, firstPublish) {
   $("ritSub").textContent = "All at once, never halfway — your site is never partially updated.";
   try {
     const r = await api("POST", "/publish", undefined, REVIEWED || S.draftHash);
-    if (r.data.status === "live") return showReceipt(firstPublish);
+    if (r.data.status === "live") { showReceipt(firstPublish); warnWaitingPublish(); return; }
     pollPublish(0, firstPublish);
   } catch (err) {
     $("ritBody").innerHTML = pipeHtml(-1);
@@ -5669,13 +5764,31 @@ async function runPublish(btn, firstPublish) {
     $("ritActions").appendChild(ny);
   }
 }
+// Builder item 249: a publish set for later holds the site as it was when it was scheduled. Once
+// something newer has gone live, sending it would put the older site back (the scheduler refuses
+// that at the set time), so the moment a publish goes live over a waiting one, ask: update it to
+// what's live now, or cancel it? Escape leaves it alone. Updating cancels the old row and schedules
+// today's draft for the same time, with the same note.
+async function warnWaitingPublish() {
+  let waiting = [];
+  try { waiting = (((await api("GET", "/schedule")).data || {}).scheduled || []).filter((s) => s.kind === "publish"); } catch (_) { return; }
+  for (const s of waiting) {
+    const when = new Date(s.scheduled_for).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+    const update = await window.ddsConfirm({ title: "A publish is still waiting for " + when, text: "It holds your site as it was when you scheduled it, which is older than what just went live. Update it to today’s version, or cancel it?", yes: "Update it", no: "Cancel it" });
+    try {
+      await api("POST", `/schedule/${s.id}/cancel`);
+      if (update) { await api("POST", "/schedule", { scheduled_for: s.scheduled_for, kind: "publish", note: s.summary && s.summary !== "Scheduled publish" ? s.summary : "" }); toast("Updated — today’s version publishes at " + when + "."); }
+      else toast("Canceled — nothing will happen at that time.");
+    } catch (err) { toast(nice(err), true); }
+  }
+}
 async function pollPublish(n, firstPublish) {
   if (n > 30) { $("ritSub").textContent = "This is taking longer than usual — it’s still working, and Versions will show how it ends. You can safely step away."; return; }
   await new Promise((r) => setTimeout(r, 4000));
   try {
     const pubs = (await api("GET", "/publishes")).data;
     const top = pubs[0];
-    if (top && top.status === "live") return showReceipt(firstPublish);
+    if (top && top.status === "live") { showReceipt(firstPublish); warnWaitingPublish(); return; }
     if (top && top.status === "failed") {
       $("ritBody").innerHTML = pipeHtml(-1);
       $("ritTitle").textContent = "That didn’t go through.";
@@ -5821,6 +5934,7 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
   noteLab.htmlFor = "schedNote"; noteRow.appendChild(noteLab); noteRow.appendChild(noteIn); panel.appendChild(noteRow);
   const btns = el("div"); btns.style.cssText = "display:flex;gap:8px;margin-top:14px";
   const okb = el("button", "schedgo", "Schedule it"); okb.type = "button";
+  let pubScheduled = false;
   // one filled button per screen: while the panel holds focus, scheduling is the
   // job on screen (Schedule it filled, publish-now quiet); when focus leaves it
   // for something else, publish-now is the filled button again. pointerdown
@@ -5844,11 +5958,17 @@ async function renderRitualSchedule(host, publishable, toSchedule) {
     }
     okb.disabled = true; okb.textContent = "Scheduling…";
     try {
-      await api("POST", "/schedule", { scheduled_for: when.toISOString(), kind: "publish", note: noteIn.value.trim() });
+      // builder item 249: once the publish is scheduled, a second press (after the offline leg
+      // failed) sets only the offline time, never a second publish
+      if (!pubScheduled) { await api("POST", "/schedule", { scheduled_for: when.toISOString(), kind: "publish", note: noteIn.value.trim() }); pubScheduled = true; }
       if (offWhen) await api("POST", "/schedule", { scheduled_for: offWhen.toISOString(), kind: "offline" });
       toast(offWhen ? "Scheduled — it publishes, then comes down, on its own." : "Scheduled — it publishes on its own.");
       loadRitual();
-    } catch (err) { okb.disabled = false; okb.textContent = "Schedule it"; toast(nice(err), true); }
+    } catch (err) {
+      okb.disabled = false; okb.textContent = pubScheduled ? "Set the offline time" : "Schedule it";
+      if (pubScheduled) { pub.inp.disabled = true; toast("The publish is scheduled. The offline time didn’t save — try it again, or untick it.", true); }
+      else toast(nice(err), true);
+    }
   });
   btns.appendChild(okb); panel.appendChild(btns);
   wrap.appendChild(panel);
@@ -6556,6 +6676,17 @@ $("btnRestoreGo").addEventListener("click", async () => {
     go("today");
   } catch (err) {
     btn.disabled = false; btn.textContent = "Restore to my draft";
+    // Builder item 254: a restore that stopped part-way says so, and offers to put the draft back
+    // from the safety copy taken first
+    const b = err && err.body;
+    if (b && b.error === "restore_partial" && b.safety_snapshot_id) {
+      closeSheet("restoreScrim");
+      toastAction(nice(err), b.put_back || "Put my draft back", async () => {
+        try { const r = await api("POST", "/restore-to-draft", { snapshot_id: b.safety_snapshot_id }); toast(r.data.message); await refreshAll(); workFromRestored(); }
+        catch (e2) { toast(nice(e2), true); }
+      }, 60000);
+      return;
+    }
     toast(nice(err), true);
   }
 });
@@ -9088,8 +9219,10 @@ let IPE_SAVE_T = null, IPE_SAVE_PENDING = false;
 let IPE_SAVE_INFLIGHT = false;
 window.addEventListener('beforeunload', (e) => {
   if (IPE_SAVE_T != null || IPE_SAVE_PENDING || IPE_SAVE_INFLIGHT || (IPE && IPE.dirty) || BLOCKS_SAVING || SETTINGS_TURNS || DRAFT_WRITES_OUT || blocksDirty()
-    || (IDE && IDE.el.textContent !== IDE.orig) || IDE_SAVING || detailsPending()) { e.preventDefault(); e.returnValue = ''; }
+    || (IDE && IDE.el.textContent !== IDE.orig) || IDE_SAVING || detailsPending() || blogPending() || partsPending()) { e.preventDefault(); e.returnValue = ''; }
 });
+// Builder item 251: a post's unsaved words (waiting, on their way, or failed) count too
+function blogPending() { const bs = window.DDSBlogStudio && window.DDSBlogStudio.current && window.DDSBlogStudio.current(); return !!(bs && bs.dirty && bs.dirty()); }
 let IDE = null;
 let IDE_SAVING = null;   // words just typed, on their way to the server; the canvas holds its redraw till they land
 function dcBlockSections(main) {

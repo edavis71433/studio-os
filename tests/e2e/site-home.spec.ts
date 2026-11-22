@@ -1140,15 +1140,16 @@ test.describe('type into the welcome section and About on the canvas', () => {
     await expect.poll(() => identityWrites(writes).at(-1)?.body).toEqual({ business_name: 'Marlow’s Kitchen' });
   });
 
-  test('Escape puts the words back and saves nothing', async ({ page }) => {
+  // builder item 255: Escape used to throw the words away; now it keeps them and leaves the box
+  test('Escape keeps the words and leaves the box, and they save', async ({ page }) => {
     const { writes, frame } = await canvas(page);
     const p = frame.locator('p[data-pr="identity.description"]');
     await p.dblclick();
     await page.keyboard.type(' and more');
     await page.keyboard.press('Escape');
-    await expect(p).toHaveText('Hello');
-    await settled(page);
-    expect(identityWrites(writes)).toHaveLength(0);
+    await expect(p).toHaveText('Hello and more');
+    await expect(p).not.toHaveAttribute('contenteditable', /.+/);
+    await expect.poll(() => identityWrites(writes).map((w) => w.body.description), { timeout: 6000 }).toContain('Hello and more');
   });
 
   test('a sample line is replaced by the first keystroke, and only real words are saved', async ({ page }) => {
@@ -1462,11 +1463,12 @@ test.describe('a save that fails says so', () => {
   const failing = (page: Page, path: string) => page.route(`**/functions/v1/presence${path}`, (route: Route) => route.request().method() === 'PUT'
     ? route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }) })
     : route.fallback());
-  test('a business detail that fails to save says “Not saved, try again”', async ({ page }) => {
+  test('a business detail that fails to save says “Not saved · Try again”', async ({ page }) => {   // item 250: a button now
     await mount(page, '/presence.html#business');
     await failing(page, '/identity');
     await page.locator('#f-phone').fill('555-0199');
-    await expect(page.locator('#topWhisper')).toHaveText('Not saved, try again');
+    await expect(page.locator('#topWhisper')).toHaveText('Not saved · Try again');
+    await expect(page.locator('#topWhisper')).toHaveAttribute('role', 'button');
     await expect(page.locator('#topWhisper')).toHaveClass(/\bbad\b/);
   });
   test('the closed switch goes back to what’s saved when its save fails', async ({ page }) => {
@@ -1475,7 +1477,7 @@ test.describe('a save that fails says so', () => {
     const sw = page.locator('#closedSwitch');
     await expect(sw).not.toBeChecked();
     await sw.click();
-    await expect(page.locator('#topWhisper')).toHaveText('Not saved, try again');
+    await expect(page.locator('#topWhisper')).toHaveText('Not saved · Try again');
     await expect(sw).not.toBeChecked();
     await expect(page.locator('#f-closednote')).toBeHidden();
   });
