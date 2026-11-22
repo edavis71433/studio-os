@@ -30,6 +30,7 @@ import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 import { copiedBlockerFor } from '../lib/copied_record.ts';
 import { pageLockBlockers, lockIdsIn } from '../lib/page_access.ts';
 import { pageLocksFound } from './page_locks.ts';
+import { SITE_DEFAULT_TZ } from '../lib/visits.ts';
 
 
 interface RoomState {
@@ -97,8 +98,14 @@ async function roomState(site: SiteRow): Promise<RoomState | null> {
   return { draftContent: snapshot.content, liveContent, draftHash, blockers: v.blockers.length, warnings: v.warnings.length, blockerList: v.blockers, warningList: v.warnings, changes, lastLive, lastAny, oldestDraftChangeAt: oldest, hostingProblem, liveDomain };
 }
 
+/** Item 282: a date for the bar, on the site's own clock (the Versions list beside it says the same day). Pure. */
+export function publishDayLabel(iso: string, tz: string | null | undefined): string {
+  try { return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: tz || SITE_DEFAULT_TZ }); }
+  catch { return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: SITE_DEFAULT_TZ }); }
+}
 export async function handleHealth(site: SiteRow, cors: Record<string, string>) {
-  const st = await roomState(site);
+  const [st, zoneQ] = await Promise.all([roomState(site), svc(`presence_locations?site_id=eq.${site.id}&select=timezone&limit=1`).catch(() => null)]);
+  const tz = zoneQ && zoneQ.ok && Array.isArray(zoneQ.json) && zoneQ.json[0] && typeof zoneQ.json[0].timezone === 'string' ? String(zoneQ.json[0].timezone) : null;
   if (!st) return json({ error: 'template_missing', message: 'This site’s template isn’t available.' }, 500, cors);
   const nowIso = new Date().toISOString();
 
@@ -133,7 +140,7 @@ export async function handleHealth(site: SiteRow, cors: Record<string, string>) 
           ? { state: 'changes', label: `${st.changes.count} change${st.changes.count > 1 ? 's' : ''}`, detail: st.blockers ? `${st.blockers} to fix before publishing` : 'ready to publish' }
           : { state: 'clean', label: 'Up to date', detail: 'no unpublished changes' },
         last_publish: st.lastLive
-          ? { label: new Date(st.lastLive.completed_at || st.lastLive.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }), detail: lastPublishDetail(st.lastLive.actor_kind) }   // staff OR operator = the studio (audit change 2)
+          ? { label: publishDayLabel(st.lastLive.completed_at || st.lastLive.created_at, tz), detail: lastPublishDetail(st.lastLive.actor_kind) }   // staff OR operator = the studio (audit change 2); item 282: the site's own day
           : { label: '—', detail: 'no publishes yet' },
         domain,
       },

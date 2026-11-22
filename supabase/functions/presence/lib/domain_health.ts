@@ -2,13 +2,47 @@
 // Moved here from routes/admin.ts (Nov 2026 review, builder list item 134) so the
 // client's domain sheet and the daily domain watch (commerce/lifecycle.ts) ask the
 // same question the same way. DNS is read over DNS-over-HTTPS (Google's resolver):
-// a CNAME to the site's netlify.app name, or the Netlify apex address. The apex
-// address comes from the ONE constant (platform/dns.ts), never a second literal.
+// a CNAME to the site's netlify.app name, or one of Netlify's own addresses.
+//
+// Builder list item 265 (full review of Nov 22, 2026): the list of "ours" used to be the
+// one fallback address (platform/dns.ts). Netlify's preferred record is an ALIAS, ANAME or
+// flattened CNAME at the bare name pointed at its load balancer, which answers with TWO
+// addresses, and a name flattened to the site's own netlify.app answers with others again.
+// A client set up that way, or on Cloudflare, was told the second address was a leftover
+// to delete, the Domains page said "Not fully set up" for good, and "your website is
+// live" never went. So Netlify's addresses are looked up at check time (the load balancer
+// name and the site's own netlify.app name), the fallback constant always among them, and
+// a Netlify address is never a leftover.
 import { getSite, sslStatus } from './netlify.ts';
 import { NETLIFY_APEX_IP } from '../platform/dns.ts';
 import { guardedFetch } from '../../_shared/tools/url_guard.ts';
 
-const NETLIFY_APEX_IPS = new Set([NETLIFY_APEX_IP]);
+/** Netlify's load balancer: the name its guide says to point a bare domain at. */
+export const NETLIFY_APEX_NAME = 'apex-loadbalancer.netlify.com';
+/** The one address known without a lookup: the fallback A record our connect steps hand out. */
+export const NETLIFY_KNOWN_IPS: ReadonlySet<string> = new Set([NETLIFY_APEX_IP]);
+const IS_ADDRESS = /^\d{1,3}(\.\d{1,3}){3}$/;
+
+/** Pure: the set of addresses that count as "ours", from the lookups of Netlify's names:
+ *  the fallback constant, whatever the load balancer answers, and whatever the site's own
+ *  netlify.app name answers. Only real addresses join; a lookup that failed adds nothing. */
+export function netlifyAddressSet(lookups: ReadonlyArray<ReadonlyArray<string>>): Set<string> {
+  const out = new Set<string>(NETLIFY_KNOWN_IPS);
+  for (const list of lookups) for (const ip of list || []) if (IS_ADDRESS.test(String(ip))) out.add(String(ip).toLowerCase());
+  return out;
+}
+let addrCache: { at: number; target: string | null; set: Set<string> } | null = null;
+const ADDR_CACHE_MS = 60 * 60_000;
+/** Netlify's addresses right now, looked up (and kept an hour in this process). `target`
+ *  is the site's own netlify.app name when known; its addresses join the set too. */
+export async function netlifyAddresses(target: string | null): Promise<Set<string>> {
+  const now = Date.now();
+  if (addrCache && now - addrCache.at < ADDR_CACHE_MS && (addrCache.target === target || !target)) return addrCache.set;
+  const [lb, own] = await Promise.all([dnsLookup(NETLIFY_APEX_NAME, 'A'), target ? dnsLookup(target, 'A') : Promise.resolve([])]);
+  const set = netlifyAddressSet([lb, own]);
+  addrCache = { at: now, target, set };
+  return set;
+}
 
 export async function dnsLookup(name: string, type: 'A' | 'CNAME'): Promise<string[]> {
   try {
@@ -113,7 +147,8 @@ export async function domainHealth(site: { custom_domain: string | null; netlify
   const nf = 'nf' in pre ? pre.nf : site.netlify_site_id ? await getSite(site.netlify_site_id) : null;
   const target = nf && nf.ok && nf.site ? nf.site.default_domain.toLowerCase() : null;
   const { cnames, aRecords } = pre.lookups || await lookupName(site.custom_domain);
-  const dnsOk = (target !== null && cnames.includes(target)) || aRecords.some((ip) => NETLIFY_APEX_IPS.has(ip));
+  const ours = await netlifyAddresses(target);
+  const dnsOk = (target !== null && cnames.includes(target)) || aRecords.some((ip) => ours.has(ip));
   const ssl = ('ssl' in pre ? pre.ssl : site.netlify_site_id ? await sslStatus(site.netlify_site_id) : null) || { ok: false, state: 'unknown', expires_at: null };
   const sslOk = certIsOn(ssl.state);
   const health = !dnsOk ? 'dns_pending' : !sslOk ? 'ssl_pending' : 'ok';
@@ -124,7 +159,7 @@ export async function domainHealth(site: { custom_domain: string | null; netlify
   return {
     custom_domain: site.custom_domain, health, message,
     netlify_subdomain: target,
-    dns: { ok: dnsOk, cname: cnames, a: aRecords, expected_cname: target, expected_apex_ip: [...NETLIFY_APEX_IPS] },
+    dns: { ok: dnsOk, cname: cnames, a: aRecords, expected_cname: target, expected_apex_ip: [...ours] },
     ssl: { state: ssl.state, expires_at: ssl.expires_at },
   };
 }
@@ -180,15 +215,20 @@ export function twinName(domain: string, registered?: string | null): string | n
 export interface NameCheck { name: string; points: boolean; leftovers: string[] }
 export interface CheckLine { key: string; ok: boolean; words: string }
 
-/** Pure: the checklist the sheet and the Domains page show, one line per thing. */
+/** Pure: the checklist the sheet and the Domains page show, one line per thing. Item 265:
+ *  when the domain is showing our latest page, that name points here whatever its records
+ *  look like (a flattened record, a proxy in front), so its "points here" line passes. The
+ *  page is compared at the domain itself, so its twin ("www.") keeps its own records test. */
 export function domainChecklist(i: { domain: string; names: NameCheck[]; padlockOn: boolean; padlockNames: string[]; serving: Serving | null; compared?: boolean }): CheckLine[] {
   const out: CheckLine[] = [];
+  const shownAt = (name: string) => i.serving === 'latest' && name.toLowerCase() === String(i.domain || '').toLowerCase();
   for (const n of i.names) {
-    out.push({ key: `points:${n.name}`, ok: n.points, words: n.points ? `${n.name} points here` : `${n.name} doesn’t point here yet` });
+    const points = n.points || shownAt(n.name);
+    out.push({ key: `points:${n.name}`, ok: points, words: points ? `${n.name} points here` : `${n.name} doesn’t point here yet` });
     for (const ip of n.leftovers) out.push({ key: `leftover:${n.name}:${ip}`, ok: false, words: `An old record is still on ${n.name}: delete ${ip} at the provider` });
   }
   if (i.padlockOn) {
-    const missing = i.names.filter((n) => n.points && i.padlockNames.length && !i.padlockNames.includes(n.name)).map((n) => n.name);
+    const missing = i.names.filter((n) => (n.points || shownAt(n.name)) && i.padlockNames.length && !i.padlockNames.includes(n.name)).map((n) => n.name);
     out.push(missing.length
       ? { key: 'padlock', ok: false, words: `The padlock doesn’t cover ${missing.join(' or ')} yet` }
       : { key: 'padlock', ok: true, words: i.names.length > 1 ? 'The padlock covers both names' : 'The padlock is on' });
@@ -217,23 +257,23 @@ async function pageHash(url: string): Promise<{ ok: boolean; server: string; has
   } catch { return { ok: false, server: '', hash: null }; }
 }
 
-const IS_ADDRESS = /^\d{1,3}(\.\d{1,3}){3}$/;
 /** Pure: one name's check, from its two lookups. An address lookup on a name that is a pointer
  *  answers with the pointer first and the addresses behind it after, so `aRecords` can hold a
  *  NAME ("www" pointing at the bare domain is how most providers set it up). That name used to
  *  be read as an old record: "delete x.com at the provider", and an owner who obeyed took www.
  *  offline (Nov 12 review, finding 17). Leftovers are real addresses only, and only on a name
  *  that holds its own records: behind a pointer the addresses belong to the name pointed at,
- *  which is checked on its own line. */
-export function nameCheckFrom(name: string, target: string | null, cnames: string[], aRecords: string[]): NameCheck {
+ *  which is checked on its own line. Item 265: `ourIps` is every address Netlify answers
+ *  with today (netlifyAddresses); none of them is ever a leftover. */
+export function nameCheckFrom(name: string, target: string | null, cnames: string[], aRecords: string[], ourIps: ReadonlySet<string> = NETLIFY_KNOWN_IPS): NameCheck {
   const viaCname = target !== null && cnames.includes(target);
-  const ours = aRecords.filter((ip) => NETLIFY_APEX_IPS.has(ip));
-  const leftovers = cnames.length ? [] : aRecords.filter((ip) => IS_ADDRESS.test(ip) && !NETLIFY_APEX_IPS.has(ip) && ours.length > 0);
+  const ours = aRecords.filter((ip) => ourIps.has(ip));
+  const leftovers = cnames.length ? [] : aRecords.filter((ip) => IS_ADDRESS.test(ip) && !ourIps.has(ip) && ours.length > 0);
   return { name, points: viaCname || ours.length > 0, leftovers };
 }
 export async function checkName(name: string, target: string | null): Promise<NameCheck> {
-  const { cnames, aRecords } = await lookupName(name);
-  return nameCheckFrom(name, target, cnames, aRecords);
+  const [{ cnames, aRecords }, ours] = await Promise.all([lookupName(name), netlifyAddresses(target)]);
+  return nameCheckFrom(name, target, cnames, aRecords, ours);
 }
 
 /** The live checks for one hosted site: both names, the padlock's names, and what the domain shows. */

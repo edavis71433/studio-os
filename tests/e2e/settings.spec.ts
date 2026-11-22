@@ -313,7 +313,7 @@ test.describe('Settings page', () => {
     await expect(sec.locator('#reportLast')).toHaveText('');
     await sec.locator('#sw-report').click();
     await expect(sec.locator('#sw-report')).toHaveAttribute('aria-checked', 'true');
-    await expect(page.locator('.dds-toast').last()).toContainText('On. The first report goes out in the first days of next month.');
+    await expect(page.locator('.dds-toast').last()).toContainText('On. The first report goes out on the 4th to 6th of next month.');
     await expect(sec.locator('#reportLast')).toContainText('Nothing sent yet');
     expect(puts).toEqual([{ enabled: true }]);
     await sec.locator('#report-note').fill('Thanks for a great month!');

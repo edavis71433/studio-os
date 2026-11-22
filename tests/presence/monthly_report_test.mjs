@@ -5,7 +5,7 @@
 // only in the first days of a month, once; the fold uses the same visit counting
 // as Analytics; the words say a part that couldn't be read rather than a zero.
 import {
-  normalizeReportSetting, lastMonth, reportDueNow, foldReport, reportHtml, REPORT_NOTE_MAX, REPORT_SEND_DAYS,
+  normalizeReportSetting, lastMonth, reportDueNow, foldReport, reportHtml, REPORT_NOTE_MAX, REPORT_SEND_FROM, REPORT_SEND_TO,
   applyReportChange, blockedReason, afterFailure, REPORT_MAX_TRIES, BLOCK_WORDS,
   reportZone, monthNow, anyZoneInSendDays, REPORT_DEFAULT_TZ,
   sentMonthsOf, withSentMonth, monthWindow, REPORT_KEEP_MONTHS,
@@ -32,21 +32,23 @@ ok('January looks back to December of the year before', lastMonth('2027-01-01T00
 
 // due
 const on = normalizeReportSetting({ enabled: true });
-ok('due on the 1st when nothing was sent', reportDueNow(on, '2026-11-01T06:00:00.000Z'));
-ok(`due up to the ${REPORT_SEND_DAYS}rd`, reportDueNow(on, `2026-11-0${REPORT_SEND_DAYS}T23:00:00.000Z`));
-ok('not due later in the month', !reportDueNow(on, `2026-11-0${REPORT_SEND_DAYS + 1}T00:00:00.000Z`) && !reportDueNow(on, '2026-11-20T00:00:00.000Z'));
-ok('not due when last month was already sent', !reportDueNow({ ...on, last_month: '2026-10' }, '2026-11-02T00:00:00.000Z'));
-ok('due again the next month', reportDueNow({ ...on, last_month: '2026-10' }, '2026-12-02T00:00:00.000Z'));
+// item 266 (full review of Nov 22): the 4th to 6th, once Google's month is in
+ok('not due on the 1st to 3rd any more (Google’s month isn’t in)', !reportDueNow(on, '2026-11-01T06:00:00.000Z') && !reportDueNow(on, '2026-11-03T23:00:00.000Z'));
+ok(`due from the ${REPORT_SEND_FROM}th when nothing was sent`, reportDueNow(on, `2026-11-0${REPORT_SEND_FROM}T06:00:00.000Z`));
+ok(`due up to the ${REPORT_SEND_TO}th`, reportDueNow(on, `2026-11-0${REPORT_SEND_TO}T23:00:00.000Z`));
+ok('not due later in the month', !reportDueNow(on, `2026-11-0${REPORT_SEND_TO + 1}T00:00:00.000Z`) && !reportDueNow(on, '2026-11-20T00:00:00.000Z'));
+ok('not due when last month was already sent', !reportDueNow({ ...on, last_month: '2026-10' }, '2026-11-05T00:00:00.000Z'));
+ok('due again the next month', reportDueNow({ ...on, last_month: '2026-10' }, '2026-12-05T00:00:00.000Z'));
 ok('never due while off', !reportDueNow(normalizeReportSetting({ enabled: false }), '2026-11-01T00:00:00.000Z'));
 
 // switching on (Nov 10 review, finding 4): the first report is next month's, as the card says
 {
   const off = normalizeReportSetting({ enabled: false });
   const onDec2 = applyReportChange(off, { enabled: true }, 'eric@example.com', '2026-12-02T10:00:00.000Z');
-  ok('switched on during the first days, last month counts as handled', onDec2.enabled && onDec2.last_month === '2026-11' && !reportDueNow(onDec2, '2026-12-02T11:00:00.000Z'));
-  ok('…and the report goes out the next month', reportDueNow(onDec2, '2027-01-01T06:00:00.000Z'));
+  ok('switched on during the send days, last month counts as handled', onDec2.enabled && onDec2.last_month === '2026-11' && !reportDueNow(onDec2, '2026-12-05T11:00:00.000Z'));
+  ok('…and the report goes out the next month', reportDueNow(onDec2, '2027-01-05T06:00:00.000Z'));
   const onMid = applyReportChange(off, { enabled: true }, null, '2026-11-10T10:00:00.000Z');
-  ok('switched on mid-month, the first report is the one for this month', onMid.last_month === '2026-10' && reportDueNow(onMid, '2026-12-01T06:00:00.000Z'));
+  ok('switched on mid-month, the first report is the one for this month', onMid.last_month === '2026-10' && reportDueNow(onMid, '2026-12-05T06:00:00.000Z'));
   const sentAlready = applyReportChange(normalizeReportSetting({ enabled: false, last_month: '2026-11' }), { enabled: true }, null, '2026-12-02T10:00:00.000Z');
   ok('switching on never moves the mark backwards', sentAlready.last_month === '2026-11');
   const noteOnly = applyReportChange(normalizeReportSetting({ enabled: true, last_month: '2026-09' }), { note: 'Hi' }, null, '2026-11-02T10:00:00.000Z');
@@ -133,17 +135,17 @@ ok('switching on for a client who can’t be emailed is refused with the reason'
   const novFold = foldReport({ month: novLA.month, label: novLA.label, startMs: Date.parse(novLA.startIso), endMs: Date.parse(novLA.endIso), visits: [visitAt6pm], enquiries: 0, publishes: [], address: '', visitsCap: 5000, timeZone: LA });
   ok('D7: a visit at 6pm Pacific on October 31 counts in October’s report, not November’s', inOct.pageviews === 1 && novFold.pageviews === 0);
   const due = normalizeReportSetting({ enabled: true, last_month: '2026-09' });
-  ok('D7: due once the 1st starts on the site’s clock, not London’s', !reportDueNow(due, '2026-11-01T06:00:00.000Z', LA) && reportDueNow(due, '2026-11-01T08:00:00.000Z', LA));
-  ok('D7: Auckland’s 1st comes while London is still on the 31st', reportDueNow(due, '2026-10-31T12:00:00.000Z', 'Pacific/Auckland') && !reportDueNow(due, '2026-10-31T12:00:00.000Z'));
-  ok('D7: due up to the 3rd there, even when London is on the 4th', reportDueNow(due, '2026-11-04T06:00:00.000Z', LA) && !reportDueNow(due, '2026-11-04T09:00:00.000Z', LA));
+  ok('D7: due once the 4th starts on the site’s clock, not London’s', !reportDueNow(due, '2026-11-04T06:00:00.000Z', LA) && reportDueNow(due, '2026-11-04T08:00:00.000Z', LA));
+  ok('D7: Auckland’s 4th comes while London is still on the 3rd', reportDueNow(due, '2026-11-03T12:00:00.000Z', 'Pacific/Auckland') && !reportDueNow(due, '2026-11-03T12:00:00.000Z'));
+  ok('D7: due up to the 6th there, even when London is on the 7th', reportDueNow(due, '2026-11-07T06:00:00.000Z', LA) && !reportDueNow(due, '2026-11-07T09:00:00.000Z', LA));
   // switched on at 6pm on October 31 in Los Angeles: September is the month handled, so October's report goes out
   const on = applyReportChange(normalizeReportSetting({ enabled: false }), { enabled: true }, null, oct31, LA);
-  ok('D7: switched on late on the 31st there, the month that just ended there still gets its report', on.last_month === '2026-09' && reportDueNow(on, '2026-11-02T12:00:00.000Z', LA));
+  ok('D7: switched on late on the 31st there, the month that just ended there still gets its report', on.last_month === '2026-09' && reportDueNow(on, '2026-11-05T12:00:00.000Z', LA));
   ok('D7: (with London’s clock the same press skipped October)', applyReportChange(normalizeReportSetting({ enabled: false }), { enabled: true }, null, oct31).last_month === '2026-10');
   // a publish at 7pm Pacific on October 20 is October 21 in London
   const pub = foldReport({ month: octLA.month, label: octLA.label, startMs: Date.parse(octLA.startIso), endMs: Date.parse(octLA.endIso), visits: [], enquiries: 0, publishes: [{ created_at: '2026-10-21T02:00:00.000Z' }], address: '', visitsCap: 5000, timeZone: LA });
   ok('D7: "the last on …" names the day it was published there', /the last on October 20\./.test(reportHtml(pub, { studioName: 'S', note: '' }).html) && /the last on October 21\./.test(reportHtml({ ...pub, timeZone: undefined }, { studioName: 'S', note: '' }).html));
-  ok('D7: on a day no clock is in its first days the job reads nothing; on the 30th Kiritimati is already on the 1st', !anyZoneInSendDays('2026-11-15T00:00:00.000Z') && anyZoneInSendDays('2026-11-30T12:00:00.000Z') && anyZoneInSendDays('2026-12-04T11:00:00.000Z') && !anyZoneInSendDays('2026-12-05T00:00:00.000Z'));
+  ok('D7: on a day no clock is on a send day the job reads nothing; on the 3rd Kiritimati is already on the 4th', !anyZoneInSendDays('2026-11-15T00:00:00.000Z') && anyZoneInSendDays('2026-12-03T12:00:00.000Z') && anyZoneInSendDays('2026-12-07T11:00:00.000Z') && !anyZoneInSendDays('2026-12-08T00:00:00.000Z'));
   ok('D7: with no zone given, the UTC clock, as before', lastMonth('2026-11-02T03:00:00.000Z').startIso === '2026-10-01T00:00:00.000Z' && monthNow('2026-11-01T01:00:00.000Z') === '2026-11');
 }
 

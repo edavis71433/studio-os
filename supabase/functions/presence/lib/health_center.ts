@@ -27,6 +27,26 @@ export interface HealthCenterInputs {
   stripeKey?: { kind: 'restricted' | 'secret' | 'none' | 'other'; live: boolean | null };
   /** item 263: whether the stock photo library answers (lib/stock/health.ts). Left out, the area isn't shown. */
   stock?: { configured: boolean; answered: boolean | null; status: number; provider: string } | null;
+  /** builder list item 269: the host's plan as the host tells it (lib/netlify.ts readHostPlan).
+   *  Left out, the area isn't shown. */
+  hosting?: HostingRead | null;
+}
+export interface HostingRead { ok: boolean; team: string | null; plan: string | null; credits_included: number | null; credits_used: number | null; period_start: string | null; next_period_start: string | null; exceeded: boolean; read_at: string; why: string | null }
+
+/** Pure: the Hosting area's state and words, from the host's answer. */
+export function hostingArea(h: HostingRead | null | undefined): { state: AreaState; detail: string } {
+  if (!h) return { state: 'off', detail: 'No hosting key is set, so nothing is published from here.' };
+  const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : null);
+  if (!h.ok) {
+    if (h.why === 'no_token') return { state: 'off', detail: 'No hosting key is set, so nothing is published from here.' };
+    if (h.why === 'refused') return { state: 'attention', detail: 'The hosting key can’t read the team’s plan. Check the key at the host.' };
+    return { state: 'attention', detail: 'The host’s plan couldn’t be read just now.' };
+  }
+  const plan = [h.plan, h.credits_included !== null ? `${h.credits_included.toLocaleString('en-US')} credits a period` : null].filter(Boolean).join(', ');
+  const renews = day(h.next_period_start);
+  if (h.exceeded) return { state: 'attention', detail: `The host’s plan is used up: publishes are paused${renews ? ` until ${renews}` : ''}. Buy credits at the host or wait.` };
+  const used = h.credits_used !== null ? `${h.credits_used.toLocaleString('en-US')} used` : 'credits used: not known (the host reports 0, which it does even when credits were spent)';
+  return { state: 'ok', detail: `${plan || 'Plan read'}; ${used}${renews ? `; renews ${renews}` : ''}.` };
 }
 
 export type AreaState = 'ok' | 'attention' | 'off';
@@ -83,6 +103,9 @@ export function summarizeHealthCenter(i: HealthCenterInputs): { overall: AreaSta
 
   // usage
   add('usage', 'Usage', 'ok', `${i.sitesLive} site${i.sitesLive === 1 ? '' : 's'} live.`);
+
+  // hosting (builder list item 269): the host's plan, as the host tells it
+  if (i.hosting !== undefined) { const h = hostingArea(i.hosting); add('hosting', 'Hosting', h.state, h.detail); }
 
   // errors
   const errs = i.failedPublishes + i.failedRuns;

@@ -40,9 +40,20 @@ import { normalizeDecisions } from '../lib/do_next.ts';
 import { readVisitDrop, sourcesFromRows, type VisitDrop } from '../lib/visit_drop.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { json } from '../../_shared/http.ts';
+import { publishedOnce } from '../lib/site_live.ts';
+import { clientReach, studioSiteFor } from '../lib/client_reach.ts';
 
 export const REPORT_NOTE_MAX = 600;
-export const REPORT_SEND_DAYS = 3;   // the report goes out on the 1st, 2nd or 3rd of the month
+// Builder list item 266 (full review of Nov 22, 2026): the report used to go on the 1st to
+// 3rd, before Google had finished the month (its numbers trail by two or three days, and
+// the daily Search Console read runs at 07:00 UTC). Clients east of the Pacific got no
+// Google part at all; Pacific ones got a month short its last days, read as a fall. Now
+// it goes on the 4th, 5th or 6th, and a site with Google connected waits for its stored
+// month to have been read on or after the 4th; on the 6th it goes whatever happened.
+export const REPORT_SEND_FROM = 4;   // the first day of the month a report may go
+export const REPORT_SEND_TO = 6;     // the last; on this day it goes even if Google's month never arrived
+/** Builder list item 266: the day of the next month (UTC) by which Google's read of a month is whole. */
+export const GOOGLE_MONTH_WHOLE_DAY = 4;
 
 /** Item 209: the clients a monthly run reads at once, and at most how many pages. */
 export const REPORT_PAGE = 100, REPORT_PAGES = 50;
@@ -210,7 +221,7 @@ export function blockedReason(email: string | null, suppression: string | null):
  *  (routes/client_delivery.ts), and a website the studio watches on the client's own host
  *  (edition monitor) is live already, so a watch-plan client keeps getting theirs. Pure. */
 export function reportSiteLive(site: { edition?: string | null; status?: string | null; last_published_at?: string | null } | null | undefined): boolean {
-  return !!site && (site.edition === 'monitor' || site.status === 'live' || !!site.last_published_at);
+  return !!site && (site.edition === 'monitor' || publishedOnce(site));   // item 261: the one rule
 }
 
 // ── Bug hunt D7 (Nov 10): the month is the site's own, not London's ──
@@ -277,19 +288,36 @@ export function monthNow(nowIso: string, tz = 'UTC'): string {
   return `${y}-${String(m).padStart(2, '0')}`;
 }
 
-/** Is it time to send last month's report to this site? Pure: the first days of a
- *  month on the site's clock, the switch on, and last month not sent yet. */
-export function reportDueNow(setting: ReportSetting, nowIso: string, tz = 'UTC'): boolean {
+/** Item 266: whether Google's numbers for `month` (YYYY-MM) are in: the stored month was
+ *  read on or after the 4th of the month after, on the UTC clock the daily read keeps. Pure. */
+export function googleMonthIn(storedAt: string | null | undefined, month: string): boolean {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(month || ''));
+  const t = storedAt ? Date.parse(storedAt) : NaN;
+  if (!m || !Number.isFinite(t)) return false;
+  return t >= Date.UTC(Number(m[1]), Number(m[2]), GOOGLE_MONTH_WHOLE_DAY);   // month index m[2] is the month AFTER (0-based)
+}
+/** What the job knows about a site's Google numbers for the month: connected or not, and
+ *  when the stored month was last read. Not connected: nothing to wait for. */
+export interface GoogleGate { connected: boolean; stored_at: string | null }
+
+/** Is it time to send last month's report to this site? Pure: the 4th to 6th of a month on
+ *  the site's clock, the switch on, last month not sent yet, and (item 266) for a site with
+ *  Google connected, its month read whole, or the 6th come. With no `google` given, the
+ *  date alone decides (the first read of the loop; the claim reads it again with it). */
+export function reportDueNow(setting: ReportSetting, nowIso: string, tz = 'UTC', google?: GoogleGate | null): boolean {
   if (!setting.enabled) return false;
   const day = zoneClock(Date.parse(nowIso), reportZone(tz, 'UTC')).d;
-  if (day > REPORT_SEND_DAYS) return false;
-  return setting.last_month !== lastMonth(nowIso, tz).month;
+  if (day < REPORT_SEND_FROM || day > REPORT_SEND_TO) return false;
+  const month = lastMonth(nowIso, tz).month;
+  if (setting.last_month === month) return false;
+  if (google && google.connected && day < REPORT_SEND_TO && !googleMonthIn(google.stored_at, month)) return false;
+  return true;
 }
-/** Can it be the first days of a month anywhere? Zones run from 12 hours behind UTC to 14
- *  ahead, so on any other day the monthly job reads nothing at all. Pure. */
+/** Can it be a send day anywhere? Zones run from 12 hours behind UTC to 14 ahead, so on any
+ *  other day the monthly job reads nothing at all. Pure. */
 export function anyZoneInSendDays(nowIso: string): boolean {
   const ms = Date.parse(nowIso);
-  return [-12, 14].some((h) => new Date(ms + h * 3_600_000).getUTCDate() <= REPORT_SEND_DAYS);
+  return [-12, 14].some((h) => { const d = new Date(ms + h * 3_600_000).getUTCDate(); return d >= REPORT_SEND_FROM && d <= REPORT_SEND_TO; });
 }
 
 /** Fold the month's reads into the report's numbers. Pure. */
@@ -522,20 +550,22 @@ export async function loadReportData(site: SiteRow, win: { month: string; startI
   return { ...base, ...extras, maps, siteName, priorLabel: priorWin.label.replace(/ \d{4}$/, ''), speed: reportSpeed(sq ? sq.rows as SpeedRow[] : null), contacts, drop };
 }
 
+/** Item 266: is Google connected for this site, and when was its `month` last read (the
+ *  daily read rewrites the row and stamps observed_at, lib/gsc.ts signalRowsFor). */
+export async function googleGateFor(site: SiteRow, month: string): Promise<GoogleGate> {
+  const conn = await svc(`presence_connections?site_id=eq.${site.id}&provider_key=eq.google_search_console&status=eq.connected&select=site_id&limit=1`).catch(() => null);
+  const connected = !!(conn && conn.ok && Array.isArray(conn.json) && conn.json.length);
+  if (!connected || !site.client_id) return { connected: false, stored_at: null };
+  const sig = await svc(`signals?client_id=eq.${encodeURIComponent(String(site.client_id))}&source=eq.gsc&metric=eq.search_clicks&period=eq.${encodeURIComponent(month)}&select=observed_at&limit=1`).catch(() => null);
+  const row = sig && sig.ok && Array.isArray(sig.json) ? (sig.json[0] as { observed_at?: string } | undefined) : undefined;
+  return { connected: true, stored_at: row?.observed_at ? String(row.observed_at) : null };
+}
+
 /** The studio that looks after this client site (the active service link): its brand,
  *  and the reply home, so a client's reply lands in the studio's Inbox. */
-async function studioSiteOf(siteId: string): Promise<string | null> {
-  try {
-    const l = await svc(`presence_service_links?customer_site_id=eq.${siteId}&status=eq.active&select=agency_site_id&order=created_at.desc&limit=1`);
-    return Array.isArray(l.json) && l.json[0]?.agency_site_id ? String(l.json[0].agency_site_id) : null;
-  } catch { return null; }
-}
-async function clientOf(site: SiteRow): Promise<{ email: string | null; name: string | null }> {
-  if (!site.client_id) return { email: null, name: null };
-  const c = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email,name&limit=1`).catch(() => ({ json: [] as unknown[] }));
-  const row = (Array.isArray(c.json) ? c.json[0] : null) as { email?: string; name?: string } | null;
-  return { email: row?.email ? String(row.email).trim() : null, name: row?.name || null };
-}
+const studioSiteOf = (siteId: string) => studioSiteFor(siteId);   // item 267: the service link, else the studio's list of sites
+/** Item 268: the client's address from wherever their record keeps it (lib/client_reach.ts). */
+const clientOf = (site: SiteRow) => clientReach(site.client_id);
 /** The client's address, their name, and why they can't be emailed (or null). Read
  *  before anything else, so a client who can't be reached costs two small reads. */
 export async function reachOf(site: SiteRow): Promise<{ email: string | null; name: string | null; blocked: string | null }> {
@@ -604,7 +634,7 @@ export function afterFailure(s: ReportSetting, month: string, before: string | n
   return { ...s, last_month: s.last_month === month ? before : s.last_month, tries: { month, count } };
 }
 
-/** The monthly job: on the first days of a month, every switched-on client site that
+/** The monthly job: on the 4th to 6th of a month, every switched-on client site that
  *  hasn't had last month handled yet. Each month is CLAIMED first (a compare-and-swap
  *  on the setting that writes only the month mark), then sent; a client who can't be
  *  emailed is marked skipped once, with the reason, and is not a failure. Item 160: a
@@ -615,7 +645,7 @@ export function afterFailure(s: ReportSetting, month: string, before: string | n
  *  is skipped once for the month the same way ("not_live", counted as waiting), before
  *  anything else is read, and its first report goes out the month after it goes live. */
 export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOString()): Promise<{ sent: number; skipped: number; unreachable: number; failures: number; quiet?: number; waiting?: number; not_due?: boolean }> {
-  // D7: each site's month turns on its own clock; on a day no clock is in its first days, read nothing
+  // D7: each site's month turns on its own clock; on a day no clock is on a send day, read nothing
   if (!anyZoneInSendDays(nowIso)) return { sent: 0, skipped: 0, unreachable: 0, failures: 0, not_due: true };
   // Item 209 (review file 06, finding 63): every client with the report on, a page at a
   // time in a set order, until `limit` went out. One read of up to 200 in no order used
@@ -639,9 +669,12 @@ export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOStr
     if (!site) { skipped++; continue; }
     // item 200: "how your website did" for a site nobody can visit yet reads as bad news, so the
     // month is marked skipped with its reason (the same claim: only if still due) and nothing is sent
+    // item 266: a site with Google connected waits for its month to be read whole (the 6th sends anyway)
+    const google = await googleGateFor(site, win.month).catch(() => null);
+    if (!reportDueNow(seen, nowIso, tz, google)) { waiting++; continue; }
     if (!reportSiteLive(site)) {
       const held = await SAVE(site.id, (s) => {
-        if (!reportDueNow(s, nowIso, tz)) throw new NotDue();
+        if (!reportDueNow(s, nowIso, tz, google)) throw new NotDue();
         return { ...s, last_month: win.month, tries: null, last_result: { month: win.month, status: 'skipped', reason: 'not_live', at: nowIso } };
       }).catch(() => null);
       if (held) waiting++; else skipped++;
@@ -651,7 +684,7 @@ export async function runMonthlyReports(limit = 20, nowIso = new Date().toISOStr
     // claim the month: only if it is still due on the LATEST setting; only the month mark (and, for a client who can't be emailed, the reason) changes
     let before: string | null = null, claimedSetting: ReportSetting | null = null;
     const claimed = await SAVE(site.id, (s) => {
-      if (!reportDueNow(s, nowIso, tz)) throw new NotDue();
+      if (!reportDueNow(s, nowIso, tz, google)) throw new NotDue();
       before = s.last_month;
       const next: ReportSetting = { ...s, last_month: win.month };
       if (reach.blocked) next.last_result = { month: win.month, status: 'skipped', reason: reach.blocked, at: nowIso };
@@ -694,7 +727,7 @@ async function reportCard(site: SiteRow, s: ReportSetting, principal: { email?: 
   const [reach, tz, qs] = await Promise.all([reachOf(site).catch(() => null), zoneOfSite(site.id), readReservedJson(site.id, RESERVED_NAMES.aiQuestions)]);
   // item 182: what the monthly AI check would cost, for this client's questions (the AI check's seven until they change them)
   const n = normalizeQuestions(qs).questions.length || 7;
-  const month = monthNow(nowIso, tz);   // this month's report goes out in the first days of next month
+  const month = monthNow(nowIso, tz);   // this month's report goes out on the 4th to 6th of next month
   // item 160: an extra person on the do-not-send list is left out at the send; the card says who
   const { suppressionOf } = await import('../routes/email_infra.ts');
   const ccBlocked: Record<string, string> = {};
