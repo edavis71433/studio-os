@@ -7,7 +7,9 @@ const ok = (n, p) => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL
 const near = (a, b) => Math.abs(a - b) < 1e-6;
 
 const HAIKU = 'claude-haiku-4-5-20251001';
-ok('price table has the shipping Haiku model', !!MODEL_PRICES[HAIKU]);
+ok('price table keeps the model the old rows were metered under', !!MODEL_PRICES[HAIKU]);
+// builder item 409: the small model every in-app call runs on now, at its own price
+ok('price table has the small model, ten times cheaper than the old one', MODEL_PRICES['claude-haiku-5-5']?.inputPerM === 0.10 && MODEL_PRICES['claude-haiku-5-5']?.outputPerM === 0.50);
 ok('1M in + 1M out at listed Haiku price', near(estimateTextCostUsd(HAIKU, 1_000_000, 1_000_000), MODEL_PRICES[HAIKU].inputPerM + MODEL_PRICES[HAIKU].outputPerM));
 ok('unlisted model → default text price (never NaN/undefined)', typeof estimateTextCostUsd('some-future-model', 500_000, 100_000) === 'number');
 ok('zero tokens → zero cost', estimateTextCostUsd(HAIKU, 0, 0) === 0);

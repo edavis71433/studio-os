@@ -16,7 +16,7 @@
 //
 // A file is pointed at only where its address is written whole, in quotes: src="/shell.js",
 // '/create.js', "/qr.js?v=1". An address built from pieces keeps the plain file.
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, mkdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { transformSync } from 'esbuild';
@@ -98,11 +98,38 @@ while (left.size) {
     left.delete(f);
   }
 }
-let pointed = 0;
+// ── 2b. the brand fonts (builder item 407) ─────────────────────────────────────
+// fonts/brand.css names the font files, so a browser found them only after the page, that
+// style sheet and the layout were done: 116 kB arriving late on every first visit, text drawn
+// in a stand-in face and then changed. The sheet is packed and fingerprinted like the app's
+// own styles (kept a year under /v/*, where /fonts/brand.css was re-checked daily), and every
+// page that links it preloads the two files the app draws with, so they start with the page.
+// The tools host's pages keep the plain names that host serves (list item 139).
+const BRAND_CSS = 'fonts/brand.css';
+export const PRELOAD_FONTS = [
+  '/fonts/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2',                               // Inter, latin, every weight (48 kB)
+  '/fonts/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0KxC9TeA.woff2',         // Fraunces, latin, roman (67 kB)
+];
+export const PRELOAD_TAGS = PRELOAD_FONTS.map((f) => `<link rel="preload" href="${f}" as="font" type="font/woff2" crossorigin>`).join('');
+const BRAND_LINK = /<link rel="stylesheet" href="\/fonts\/brand\.css">/g;
+let brandAt = '';
+if (existsSync(join(DIST, BRAND_CSS))) {
+  const packedBrand = css(readFileSync(join(DIST, BRAND_CSS), 'utf8'), BRAND_CSS);
+  writeFileSync(join(DIST, BRAND_CSS), packedBrand);
+  const fp = createHash('sha256').update(packedBrand).digest('hex').slice(0, 12);
+  mkdirSync(join(DIST, 'v', fp), { recursive: true });
+  writeFileSync(join(DIST, 'v', fp, 'brand.css'), packedBrand);
+  brandAt = `/v/${fp}/brand.css`;
+}
+let pointed = 0, preloaded = 0;
 for (const f of pages) {
   if (PLAIN_PAGES.has(f)) continue;
   const src = readFileSync(join(DIST, f), 'utf8');
-  const out = point(src);
+  let out = point(src);
+  if (brandAt && BRAND_LINK.test(out)) {
+    preloaded++;
+    out = out.replace(BRAND_LINK, `${PRELOAD_TAGS}<link rel="stylesheet" href="${brandAt}">`);
+  }
   if (out !== src) { pointed++; writeFileSync(join(DIST, f), out); }
 }
 // the rule that keeps them must be there, or a fingerprinted file would be kept an hour
@@ -110,4 +137,4 @@ const headers = readFileSync(join(DIST, '_headers'), 'utf8');
 if (!/^\/v\/\*\n\s+Cache-Control:\s*public,\s*max-age=31536000,\s*immutable\s*$/m.test(headers)) {
   throw new Error('pack-public: _headers has no year-long rule for /v/*');
 }
-console.log(`pack-public: ${assets.length} files and ${pages.length} pages packed, ${Math.round(before / 1024)} kB to ${Math.round(after / 1024)} kB; ${where.size} fingerprinted, ${pointed} pages point at them`);
+console.log(`pack-public: ${assets.length} files and ${pages.length} pages packed, ${Math.round(before / 1024)} kB to ${Math.round(after / 1024)} kB; ${where.size} fingerprinted, ${pointed} pages point at them; ${preloaded} pages preload the brand fonts${brandAt ? ` and link ${brandAt}` : ''}`);

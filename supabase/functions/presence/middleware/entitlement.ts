@@ -23,6 +23,14 @@ export type Mode = 'full' | 'readonly' | 'denied';
 export interface EntRow { status: string; plan: string | null }
 const entCache = new WeakMap<object, Map<string, EntRow>>();
 
+/** Builder item 401: a seat remembered by lib/who_asks.ts hands this request the row it
+ *  read, so the gates below read nothing. */
+export function seedEntitlement(principal: Principal, clientId: string, row: EntRow): void {
+  let m = entCache.get(principal as object);
+  if (!m) { m = new Map(); entCache.set(principal as object, m); }
+  m.set(clientId, row);
+}
+
 export async function entitlementFor(principal: Principal, clientId: string): Promise<EntRow> {
   let m = entCache.get(principal as object);
   if (!m) { m = new Map(); entCache.set(principal as object, m); }

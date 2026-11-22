@@ -45,7 +45,8 @@ const ago = (d) => new Date(Date.now() - d * 86400_000).toISOString();
   const r = await readCloseDates([...many, { id: 'not-a-uuid', stage: 'won' }, { id: D_OPEN, stage: 'proposal' }], `site_id=eq.${STUDIO}`, async (p) => { paths.push(p); return paths.length === 2 ? null : []; });
   ok('H1: 100 deals a read, side by side; open deals and bad ids are not asked about', paths.length === 3 && paths.every((p) => p.startsWith(`presence_deal_events?site_id=eq.${STUDIO}&kind=in.(stage_change,converted)&to_stage=in.(won,lost)&deal_id=in.(`)) && !paths.join().includes(D_OPEN) && !paths.join().includes('not-a-uuid'));
   ok('H1: a failed read says partial (those deals keep the old fallback)', r.partial === true);
-  ok('H1: the Reports and the tiles read the same path', closesPath('site_id=eq.X', ['a']) === 'presence_deal_events?site_id=eq.X&kind=in.(stage_change,converted)&to_stage=in.(won,lost)&deal_id=in.(a)&select=deal_id,to_stage,created_at&order=created_at.desc&limit=2000');
+  // builder item 411: no order or cap in the path; readCloseDates pages it and folds newest first
+  ok('H1: the Reports and the tiles read the same path', closesPath('site_id=eq.X', ['a']) === 'presence_deal_events?site_id=eq.X&kind=in.(stage_change,converted)&to_stage=in.(won,lost)&deal_id=in.(a)&select=deal_id,to_stage,created_at');
 
   // a deal marked Won by hand in September, renamed today: updated_at moved, the win didn't
   const edited = { id: D_OLD, title: 'Old win', stage: 'won', expected_value_cents: 500000, converted_client_id: null, converted_at: null, updated_at: NOW };
