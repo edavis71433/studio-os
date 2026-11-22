@@ -14,7 +14,7 @@
 const DDS_PART_SRC = {"edit":"/presence-edit.js?v=1"};
 const DDS_PART_AT = {};
 // every stand-in, so a call can tell whether the part has replaced it yet
-const DDS_STANDINS = new Set([mountEditCards, mountDesignCard, linkPick, dcDeletePage, dcSavePageName, openSettingsPanel, mountBlocksCard, applyTemplateFromGallery, dcAddPage, openTrayPanel, dcPageMenu, dcDuplicatePage, dcClearPage, stylesTab, dcOpenPage, pcEverySub, dcSaveNav, dcSwitchPage, ipeCommit, closePagesCard, closeSettingsPanel, dcClipSet, dcSavePendingEdits, dcSyncPageSwitch, pagesBarReveal, dcRefreshTree, renderPagesBar, dcSyncLiveChip, renderBlocksCard, refreshDesignPreview, exitEditMode, dcLiveFromPanel, dcLiveSoon, formsLoad, remountSectionsCard, renderBlockTray, mountTemplateGallery]);
+const DDS_STANDINS = new Set([mountEditCards, mountDesignCard, linkPick, dcDeletePage, dcSavePageName, openSettingsPanel, mountBlocksCard, applyTemplateFromGallery, dcAddPage, openTrayPanel, dcPageMenu, dcDuplicatePage, dcClearPage, stylesTab, dcOpenPage, pcEverySub, dcSaveNav, dcSwitchPage, ipeCommit, closePagesCard, closeSettingsPanel, dcClipSet, dcSavePendingEdits, dcSyncPageSwitch, pagesBarReveal, dcRefreshTree, renderPagesBar, dcSyncLiveChip, renderBlocksCard, refreshDesignPreview, exitEditMode, dcLiveFromPanel, dcLiveSoon, formsLoad, remountSectionsCard, renderBlockTray, mountTemplateGallery, eeEditCore, pfRefresh]);
 function ddsPartIn(name) { return !!(window.__ddsParts && window.__ddsParts[name]); }
 // Load a part (once); answers when it is in. A failed load can be tried again.
 function ddsPart(name) {
@@ -70,6 +70,8 @@ function dcSaveNav(...a) { return ddsStub("edit", "dcSaveNav", a, true); }
 function dcSwitchPage(...a) { return ddsStub("edit", "dcSwitchPage", a, true); }
 function ipeCommit(...a) { return ddsStub("edit", "ipeCommit", a, false); }
 function closePagesCard(...a) { return ddsStub("edit", "closePagesCard", a, false); }
+function eeEditCore(...a) { return ddsStub("edit", "eeEditCore", a, true); }
+function pfRefresh(...a) { return ddsStub("edit", "pfRefresh", a, false); }   // item 317: the Photos card draws again after descriptions are saved   // item 314: a built-in page's words, in a card beside the page
 function closeSettingsPanel(...a) { return ddsStub("edit", "closeSettingsPanel", a, false); }
 function dcClipSet(...a) { return ddsStub("edit", "dcClipSet", a, false); }
 // Builder items 250 and 251: a part of the editor with saves of its own (the forms card, in the
@@ -652,6 +654,8 @@ function go(view, early) {
   // builder item 220: a Designer never opens a business tab, even from its address or a link
   if (isBusinessTab(view) && window.ddsLacks && window.ddsLacks("business")) view = "today";
   const stays = $("view-" + view) && $("view-" + view).classList.contains("on");
+  // builder item 319: the publish card never stays over the next page opened from the sidebar
+  if (!stays && $("ritualWrap") && $("ritualWrap").classList.contains("on") && typeof closeRitual === "function") closeRitual();
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("on"));
   const target = $("view-" + view); if (!target) return;
   target.classList.add("on");
@@ -3252,7 +3256,7 @@ function renderMediaGrid(grid, manage, onPick, onEdit) {
   grid.innerHTML = "";
   if (!S.media.length) {
     if (manage) grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:30px 0"><div class="eq">No photos yet.</div><div class="eh">Add a few of your best. They’ll be ready to place anywhere on your site.</div></div>`;
-    else grid.innerHTML = `<p style="color:var(--ink-2);font-size:13px">No files in this collection yet.</p>`;
+    else grid.innerHTML = `<p style="color:var(--ink-2);font-size:13px">No photos yet. Upload some, or pick from Stock photos.</p>`;   // item 317: the chooser says what to do next
     return;
   }
   S.media.forEach((m) => {
@@ -3263,7 +3267,7 @@ function renderMediaGrid(grid, manage, onPick, onEdit) {
 // One photograph cell + its manage actions — used by the classic grid above AND by
 // FL_render (#180), so images keep every behavior inside the Files library view.
 function mediaCell(grid, m, manage, onPick) {
-  const cell = el(onPick ? "button" : "div", "mcell");
+  const cell = el(onPick ? "button" : "div", "mcell"); cell.__mediaId = m.id;
   if (m.thumb) { const img = el("img"); img.src = m.thumb; img.alt = m.alt_text || ""; img.loading = "lazy"; cell.appendChild(img); }
   if (m.used_by && m.used_by.length) { const b = el("span", "badge", "On your site"); b.title = "At work: " + m.used_by.join(", "); cell.appendChild(b); }
   const alt = el("span", "alt", m.alt_text || "");
@@ -3415,12 +3419,107 @@ function showSuggest(cell, m, grid, p) {
   cell.appendChild(panel);
   altI.focus(); altI.select();
 }
+// ── Builder item 317: photos go in by the batch, descriptions asked after, big ones made smaller ──
+// A phone photo is often 12 MB and 4,000 px across; the site never shows more than about
+// 2,400 px, so anything past that, or past 3 MB, is redrawn at 2,400 px on its long side here
+// in the browser (a PNG stays a PNG, so it keeps its transparency). The server's 10 MB rule is
+// then never the thing that turns a photo away.
+const PHOTO_MAX_PX = 2400, PHOTO_SHRINK_FROM = 3 * 1024 * 1024, PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+async function dcShrinkPhoto(file) {
+  const asIs = { blob: file, mime: file.type, width: undefined, height: undefined, shrunk: false };
+  let src = null;
+  try { if (window.createImageBitmap) src = await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (_) { src = null; }
+  if (!src) src = await new Promise((res) => { const img = new Image(); img.onload = () => res(img); img.onerror = () => res(null); img.src = URL.createObjectURL(file); });
+  if (!src) return asIs;
+  const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight, big = Math.max(w, h);
+  if (!big || (big <= PHOTO_MAX_PX && file.size <= PHOTO_SHRINK_FROM)) return { ...asIs, width: w, height: h };
+  try {
+    const k = Math.min(1, PHOTO_MAX_PX / big), nw = Math.max(1, Math.round(w * k)), nh = Math.max(1, Math.round(h * k));
+    const c = document.createElement("canvas"); c.width = nw; c.height = nh;
+    c.getContext("2d").drawImage(src, 0, 0, nw, nh);
+    const png = file.type === "image/png";
+    let blob = await new Promise((res) => c.toBlob(res, png ? "image/png" : "image/jpeg", 0.86)), mime = png ? "image/png" : "image/jpeg";
+    if (blob && png && blob.size > PHOTO_MAX_BYTES) { const j = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.86)); if (j) { blob = j; mime = "image/jpeg"; } }
+    if (!blob) return { ...asIs, width: w, height: h };
+    return { blob, mime, width: nw, height: nh, shrunk: true };
+  } catch (_) { return { ...asIs, width: w, height: h }; }
+}
+// A first description from the file's name: "fresh-pasta_basil.jpg" → "Fresh pasta basil";
+// a camera's name ("IMG_4021.HEIC") gives nothing, so it is "Photo" until they say.
+function photoWords(name) {
+  const words = String(name || "").replace(/\.[a-z0-9]+$/i, "").split(/[-_\s.]+/).filter((t) => t && !/^\d+$/.test(t) && !/^(img|dsc|dcim|pxl|mvimg|image|photo|screenshot|screen shot|jpeg|jpg|png|copy)$/i.test(t));
+  const s = words.join(" ").trim();
+  return s.length >= 3 ? s.charAt(0).toUpperCase() + s.slice(1) : "Photo";
+}
+// Every file in the list goes up, one after another, with its first description; then the
+// descriptions are asked for in one sheet (dcDescribePhotos). Resolves the photos that landed.
+async function dcUploadPhotos(files, opts) {
+  const list = Array.from(files || []).filter((f) => /^image\/(jpeg|png|webp)$/.test(f.type));
+  const skipped = Array.from(files || []).length - list.length;
+  if (skipped) toast(skipped === 1 ? "One file isn’t a JPEG, PNG or WebP photo, so it was left out." : skipped + " files aren’t JPEG, PNG or WebP photos, so they were left out.", true);
+  if (!list.length) return [];
+  const wid = (opts && opts.whisper) || "topWhisper", done = [];
+  let shrunk = 0;
+  for (let i = 0; i < list.length; i++) {
+    const f = list[i];
+    whisper(wid, list.length === 1 ? "Bringing it in…" : "Bringing in " + (i + 1) + " of " + list.length + "…");
+    try {
+      const out = await dcShrinkPhoto(f); if (out.shrunk) shrunk++;
+      const words = photoWords(f.name);
+      const r = await api("POST", "/media/upload-url", { mime: out.mime, bytes: out.blob.size, alt_text: words, width: out.width, height: out.height });
+      const put = await fetch(r.data.upload_url, { method: "PUT", headers: { "Content-Type": out.mime }, body: out.blob });
+      if (!put.ok) throw new Error("“" + f.name + "” didn’t finish arriving — nothing was lost, try it once more.");
+      done.push({ id: r.data.media_id, name: f.name, words });
+    } catch (err) { toast(nice(err), true); }
+  }
+  whisper(wid, done.length ? "saved" : "");
+  if (done.length) await loadMedia();
+  if (done.length) toast((done.length === 1 ? "1 photo" : done.length + " photos") + " in your collection" + (shrunk ? (shrunk === 1 ? ", one made smaller for the web" : ", " + shrunk + " made smaller for the web") : ""));
+  if (done.length && !(opts && opts.quiet)) dcDescribePhotos(done);
+  return done;
+}
+// One sheet for the descriptions, after the photos are in: each with the words guessed from its
+// file name, saved only where they were changed. "Later" keeps the guesses.
+function dcDescribePhotos(items) {
+  const d = svDialog(items.length === 1 ? "Describe this photo" : "Describe these photos", "A few words each: read aloud for people who can’t see them, and read by Google. The first guess comes from each file’s name.");
+  const rows = [];
+  items.forEach((it) => {
+    const m = (S.media || []).find((x) => x.id === it.id) || {};
+    const row = el("div", "ph-desc-row");
+    const img = el("img"); img.alt = ""; if (m.thumb) img.src = m.thumb; row.appendChild(img);
+    const inp = el("input"); inp.type = "text"; inp.maxLength = 200; inp.value = m.alt_text || it.words; inp.setAttribute("aria-label", "Description for " + it.name); row.appendChild(inp);
+    rows.push({ it, inp, was: inp.value }); d.body.appendChild(row);
+  });
+  const acts = el("div", "acts");
+  const save = el("button", "pillbtn sm inked", "Save descriptions"); save.type = "button";
+  const later = el("button", "pillbtn sm", "Later"); later.type = "button";
+  acts.append(save, later); d.body.appendChild(acts);
+  later.addEventListener("click", () => d.close());
+  save.addEventListener("click", async () => {
+    save.disabled = true;
+    const changed = rows.filter((r) => r.inp.value.trim().length >= 3 && r.inp.value.trim() !== r.was);
+    try {
+      for (const r of changed) { await api("PUT", `/media/${r.it.id}`, { alt_text: r.inp.value.trim() }); const m = (S.media || []).find((x) => x.id === r.it.id); if (m) m.alt_text = r.inp.value.trim(); }
+      d.close(); if (changed.length) { toast("Descriptions saved"); if ($("mediaGrid")) renderMediaGrid($("mediaGrid"), true); if ($("panelFilesGrid")) pfRefresh(); }
+    } catch (err) { save.disabled = false; toast(nice(err), true); }
+  });
+  setTimeout(() => { try { rows[0].inp.focus(); rows[0].inp.select(); } catch (_) {} }, 30);
+}
+// Files dropped anywhere on a host go in the same way.
+function dcDropPhotos(host, onDone) {
+  if (!host || host.__dcDrop) return; host.__dcDrop = true;
+  host.addEventListener("dragover", (e) => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files")) { e.preventDefault(); host.classList.add("ph-over"); } });
+  host.addEventListener("dragleave", () => host.classList.remove("ph-over"));
+  host.addEventListener("drop", async (e) => { host.classList.remove("ph-over"); const fs = e.dataTransfer && e.dataTransfer.files; if (!fs || !fs.length) return; e.preventDefault(); const got = await dcUploadPhotos(fs); if (onDone) onDone(got); });
+}
 $("btnUpload").addEventListener("click", () => $("fileInput").click());
-$("fileInput").addEventListener("change", () => {
-  const f = $("fileInput").files[0]; if (!f) return;
-  S.pendingFile = f;
-  $("uploadPrep").hidden = false; $("upload-alt").value = ""; $("upload-alt").focus();
+$("fileInput").setAttribute("multiple", "");
+$("fileInput").addEventListener("change", async () => {
+  const fs = Array.from($("fileInput").files || []); if (!fs.length) return;
+  await dcUploadPhotos(fs, { whisper: "save-media" });
+  $("fileInput").value = "";
 });
+dcDropPhotos($("mediaGrid"));
 $("btnUploadCancel").addEventListener("click", () => { S.pendingFile = null; $("uploadPrep").hidden = true; $("fileInput").value = ""; });
 $("btnUploadGo").addEventListener("click", async () => {
   const f = S.pendingFile, alt = $("upload-alt").value.trim();
@@ -3437,14 +3536,49 @@ $("btnUploadGo").addEventListener("click", async () => {
     await loadMedia(); toast("In the collection");
   } catch (err) { whisper("save-media", ""); toast(nice(err), true); }
 });
-let pickerCb = null;
-function openPicker(onPick) {
-  pickerCb = onPick;
-  renderMediaGrid($("pickerGrid"), false, (id) => { closeSheet("pickerScrim"); onPick(id); }, editInPicker);
-  pickerShowTab("mine");   // "Your photos" is always the default when the picker opens
+let pickerCb = null, PICK_MANY = null;   // item 317: many: the ids picked so far
+function pickerPaintGrid() {
+  const onPick = pickerCb; if (!onPick) return;
+  if (!PICK_MANY) { renderMediaGrid($("pickerGrid"), false, (id) => { closeSheet("pickerScrim"); onPick(id); }, editInPicker); return; }
+  renderMediaGrid($("pickerGrid"), false, (id) => {
+    const at = PICK_MANY.indexOf(id); if (at >= 0) PICK_MANY.splice(at, 1); else PICK_MANY.push(id);
+    $("pickerGrid").querySelectorAll(".mcell").forEach((c) => { const on = PICK_MANY.includes(c.__mediaId); c.classList.toggle("picked", on); c.setAttribute("aria-pressed", String(on)); });
+    pickerManyBtn();
+  });
+  $("pickerGrid").querySelectorAll(".mcell").forEach((c) => { c.setAttribute("aria-pressed", "false"); });
+  pickerManyBtn();
+}
+function pickerManyBtn() {
+  const b = $("btnPickMany"); if (!b) return;
+  b.hidden = !PICK_MANY; b.disabled = !(PICK_MANY && PICK_MANY.length);
+  b.textContent = PICK_MANY && PICK_MANY.length ? "Add " + (PICK_MANY.length === 1 ? "this photo" : PICK_MANY.length + " photos") : "Add the photos you pick";
+}
+// opts.many: several at once (a gallery); the callback gets the ids in the order they were picked.
+function openPicker(onPick, opts) {
+  pickerCb = onPick; PICK_MANY = opts && opts.many ? [] : null;
+  const t = $("pickTitle"); if (t) t.textContent = PICK_MANY ? "Choose photographs" : "Choose a photograph";
+  const none = $("btnPickNone"); if (none) none.hidden = !!PICK_MANY;
+  pickerPaintGrid();
+  // item 317: a library with nothing in it opens on Stock, searched for the kind of business
+  pickerShowTab((S.media || []).length ? "mine" : "stock");
   openSheet("pickerScrim");
 }
 $("btnPickNone").addEventListener("click", () => { const cb = pickerCb; closeSheet("pickerScrim"); if (cb) cb(null); });
+$("btnPickMany").addEventListener("click", () => { const cb = pickerCb, ids = (PICK_MANY || []).slice(); if (!ids.length) return; closeSheet("pickerScrim"); if (cb) cb(ids); });
+// Upload from inside the chooser: the photos land in the library and, one, in the slot.
+$("pickUploadBtn").addEventListener("click", () => $("pickUploadIn").click());
+$("pickUploadIn").addEventListener("change", async () => {
+  const fs = Array.from($("pickUploadIn").files || []); $("pickUploadIn").value = ""; if (!fs.length) return;
+  const got = await dcUploadPhotos(fs);
+  pickerAfterUpload(got);
+});
+function pickerAfterUpload(got) {
+  if (!got.length || !pickerCb) return;
+  if (PICK_MANY) { got.forEach((g) => { if (!PICK_MANY.includes(g.id)) PICK_MANY.push(g.id); }); pickerPaintGrid(); pickerShowTab("mine"); return; }
+  if (got.length === 1) { const cb = pickerCb; closeSheet("pickerScrim"); cb(got[0].id); return; }
+  pickerPaintGrid(); pickerShowTab("mine");
+}
+dcDropPhotos($("pickerMinePane"), pickerAfterUpload);
 
 /* ── Items 39 + 117 in the picker: Edit on a photo opens the same editor as Files
  *    (image-editor.js, loaded on first use). Saving makes a NEW file beside the
@@ -3557,8 +3691,14 @@ function pickerShowTab(which) {
   $("pickTabMine").classList.toggle("on", mine); $("pickTabMine").setAttribute("aria-selected", String(mine));
   $("pickTabStock").classList.toggle("on", !mine); $("pickTabStock").setAttribute("aria-selected", String(!mine));
   $("pickerMinePane").hidden = !mine; $("pickerStockPane").hidden = mine;
-  if (!mine) { renderPickerStock(); const q = $("pickStockQ"); if (q) q.focus(); }
+  if (!mine) {
+    // item 317: Stock opens on photos for the kind of business until something else is searched for
+    if (!PICK_STOCK.q && PICK_STOCK.state !== "off") { PICK_STOCK.q = stockWordsFor(); const q = $("pickStockQ"); if (q) q.value = PICK_STOCK.q; loadPickerStock(); return; }
+    renderPickerStock(); const q = $("pickStockQ"); if (q) q.focus();
+  }
 }
+const STOCK_WORDS = { restaurant: "restaurant food", coffee_shop: "coffee cafe", cafe: "cafe", bar: "bar cocktails", food_truck: "street food", retail: "shop products", fitness: "fitness gym", gym: "gym workout", yoga: "yoga studio", nonprofit: "community volunteers", church: "church community", salon: "hair salon", spa: "spa wellness", dentist: "dental clinic", plumber: "plumber tools", contractor: "home renovation", landscaper: "garden landscaping", cleaning: "clean home", photographer: "camera photography", lawyer: "law office", accountant: "office desk", realtor: "house exterior", auto: "car repair", pet: "dog grooming", generic: "small business" };
+function stockWordsFor() { const k = (S.settings && S.settings.industry_key) || "generic"; return STOCK_WORDS[k] || String(k).replace(/_/g, " "); }
 $("pickTabMine").addEventListener("click", () => pickerShowTab("mine"));
 $("pickTabStock").addEventListener("click", () => pickerShowTab("stock"));
 $("pickStockGo").addEventListener("click", () => { PICK_STOCK.q = $("pickStockQ").value.trim(); loadPickerStock(); });
@@ -3679,8 +3819,12 @@ const HB_ICON = {
 };
 const hbCap = (s) => { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); };
 // the public address of the live site (custom domain, else the hosting subdomain)
+// Builder item 261: ONE rule for "is it live", made on the server (lib/site_live.ts, sent as
+// GET /site's `live`): an address alone never made a site live. The address is still the site's
+// once it has been published; before that there is nothing to see.
 function siteLiveUrl() {
   const s = S.site; if (!s) return null;
+  if (S.live && S.live.published === false) return null;
   if (s.custom_domain) return `https://${s.custom_domain}`;
   if (s.netlify_site_id) return `https://presence-${String(s.id).replace(/-/g, "").slice(0, 12)}.netlify.app`;
   return null;
@@ -3926,12 +4070,13 @@ function pcChip(pg, ctx) {
 function pcRow(entry, ctx) {
   const pg = entry.pg, it = entry.it, folder = !pg && !!(it && it.folder);
   const ref = { href: it ? it.href : pg.path, parent: entry.parent ? entry.parent.href : null };
-  const canvas = !!pg && pg.view === "design", slug = canvas ? (pg.slug || "") : null, on = canvas && slug === DC_PAGE;
+  // item 314: every page opens on the canvas; a built-in one goes by "~" + its key (dcBuiltinPage)
+  const mine = !!pg && pg.view === "design", canvas = !!pg, slug = mine ? (pg.slug || "") : canvas ? "~" + pg.key : null, on = canvas && slug === DC_PAGE;
   const name = canvas ? pg.title : it ? it.label : pg.title;   // a page on the canvas goes by its own name, as the old tabs did
   const row = el("div", "pc-row" + (canvas ? " page-pill" : "") + (on ? " on" : "") + (entry.parent ? " child" : ""));
   row.setAttribute("role", "listitem"); row.dataset.href = ref.href; row.dataset.page = pg ? pg.key : folder ? "folder" : "link";
   if (ref.parent) row.dataset.parent = ref.parent;
-  const own = slug ? dcPageObj(slug) : null; if (own && own.hideNav) row.dataset.nav = "hidden";
+  const own = mine ? dcPageObj(slug) : null; if (own && own.hideNav) row.dataset.nav = "hidden";
   const grab = el("button", "pg-grab"); grab.type = "button"; grab.innerHTML = PG_GRIP; grab.title = "Drag to move";
   grab.setAttribute("aria-label", "Move " + name + ". Use the up and down arrow keys.");
   grab.addEventListener("pointerdown", (e) => pgDragStart(e, row, ref, !pg || (it && (it.children || []).length > 0)));
@@ -3957,7 +4102,7 @@ function pcRow(entry, ctx) {
   const chip = pg ? pcChip(pg, ctx) : null; if (chip) row.appendChild(chip);
   const gear = el("button", "pc-ico pg-gear"); gear.type = "button"; gear.innerHTML = PG_GEAR; gear.title = "Settings"; gear.setAttribute("aria-label", "Settings for " + name);
   row.appendChild(gear);
-  if (canvas) {
+  if (mine) {
     const mn = icoBtn("more", "More for " + name, "pc-ico pp-menu");
     mn.title = slug ? "Rename, duplicate, clear or delete this page" : "Duplicate or clear this page";
     mn.addEventListener("click", () => dcPageMenu(slug, mn));
@@ -4208,7 +4353,8 @@ function pgOpenSettings(startRef) {
       box.appendChild(el("h4", "pg-h", "What’s on it"));
       const from = { business: "your business details", offerings: "the items on your " + (VOCAB.label || "Menu") + " tab", faqs: "your questions and answers", updates: "your updates" }[pg.view] || "your details";
       box.appendChild(el("p", "pc-note", "This page is built from " + from + ", so its words are changed there."));
-      const go2 = el("button", "dc-modal-cancel", "Change what’s on it"); go2.type = "button"; go2.addEventListener("click", () => pcLeaveTo(pg.view));
+      // item 314: the tab's form opens in a card beside the page; the editor is never left
+      const go2 = el("button", "dc-modal-cancel", "Change what’s on it"); go2.type = "button"; go2.addEventListener("click", () => { close(); closePagesCard(false); eeEditCore(pg.view); });
       const acts = el("div", "pc-acts"); acts.appendChild(go2); box.appendChild(acts);
     }
     box.appendChild(el("h4", "pg-h", "On Google"));
@@ -5078,8 +5224,11 @@ function renderStageStatus() {
   const st = $("ssStatus"); if (!st) return;
   const live = siteLiveUrl(); const c = S.changes || {};
   const n = c.count || 0;
-  st.textContent = live ? (n ? `Live · ${n} change${n === 1 ? "" : "s"} waiting` : "Live") : "Not live yet";
-  st.classList.toggle("live", !!live);
+  // item 261: the server's word (Live, Offline, Not answering, Paused, Not live yet), then the count
+  const word = S.live && S.live.words ? S.live.words : live ? "Live" : "Not live yet";
+  const isLive = S.live ? !!S.live.is_live : !!live;
+  st.textContent = isLive && n ? `Live · ${n} change${n === 1 ? "" : "s"} waiting` : word;
+  st.classList.toggle("live", isLive);
   dcSyncLiveChip();
 }
 // One line for what's left before the site can go live. Nothing to finish, no line.
@@ -5476,6 +5625,7 @@ function ddsRebuildSidMap() {
 }
 // ── actions (all REUSE the existing editor logic) ──
 function eeEditBlock(bi, tab) {                  // open this one section's editor, on one of its tabs
+  if (typeof bi === "number" && bi < 0) return;   // item 314: nothing was added (a built-in page)
   STK_ITEM = null;   // item 57: the section's card, not one of its blocks'
   closePreview(); go("design");
   if (!$("blocksCard")) mountBlocksCard();
@@ -6602,7 +6752,7 @@ function versionSavedRow(c) {
 // which were all of the draft the restore set aside. A save from the copy it held, or an Undo,
 // would put the old sections back.
 function workFromRestored() {
-  if (DC_PAGE && !dcPageObj(DC_PAGE)) dcOpenPage("");
+  if (dcPageMissing()) dcOpenPage("");
   DC_UNDO = []; DC_REDO = [];
   BLOCKS_WORK = currentBlocks(); DC_HIST_LAST = histSnap(); BLOCK_FOCUS = null; updateUndoButtons();
   renderBlocksCard(); renderPagesBar(); refreshDesignPreview();
@@ -6803,6 +6953,7 @@ async function refreshAll() {
   const [[siteR, off, faq, tes, pos, med, set], ctxR] = await Promise.all([openReads(soft, tagged), ctxP]);
   S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
   S.locationFields = Array.isArray(siteR.data.location_fields) ? siteR.data.location_fields : [];   // item 334: what the database can save
+  S.live = siteR.data.live || null;   // item 261: the one live rule, from the server
   S.offerings = off.data || []; S.faqs = faq.data || []; S.testimonials = tes.data || []; S.posts = pos.data || [];
   S.media = med.data || []; S.settings = set.data || {};
   // Phase SKU: the FEATURE edition — so the standalone CMS workspace shows only
@@ -8633,14 +8784,27 @@ let DC_PAGE = "";
 function dcPagesArr() { return Array.isArray(S.settings && S.settings.pages) ? S.settings.pages : []; }
 function dcPageObj(slug) { return dcPagesArr().find((p) => p && p.slug === slug) || null; }
 function dcPageList() { return [{ slug: "", title: "Home" }, ...dcPagesArr().map((p) => ({ slug: p.slug, title: p.title || p.slug }))]; }
+// ── Builder item 314: every page on the canvas ──
+// The template's own pages (About, FAQ, Updates, Contact and the Menu page) open on the canvas
+// like Home. DC_PAGE names one as "~" + its key: it has no sections of its own, so nothing is
+// written for it; its words come from the Business, Questions, Reviews and Updates tabs, typed
+// on the page (ideStart) or in the card the pencil opens beside the page (eeEditCore).
+const dcBuiltinKey = (slug) => (typeof slug === "string" && slug.charAt(0) === "~" ? slug.slice(1) : null);
+function dcBuiltinPage(slug) { const k = dcBuiltinKey(slug === undefined ? DC_PAGE : slug); return k && typeof hbStandardPages === "function" ? hbStandardPages().find((p) => p.key === k && p.view !== "design") || null : null; }
+function dcBuiltinForPath(path) { const p = typeof hbStandardPages === "function" ? hbStandardPages().find((x) => x.view !== "design" && x.path === path) : null; return p ? "~" + p.key : null; }
+function dcPagePath() { const b = dcBuiltinPage(); return b ? b.path : DC_PAGE ? "/" + DC_PAGE + "/" : "/"; }
+function dcPageMissing() { return !!DC_PAGE && !dcBuiltinPage() && !dcPageObj(DC_PAGE); }
+function dcBuiltinFrom(view) { return { business: "your business details", offerings: "the items on your " + ((typeof VOCAB === "object" && VOCAB && VOCAB.label) || "Menu") + " tab", faqs: "your questions and answers", testimonials: "your reviews", updates: "your updates" }[view] || "your details"; }
 function currentBlocks() {
+  if (dcBuiltinPage()) return [];   // item 314: a built-in page has no sections of its own
   if (DC_PAGE) { const p = dcPageObj(DC_PAGE); return Array.isArray(p && p.blocks) ? p.blocks.map((b) => ({ ...b })) : []; }
   return Array.isArray(S.settings && S.settings.blocks) ? S.settings.blocks.map((b) => ({ ...b })) : [];
 }
 // ── Multi-page: the Pages bar (Home + custom pages) — click a page to author it ──
 const DC_PAGE_RESERVED = new Set(["", "index", "home", "404", "about", "contact", "faq", "faqs", "services", "service", "menu", "products", "classes", "updates", "blog", "news", "post", "posts", "thanks", "thank-you", "privacy", "accessibility", "search", "sitemap", "robots", "assets", "img"]);
-// Section snapshots belong to the page they were taken on; the other steps don't.
-function dcResetHistory() { DC_UNDO = DC_UNDO.filter((x) => typeof x !== "string"); DC_REDO = DC_REDO.filter((x) => typeof x !== "string"); DC_HIST_LAST = null; if (typeof updateUndoButtons === "function") updateUndoButtons(); }
+// Builder item 320: a section step remembers its page (undoSectionsRec), so opening another
+// page keeps it; Undo switches back to that page first. Only the saved-list baseline resets.
+function dcResetHistory() { DC_HIST_LAST = null; if (typeof updateUndoButtons === "function") updateUndoButtons(); }
 // ── Editable GLOBAL top menu (header + footer are global — ONE edit changes every
 //    page). A small structured editor: order items, rename them, point each at one of
 //    your pages or an external link, and give any item a dropdown of child links.
@@ -8665,10 +8829,14 @@ const MEDIA_FILL_TYPES = new Set(["image", "gallery", "carousel", "video", "befo
 // same saveBlocks path (server re-validates), so nothing can drift out of the moat.
 let DC_UNDO = [], DC_REDO = [], DC_HIST_LAST = null, DC_HIST_SILENT = false;
 function histSnap() { try { return JSON.stringify(BLOCKS_WORK || []); } catch (_) { return null; } }
+// Item 320: a section step: the page's list as it was saved, and which page. The same "before"
+// twice in a row (a save that failed and was sent again) is one step, not two.
+const undoSectionsRec = (snap, page) => ({ kind: "sections", page: page == null ? DC_PAGE : page, snap });
+const undoSectionsSame = (rec, snap, page) => !!rec && rec.kind === "sections" && rec.page === (page == null ? DC_PAGE : page) && rec.snap === snap;
 function dcHistoryRecord() {   // called at the start of a USER save (pre-change state → undo)
   if (DC_HIST_SILENT) return;
   if (histSnap() === DC_HIST_LAST) return;   // nothing changed: not a step worth undoing
-  if (DC_HIST_LAST != null) { DC_UNDO.push(DC_HIST_LAST); while (DC_UNDO.length > 60) DC_UNDO.shift(); }
+  if (DC_HIST_LAST != null && !undoSectionsSame(DC_UNDO[DC_UNDO.length - 1], DC_HIST_LAST)) { DC_UNDO.push(undoSectionsRec(DC_HIST_LAST)); while (DC_UNDO.length > 60) DC_UNDO.shift(); }
   DC_REDO = [];
 }
 function dcHistoryCommit() { DC_HIST_LAST = histSnap(); updateUndoButtons(); }
@@ -8821,7 +8989,7 @@ async function undoStep(rec, dir) {
         UNDO_QUIET++; const call = api("PUT", rec.route, vals); UNDO_QUIET--;
         return call.then((r) => undoSync(rec, vals, r));
       });
-      if (DC_PAGE && !dcPageObj(DC_PAGE)) { await dcSavePendingEdits(); dcOpenPage(""); renderPagesBar(); renderBlocksCard(); }   // the page on screen is gone, and anything typed during that write went with it, not onto Home
+      if (dcPageMissing()) { await dcSavePendingEdits(); dcOpenPage(""); renderPagesBar(); renderBlocksCard(); }   // the page on screen is gone, and anything typed during that write went with it, not onto Home
     } else if (rec.kind === "put") {
       const vals = back ? rec.before : rec.after;
       const put = () => { UNDO_QUIET++; const call = api("PUT", rec.route, vals); UNDO_QUIET--; return call.then((r) => undoSync(rec, vals, r)); };
@@ -8849,7 +9017,7 @@ async function undoSync(rec, vals, r) {
   else if (rec.route === "/location") { S.location = { ...(S.location || {}), ...vals }; fillSingles(); }
   else if (rec.route === "/bookings/settings") { BK.settings = { ...BK.settings, ...vals }; if ($("view-bookings").classList.contains("on")) loadBookings(); }
   else if (rec.route === "/dev/customization") { DESIGN_TOKENS = vals.theme_tokens || {}; if (EDIT_CARDS) remountInPlace("designCard", () => mountDesignCard(false), true); }   // item 85: the tokens are in hand
-  else if (rec.route === "/site/template") { const s = await api("GET", "/site"); S.site = s.data.site; LOOKS = null; applyVocab(); if ($("designGallery")) mountTemplateGallery(); const c = $("designCard"); if (c) c.remove(); mountDesignCard(); }
+  else if (rec.route === "/site/template") { const s = await api("GET", "/site"); S.site = s.data.site; S.live = s.data.live || S.live; LOOKS = null; applyVocab(); if ($("designGallery")) mountTemplateGallery(); const c = $("designCard"); if (c) c.remove(); mountDesignCard(); }
   else if (rec.route === "/settings") {
     S.settings = (r && r.data) || { ...S.settings, ...vals };
     const moved = rec.kind === "pages" && DC_PAGE && vals.pages.find((p) => p.prev_slug === DC_PAGE);
@@ -8866,29 +9034,42 @@ async function undoSync(rec, vals, r) {
     if ($("ann-text")) { $("ann-text").value = S.settings.announcement_text || ""; $("ann-url").value = S.settings.announcement_url || ""; $("ann-until").value = (S.settings.announcement_expires_at || "").slice(0, 10); }
   }
 }
+// Item 320: a section step taken on another page opens that page first, then runs again.
+function undoOnItsPage(rec, again, word) {
+  if (rec.kind !== "sections" || rec.page === DC_PAGE) return false;
+  if (typeof dcSwitchPage !== "function") return false;
+  const title = rec.page ? ((dcBuiltinPage(rec.page) || dcPageObj(rec.page) || {}).title || rec.page) : "Home";
+  toast("That change was on " + title + ". Opening it to " + word + " it there.");
+  dcSwitchPage(rec.page).then((ok) => { if (ok && DC_PAGE === rec.page) again(); });
+  return true;
+}
 function dcUndo() {
   // an edit still waiting for its save is the newest step, so it's the one to take back
   if (blocksDirty()) { clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null; dcHistoryRecord(); dcHistoryCommit(); }
   if (!DC_UNDO.length) { toast("Nothing to undo"); return; }
-  const top = DC_UNDO.pop();
-  if (typeof top !== "string") {
+  const top = DC_UNDO[DC_UNDO.length - 1];
+  if (undoOnItsPage(top, dcUndo, "undo")) return;
+  DC_UNDO.pop();
+  if (top.kind !== "sections") {
     DC_REDO.push(top); updateUndoButtons();
     undoRun(top, "undo").then((ok) => { if (ok) toast("Undone"); else { DC_REDO.pop(); DC_UNDO.push(top); updateUndoButtons(); } });
     return;
   }
-  DC_REDO.push(DC_HIST_LAST != null ? DC_HIST_LAST : histSnap());
-  dcApplyHistory(top); toast("Undone");
+  DC_REDO.push(undoSectionsRec(DC_HIST_LAST != null ? DC_HIST_LAST : histSnap()));
+  dcApplyHistory(top.snap); toast("Undone");
 }
 function dcRedo() {
   if (blocksDirty() || !DC_REDO.length) { toast("Nothing to redo"); return; }   // a new edit outranks the redo list
-  const top = DC_REDO.pop();
-  if (typeof top !== "string") {
+  const top = DC_REDO[DC_REDO.length - 1];
+  if (undoOnItsPage(top, dcRedo, "redo")) return;
+  DC_REDO.pop();
+  if (top.kind !== "sections") {
     DC_UNDO.push(top); updateUndoButtons();
     undoRun(top, "redo").then((ok) => { if (ok) toast("Redone"); else { DC_UNDO.pop(); DC_REDO.push(top); updateUndoButtons(); } });
     return;
   }
-  DC_UNDO.push(DC_HIST_LAST != null ? DC_HIST_LAST : histSnap());
-  dcApplyHistory(top); toast("Redone");
+  DC_UNDO.push(undoSectionsRec(DC_HIST_LAST != null ? DC_HIST_LAST : histSnap()));
+  dcApplyHistory(top.snap); toast("Redone");
 }
 // ── One save rule: every section edit saves itself ──────────────────────────
 // A change is whatever makes the working list differ from what was last saved, so
@@ -8945,6 +9126,7 @@ function saveBlocks() {
 async function putBlocks() {
   BLOCKS_PUT_WAITING = false;
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;   // the save before it may have asked for one more
+  if (dcBuiltinPage()) { whisper("topWhisper", "saved"); return true; }   // item 314: nothing of its own to write
   dcHistoryRecord();   // snapshot the previously-persisted state for undo (skipped during undo/redo)
   const sentSnap = histSnap(), sentPage = DC_PAGE;   // what this save carries, and for which page
   whisper("topWhisper", "saving");
@@ -8984,16 +9166,20 @@ async function putBlocks() {
     // Item 195 (review finding 28): a save refused for a locked section is refused again while
     // the list still holds that change, so every later edit on the page was refused too, until a
     // reload threw them all away. The page goes back to how it was last saved; the refusal says why.
-    if (err && err.body && err.body.error === "section_locked" && DC_PAGE === sentPage) lockRefusedPutBack();
+    // Item 318: the page moved the moment the change was made, so a save the server REFUSES
+    // (its answer, not a dropped line or a lapse, which are sent again) puts the list and the
+    // page back the way they were saved, and says so. A stale draft keeps its Load the latest.
+    const refused = !!(err && !err.stale && !err.offline && !err.noSession && !err.timeout && Number(err.status) >= 400 && Number(err.status) < 500 && err.status !== 401);
+    if (refused && DC_PAGE === sentPage) { lockRefusedPutBack(); toast(nice(err) + " The page is back the way it was saved.", true); }
     // G7 "someone else is editing": a refused-stale save gets a calm LOAD-LATEST
     // action (with who, when the server knows) instead of a dead-end error.
-    if (!(err && err.stale)) toast(nice(err), true);   // a stale one already offers Load the latest (offerLoadLatest)
+    else if (!(err && err.stale)) toast(nice(err), true);   // a stale one already offers Load the latest (offerLoadLatest)
     return false;
   }
 }
 // The refused save's undo step never landed, so it goes too.
 function lockRefusedPutBack() {
-  if (DC_HIST_LAST != null && DC_UNDO[DC_UNDO.length - 1] === DC_HIST_LAST) DC_UNDO.pop();
+  if (DC_HIST_LAST != null && undoSectionsSame(DC_UNDO[DC_UNDO.length - 1], DC_HIST_LAST)) DC_UNDO.pop();
   BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null; LIVE_WANTED = false; LIVE_DRAWN = null;
   dcHistoryCommit();
   dcCaptureScroll(); renderBlocksCard(); refreshDesignPreview();
