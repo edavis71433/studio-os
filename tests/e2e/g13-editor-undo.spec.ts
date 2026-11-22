@@ -416,7 +416,7 @@ test.describe('Comments mode offers no editing (item 99)', () => {
     await expect(page.locator('#designTreeList .dc-tree-addpage')).toHaveCount(0);             // no Add a page
     expect(puts.length).toBe(0);
     // back in Edit mode, all of it returns
-    if (phone) { await page.getByRole('button', { name: /Collapse/ }).click(); await page.locator('#dkMore').click(); }
+    if (phone) await page.locator('#dkMore').click();                                         // item 284: the Notes card is a sheet above the dock, so More is still in reach
     await page.locator('#dcModeSeg [data-dcmode="comments"]').click();                        // Notes again is the way back to Edit
     await expect(page.locator('#dcModeSeg [data-dcmode="comments"]')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('#designTreeList .dc-tree-acts').first()).toBeAttached();

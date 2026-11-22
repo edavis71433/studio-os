@@ -260,6 +260,7 @@ function cmToggle() {
   CM_PENDING = (async () => {
     try {
       await cmLoad(); CM_ON = true;
+      dcRefreshTree();   // item 99: the Contents list drops its move, settings and remove buttons while Notes is on (the off path redraws it too)
       if (DC_MODE === "comments") cmRenderList();   // builder item 284: the Notes card …unless the user already moved on mid-load
     } catch (err) { toast(nice(err), true); }
     CM_BUSY = false; CM_PENDING = null; cmSyncButton();
