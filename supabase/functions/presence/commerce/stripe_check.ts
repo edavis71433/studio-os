@@ -27,7 +27,7 @@ import { svc } from '../lib/db.ts';
 import { raiseNotice, clearNotice, clearNoticePrefix } from '../lib/notice.ts';
 import { stripeConfigured, retrieveSubscription, searchInvoicePayments, listSubscriptionPaidInvoices, listLinkCompletedSessions, listRecentRefunds, listRecentDisputes } from './stripe.ts';
 import { syncCharge, syncDispute } from './charge_returns.ts';
-import { applyRetainerSync, recordRetainerCharge, retainerStatusNow, retainerStatusFromStripe, type RetainerState } from './retainers.ts';
+import { applyRetainerSync, recordRetainerCharge, retainerStatusNow, retainerStatusFromStripe, retainerDealsPath, type RetainerState } from './retainers.ts';
 import { subscriptionPeriodEnd } from './stripe_shape.ts';
 
 const enc = encodeURIComponent;
@@ -285,7 +285,7 @@ async function checkOneRetainer(deal: any, out: StripeCheckResult): Promise<'sam
 
 async function checkRetainers(out: StripeCheckResult, n: number, nowMs: number): Promise<void> {
   if (n <= 0) return;
-  const q = await svc('presence_deals?retainer=not.is.null&deleted_at=is.null&select=id,site_id,title,retainer,created_at&order=created_at.asc&limit=100').catch(() => ({ ok: false, json: null }));
+  const q = await svc(retainerDealsPath()).catch(() => ({ ok: false, json: null }));   // the first page; the yearly note (sales item 163) shares this read
   if (!q.ok) { out.errors++; return; }
   const deals = rowsOf(q).filter((d) => retainerCheckable(d?.retainer, nowMs));
   const checked = await lastChecked(deals.map((d) => `retainer:${d.id}`));
@@ -365,7 +365,7 @@ async function checkReturns(out: StripeCheckResult, nowMs: number): Promise<void
 /** Every tick: a few open invoices, a few retainers and a few missed receipts, each at
  *  most once a day, and the week's refunds and disputes once a day. Bounded so a tick
  *  stays quick; with nothing due it only reads. */
-export async function runStripeCheck(limits: { invoices?: number; retainers?: number; receipts?: number; returns?: number; processing?: number } = {}, nowMs: number = Date.now()): Promise<StripeCheckResult> {
+export async function runStripeCheck(limits: { invoices?: number; retainers?: number; receipts?: number; returns?: number; processing?: number; refs?: number } = {}, nowMs: number = Date.now()): Promise<StripeCheckResult> {
   const out = zero();
   if (!stripeConfigured()) return { ...out, skipped_no_stripe: true };
   // before APPLY-0235 the check has nowhere to keep what it asked: it does nothing
@@ -376,5 +376,29 @@ export async function runStripeCheck(limits: { invoices?: number; retainers?: nu
   await checkRetainers(out, limits.retainers ?? 3, nowMs);
   await sendMissedReceipts(out, limits.receipts ?? 3, nowMs);
   if (limits.returns !== 0) await checkReturns(out, nowMs);
+  await fillPaidRefs(out, limits.refs ?? 5, nowMs);   // sales item 177
   return out;
+}
+
+// ── 5. which payment paid an invoice paid before paid_ref existed (sales item 177) ──
+// Migration 0251 fills most from the webhook's own record; a row it couldn't place is asked
+// of Stripe here, a few a day, by the invoice's own id in the payment's metadata. A filled
+// paid_ref is what tells a second, different payment from Stripe repeating itself.
+async function fillPaidRefs(out: StripeCheckResult, n: number, nowMs: number): Promise<void> {
+  if (n <= 0) return;
+  const q = await svc(`presence_invoices?status=eq.paid&paid_ref=eq.&paid_method=eq.&payment_for=is.null&deleted_at=is.null&select=id,paid_at&order=paid_at.asc&limit=${n * 4}`).catch(() => ({ ok: false, json: null }));
+  if (!q.ok) return;   // before 0188 there is no paid_ref to fill
+  const ids = rowsOf(q).map((x) => String(x.id));
+  const checked = await lastChecked(ids.map((id) => `paidref:${id}`));
+  if (!checked) { out.errors++; return; }
+  for (const subject of dueSubjects(ids.map((id) => `paidref:${id}`), checked, n, nowMs)) {
+    const id = subject.slice('paidref:'.length);
+    let payments: any[] = [];
+    try { payments = await searchInvoicePayments(id); } catch { out.stripe_unanswered++; continue; }
+    const paid = payments.filter((p) => p && p.status === 'succeeded').sort((a, b) => (Number(a.created) || 0) - (Number(b.created) || 0));
+    const ref = paid.length ? String(paid[0].id || '') : '';
+    let fixed = false;
+    if (ref) { const up = await svc(`presence_invoices?id=eq.${enc(id)}&paid_ref=eq.&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ paid_ref: ref }) }).catch(() => ({ ok: false, json: null })); fixed = !!(up.ok && rowsOf(up).length); }
+    if (!(await stamp(subject, fixed ? 'fixed' : 'same', nowMs))) out.errors++;
+  }
 }

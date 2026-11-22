@@ -422,8 +422,11 @@
     if (kind === 'invoice') return whoHtml(kind) +
       '<label class="cr-l" for="cr-what">What for</label>' +
       '<input id="cr-what" class="cr-in" maxlength="200" placeholder="e.g. Website — 50% deposit">' +
+      '<div id="cr-lines"></div>' +
+      '<button type="button" class="cr-chip" id="cr-addline" style="margin:4px 0 8px">+ another line</button>' +
       '<label class="cr-l" for="cr-amt">Amount</label>' +
-      '<input id="cr-amt" class="cr-in cr-money" inputmode="decimal" required placeholder="$700">' +
+      '<input id="cr-amt" class="cr-in cr-money" inputmode="decimal" required placeholder="$700" aria-describedby="cr-amt-h">' +
+      '<p class="cr-sub" id="cr-amt-h" hidden>The lines added up.</p>' +
       '<div class="cr-fill" id="cr-fill" hidden></div>' +
       '<span class="cr-l">Due</span>' + chips('due', 'When is it due?', [['receipt', 'On receipt'], ['7', '7 days'], ['14', '14 days'], ['30', '30 days']], '14') +
       '<div class="cr-preview" id="cr-preview" aria-live="polite"></div>';
@@ -493,9 +496,39 @@
     var v = f.querySelector('#cr-value');
     v.addEventListener('blur', function () { var c = crCents(v.value); if (c) v.value = crMoney(c); });
   }
+  // sales item 170: an invoice can have more than one line. "What for" is the first line; each
+  // extra line has its own words and amount, and the amount box becomes the lines added up.
+  function crLines() {
+    var out = [];
+    [].slice.call(dlg.querySelectorAll('#cr-lines .cr-line')).forEach(function (r) { out.push({ label: r.querySelector('.cr-ll').value.trim(), amount_cents: crCents(r.querySelector('.cr-la').value) }); });
+    return out;
+  }
+  function crSumLines() {
+    var extra = crLines(); if (!extra.length) { var h0 = dlg.querySelector('#cr-amt-h'); if (h0) h0.hidden = true; var a0 = dlg.querySelector('#cr-amt'); if (a0) a0.readOnly = false; return; }
+    var first = crCents(dlg.querySelector('#cr-first') ? dlg.querySelector('#cr-first').value : '');
+    var sum = first + extra.reduce(function (n, l) { return n + (l.amount_cents || 0); }, 0);
+    var a = dlg.querySelector('#cr-amt'); a.value = sum ? crMoney(sum) : ''; a.readOnly = true;
+    var h = dlg.querySelector('#cr-amt-h'); if (h) h.hidden = false;
+  }
   function wireInvoice(f) {
     var a = f.querySelector('#cr-amt'), w = f.querySelector('#cr-what');
     a.addEventListener('input', preview); w.addEventListener('input', preview);
+    var add = f.querySelector('#cr-addline');
+    if (add) add.addEventListener('click', function () {
+      var host = f.querySelector('#cr-lines');
+      if (!host.children.length) {
+        // the first line takes the amount typed so far
+        host.insertAdjacentHTML('beforeend', '<div class="cr-line cr-line-first"><label class="cr-l" for="cr-first">First line amount</label><input id="cr-first" class="cr-in cr-money" inputmode="decimal" value="' + (a.value ? esc(a.value) : '') + '" placeholder="$700"></div>');
+        host.querySelector('#cr-first').addEventListener('input', function () { crSumLines(); preview(); });
+      }
+      var n = host.querySelectorAll('.cr-line').length;
+      host.insertAdjacentHTML('beforeend', '<div class="cr-line"><label class="cr-l" for="cr-ll' + n + '">Line ' + (n + 1) + '</label><div style="display:grid;grid-template-columns:1fr 120px 36px;gap:6px;align-items:center"><input id="cr-ll' + n + '" class="cr-in cr-ll" maxlength="200" placeholder="e.g. Logo refresh"><input class="cr-in cr-money cr-la" inputmode="decimal" placeholder="$250" aria-label="Amount for line ' + (n + 1) + '"><button type="button" class="cr-change cr-rm" aria-label="Remove line ' + (n + 1) + '">×</button></div></div>');
+      var row = host.lastElementChild;
+      row.querySelector('.cr-ll').focus();
+      row.querySelector('.cr-la').addEventListener('input', function () { crSumLines(); preview(); });
+      row.querySelector('.cr-rm').addEventListener('click', function () { row.remove(); if (host.querySelectorAll('.cr-line').length === 1) { var first = host.querySelector('.cr-line-first'); if (first) { a.value = first.querySelector('#cr-first').value; first.remove(); } } crSumLines(); preview(); });
+      crSumLines(); preview();
+    });
     a.addEventListener('blur', function () { var c = crCents(a.value); if (c) a.value = crMoney(c); preview(); });
     f.querySelector('#cr-fill').addEventListener('click', function (e) {
       var b = e.target.closest ? e.target.closest('[data-amt]') : null; if (!b) return;
@@ -559,7 +592,7 @@
       : (S.kind === 'deal' ? all.slice(0, 5) : crSuggest(all, 5));
     if (!q && !SHOWN.length && S.kind !== 'deal') SHOWN = all.slice(0, 5);
     hint.textContent = q ? (SHOWN.length ? 'Matches' : 'No one matches “' + q + '”.' + (S.kind === 'proposal' ? ' A proposal needs an open deal.' : ''))
-      : (S.kind === 'deal' ? 'People you know' : S.kind === 'call' ? 'Due a call, and recent' : 'Your open deals');
+      : (S.kind === 'deal' ? 'People you know' : S.kind === 'call' ? 'Due a call, and recent' : S.kind === 'invoice' ? 'Your customers' : 'Your open deals');   // sales item 170: an invoice's list is customers, won or not
     if (S.active >= SHOWN.length) S.active = SHOWN.length ? 0 : -1;
     list.innerHTML = SHOWN.map(function (c, i) {
       var who = c.name ? c.name + (c.company ? ' · ' + c.company : '') : c.title;
@@ -720,6 +753,7 @@
     // item 97: a value that isn't a number is said, never saved as no value
     if (k === 'deal' && val('cr-value') && !crCents(val('cr-value'))) return need('Write the value as a number, like 2500 or 2.5k.', '#cr-value');
     if (k === 'invoice' && !crCents(val('cr-amt'))) return need('Enter the amount.', '#cr-amt');
+    if (k === 'invoice' && crLines().some(function (l) { return !l.label; })) return need('Every line needs a few words saying what it is for.', '#cr-lines .cr-ll');
     if (k === 'todo' && !val('cr-what')) return need('Say what needs doing.', '#cr-what');
     if (k === 'proposal') { close(); location.assign('/pipeline.html?deal=' + encodeURIComponent(c.deal_id) + '&dtab=billing&compose=proposal'); return; }
     S.busy = true; if (go) go.disabled = true;
@@ -774,6 +808,12 @@
       p = ensureDeal(c).then(function (id) {
         var b = { purpose: 'service', amount_cents: amt, due_date: crDue(S.due) };
         if (what) b.title = what;
+        // sales item 170: more than one line goes with the invoice (the first line is "What for")
+        var extra = crLines().filter(function (l) { return l.label || l.amount_cents; });
+        if (extra.length) {
+          var firstEl = dlg.querySelector('#cr-first');
+          b.lines = [{ label: what || 'Invoice', qty: 1, amount_cents: crCents(firstEl ? firstEl.value : '') }].concat(extra.map(function (l) { return { label: l.label, qty: 1, amount_cents: l.amount_cents }; }));
+        }
         if (S.force) b.force = true;
         return api('/sales/deals/' + encodeURIComponent(id) + '/invoice', { method: 'POST', body: b }).then(function (r) {
           if (r.status === 409 && !S.force && r.body && r.body.error === 'amount_mismatch') {
@@ -783,6 +823,7 @@
           if (!r.ok) return Promise.reject(msg(r, r.status === 409 ? 'There’s already an open invoice for a different amount on this deal — open the deal to send or void it.' : 'That invoice didn’t send — please try again.'));
           var b2 = r.body || {}, url = b2.url || '', href = hrefFor(id, 'billing');
           if (b2.warning === 'link_failed' || !url) return Promise.reject(b2.message || 'The invoice saved, but its payment link didn’t generate — press Send invoice again to finish it.');
+          if (b2.ask_reminders && window.ddsAskReminders) setTimeout(function () { window.ddsAskReminders(CLIENT ? CLIENT.site_id : ''); }, 400);   // sales item 166: asked once
           if (b2.emailed) { done('Invoice sent — emailed to ' + (c.name || 'them'), href); return; }
           var copy = navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(url).then(function () { return true; }, function () { return false; }) : Promise.resolve(false);
           return copy.then(function (copied) {

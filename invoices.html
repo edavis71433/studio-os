@@ -15,6 +15,20 @@
   invoice or a customer, a month picker shows one month's. Each row opens its
   deal, downloads its PDF, or records a payment by hand (the same route the deal
   page uses). A part payment shows under the invoice it paid toward.
+  Sales items 162, 165, 166, 169 and 170 (Nov 22 2026 review): the row's menu also
+  sends or resends, copies the pay link, changes the invoice (title, due date, note;
+  amount and lines while nothing was paid toward it; the number is kept), reminds
+  now, voids, undoes a payment recorded by hand and gives money back by hand. The Due
+  column reads "On receipt" when no date was set, a customer's name prints once, and
+  Overdue is red only when something is late. The first send with reminders off asks
+  "Remind them if it isn't paid?" once (shell-kit.js ddsAskReminders).
+  Sales item 173, direction A (Eric's pick, drawn in Figma page 445:2): the page is a money
+  home. A deep plum band carries what is owed, a bar of it by how late (press a piece to see
+  those invoices), overdue, paid this month and this year; under it money in by month, the
+  three customers who owe most, and for the platform's own studio a Stripe strip (paid online,
+  Stripe's fees, what reached the bank, the next payout). GET /sales/money-home brings the
+  months and Stripe's side; an older server (404) leaves those two cards out. The chips, the
+  search, the month picker and the table are as before, under the band.
 ═════════════════════════════════════════════════════════════════════════ -->
 <style>
   :root{
@@ -42,13 +56,46 @@
   .pill[aria-disabled="true"]{opacity:.65;cursor:progress}
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pill.go,:root:not([data-theme="light"]) .chip[aria-pressed="true"],:root:not([data-theme="light"]) .echip[aria-pressed="true"]{color:#171320}}
   :root[data-theme="dark"] .pill.go,:root[data-theme="dark"] .chip[aria-pressed="true"],:root[data-theme="dark"] .echip[aria-pressed="true"]{color:#171320}
-  /* the four totals */
-  .totals{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0}
-  .tot{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px 18px}
-  .tot .l{font-size:13.5px;color:var(--soft)}
-  .tot .v{font-size:28px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.25}
-  .tot.bad .v{color:var(--bad)}
-  .tot .s{font-size:13px;color:var(--faint)}
+  td.late{color:var(--bad)}.foot-row td{background:var(--bg);font-weight:600}
+  .said{display:inline-block;font-size:12.5px;color:var(--info);background:var(--info-soft);border-radius:999px;padding:2px 8px;margin-top:3px}
+  /* sales item 173: the money wall (direction A). The four numbers keep .tot/.v, as the page always had */
+  .wall{--onband:#d9d0ee;background:linear-gradient(100deg,#2a1b4a,#3a2470);color:#fff;border-radius:24px;padding:26px 30px;margin:18px 0;box-shadow:var(--shadow);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .wall-top{display:flex;justify-content:space-between;gap:28px;align-items:flex-start;flex-wrap:wrap}
+  .tot{display:flex;flex-direction:column;gap:2px}
+  .tot .l{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--onband)}
+  .tot .v{font-size:28px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.2;color:#fff}
+  .tot.hero .v{font-size:52px;line-height:1.05}
+  .tot.bad .v{color:#ffb3ad}
+  .tot .s{font-size:13px;color:var(--onband)}
+  .wall-side{display:flex;gap:32px;flex-wrap:wrap}
+  .agebar-h{display:flex;justify-content:space-between;gap:12px;margin:22px 0 8px;font-size:13.5px}
+  .agebar-h b{font-weight:600}.agebar-h span{color:var(--onband);font-size:12.5px}
+  .agebar{display:flex;gap:4px;height:36px}
+  .agebar button{font:inherit;font-size:12.5px;font-weight:700;color:#2a1b4a;border:0;border-radius:9px;min-width:0;padding:0 8px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-height:36px}
+  .agebar button[aria-pressed="true"]{outline:3px solid #fff;outline-offset:-3px}
+  .agebar .a0{background:#8fd3a8}.agebar .a1{background:#ffd48a}.agebar .a2{background:#f0a28a}.agebar .a3{background:#e8766a}
+  .agebar .none{background:rgba(255,255,255,.14);color:var(--onband);flex:1}
+  .homecards{display:grid;grid-template-columns:2fr 1fr 1fr;gap:18px;margin:0 0 18px}
+  .mcard{background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:20px 22px;min-width:0}
+  .mcard h2{font-size:16px;font-weight:700;margin:0 0 10px;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .mcard h2 span{font-size:13px;font-weight:400;color:var(--soft)}
+  .bars{display:flex;gap:8px;align-items:flex-end;height:150px}
+  .bars .bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;min-width:0;height:100%}
+  .bars .bar i{display:block;width:100%;background:#c9bde6;border-radius:6px;min-height:3px}
+  .bars .bar.now i{background:var(--p)}
+  .bars .bar small{font-size:11.5px;color:var(--soft)}
+  .mcard .note{font-size:13px;color:var(--soft);margin-top:10px}
+  .who{display:grid;gap:4px}
+  .who .r{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+  .who .r:first-child{border-top:0}
+  .who .r b{display:block;font-size:14px}.who .r small{display:block;font-size:12.5px;color:var(--soft)}.who .r small.late{color:var(--bad)}
+  .who .r .amt{font-size:16px}
+  .mcard.stripe{background:linear-gradient(135deg,#6d4fc6,#5b3fa0);color:#fff;border-color:transparent}
+  .agebar .w{margin-right:4px}
+  .mcard.stripe h2{color:#fff}.mcard.stripe .tot .l{color:#d9d0ee}.mcard.stripe .tot .v{font-size:22px;color:#fff}.mcard.stripe .tot{margin-top:8px}
+  .mcard.stripe .note{color:#d9d0ee}
+  .remind-all{font:inherit;font-size:13px;font-weight:600;color:var(--p);background:none;border:1px solid var(--line);border-radius:999px;padding:7px 14px;min-height:36px;cursor:pointer;margin-top:10px}
+  @media (max-width:1000px){.homecards{grid-template-columns:1fr 1fr}.mcard.wide{grid-column:1/-1}}
   /* chips, search, month */
   .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
   .chip,.echip{font:inherit;font-size:14px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 14px;min-height:38px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;box-shadow:var(--shadow)}
@@ -110,11 +157,21 @@
   .efiles b{display:block;color:var(--ink);font-size:14px}
   .efiles .how{display:block;color:var(--p);font-size:12.5px;margin-top:2px}
   .empty .pill{margin-top:14px}
+  /* sales item 162: the lines of an invoice being changed */
+  .elines{display:grid;gap:6px}
+  .eline{display:grid;grid-template-columns:1fr 64px 110px 36px;gap:6px;align-items:center}
+  .eline input{min-height:40px;padding:6px 10px;font-size:14px}
+  .eline .x{font:inherit;border:0;background:none;color:var(--soft);min-height:36px;min-width:36px;cursor:pointer;border-radius:8px}
+  .eline .x:hover{background:var(--bad-soft);color:var(--bad)}
+  #editDlg{width:min(520px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto}
   @media (max-width:900px){.totals{grid-template-columns:repeat(2,1fr)}}
   @media (max-width:767px){
     .wrap{padding:16px 16px 100px}
     .pill{min-height:44px}
-    .totals{gap:10px;margin:14px 0}.tot{padding:12px 14px}.tot .v{font-size:22px}.tot .s{display:none}
+    .wall{padding:20px 18px;border-radius:22px;margin:14px 0}.tot .v{font-size:20px}.tot.hero .v{font-size:44px}.tot .s{display:none}.tot.hero .s{display:block}
+    .wall-side{gap:18px}.agebar{height:30px}.agebar button{font-size:11.5px;padding:0 6px;min-height:30px}.agebar .w{display:none}
+    .homecards{display:flex;gap:12px;overflow-x:auto;scrollbar-width:none;margin:0 -16px 14px;padding:2px 16px 8px;scroll-snap-type:x mandatory}.homecards::-webkit-scrollbar{display:none}
+    .mcard{flex:0 0 250px;scroll-snap-align:start;padding:16px}.bars{height:110px}
     .bar .chips{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px 8px;width:calc(100% + 32px)}
     .bar .chips::-webkit-scrollbar{display:none}
     .chip,.eper .echip{flex:0 0 auto;min-height:44px}
@@ -153,6 +210,36 @@
     <div class="row2"><button type="button" class="pill" id="payCancel">Cancel</button><button type="submit" class="pill go" id="payGo">Record payment</button></div>
   </form>
 </dialog>
+<dialog id="editDlg" aria-labelledby="editH">
+  <form class="dbody" method="dialog" id="editForm">
+    <h2 id="editH">Change this invoice</h2>
+    <p class="muted" id="editWhat"></p>
+    <label for="editTitle">Title</label><input id="editTitle" maxlength="200" autocomplete="off">
+    <div id="editLinesWrap" hidden><label>Lines</label><div id="editLines" class="elines"></div><button type="button" class="more" id="editAddLine">+ another line</button></div>
+    <label for="editAmt">Amount</label><input id="editAmt" inputmode="decimal" autocomplete="off" aria-describedby="editAmtH">
+    <p class="muted" id="editAmtH" style="margin:4px 0 0"></p>
+    <label for="editDue">Due</label><input id="editDue" type="date" aria-describedby="editDueH">
+    <p class="muted" id="editDueH" style="margin:4px 0 0">Leave it blank for “on receipt”.</p>
+    <label for="editNote">Note on the invoice (optional)</label><input id="editNote" maxlength="1000" autocomplete="off">
+    <label id="editResendWrap" style="display:flex;gap:8px;align-items:center;margin-top:10px;font-weight:400"><input type="checkbox" id="editResend" checked> <span id="editResendText">Send the corrected copy to them (same number)</span></label>
+    <p class="err" id="editErr" role="alert" hidden></p>
+    <div class="row2"><button type="button" class="pill" id="editCancel">Cancel</button><button type="submit" class="pill go" id="editGo">Save changes</button></div>
+  </form>
+</dialog>
+<dialog id="backDlg" aria-labelledby="backH">
+  <form class="dbody" method="dialog" id="backForm">
+    <h2 id="backH">Give money back</h2>
+    <p class="muted" id="backWhat"></p>
+    <label for="backAmt">Amount given back</label><input id="backAmt" inputmode="decimal" autocomplete="off">
+    <label for="backOn">The day you gave it back</label><input id="backOn" type="date">
+    <label for="backHow">How</label>
+    <select id="backHow"><option value="">Pick one…</option><option value="check">Check</option><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option><option value="zelle">Zelle</option><option value="other">Other</option></select>
+    <label for="backNote">Why, in a few words (optional)</label><input id="backNote" maxlength="300" placeholder="Goodwill credit" aria-describedby="backNoteH">
+    <p class="muted" id="backNoteH" style="margin:4px 0 0">The invoice reads “Paid, $X refunded”, the money comes off the month it went back, and the receipt says so. Nothing is emailed.</p>
+    <p class="err" id="backErr" role="alert" hidden></p>
+    <div class="row2"><button type="button" class="pill" id="backCancel">Cancel</button><button type="submit" class="pill go" id="backGo">Record it</button></div>
+  </form>
+</dialog>
 <dialog id="expDlg" aria-labelledby="expH">
   <form class="dbody" method="dialog" id="expForm">
     <h2 id="expH">Export for your bookkeeper</h2>
@@ -179,7 +266,7 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let TOKEN="",DATA=null,SHOW='all',Q='',MONTH='',LIMIT=50,PAYING=null;
+let TOKEN="",DATA=null,SHOW='all',Q='',MONTH='',LIMIT=50,PAYING=null,AGE='',HOME=null;   // AGE: a piece of the owed bar pressed (current · d30 · d60 · d90); HOME: /sales/money-home
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // builder item 83: ?client= is also how someone with places in two businesses opens their second one. That is
@@ -196,6 +283,7 @@ const niceDay=(s)=>{const m=/^\d{4}-\d{2}-\d{2}/.exec(String(s||''));return m?dd
 const money=(c)=>ddsMoney(c||0);   // the shell's one money format; no amount reads $0
 const METHOD={check:'check',cash:'cash',bank_transfer:'bank transfer',zelle:'Zelle',other:'another way',stripe:'card'};
 const isPart=(i)=>!!i.payment_for;
+const sameName=(a,b)=>String(a||'').toLowerCase().replace(/\s+/g,' ').trim()===String(b||'').toLowerCase().replace(/\s+/g,' ').trim();   // sales item 170: one name, not twice
 const kindOf=(i)=>i.status==='void'||i.status==='canceled'?'void':i.status==='paid'?'paid':'unpaid';
 // the status in plain words, on the local day
 function statusChip(i,today){
@@ -209,6 +297,8 @@ function statusChip(i,today){
     const how=i.paid_method&&METHOD[i.paid_method]?' by '+METHOD[i.paid_method]:'';return`<span class="st paid">${how?'Paid'+esc(how):'Paid '+esc(niceDay(localDay(i.paid_at)))}</span>${r>0?` <span class="st">${esc(money(r))} refunded</span>`:''}`;}
   if(i.processing||i.state==='processing')return'<span class="st proc">Processing</span>';
   if(i.not_sent===true||i.state==='draft')return'<span class="st">Not sent yet</span>';   // sales item 141: a draft is not owed and never overdue
+  // sales item 172: the client says they paid another way; reminders pause until Confirm or Not received
+  if(i.client_says_paid)return`<span class="st proc">They say they paid</span><br><span class="said">${esc(METHOD[i.client_says_paid.method]||'another way')}${i.client_says_paid.on?' · '+esc(niceDay(i.client_says_paid.on)):''}</span>`;
   if(!i.due_date)return'<span class="st">Unpaid</span>';
   const d=dayDiff(i.due_date.slice(0,10),today);
   if(d<0)return`<span class="st over">Overdue ${-d} day${d===-1?'':'s'}</span>`;
@@ -237,6 +327,45 @@ function totals(items,today){
   return{owed:sum(open),owedN:open.length,proc:sum(proc),late:sum(late),lateN:late.length,oldest,pm:Math.max(0,keptSum(pm)-back(month)),pmN:pm.length,ways,py:Math.max(0,keptSum(py)-back(year)),pyN:py.length};
 }
 const plural=(n,w)=>n+' '+w+(n===1?'':'s');
+// sales item 173: which piece of the owed bar an open invoice sits in (the server's lib/money_home.ts owedByAge says the same)
+function ageOf(i,today){
+  if(isPart(i)||i.status!=='open'||i.processing||i.state==='processing'||i.not_sent===true||i.state==='draft')return '';
+  const late=i.due_date?-dayDiff(i.due_date.slice(0,10),today):0;
+  return late<=0?'current':late<=30?'d30':late<=60?'d60':'d90';
+}
+function owedByAge(items,today){
+  const b={current:0,d30:0,d60:0,d90:0},by=new Map();
+  for(const i of items){const k=ageOf(i,today);if(!k)continue;const c=Number(i.amount_cents)||0;b[k]+=c;const name=i.business||i.person||'Customer';const r=by.get(name)||{name,total:0,oldest:0,n:0};r.total+=c;r.n++;r.oldest=Math.max(r.oldest,i.due_date?-dayDiff(i.due_date.slice(0,10),today):0);by.set(name,r);}
+  return{buckets:b,rows:[...by.values()].sort((a,c)=>c.oldest-a.oldest||c.total-a.total),total:b.current+b.d30+b.d60+b.d90};
+}
+const AGE_WORDS={current:'Not due yet',d30:'1 to 30 days late',d60:'31 to 60 days',d90:'Over 60 days'};
+function wallHtml(t,today){
+  const age=owedByAge(DATA.items,today);
+  const pieces=[['current','a0'],['d30','a1'],['d60','a2'],['d90','a3']].filter(([k])=>age.buckets[k]>0);
+  const bar=pieces.length?pieces.map(([k,c])=>`<button type="button" class="${c}" data-age="${k}" aria-pressed="${AGE===k?'true':'false'}" style="flex:${Math.max(8,Math.round(age.buckets[k]/age.total*100))}" title="${esc(AGE_WORDS[k])}: ${esc(money(age.buckets[k]))}" aria-label="${esc(AGE_WORDS[k])}: ${esc(money(age.buckets[k]))}"><span class="w">${esc(AGE_WORDS[k])} · </span>${esc(money(age.buckets[k]))}</button>`).join(''):`<span class="none" style="display:flex;align-items:center;padding:0 10px;border-radius:9px;font-size:13px">Nothing owed</span>`;
+  return`<section class="wall" aria-label="Money at a glance"><div class="wall-top">
+    <div class="tot hero"><div class="l">Owed to you</div><div class="v">${money(t.owed)}</div><div class="s">${t.owedN?`${t.owedN} unpaid${t.proc?' · '+money(t.proc)+' of it on its way':''}${t.lateN?' · the oldest '+plural(t.oldest,'day')+' late':''}`:'Every sent invoice is paid'}</div></div>
+    <div class="wall-side">
+      <div class="tot${t.late?' bad':''}"><div class="l">Overdue</div><div class="v">${money(t.late)}</div><div class="s">${t.lateN?plural(t.lateN,'invoice'):'Nothing late'}</div></div>
+      <div class="tot"><div class="l">Paid this month</div><div class="v">${money(t.pm)}</div><div class="s">${plural(t.pmN,'payment')}${t.ways.length===1&&METHOD[t.ways[0]]?' · by '+METHOD[t.ways[0]]:''}</div></div>
+      <div class="tot"><div class="l">Paid this year</div><div class="v">${money(t.py)}</div><div class="s">${plural(t.pyN,'payment')} since January</div></div>
+    </div></div>
+    <div class="agebar-h"><b>Owed, by how late</b><span>${AGE?'Showing one piece · ':''}Press a piece to see those invoices</span></div>
+    <div class="agebar" role="group" aria-label="Owed, by how late">${bar}</div></section>`;
+}
+function homeCardsHtml(today){
+  const age=owedByAge(DATA.items,today);
+  const top=age.rows.slice(0,3);
+  const months=HOME&&Array.isArray(HOME.months)?HOME.months:null;
+  const max=months?Math.max(1,...months.map(m=>m.cents)):1;
+  const nowYm=today.slice(0,7);
+  const chart=months?`<div class="mcard wide"><h2>Money in by month <span>Last 12 months · ${esc(money(HOME.total_12_cents||0))}</span></h2><div class="bars" role="img" aria-label="Money in by month: ${esc(months.map(m=>m.label+' '+money(m.cents)).join(', '))}">${months.map(m=>`<div class="bar${m.month===nowYm?' now':''}" title="${esc(m.label)}: ${esc(money(m.cents))}"><i style="height:${Math.max(2,Math.round(m.cents/max*100))}%"></i><small>${esc(m.label.slice(0,1))}</small></div>`).join('')}</div><p class="note">${esc(months[months.length-1].label)} so far: ${esc(money(months[months.length-1].cents))}${months[months.length-1].retainer_cents?' · '+esc(money(months[months.length-1].retainer_cents))+' of it from retainers':''}</p></div>`:'';
+  const who=`<div class="mcard"><h2>Who owes most</h2>${top.length?`<div class="who">${top.map(r=>`<div class="r"><span><b>${esc(r.name)}</b><small class="${r.oldest>0?'late':''}">${r.oldest>0?plural(r.oldest,'day')+' late':plural(r.n,'invoice')+' not due yet'}</small></span><span class="amt">${esc(money(r.total))}</span></div>`).join('')}</div>${top.some(r=>r.oldest>0)?`<button type="button" class="remind-all" id="remindAll">Remind ${top.filter(r=>r.oldest>0).length===1?'them':'all '+(top.filter(r=>r.oldest>0).length===2?'two':'three')}</button>`:''}`:`<p class="note" style="margin-top:0">Nobody owes you anything.</p>`}</div>`;
+  const s=HOME&&HOME.stripe;
+  const stripe=s?`<div class="mcard stripe"><h2>Stripe this month</h2><div class="tot"><div class="l">Paid online</div><div class="v">${esc(money(s.paid_online_cents))}</div></div><div class="tot"><div class="l">Stripe’s fees</div><div class="v">${s.fee_cents?'−'+esc(money(s.fee_cents)):money(0)}</div></div><div class="tot"><div class="l">Reached your bank</div><div class="v">${esc(money(s.reached_bank_cents))}</div></div><div class="tot"><div class="l">Next payout</div><div class="v">${s.next_payout?esc(money(s.next_payout.cents))+' · '+esc(niceDay(s.next_payout.arrival)):'None on its way'}</div></div>${s.more?'<p class="note">Stripe had more this month than one read brings.</p>':''}</div>`
+    :(HOME&&HOME.stripe_failed?`<div class="mcard stripe"><h2>Stripe this month</h2><p class="note" style="margin-top:0">Stripe couldn’t be read just now. The bookkeeper file has the fees and payouts.</p></div>`:'');
+  return(chart||who||stripe)?`<div class="homecards">${chart}${who}${stripe}</div>`:'';
+}
 function filtered(today){
   const q=Q.trim().toLowerCase();
   return DATA.items.filter(i=>!isPart(i)).filter(i=>{
@@ -246,6 +375,7 @@ function filtered(today){
     if(SHOW==='paid'&&k!=='paid')return false;
     if(SHOW==='void'&&k!=='void')return false;
     if(MONTH&&localDay(i.issued_at).slice(0,7)!==MONTH)return false;
+    if(AGE&&ageOf(i,today)!==AGE)return false;   // sales item 173: a piece of the owed bar
     if(q&&![i.number_label,i.business,i.person,i.title,i.deal_title].join(' ').toLowerCase().includes(q))return false;
     return true;
   });
@@ -256,6 +386,7 @@ function render(focusSel){
   const all=DATA.items.filter(i=>!isPart(i));
   const n=(k)=>k==='all'?all.length:k==='overdue'?all.filter(i=>kindOf(i)==='unpaid'&&!(i.processing||i.state==='processing')&&!(i.not_sent===true||i.state==='draft')&&i.due_date&&dayDiff(i.due_date.slice(0,10),today)<0).length:all.filter(i=>kindOf(i)===k).length;
   const months=[...new Set(all.map(i=>localDay(i.issued_at).slice(0,7)).filter(Boolean))].sort().reverse();
+  const ageingOn=SHOW==='ageing';
   // builder item 165: the one page header (shell.css .dds-ph); its line counts every invoice sent and what is owed,
   // Send an invoice is the one filled action, the test and the download wait behind ⋯ on a phone
   const all0=all.length;
@@ -265,14 +396,9 @@ function render(focusSel){
       <div class="dds-ph-acts"><button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
         <div class="dds-ph-more" id="phMore" popover><button type="button" class="pill" id="testInvBtn">Send a test to myself</button><button type="button" class="pill" id="csvBtn">Download CSV</button><button type="button" class="pill" id="expBtn">For your bookkeeper</button></div>
         <button type="button" class="pill go dds-ph-fill" id="sendBtn">Send an invoice</button></div></div></header>
-    <div class="totals">
-      <div class="tot"><div class="l">Owed to you</div><div class="v">${money(t.owed)}</div><div class="s">${t.owedN} unpaid${t.proc?' · '+money(t.proc)+' of it on its way':''}</div></div>
-      <div class="tot bad"><div class="l">Overdue</div><div class="v">${money(t.late)}</div><div class="s">${t.lateN?plural(t.lateN,'invoice')+' · the oldest '+plural(t.oldest,'day')+' late':'Nothing late'}</div></div>
-      <div class="tot"><div class="l">Paid this month</div><div class="v">${money(t.pm)}</div><div class="s">${plural(t.pmN,'payment')}${t.ways.length===1&&METHOD[t.ways[0]]?' · paid by '+METHOD[t.ways[0]]:''}</div></div>
-      <div class="tot"><div class="l">Paid this year</div><div class="v">${money(t.py)}</div><div class="s">${plural(t.pyN,'payment')} since January</div></div>
-    </div>`;
+    ${wallHtml(t,today)}${homeCardsHtml(today)}`;
   if(DATA.partial)h+=`<p class="partial" role="status">Only your newest invoices are here, so the totals may be short of everything.</p>`;
-  h+=`<div class="bar"><div class="chips" role="group" aria-label="Show">${[['all','All',''],['unpaid','Unpaid',''],['overdue','Overdue','over'],['paid','Paid',''],['void','Void','']].map(([k,l,c])=>`<button type="button" class="chip ${c}" data-show="${k}" aria-pressed="${SHOW===k?'true':'false'}">${l} <b>${n(k)}</b></button>`).join('')}</div><span class="grow"></span>
+  h+=`<div class="bar"><div class="chips" role="group" aria-label="Show">${[['all','All',''],['unpaid','Unpaid',''],['overdue','Overdue','over'],['paid','Paid',''],['void','Void','']].map(([k,l,c])=>`<button type="button" class="chip ${c}" data-show="${k}" aria-pressed="${SHOW===k?'true':'false'}">${l} <b>${n(k)}</b></button>`).join('')}<button type="button" class="chip" data-show="ageing" aria-pressed="${ageingOn?'true':'false'}" title="Who owes what, and how old it is">Who owes</button></div><span class="grow"></span>
     <label class="sr-only" for="find">Find an invoice or customer</label><input type="search" class="find" id="find" placeholder="Find an invoice or customer" value="${esc(Q)}" autocomplete="off">
     <label class="sr-only" for="month">Which month they were sent</label><select class="month" id="month"><option value="">All months</option>${months.map(m=>`<option value="${m}"${MONTH===m?' selected':''}>${esc(new Date(+m.slice(0,4),+m.slice(5,7)-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'}))}</option>`).join('')}</select></div>`;
   h+=`<div class="list" id="ilist">${listHtml()}</div>`;
@@ -281,8 +407,25 @@ function render(focusSel){
   if(focusSel){const el=document.querySelector(focusSel);if(el)el.focus();}
 }
 // the list alone: a search, a chip or a month redraws only this, so the search box keeps its caret
+// sales item 171: who owes what, and how old. Each customer's open invoices in four ages: not due
+// yet, 1 to 30 days late, 31 to 60, over 60. The oldest debt first.
+function ageingHtml(today){
+  const open=DATA.items.filter(i=>!isPart(i)&&i.status==='open'&&!(i.processing||i.state==='processing')&&!(i.not_sent===true||i.state==='draft'));
+  const by=new Map();
+  for(const i of open){const k=i.business||i.person||'Customer';const row=by.get(k)||{name:k,current:0,d30:0,d60:0,d90:0,total:0,oldest:0,n:0};const late=i.due_date?-dayDiff(i.due_date.slice(0,10),today):0;const c=Number(i.amount_cents)||0;
+    if(late<=0)row.current+=c;else if(late<=30)row.d30+=c;else if(late<=60)row.d60+=c;else row.d90+=c;row.total+=c;row.oldest=Math.max(row.oldest,late);row.n++;by.set(k,row);}
+  const list=[...by.values()].sort((a,b)=>b.oldest-a.oldest||b.total-a.total);
+  const sum=(k)=>list.reduce((a,r)=>a+r[k],0);
+  if(!list.length)return`<div class="empty"><h2>Nobody owes you anything</h2><p>Every sent invoice is paid.</p></div>`;
+  const cell=(c,bad)=>`<td class="num${c&&bad?' late':''}">${c?money(c):'<span class="per">—</span>'}</td>`;
+  return`<table aria-label="Who owes what, and how old"><thead><tr><th scope="col">Customer</th><th scope="col" class="num">Not due yet</th><th scope="col" class="num">1 to 30 days late</th><th scope="col" class="num">31 to 60</th><th scope="col" class="num">Over 60</th><th scope="col" class="num">Owes</th></tr></thead><tbody>`
+    +list.map(r=>`<tr><td><div class="biz">${esc(r.name)}</div><div class="per">${plural(r.n,'invoice')}${r.oldest>0?' · the oldest '+plural(r.oldest,'day')+' late':''}</div></td>${cell(r.current)}${cell(r.d30,1)}${cell(r.d60,1)}${cell(r.d90,1)}<td class="num amt">${money(r.total)}</td></tr>`).join('')
+    +`<tr class="foot-row"><td><b>Everyone</b></td>${cell(sum('current'))}${cell(sum('d30'),1)}${cell(sum('d60'),1)}${cell(sum('d90'),1)}<td class="num amt">${money(sum('total'))}</td></tr></tbody></table>`
+    +`<div class="cards">${list.map(r=>`<div class="card"><div class="top"><span class="biz">${esc(r.name)}</span><span class="amt">${money(r.total)}</span></div><div class="what">${[r.current?'Not due '+money(r.current):'',r.d30?'1 to 30 days '+money(r.d30):'',r.d60?'31 to 60 '+money(r.d60):'',r.d90?'Over 60 '+money(r.d90):''].filter(Boolean).join(' · ')}</div></div>`).join('')}</div>`;
+}
 function listHtml(){
   const today=DATA.today||ymd(),all=DATA.items.filter(i=>!isPart(i));
+  if(SHOW==='ageing')return ageingHtml(today);
   const list=filtered(today),shown=list.slice(0,LIMIT),parts=DATA.items.filter(isPart);
   let h='';
   if(!list.length){
@@ -292,7 +435,7 @@ function listHtml(){
     h+=`<table aria-label="Invoices"><thead><tr><th scope="col">Number</th><th scope="col">Customer</th><th scope="col">What for</th><th scope="col" class="num">Amount</th><th scope="col">Issued</th><th scope="col">Due</th><th scope="col">Status</th><th scope="col"><span class="sr-only">More</span></th></tr></thead><tbody>`
       +shown.map(i=>{
         const pp=parts.filter(p=>p.payment_for===i.id);
-        return `<tr class="${kindOf(i)==='void'?'dim':''}"><td class="no">${esc(i.number_label||'—')}</td><td><div class="biz">${esc(i.business||i.person||'—')}</div>${i.business&&i.person?`<div class="per">${esc(i.person)}</div>`:''}</td><td>${esc(i.title||(i.purpose==='deposit'?'Deposit':'Invoice'))}</td><td class="num amt">${money(wholeOf(i))}${pp.length&&kindOf(i)==='unpaid'?`<div class="per">${money(i.amount_cents)} left</div>`:''}</td><td>${esc(niceDay(localDay(i.issued_at)))}</td><td>${esc(niceDay(i.due_date))}</td><td>${statusChip(i,today)}</td><td>${rowMenu(i)}</td></tr>`
+        return `<tr class="${kindOf(i)==='void'?'dim':''}"><td class="no">${esc(i.number_label||'—')}</td><td><div class="biz">${esc(i.business||i.person||'—')}</div>${i.business&&i.person&&!sameName(i.business,i.person)?`<div class="per">${esc(i.person)}</div>`:''}</td><td>${esc(i.title||(i.purpose==='deposit'?'Deposit':'Invoice'))}</td><td class="num amt">${money(wholeOf(i))}${pp.length&&kindOf(i)==='unpaid'?`<div class="per">${money(i.amount_cents)} left</div>`:''}${i.late_fee_cents>0?`<div class="per">incl. ${money(i.late_fee_cents)} late fee</div>`:''}</td><td>${esc(niceDay(localDay(i.issued_at)))}</td><td>${i.due_date?esc(niceDay(i.due_date)):'<span class="per">On receipt</span>'}</td><td>${statusChip(i,today)}</td><td>${rowMenu(i)}</td></tr>`
           +pp.map(p=>`<tr class="part"><td></td><td colspan="7">Part paid ${money(p.amount_cents)}${p.paid_method&&METHOD[p.paid_method]?' by '+esc(METHOD[p.paid_method]):''}, ${esc(niceDay(localDay(p.paid_at)))}</td></tr>`).join('');
       }).join('')+`</tbody></table>`;
     h+=`<div class="cards">`+shown.map(i=>`<div class="card"><div class="top"><span class="biz">${esc(i.number_label?i.number_label+' · ':'')}${esc(i.business||i.person||'—')}</span>${statusChip(i,today)}</div><div class="what">${esc(i.title||'Invoice')}</div><div class="bot"><span class="amt">${money(wholeOf(i))}</span><span class="per">${i.due_date?'Due '+esc(niceDay(i.due_date)):''}</span>${rowMenu(i)}</div></div>`).join('')+`</div>`;
@@ -318,7 +461,23 @@ function wire(){
   const tb=$('testInvBtn');if(tb)tb.addEventListener('click',()=>sendTestInvoice(tb));
   const sb2=$('sendBtn');if(sb2)sb2.addEventListener('click',()=>{if(!(window.ddsOpenCreate&&window.ddsOpenCreate('invoice',sb2)))location.href='/pipeline.html';});
   const eb=$('expBtn');if(eb)eb.addEventListener('click',()=>openExport(eb));
+  // sales item 173: a piece of the owed bar narrows the list to those invoices (press again to clear)
+  document.querySelectorAll('[data-age]').forEach(b=>b.addEventListener('click',()=>{const k=b.getAttribute('data-age');AGE=AGE===k?'':k;if(AGE){SHOW='all';}LIMIT=50;render('[data-age="'+k+'"]');}));
+  const ra=$('remindAll');if(ra)ra.addEventListener('click',()=>remindTopDebtors(ra));
   wireList();
+}
+// sales item 173: one reminder to each of the three customers who owe most (their oldest overdue invoice each)
+async function remindTopDebtors(btn){
+  const today=DATA.today||ymd();
+  const age=owedByAge(DATA.items,today);
+  const names=age.rows.slice(0,3).filter(r=>r.oldest>0).map(r=>r.name);
+  const picks=names.map(n=>DATA.items.filter(i=>(i.business||i.person||'Customer')===n&&ageOf(i,today)&&ageOf(i,today)!=='current'&&i.has_link).sort((a,b)=>String(a.due_date||'').localeCompare(String(b.due_date||'')))[0]).filter(Boolean);
+  if(!picks.length){toast('Nothing to remind about: none of them has a sent, overdue invoice.',true);return;}
+  if(!(await ddsConfirm(`Send one reminder each to ${picks.length===1?'that customer':'these '+picks.length+' customers'}, about their oldest overdue invoice?`,null,'Send reminders')))return;
+  btn.disabled=true;let sent=0;const said=[];
+  for(const i of picks){const r=await api('/sales/invoices/'+encodeURIComponent(i.id)+'/remind?today='+today,'POST',{});if(r.ok)sent++;else said.push((i.business||i.person||'one')+': '+((r.body&&r.body.message)||'didn’t go'));}
+  btn.disabled=false;
+  toast((sent?`Reminded ${sent===1?'one customer':sent+' customers'}.`:'No reminder went out.')+(said.length?' '+said.join(' · '):''),!sent||said.length>0);
 }
 function wireList(){
   const mb=$('moreBtn');if(mb)mb.addEventListener('click',()=>{LIMIT+=50;renderList();const nb=$('moreBtn');if(nb)nb.focus();});
@@ -330,11 +489,23 @@ function openMenu(btn){
   const open=btn.getAttribute('aria-expanded')==='true';closeMenus();if(open)return;
   const i=DATA.items.find(x=>x.id===btn.getAttribute('data-menu'));if(!i)return;
   const m=document.createElement('div');m.className='mlist';m.setAttribute('role','menu');
+  // sales item 169: everything the deal page can do to an invoice, from its row
   const items=[];
+  const waits=i.status==='open'&&!(i.processing||i.state==='processing');
+  const sent=!!(i.pay_url||i.has_link)||i.not_sent===false&&i.state!=='draft';
+  if(waits&&i.client_says_paid){items.push(['confirm','Confirm: record their payment']);items.push(['notpaid','Not received']);}   // sales item 172
+  if(waits){
+    items.push(['send',i.has_link?'Resend':'Send']);
+    if(i.pay_url)items.push(['copy','Copy the pay link']);
+    items.push(['pay','Record a payment']);
+    if(i.has_link)items.push(['remind','Send a reminder now']);
+    items.push(['edit','Change it']);
+  }
+  if(i.status==='paid'&&i.paid_method){items.push(['back','Give money back']);items.push(['undo','Undo the payment']);}
   if(i.deal_id)items.push(['deal','Open the deal']);
   items.push(['pdf','Download PDF']);
-  if(i.status==='open'&&!(i.processing||i.state==='processing'))items.push(['pay','Record a payment']);
-  m.innerHTML=items.map(([k,l])=>`<button type="button" role="menuitem" data-act="${k}">${l}</button>`).join('');
+  if(waits)items.push(['void','Void']);
+  m.innerHTML=items.map(([k,l])=>`<button type="button" role="menuitem" data-act="${k}"${k==='void'||k==='undo'||k==='back'?' data-needs="delete"':''}${k==='void'||k==='undo'?' style="color:var(--bad)"':''}>${l}</button>`).join('');
   btn.parentNode.appendChild(m);btn.setAttribute('aria-expanded','true');
   if(window.ddsListKit&&window.ddsListKit.fit)window.ddsListKit.fit(m);
   m.querySelector('button').focus();
@@ -344,8 +515,127 @@ function openMenu(btn){
     if(act==='deal')location.href='/pipeline.html?deal='+encodeURIComponent(i.deal_id)+'&dtab=billing';
     else if(act==='pdf'){const r=await api('/sales/invoices/'+encodeURIComponent(i.id)+'/document');const u=r.ok&&r.body&&r.body.pdf_url;if(u)window.open(u,'_blank','noopener');else toast((r.body&&r.body.message)||'The PDF couldn’t be made just now. Try again in a moment.',true);btn.focus();}
     else if(act==='pay')openPay(i,btn);
+    else if(act==='confirm'){openPay(i,btn);const sp=i.client_says_paid||{};if(sp.method&&METHOD[sp.method])$('payHow').value=sp.method;if(sp.on)$('payOn').value=String(sp.on).slice(0,10);}
+    else if(act==='notpaid'){const r=await api('/sales/invoices/'+encodeURIComponent(i.id)+'/not-paid','POST',{});if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.',true);return;}toast('Noted: not received. Reminders carry on.');await load();}
+    else if(act==='copy'){if(navigator.clipboard)navigator.clipboard.writeText(i.pay_url).then(()=>toast('Pay link copied'),()=>toast('Couldn’t copy on this device.',true));btn.focus();}
+    else if(act==='send')await sendInvoice(i,btn);
+    else if(act==='remind')await remindNow(i,btn);
+    else if(act==='edit')openEdit(i,btn);
+    else if(act==='back')openBack(i,btn);
+    else if(act==='undo')await undoPayment(i,btn);
+    else if(act==='void')await voidInvoice(i,btn);
   });
 }
+// ── sales item 169: send, remind, void and undo from the row (the deal page's routes) ──
+async function sendInvoice(i,btn){
+  const r=await api('/sales/invoices/'+encodeURIComponent(i.id)+'/send','POST',{});
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t go through.',true);btn.focus();return;}
+  const b=r.body||{};
+  if(b.warning==='link_failed'){toast(b.message||'The payment link didn’t generate. Press Send again.',true);await load();return;}
+  if(b.url&&!b.emailed&&navigator.clipboard)navigator.clipboard.writeText(b.url).catch(()=>{});
+  toast(b.double_tap?'Already sent a moment ago'+(b.url?', link copied':''):b.emailed?(b.resent?'Invoice re-sent, emailed to the client':'Invoice sent, emailed to the client'):(b.url?'Nothing was emailed (no email on the contact), so the pay link is copied for you to send':'Invoice sent'));
+  if(b.ask_reminders&&window.ddsAskReminders)window.ddsAskReminders(scope());   // sales item 166: asked once
+  await load();
+}
+async function remindNow(i,btn){
+  const r=await api('/sales/invoices/'+encodeURIComponent(i.id)+'/remind?today='+ymd(),'POST',{});
+  if(!r.ok){toast((r.body&&r.body.message)||'The reminder didn’t go out.',true);btn.focus();return;}
+  const d=(r.body&&r.body.data)||{};
+  toast('Reminder emailed to '+(d.to_first||i.first||'them')+'.');btn.focus();
+}
+async function voidInvoice(i,btn){
+  if(!(await ddsConfirm('Void this invoice? It stops being payable and its reminders clear. It stays here, marked Void.',null,'Void invoice',{danger:true}))){btn.focus();return;}
+  const r=await api('/sales/invoices/'+encodeURIComponent(i.id)+'/void','POST',{});
+  if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t void it.',true);btn.focus();return;}
+  const linkLive=!r.body.already&&!!r.body.data&&r.body.data.link_deactivated===false;
+  toast(linkLive?'Invoice voided, but its payment link may still be live. Switch it off in Stripe.':r.body.already?'Already voided':'Invoice voided',linkLive);
+  await load();
+}
+async function undoPayment(i,btn){
+  const no=i.number_label||'the invoice';
+  if(!(await ddsConfirm(`Undo this payment? ${no} goes back to unpaid (${money(i.amount_cents)} due) and its reminders can start again. Use this only for a payment recorded by mistake.`,null,'Undo payment',{danger:true}))){btn.focus();return;}
+  const r=await api('/sales/invoices/'+encodeURIComponent(i.id)+'/payment/undo','POST',{});
+  if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t undo it.',true);btn.focus();return;}
+  const x=(r.body&&r.body.data)||{};
+  toast('Payment undone: '+no+' is unpaid again.'+(x.fresh_link===false?' A new payment link couldn’t be made just now: press Send on it to make one.':''));
+  await load();
+}
+// ── sales item 162: change an unpaid invoice (the number is kept) ──
+let EDITING=null;
+const lineRow=(l)=>`<div class="eline"><input type="text" class="el-label" maxlength="200" placeholder="What for" value="${esc(l.label||'')}" aria-label="Line"><input type="number" class="el-qty" min="1" max="999" step="1" value="${Number(l.qty)||1}" aria-label="Quantity"><input type="text" class="el-amt" inputmode="decimal" value="${((Number(l.amount_cents)||0)/100).toFixed(2)}" aria-label="Amount"><button type="button" class="x" aria-label="Remove this line">×</button></div>`;
+function editLines(){return [...document.querySelectorAll('#editLines .eline')].map(r=>({label:r.querySelector('.el-label').value.trim(),qty:Math.max(1,Math.trunc(Number(r.querySelector('.el-qty').value)||1)),amount_cents:Math.round(parseFloat(String(r.querySelector('.el-amt').value).replace(/[^0-9.\-]/g,'')||'0')*100)}));}
+function editSum(){const a=$('editAmt');if(!$('editLinesWrap').hidden){const sum=editLines().reduce((n,l)=>n+(Number.isFinite(l.amount_cents)?l.amount_cents:0),0);a.value=(sum/100).toFixed(2);}}
+function openEdit(i,back){
+  EDITING={i,back};
+  const parts=partsOf(i).reduce((a,p)=>a+(Number(p.amount_cents)||0),0);
+  $('editWhat').textContent=[i.number_label,i.business||i.person,money(wholeOf(i))].filter(Boolean).join(' · ');
+  $('editTitle').value=i.title||'';$('editDue').value=String(i.due_date||'').slice(0,10);$('editNote').value=i.note||'';$('editErr').hidden=true;
+  const lines=Array.isArray(i.lines)&&i.lines.length>1?i.lines:null;
+  $('editLinesWrap').hidden=!lines||parts>0;
+  $('editLines').innerHTML=lines?lines.map(lineRow).join(''):'';
+  $('editAmt').value=((Number(i.amount_cents)||0)/100).toFixed(2);
+  $('editAmt').disabled=parts>0||(!!lines&&parts===0);$('editAddLine').disabled=parts>0;
+  $('editAmtH').textContent=parts>0?`${money(parts)} was already paid toward it, so the amount and lines stay. The title, the note and the due date can still change.`:lines?'The amount is the lines added up.':'A new amount gets a fresh pay link; the old link stops working.';
+  const sent=!!(i.has_link||i.pay_url||(i.not_sent===false&&i.state!=='draft'));
+  $('editResendWrap').hidden=!sent;$('editResend').checked=sent;$('editResendText').textContent='Send the corrected copy to '+(i.first||'them')+' (same number)';
+  $('editDlg').showModal();$('editTitle').focus();
+}
+$('editAddLine').addEventListener('click',()=>{$('editLines').insertAdjacentHTML('beforeend',lineRow({label:'',qty:1,amount_cents:0}));const last=$('editLines').lastElementChild;last.querySelector('.el-label').focus();editSum();});
+$('editLines').addEventListener('click',(e)=>{const x=e.target.closest('.x');if(!x)return;if($('editLines').children.length<=1){toast('Keep at least one line.',true);return;}x.closest('.eline').remove();editSum();});
+$('editLines').addEventListener('input',editSum);
+$('editCancel').addEventListener('click',()=>$('editDlg').close());
+$('editDlg').addEventListener('close',()=>{const b=EDITING&&EDITING.back;EDITING=null;if(b&&b.isConnected)b.focus();});
+$('editForm').addEventListener('submit',async(e)=>{
+  e.preventDefault();if(!EDITING)return;
+  const err=(m)=>{const x=$('editErr');x.textContent=m;x.hidden=false;};
+  const i=EDITING.i;
+  const body={title:$('editTitle').value.trim(),due_date:$('editDue').value||null,description:$('editNote').value.trim(),resend:!$('editResendWrap').hidden&&$('editResend').checked};
+  if(!body.title)return err('Give the invoice a title.');
+  if(!$('editAmt').disabled||!$('editLinesWrap').hidden){
+    if(!$('editLinesWrap').hidden){body.lines=editLines();if(body.lines.some(l=>!l.label))return err('Every line needs a few words saying what it is for.');body.amount_cents=body.lines.reduce((n,l)=>n+l.amount_cents,0);}
+    else{const cents=Math.round(parseFloat(String($('editAmt').value).replace(/[^0-9.]/g,'')||'0')*100);if(!(cents>0))return err('Enter the amount.');body.amount_cents=cents;}
+  }
+  const go=$('editGo');go.disabled=true;
+  const r=await api('/sales/invoices/'+encodeURIComponent(i.id)+'?today='+ymd(),'PATCH',body);
+  go.disabled=false;
+  if(!r.ok)return err((r.body&&r.body.message)||'That didn’t save. Nothing changed. Try again.');
+  $('editDlg').close();
+  const b=r.body||{};
+  if(!b.changed){toast('Nothing changed.');return;}
+  let m='Changed '+(i.number_label||'the invoice')+': '+(b.words||[]).join('; ')+'.';
+  if(b.resent)m+=' Sent again to '+(i.first||'them')+' as corrected.';else if(b.sent_before&&body.resend)m+=' The corrected copy didn’t email; press Resend to send it.';
+  if(b.fresh_link===false)m+=' A new payment link couldn’t be made just now: press Send on it to make one.';
+  if(b.link_deactivated===false)m+=' Its old card link may still be live, so switch it off in Stripe.';
+  toast(m,b.fresh_link===false||b.link_deactivated===false);
+  await load();
+});
+// ── sales item 165: money given back by hand on an invoice paid by hand ──
+let BACKING=null;
+function openBack(i,back){
+  BACKING={i,back};
+  const kept=wholeOf(i)-(Number(i.refunded_cents)||0);
+  $('backWhat').textContent=[i.number_label,i.business||i.person,money(wholeOf(i))+' paid'+(i.refunded_cents>0?', '+money(i.refunded_cents)+' already given back':'')].filter(Boolean).join(' · ');
+  $('backAmt').value='';$('backOn').value=ymd();$('backOn').max=ymd();$('backHow').value=i.paid_method&&METHOD[i.paid_method]&&i.paid_method!=='stripe'?i.paid_method:'';$('backNote').value='';$('backErr').hidden=true;
+  $('backAmt').placeholder=(kept/100).toFixed(2);
+  $('backDlg').showModal();$('backAmt').focus();
+}
+$('backCancel').addEventListener('click',()=>$('backDlg').close());
+$('backDlg').addEventListener('close',()=>{const b=BACKING&&BACKING.back;BACKING=null;if(b&&b.isConnected)b.focus();});
+$('backForm').addEventListener('submit',async(e)=>{
+  e.preventDefault();if(!BACKING)return;
+  const err=(m)=>{const x=$('backErr');x.textContent=m;x.hidden=false;};
+  const i=BACKING.i;
+  const cents=Math.round(parseFloat(String($('backAmt').value).replace(/[^0-9.]/g,'')||'0')*100);
+  if(!(cents>0))return err('Enter the amount you gave back.');
+  if(!$('backHow').value)return err('Pick how you gave it back.');
+  const go=$('backGo');go.disabled=true;
+  const r=await api('/sales/invoices/'+encodeURIComponent(i.id)+'/money-back?today='+ymd(),'POST',{amount_cents:cents,on:$('backOn').value||ymd(),method:$('backHow').value,note:$('backNote').value.trim()});
+  go.disabled=false;
+  if(!r.ok)return err((r.body&&r.body.message)||'That didn’t save. Nothing changed. Try again.');
+  $('backDlg').close();
+  toast('Recorded '+money(cents)+' given back on '+(i.number_label||'the invoice')+'. It reads Paid, '+money(((r.body.data||{}).refunded_cents)||cents)+' refunded.');
+  await load();
+});
 function openPay(i,back){
   PAYING={i,back};
   $('payWhat').textContent=[i.number_label,i.business||i.person,i.title,money(i.amount_cents)+' due'].filter(Boolean).join(' · ');
@@ -458,7 +748,8 @@ $('expForm').addEventListener('submit',async(e)=>{
 });
 async function load(){
   if(await inClientNow()){$('main').innerHTML=`<div class="center"><h2>Invoices live at the studio level.</h2><p class="muted">You’re looking at one client. Their invoices are on their record’s Invoices tab.</p><p style="margin-top:16px"><a class="link" data-noscope href="/invoices.html">Leave this client and open Invoices →</a></p></div>`;return;}
-  const r=await api('/sales/invoices?today='+ymd());
+  const [r,h]=await Promise.all([api('/sales/invoices?today='+ymd()),api('/sales/money-home?today='+ymd())]);   // sales item 173: the months and Stripe's side ride beside the rows
+  HOME=h&&h.ok&&h.body&&h.body.data?h.body.data:null;   // an older server (404) leaves the month chart and the Stripe strip out
   if(r.status===401){signedOut();return;}
   if(r.status===404&&!(r.body&&r.body.data)){$('main').innerHTML=`<div class="center"><h2>Invoices is on its way.</h2><p class="muted">This page arrives with an update that’s being rolled out. Your invoices are on Pipeline’s Who owes you meanwhile.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html#outstanding">Open Who owes you →</a></p></div>`;return;}
   if(!r.ok||!r.body||!r.body.data){trouble();return;}

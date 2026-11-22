@@ -165,6 +165,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /comments/${ID}/delete`,
     `POST /sales/invoices/${ID}/void`,
     `POST /sales/invoices/${ID}/payment/undo`,   // sales review item 77: taking back a recorded payment changes the books, like a void
+    `POST /sales/invoices/${ID}/money-back`,   // sales item 165: money given back by hand changes the books, like an undo
+    `DELETE /sales/costs/${ID}`,   // sales item 176: removing a cost changes the books
     `POST /sales/deals/${ID}/retainer/cancel`,
     `POST /sales/recurring/${ID}/stop`,   // sales review item 47: stopping a recurring invoice ends its billing, like cancelling a retainer
     'DELETE /broadcasts/lists/[A-Za-z0-9-]{6,40}',   // sales review items 31 + 39: removing a picked list
@@ -276,7 +278,11 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /sales/estimates/${ID}/(send|proposal|invoice)`,   // sales review item 47: send an estimate, or turn it into a proposal or an invoice (drafts)
     `PATCH /sales/recurring/${ID}`,
     `POST /sales/recurring/${ID}/(pause|resume|skip)`,
-    `POST /sales/invoices/${ID}/(send|payment)`,   // item 77: recording a check, cash, transfer or Zelle payment is everyday bookkeeping
+    `POST /sales/invoices/${ID}/(send|payment|remind)`,   // item 77: recording a check, cash, transfer or Zelle payment is everyday bookkeeping; item 166: a reminder now
+    `PATCH /sales/invoices/${ID}`,   // sales item 162: changing an unpaid invoice is everyday bookkeeping, like sending it
+    `POST /sales/invoices/${ID}/not-paid`,   // sales item 172: "Not received" puts the reminders back
+    `POST /sales/deals/${ID}/costs`, `PATCH /sales/costs/${ID}`,   // sales item 176: a cost paid for a customer
+    'POST /sales/statement/email',   // sales item 171: emailing a customer their statement
     `POST /sales/contracts/${ID}/(term|send)`,
     `POST /sales/proposals/${ID}/(send|revise)`,
     'POST /projects',

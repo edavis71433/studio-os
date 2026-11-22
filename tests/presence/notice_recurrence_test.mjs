@@ -91,6 +91,8 @@ const TERMINAL_OK = [
   { kind: 'publish_failed', marker: 'pub:', why: 'each publish attempt has its own pubId — a new failure is a new event id' },
   { kind: 'publish_failed', marker: 'sched:', why: 'sched:<row id> (builder item 249) — one row per scheduled publish set aside because a newer version went live; the row is canceled, a terminal state, and scheduling again mints a new row id' },
   { kind: 'domain_expiry', marker: 'domainExpiryPeriod(', why: 'exp:<domain>:<expiry date>:<rung> (builder list item 133) — each rung of ONE expiry is said once; a renewal moves the date, so the next expiry gets new keys and the ladder starts again' },
+  { kind: 'deal_followup', marker: 'retainerRenewalPeriod(', why: 'retainer:<deal>:renew:<period end> (sales item 163) — a silent ledger row: the week-before note for ONE yearly charge goes once; the next year has a new period end, so a new key' },
+  { kind: 'deal_followup', marker: 'invremind:${id}:now:${today}', why: 'invremind:<id>:now:<day> (sales item 166) — Remind now once a day by design; the next day is a new key, and paying or voiding takes the prefix down' },
   { kind: 'deal_followup', marker: 'invoiceReminderPeriod(', why: 'invremind:<id>:<leg> — an invoice settles exactly once (paid or voided); each of the three legs (−7 · due · +N) sends once by design (Oct 2026 studio audit, change 10)' },
   // sales items 116 to 118 (Nov 12 2026 review)
   { kind: 'deal_followup', marker: 'draftNudgePeriod(', why: 'invremind:<id>:draft:<date> — one ask per unsent invoice per due date (sales item 141); sending or voiding the invoice takes the invremind prefix down, and a re-dated draft gets a fresh key' },

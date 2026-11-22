@@ -93,7 +93,7 @@ test.describe('the Pages card (the floating studio, part three)', () => {
     await expect(crow(page, 'Home').locator('.pc-open')).toHaveAttribute('aria-current', 'page');
     await expect(crow(page, 'Home').locator('.pc-sub')).toHaveText('Editing now');
     // a page on the canvas is a tab here; the template's own pages are not
-    expect(await page.locator('#pagesBar .page-pill .pp-name').allTextContents()).toEqual(['Home', 'Gallery', 'Landing']);
+    expect(await page.locator('#pagesBar .page-pill .pp-name').allTextContents()).toEqual(['Home', 'Services', 'About', 'FAQ', 'Updates', 'Contact', 'Gallery', 'Landing']);   // item 314: every page opens on the canvas
     await expect(card(page).locator('#btnPcAuto')).toBeHidden();
     for (const id of ['pcHeadFoot', 'pcNotFound', 'pcSearchLook', 'btnPageInfo']) await expect(card(page).locator('#' + id)).toBeAttached();
     expect(writes.filter((w) => w.path === '/settings')).toHaveLength(0);   // just looking changes nothing
@@ -178,16 +178,29 @@ test.describe('the Pages card (the floating studio, part three)', () => {
     await expect(page.locator('#pageSettings')).toHaveCount(0);                      // no second copy over the page
   });
 
-  test('a built-in page’s settings say where its words live, and that button is the one way out', async ({ page }) => {
+  // builder item 314: the template's own pages open on the canvas like Home; their settings sit
+  // behind the gear, and "Change what's on it" opens the tab's form in a card beside the page
+  test('a built-in page opens on the canvas; its gear opens its settings, and its words open in a card beside the page', async ({ page }) => {
     await mount(page);
+    const pages: string[] = [];   // after the mount, so this route answers from here on
+    await page.route('**/functions/v1/presence/preview**', (route: Route) => { pages.push(new URL(route.request().url()).searchParams.get('page') || '/'); return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: HTML }); });
     await openCard(page);
-    await crow(page, 'Services').locator('.pc-open').click();                         // the template's own page: a press opens its settings
+    await crow(page, 'Services').locator('.pc-open').click();                         // the template's own page: a press opens it on the canvas
+    await expect(card(page)).toBeHidden();
+    await expect(page.locator('#dcPageName')).toHaveText('Services');
+    await expect.poll(() => pages.at(-1)).toBe('/services/');
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    await openCard(page);
+    await expect(crow(page, 'Services')).toHaveClass(/\bon\b/);
+    await crow(page, 'Services').locator('.pg-gear').click();
     const panel = card(page).locator('#pageSettings');
     await expect(panel).toContainText('built from the items on your Services tab');
-    await expect(page.locator('html')).toHaveClass(/dc-edit/);
     await panel.getByRole('button', { name: 'Change what’s on it' }).click();
-    await expect(page.locator('#view-offerings')).toBeVisible();
-    await expect(page.locator('html')).not.toHaveClass(/dc-edit/);
+    await expect(page.locator('#settingsPanel')).toHaveAttribute('data-mode', 'core');
+    await expect(page.locator('#settingsPanel #view-offerings')).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    await page.locator('#btnSettingsClose').click();
+    await expect(page.locator('.content > #view-offerings, .content #view-offerings:not(.dc-hosted)')).toHaveCount(1);   // back on its tab
   });
 
   test('＋ Link adds a link to the menu from inside the card', async ({ page }) => {
