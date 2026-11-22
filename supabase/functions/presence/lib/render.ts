@@ -27,6 +27,7 @@ import { applyPhoneBar } from './phone_bar.ts';
 import { applyMotion } from './site_motion.ts';
 import { applySiteIcon } from './site_icon.ts';
 import { applyButtonStyles } from './site_buttons.ts';
+import { applyLookLayer, LOOK_COLOUR_TOKENS } from './site_looks.ts';
 
 // ── FD-T2: indexed template registry; each template's code loads on first use ──
 // slug → version → { manifest, code loader }. Render resolution goes through this
@@ -201,6 +202,14 @@ export function injectDevLayer(fileMap: FileMap, dev: Snapshot['dev_customizatio
   return out;
 }
 
+/** Item 333: a template that keeps its own colours (Slate) never takes a look's dark-page colours.
+ *  The customization comes back untouched when it sets none of them. */
+function withoutLookColours(dev: Snapshot['dev_customization']): Snapshot['dev_customization'] {
+  const t = dev?.theme_tokens;
+  if (!dev || !t || !LOOK_COLOUR_TOKENS.some((k) => k in t)) return dev;
+  return { ...dev, theme_tokens: Object.fromEntries(Object.entries(t).filter(([k]) => !(LOOK_COLOUR_TOKENS as readonly string[]).includes(k))) };
+}
+
 /** Render a snapshot with its PINNED template version, then apply the developer
  *  layer from the SAME snapshot. This is the ONE render entry — publish, preview,
  *  and restore all call it, so a developer edit is indistinguishable from any
@@ -227,7 +236,10 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   const moved = applySiteIcon(opts.allSectionStyles ? drawn : applyMotion(drawn, tokens?.motion), (snapshot.content as SnapshotContent)?.settings?.icon);
   // item 217: the button set and form style, when one is picked, in the canvas too; before the
   // developer layer, so a developer's own CSS still has the last word
-  const buttoned = applyButtonStyles(moved, tokens, FIXED_COLOR_TEMPLATES.has(snapshot.template_slug));
+  const fixedColours = FIXED_COLOR_TEMPLATES.has(snapshot.template_slug);
+  // item 333: a ready-made look's own rules (lib/site_looks.ts), after the set's so its button
+  // corners win, before the developer layer
+  const buttoned = applyLookLayer(applyButtonStyles(moved, tokens, fixedColours), tokens, { fixed: fixedColours, template: snapshot.template_slug });
   // List item 124: hidden from search, every page says noindex; the owner's llms.txt is written.
   const searched = withSearchChoices(buttoned, (snapshot.content as SnapshotContent)?.settings);
   // item 122: Call, Directions, Hours and Email along the bottom of every page on a phone, when turned on
@@ -238,7 +250,7 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   // item 148: the pop-up and any form a "#form-<id>" link opens (lib/popup.ts), then item 131:
   // pages with the site's forms send them from the page (lib/site_send.ts)
   const content = snapshot.content as SnapshotContent;
-  const dressed = injectSender(injectPopup(injectDevLayer(found, snapshot.dev_customization), content, site), content, site);
+  const dressed = injectSender(injectPopup(injectDevLayer(found, fixedColours ? withoutLookColours(snapshot.dev_customization) : snapshot.dev_customization), content, site), content, site);
   // List item 152: the Google tag and the Meta Pixel, behind a cookie notice, on a site that has them.
   const tagged = injectAdTags(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
   return injectCsp(injectAnalytics(tagged, counting ? site.siteId : undefined));

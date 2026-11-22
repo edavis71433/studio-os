@@ -39,6 +39,17 @@ const TOKEN_RULES: Record<string, RegExp> = {
   header_brand: /^(both|logo|name)$/,          // builder item 296: the header shows the logo and the name, the logo alone, or the name alone (lib/template_kit.ts)
   logo_height: /^(2[4-9]|[3-7]\d|80)$/,         // builder item 296: the logo's height in px, 24 to 80
   site_search: /^(on|off)$/,                    // builder item 295: the header's search box can be left out
+  // builder item 333: the twelve ready-made looks. Each one draws only when set (lib/site_looks.ts).
+  look: /^[a-z][a-z0-9_]{1,30}$/,               // the ready-made look the site wears: its small layer of rules keeps every word readable
+  scheme: /^dark$/,                             // a dark page: the template's own light surfaces follow the look's dark colours
+  card: /^#[0-9a-fA-F]{3,8}$/,                  // a card's colour (templates read --card)
+  line: /^#[0-9a-fA-F]{3,8}$/,                  // the thin rules between things (--line)
+  wash: /^#[0-9a-fA-F]{3,8}$/,                  // the lightly shaded bands (--wash)
+  accent_band: /^#[0-9a-fA-F]{3,8}$/,           // what an accent section draws behind its white words (--accent-band)
+  heading_case: /^upper$/,                      // headings in capitals
+  heading_weight: /^400$/,                      // headings at regular weight, for a face drawn in one weight
+  button_radius: /^([0-9]|[1-3][0-9]|40)px$/,   // every button's corners, over its set's
+  button_shadow: /^offset$/,                    // a solid shadow beside the main button
 };
 export const ALLOWED_TOKENS = Object.keys(TOKEN_RULES);
 
