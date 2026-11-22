@@ -44,7 +44,7 @@ To see what production has: `select number, name, how, last_at from public.prese
 
 Every pull request rehearses its changes for free: "Database changes rehearsal" builds a scratch database from every migration in order, runs each pack from 0260 on twice, and checks the ledger. A red rehearsal means the change won't apply cleanly on production.
 
-Writing a new change: take the next free number, end both the migration and its pack with `select public.presence_ledger_note(NNNN, 'short_name');`, and raise `CODE_NEWEST_CHANGE` in `supabase/functions/presence/lib/schema_ledger.ts` to the same number. `tests/presence/change_ledger_420_test.mjs` fails until all three agree.
+Writing a new change: take the next free number, end both the migration and its pack with `select public.presence_ledger_note(NNNN, 'short_name');`, and raise `CODE_NEWEST_CHANGE` in `supabase/functions/presence/lib/schema_ledger.ts` to the same number. `tests/presence/change_ledger_420_test.mjs` fails until all three agree. The changes that ran before the ledger existed (through 0247, 0249 to 0255, and 0265 to 0267) are written down once by APPLY-0260's backfill and don't write themselves.
 
 ## Pages
 

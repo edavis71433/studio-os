@@ -7,10 +7,13 @@
 // doesn't have it (deploy.yml, "Database changes are in place").
 //
 // Adding a migration? Raise this number to the migration's own number in the same pull
-// request; tests/presence/change_ledger_420_test.mjs fails until the two agree, and until
-// the migration and its apply pack both end by writing their number down.
+// request; tests/presence/change_ledger_420_test.mjs fails until it is at least the newest
+// file, and until the migration and its apply pack both end by writing their number down.
+// It may name a change whose file is still in another pull request when that change is
+// already on production and in APPLY-0260's backfill list: 0265 to 0267 ran before the
+// ledger existed (Nov 22 2026).
 
-export const CODE_NEWEST_CHANGE = 261;
+export const CODE_NEWEST_CHANGE = 267;
 
 /** The Health page's "Database changes" area, from the ledger's newest number. Pure. */
 export function changesArea(newest: number | null | undefined, expected = CODE_NEWEST_CHANGE): { state: 'ok' | 'attention' | 'off'; detail: string } {
