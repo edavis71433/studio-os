@@ -321,11 +321,11 @@ export function aggregateVisits(rows: VisitRow[], nowMs: number, windowDays: num
 }
 
 // ── the injected tracker (privacy-first, cookieless, ~700 bytes minified) ─────
-// Honors Do-Not-Track, uses sendBeacon (zero latency, fire-and-forget), no
+// Honors Do-Not-Track and Global Privacy Control (item 279), uses sendBeacon (zero latency, fire-and-forget), no
 // cookies/localStorage, sends only path + referrer + UTM + click kind.
 export function trackerScript(siteId: string, collectBase: string): string {
   const url = `${collectBase}/px/${siteId}`;
-  const js = `(function(){try{if(navigator.doNotTrack=='1'||window.doNotTrack=='1')return;var U='${url}';` +
+  const js = `(function(){try{if(navigator.doNotTrack=='1'||window.doNotTrack=='1'||navigator.globalPrivacyControl===true)return;var U='${url}';` +
     `function q(k){var m=location.search.match(new RegExp('[?&]utm_'+k+'=([^&]+)'));return m?decodeURIComponent(m[1]):''}` +
     `function s(o){try{navigator.sendBeacon(U,JSON.stringify(o))}catch(e){}}` +
     `s({k:'pageview',p:location.pathname,r:document.referrer,u:{s:q('source'),m:q('medium'),c:q('campaign')}});` +

@@ -16,7 +16,7 @@ import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { describeChanges } from '../lib/diff.ts';
 import { computeDraftHash } from '../lib/draft_hash.ts';
 import { deriveHealth } from '../lib/health.ts';
-import { applySnapshotToDraft, snapshotForRestore, leftOffSentence } from '../lib/draft_writer.ts';
+import { applySnapshotToDraft, snapshotForRestore, leftOffSentence, restoreFailedBody } from '../lib/draft_writer.ts';
 import { lockedRestoreMessage } from '../lib/section_lock.ts';
 import { draftAsFound } from '../lib/optimistic_lock.ts';
 import { getSite as netlifyGetSite, netlifyConfigured } from '../lib/netlify.ts';
@@ -39,6 +39,7 @@ interface RoomState {
   draftHash: string;               // M9: the M3 version token for optimistic locking
   blockers: number; warnings: number;
   blockerList: { field: string; message: string; at?: { page: string; index: number } }[];   // the same validation, by name, for the publish page
+  warningList: { field: string; message: string; at?: { page: string; index: number } }[];   // item 275: what can publish but deserves a look, by name
   changes: ReturnType<typeof describeChanges>;
   lastLive: { id: string; created_at: string; completed_at: string | null; actor_kind: string } | null;
   lastAny: { status: string } | null;
@@ -94,7 +95,7 @@ async function roomState(site: SiteRow): Promise<RoomState | null> {
     if (!liveDomain && nf.ok && nf.site) liveDomain = nf.site.default_domain ?? null;
   }
 
-  return { draftContent: snapshot.content, liveContent, draftHash, blockers: v.blockers.length, warnings: v.warnings.length, blockerList: v.blockers, changes, lastLive, lastAny, oldestDraftChangeAt: oldest, hostingProblem, liveDomain };
+  return { draftContent: snapshot.content, liveContent, draftHash, blockers: v.blockers.length, warnings: v.warnings.length, blockerList: v.blockers, warningList: v.warnings, changes, lastLive, lastAny, oldestDraftChangeAt: oldest, hostingProblem, liveDomain };
 }
 
 /** Item 282: a date for the bar, on the site's own clock (the Versions list beside it says the same day). Pure. */
@@ -157,6 +158,7 @@ export async function handleChanges(site: SiteRow, cors: Record<string, string>)
       changes: st.changes.changes,
       blockers: st.blockers, warnings: st.warnings,
       blocker_list: st.blockerList,   // what is holding up the publish, each in plain words
+      warning_list: st.warningList,   // item 275: what can publish but deserves a look (sample words), each in plain words
       draft_hash: st.draftHash,   // M9: review these changes, then publish with If-Match this hash
     },
   }, 200, cors);
@@ -220,29 +222,31 @@ export async function handleContentTree(site: SiteRow, cors: Record<string, stri
  *  version is loaded INTO THE DRAFT for review; the live site is untouched
  *  until the client publishes through the normal ritual. */
 export async function handleRestoreToDraft(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  let body: { publish_id?: string } = {};
+  let body: { publish_id?: string; snapshot_id?: string } = {};
   try { body = await req.json(); } catch { /* fall through */ }
   const publishId = body?.publish_id || '';
-  if (!UUID_RE.test(publishId)) return json({ error: 'bad_request', message: 'Which version should we bring back?' }, 400, cors);
+  // Builder item 254: after a restore stopped part-way, "Put my draft back" names the safety
+  // copy itself (a kept snapshot of this site), not a publish
+  const safetyId = !publishId && body?.snapshot_id ? String(body.snapshot_id) : '';
+  if (!UUID_RE.test(publishId) && !UUID_RE.test(safetyId)) return json({ error: 'bad_request', message: 'Which version should we bring back?' }, 400, cors);
 
-  const p = await svc(`presence_publishes?id=eq.${publishId}&site_id=eq.${site.id}&select=snapshot_id,created_at&limit=1`);
-  const rec = p.json?.[0];
+  const rec = safetyId ? { snapshot_id: safetyId, created_at: '' } : (await svc(`presence_publishes?id=eq.${publishId}&site_id=eq.${site.id}&select=snapshot_id,created_at&limit=1`)).json?.[0];
   if (!rec) return json({ error: 'not_found', message: 'We couldn’t find that version.' }, 404, cors);
   if (!rec.snapshot_id) return json({ error: 'not_restorable', message: 'That version is no longer restorable (older versions are kept for a limited time).' }, 410, cors);
 
   const snap = await snapshotForRestore(site.id, rec.snapshot_id);
-  if (!snap) return json({ error: 'not_restorable', message: 'That version is no longer restorable.' }, 410, cors);
+  if (!snap) return json({ error: 'not_restorable', message: safetyId ? 'That safety copy isn’t here.' : 'That version is no longer restorable.' }, 410, cors);
   if (!snapshotContentUsable(snap.content)) return json({ error: 'not_restorable', message: 'That version predates the current site format and can’t be restored.' }, 410, cors);
 
-  const when = new Date(rec.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const res = await applySnapshotToDraft(site, snap, principal, `Brought the version from ${when} into the draft`, await draftAsFound(req), { settings: true });
+  const when = safetyId ? 'the safety copy' : new Date(rec.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const res = await applySnapshotToDraft(site, snap, principal, safetyId ? 'Put the draft back from the safety copy' : `Brought the version from ${when} into the draft`, await draftAsFound(req), { settings: true });
   if (res.error === 'section_locked') return json({ error: 'section_locked', message: lockedRestoreMessage(res.locked || [], 'that version'), sections: res.locked }, 403, cors);
-  if (!res.ok) return json({ error: 'restore_failed', message: 'That didn’t work — your draft is unchanged except where noted, and nothing was lost.', }, 502, cors);
+  if (!res.ok) return json(restoreFailedBody(res), 502, cors);   // builder item 254: honest about a part-way stop
 
   return json({
     data: {
       ok: true,
-      message: `The version from ${when} is now in your draft. Look it over, then publish when you’re happy.` + leftOffSentence(res.applied?.dropped_media ?? 0, 'that version'),
+      message: (safetyId ? 'Your draft is back as it was before the restore.' : `The version from ${when} is now in your draft. Look it over, then publish when you’re happy.`) + leftOffSentence(res.applied?.dropped_media ?? 0, safetyId ? 'that copy' : 'that version'),
       set_aside: 'Your previous draft was set aside as a safety copy — nothing was lost.',
       applied: res.applied,
     },

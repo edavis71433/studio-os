@@ -5,6 +5,8 @@
 // per area. It reads what exists; it does not add a second monitoring system.
 // Pure: the /system/health route feeds it already-loaded counts.
 
+import { stockHealthWords } from './stock/health.ts';
+
 export interface HealthCenterInputs {
   nowIso: string;
   cronLastRunAt: string | null;
@@ -23,6 +25,8 @@ export interface HealthCenterInputs {
   /** sales item 131: which kind of Stripe key Studio OS holds, from its prefix only
    *  (commerce/stripe.ts heldKeyKind). Left out, the area isn't shown. */
   stripeKey?: { kind: 'restricted' | 'secret' | 'none' | 'other'; live: boolean | null };
+  /** item 263: whether the stock photo library answers (lib/stock/health.ts). Left out, the area isn't shown. */
+  stock?: { configured: boolean; answered: boolean | null; status: number; provider: string } | null;
   /** builder list item 269: the host's plan as the host tells it (lib/netlify.ts readHostPlan).
    *  Left out, the area isn't shown. */
   hosting?: HostingRead | null;
@@ -81,6 +85,12 @@ export function summarizeHealthCenter(i: HealthCenterInputs): { overall: AreaSta
         : k.live === false ? 'This is a test key, so real payments can’t be taken.'
         : k.kind === 'secret' ? 'Studio OS holds a full-power Stripe key. Swap it for a restricted key that can do only what Studio OS needs.'
         : 'A restricted key that can do only what Studio OS needs. Check its permissions to see each one.');
+  }
+
+  // stock photos (item 263): a refused key used to fail every search quietly
+  if (i.stock !== undefined) {
+    const w = stockHealthWords(i.stock);
+    add('stock', 'Stock photos', w.state, w.detail);
   }
 
   // AI

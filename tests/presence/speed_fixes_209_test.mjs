@@ -24,7 +24,7 @@ const hex = (k, i) => `${k}${i.toString(16).padStart(7, '0')}-0000-4000-8000-000
 
 const { unfinishedOf, unfinishedSectionsOf } = await import('../../supabase/functions/presence/lib/unfinished.ts');
 const { svcPaged } = await import('../../supabase/functions/presence/lib/db.ts');
-const { rateAllowBoth } = await import('../../supabase/functions/presence/lib/ratelimit.ts');
+const { rateAllowBoth, scrambleIpBucket } = await import('../../supabase/functions/presence/lib/ratelimit.ts');
 const { gather } = await import('../../supabase/functions/presence/agency/routes.ts');
 const { runInvoiceReminders, INVOICE_PAGE } = await import('../../supabase/functions/presence/commerce/lifecycle.ts');
 const { handleProjects } = await import('../../supabase/functions/presence/routes/projects.ts');
@@ -197,9 +197,11 @@ const draftReads = () => db.log.filter((c) => c.method === 'GET' && c.url.starts
     return pg(url, init);
   };
   const A = { bucket: 'px:ip:1.2.3.4', max: 120 }, B = { bucket: 'px:site:s', max: 1200 };
-  ok('visit limits: one call for both', (await rateAllowBoth(A, B, 60)) === true && calls.join() === 'rate_hit_both:px:ip:1.2.3.4', calls.join());
+  // item 279: the limiter stores a scrambled code in place of the address, the same one in every call
+  const IP = scrambleIpBucket('px:ip:1.2.3.4');
+  ok('visit limits: one call for both', (await rateAllowBoth(A, B, 60)) === true && calls.join() === `rate_hit_both:${IP}`, calls.join());
   calls.length = 0; hasBoth = false;
-  ok('visit limits before 0206: the two calls, as before', (await rateAllowBoth(A, B, 60)) === true && calls.join() === 'rate_hit_both:px:ip:1.2.3.4,rate_hit:px:ip:1.2.3.4,rate_hit:px:site:s', calls.join());
+  ok('visit limits before 0206: the two calls, as before', (await rateAllowBoth(A, B, 60)) === true && calls.join() === `rate_hit_both:${IP},rate_hit:${IP},rate_hit:px:site:s`, calls.join());
   calls.length = 0; firstOver = true;
   ok('visit limits before 0206: a visitor over its limit never counts against the site', (await rateAllowBoth(A, B, 60)) === false && !calls.some((c) => c.includes('px:site')), calls.join());
   globalThis.fetch = pg;

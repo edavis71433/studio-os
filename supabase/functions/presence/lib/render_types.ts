@@ -250,6 +250,12 @@ export interface SiteBlockColumns { type: 'columns'; id: string; title?: string;
 export interface SiteBlockCards { type: 'cards'; id: string; title?: string; cards: Array<{ heading: string; text?: string; image?: MediaRef | null; link?: string }> }
 export interface SiteBlockDownload { type: 'download'; title?: string; file?: MediaRef | null; label?: string }
 export interface SiteBlockToc { type: 'toc'; title?: string }
+/** Item 259: a section the owner added that has nothing to show yet (a gallery with no photos,
+ *  a video with no link, a map with no address, a team with no people, a reviews wall with no
+ *  approved reviews, an image with no photo). Only the builder's canvas draws it, as a clear
+ *  placeholder, so the section is on the page and in Layers the moment it is added. A publish
+ *  never makes one (lib/serializer.ts composeBlocks keepEmpty). `of` is the stored type. */
+export interface SiteBlockEmpty { type: 'empty'; of: string; title?: string }
 // AEM-parity staples (r5, text-first — no media, always auto-responsive/accessible):
 // Title = a standalone heading + optional subtitle; Link list = a titled list of safe
 // links; Table = a simple data table (header row + body rows, scrolls on small screens);
@@ -353,6 +359,7 @@ export type SiteBlock = WithLook<
   | SiteBlockTitle | SiteBlockLinkList | SiteBlockTable | SiteBlockSpotlight
   | SiteBlockFreeform
   | SiteBlockStack
+  | SiteBlockEmpty
   | FormDefinition
 >;
 export type SiteBlockType = SiteBlock['type'];

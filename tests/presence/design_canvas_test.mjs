@@ -658,7 +658,7 @@ const ipeSerializeMd = new Function('return (' + extractFn(html, 'ipeSerializeMd
     ok(prevented === 0 && inserted === null, 'outside a session the handler is inert (no session, no interception)');
   }
   const kd = extractFn(html, 'ipeKeydown');
-  ok(/Escape/.test(kd) && /ipeCancel\(\)/.test(kd), 'Escape always exits without saving (no trap)');
+  ok(/Escape/.test(kd) && /ipeCommit\(\)/.test(kd) && !/ipeCancel\(\)/.test(kd), 'Escape keeps the words and leaves the box, never throwing them away (builder item 255)');
   // ── review finding 4: the phantom-write gate ──
   const start2 = extractFn(html, 'ipeStart');
   ok(/base = md \? ipeSerializeMd\(fieldEl\) : ipeReadPlain\(fieldEl\)/.test(start2), 'FINDING 4: the session captures its PRE-SESSION serialization at start');

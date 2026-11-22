@@ -31,6 +31,7 @@ import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
 import { runStripeCheck } from '../commerce/stripe_check.ts';   // sales item 130: the daily check against Stripe
 import { summarizeHealthCenter } from '../lib/health_center.ts';
+import { stockHealth } from '../lib/stock/health.ts';
 import { timingSafeEqual } from '../../_shared/hmac.ts';
 import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
 import { oauthConfigured } from '../connected/auth.ts';
@@ -278,6 +279,7 @@ export async function computeHealthCenter(): Promise<any> {
     backupsVerified: envPresent('BACKUPS_VERIFIED'),
     stripeKey: heldKeyKind(),   // sales item 131: restricted or full-power, from the prefix alone
     hosting: netlifyConfigured() ? await readHostPlan(nowIso, (await svcCount(`presence_publishes?netlify_deploy_id=not.is.null&created_at=gte.${encodeURIComponent(new Date(Date.now() - 30 * 86400_000).toISOString())}`).catch(() => null)) ?? 0).catch(() => null) : null,   // builder list item 269: the host's plan, as the host tells it; the paid publishes it knows of say whether "0 used" can be believed
+    stock: await stockHealth().catch(() => null),   // item 263: a refused photo key shows here, not only in a failed search
   });
 }
 
