@@ -48,7 +48,7 @@ import { loadEmailBrand } from '../lib/email_brand.ts';
 import { raiseNotice, clearNotice, dealFollowupPeriod, leadFollowupPeriod, noticeWeekBucket } from '../lib/notice.ts';
 import { summarizePipeline, splitLineItems } from '../lib/sales_lifecycle.ts';
 import { emailMatch } from '../lib/contact_email.ts';
-import { agreementRenewalWindow, agreementRenewalPeriod, agreementRenewalCopy } from './retainers.ts';
+import { agreementRenewalWindow, agreementRenewalPeriod, agreementRenewalCopy, retainerDealsPath, RETAINER_DEALS_PAGE } from './retainers.ts';
 import { planReminder, noShowNudgeDue, humanSlot, priceText, REMINDER_DAY_HRS } from '../lib/booking.ts';
 import { bookingMail, bookingBits } from '../lib/booking_links.ts';
 import { FOLLOWUP_DEFAULT_DAYS, followupDays, followupWords, followupStepDue, followupStopReason, followupEmail, quoteExpiryDue, quoteExpiryCopy, type FollowupSettings } from '../lib/follow_ups.ts';
@@ -762,8 +762,14 @@ export function invoiceReminderMore(docUrl: string | null | undefined, linkColor
 }
 /** `undated` (sales item 118): an invoice with no due date said "due on receipt" in its
  *  email, and a week later the reminder said "due today", a date nobody had set. */
-export function invoiceReminderCopy(slot: InvoiceReminderSlot, what: 'deposit' | 'invoice', amount: string, title: string, undated = false): { subject: string; line: string } {
+export function invoiceReminderCopy(slot: InvoiceReminderSlot, what: 'deposit' | 'invoice', amount: string, title: string, undated = false, lateFeeCents = 0): { subject: string; line: string } {
   const name = title || what;
+  // sales item 167: a late fee that was added is said plainly, in the overdue reminders
+  const fee = lateFeeCents > 0 && (slot === 'after' || slot === 'again') ? ` A late fee of $${(lateFeeCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })} was added, as agreed, so the amount now includes it.` : '';
+  const base = invoiceReminderBase(slot, what, amount, name, undated);
+  return fee ? { subject: base.subject, line: base.line + fee } : base;
+}
+function invoiceReminderBase(slot: InvoiceReminderSlot, what: 'deposit' | 'invoice', amount: string, name: string, undated: boolean): { subject: string; line: string } {
   if (slot === 'due' && undated) return { subject: `A quick reminder — ${name} (${amount})`, line: `Just a friendly nudge: the ${what} for <strong>${amount}</strong> we sent last week is still open. The same secure link works whenever you're ready — nothing expires.` };
   if (slot === 'before') return { subject: `Coming up — ${name} (${amount})`, line: `A quick heads-up: the ${what} for <strong>${amount}</strong> is due in a few days. The same secure link works whenever you're ready — nothing expires.` };
   if (slot === 'due') return { subject: `Due today — ${name} (${amount})`, line: `Just a friendly nudge: the ${what} for <strong>${amount}</strong> is due today. The same secure link works whenever you're ready — nothing expires.` };
@@ -781,6 +787,107 @@ export function invoiceReminderOperatorBody(slot: InvoiceReminderSlot, hasEmail:
 /** The line a reminder that did NOT leave raises (sales item 118). Its own period, under
  *  the invoice's reminder prefix, so paying or voiding the invoice takes it down too. */
 export const invoiceReminderFailedPeriod = (invoiceId: string, slot: InvoiceReminderSlot): string => `invremind:${invoiceId}:${slot}:failed`;
+
+// ── Late fees (sales item 167, Nov 22 2026 review) ─────────────────────────────
+// Off for every studio until it sets one (Settings, On every invoice): a flat amount or a percent
+// of the invoice, added ONCE, `late_fee_days` after the due date, as a line on the invoice with a
+// fresh pay link (the old link was for the old amount). The next reminder says so. Never on an
+// invoice with no due date, one already carrying a fee, or one the client says they paid.
+export interface LateFeeSetting { late_fee_mode?: unknown; late_fee_value?: unknown; late_fee_days?: unknown }
+/** The fee this invoice is due today, in cents, or 0. Pure. */
+export function lateFeeDue(inv: { due_date?: unknown; amount_cents?: unknown; late_fee_cents?: unknown; stripe_url?: unknown; status?: unknown; processing_since?: unknown; client_says_paid?: unknown }, s: LateFeeSetting | null | undefined, todayYmd: string): number {
+  const mode = String(s?.late_fee_mode || 'off');
+  if (mode !== 'flat' && mode !== 'percent') return 0;
+  if (String(inv.status || 'open') !== 'open' || inv.processing_since || !inv.stripe_url || inv.client_says_paid) return 0;
+  if ((Number(inv.late_fee_cents) || 0) > 0) return 0;
+  const due = ymdOf(inv.due_date);
+  if (!due) return 0;
+  const days = Math.max(1, Math.min(90, Math.trunc(Number(s?.late_fee_days)) || 7));
+  if (daysFromTo(due, todayYmd) < days) return 0;
+  const value = Math.max(0, Math.trunc(Number(s?.late_fee_value) || 0));
+  const amount = Math.max(0, Math.round(Number(inv.amount_cents) || 0));
+  const fee = mode === 'flat' ? value : Math.round(amount * Math.min(100, value) / 100);
+  return fee >= 50 && fee <= 100_000_000 ? fee : 0;
+}
+async function lateFeeSettingFor(siteId: string, cache: Map<string, unknown>): Promise<LateFeeSetting | null> {
+  const key = `latefee:${siteId}`;
+  if (cache.has(key)) return cache.get(key) as LateFeeSetting | null;
+  let out: LateFeeSetting | null = null;
+  try { const r = await svc(`presence_settings?site_id=eq.${siteId}&select=late_fee_mode,late_fee_value,late_fee_days&limit=1`); if (r.ok && Array.isArray(r.json)) out = r.json[0] || null; } catch { out = null; }
+  cache.set(key, out);
+  return out;
+}
+/** Add the fee to one invoice: the amount and lines up by it, the old link off, a fresh link under
+ *  the next number, a line on the deal. Guarded on the amount it had, so it is added once. */
+async function addLateFee(inv: { id: string; site_id: string; deal_id: string | null; title?: string; description?: string; currency?: string; amount_cents: number; stripe_url: string | null; stripe_payment_link_id?: string | null; link_gen?: number; lines?: unknown; late_fee_cents?: number; due_date?: string | null; status?: string; processing_since?: string | null; client_says_paid?: unknown }, localYmd: string, cache: Map<string, unknown>): Promise<boolean> {
+  const s = await lateFeeSettingFor(inv.site_id, cache);
+  const fee = lateFeeDue(inv, s, localYmd);
+  if (!fee) return false;
+  const { invoiceLines } = await import('../lib/documents.ts');
+  const lines = [...invoiceLines({ lines: inv.lines, title: inv.title, description: inv.description }, Math.round(Number(inv.amount_cents) || 0)), { label: `Late fee (added ${localYmd})`, qty: 1, amount_cents: fee }];
+  const gen = Math.max(0, Math.trunc(Number(inv.link_gen) || 0)) + 1;
+  const up = await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${inv.site_id}&status=eq.open&processing_since=is.null&late_fee_cents=eq.0&amount_cents=eq.${Math.round(Number(inv.amount_cents) || 0)}&deleted_at=is.null&select=id,site_id,amount_cents,currency,description,title,link_gen`,
+    { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ amount_cents: Math.round(Number(inv.amount_cents) || 0) + fee, lines, late_fee_cents: fee, stripe_url: null, stripe_payment_link_id: null, link_gen: gen, updated_at: new Date().toISOString() }) });
+  const row = up.ok && Array.isArray(up.json) ? up.json[0] : null;
+  if (!row) return false;
+  if (inv.stripe_payment_link_id) { const { deactivatePaymentLink } = await import('./stripe.ts'); await deactivatePaymentLink(String(inv.stripe_payment_link_id)).catch(() => false); }
+  const { mintPayLink } = await import('../lib/pay_link.ts');
+  const url = await mintPayLink(row);
+  inv.amount_cents = Number(row.amount_cents); inv.late_fee_cents = fee; inv.link_gen = gen; inv.stripe_url = url;   // the reminder below sends the new amount and link
+  if (inv.deal_id) await svc('presence_deal_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ deal_id: inv.deal_id, site_id: inv.site_id, kind: 'invoice_changed', actor: 'system', actor_kind: 'system', detail: { invoice_id: inv.id, late_fee: true, amount_cents: Number(row.amount_cents), changes: [{ field: 'amount_cents', from: Number(inv.amount_cents) - fee, to: Number(row.amount_cents) }], words: [`late fee of $${(fee / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })} added`] } }) }).catch(() => {});
+  return true;
+}
+
+// ── A word before a yearly retainer charge (sales item 163, Nov 22 2026 review) ──
+// A yearly retainer charged with no heads-up. A week before its next charge the client gets one
+// short note: the amount, the day, and that they can stop it from their portal. Once per charge
+// (the ledger row is keyed by the period end), to the deal's person. Studio-scoped like the rest.
+export const RETAINER_NOTE_DAYS = 7;
+export const retainerRenewalPeriod = (dealId: string, periodEnd: string): string => `retainer:${dealId}:renew:${String(periodEnd).slice(0, 10)}`;
+/** Is a yearly retainer's next charge within the week? Pure. */
+export function retainerNoteDue(r: { status?: unknown; interval?: unknown; current_period_end?: unknown } | null | undefined, nowMs: number): boolean {
+  if (!r || String(r.status) !== 'active' || String(r.interval) !== 'year') return false;
+  const end = Date.parse(String(r.current_period_end || ''));
+  if (!Number.isFinite(end)) return false;
+  const days = (end - nowMs) / 86400_000;
+  return days >= 0 && days <= RETAINER_NOTE_DAYS;
+}
+export async function runRetainerRenewalNotes(limit = 20, nowMs = Date.now()): Promise<{ noted: number }> {
+  // the deals with a retainer, read the way the daily Stripe check reads them, so the run's shared
+  // reads answer the first page from the check's (commerce/retainers.ts retainerDealsPath)
+  type Due = { id: string; site_id: string; title?: string; contact_id?: string | null; retainer?: { amount_cents?: number; current_period_end?: string } };
+  const due: Due[] = [];
+  for (let off = 0; off < RETAINER_DEALS_PAGE * 20; off += RETAINER_DEALS_PAGE) {
+    const q = await svc(retainerDealsPath(off)).catch(() => ({ ok: false, json: null }));
+    if (!q.ok || !Array.isArray(q.json)) { if (off === 0) return { noted: 0 }; break; }
+    for (const d of q.json as Due[]) if (retainerNoteDue(d.retainer as any, nowMs)) due.push(d);
+    if (q.json.length < RETAINER_DEALS_PAGE) break;
+  }
+  let noted = 0;
+  for (const d of due) {
+    if (noted >= limit) break;
+    const siteQ = await svc(`presence_sites?id=eq.${d.site_id}&select=client_id&limit=1`);
+    const clientId = siteQ.json?.[0]?.client_id;
+    if (!clientId) continue;
+    const contact = d.contact_id ? (await svc(`presence_contacts?id=eq.${d.contact_id}&site_id=eq.${d.site_id}&select=name,email&limit=1`)).json?.[0] : null;
+    const email = String(contact?.email || '').trim();
+    if (!email) continue;
+    const end = String(d.retainer?.current_period_end || '');
+    const created = await raiseNotice({ siteId: d.site_id, clientId, kind: 'deal_followup', period: retainerRenewalPeriod(d.id, end), headline: `Yearly retainer note sent: ${d.title || 'retainer'}`, body: 'The client was told a week ahead.', status: 'dismissed' });
+    if (!created) continue;
+    const amount = '$' + ((Number(d.retainer?.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const brand = await loadEmailBrand(d.site_id);
+    const studio = brand.name && brand.name !== 'Studio OS' ? brand.name : 'your studio';
+    const zone = (await studioZones([d.site_id])).get(d.site_id) || 'America/Los_Angeles';   // the studio's own day, as the rest of the money clock (sales item 152)
+    const day = new Intl.DateTimeFormat('en-US', { timeZone: zone, month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(end));
+    const first = String(contact?.name || '').trim().split(/\s+/)[0] || '';
+    const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+    const sent = await sendEmail(email, `Your yearly retainer renews on ${day}`, `<p>${first ? `Hi ${esc(first)},` : 'Hi there,'}</p><p>A quick note a week ahead: your yearly retainer with ${esc(studio)}${d.title ? ` for ${esc(String(d.title))}` : ''} renews on <strong>${esc(day)}</strong>, and <strong>${amount}</strong> will be charged to your card then.</p><p>Nothing to do if that is right. To stop it, cancel the retainer from your portal before that day, or reply to this email.</p>`, brand, { critical: true, asBusiness: true, siteId: d.site_id }).catch(() => false);
+    if (sent) noted++;
+    else await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(String(clientId))}&kind=eq.deal_followup&period=eq.${encodeURIComponent(retainerRenewalPeriod(d.id, end))}`, { method: 'DELETE' }).catch(() => {});   // the claim comes off; tried again next tick
+  }
+  return { noted };
+}
 
 // ── Deal nudge: "no next step for N days" (benchmark item 6, third switch) ───
 /** An OPEN deal is due a nudge when it has been quiet (no edit, no logged
@@ -1047,11 +1154,13 @@ export async function runInvoiceReminders(limit = 20, nowMs = Date.now()): Promi
   // a part payment, an Undo) is still owed, so it stays in the sweep and gets its fresh
   // link here if nothing made one yet. Before 0188 the read is refused → the old one.
   const READS = [
+    // sales items 167, 172 (APPLY-0250): the late fee already added, the lines it rides on, and what the client told us
+    `presence_invoices?status=eq.open&deleted_at=is.null&payment_for=is.null&or=(stripe_url.not.is.null,link_gen.gt.0)&processing_since=is.null&select=${COLS},first_sent_at,link_gen,description,currency,late_fee_cents,lines,client_says_paid,stripe_payment_link_id`,
     `presence_invoices?status=eq.open&deleted_at=is.null&payment_for=is.null&or=(stripe_url.not.is.null,link_gen.gt.0)&processing_since=is.null&select=${COLS},first_sent_at,link_gen,description,currency`,
     `presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&processing_since=is.null&select=${COLS}`,
     `presence_invoices?status=eq.open&deleted_at=is.null&stripe_url=not.is.null&select=${COLS}`,
   ];
-  type Candidate = { id: string; site_id: string; deal_id: string | null; title?: string; description?: string; currency?: string; amount_cents: number; purpose: string; stripe_url: string | null; due_date?: string | null; created_at: string; first_sent_at?: string | null; link_gen?: number; status?: string; processing_since?: string | null };
+  type Candidate = { id: string; site_id: string; deal_id: string | null; title?: string; description?: string; currency?: string; amount_cents: number; purpose: string; stripe_url: string | null; due_date?: string | null; created_at: string; first_sent_at?: string | null; link_gen?: number; status?: string; processing_since?: string | null; late_fee_cents?: number; lines?: unknown; client_says_paid?: unknown; stripe_payment_link_id?: string | null };
   let read = 0, minted = 0, tried = 0, reminded = 0;
   const settingsCache = new Map<string, AutomationSettings>();
   // one page: a link made where one is missing, then the legs due today, sent
@@ -1070,8 +1179,11 @@ export async function runInvoiceReminders(limit = 20, nowMs = Date.now()): Promi
     const zones = await studioZones(candidates.map((c) => String(c.site_id)));
     for (const inv of candidates) {
       if (!inv.stripe_url) continue;
+      if (inv.client_says_paid) continue;   // sales item 172: the client says they paid; reminders pause until the studio confirms or says not received
       const local = localClock(zones.get(String(inv.site_id)), nowMs);
       if (!morningYet(local)) continue;   // sales item 152: not before 9 in the studio's morning
+      // sales item 167: the late fee, once, N days after the due date, as a line with a fresh pay link
+      await addLateFee(inv, local.ymd, settingsCache).catch(() => {});
       const auto = await automationSettingsFor(inv.site_id, settingsCache);
       if (!auto.invoice_reminders) continue;
       const slot = invoiceReminderSlot(inv, local.ymd, auto.invoice_remind_after_days, auto.invoice_overdue_repeat);
@@ -1125,7 +1237,7 @@ export async function runInvoiceReminders(limit = 20, nowMs = Date.now()): Promi
       let sent = false;
       try {
         const brand = await loadEmailBrand(inv.site_id);
-        const copy = invoiceReminderCopy(slot, what, amount, String(inv.title || ''), undated);
+        const copy = invoiceReminderCopy(slot, what, amount, String(inv.title || ''), undated, Number(inv.late_fee_cents) || 0);   // sales item 167: the fee, announced
         const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
         // Sales item 92: a reminder offers more than "pay": the invoice itself, and a reply
         const { docLinkFor } = await import('../routes/sales.ts');

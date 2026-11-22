@@ -45,7 +45,7 @@ test.describe('Settings page', () => {
     // the Nov 2026 bold redesign; Recently deleted in sales item 83; Goal and AI help in sales item 94; Sign-in
     // and security in builder item 191), each a link to where the thing lives
     const cards = page.locator('#cards .setcard');
-    await expect(cards).toHaveCount(14);
+    await expect(cards).toHaveCount(15);   // sales item 168: On every invoice
     await expect(page.locator('[data-card="goal"]')).toHaveAttribute('href', '#goal');
     await expect(page.locator('[data-card="security"]')).toHaveAttribute('href', '#security');
     await expect(page.locator('[data-card="deleted"]')).toHaveAttribute('href', '/recently-deleted.html');

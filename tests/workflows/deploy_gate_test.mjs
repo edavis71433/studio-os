@@ -131,6 +131,9 @@ if (hasJq && FILTER) {
   ok('a finished device job, before the browser job starts, still means under way', await jq({ check_runs: [run({ name: 'browser on mobile' })] }) === 'devices');
   ok('once the browser job exists, it decides, whatever the devices say', await jq({ check_runs: [run({ name: 'browser on mobile', conclusion: 'failure' }), run({ status: 'in_progress', conclusion: null })] }) === 'in_progress ');
   ok('a device job from another app doesn\'t count', await jq({ check_runs: [run({ name: 'browser on tablet', app: { slug: 'someone-else' } })] }) === '');
+  // Builder item 419: each device runs in parts, one machine each ("browser on mobile (2 of 3)").
+  ok('a part of a device running means the check is under way', await jq({ check_runs: [run({ name: 'scope' }), run({ name: 'browser on mobile (2 of 3)', status: 'in_progress', conclusion: null })] }) === 'devices');
+  ok('…and once the browser job exists it decides, whatever any part says', await jq({ check_runs: [run({ name: 'browser on tablet (3 of 3)', conclusion: 'failure' }), run({ name: 'browser on mobile (1 of 3)' }), run({ conclusion: 'failure' })] }) === 'completed failure');
 }
 await Deno.remove(dir, { recursive: true });
 
