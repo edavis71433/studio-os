@@ -171,7 +171,9 @@ export async function mountPages(page: Page, spacer = '', pages: unknown[] = PAG
   await expect(page.locator('#blocksCard')).toBeAttached();
   return { ...mounted, draft };
 }
-export const pill = (page: Page, name: string) => page.locator('#pagesBar .page-pill', { hasText: name });
+// item 314: every page is a pill now; these name the pages of the person's own (Home and the ones they added)
+const OWN_PILL = '#pagesBar .page-pill[data-page="home"], #pagesBar .page-pill[data-page^="page:"]';
+export const pill = (page: Page, name: string) => page.locator(OWN_PILL).filter({ has: page.locator('.pp-name', { hasText: new RegExp('^' + name + '$') }) });
 // The floating studio (Nov 2026): the page tabs live in a card that opens from the bar's page
 // switcher, so a test that clicks a page opens the card first.
 export const openPages = async (page: Page) => { const sw = page.locator('#dcPageSwitch'); if ((await sw.getAttribute('aria-expanded')) !== 'true') await sw.click(); await expect(page.locator('#pagesCard')).toBeVisible(); };
@@ -414,7 +416,7 @@ export const WITH_CONTACT = [...PAGED.pages, CONTACT];
 // The Pages tab writes { nav, pages }, or just one of them. A menu left behind keeps a
 // page where it was moved to, so Undo owes the menu as much as it owes the order.
 export const menuRows = (page: Page) => page.locator('#pagesList .pg-row .t b').allTextContents();
-export const pillNames = (page: Page) => page.locator('#pagesBar .page-pill .pp-name').allTextContents();
+export const pillNames = (page: Page) => page.locator(OWN_PILL).locator('.pp-name').allTextContents();
 export const lastTwo = async (page: Page) => (await menuRows(page)).slice(-2);
 export const OWN_MENU = [{ label: 'Home', href: '/' }, { label: 'Story', href: '/story/' }, { label: 'Gallery', href: '/gallery/' }];
 // A move on the Pages tab, then words on Story, then off that page so the page step is on top.
@@ -427,6 +429,7 @@ export async function moveThenWrite(page: Page, frame: Frame, puts: Mounted['put
   const before = puts.length;
   await nudge(page, name, key);
   await expect.poll(() => puts.length, { timeout: 6000 }).toBe(before + 1);
+  await settled(page);   // the write's answer records the Undo step; pressed before it lands, Undo would take the words instead
   const moved = lastPut(puts);
   return { moved, count: puts.length };
 }

@@ -2135,8 +2135,8 @@ function ovDarkenUntil(color, against, min) { let c = color; for (let i = 0; i <
 // client-side mix() tints/shades of the site accent + neutrals, per well.
 function ovShades(key) {
   const T = DESIGN_TOKENS || {}, site = dcSiteColours();   // item 277: a new site's palette is the template's, not the studio's purple
-  const acc = normHexJs(T.accent) || normHexJs(site.accent) || "#23635a";
-  const ink = normHexJs(T.ink) || normHexJs(site.ink) || "#1d1c22";
+  const acc = normHexJs(T.accent) || normHexJs(site.accent) || site.accent;
+  const ink = normHexJs(T.ink) || normHexJs(site.ink) || site.ink;
   let list;
   if (key === "text_color") list = [ink, ovMix(acc, "#000000", 0.55), ovMix(acc, "#000000", 0.3), acc, "#ffffff"];
   else if (key === "bg_color") list = ["#ffffff", ovMix(acc, "#ffffff", 0.92), ovMix(acc, "#ffffff", 0.8), ovMix(ink, "#ffffff", 0.94), ovMix(acc, "#000000", 0.45)];
@@ -7075,8 +7075,8 @@ function ipeRetag(node, tag) {   // the same words in another kind of block, the
   const s = IPE, doc = s.doc, nu = doc.createElement(tag);
   while (node.firstChild) nu.appendChild(node.firstChild);
   node.replaceWith(nu);
-  try { const sel = doc.getSelection(), r = doc.createRange(); r.selectNodeContents(nu); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); } catch (_) {}
   s.dirty = true;
+  ipeCaretIn(nu);
   return nu;
 }
 function ipeHeading() {   // paragraph → heading → smaller heading → paragraph
@@ -7098,18 +7098,22 @@ function ipeList() {
     else if (!after.length) ul.after(p);
     else if (after.length === items.length) ul.before(p);
     else { const rest = doc.createElement(ul.tagName.toLowerCase()); after.forEach((x) => rest.appendChild(x)); ul.after(p); p.after(rest); }
+    ipeCaretIn(p);   // moving it out dropped the caret again
     s.dirty = true;
   } else if (t === 'BLOCKQUOTE') { toast('Take it out of the quote first.'); return; }
   else { const ul = doc.createElement('ul'); b.replaceWith(ul); ul.appendChild(b); ipeRetag(b, 'li'); }
   ipeShowBar(s.doc, s.el);
 }
+function ipeCaretIn(node) {   // moving a block drops the browser's selection: put the caret back at its end, the field focused
+  try { const doc = IPE.doc, sel = doc.getSelection(), r = doc.createRange(); IPE.el.focus({ preventScroll: true }); r.selectNodeContents(node); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); } catch (_) {}
+}
 function ipeQuote() {
   const s = IPE, b = ipeBlockOf(); if (!b) return;
   const doc = s.doc, t = String(b.tagName).toUpperCase();
   const q = t === 'BLOCKQUOTE' ? b : (b.parentNode && String(b.parentNode.tagName).toUpperCase() === 'BLOCKQUOTE' ? b.parentNode : null);
-  if (q) { while (q.firstChild) q.before(q.firstChild); q.remove(); s.dirty = true; }
+  if (q) { const first = q.firstElementChild || q.firstChild; while (q.firstChild) q.before(q.firstChild); q.remove(); if (first) ipeCaretIn(first); s.dirty = true; }
   else if (t === 'LI') { toast('Take it out of the list first.'); return; }
-  else { const nq = doc.createElement('blockquote'); b.replaceWith(nq); nq.appendChild(b); s.dirty = true; }
+  else { const nq = doc.createElement('blockquote'); b.replaceWith(nq); nq.appendChild(b); ipeCaretIn(b); s.dirty = true; }
   ipeShowBar(s.doc, s.el);
 }
 // The section's own words settings (the Style tab's), shown on the section at once the way
@@ -7181,7 +7185,10 @@ function ipeShowBar(doc, el2) {
     }
   }
   bar.classList.add('on');
-  dcFloatClear(doc, el2, bar);   // item 319: clear of the heading above
+  // item 319: clear of the heading above; on a phone the bar takes the foot of the page, over the
+  // dock, where it covers no words at all (its ten buttons would wrap to three rows up there)
+  bar.classList.toggle('ipe-foot', window.innerWidth <= 760);
+  if (window.innerWidth > 760) dcFloatClear(doc, el2, bar); else { bar.style.left = ''; bar.style.top = ''; }
 }
 function ipeHideBar(doc) { try { const b = doc.getElementById('dds-ipe-bar'); if (b) b.classList.remove('on'); } catch (_) {} }
 // Direct Range wrapping (execCommand is deprecated): wrap the selection in
@@ -7629,6 +7636,7 @@ function dcInjectCanvas(doc, main, live) {
       "#dds-ipe-bar .ipe-sw.ipe-on{border-color:var(--ddsdc-p);box-shadow:0 0 0 2px var(--ddsdc-card)}" +
       "#dds-ipe-bar .ipe-sw.ipe-none{background:linear-gradient(135deg,transparent 45%,var(--ddsdc-bad) 45%,var(--ddsdc-bad) 55%,transparent 55%)}" +
       "#dds-ipe-bar{max-width:calc(100vw - 24px);flex-wrap:wrap}" +
+      "#dds-ipe-bar.ipe-foot{position:fixed;left:8px;right:8px;top:auto;bottom:calc(var(--ddsdc-foot,0px) + 8px);justify-content:center;border-radius:18px}" +
       "@media (pointer:coarse){#dds-ipe-bar button{height:44px;min-width:44px}#dds-ipe-bar .ipe-sw{width:40px;height:40px}}" +
       ".ipe-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}";
     (doc.head || doc.documentElement).appendChild(st);
@@ -7679,13 +7687,17 @@ function dcInjectCanvas(doc, main, live) {
     // a short section (a heading alone) would have its words under the pill: the pill
     // sits just above it instead, or just below when the top edge is off the screen
     if (r.height < h + 28) y = top - h - 6 >= sy + 4 ? top - h - 6 : top + r.height + 6;
+    // item 319: on a phone the pill is nearly as wide as the page, so inside the section it sat
+    // on the first words (a second tap to type landed on it): it sits just above the section
+    else if (window.innerWidth <= 760 && top - h - 6 >= sy + 4) y = top - h - 6;
+    const above = y < top;
     const x = Math.max(sx + 8 + ins.left, Math.min(left + r.width - w - 8, sx + vw - ins.right - w - 8));
     bar.style.left = x + "px"; bar.style.top = y + "px";
     chip.classList.toggle("compact", r.width < 560);
     const ch = chip.offsetHeight || 24, cw = chip.offsetWidth || 0, cx = Math.max(left + 8, sx + 8 + ins.left);
     chip.style.left = cx + "px";
     // item 319: the tag sits just above the section, clear of its words, when that is on screen
-    chip.style.top = (top - ch - 6 >= sy + 4 ? top - ch - 6 : cx + cw + 8 <= x ? y + (h - ch) / 2 : y + h + 6) + "px";
+    chip.style.top = (above ? (y - ch - 4 >= sy + 4 ? y - ch - 4 : top + 8) : top - ch - 6 >= sy + 4 ? top - ch - 6 : cx + cw + 8 <= x ? y + (h - ch) / 2 : y + h + 6) + "px";
     if (more.classList.contains("on")) placeMore();
   };
   // item 158: the right-click menu. It holds the section's actions with their keys, and it keeps

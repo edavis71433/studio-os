@@ -1,5 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar, settled } from './helpers/app';
 import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave, openPages } from './helpers/editor';
 import { touchScreen } from './helpers/app';
 
@@ -53,8 +53,16 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
 
   test('Undo of a move puts a custom menu back as it was', async ({ page }) => {
     const { frame, puts } = await mountPages(page, '', OWN_PAGES);
+    // the words first (item 320: a section step lives on), then the custom menu, since the
+    // words' save answers with the draft's settings, which have no menu
+    await openAbout(page, frame, 'Story');
+    await writeOnAboutAndLeave(page, frame, puts, 'story');
     await page.evaluate((nav) => { (0, eval)('S.settings.nav = ' + JSON.stringify(nav)); }, OWN_MENU);
-    const { moved, count } = await moveThenWrite(page, frame, puts, 'Story', 'ArrowDown');
+    const before = puts.length;
+    await nudge(page, 'Story', 'ArrowDown');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(before + 1);
+    await settled(page);
+    const moved = lastPut(puts), count = puts.length;
     expect(moved.nav?.map((n) => n.href)).toEqual(['/', '/gallery/', '/story/']);
     await undo(page);
     await expect.poll(() => puts.length).toBe(count + 1);

@@ -1625,7 +1625,7 @@ html.plan-watch #svWords{display:none}
 .pickUploadHint{font-size:12.5px;color:var(--ink-2)}
 .ph-over{outline:2px dashed var(--plum);outline-offset:4px;border-radius:12px}
 .mcell.picked{outline:3px solid var(--plum);outline-offset:2px}
-.mcell.picked::after{content:"✓";position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:var(--plum);color:#fff;font:700 13px/22px var(--sans);text-align:center}
+.mcell.picked::after{content:"✓";position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:var(--plum);color:var(--sheet);font:700 13px/22px var(--sans);text-align:center}
 .ph-desc-row{display:flex;align-items:center;gap:12px;margin:8px 0}
 .ph-desc-row img{width:56px;height:56px;object-fit:cover;border-radius:8px;background:var(--paper);flex:none}
 .ph-desc-row input{flex:1;padding:9px 11px;font:inherit;font-size:13.5px;border:1px solid var(--hair-2);border-radius:10px;background:var(--sheet);color:var(--ink)}

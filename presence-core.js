@@ -14,7 +14,7 @@
 const DDS_PART_SRC = {"edit":"/presence-edit.js?v=1"};
 const DDS_PART_AT = {};
 // every stand-in, so a call can tell whether the part has replaced it yet
-const DDS_STANDINS = new Set([mountEditCards, mountDesignCard, linkPick, dcDeletePage, dcSavePageName, openSettingsPanel, mountBlocksCard, applyTemplateFromGallery, dcAddPage, openTrayPanel, dcPageMenu, dcDuplicatePage, dcClearPage, stylesTab, dcOpenPage, pcEverySub, dcSaveNav, dcSwitchPage, ipeCommit, closePagesCard, closeSettingsPanel, dcClipSet, dcSavePendingEdits, dcSyncPageSwitch, pagesBarReveal, dcRefreshTree, renderPagesBar, dcSyncLiveChip, renderBlocksCard, refreshDesignPreview, exitEditMode, dcLiveFromPanel, dcLiveSoon, formsLoad, remountSectionsCard, renderBlockTray, mountTemplateGallery]);
+const DDS_STANDINS = new Set([mountEditCards, mountDesignCard, linkPick, dcDeletePage, dcSavePageName, openSettingsPanel, mountBlocksCard, applyTemplateFromGallery, dcAddPage, openTrayPanel, dcPageMenu, dcDuplicatePage, dcClearPage, stylesTab, dcOpenPage, pcEverySub, dcSaveNav, dcSwitchPage, ipeCommit, closePagesCard, closeSettingsPanel, dcClipSet, dcSavePendingEdits, dcSyncPageSwitch, pagesBarReveal, dcRefreshTree, renderPagesBar, dcSyncLiveChip, renderBlocksCard, refreshDesignPreview, exitEditMode, dcLiveFromPanel, dcLiveSoon, formsLoad, remountSectionsCard, renderBlockTray, mountTemplateGallery, eeEditCore, pfRefresh]);
 function ddsPartIn(name) { return !!(window.__ddsParts && window.__ddsParts[name]); }
 // Load a part (once); answers when it is in. A failed load can be tried again.
 function ddsPart(name) {
@@ -70,6 +70,8 @@ function dcSaveNav(...a) { return ddsStub("edit", "dcSaveNav", a, true); }
 function dcSwitchPage(...a) { return ddsStub("edit", "dcSwitchPage", a, true); }
 function ipeCommit(...a) { return ddsStub("edit", "ipeCommit", a, false); }
 function closePagesCard(...a) { return ddsStub("edit", "closePagesCard", a, false); }
+function eeEditCore(...a) { return ddsStub("edit", "eeEditCore", a, true); }
+function pfRefresh(...a) { return ddsStub("edit", "pfRefresh", a, false); }   // item 317: the Photos card draws again after descriptions are saved   // item 314: a built-in page's words, in a card beside the page
 function closeSettingsPanel(...a) { return ddsStub("edit", "closeSettingsPanel", a, false); }
 function dcClipSet(...a) { return ddsStub("edit", "dcClipSet", a, false); }
 // Builder items 250 and 251: a part of the editor with saves of its own (the forms card, in the
@@ -3460,7 +3462,7 @@ function dcDescribePhotos(items) {
     const changed = rows.filter((r) => r.inp.value.trim().length >= 3 && r.inp.value.trim() !== r.was);
     try {
       for (const r of changed) { await api("PUT", `/media/${r.it.id}`, { alt_text: r.inp.value.trim() }); const m = (S.media || []).find((x) => x.id === r.it.id); if (m) m.alt_text = r.inp.value.trim(); }
-      d.close(); if (changed.length) { toast("Descriptions saved"); if ($("mediaGrid")) renderMediaGrid($("mediaGrid"), true); if (typeof pfRefresh === "function" && $("panelFilesGrid")) pfRefresh(); }
+      d.close(); if (changed.length) { toast("Descriptions saved"); if ($("mediaGrid")) renderMediaGrid($("mediaGrid"), true); if ($("panelFilesGrid")) pfRefresh(); }
     } catch (err) { save.disabled = false; toast(nice(err), true); }
   });
   setTimeout(() => { try { rows[0].inp.focus(); rows[0].inp.select(); } catch (_) {} }, 30);
@@ -8995,7 +8997,7 @@ async function undoSync(rec, vals, r) {
 function undoOnItsPage(rec, again, word) {
   if (rec.kind !== "sections" || rec.page === DC_PAGE) return false;
   if (typeof dcSwitchPage !== "function") return false;
-  const title = typeof dcPageTitle === "function" ? dcPageTitle(rec.page) : rec.page;
+  const title = rec.page ? ((dcBuiltinPage(rec.page) || dcPageObj(rec.page) || {}).title || rec.page) : "Home";
   toast("That change was on " + title + ". Opening it to " + word + " it there.");
   dcSwitchPage(rec.page).then((ok) => { if (ok && DC_PAGE === rec.page) again(); });
   return true;
