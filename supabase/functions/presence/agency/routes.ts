@@ -269,7 +269,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       if (!can(member.role, 'manage_clients')) return forbid(cors);
       const siteId = decodeURIComponent(nm[1]).toLowerCase();
       const change = pickFlags(await body());
-      if (!isSiteId(siteId) || !Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which site, and turn on or off its notifications, the bell or email.' }, 400, cors);
+      if (!isSiteId(siteId) || !Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which site, and turn on or off its notifications, the bell, email, or telling the client when their site is down.' }, 400, cors);
       const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
       if (!own) return json({ error: 'no_studio_site', message: 'Notifications are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
       const input = await sharedGather(member.agency_id, now);

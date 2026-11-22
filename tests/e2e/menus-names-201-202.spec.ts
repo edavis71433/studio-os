@@ -25,6 +25,11 @@ test.describe('The frame (builder 201)', () => {
     await page.locator('#dds-profile').click();
     const menu = page.getByRole('region', { name: 'Account menu' });
     await expect(menu.locator('a.row').first()).toContainText('Help');
+    // builder item 283: the hint sits on its own line under the name, never run into it ("HelpAsk how…")
+    const hint = menu.locator('#dds-help-row .sub');
+    await expect(hint).toHaveCSS('display', 'block');
+    const [nameBox, hintBox] = [await menu.locator('#dds-help-row').boundingBox(), await hint.boundingBox()];
+    expect(hintBox!.y, 'the hint starts below the row’s first line').toBeGreaterThan(nameBox!.y + 10);
     await menu.locator('#dds-help-row').click();
     const help = page.getByRole('region', { name: 'Help — how do I…?' });
     await expect(help).toBeVisible();

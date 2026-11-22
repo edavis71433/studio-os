@@ -135,7 +135,7 @@ world({ dns: BOTH, registered: 'bistro.example' });
   const lookups = w.asked.filter((a) => a.startsWith('g:'));
   ok('a live domain: all checks pass', r.body.data.all_ok === true, JSON.stringify(r.body.data.checklist));
   ok('the hosting company is asked for the site once and the padlock once', w.siteGets === 1 && w.sslGets === 1, `site ${w.siteGets}, padlock ${w.sslGets}`);
-  ok('each name is looked up once: two questions for each of the two names', lookups.length === 4 && new Set(lookups).size === 4, lookups.join(' '));
+  ok('each name is looked up once: two questions for each of the two names, and Netlify’s two names once (item 265)', lookups.length === 6 && new Set(lookups).size === 6 && lookups.includes('g:apex-loadbalancer.netlify.com|A'), lookups.join(' '));
   ok('the answer carries both names, the records and the one wait', r.body.data.names.length === 2 && r.body.data.records.length === 2 && r.body.data.wait === DOMAIN_WAIT && r.body.data.shape === 'pair');
 }
 // 25: one snapshot a day

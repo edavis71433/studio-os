@@ -523,7 +523,7 @@
     <div class="swrow" id="reportSwRow">
       <button type="button" class="sw" role="switch" id="sw-report" aria-checked="false" aria-labelledby="sw-report-l"></button>
       <div class="t"><b id="sw-report-l">Send this client a monthly report</b>
-        <div class="how">In the first days of each month: how their website did, each part when there’s something to say. From your studio, with a reply address that reaches you.</div>
+        <div class="how">On the 4th to 6th of each month, once Google’s numbers for the month are in: how their website did, each part when there’s something to say. From your studio, with a reply address that reaches you.</div>
         <div class="how" id="reportLast"></div>
         <div class="how" id="reportWarn" role="status" hidden style="color:var(--bad,#b3261e)"></div></div>
     </div>
@@ -593,7 +593,7 @@
        (PUT /report/monthly, scoped to them), so there is one setting and one set of rules. -->
   <section class="card" id="reports" aria-labelledby="reportsHead" hidden>
     <div class="card-h"><h2 id="reportsHead" tabindex="-1">Monthly reports</h2><button type="button" class="btn sm" id="reportsAll" hidden>Switch on everyone who can get it</button></div>
-    <div class="how" id="reportsHint" style="margin-top:6px">Which clients get a report in the first days of each month, and who it goes to. Each client’s own settings have the rest: the parts, the line from you and what to suggest.</div>
+    <div class="how" id="reportsHint" style="margin-top:6px">Which clients get a report on the 4th to 6th of each month, and who it goes to. Each client’s own settings have the rest: the parts, the line from you and what to suggest.</div>
     <div class="rr-head" aria-hidden="true"><span></span><span>Client</span><span>Goes to</span><span>Suggests</span><span>Last report</span><span></span></div>
     <div id="reportsRows" role="list" aria-labelledby="reportsHead"></div>
     <div class="how" id="reportsNote" style="margin-top:10px">A switch here is the same switch as on the client’s own card. A client who can’t be emailed can’t be switched on; the row says why, and Fix opens their record.</div>
@@ -1739,7 +1739,7 @@ async function setSuggestMode(mode) {
 }
 function reportStatusLine(d) {
   // item 200: an older server sends no `live`, which reads as live, as before
-  if (d.live === false) return d.enabled ? 'Waiting for their website to go live. The first report goes out on the 1st of the month after it does.' : 'Their website isn’t live yet. Switch this on now if you like: the report waits until it is.';
+  if (d.live === false) return d.enabled ? 'Waiting for their website to go live. The first report goes out early in the month after it does.' : 'Their website isn’t live yet. Switch this on now if you like: the report waits until it is.';
   const r = d.last_result;
   if (r && r.month) {
     const m = monthWords(r.month);
@@ -1747,7 +1747,7 @@ function reportStatusLine(d) {
     if (r.status === 'skipped') return 'The ' + m + ' report wasn’t sent: ' + (REPORT_BLOCK_WORDS[r.reason] || 'they couldn’t be emailed') + '.';
     if (r.status === 'failed') return 'The ' + m + ' report didn’t go out after three tries. The next one goes out as usual.';
   }
-  return d.enabled ? 'Nothing sent yet; the first report goes out in the first days of next month.' : '';
+  return d.enabled ? 'Nothing sent yet; the first report goes out on the 4th to 6th of next month.' : '';
 }
 function aiStatusLine(d) {
   const r = d.ai_result;
@@ -1798,7 +1798,7 @@ function wireReport() {
     if (REPORT_BUSY || !REPORT_READ) return;   // greyed: the press does nothing, and shows nothing
     const next = !(REPORT && REPORT.enabled === true);
     $('sw-report').setAttribute('aria-checked', next ? 'true' : 'false');
-    if (await saveReport({ enabled: next })) toast(next ? (REPORT && REPORT.live === false ? 'On. The first report goes out the month after their website goes live.' : 'On. The first report goes out in the first days of next month.') : 'Off. No more reports to this client.');
+    if (await saveReport({ enabled: next })) toast(next ? (REPORT && REPORT.live === false ? 'On. The first report goes out the month after their website goes live.' : 'On. The first report goes out on the 4th to 6th of next month.') : 'Off. No more reports to this client.');
   });
   $('sw-ai').addEventListener('click', async () => {
     if (REPORT_BUSY || !REPORT_READ) return;   // one save at a time, like the report switch (item 101)
@@ -1967,7 +1967,7 @@ async function flipClientReport(siteId) {
   if (!r.ok) { row.enabled = !next; if (r.body && r.body.blocked) row.blocked = r.body.blocked; paintReports(); toast(nice(r.body, 'That didn’t save — nothing was changed.'), true); return; }
   paintReports();
   const sw = $('reportsRows').querySelector('[data-rsw="' + CSS.escape(siteId) + '"]'); if (sw) sw.focus();
-  toast(next ? 'On. ' + row.name + (row.live === false ? ' gets a report the month after their website goes live.' : ' gets a report in the first days of next month.') : 'Off. No more reports to ' + row.name + '.');
+  toast(next ? 'On. ' + row.name + (row.live === false ? ' gets a report the month after their website goes live.' : ' gets a report on the 4th to 6th of next month.') : 'Off. No more reports to ' + row.name + '.');
 }
 async function switchOnTheRest() {
   if (REPORTS_BUSY || !REPORTS) return;
@@ -2159,6 +2159,9 @@ function paintNotify() {
         <div class="chans" role="group" aria-label="${esc('How you hear about ' + x.name)}"${chanOff ? ' aria-disabled="true"' : ''}>
           <label class="chan"><input type="checkbox" id="ch-d-${id}" data-notify-chan="dashboard" data-site="${id}"${x.dashboard ? ' checked' : ''}${chanOff ? ' disabled' : ''}>On Home and in the bell</label>
           <label class="chan"><input type="checkbox" id="ch-e-${id}" data-notify-chan="email" data-site="${id}"${x.email ? ' checked' : ''}${chanOff ? ' disabled' : ''}>By email</label>
+        </div>
+        <div class="chans" role="group" aria-label="${esc('What ' + x.name + ' is told')}"${off ? ' aria-disabled="true"' : ''}>
+          <label class="chan"><input type="checkbox" id="ch-c-${id}" data-notify-chan="client_down" data-site="${id}"${x.client_down !== false ? ' checked' : ''}${off ? ' disabled' : ''}>Email the client when their site stops answering, and when it’s back. You hear first either way.</label>
         </div></div>
     </div>`;
   }).join('');
@@ -2178,7 +2181,7 @@ async function saveNotify(siteId, patch) {
   NOTIFY_BUSY.delete(siteId);
   if (!r.ok || !r.body || !r.body.data) { NOTIFY.sites[i] = before; NOTIFY_FAILED.set(siteId, { patch, r }); paintNotify(); return; }   // as it was, and says so beside it
   const d = r.body.data;
-  NOTIFY.sites[i] = { ...before, on: d.on, dashboard: d.dashboard, email: d.email };
+  NOTIFY.sites[i] = { ...before, on: d.on, dashboard: d.dashboard, email: d.email, client_down: d.client_down !== false };
   NOTIFY_SAVED.add(siteId); paintNotify();
   try { if (window.ddsBellRefresh) window.ddsBellRefresh(); } catch (_) { /* the bell asks again on its next look */ }
 }

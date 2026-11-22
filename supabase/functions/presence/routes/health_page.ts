@@ -23,6 +23,7 @@ import { buildContentPerformance } from '../lib/content_performance.ts';
 import { sslStatus } from '../lib/netlify.ts';
 import { buildHealthMemory, healthPdf, type HealthMemory } from '../lib/health_memory.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
+import { publishedOnce } from '../lib/site_live.ts';
 
 const PROVIDER_LABEL: Record<string, string> = Object.fromEntries(CONNECTED_PROVIDERS.map((p: any) => [p.key, p.name]));
 const arr = (r: { json: unknown }): any[] => (Array.isArray(r.json) ? r.json : []);
@@ -56,7 +57,7 @@ export async function loadHealthMemory(site: SiteRow, nowIso: string, hidden = f
     items = ok(q) ? arr(q) : null;
   }
   if (items === null) return { memory: null, ready: true };
-  const live = site.edition === 'monitor' || site.status === 'live' || !!site.last_published_at;
+  const live = site.edition === 'monitor' || publishedOnce(site);   // item 261: the one rule
   return { memory: buildHealthMemory({ days, items: items as any[], live, hidden, todayIso: nowIso }), ready: true };
 }
 

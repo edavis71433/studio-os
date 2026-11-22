@@ -6,7 +6,19 @@
 // salted-hash pattern from the lead form; adds no new infrastructure.
 import { svc } from '../lib/db.ts';
 import { rateAllowBoth, clientIp } from '../lib/ratelimit.ts';
-import { parseUA, refHost, cleanPath, cleanUtms, visitorDayHash, isVisitKind, cleanLabel, cleanMs, cleanLcp } from '../lib/visits.ts';
+import { parseUA, refHost, cleanPath, cleanUtms, visitorDayHash, isVisitKind, cleanLabel, cleanMs, cleanLcp, dayInZone } from '../lib/visits.ts';
+
+// item 282: each site's time zone, kept ten minutes in this process so a beacon costs no extra read
+const zoneCache = new Map<string, { at: number; tz: string | null }>();
+const ZONE_CACHE_MS = 10 * 60_000;
+export async function siteZone(siteId: string): Promise<string | null> {
+  const hit = zoneCache.get(siteId);
+  if (hit && Date.now() - hit.at < ZONE_CACHE_MS) return hit.tz;
+  const r = await svc(`presence_locations?site_id=eq.${siteId}&select=timezone&limit=1`).catch(() => null);
+  const tz = r && r.ok && Array.isArray(r.json) && r.json[0] && typeof r.json[0].timezone === 'string' ? String(r.json[0].timezone) : null;
+  zoneCache.set(siteId, { at: Date.now(), tz });
+  return tz;
+}
 
 // exported for routes/visit_source.ts, which rebuilds a visitor's daily hash to find their page views (item 89)
 export const VISITS_SALT = Deno.env.get('VISITS_SALT') || Deno.env.get('APPROVAL_SECRET') || 'presence-visits';
@@ -36,7 +48,7 @@ export async function handleCollect(req: Request, siteId: string, cors: Record<s
 
   const host = (() => { try { return new URL(req.headers.get('origin') || req.headers.get('referer') || '').hostname; } catch { return ''; } })();
   const utm = cleanUtms(b?.u);
-  const day = new Date().toISOString().slice(0, 10);
+  const day = dayInZone(new Date().toISOString(), await siteZone(siteId));   // item 282: the site's own day
   const visitor = await visitorDayHash(ip, ua, siteId, day, VISITS_SALT);
   const country = (req.headers.get('cf-ipcountry') || req.headers.get('x-country') || '').slice(0, 2).toUpperCase().replace(/[^A-Z]/g, '');
   const region = (req.headers.get('cf-region') || '').slice(0, 40);

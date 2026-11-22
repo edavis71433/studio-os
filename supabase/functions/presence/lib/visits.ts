@@ -116,8 +116,23 @@ export function cleanUtms(u: any): { source: string; medium: string; campaign: s
   return { source: cleanUtm(o.s ?? o.source), medium: cleanUtm(o.m ?? o.medium), campaign: cleanUtm(o.c ?? o.campaign) };
 }
 
-/** Daily-rotating anonymous visitor id. No raw IP stored; resets each UTC day so
- *  there is no cross-day identity. */
+// Builder list item 282 (full review of Nov 22, 2026): the visitor id turned over at
+// midnight UTC, 4 pm in Burbank, so one person browsing across that hour counted as two
+// visits. It now turns over at midnight on the site's own clock (Business details; Los
+// Angeles when none is set, as everywhere else).
+export const SITE_DEFAULT_TZ = 'America/Los_Angeles';
+/** Pure: the calendar day (YYYY-MM-DD) of `iso` on the `tz` clock; UTC for a zone that isn't one. */
+export function dayInZone(iso: string, tz: string | null | undefined): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '';
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: tz || SITE_DEFAULT_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(t));
+    const get = (k: string) => parts.find((x) => x.type === k)?.value || '';
+    return `${get('year')}-${get('month')}-${get('day')}`;
+  } catch { return new Date(t).toISOString().slice(0, 10); }
+}
+/** Daily-rotating anonymous visitor id. No raw IP stored; resets each day on the site's own
+ *  clock (dayInZone) so there is no cross-day identity. */
 export async function visitorDayHash(ip: string, ua: string, siteId: string, dayIso: string, salt: string): Promise<string> {
   const data = new TextEncoder().encode(`${ip}|${ua}|${siteId}|${dayIso}|${salt}`);
   const buf = await crypto.subtle.digest('SHA-256', data);

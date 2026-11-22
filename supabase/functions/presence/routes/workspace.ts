@@ -61,6 +61,7 @@ async function verifiedNotices(site: SiteRow, rows: any[]): Promise<any[]> {
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { requireFresh } from '../lib/fresh_code.ts';   // builder item 191
 import { alertOwner } from '../lib/security_alerts.ts';
+import { publishedOnce } from '../lib/site_live.ts';
 
 /** The ONLY routes a client_reviewer (the client portal audience) may reach.
  *  Everything else in the client gate is 403 for a reviewer — so the simplified
@@ -303,7 +304,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   // Oct 2026 nav cut: "Get started" is listed only until the site is live — the
   // site row already in hand says so (deploy_reconcile stamps status 'live' +
   // last_published_at on the first successful publish).
-  const siteLive = site.status === 'live' || !!site.last_published_at;
+  const siteLive = publishedOnce(site);   // item 261: the one rule
   // Item 54: at studio level, the areas this studio took out of its menu (a reserved row on
   // its own site, which is the site in hand when nothing is scoped). A failed read hides nothing.
   const hiddenSections = (isAgency && !scopedName) ? normalizeHidden(await readReservedJson(site.id, RESERVED_NAMES.navHidden)) : [];
@@ -365,7 +366,7 @@ export async function handlePortalPreviewContext(site: SiteRow, scope: { site_id
     site_role: 'business_owner', capabilities: capabilitiesOf('business_owner'),
     studio, client_first_name: clientFirstName || null,
     portal: { off: resolveOff(ps, site.id), welcome: ps.welcome, home_off: ps.home_off, signin: ps.signin },
-    edition: site.edition, site_live: site.status === 'live' || !!site.last_published_at,
+    edition: site.edition, site_live: publishedOnce(site),
     is_agency: false, is_operator: false, is_managed_client: true, sees_full_workspace: siteCan('business_owner', 'view_all'), is_client_portal: false,
     landing: '/client.html', scope: null, attention_count: 0, attention_stale: false, studio_requests: [], businesses: [], business: null, nav: [],
     preview: { site_id: site.id, name: scope.name, email: String(who[0]?.email || who[0]?.contact_email || '') },

@@ -256,7 +256,7 @@ test.describe('Settings › Monthly reports, every client (builder list item 160
     const blue = sec.locator(`[data-report="${OTHER}"]`);
     await blue.getByRole('switch').click();
     await expect(blue.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
-    await expect(toast(page)).toContainText('On. Bluebird Bakery gets a report in the first days of next month.');
+    await expect(toast(page)).toContainText('On. Bluebird Bakery gets a report on the 4th to 6th of next month.');
     expect(puts).toEqual([{ scope: OTHER, body: { enabled: true } }]);   // the client's own switch, with that client in scope
     await expect(sec.getByRole('button', { name: 'Switch on everyone who can get it' })).toBeHidden();   // nobody left who can
   });

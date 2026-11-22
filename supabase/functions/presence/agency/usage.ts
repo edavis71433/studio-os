@@ -1,28 +1,36 @@
 // ── What each client uses (builder list item 210, Nov 2026) ─────────────────────────
 // Review file 03, findings 1, 6 and 11: every publish and every restore of a client's site
-// is its own deploy at Netlify, about 10 cents each (15 credits; the Pro plan's 5,000 a
-// month cover about 330, the app's own updates included), and nobody was watching it. The
-// studio now sees, per client, the publishes that went up this month and what they cost,
-// the ones skipped because nothing had changed (item 208), the storage their files take,
-// and their visits.
+// is its own deploy at Netlify, about 10 cents each (15 credits), and nobody was watching
+// it. The studio now sees, per client, the publishes that went up this month and what they
+// cost, the ones skipped because nothing had changed (item 208), the storage their files
+// take, and their visits.
+//
+// Builder list item 269 (full review of Nov 22, 2026): the plan gauge used to be two typed-in
+// numbers ("330 publishes a month") counting client publishes only, so it read 0% with the
+// plan half spent by the app's own updates. Now `host` is the host's own answer about the
+// team's plan (lib/netlify.ts readHostPlan): the credits a period includes, when it renews,
+// whether publishes are paused, and the credits used only when the host's figure can be
+// believed. When it can't, the page says "not known".
 //
 //   GET /agency/usage?month=YYYY-MM   (this month by default, UTC)
 //     { data: { [site_id]: SiteUsage }, totals, days, month, month_label, visits_month,
-//       visits_label, prior_label, plan, partial }
+//       visits_label, prior_label, plan: { cost_cents, host }, partial }
 //
 // A number that can't be known says why (`*_why`), never a zero. Reading needs `read`.
 import { json } from '../../_shared/http.ts';
-import { svc, svcPages } from '../lib/db.ts';
+import { svc, svcPages, svcCount } from '../lib/db.ts';
 import { can, agencySiteIds } from './auth.ts';
 import type { AgencyMember } from './auth.ts';
 import { monthsCompared } from './site_numbers.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 import { mediaQuota } from '../lib/media_guard.ts';
+import { readHostPlan, type HostPlan } from '../lib/netlify.ts';
+import { publishedOnce } from '../lib/site_live.ts';
 
 /** About what one deploy costs at Netlify, in cents (15 credits; $10 buys 1,500). */
 export const PUBLISH_COST_CENTS = 10;
-/** The deploys a month the Pro plan's credits cover (5,000 / 15), the app's own included. */
-export const PLAN_PUBLISHES = 330;
+/** The credits one production deploy costs at Netlify (its pricing page, Nov 2026). */
+export const PUBLISH_CREDITS = 15;
 /** This many deploys of one site inside an hour is worth a word to the studio. */
 export const BURST_AT = 5;
 
@@ -72,7 +80,7 @@ export function foldUsage(i: {
   const visitsOf = (siteId: string, month: string) => (i.visits || []).filter((v) => v.site_id === siteId && v.month === month).reduce((n, v) => n + (Number(v.visitors) || 0), 0);
   for (const s of i.sites) {
     const elsewhere = s.edition === 'monitor';
-    const live = s.status === 'live' || !!s.last_published_at;
+    const live = publishedOnce(s);   // item 261: the one rule
     const rows = bySite.get(s.id) || [];
     const paid = rows.filter((p) => p.netlify_deploy_id && p.unchanged !== true);
     const skipped = rows.filter((p) => p.unchanged === true).length;
@@ -107,8 +115,12 @@ export async function handleUsage(req: Request, route: string, method: string, m
   if (!can(member.role, 'read')) return json({ error: 'forbidden', message: 'Your role can’t see this.' }, 403, cors);
   const um = usageMonth(new URL(req.url).searchParams.get('month'), nowIso);
   const vm = monthsCompared(nowIso);   // visits: the last whole month against the one before, as Sites shows them
-  const head = { month: um.month, month_label: um.label, visits_month: vm.month, visits_label: vm.label, prior_label: vm.priorLabel, plan: { publishes: PLAN_PUBLISHES, cost_cents: PUBLISH_COST_CENTS }, storage_limit: mediaQuota().maxBytes };
   const ids = (await agencySiteIds(member.agency_id)).filter((x) => UUID_RE.test(String(x)));
+  // item 269: the host's plan, as the host tells it; the paid publishes it knows of (this month's
+  // client ones, a floor) say whether a "0 used" answer can be believed
+  const paidQ = ids.length ? await svcCount(`presence_publishes?site_id=in.(${ids.join(',')})&created_at=gte.${encodeURIComponent(um.startIso)}&netlify_deploy_id=not.is.null&or=(unchanged.is.null,unchanged.eq.false)`).catch(() => null) : null;
+  const host: HostPlan = await readHostPlan(nowIso, paidQ ?? 0).catch(() => ({ ok: false, team: null, plan: null, credits_included: null, credits_used: null, period_start: null, next_period_start: null, exceeded: false, read_at: nowIso, why: 'unreadable' }));
+  const head = { month: um.month, month_label: um.label, visits_month: vm.month, visits_label: vm.label, prior_label: vm.priorLabel, plan: { cost_cents: PUBLISH_COST_CENTS, credits: PUBLISH_CREDITS, host }, storage_limit: mediaQuota().maxBytes };
   if (!ids.length) return json({ data: {}, totals: null, days: [], ...head, partial: false }, 200, cors);
   const IN = `in.(${ids.join(',')})`;
   const soft = () => ({ ok: false, status: 0, json: null as unknown, text: '' });

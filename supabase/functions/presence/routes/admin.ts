@@ -28,7 +28,7 @@ import {
 } from '../lib/netlify.ts';
 import { computeReadiness } from './monitor.ts';
 import { applyPlan } from './foundations.ts';
-import { domainHealth, domainTruth, twinName, dnsRecordsSure, lookupName, nameCheckFrom, connectRecords, DOMAIN_WAIT } from '../lib/domain_health.ts';
+import { domainHealth, domainTruth, twinName, dnsRecordsSure, lookupName, nameCheckFrom, netlifyAddresses, connectRecords, DOMAIN_WAIT } from '../lib/domain_health.ts';
 import { byWhom, domainChangeEmail, tellOwnerAndStudio, afterResponse, escHtml, announceLiveOnce, forwardsOf } from '../lib/domain_notify.ts';
 import { writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { rdapLookupDetailed, lookupPatch, whereToGo } from '../lib/rdap.ts';
@@ -316,8 +316,8 @@ async function domainSheetRead(site: SiteRow) {
     const main = site.custom_domain.toLowerCase();
     const twin = twinName(main, facts.registered);
     const asked = [main, ...(twin ? [twin] : []), ...forwards];
-    const looked = await Promise.all(asked.map((n) => lookupName(n)));
-    const checks = asked.map((n, i) => nameCheckFrom(n, target, looked[i].cnames, looked[i].aRecords));
+    const [looked, ours] = await Promise.all([Promise.all(asked.map((n) => lookupName(n))), netlifyAddresses(target)]);   // item 265: every Netlify address counts
+    const checks = asked.map((n, i) => nameCheckFrom(n, target, looked[i].cnames, looked[i].aRecords, ours));
     const names = checks.slice(0, twin ? 2 : 1);
     const read = { nf: nfs, ssl, lookups: looked[0], names };
     const st = await domainStatus(site, read);

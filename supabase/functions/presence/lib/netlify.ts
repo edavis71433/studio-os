@@ -250,3 +250,65 @@ export async function restoreDeploy(netlifySiteId: string, deployId: string): Pr
   const r = await nf(`/sites/${netlifySiteId}/deploys/${deployId}/restore`, { method: 'POST' });
   return r.ok ? { ok: true } : { ok: false, error: `restore failed: ${r.status} ${r.text.slice(0, 200)}` };
 }
+
+// ── Builder list item 269 (full review of Nov 22, 2026): what the host's plan really says ──
+// The Usage page drew "N of about 330 publishes" from two typed-in numbers, counting client
+// publishes only, while the app's own updates (nearly the whole bill) went uncounted. Now the
+// team's account is read from Netlify (GET /accounts). What it answers for sure: the plan's
+// name, the credits a period includes, when the period started and when the next begins,
+// and whether usage is exceeded (production publishes paused). What it does NOT answer
+// honestly: credits used, which its API reports as 0 on credit plans (netlify/open-api issue
+// 640, still open Nov 2026), so that figure is shown only when it is above zero, and
+// otherwise the page says "not known" rather than a number that isn't one.
+export interface HostPlan {
+  ok: boolean;                 // the account could be read
+  team: string | null;         // the team's name, for the studio's own eyes
+  plan: string | null;         // "Pro", "Personal"…
+  credits_included: number | null;
+  credits_used: number | null; // null when the host's answer can't be trusted (it reports 0)
+  period_start: string | null;
+  next_period_start: string | null;
+  exceeded: boolean;           // production publishes paused until the next period
+  read_at: string;
+  why: string | null;          // when !ok: 'no_token' | 'refused' | 'unreadable'
+}
+/** Pure: one account's answer, read the honest way (see above). `paidThisPeriod` is how
+ *  many deploys Studio OS itself knows went up since the period started: when that is
+ *  above zero and the host says 0 used, the host's figure is not believed. */
+export function hostPlanFrom(account: unknown, nowIso: string, paidThisPeriod = 0): HostPlan {
+  const a = (account && typeof account === 'object' ? account : {}) as Record<string, unknown>;
+  const caps = (a.capabilities && typeof a.capabilities === 'object' ? a.capabilities : {}) as Record<string, unknown>;
+  const credits = (caps.credits && typeof caps.credits === 'object' ? caps.credits : {}) as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && /^\d+(\.\d+)?$/.test(v) ? Number(v) : null);
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  const included = num(a.plan_credits) ?? num(credits.included);
+  const usedRaw = num(credits.used);
+  const used = usedRaw !== null && (usedRaw > 0 || paidThisPeriod === 0) ? usedRaw : null;
+  const exceeded = a.usages_exceeded === true || a.in_operational_mode === true;
+  return {
+    ok: true, team: str(a.name), plan: str(a.type_name), credits_included: included,
+    credits_used: exceeded && used === null && included !== null ? included : used,
+    period_start: str(a.current_billing_period_start), next_period_start: str(a.next_billing_period_start),
+    exceeded, read_at: nowIso, why: null,
+  };
+}
+let hostCache: { at: number; account: unknown; read_at: string } | null = null;
+const HOST_CACHE_MS = 6 * 60 * 60_000;
+/** The team's plan, read from the host (its raw answer is kept six hours in this process;
+ *  the reading of it is made fresh for each caller's `paidThisPeriod`, as for hostPlanFrom).
+ *  Never throws: a failure is a HostPlan with ok:false and why. */
+export async function readHostPlan(nowIso = new Date().toISOString(), paidThisPeriod = 0): Promise<HostPlan> {
+  const blank = (why: HostPlan['why']): HostPlan => ({ ok: false, team: null, plan: null, credits_included: null, credits_used: null, period_start: null, next_period_start: null, exceeded: false, read_at: nowIso, why });
+  if (!NETLIFY_TOKEN) return blank('no_token');
+  if (hostCache && Date.now() - hostCache.at < HOST_CACHE_MS) return hostPlanFrom(hostCache.account, hostCache.read_at, paidThisPeriod);
+  try {
+    const r = await fetch(`${API}/accounts`, { headers: { Authorization: `Bearer ${NETLIFY_TOKEN}` }, signal: AbortSignal.timeout(8000) });
+    const text = await r.text();
+    if (!r.ok) return blank(r.status === 401 || r.status === 403 ? 'refused' : 'unreadable');
+    let json: unknown = null; try { json = JSON.parse(text); } catch { return blank('unreadable'); }
+    const first = Array.isArray(json) ? json[0] : json;
+    if (!first || typeof first !== 'object') return blank('unreadable');
+    hostCache = { at: Date.now(), account: first, read_at: nowIso };
+    return hostPlanFrom(first, nowIso, paidThisPeriod);
+  } catch { return blank('unreadable'); }
+}

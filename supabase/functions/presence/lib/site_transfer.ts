@@ -104,18 +104,21 @@ export function ownerWho(c: { name?: string | null; email?: string | null; conta
 
 /* ── reading ── */
 
-export interface OwnerFacts { client: { id: string; name?: string | null; email?: string | null; contact_email?: string | null; contact_id?: string | null } | null; contact: { name?: string | null; email?: string | null; auth_user_id?: string | null } | null }
+export interface OwnerFacts { client: { id: string; name?: string | null; email?: string | null; contact_email?: string | null; contact_id?: string | null } | null; contact: { name?: string | null; email?: string | null; auth_user_id?: string | null } | null; person?: { name?: string | null; email?: string | null } | null }   // item 268: `person` is the linked person in the studio's contacts
 /** The site's client record and its owner's contact. Null fields when there is none. */
 export async function ownerFacts(siteId: string): Promise<OwnerFacts | null> {
   const s = rowsOf<{ client_id: string | null }>(await svc(`presence_sites?id=eq.${siteId}&select=client_id&limit=1`))[0];
   if (!s) return null;
   if (!s.client_id) return { client: null, contact: null };
   const client = rowsOf<NonNullable<OwnerFacts['client']>>(await svc(`clients?id=eq.${s.client_id}&select=id,name,email,contact_email,contact_id&limit=1`))[0] || null;
-  const contact = client?.contact_id ? rowsOf<NonNullable<OwnerFacts['contact']>>(await svc(`contacts?id=eq.${client.contact_id}&select=name,email,auth_user_id&limit=1`))[0] || null : null;
-  return { client, contact };
+  const [contact, person] = await Promise.all([
+    client?.contact_id ? svc(`contacts?id=eq.${client.contact_id}&select=name,email,auth_user_id&limit=1`).then((q) => rowsOf<NonNullable<OwnerFacts['contact']>>(q)[0] || null) : Promise.resolve(null),
+    client ? svc(`presence_contacts?client_id=eq.${client.id}&deleted_at=is.null&email=neq.&select=name,email&order=created_at.asc&limit=1`).then((q) => rowsOf<NonNullable<OwnerFacts['person']>>(q)[0] || null).catch(() => null) : Promise.resolve(null),
+  ]);
+  return { client, contact, person };
 }
 export function ownerEmailsOf(f: OwnerFacts | null): string[] {
-  return [...new Set([f?.client?.email, f?.client?.contact_email, f?.contact?.email].map(lower).filter(Boolean))];
+  return [...new Set([f?.client?.email, f?.client?.contact_email, f?.contact?.email, f?.person?.email].map(lower).filter(Boolean))];   // item 268: the linked person too
 }
 export function hasOwnerFacts(f: OwnerFacts | null): boolean {
   return !!f?.client && !!(lower(f.client.email) || lower(f.client.contact_email) || f.client.contact_id);

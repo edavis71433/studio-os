@@ -11,17 +11,22 @@
 // something broken (a failed publish, a domain about to lapse) and a client's own
 // message or support request; and every email that goes to the client themself.
 //
+// Builder list item 267 (full review of Nov 22, 2026): a fourth choice, `client_down`:
+// whether the client themself is emailed when their site stops answering (and when it
+// is back). The studio always hears first; a studio that would rather call the client
+// in its own words switches this off for that client.
+//
 // Kept once per studio, on its own site, as reserved JSON (no migration):
-//   { sites: { [siteId]: { on, dashboard, email } } }
+//   { sites: { [siteId]: { on, dashboard, email, client_down } } }
 // A site with no entry hears everything, and only sites that hear less are stored.
 // A failed read hears everything too: a switch must never go quiet by accident.
 import { readReservedJson, RESERVED_NAMES } from './reserved_store.ts';
 
-export interface NotifyPref { on: boolean; dashboard: boolean; email: boolean }
+export interface NotifyPref { on: boolean; dashboard: boolean; email: boolean; client_down: boolean }
 export interface NotifyStore { sites: Record<string, NotifyPref> }
 export type NotifyChannel = 'dashboard' | 'email';
 
-export const NOTIFY_ALL: Readonly<NotifyPref> = Object.freeze({ on: true, dashboard: true, email: true });
+export const NOTIFY_ALL: Readonly<NotifyPref> = Object.freeze({ on: true, dashboard: true, email: true, client_down: true });
 /** A studio's client list is capped well above any real one; past it, the oldest entries go. */
 export const NOTIFY_MAX_SITES = 1000;
 const SITE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -31,9 +36,9 @@ const flag = (v: unknown, dflt: boolean) => (typeof v === 'boolean' ? v : dflt);
 /** One site's choice, with anything missing or malformed read as "on". */
 export function normalizePref(raw: unknown): NotifyPref {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  return { on: flag(r.on, true), dashboard: flag(r.dashboard, true), email: flag(r.email, true) };
+  return { on: flag(r.on, true), dashboard: flag(r.dashboard, true), email: flag(r.email, true), client_down: flag(r.client_down, true) };
 }
-const allOn = (p: NotifyPref) => p.on && p.dashboard && p.email;
+const allOn = (p: NotifyPref) => p.on && p.dashboard && p.email && p.client_down;
 
 /** The stored setting, cleaned: real site ids only, all-on entries dropped (that is the
  *  default), at most NOTIFY_MAX_SITES kept. Anything unreadable is an empty setting. */
@@ -79,11 +84,11 @@ export function applyNotifyChange(store: NotifyStore | null | undefined, siteId:
   if (allOn(next)) delete sites[id]; else sites[id] = next;
   return normalizeNotify({ sites });
 }
-/** Only the three booleans of a request body; anything else is left out. */
+/** Only the four booleans of a request body; anything else is left out. */
 export function pickFlags(body: unknown): Partial<NotifyPref> {
   const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
   const out: Partial<NotifyPref> = {};
-  for (const k of ['on', 'dashboard', 'email'] as const) if (typeof b[k] === 'boolean') out[k] = b[k] as boolean;
+  for (const k of ['on', 'dashboard', 'email', 'client_down'] as const) if (typeof b[k] === 'boolean') out[k] = b[k] as boolean;
   return out;
 }
 
@@ -98,6 +103,12 @@ export async function readNotify(studioSiteId: string | null | undefined): Promi
 export async function studioWantsEmail(studioSiteId: string | null | undefined, siteId: string | null | undefined): Promise<boolean> {
   if (!studioSiteId || !siteId) return true;
   return hears(await readNotify(studioSiteId), siteId, 'email');
+}
+/** Item 267: should the client themself be emailed when their site is down or back? The
+ *  studio's choice for that client; with no studio, or nothing chosen, yes (as before). */
+export async function tellsClientDown(studioSiteId: string | null | undefined, siteId: string | null | undefined): Promise<boolean> {
+  if (!studioSiteId || !siteId) return true;
+  return prefFor(await readNotify(studioSiteId), siteId).client_down;
 }
 
 // ── Repeats fold into one line, and a line names the site, the number and one link ──

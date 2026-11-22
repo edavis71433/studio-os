@@ -14,7 +14,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
 const quiet = async (fn) => { const e = console.error, w = console.warn; console.error = () => {}; console.warn = () => {}; try { return await fn(); } finally { console.error = e; console.warn = w; } };
 
 const U = await import('../../supabase/functions/presence/agency/usage.ts');
-const { usageMonth, burstOf, foldUsage, handleUsage, PUBLISH_COST_CENTS, PLAN_PUBLISHES, BURST_AT } = U;
+const { usageMonth, burstOf, foldUsage, handleUsage, PUBLISH_COST_CENTS, PUBLISH_CREDITS, BURST_AT } = U;
 
 // ═══ 1. the pure parts ═══
 {
@@ -25,7 +25,7 @@ const { usageMonth, burstOf, foldUsage, handleUsage, PUBLISH_COST_CENTS, PLAN_PU
   const t = (h, m) => `2026-11-09T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`;
   ok('burst: eight in under an hour is named, with its day', JSON.stringify(burstOf([t(10, 0), t(10, 5), t(10, 9), t(10, 20), t(10, 31), t(10, 40), t(10, 51), t(10, 59), t(14, 0)])) === JSON.stringify({ count: 8, day: '2026-11-09' }));
   ok(`burst: fewer than ${BURST_AT} in any hour is nothing`, burstOf([t(10, 0), t(10, 5), t(10, 9), t(10, 20), t(11, 30), t(12, 40)]) === null);
-  ok('the cost and the plan: about 10 cents a publish, about 330 a month', PUBLISH_COST_CENTS === 10 && PLAN_PUBLISHES === 330);
+  ok('the cost: about 10 cents a publish, 15 credits; no typed-in plan size any more (item 269)', PUBLISH_COST_CENTS === 10 && PUBLISH_CREDITS === 15 && U.PLAN_PUBLISHES === undefined);
 
   const pub = (site, kind, at, extra = {}) => ({ site_id: site, kind, status: 'live', netlify_deploy_id: 'dep-' + at, created_at: at, ...extra });
   const out = foldUsage({
@@ -86,7 +86,7 @@ const { usageMonth, burstOf, foldUsage, handleUsage, PUBLISH_COST_CENTS, PLAN_PU
   ok('route: this month’s publishes and their cost, a restore counted, a skip apart, last month left out', d1.publishes === 8 && d1.skipped === 1 && d1.cost_cents === 80 && d2.publishes === 1 && d2.restores === 1, JSON.stringify({ d1, d2 }));
   ok('route: eight in one hour on Nov 9 is named', d1.burst && d1.burst.count === 8 && d1.burst.day === '2026-11-09');
   ok('route: storage and last month’s visits', d1.storage.bytes === 340e6 && d1.visits.value === 389 && d2.visits.prior === 990);
-  ok('route: the month, the visits month, the plan', body.month === '2026-11' && body.visits_month === '2026-10' && body.visits_label === 'October' && body.plan.publishes === 330 && body.plan.cost_cents === 10 && body.storage_limit === 1024 ** 3 && body.totals.publishes === 9 && !body.partial, JSON.stringify({ m: body.month, t: body.totals, p: body.partial }));
+  ok('route: the month, the visits month, the plan', body.month === '2026-11' && body.visits_month === '2026-10' && body.visits_label === 'October' && body.plan.publishes === undefined && body.plan.cost_cents === 10 && body.plan.host && body.plan.host.ok === false && body.plan.host.why === 'no_token' && body.storage_limit === 1024 ** 3 && body.totals.publishes === 9 && !body.partial, JSON.stringify({ m: body.month, t: body.totals, p: body.partial }));
   ok('route: someone without read is refused', (await handleUsage(new Request('http://x/agency/usage'), '/agency/usage', 'GET', { ...member, role: 'none' }, {})).status === 403);
   ok('route: another route is not its business', (await handleUsage(new Request('http://x/agency/sites'), '/agency/sites', 'GET', member, {})) === null);
 

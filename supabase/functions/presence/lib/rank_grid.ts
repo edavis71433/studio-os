@@ -139,9 +139,21 @@ export function applyGridChange(cur: GridSetting, b: Record<string, unknown>, wh
   return next;
 }
 
-/** Due for its monthly scan: on, with a business and a search, and this month not handled. */
+/** Item 266: the monthly scan runs in the last week of the month (from this day on), so the
+ *  report that goes out a few days later carries a map that is days old, not a month old. */
+export const GRID_SCAN_FROM_DAYS_LEFT = 7;
+/** Pure: is `nowIso` (UTC) inside the month's last seven days? */
+export function inLastWeek(nowIso: string): boolean {
+  const d = new Date(nowIso);
+  const days = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  return d.getUTCDate() > days - GRID_SCAN_FROM_DAYS_LEFT;
+}
+/** Due for its monthly scan: on, with a business and a search, this month not handled, and
+ *  (item 266) the month in its last week, unless no scan has ever run: the first one is
+ *  due at once, so a client just switched on sees their map today. */
 export function gridDueNow(s: GridSetting, nowIso: string): boolean {
-  return s.enabled && !!s.place && s.phrases.length > 0 && s.month !== nowIso.slice(0, 7);
+  if (!(s.enabled && !!s.place && s.phrases.length > 0 && s.month !== nowIso.slice(0, 7))) return false;
+  return inLastWeek(nowIso) || !s.last_result;
 }
 
 /** After a monthly scan that failed: under the cap the month is let go, for a later tick;
@@ -254,8 +266,12 @@ export const mapsSpotUrl = (phrase: string, lat: number, lng: number) => `https:
 
 /** The first of next month, as the card says it ("Dec 1"). Pure. */
 export function nextScanDay(nowIso: string): string {
+  // item 266: the first day of the month's last week, this month if it hasn't come, else next month's
   const d = new Date(nowIso);
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const firstOfWeek = (y: number, m: number) => { const days = new Date(Date.UTC(y, m + 1, 0)).getUTCDate(); return Date.UTC(y, m, days - GRID_SCAN_FROM_DAYS_LEFT + 1); };
+  let at = firstOfWeek(d.getUTCFullYear(), d.getUTCMonth());
+  if (at <= d.getTime()) at = firstOfWeek(d.getUTCFullYear(), d.getUTCMonth() + 1);
+  return new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 // ── the four Google calls (Places API (New)); tests replace fetch here ──
