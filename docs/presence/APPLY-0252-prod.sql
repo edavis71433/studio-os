@@ -1,5 +1,5 @@
 -- ===========================================================================
---  APPLY PACK - migration 0246  (owner-apply, prod)
+--  APPLY PACK - migration 0252  (owner-apply, prod)
 -- ===========================================================================
 --  Run this ONCE (Supabase -> SQL Editor, or the Supabase connector), BEFORE or
 --  WITH the deploy.yml run that ships the client reminders. ADDITIVE and
@@ -17,7 +17,7 @@
 --    alter table public.presence_tasks drop column if exists last_reminded_at;
 --    alter table public.presence_surveys drop column if exists last_reminded_at;
 --
---  Covers: supabase/migrations/0246_client_reminders.sql
+--  Covers: supabase/migrations/0252_client_reminders.sql
 -- ===========================================================================
 
 alter table public.presence_tasks add column if not exists last_reminded_at timestamptz;

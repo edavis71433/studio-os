@@ -12,7 +12,7 @@
 // and no reminder: a file asks nothing of them.
 // The decision is pure (clientReminderDue) and the once-only gate is the row's own
 // last_reminded_at, claimed BEFORE the send with the previous value in the WHERE, the
-// same race guard the approval sweep uses. Before migration 0246 the to-do and
+// same race guard the approval sweep uses. Before migration 0252 the to-do and
 // questionnaire reads 400 on the missing column and the sweep is a clean no-op.
 import { svc } from './db.ts';
 import { emailBridgedCustomer } from './service_bridge.ts';
@@ -135,7 +135,7 @@ export async function runClientReminders(limit = 50, nowIso = new Date().toISOSt
   const table: Record<ClientAskKind, string> = { todo: 'presence_tasks', questionnaire: 'presence_surveys', approval: 'presence_approvals' };
   for (const [kind, path] of reads) {
     const q = await svc(path).catch(() => ({ ok: false, json: null }));
-    if (!q.ok) continue;   // pre-0246 (no last_reminded_at on the table yet): a clean no-op for that kind
+    if (!q.ok) continue;   // pre-0252 (no last_reminded_at on the table yet): a clean no-op for that kind
     let list = rows(q) as AskRow[];
     if (kind === 'questionnaire' && list.length) {
       // answered questionnaires are done, whatever their status says

@@ -1776,9 +1776,9 @@ test.describe('Client portal — Documents shelf: files and documents (slice 12,
     await page.goto('/client.html');
     await openFilesTab(page);
     // the input itself advertises exactly what the store accepts
-    await expect(page.locator('#ffile')).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf');
-    await page.locator('#ffile').setInputFiles({ name: 'Team photos.zip', mimeType: 'application/zip', buffer: Buffer.from('zip') });
-    await expect(page.locator('#toast')).toContainText('a JPEG, PNG or WebP image, or a PDF');
+    await expect(page.locator('#ffile')).toHaveAttribute('accept', /^image\/jpeg,image\/png,image\/webp,image\/heic,.*,video\/quicktime,\.jpg,.*\.mov$/);   // item 337: every kind the studio door takes, with its extensions
+    await page.locator('#ffile').setInputFiles({ name: 'Team photos.exe', mimeType: 'application/x-msdownload', buffer: Buffer.from('exe') });   // item 337: a zip is welcome now; a program is not
+    await expect(page.locator('#toast')).toContainText('That kind of file can’t be sent here');
     await expect(page.locator('#fsend')).toBeHidden();      // the compose never opens
     expect(calls).toBe(0);
     // a file it can take opens the send form, which names the caps
@@ -1793,8 +1793,8 @@ test.describe('Client portal — Documents shelf: files and documents (slice 12,
     page.on('request', (r) => { if (/upload-url|\/uploads$|storage\.example/.test(r.url())) calls++; });
     await page.goto('/client.html');
     await openFilesTab(page);
-    await page.locator('#ffile').setInputFiles({ name: 'huge.png', mimeType: 'image/png', buffer: Buffer.alloc(10 * 1024 * 1024 + 1) });
-    await expect(page.locator('#toast')).toContainText('images can be up to 10MB');
+    await page.locator('#ffile').setInputFiles({ name: 'huge.png', mimeType: 'image/png', buffer: Buffer.alloc(25 * 1024 * 1024 + 1) });   // item 337: photos up to 25MB now
+    await expect(page.locator('#toast')).toContainText('Photos and documents can be up to 25MB');
     await expect(page.locator('#fsend')).toBeHidden();
     expect(calls).toBe(0);
   });
@@ -3396,7 +3396,7 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     page.on('request', (r) => { if (/upload-url|\/uploads$/.test(new URL(r.url()).pathname) || r.method() === 'PUT') sends.push(r.url()); });
     await page.goto(`/client.html?project=${PID}`);
     await expect(page.locator('#sec-files #fchoose')).toBeVisible();
-    await page.locator('#ffile').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hi') });
+    await page.locator('#ffile').setInputFiles({ name: 'notes.exe', mimeType: 'application/x-msdownload', buffer: Buffer.from('hi') });   // item 337: a text file is welcome now; a program is not
     await expect(page.locator('#toast')).toContainText('That kind of file can’t be sent here');
     expect(sends).toHaveLength(0);
   });

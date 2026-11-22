@@ -14,7 +14,7 @@
 //          into a hidden span, the footer never says "on Studio OS" to a client, the logo's
 //          address for mail is the lasting public one.
 // PART E — the wiring (read in the code): the first email on a to-do and a questionnaire, the
-//          daily step, the public routes, migration 0246 and its APPLY pack.
+//          daily step, the public routes, migration 0252 and its APPLY pack.
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => Deno.readTextFileSync(new URL(p, ROOT));
 const results = [];
@@ -147,12 +147,12 @@ const account = await import('../../supabase/functions/presence/commerce/account
   const si = read('supabase/functions/presence/routes/service_intake.ts');
   const sys = read('supabase/functions/presence/routes/system.ts');
   const idx = read('supabase/functions/presence/index.ts');
-  const mig = read('supabase/migrations/0246_client_reminders.sql');
-  const pack = read('docs/presence/APPLY-0246-prod.sql');
+  const mig = read('supabase/migrations/0252_client_reminders.sql');
+  const pack = read('docs/presence/APPLY-0252-prod.sql');
   ok('E1: a to-do put to the client is emailed on create and on the flag', /emailClientAsk\(site\.id, projectId, 'todo', title\)/.test(pj) && /emailClientAsk\(site\.id, projectId, 'todo', String\(rows\(up\)\[0\]\.title/.test(pj));
   ok('E2: a questionnaire posted to the client is emailed', /emailClientAsk\(site\.id, projectId, 'questionnaire', title\)/.test(si));
   ok('E3: the daily tick has the step, after the approval reminders', /\['client_reminders', \(\) => runClientReminders\(50\)\]/.test(sys) && sys.indexOf("['client_reminders'") > sys.indexOf("['approval_reminders'"));
-  ok('E4: migration 0246 adds the column to both tables, with the APPLY pack to match', /presence_tasks add column if not exists last_reminded_at timestamptz/.test(mig) && /presence_surveys add column if not exists last_reminded_at timestamptz/.test(mig) && /presence_tasks add column if not exists last_reminded_at/.test(pack) && /presence_surveys add column if not exists last_reminded_at/.test(pack));
+  ok('E4: migration 0252 adds the column to both tables, with the APPLY pack to match', /presence_tasks add column if not exists last_reminded_at timestamptz/.test(mig) && /presence_surveys add column if not exists last_reminded_at timestamptz/.test(mig) && /presence_tasks add column if not exists last_reminded_at/.test(pack) && /presence_surveys add column if not exists last_reminded_at/.test(pack));
   ok('E5: the public routes: the logo’s lasting address and the default studio for a bare /portal', idx.includes('([0-9a-f-]{36})\\/logo$/') && idx.includes("'/public/studio/default/brand'"));
   const sbr = read('supabase/functions/presence/routes/studio_brand.ts');
   ok('E6: the logo route forwards to a fresh signed address; the default studio is AGENCY_SITE_ID or the first studio with a client', /status: 302/.test(sbr) && /AGENCY_SITE_ID/.test(sbr) && /presence_service_links\?select=agency_site_id/.test(sbr));

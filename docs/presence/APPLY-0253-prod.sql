@@ -1,5 +1,5 @@
 -- ===========================================================================
---  APPLY PACK - migration 0247  (owner-apply, prod)
+--  APPLY PACK - migration 0253  (owner-apply, prod)
 -- ===========================================================================
 --  Run this ONCE (Supabase -> SQL Editor, or the Supabase connector), BEFORE OR
 --  AFTER the deploy.yml run that ships backup codes for two-step sign-in
@@ -21,7 +21,7 @@
 --  Rollback (only if ever needed):
 --    drop table if exists public.presence_backup_codes;
 --
---  Covers: supabase/migrations/0247_backup_codes.sql
+--  Covers: supabase/migrations/0253_backup_codes.sql
 -- ===========================================================================
 
 create table if not exists public.presence_backup_codes (

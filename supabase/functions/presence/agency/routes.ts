@@ -201,7 +201,7 @@ export function forgetAgencyReads(agencyId: string): void {
 const portalAddress = (studioSiteId: string, slug?: string | null) => portalAddressOf(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com', studioSiteId, slug);
 async function portalSlugOf(siteId: string): Promise<string | null> {
   const r = await svc(`presence_sites?id=eq.${siteId}&select=portal_slug&limit=1`).catch(() => ({ ok: false, json: null }));
-  return r.ok && Array.isArray(r.json) ? (r.json[0]?.portal_slug ?? null) : null;   // pre-0248: no column, no name
+  return r.ok && Array.isArray(r.json) ? (r.json[0]?.portal_slug ?? null) : null;   // pre-0254: no column, no name
 }
 const activeClientsOf = (input: { links: Array<{ site_id: string; status: string }>; clientNames: Record<string, string> }) => input.links.filter((l) => l.status === 'active')
   .map((l) => ({ site_id: l.site_id, name: input.clientNames[l.site_id] || 'A client' }))
@@ -317,7 +317,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       if (want && !slug) return json({ error: 'bad_slug', message: slugRefusal(want) }, 400, cors);
       const up = await svc(`presence_sites?id=eq.${own.id}&select=id,portal_slug`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ portal_slug: slug || null }) });
       if (up.status === 409) return json({ error: 'slug_taken', message: 'Another studio already uses that name. Try a different one.' }, 409, cors);
-      if (up.status === 400) return json({ error: 'unavailable', message: 'Short names need a one-time database update first.' }, 503, cors);   // pre-0248
+      if (up.status === 400) return json({ error: 'unavailable', message: 'Short names need a one-time database update first.' }, 503, cors);   // pre-0254
       if (!up.ok) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
       return json({ data: { slug, address: portalAddress(own.id, slug) } }, 200, cors);
     }

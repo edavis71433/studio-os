@@ -2211,17 +2211,31 @@ function fileRowHtml(f,ap){
 // The client→studio share card (uploads are PER-PROJECT: hidden entirely with
 // zero projects; a reviewer never reaches any of this — renderDocuments' persona
 // gate returns the calm read-only state before any share UI or /client/* read).
-// Type/size honesty up front: the ONE media store accepts JPEG/PNG/WebP images
-// up to 10MB and PDF documents up to 25MB (lib/media.ts MIME_ALLOW / MAX_BYTES /
-// MAX_DOC_BYTES). The input advertises exactly that, the card copy says it, and
-// a pre-flight check catches the rest BEFORE any network call.
-const SHARE_ACCEPT='image/jpeg,image/png,image/webp,application/pdf';
-const SHARE_IMG_CAP=10*1024*1024,SHARE_PDF_CAP=25*1024*1024;
+// Type/size honesty up front. Builder item 337 (Nov 22 review): the studio door takes what a
+// client really has (lib/client_files.ts STUDIO_KINDS): photos including iPhone HEIC, PDFs, Word
+// and text files, SVG, Illustrator and EPS, zips and short videos. Photos and documents up to
+// 25MB, zips and videos up to 100MB. The input advertises exactly that, the words say it, and a
+// pre-flight check catches the rest BEFORE any network call; the server checks the bytes too.
+const SHARE_KINDS={'image/jpeg':['jpg','jpeg'],'image/png':['png'],'image/webp':['webp'],'image/heic':['heic'],'image/heif':['heif'],'application/pdf':['pdf'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':['docx'],'application/msword':['doc'],'text/plain':['txt'],'image/svg+xml':['svg'],
+  'application/postscript':['eps'],'application/illustrator':['ai'],'application/zip':['zip'],'video/mp4':['mp4'],'video/quicktime':['mov']};
+const SHARE_BIG=new Set(['application/zip','video/mp4','video/quicktime']);
+const SHARE_ACCEPT=Object.keys(SHARE_KINDS).concat(Object.values(SHARE_KINDS).flat().map(e=>'.'+e)).join(',');
+const SHARE_CAP=25*1024*1024,SHARE_BIG_CAP=100*1024*1024;
+const SHARE_WORDS='Photos (JPEG, PNG, WebP or iPhone HEIC), PDFs, Word documents, text files, SVG, Illustrator and EPS files, zips, and short videos (MP4 or MOV). Photos and documents up to 25MB; videos and zips up to 100MB.';
+// the kind a file is sent as: its own type when it is one we take, else the one its extension
+// names (a Mac or iPhone hands over .ai and .heic files with no type at all)
+function shareMime(file){
+  const t=String((file&&file.type)||'').toLowerCase();if(SHARE_KINDS[t])return t;
+  const m=/\.([a-z0-9]+)$/i.exec(String((file&&file.name)||''));const e=m?m[1].toLowerCase():'';
+  for(const k in SHARE_KINDS)if(SHARE_KINDS[k].indexOf(e)>=0)return k;
+  return'';
+}
 function sharePreflight(file){
-  const t=String((file&&file.type)||'');
-  if(SHARE_ACCEPT.split(',').indexOf(t)<0)return'That kind of file can’t be sent here — a JPEG, PNG or WebP image, or a PDF, works.';
-  const cap=t==='application/pdf'?SHARE_PDF_CAP:SHARE_IMG_CAP;
-  if(file.size>cap)return t==='application/pdf'?'That PDF is too big — PDFs can be up to 25MB.':'That image is too big — images can be up to 10MB.';
+  const t=shareMime(file);
+  if(!t)return'That kind of file can’t be sent here. '+SHARE_WORDS;
+  const big=SHARE_BIG.has(t);
+  if(file.size>(big?SHARE_BIG_CAP:SHARE_CAP))return big?'That file is too big. Videos and zips can be up to 100MB.':'That file is too big. Photos and documents can be up to 25MB.';
   return'';
 }
 // Known server 422s whose wording reads wrong IN THE PORTAL get a portal voice
@@ -2236,7 +2250,7 @@ function shareServerMsg(m,file){
 }
 function shareCardHtml(){
   return `<div class="fshare"><span class="fshare-i" aria-hidden="true">${si('upload')}</span>`+
-    `<div class="fshare-m"><p class="fshare-t">Share a file with your studio</p><p class="fshare-d">JPEG, PNG or WebP images up to 10MB, or PDFs up to 25MB — it lands in your project’s files right away.</p></div>`+
+    `<div class="fshare-m"><p class="fshare-t">Share a file with your studio</p><p class="fshare-d">${SHARE_WORDS} It lands in your project’s files right away.</p></div>`+
     `<button class="approve fshare-btn" id="fchoose">Choose a file</button>`+
     `<input type="file" id="ffile" class="fshare-file" accept="${SHARE_ACCEPT}" aria-hidden="true" tabindex="-1">`+
     `<form class="fsend" id="fsend" aria-live="polite" hidden></form></div>`;
@@ -2281,7 +2295,7 @@ async function shareCompose(file){
   host.hidden=false;
   host.innerHTML=`<p class="fsel">${esc(file.name)}</p>`+
     // the shelf's send button has no card around it to name the limits, so its form does
-    (host.classList.contains('shelfform')?`<p class="fshare-d">JPEG, PNG or WebP images up to 10MB, or PDFs up to 25MB. It lands in your project’s files right away.</p>`:'')+
+    (host.classList.contains('shelfform')?`<p class="fshare-d">${SHARE_WORDS} It lands in your project’s files right away.</p>`:'')+
     (multi?`<label class="fld" for="fproj">Which project is this for?</label><select id="fproj" class="fin">${list.map(p=>`<option value="${esc(p.id)}"${p.id===SHARE_CTX.pid?' selected':''}>${esc(p.name)}</option>`).join('')}</select>`:'')+
     `<label class="fld" for="ftitle">Title <span class="muted" style="font-weight:400">(optional)</span></label><input id="ftitle" class="fin" type="text" value="${esc(file.name)}">`+
     `<div class="row" style="margin-top:14px"><button type="submit" class="approve" id="fgo">Send to your studio</button><button type="button" id="fno">Cancel</button></div>`;
@@ -2311,10 +2325,10 @@ async function shareSend(file){
   try{
     let mediaId=(SHARE_KEPT.pid===pid&&SHARE_KEPT.mediaId)||'';
     if(!mediaId){   // fresh send — a kept id (a prior step-3 failure on THIS project) skips straight to the record step
-      const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:file.type||'application/octet-stream',bytes:file.size,title});
+      const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:shareMime(file)||file.type||'application/octet-stream',bytes:file.size,title});
       if(!up.ok||!up.body.data)return fail(shareServerMsg(up.body&&up.body.message,file)||'Uploads aren’t available right now.');
       if(!up.body.data.upload_url)return fail((up.body&&up.body.message)||'Uploads aren’t available right now.');   // a 200 with no URL is its own honest failure, never a throw
-      const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file});
+      const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':shareMime(file)||file.type||'application/octet-stream','x-upsert':'true'},body:file});
       if(!put.ok)return fail('The upload didn’t finish — please try again.');
       mediaId=up.body.data.media_id;
       SHARE_KEPT={mediaId,pid};   // the bytes are up — a failed record step retries from HERE, orphan-free
@@ -3001,7 +3015,7 @@ async function paintTwoStep(){
 // The starter answers: how this portal works, true for every studio. Same markup as
 // the studio's own articles (lib/faq.ts renderFaq), so the search covers them too.
 const STARTER_FAQ=[
-  ['How do I send my studio a file?','Open Documents and press Send a file. Photos (JPEG, PNG or WebP) up to 10MB and PDFs up to 25MB go straight to your studio.'],
+  ['How do I send my studio a file?','Open Documents and press Send a file. Photos (including iPhone HEIC), PDFs, Word and text files, your logo as SVG, AI or EPS, zips and short videos go straight to your studio. Photos and documents up to 25MB, videos and zips up to 100MB.'],
   ['How do I approve something?','Anything waiting for your OK is at the top of Home, under Needs you, and in your project. Press Approve, or Request changes to say what you’d like different. Nothing changes until you approve.'],
   ['How do I pay an invoice?','Open Documents: what you owe is at the top, with Pay. You pay on Stripe’s secure page and come straight back here, where the invoice shows Processing and then Paid.'],
   ['How do I ask for something new?','Open Messages to book a call, ask for one of your studio’s services, or press Write and say what you need. Nothing is charged until your studio replies.'],
@@ -3587,7 +3601,7 @@ async function openTodo(pid,tid,from){
   if(k==='content'||k==='questionnaire'){
     const mine=(data.deliverables||[]).filter(isClientUpload);
     const sent=`<section style="margin-top:22px"><h2>Sent so far · ${mine.length}</h2>${mine.length?`<div class="flv">${mine.map(fx=>fileRowHtml(fx)).join('')}</div>`:emptyCard('Nothing yet. What you send shows up here.')}</section>`;
-    const drop=`<div class="dropbox" id="dropbox"><span class="di" aria-hidden="true">${si('upload')}</span><p class="dt">${k==='content'?'Choose photos or a PDF':'Choose your filled-in questionnaire'}</p><p class="dd">JPEG, PNG or WebP images up to 10MB, or PDFs up to 25MB. Pick several at once.</p><p class="dprog" id="dprog" aria-live="polite"></p><button class="approve" id="dchoose">Choose files</button><input type="file" id="dfiles" class="fshare-file" accept="${SHARE_ACCEPT}" multiple aria-hidden="true" tabindex="-1"></div>`;
+    const drop=`<div class="dropbox" id="dropbox"><span class="di" aria-hidden="true">${si('upload')}</span><p class="dt">${k==='content'?'Choose photos, your logo or any file':'Choose your filled-in questionnaire'}</p><p class="dd">${SHARE_WORDS} Pick several at once.</p><p class="dprog" id="dprog" aria-live="polite"></p><button class="approve" id="dchoose">Choose files</button><input type="file" id="dfiles" class="fshare-file" accept="${SHARE_ACCEPT}" multiple aria-hidden="true" tabindex="-1"></div>`;
     const helps=k==='content'?`<section style="margin-top:22px"><h2>What helps most</h2><div class="card helps">${HELPS.map(h=>`<div class="hrow"><span class="hck" aria-hidden="true">✓</span><span><strong>${esc(h[0])}</strong><span class="hsub">${esc(h[1])}</span></span></div>`).join('')}</div></section>`:'';
     const tell=done?`<p class="histline"><span aria-hidden="true">✓</span>Done — your studio has ticked this off.</p>`:`<button class="donebtn" id="tdone">I’ve sent everything — tell my studio</button><p class="muted" style="font-size:12.5px;margin-top:8px">This writes to ${esc(studioBrand())} in your project’s conversation, so they can check and tick it off.</p>`;
     $('main').innerHTML=sheetBackHtml(back)+`<div class="sheetcols headtop"><div class="s-ask">${sheetHead(chips,t.title||'Send your files',subs[k])}</div><div class="s-thing">${drop}${sent}</div><div class="s-answer">${helps}${tell}</div></div>`;
@@ -3652,10 +3666,10 @@ async function sendFilesTo(pid,files,onStep){
     const file=files[i];if(onStep)onStep(i+1,files.length,file);
     const bad=sharePreflight(file);if(bad){failed.push({name:file.name,msg:bad});continue;}
     try{
-      const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:file.type||'application/octet-stream',bytes:file.size,title:file.name});
+      const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:shareMime(file)||file.type||'application/octet-stream',bytes:file.size,title:file.name});
       const d=up.ok&&up.body&&up.body.data;
       if(!d||!d.upload_url){failed.push({name:file.name,msg:shareServerMsg(up.body&&up.body.message,file)||'Uploads aren’t available right now.'});continue;}
-      const put=await fetch(d.upload_url,{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file});
+      const put=await fetch(d.upload_url,{method:'PUT',headers:{'Content-Type':shareMime(file)||file.type||'application/octet-stream','x-upsert':'true'},body:file});
       if(!put.ok){failed.push({name:file.name,msg:'The upload didn’t finish.'});continue;}
       let rec=await api('/client/projects/'+pid+'/uploads','POST',{media_id:d.media_id,title:file.name});
       if(!rec.ok&&rec.status!==422)rec=await api('/client/projects/'+pid+'/uploads','POST',{media_id:d.media_id,title:file.name});

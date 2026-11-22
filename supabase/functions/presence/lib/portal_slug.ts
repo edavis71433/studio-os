@@ -1,7 +1,7 @@
 // ── Builder list item 350 (Nov 22 review): a short name in the portal's address ──
 // The portal's address was a long line ending in a 36-character code, which can't be
 // read out on a call or printed on an invoice. Each studio may choose a short name in
-// Settings (presence_sites.portal_slug, migration 0248, unique across the platform
+// Settings (presence_sites.portal_slug, migration 0254, unique across the platform
 // whatever the case); the address is then app.example/portal/<name>, which Netlify
 // forwards to portal.html?studio=<name> (_redirects). The sign-in page asks the public
 // route /public/studio/by-slug/<name>/brand, which answers the same brand as the id

@@ -1,5 +1,5 @@
 -- ===========================================================================
---  APPLY PACK - migration 0248  (owner-apply, prod)
+--  APPLY PACK - migration 0254  (owner-apply, prod)
 -- ===========================================================================
 --  Run this ONCE (Supabase -> SQL Editor, or the Supabase connector), BEFORE or
 --  WITH the deploy.yml run that ships the short portal address. ADDITIVE and
@@ -17,7 +17,7 @@
 --    drop index if exists public.presence_sites_portal_slug_uq;
 --    alter table public.presence_sites drop column if exists portal_slug;
 --
---  Covers: supabase/migrations/0248_portal_slug.sql
+--  Covers: supabase/migrations/0254_portal_slug.sql
 -- ===========================================================================
 
 alter table public.presence_sites add column if not exists portal_slug text;

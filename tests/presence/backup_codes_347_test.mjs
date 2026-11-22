@@ -7,7 +7,7 @@
 // PART B — the routes (routes/backup_codes.ts) through a fetch fake: PostgREST answered from
 //          memory (fake_pgrst.mjs), the auth ADMIN API faked (a user with their factors, a
 //          user by email, deleting a factor), Resend caught.
-//          · GET: none yet; after a save; a database before 0247 says so
+//          · GET: none yet; after a save; a database before 0253 says so
 //          · POST: bad hashes refused; no authenticator app refused; ten rows of hashes and
 //            never a code; a second save replaces the first
 //          · use: unknown email, wrong code and no codes get ONE identical answer; the right
@@ -17,8 +17,8 @@
 //          · the owner's route through handleAgency: owner only, their own client only, a
 //            client with no sign-in / no second step, the fresh code asked first, then the
 //            factor goes, the client is emailed under the studio's brand, the log says so
-// PART C — migration 0247 (the table, its indexes, row security, the wider fresh-code
-//          constraint) and the APPLY-0247 note at its top; the apply pack in docs/; the
+// PART C — migration 0253 (the table, its indexes, row security, the wider fresh-code
+//          constraint) and the APPLY-0253 note at its top; the apply pack in docs/; the
 //          route wiring in index.ts and the agency router.
 import { installFakePostgrest } from './fake_pgrst.mjs';
 
@@ -182,9 +182,9 @@ const events = () => db.tables.presence_change_events || [];
   ok('B2: GET without a sign-in → 401', r.status === 401);
   tableGone = true;
   r = await out(await R.handleBackupCodesGet(P_ALEX, cors));
-  ok('B3: a database before 0247 → 503 "needs a one-time database update"', r.status === 503 && /one-time database update/.test(r.body.message));
+  ok('B3: a database before 0253 → 503 "needs a one-time database update"', r.status === 503 && /one-time database update/.test(r.body.message));
   r = await out(await R.handleBackupCodesSave(post({ hashes: Array.from({ length: 10 }, (_, i) => String(i).repeat(64)), salt: 'ab'.repeat(16) }), P_ALEX, cors));
-  ok('B4: a save before 0247 → 503 too, nothing written', r.status === 503 && codesTable().length === 0);
+  ok('B4: a save before 0253 → 503 too, nothing written', r.status === 503 && codesTable().length === 0);
   tableGone = false;
 
   const set = L.newSet(); const hashes = await L.hashSet(set.codes, set.salt);
@@ -337,12 +337,12 @@ F.freshDeps.now = () => freshNow * 1000;
 
 // ═══ PART C — the migration, the apply pack, the wiring ═══
 {
-  const sql = read('supabase/migrations/0247_backup_codes.sql');
-  ok('C1: migration 0247 creates presence_backup_codes with the agreed columns', /create table if not exists public\.presence_backup_codes \(/.test(sql) && ['id uuid primary key', 'user_id uuid not null', 'site_id uuid references public.presence_sites(id) on delete set null', 'code_hash text not null', 'salt text not null', 'used_at timestamptz', 'created_at timestamptz not null default now()'].every((c) => sql.includes(c)));
+  const sql = read('supabase/migrations/0253_backup_codes.sql');
+  ok('C1: migration 0253 creates presence_backup_codes with the agreed columns', /create table if not exists public\.presence_backup_codes \(/.test(sql) && ['id uuid primary key', 'user_id uuid not null', 'site_id uuid references public.presence_sites(id) on delete set null', 'code_hash text not null', 'salt text not null', 'used_at timestamptz', 'created_at timestamptz not null default now()'].every((c) => sql.includes(c)));
   ok('C2: an index on user_id, row security on, no policy, service role only', /create index if not exists presence_backup_codes_user_idx\s+on public\.presence_backup_codes \(user_id\)/.test(sql) && /enable row level security/.test(sql) && !/create policy/.test(sql));
   ok('C3: presence_fresh_codes.action accepts two_step_off (dropped and re-added, idempotent)', /drop constraint if exists presence_fresh_codes_action_check/.test(sql) && /'close_account', 'two_step_off'\)/.test(sql));
-  ok('C4: the APPLY-0247 note at the top says what it creates and that it is safe before or after the deploy', /^-- =+\n--  APPLY-0247/.test(sql) && /BEFORE OR AFTER/.test(sql) && /either order is safe/.test(sql) && /IDEMPOTENT/.test(sql) && /rollback:/.test(sql));
-  const pack = read('docs/presence/APPLY-0247-prod.sql');
+  ok('C4: the APPLY-0253 note at the top says what it creates and that it is safe before or after the deploy', /^-- =+\n--  APPLY-0253/.test(sql) && /BEFORE OR AFTER/.test(sql) && /either order is safe/.test(sql) && /IDEMPOTENT/.test(sql) && /rollback:/.test(sql));
+  const pack = read('docs/presence/APPLY-0253-prod.sql');
   ok('C5: the apply pack in docs/ carries the same table and constraint, and a check query', /create table if not exists public\.presence_backup_codes/.test(pack) && /'two_step_off'\)/.test(pack) && /-- Verify/.test(pack) && /pg_get_constraintdef/.test(pack));
   const idx = read('supabase/functions/presence/index.ts');
   const gate = idx.indexOf("if (principal.kind !== 'client' && principal.kind !== 'staff') {");

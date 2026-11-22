@@ -1,5 +1,5 @@
 -- ===========================================================================
---  APPLY-0247  (owner-apply, prod)  ·  backup codes for two-step sign-in
+--  APPLY-0253  (owner-apply, prod)  ·  backup codes for two-step sign-in
 -- ===========================================================================
 --  Run ONCE (Supabase -> SQL Editor, or the Supabase connector), BEFORE OR AFTER
 --  the deploy.yml run that ships builder list item 347: either order is safe.
@@ -22,7 +22,7 @@
 --  code until the constraint is widened. Nothing else is touched.
 --  IF THIS GOES FIRST: an empty table and a wider constraint, used by nothing.
 --
---  The same SQL is in docs/presence/APPLY-0247-prod.sql with its check query.
+--  The same SQL is in docs/presence/APPLY-0253-prod.sql with its check query.
 --
 --  Rollback (only if ever needed):
 --    drop table if exists public.presence_backup_codes;
