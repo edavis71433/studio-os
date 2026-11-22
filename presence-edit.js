@@ -3097,7 +3097,7 @@ function renderRowsBlockBody(def, blk, idx, sub, ti) {
     const rm = icoBtn("x", "Remove " + spec.one + " " + (k + 1), "rw-b rw-rm", 14); rm.addEventListener("click", () => { rows.splice(k, 1); again(); });
     head.append(up, dn, rm); card.appendChild(head);
     spec.fields.forEach(([key, label, max, kind]) => {
-      if (kind === "icon") { card.appendChild(rwIconPick(r, k, spec.one, put, again)); return; }   // item 304's line icons, on each card
+      if (kind === "icon") { card.appendChild(rwIconPick(r, k, spec.one, put, again, idx)); return; }   // item 304's line icons, on each card
       let inp;
       const val = r[key];
       if (kind === "lines") { inp = el("textarea"); inp.value = Array.isArray(val) ? val.join("\n") : String(val || ""); inp.rows = Math.max(2, inp.value.split("\n").length + 1); }
@@ -3137,22 +3137,22 @@ function renderRowsBlockBody(def, blk, idx, sub, ti) {
     if (target) setTimeout(() => { try { target.focus({ preventScroll: true }); if (f.first && target.select) target.select(); c.scrollIntoView({ block: "nearest" }); } catch (_) {} }, 0);
   }
 }
-let RW_DRAG = null, RW_FOCUS = null, RW_ICON_OPEN = null;
+let RW_DRAG = null, RW_FOCUS = null, RW_ICON_OPEN = null;   // RW_ICON_OPEN: "<section index>:<card index>" whose icons are showing
 // A feature's icon on its card: what it is now, and a press opens item 304's line icons (in the
 // site's accent colour), None, and a box for a typed emoji. Stored as "icon:<name>" or the emoji.
-function rwIconPick(r, k, one, put, again) {
+function rwIconPick(r, k, one, put, again, idx) {
   const wrap = el("div", "rw-icon");
   const cur = String(r.icon || ""), line = /^icon:/.test(cur) ? cur.slice(5) : "";
   const accent = dcSiteColours().accent;
   const svg = (name, px) => '<svg viewBox="0 0 24 24" width="' + px + '" height="' + px + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + LINE_ICONS[name] + "</svg>";
-  const open = RW_ICON_OPEN === r;
+  const key = idx + ":" + k, open = RW_ICON_OPEN === key;   // a redraw makes new row objects, so the card is named by place
   const btn = el("button", "rw-icon-now"); btn.type = "button"; btn.setAttribute("aria-expanded", String(open));
   btn.setAttribute("aria-label", "Icon for " + one + " " + (k + 1) + ": " + (line ? (ICON_WORDS[line] || line) : cur ? cur : "none") + ". Press to change it");
   wrap.style.setProperty("--rw-accent", accent);   // the line icons draw in the site's accent colour
   if (line && LINE_ICONS[line]) { const i = el("span", "rw-icon-pic"); i.innerHTML = svg(line, 20); btn.appendChild(i); }
   else if (cur) btn.appendChild(el("span", "rw-icon-pic", cur));
   btn.appendChild(el("span", null, line ? (ICON_WORDS[line] || line) : cur ? "Emoji" : "Add an icon"));
-  btn.addEventListener("click", () => { RW_ICON_OPEN = open ? null : r; again(); });
+  btn.addEventListener("click", () => { RW_ICON_OPEN = open ? null : key; again(); });
   wrap.appendChild(btn);
   if (!open) return wrap;
   const set = (v) => { if (v) r.icon = v; else delete r.icon; RW_ICON_OPEN = null; again(); };

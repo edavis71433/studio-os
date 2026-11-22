@@ -2218,6 +2218,12 @@ body.pd-dragging *{cursor:grabbing !important}
 #designPreviewEmpty .eq{font-family:var(--serif);font-style:italic;font-size:17px;line-height:1.5;max-width:26ch}
 #designPreviewEmpty .eh{font-size:13px;color:var(--ink-2);margin-top:10px;line-height:1.7;max-width:40ch}
 #designPreviewEmpty .ea{margin-top:var(--dds-s4,16px);display:flex;gap:var(--dds-s5,20px);flex-wrap:wrap}
+/* in Edit mode the note sits in the middle of the canvas, clear of the dock on the left (and of the
+   dock along the bottom on a phone), so its words show and its button takes a press */
+html.dc-edit:not(.plan-watch) #designPreviewEmpty{align-items:center;text-align:center;padding:var(--dds-s7,32px) 24px var(--dds-s7,32px) calc(16px + var(--dc-dock-w) + 24px)}
+html.dc-edit:not(.plan-watch) #designPreviewEmpty .ea{justify-content:center}
+html.dc-edit:not(.plan-watch) #designPreviewEmpty .textact{min-height:44px}
+@media (max-width:760px){html.dc-edit:not(.plan-watch) #designPreviewEmpty{padding:24px 16px calc(96px + env(safe-area-inset-bottom,0px))}}
 /* narrow screens: gallery to one column, panels become bottom sheets (no h-scroll) */
 @media(max-width:1180px){
   .tg-grid{grid-template-columns:1fr}

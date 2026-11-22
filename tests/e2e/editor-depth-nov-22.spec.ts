@@ -55,21 +55,32 @@ test.describe('318: a section moves on the page the moment it is moved, copied, 
     await run(page, 'dcDelete(1)');   // the heading, now second
     await expect(frame.locator('#your-heading')).toHaveCount(0);
     release();
-    await expect.poll(() => puts.length).toBeGreaterThanOrEqual(1);
+    // the move's save, then the delete's: the last one carries both
+    await expect.poll(() => (lastPut(puts) as { blocks?: unknown[] } | undefined)?.blocks?.length).toBe(3);
     const last = lastPut(puts) as { blocks?: Array<{ type: string }> };
     expect(last.blocks?.map((b) => b.type)).toEqual(['richtext', 'cta', 'features']);
   });
 
   test('a duplicate draws from the original at once; an added section shows as a named placeholder, then as drawn', async ({ page }) => {
     const { frame, puts } = await mountDepth(page);
+    // each save is held at the door while the page is checked, so no redraw can land first
+    let release = () => {};
+    const hold = async () => { const held = new Promise<void>((r) => { release = r; }); await page.unroute('**/functions/v1/presence/settings**', gate).catch(() => {}); gateHeld = held; await page.route('**/functions/v1/presence/settings**', gate); };
+    let gateHeld: Promise<void> = Promise.resolve();
+    const gate = async (route: Route) => { if (route.request().method() === 'PUT') await gateHeld; await route.fallback(); };
+    await hold();
     await run(page, 'dcDuplicate(0)');
     await expect(frame.locator('#main > section[data-dc-fresh]')).toHaveCount(1);
     expect(await frame.locator('#main > section').evaluateAll((ns) => ns.filter((n) => /Your heading/.test(n.textContent || '')).length)).toBe(2);
+    release();
     await expect.poll(() => puts.length).toBe(1);
+    await expect(frame.locator('#main > section[data-dc-fresh]')).toHaveCount(0);   // the save's redraw drew it for real
+    await hold();
     await run(page, 'dcAddAt("cta", 1)');
     await expect(frame.locator('.dc-ghost')).toContainText('Adding call-to-action banner…');
     const ghostAt = await frame.locator('#main > section').evaluateAll((ns) => ns.findIndex((n) => n.classList.contains('dc-ghost')));
     expect(ghostAt).toBe(2);   // after the hero and the first section
+    release();
     await expect.poll(() => puts.length).toBe(2);
     await expect(frame.locator('.dc-ghost')).toHaveCount(0);   // the save's redraw replaced it
   });
