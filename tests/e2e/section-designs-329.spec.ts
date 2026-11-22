@@ -248,9 +248,9 @@ test.describe('picking the bold designs in the editor (builder item 329)', () =>
     await expect(page.getByLabel('Most popular plan')).toHaveValue('3');
     // a change to the prices themselves keeps the plan raised (the section is rebuilt from its fields)
     await toTab(page, 'content');
-    const lines = page.locator('#settingsPanel textarea').first();
-    await lines.fill('Drop in | $25 | Any class\nUnlimited | $129 a month | Every class\nTen classes | $189 | Share with a friend');
-    await lines.blur();
+    const price = page.locator('#settingsPanel').getByLabel('Price, tier 3', { exact: true });   // each plan is its own card (item 315)
+    await price.fill('$189');
+    await price.blur();
     await expect.poll(() => saved(writes, 1)()?.tiers?.[2]?.price_text, { timeout: 8000 }).toBe('$189');
     expect(saved(writes, 1)()?.featured).toBe(3);
     expect(saved(writes, 1)()?.variant).toBe('plans');
@@ -316,7 +316,7 @@ test.describe('picking the bold designs in the editor (builder item 329)', () =>
 
   test('@touch the designs’ own choices and fields are full 44px targets', async ({ page }) => {
     test.skip(!test.info().project.use.hasTouch, 'touch screens only');
-    await mountEditor(page);
+    const writes = await mountEditor(page);
     await openSection(page, 3, 'layout');
     await tile(page, 'Photo in a colour frame').click();
     await expect(page.locator('#settingsPanel [data-group="photo-side"]')).toBeVisible();
@@ -326,6 +326,7 @@ test.describe('picking the bold designs in the editor (builder item 329)', () =>
     for (const label of ['Big number (optional)', 'What the number counts (optional)']) expect((await page.getByLabel(label).boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await openSection(page, 1, 'layout');
     await tile(page, 'Three plans').click();
+    await expect.poll(() => saved(writes, 1)()?.variant, { timeout: 8000 }).toBe('plans');   // the choice comes with the saved design
     await expect(page.getByLabel('Most popular plan')).toBeVisible();
     small = await smallTargets(page, '#settingsPanel [data-group="featured"]');
     expect(small, say(small)).toEqual([]);
