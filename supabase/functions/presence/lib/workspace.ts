@@ -103,6 +103,13 @@ export async function listBusinesses(jwt: string, principal: { kind: string; use
 // handlers both resolve the same role otherwise — this collapses that to one lookup
 // (which, on the client-portal path, is a full external /auth/v1/user round-trip).
 const roleCache = new WeakMap<object, Map<string, SiteRole>>();
+/** Builder item 401: a seat remembered by lib/who_asks.ts hands this request the role it
+ *  resolved, so resolveSiteRoleCached reads nothing. */
+export function seedSiteRole(principal: object, siteId: string, role: SiteRole): void {
+  let m = roleCache.get(principal);
+  if (!m) { m = new Map(); roleCache.set(principal, m); }
+  m.set(siteId, role);
+}
 export async function resolveSiteRoleCached(principal: { kind: string; member?: { site_id: string; role: string } | null }, jwt: string, siteId: string): Promise<SiteRole> {
   let m = roleCache.get(principal as object);
   if (!m) { m = new Map(); roleCache.set(principal as object, m); }

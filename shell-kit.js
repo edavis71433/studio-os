@@ -124,7 +124,11 @@
     });
   };
   // the page's own sign-in: ddsApi.use(sb), or ddsApi.use(sb, { signIn: '/portal.html' }) for a client's page
-  api.use = function (c, o) { if (c && c.auth) { CLIENT = c; watch(c); } if (o && o.signIn) SIGN_IN = o.signIn; return api; };
+  // Builder item 414: a studio page's own client becomes the shared one (window.__ddsSb), so
+  // shell.js reuses it instead of starting a second on the same storage key (the browser warned
+  // on every page, and two clients both refreshing one session is a race). A client's portal
+  // page (signIn given) keeps its client to itself: its session is on another key.
+  api.use = function (c, o) { if (c && c.auth) { CLIENT = c; watch(c); if (!(o && o.signIn) && !window.__ddsSb) window.__ddsSb = c; } if (o && o.signIn) SIGN_IN = o.signIn; return api; };
   // The sentence for a call that didn't work: what the server said, else the
   // sign-in or connection sentence, else the page's own words.
   api.say = function (r, fallback) {

@@ -7,7 +7,7 @@
 //                        15-minute tick); the single tasks are listed in the handler
 //   GET  /system/health  the secret in the x-system-secret header (never ?secret=)
 import { json } from '../../_shared/http.ts';
-import { svc, svcAll, svcCount } from '../lib/db.ts';
+import { svc, svcAll, svcCount, tickMemoBegin, tickMemoEnd } from '../lib/db.ts';
 import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuckPublishes, reapStaleRuns, runWindowExpiries } from '../ops/scheduler.ts';
 import { runUptimeHeartbeat } from '../monitor/heartbeat.ts';
 import { runGscSync } from '../ops/gsc_sync.ts';
@@ -317,6 +317,23 @@ function summarizeProgress(progress: Record<string, unknown>): Record<string, un
   return out;
 }
 
+// Builder item 402: the progress note used to be rewritten after every chore (41 writes a
+// run, 3,940 a day, on a table that grew to 33 MB). It is still the forensics for a run
+// that dies mid-chain (the wall clock, a crash): now it is written when a chore ends and
+// NOTE_EVERY_MS have passed since the last note, and at the end with the verdict. A dying
+// run's note is at most that many seconds behind.
+export const NOTE_EVERY_MS = 3_000;
+function progressNote(row: string | null, progress: Record<string, unknown>) {
+  let last = Date.now();
+  return {
+    maybe: async () => {
+      if (!row || Date.now() - last < NOTE_EVERY_MS) return;
+      last = Date.now();
+      await svc(`presence_scheduled_runs?id=eq.${row}`, { method: 'PATCH', body: JSON.stringify({ result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
+    },
+  };
+}
+
 export async function handleSystem(req: Request, route: string, method: string, cors: Record<string, string>): Promise<Response> {
   let body: any = null;
   if (method === 'POST') { try { body = await req.json(); } catch { body = null; } }
@@ -426,10 +443,14 @@ export async function handleSystem(req: Request, route: string, method: string, 
           method: 'POST', headers: { Prefer: 'return=representation' },
           body: JSON.stringify({ run_type: 'tick', site_id: null, status: 'running', started_at: new Date().toISOString(), attempts: 1 }),
         }).then((r) => r.json?.[0]?.id || null).catch(() => null);
-        for (const [name, fn] of GROUPS[task]) {
-          progress[name] = await fn();
-          if (row) await svc(`presence_scheduled_runs?id=eq.${row}`, { method: 'PATCH', body: JSON.stringify({ result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
-        }
+        const note = progressNote(row, progress);
+        tickMemoBegin();
+        try {
+          for (const [name, fn] of GROUPS[task]) {
+            progress[name] = await fn();
+            await note.maybe();
+          }
+        } finally { tickMemoEnd(); }
         const issues = sweepIssues(progress);
         if (row) await svc(`presence_scheduled_runs?id=eq.${row}`, { method: 'PATCH', body: JSON.stringify({ status: issues.length ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: issues.join('; ').slice(0, 500), result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
         return json({ data: summarizeProgress(progress) }, 200, cors);
@@ -445,12 +466,15 @@ export async function handleSystem(req: Request, route: string, method: string, 
         method: 'POST', headers: { Prefer: 'return=representation' },
         body: JSON.stringify({ run_type: 'tick', site_id: null, status: 'running', started_at: new Date().toISOString(), attempts: 1 }),
       }).then((r) => r.json?.[0]?.id || null).catch(() => null);
+      const note = progressNote(tickRow, progress);
       const step = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
         const res = await fn();
         progress[name] = res;
-        if (tickRow) await svc(`presence_scheduled_runs?id=eq.${tickRow}`, { method: 'PATCH', body: JSON.stringify({ result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
+        await note.maybe();
         return res;
       };
+      tickMemoBegin();   // builder item 402: the chores share their reads for this run
+      try {
 
       // The reaper runs FIRST: it converts the PREVIOUS tick's stuck 'running'
       // rows into countable failures. At the end of the chain it would itself
@@ -507,6 +531,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const issues = sweepIssues(progress);
       if (tickRow) await svc(`presence_scheduled_runs?id=eq.${tickRow}`, { method: 'PATCH', body: JSON.stringify({ status: issues.length ? 'failed' : 'done', finished_at: new Date().toISOString(), last_error: issues.join('; ').slice(0, 500), result: { progress: summarizeProgress(progress) } }) }).catch(() => {});
       return json({ data: { ...cycle, window_expiry: { enqueued: windowExpiry.enqueued, scanned: windowExpiry.scanned }, scheduled_publishes: { ran: scheduled.ran, failures: scheduled.failures }, reconcile, heartbeat, media_gc, snapshot_gc, lifecycle, deletion, reconcile_billing, digest, domains, emailAuth, apexDrift, leads, dealNudges, supportAging, renewals, invoiceNudges, docReminders, recurringInvoices, approvalReminders, reviewRequests, bookingReminders, bookingFollowups, retention } }, 200, cors);
+      } finally { tickMemoEnd(); }
     } catch (e) {
       return json({ error: 'run_failed', detail: String((e as Error)?.message || e) }, 502, cors);
     }
