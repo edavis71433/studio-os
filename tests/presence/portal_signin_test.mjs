@@ -26,11 +26,11 @@ ok('other changes leave the sign-in ways alone', same(P.applyStudioChange(P.norm
 
 // ── the wiring ──
 const routes = read('supabase/functions/presence/agency/routes.ts');
-ok('Settings reads and saves them with the portal’s other choices', /signin: ps\.signin, clients,/.test(routes) && /home_off: saved\.home_off, signin: saved\.signin \}/.test(routes));
+ok('Settings reads and saves them with the portal’s other choices', /signin: ps\.signin(, reply: ps\.reply)?(, look: ps\.look)?, clients,/.test(routes) && /home_off: saved\.home_off, signin: saved\.signin(, reply: saved\.reply)?(, look: saved\.look)? \}/.test(routes));
 const brand = read('supabase/functions/presence/routes/studio_brand.ts');
-ok('the sign-in page’s public answer carries them (and nothing hidden fails it)', /readPortalSettings\(siteId\)\)\.then\(\(s\) => s\.signin\)\.catch\(\(\) => \(\{ google: false, password: true \}\)\)/.test(brand) && /data: \{ \.\.\.brand, signin \}/.test(brand));
+ok('the sign-in page’s public answer carries them (and nothing hidden fails it)', /readPortalSettings\(siteId\)\)\.then\(\(s\) => s\.signin\)\.catch\(\(\) => \(\{ google: false, password: true \}\)\)/.test(brand) && /data: \{ \.\.\.brand, signin, contact \}/.test(brand));
 const ws = read('supabase/functions/presence/routes/workspace.ts');
-ok('the portal’s context carries them, for the brand the device keeps', /home_off: s\.home_off, signin: s\.signin \}/.test(ws));
+ok('the portal’s context carries them, for the brand the device keeps', /home_off: s\.home_off, signin: s\.signin(, reply: s\.reply)? \}/.test(ws));
 const client = read('client.html');
 ok('the portal keeps them with the studio’s name for the sign-in page', client.includes("const si=PORTAL.ctx.portal&&PORTAL.ctx.portal.signin;") && client.includes("si?{signin:si}:{}"));
 

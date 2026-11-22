@@ -225,6 +225,9 @@ const SENTINEL = '';
 export function htmlToPlainText(html: string | null | undefined): string {
   return String(html ?? '')
     .replace(new RegExp(SENTINEL, 'g'), '')                 // the separator is OURS — never the caller's
+    // builder item 344: a link keeps its address in the plain-text copy ("Read and reply: https://…"),
+    // so a text-only reader can still get there; a link whose words are its address stays as is
+    .replace(/<a\b[^>]*\bhref=(["'])(https?:\/\/[^"']+)\1[^>]*>([\s\S]*?)<\/a>/gi, (_m, _q, href, text) => { const t = String(text).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(); const u = String(href).replace(/&amp;/g, '&'); return !t || t === u ? u : `${t.replace(/\s*→\s*$/, '')}: ${u}`; })
     .replace(/<\s*br\s*\/?\s*>/gi, '\n')
     .replace(/<\s*\/\s*(td|th)\s*>/gi, SENTINEL)
     .replace(/<\s*\/\s*(p|div|tr|li|ul|ol|h[1-6]|blockquote|table|thead|tbody|section|article)\s*>/gi, '\n')

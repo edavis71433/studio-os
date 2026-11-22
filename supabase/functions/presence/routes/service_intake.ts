@@ -64,6 +64,8 @@ export async function handleProjectSurveys(req: Request, jwt: string, site: Site
     if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed' }, 502, cors);
     const s = rows(ins)[0];
     await projectEvent(site.id, projectId, 'survey_requested', principal, s.client_visible, { survey_id: s.id, title });
+    // builder item 336: a questionnaire posted to the client is emailed to them; reminders follow after 3 and 7 days
+    if (s.client_visible) await import('../lib/client_reminders.ts').then((m) => m.emailClientAsk(site.id, projectId, 'questionnaire', title)).catch(() => false);
     return json({ data: s }, 201, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
@@ -260,8 +262,11 @@ async function emailStudioSupportReply(site: SiteRow, reqRow: any, body: string,
     const requester = String(reqRow?.requester || '').trim();
     const prev = rows(await svc(`presence_support_messages?request_id=eq.${reqRow.id}&site_id=eq.${site.id}&deleted_at=is.null&id=neq.${insId}&author_kind=neq.client&select=created_at&order=created_at.desc&limit=1`))[0];
     if (prev && (Date.now() - Date.parse(String(prev.created_at))) < 15 * 60 * 1000) return;   // throttle — one email per request per quarter-hour
-    const safe = body.slice(0, 500).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
-    const replyHtml = `<p>You have a reply on your support request:</p><blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid #ccc">${safe}</blockquote><p>Just reply to this email to continue the conversation.</p>`;
+    const REPLY_CUT = 500;
+    const cut = body.length > REPLY_CUT;   // builder item 344: a long reply is cut, and the email says so
+    const safe = body.slice(0, REPLY_CUT).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
+    const { emailPreheader } = await import('../lib/email_brand.ts');
+    const replyHtml = `${emailPreheader(body)}<p>You have a reply on your request:</p><blockquote style="margin:8px 0;padding:8px 14px;border-left:3px solid #ccc">${safe}${cut ? '…' : ''}</blockquote>${cut ? '<p style="font-size:13px;color:#6b6478">That is the first part. Read the rest in your client portal.</p>' : ''}<p>Just reply to this email to continue the conversation.</p>`;
     // sales item 92: "A reply from <the studio>", by its name, on both branches
     const { loadEmailBrand, EMAIL_BRAND_DEFAULT } = await import('../lib/email_brand.ts');
     const brand = await loadEmailBrand(site.id);
@@ -275,7 +280,7 @@ async function emailStudioSupportReply(site: SiteRow, reqRow: any, body: string,
     const { clientIdForRequester, emailCustomerByClient } = await import('../lib/service_bridge.ts');
     const clientId = (reqRow?.client_id && UUID_RE.test(String(reqRow.client_id))) ? String(reqRow.client_id)
       : (UUID_RE.test(requester) ? await clientIdForRequester(site.id, { userId: requester }) : null);
-    const sent = clientId ? await emailCustomerByClient(site.id, clientId, subject, replyHtml) : false;
+    const sent = clientId ? await emailCustomerByClient(site.id, clientId, subject, replyHtml, { support: String(reqRow.id) }) : false;
     if (!sent) console.warn(`[support-reply] request ${reqRow?.id} on site ${site.id}: requester ${requester ? '(uid)' : '(empty)'} resolved to no reachable email — the reply exists only in-app (non-fatal)`);
   } catch (e) {
     console.warn(`[support-reply] email for request ${reqRow?.id} on site ${site?.id} failed: ${String((e as Error)?.message || e)} (non-fatal)`);

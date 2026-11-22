@@ -38,7 +38,7 @@ const EXPECTED_PLAIN = [
   'Subject: Can we swap the hero photo?',
   '',
   'The one on the homepage is from last summer.',
-  'Open it in your workspace →',
+  'Open it in your workspace: https://app.example.com/crm.html?project=p1&tab=messages',   // builder item 344: the link keeps its address in the plain-text copy
 ].join('\n');
 
 ok('B2: htmlToPlainText is exported (the derivation is a named, testable unit)', typeof account.htmlToPlainText === 'function');

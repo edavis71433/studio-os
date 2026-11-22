@@ -254,11 +254,16 @@ export async function healUnstampedSupport(agencySiteId: string): Promise<void> 
  *  Best-effort: resolves project → bridge → customer email; never throws. */
 export async function emailBridgedCustomer(agencySiteId: string, projectId: string, subject: string, bodyHtml: string, open?: { approval?: string }): Promise<boolean> {
   try {
-    const link = rows(await svc(`presence_service_links?project_id=eq.${projectId}&agency_site_id=eq.${agencySiteId}&status=eq.active&select=customer_client_id&limit=1`))[0];
+    const link = rows(await svc(`presence_service_links?project_id=eq.${projectId}&agency_site_id=eq.${agencySiteId}&status=eq.active&select=customer_client_id,customer_site_id&limit=1`))[0];
     if (!link?.customer_client_id) return false;
     const client = rows(await svc(`clients?id=eq.${link.customer_client_id}&select=email&limit=1`))[0];
     const email = client?.email ? String(client.email) : '';
     if (!email) return false;
+    // builder item 339: everyone on the client's account hears (the co-owners they added), not one address;
+    // item 340: and a tap on the phone that said yes to alerts (best-effort, after the email)
+    const others = await accountPeople(String(link.customer_site_id || ''), email);
+    const pushBody = String(bodyHtml).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140);
+    if (link.customer_site_id) pushAccount(String(link.customer_site_id), subject, pushBody, `/client.html?project=${encodeURIComponent(projectId)}`);
     const { sendEmail } = await import('../commerce/account.ts');
     const { loadEmailBrand } = await import('./email_brand.ts');
     const brand = await loadEmailBrand(agencySiteId);
@@ -270,15 +275,36 @@ export async function emailBridgedCustomer(agencySiteId: string, projectId: stri
     const btn = `<a href="${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html?project=${encodeURIComponent(projectId)}${approval ? `&approval=${approval}` : ''}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${approval ? 'Take a look →' : 'Open your project →'}</a>`;
     // critical: this is the "your project needs you" nudge — an opted-out client's
     // approval/message must still reach them (bounces still suppress).
-    return await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId: agencySiteId });
+    const sent = await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId: agencySiteId });
+    for (const o of others) sendEmail(o, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId: agencySiteId }).catch(() => false);
+    return sent;
   } catch { return false; }
+}
+
+/** Builder item 339: the other people on a client's account (active Co-owner seats on their own
+ *  site, lib/workspace.ts), by email, without the owner's own address. Never throws. */
+export async function accountPeople(customerSiteId: string, ownerEmail: string): Promise<string[]> {
+  try {
+    if (!/^[0-9a-f-]{36}$/i.test(customerSiteId)) return [];
+    const q = await svc(`presence_site_members?site_id=eq.${customerSiteId}&status=eq.active&role=eq.business_owner&select=email&limit=20`);
+    const mine = String(ownerEmail || '').trim().toLowerCase();
+    return Array.from(new Set(rows(q).map((m) => String(m.email || '').trim().toLowerCase()).filter((e) => e && e !== mine && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))));
+  } catch { return []; }
+}
+/** Builder item 340: a tap on the phones that said yes (the subscriptions a client's own site
+ *  holds, routes/push.ts). Best-effort, never awaited by a caller. */
+export function pushAccount(customerSiteId: string, title: string, body: string, path: string): void {
+  try {
+    const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+    import('../routes/push.ts').then((m) => m.pushToSite(customerSiteId, { title: String(title).slice(0, 80), body, url: `${base}${path}`, tag: 'portal:needs-you' })).catch(() => {});
+  } catch { /* best-effort */ }
 }
 
 /** Email a customer DIRECTLY by their clients.id — the transactional channel for
  *  a support request that has no project to resolve a recipient through (the
  *  auto-acknowledgement of a new ticket). Same agency brand + "open your project"
  *  button as emailBridgedCustomer. Best-effort: never throws. */
-export async function emailCustomerByClient(agencySiteId: string, customerClientId: string | null, subject: string, bodyHtml: string): Promise<boolean> {
+export async function emailCustomerByClient(agencySiteId: string, customerClientId: string | null, subject: string, bodyHtml: string, open?: { support?: string }): Promise<boolean> {
   try {
     if (!customerClientId) return false;
     const client = rows(await svc(`clients?id=eq.${customerClientId}&select=email&limit=1`))[0];
@@ -287,8 +313,19 @@ export async function emailCustomerByClient(agencySiteId: string, customerClient
     const { sendEmail } = await import('../commerce/account.ts');
     const { loadEmailBrand } = await import('./email_brand.ts');
     const brand = await loadEmailBrand(agencySiteId);
-    const btn = `<a href="${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open your project →</a>`;
-    return await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId: agencySiteId });
+    // items 339 and 340: the others on the account, and a tap on their phone
+    const site = rows(await svc(`presence_service_links?customer_client_id=eq.${customerClientId}&agency_site_id=eq.${agencySiteId}&status=eq.active&customer_site_id=not.is.null&select=customer_site_id&limit=1`).catch(() => ({ json: [] })))[0];
+    const customerSite = String(site?.customer_site_id || '');
+    const others = await accountPeople(customerSite, email);
+    // builder item 344: a reply opens THAT conversation (client.html?support=<id>) and the
+    // button says what it does; without one it is still the portal's door
+    const support = open?.support && /^[0-9a-f-]{36}$/i.test(open.support) ? open.support : '';
+    const href = `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html${support ? `?support=${encodeURIComponent(support)}` : ''}`;
+    const btn = `<a href="${href}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${support ? 'Read and reply →' : 'Open your client portal →'}</a>`;
+    if (customerSite) pushAccount(customerSite, subject, String(bodyHtml).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140), support ? `/client.html?support=${encodeURIComponent(support)}` : '/client.html');
+    const sent = await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId: agencySiteId });
+    for (const o of others) sendEmail(o, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId: agencySiteId }).catch(() => false);
+    return sent;
   } catch { return false; }
 }
 

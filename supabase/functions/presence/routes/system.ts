@@ -36,6 +36,7 @@ import { timingSafeEqual } from '../../_shared/hmac.ts';
 import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
 import { oauthConfigured } from '../connected/auth.ts';
 import { heldKeyKind } from '../commerce/stripe.ts';
+import { runClientReminders } from '../lib/client_reminders.ts';   // builder item 336: to-dos, questionnaires and undated approvals still open after 3 and 7 days
 
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
 
@@ -447,6 +448,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['doc_reminders', () => runSalesDocReminders(20)],
             ['recurring_invoices', () => runRecurringInvoices(20)],   // item 47: send the recurring invoices that are due (and the heads-up three days before)
             ['approval_reminders', () => runApprovalReminders(50)],   // audit change 8: chase a dated client approval (day before + daily overdue), once a day
+            ['client_reminders', () => runClientReminders(50)],   // builder item 336: a to-do, a questionnaire or an undated approval still open after 3 and 7 days
             ['review_requests', () => runReviewRequests(20)],   // list item 29: ask a finished project's client for a review, once, behind the switch
             ['booking_reminders', () => runBookingReminders(50)],   // #164: calm customer reminders (transactional, send-once)
             ['booking_followups', () => runBookingFollowups(50)],   // #164: owner no-show/completion nudge (bell only)
@@ -548,6 +550,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const docReminders = await step('doc_reminders', () => runSalesDocReminders(20));  // SALES: unsigned doc reminders
       const recurringInvoices = await step('recurring_invoices', () => runRecurringInvoices(20));  // item 47: recurring invoices due today (and the heads-up three days before)
       const approvalReminders = await step('approval_reminders', () => runApprovalReminders(50)); // audit change 8: chase a dated client approval (day before + daily overdue), once a day
+      const clientReminders = await step('client_reminders', () => runClientReminders(50)); // builder item 336: a to-do, a questionnaire or an undated approval still open after 3 and 7 days
       const reviewRequests = await step('review_requests', () => runReviewRequests(20)); // list item 29: ask a finished project's client for a review, once, behind the switch
       const bookingReminders = await step('booking_reminders', () => runBookingReminders(50)); // #164: customer appointment reminders (transactional, send-once)
       const bookingFollowups = await step('booking_followups', () => runBookingFollowups(50)); // #164: owner no-show/completion nudge (bell only, never auto-mark)
