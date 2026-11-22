@@ -887,8 +887,21 @@ export async function handleClientSupportMessage(req: Request, site: SiteRow, pr
 // section (the card degrades), never a 500; an unpublished site returns
 // published:false and the portal hides the card entirely. Zero schema change.
 export async function handleClientWebsiteStats(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
-  const published = publishedOnce(site);   // item 261: the one rule
+  // Builder item 258 (Nov 22 review): a site the studio marked "Hosted elsewhere" (edition
+  // monitor, agency/sites.ts siteState) is live on its own host, not "on its way". The portal
+  // told four of six clients their site wasn't live yet. Its visits aren't counted here (the
+  // counter is on sites published from here), so month stays null and elsewhere:true says why;
+  // Google's search numbers come along when they are connected, as for any site.
+  const elsewhere = site.edition === 'monitor';
+  const published = elsewhere || publishedOnce(site);   // item 261: the one rule; 258: elsewhere counts too
   if (!published) return json({ data: { published: false, month: null, search: null } }, 200, cors);
+  if (elsewhere) {
+    const gscE = await (async () => { try { return await readGsc(site.client_id); } catch { return null; } })();
+    let searchE: unknown = null;
+    if (!gscE || !gscE.ok) searchE = { unavailable: true };
+    else if (gscE.hasData) searchE = { clicks: gscE.clicks, impressions: gscE.impressions, period: gscE.period, top_terms: [] };
+    return json({ data: { published: true, elsewhere: true, month: null, search: searchE, site: { url: siteOrigin(site) || null, last_published_at: null } } }, 200, cors);
+  }
   const statNowIso = nowIso();
   const nowMs = Date.parse(statNowIso);
   const { startMs } = dashRange('this_month', nowMs);

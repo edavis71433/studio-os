@@ -656,7 +656,7 @@
        the top of their Help. Each saves on its own (GET /agency/portal/pages, PUT and DELETE
        /agency/portal/pages/:id and /agency/portal/links/:id). Drawn in Figma first. -->
   <section class="card" id="portalPages" aria-labelledby="portalPagesHead" hidden>
-    <div class="card-h"><h2 id="portalPagesHead" tabindex="-1">Pages for your clients</h2><span class="hint">Each page shows at the top of your clients’ Help.</span></div>
+    <div class="card-h"><h2 id="portalPagesHead" tabindex="-1">Pages for your clients</h2><span class="hint">Each page shows at the top of your clients’ Help; one can sit on their Home too. Quick links go in their menu.</span></div>
     <div id="portalPageRows"></div>
     <div class="row pgacts"><button type="button" class="btn sm primary" id="portalNewPage">New page</button></div>
     <div class="plabel">Quick links · up to 6</div>
@@ -681,6 +681,8 @@
         <label class="chan"><input type="radio" name="pgWho" value="some"> Chosen clients</label>
         <div id="pgWhoList" hidden></div>
       </fieldset>
+      <!-- builder item 280 (Nov 22 review): one page can sit on the client's Home too, not three taps deep under Help -->
+      <label class="chan" style="margin-top:10px"><input type="checkbox" id="pgHome"> Show it on their Home too <span class="how" style="display:inline">(one page at a time; this takes the place from the last one)</span></label>
       <p class="how pgerr" id="pgErr" role="alert"></p>
       <div class="row pgacts pgfoot"><button type="submit" class="btn sm primary" id="pgSave">Save</button><button type="button" class="btn sm" id="pgSee">See it as a client</button><button type="button" class="btn sm" id="pgCancel">Cancel</button><button type="button" class="btn sm danger" id="pgDelete" hidden>Delete page</button></div>
     </form>
@@ -2365,7 +2367,7 @@ function paintSignIn() {
   $('portalSignInRows').innerHTML =
     row('code', 'Emailed code', 'Always on, so nobody is locked out.', true, true, 'Always on') +
     row('google', 'Google', gReady ? 'Shows “Continue with Google” on your clients’ sign-in page.' : 'Not available yet: Google sign-in needs a one-time set-up for Studio OS first.', si.google && gReady, locked || !gReady || PORTAL_BUSY.has('signin:google')) +
-    row('password', 'Password', 'Lets a client set a password and use it instead.', si.password, locked || PORTAL_BUSY.has('signin:password'));
+    row('password', 'Password', 'Shows “Use a password instead” on your clients’ sign-in page, and Change password in their Help. Off, both are hidden; a password someone already set still works.', si.password, locked || PORTAL_BUSY.has('signin:password'));   // item 281: the switch hides the option, it doesn’t refuse a password
   $('portalSignInRows').querySelectorAll('[data-signin="google"] .sw, [data-signin="password"] .sw').forEach((b) => b.addEventListener('click', () => {
     if (b.getAttribute('aria-disabled') === 'true') return;
     saveSignIn(b.id.replace('sw-si-', ''), b.getAttribute('aria-checked') !== 'true');
@@ -2413,7 +2415,7 @@ const placeWords = (to) => to === 'book' ? 'Your booking page' : to === 'message
 function paintPortalPages() {
   const locked = pagesLocked(), lim = PAGESET.limits || {};
   const day = (iso) => ddsDate.short(iso);
-  $('portalPageRows').innerHTML = (PAGESET.pages || []).map((p) => `<div class="swrow pgrow" data-page-row="${esc(p.id)}"><div class="t"><b>${esc(p.title)}</b><div class="how">${esc(whoWords(p))}${p.updated_at ? ' · changed ' + esc(day(p.updated_at)) : ''}</div></div><button type="button" class="btn sm" data-edit-page="${esc(p.id)}" aria-label="${locked ? 'Open' : 'Edit'} ${esc(p.title)}">${locked ? 'Open' : 'Edit'}</button></div>`).join('')
+  $('portalPageRows').innerHTML = (PAGESET.pages || []).map((p) => `<div class="swrow pgrow" data-page-row="${esc(p.id)}"><div class="t"><b>${esc(p.title)}</b><div class="how">${esc(whoWords(p))}${p.home ? ' · on their Home' : ''}${p.updated_at ? ' · changed ' + esc(day(p.updated_at)) : ''}</div></div><button type="button" class="btn sm" data-edit-page="${esc(p.id)}" aria-label="${locked ? 'Open' : 'Edit'} ${esc(p.title)}">${locked ? 'Open' : 'Edit'}</button></div>`).join('')
     || '<p class="how">No pages yet. A welcome guide is a good first one.</p>';
   $('portalLinkRows').innerHTML = (PAGESET.links || []).map((l) => `<div class="swrow pgrow" data-link-row="${esc(l.id)}"><div class="t"><b>${esc(l.label)}</b><div class="how">${esc(placeWords(l.to))}</div></div>${locked ? '' : `<button type="button" class="btn sm" data-edit-link="${esc(l.id)}" aria-label="Edit ${esc(l.label)}">Edit</button>`}</div>`).join('')
     || '<p class="how">No quick links yet.</p>';
@@ -2450,6 +2452,7 @@ function openPageEditor(id) {
   $('pgWhoList').innerHTML = (PAGESET.clients || []).map((c) => `<label class="chan"><input type="checkbox" value="${esc(c.site_id)}"${some && p.who.includes(c.site_id) ? ' checked' : ''}> ${esc(c.name)}</label>`).join('') || '<p class="how">No clients yet.</p>';
   $('pgWhoList').hidden = !some;
   paintPgItems();
+  $('pgHome').checked = !!(p && p.home);   // item 280
   $('pgAdd').hidden = true; $('pgFiles').hidden = true; $('pgErr').textContent = '';
   $('pgDelete').hidden = !p || locked; $('pgDelete').textContent = 'Delete page';
   $('pageForm').querySelectorAll('input, textarea, [data-add]').forEach((el) => { el.disabled = locked; });
@@ -2502,7 +2505,7 @@ async function savePage() {
   const who = some ? [...$('pgWhoList').querySelectorAll('input:checked')].map((c) => c.value) : 'all';
   if (some && !who.length) { $('pgErr').textContent = 'Choose at least one client, or show it to all clients.'; return false; }
   const btn = $('pgSave'); btn.disabled = true;
-  const r = await api('/agency/portal/pages/' + encodeURIComponent(PG_EDIT.id), 'PUT', { title, words: $('pgWords').value, items: PG_EDIT.items, who });
+  const r = await api('/agency/portal/pages/' + encodeURIComponent(PG_EDIT.id), 'PUT', { title, words: $('pgWords').value, items: PG_EDIT.items, who, home: $('pgHome').checked });   // item 280
   btn.disabled = false;
   if (!r.ok || !r.body || !r.body.data) { $('pgErr').textContent = nice(r.body, 'That didn’t save. Try again in a moment.'); return false; }
   PAGESET.pages = r.body.data.pages; PAGESET.links = r.body.data.links; PG_EDIT.saved = true;

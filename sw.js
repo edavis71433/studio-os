@@ -1,22 +1,22 @@
-const CACHE_NAME = 'dds-v18'; // bumped: /report-card forwards to the Site Review now (list item 139), so its old copy rotates out
+const CACHE_NAME = 'dds-v19'; // bumped (builder item 264): the install list lost the pages that forward to the marketing site
+// Builder item 264 (Nov 22 review): the install step stores these pages, and the whole
+// install fails if any one can't be fetched. /about, /services, /work and /contact now
+// forward to the Squarespace site (_redirects), whose answer a worker may not read, so
+// in a new browser the worker never installed: no "install the app", no phone alerts.
+// Only the app's own "not found" page is stored now. tests/presence/sw_precache_test.mjs
+// reads this list and refuses any entry that forwards off this site.
 const PRECACHE = [
-  '/about',
-  '/services',
-  '/work',
-  '/contact',
   '/404.html'
 ];
 
-// The marketing pages, and nothing else (list item 64). The worker used to cache every
-// page that wasn't on a hand-written list of app pages, so Settings, Customers and Send an
-// update were served stale for one load after each deploy, and so would every new app page
-// have been. Now a page is handled only if it is listed here: fresh from the network, the
-// cached copy only when there is no connection. An unlisted page, every app page
-// included, goes straight to the network. Paths _redirects sends off this site stay off.
-const NETWORK_FIRST = ['/', '/about', '/services', '/work', '/contact', '/how-we-work', '/industries', '/web-design',
-  '/seo-strategy', '/monthly-retainer', '/privacy', '/terms', '/accessibility', '/ai-disclaimer',
-  '/burbank-web-design', '/glendale-web-design', '/pasadena-web-design', '/health-wellness-web-design',
-  '/home-services-web-design', '/restaurant-web-design', '/retail-web-design', '/salon-web-design'];
+// The marketing pages still served here, and nothing else (list item 64). The worker used
+// to cache every page that wasn't on a hand-written list of app pages, so Settings,
+// Customers and Send an update were served stale for one load after each deploy, and so
+// would every new app page have been. Now a page is handled only if it is listed here:
+// fresh from the network, the cached copy only when there is no connection. An unlisted
+// page, every app page included, goes straight to the network. Paths _redirects sends off
+// this site stay off this list (item 264: a forwarded page can't be read by the worker).
+const NETWORK_FIRST = ['/', '/privacy', '/terms', '/accessibility', '/ai-disclaimer'];
 // The Free Tools report page carries private data and versioned scripts: never from this cache.
 const NEVER_CACHE = /^\/(report\/|site-review|ai-visibility)/;
 // Pictures, icons and fonts keep their meaning across a deploy: served from the cache and

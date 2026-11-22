@@ -11,8 +11,8 @@ const ok = (n, p, note = '') => { results.push(p); console.log(`${p ? 'PASS' : '
 const DIR = 'supabase/templates/auth/';
 const T = {
   magic_link: { needs: ['{{ .ConfirmationURL }}', '{{ .Token }}'], says: 'Your sign-in link' },
-  reset_password: { needs: ['{{ .Token }}', 'davisdigitalstudio.com/set-password'], says: 'Reset your password' },
-  invite: { needs: ['{{ .Token }}', 'davisdigitalstudio.com/set-password'], says: 'Set your password' },
+  reset_password: { needs: ['{{ .Token }}', 'app.davisdigitalstudio.com/set-password'], says: 'Reset your password' },
+  invite: { needs: ['{{ .Token }}', 'app.davisdigitalstudio.com/set-password'], says: 'Set your password' },
   confirm_signup: { needs: ['{{ .ConfirmationURL }}'], says: 'Confirm your email address' },
   change_email: { needs: ['{{ .ConfirmationURL }}', '{{ .NewEmail }}'], says: 'Confirm your new email address' },
   reauthentication: { needs: ['{{ .Token }}'], says: 'Your verification code' },

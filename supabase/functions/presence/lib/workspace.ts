@@ -164,12 +164,17 @@ export async function mintSignInLink(email: string, next: string, origin?: strin
 export async function sendInviteLink(email: string, opts: { subject: string; intro: string; brand: EmailBrand; next: string; role?: { title: string; lines: string[] } }): Promise<boolean> {
   const link = await mintSignInLink(email, opts.next);
   if (!link) return false;
+  // Builder item 274 (Nov 22 review): the button is a one-use link whose life is a Supabase
+  // setting (Authentication › Sign In / Providers › Email › "Email OTP expiration": an hour
+  // unless changed, a day at most), while the studio is told an invite lasts 7 days. The
+  // words say so, and name the door that works any time: the sign-in page emails a code.
+  const door = `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}${opts.next}`;
   const { sendEmail } = await import('../commerce/account.ts');
   // builder item 220: the role in one sentence, in a box under the welcome (the words are ours, not the inviter's)
   const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
   const roleBox = opts.role ? `<div style="background:#efeafc;border-radius:12px;padding:12px 16px;margin:14px 0 4px"><p style="margin:0 0 4px;font-weight:600;color:#40297f">${esc(opts.role.title)}</p>${opts.role.lines.filter(Boolean).map((l, i) => `<p style="margin:${i ? '4px' : '0'} 0 0;color:${i ? '#55526a' : '#40297f'}">${esc(l)}</p>`).join('')}</div>` : '';
   const sent = await sendEmail(email, opts.subject,
-    `<p>${opts.intro}</p>${roleBox}<p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${opts.brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type — this link signs you straight in. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`, opts.brand, { critical: true }).catch(() => false);   // an invited member’s ONLY door in = transactional
+    `<p>${opts.intro}</p>${roleBox}<p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${opts.brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type — this button signs you straight in. It works once, for a short while. After that, go to <a href="${door}" style="color:#938ba3">${door.replace(/^https:\/\//, '')}</a>, enter this email address, and we’ll email you a code. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`, opts.brand, { critical: true }).catch(() => false);   // an invited member’s ONLY door in = transactional
   return sent !== false;
 }
 

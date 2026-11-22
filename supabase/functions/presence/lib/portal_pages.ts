@@ -7,7 +7,8 @@
 // the client's Help. A page shown to chosen clients is simply not there for anyone else,
 // and the server never sends it to them. Kept once per studio, on its own site, as
 // reserved JSON (no migration):
-//   { pages: [{ id, title, words, items: [{ kind, label, url? , media_id? }], who: 'all' | siteId[], updated_at }],
+//   { pages: [{ id, title, words, items: [{ kind, label, url? , media_id? }], who: 'all' | siteId[], home, updated_at }],
+//   home (builder item 280, Nov 22): one page at a time is also shown on the client's Home.
 //     links: [{ id, label, to }] }        to: an https address, or 'book' | 'messages' | 'documents'
 import { readReservedJson, RESERVED_NAMES } from './reserved_store.ts';
 
@@ -21,7 +22,7 @@ export const PLACES = ['book', 'messages', 'documents'] as const;
 export type Place = typeof PLACES[number];
 export type ItemKind = 'link' | 'video' | 'file';
 export interface PageItem { kind: ItemKind; label: string; url?: string; media_id?: string }
-export interface PortalPage { id: string; title: string; words: string; items: PageItem[]; who: 'all' | string[]; updated_at: string | null }
+export interface PortalPage { id: string; title: string; words: string; items: PageItem[]; who: 'all' | string[]; home: boolean; updated_at: string | null }
 export interface PortalLink { id: string; label: string; to: string }
 export interface PortalPages { pages: PortalPage[]; links: PortalLink[] }
 
@@ -60,7 +61,7 @@ export function cleanPage(v: unknown, id: string, nowIso: string | null = new Da
   const title = line(r.title, TITLE_MAX);
   if (!isId(id) || !title) return null;
   const items = (Array.isArray(r.items) ? r.items : []).map(cleanItem).filter((x): x is PageItem => !!x).slice(0, MAX_ITEMS);
-  return { id: id.toLowerCase(), title, words: cleanWords(r.words), items, who: cleanWho(r.who), updated_at: nowIso };
+  return { id: id.toLowerCase(), title, words: cleanWords(r.words), items, who: cleanWho(r.who), home: r.home === true, updated_at: nowIso };
 }
 /** One quick link as kept, or null. Pure. */
 export function cleanLink(v: unknown, id: string): PortalLink | null {
@@ -81,11 +82,13 @@ export function normalizePages(raw: unknown): PortalPages {
     links: links.filter((l) => !seen.has(l.id) && seen.add(l.id)).slice(0, MAX_LINKS),
   };
 }
-/** A page saved: replaced where it was, else added at the end; refused (null) past twenty. Pure. */
+/** A page saved: replaced where it was, else added at the end; refused (null) past twenty.
+ *  Item 280: a page pinned to Home takes the pin from whichever page had it. Pure. */
 export function putPage(cur: PortalPages, page: PortalPage): PortalPages | null {
   const i = cur.pages.findIndex((p) => p.id === page.id);
   if (i < 0 && cur.pages.length >= MAX_PAGES) return null;
-  const pages = i < 0 ? [...cur.pages, page] : cur.pages.map((p, k) => (k === i ? page : p));
+  const others = cur.pages.map((p) => (page.home && p.home ? { ...p, home: false } : p));
+  const pages = i < 0 ? [...others, page] : others.map((p, k) => (k === i ? page : p));
   return { ...cur, pages };
 }
 export function dropPage(cur: PortalPages, id: string): PortalPages { return { ...cur, pages: cur.pages.filter((p) => p.id !== String(id).toLowerCase()) }; }

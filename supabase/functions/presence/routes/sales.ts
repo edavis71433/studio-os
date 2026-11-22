@@ -3368,7 +3368,8 @@ export async function sendCustomerInvite(siteId: string, email: string, _isNewLo
   const link = magic ? '' : await generateSetPasswordLink(email, `${base}/set-password.html?next=/client.html`);
   const btnStyle = `display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none`;
   const cta = magic
-    ? `<p class="cta"><a href="${magic}" style="${btnStyle}">Sign in to your client portal →</a></p><p style="font-size:13px;color:#6b6478">No password to set — this link signs you straight in. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`
+    // builder item 274 (Nov 22 review): the button works once, for a short while (a Supabase setting, see lib/workspace.ts sendInviteLink); the portal door below works any time
+    ? `<p class="cta"><a href="${magic}" style="${btnStyle}">Sign in to your client portal →</a></p><p style="font-size:13px;color:#6b6478">No password to set — this button signs you straight in. It works once, for a short while. After that, open <a href="${base}/portal.html?studio=${siteId}" style="color:#6b6478">your portal’s sign-in page</a>, enter this email address, and we’ll email you a code. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`
     : link
     ? `<p class="cta"><a href="${link}" style="${btnStyle}">Create your password &amp; sign in →</a></p>`
     : `<p class="cta"><a href="${base}/portal.html?studio=${siteId}" style="${btnStyle}">Sign in at your portal →</a></p><p style="font-size:13px;color:#6b6478">No password needed — we’ll email you a one-time code.</p>`;
