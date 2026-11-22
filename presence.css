@@ -523,6 +523,9 @@ html.dc-edit:not(.plan-watch) .dp-stage.dev-tablet .dp-frame,html.dc-edit:not(.p
 /* ── the floating bar: one white pill at the top centre ── */
 html.dc-edit:not(.plan-watch) .dc-bar{position:absolute;top:var(--dc-bar-top);left:0;right:0;z-index:90;width:fit-content;max-width:calc(100vw - 32px);height:var(--dc-bar-h);margin:0 auto;padding:8px;display:flex;flex-wrap:nowrap;align-items:center;gap:var(--dds-s2,8px);box-sizing:border-box;background:var(--sheet);border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:999px;box-shadow:var(--dds-shadow-pop)}
 .dc-bar>*{flex:none}
+/* builder item 319: on a wide screen the bar keeps one width, so Exit and Publish stay put while the
+   status words in the middle change; the saved line takes up the slack */
+@media (min-width:1100px){html.dc-edit:not(.plan-watch) .dc-bar{width:min(calc(100vw - 32px),1120px)}html.dc-edit:not(.plan-watch) .dc-bar #dcWhisper{flex:1 1 auto;min-width:0;text-align:center}}
 .dc-sep{width:1px;height:22px;background:var(--hair)}
 .dc-bar .dc-actbtn{height:36px;padding:0 14px;border:1px solid transparent;border-radius:999px;background:transparent;color:var(--ink);font-size:13px;font-weight:600;gap:6px}
 .dc-bar .dc-actbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -680,6 +683,12 @@ html.dc-edit:not(.plan-watch) .dc-twbar[hidden]{display:none}
 #settingsPanel[data-mode="styles"] #blocksCard,#settingsPanel[data-mode="styles"] #formsCard{display:none}
 /* items 41, 50 and 123: the header's and footer's own card */
 #settingsPanel:not([data-mode="header"]):not([data-mode="footer"]) #hfCard{display:none}
+/* builder item 314: a tab's form (Business details, Questions, Reviews, Updates) hosted beside the page */
+#settingsPanel[data-mode="core"] .dc-panel-scroll>:not(.dc-hosted){display:none !important}
+#settingsPanel .view.dc-hosted{display:block !important;padding:4px 18px 24px}
+#settingsPanel .view.dc-hosted h1.doc{font-size:18px;margin:8px 0 4px}
+#settingsPanel .view.dc-hosted .docsub{font-size:13px;margin-bottom:12px}
+#settingsPanel .view.dc-hosted .biz-grid{grid-template-columns:1fr;max-width:none}
 #settingsPanel[data-mode="header"] .dc-panel-scroll>:not(#hfCard),#settingsPanel[data-mode="footer"] .dc-panel-scroll>:not(#hfCard){display:none !important}
 #hfCard{display:flex;flex-direction:column;gap:14px;padding:4px 20px 20px}
 #hfCard .ins-lbl{margin-top:4px}

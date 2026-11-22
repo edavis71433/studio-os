@@ -652,6 +652,8 @@ function go(view, early) {
   // builder item 220: a Designer never opens a business tab, even from its address or a link
   if (isBusinessTab(view) && window.ddsLacks && window.ddsLacks("business")) view = "today";
   const stays = $("view-" + view) && $("view-" + view).classList.contains("on");
+  // builder item 319: the publish card never stays over the next page opened from the sidebar
+  if (!stays && $("ritualWrap") && $("ritualWrap").classList.contains("on") && typeof closeRitual === "function") closeRitual();
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("on"));
   const target = $("view-" + view); if (!target) return;
   target.classList.add("on");
@@ -3887,12 +3889,13 @@ function pcChip(pg, ctx) {
 function pcRow(entry, ctx) {
   const pg = entry.pg, it = entry.it, folder = !pg && !!(it && it.folder);
   const ref = { href: it ? it.href : pg.path, parent: entry.parent ? entry.parent.href : null };
-  const canvas = !!pg && pg.view === "design", slug = canvas ? (pg.slug || "") : null, on = canvas && slug === DC_PAGE;
+  // item 314: every page opens on the canvas; a built-in one goes by "~" + its key (dcBuiltinPage)
+  const mine = !!pg && pg.view === "design", canvas = !!pg, slug = mine ? (pg.slug || "") : canvas ? "~" + pg.key : null, on = canvas && slug === DC_PAGE;
   const name = canvas ? pg.title : it ? it.label : pg.title;   // a page on the canvas goes by its own name, as the old tabs did
   const row = el("div", "pc-row" + (canvas ? " page-pill" : "") + (on ? " on" : "") + (entry.parent ? " child" : ""));
   row.setAttribute("role", "listitem"); row.dataset.href = ref.href; row.dataset.page = pg ? pg.key : folder ? "folder" : "link";
   if (ref.parent) row.dataset.parent = ref.parent;
-  const own = slug ? dcPageObj(slug) : null; if (own && own.hideNav) row.dataset.nav = "hidden";
+  const own = mine ? dcPageObj(slug) : null; if (own && own.hideNav) row.dataset.nav = "hidden";
   const grab = el("button", "pg-grab"); grab.type = "button"; grab.innerHTML = PG_GRIP; grab.title = "Drag to move";
   grab.setAttribute("aria-label", "Move " + name + ". Use the up and down arrow keys.");
   grab.addEventListener("pointerdown", (e) => pgDragStart(e, row, ref, !pg || (it && (it.children || []).length > 0)));
@@ -3918,7 +3921,7 @@ function pcRow(entry, ctx) {
   const chip = pg ? pcChip(pg, ctx) : null; if (chip) row.appendChild(chip);
   const gear = el("button", "pc-ico pg-gear"); gear.type = "button"; gear.innerHTML = PG_GEAR; gear.title = "Settings"; gear.setAttribute("aria-label", "Settings for " + name);
   row.appendChild(gear);
-  if (canvas) {
+  if (mine) {
     const mn = icoBtn("more", "More for " + name, "pc-ico pp-menu");
     mn.title = slug ? "Rename, duplicate, clear or delete this page" : "Duplicate or clear this page";
     mn.addEventListener("click", () => dcPageMenu(slug, mn));
@@ -4169,7 +4172,8 @@ function pgOpenSettings(startRef) {
       box.appendChild(el("h4", "pg-h", "What’s on it"));
       const from = { business: "your business details", offerings: "the items on your " + (VOCAB.label || "Menu") + " tab", faqs: "your questions and answers", updates: "your updates" }[pg.view] || "your details";
       box.appendChild(el("p", "pc-note", "This page is built from " + from + ", so its words are changed there."));
-      const go2 = el("button", "dc-modal-cancel", "Change what’s on it"); go2.type = "button"; go2.addEventListener("click", () => pcLeaveTo(pg.view));
+      // item 314: the tab's form opens in a card beside the page; the editor is never left
+      const go2 = el("button", "dc-modal-cancel", "Change what’s on it"); go2.type = "button"; go2.addEventListener("click", () => { close(); closePagesCard(false); eeEditCore(pg.view); });
       const acts = el("div", "pc-acts"); acts.appendChild(go2); box.appendChild(acts);
     }
     box.appendChild(el("h4", "pg-h", "On Google"));
@@ -5437,6 +5441,7 @@ function ddsRebuildSidMap() {
 }
 // ── actions (all REUSE the existing editor logic) ──
 function eeEditBlock(bi, tab) {                  // open this one section's editor, on one of its tabs
+  if (typeof bi === "number" && bi < 0) return;   // item 314: nothing was added (a built-in page)
   STK_ITEM = null;   // item 57: the section's card, not one of its blocks'
   closePreview(); go("design");
   if (!$("blocksCard")) mountBlocksCard();
@@ -6563,7 +6568,7 @@ function versionSavedRow(c) {
 // which were all of the draft the restore set aside. A save from the copy it held, or an Undo,
 // would put the old sections back.
 function workFromRestored() {
-  if (DC_PAGE && !dcPageObj(DC_PAGE)) dcOpenPage("");
+  if (dcPageMissing()) dcOpenPage("");
   DC_UNDO = []; DC_REDO = [];
   BLOCKS_WORK = currentBlocks(); DC_HIST_LAST = histSnap(); BLOCK_FOCUS = null; updateUndoButtons();
   renderBlocksCard(); renderPagesBar(); refreshDesignPreview();
@@ -8592,14 +8597,27 @@ let DC_PAGE = "";
 function dcPagesArr() { return Array.isArray(S.settings && S.settings.pages) ? S.settings.pages : []; }
 function dcPageObj(slug) { return dcPagesArr().find((p) => p && p.slug === slug) || null; }
 function dcPageList() { return [{ slug: "", title: "Home" }, ...dcPagesArr().map((p) => ({ slug: p.slug, title: p.title || p.slug }))]; }
+// ── Builder item 314: every page on the canvas ──
+// The template's own pages (About, FAQ, Updates, Contact and the Menu page) open on the canvas
+// like Home. DC_PAGE names one as "~" + its key: it has no sections of its own, so nothing is
+// written for it; its words come from the Business, Questions, Reviews and Updates tabs, typed
+// on the page (ideStart) or in the card the pencil opens beside the page (eeEditCore).
+const dcBuiltinKey = (slug) => (typeof slug === "string" && slug.charAt(0) === "~" ? slug.slice(1) : null);
+function dcBuiltinPage(slug) { const k = dcBuiltinKey(slug === undefined ? DC_PAGE : slug); return k && typeof hbStandardPages === "function" ? hbStandardPages().find((p) => p.key === k && p.view !== "design") || null : null; }
+function dcBuiltinForPath(path) { const p = typeof hbStandardPages === "function" ? hbStandardPages().find((x) => x.view !== "design" && x.path === path) : null; return p ? "~" + p.key : null; }
+function dcPagePath() { const b = dcBuiltinPage(); return b ? b.path : DC_PAGE ? "/" + DC_PAGE + "/" : "/"; }
+function dcPageMissing() { return !!DC_PAGE && !dcBuiltinPage() && !dcPageObj(DC_PAGE); }
+function dcBuiltinFrom(view) { return { business: "your business details", offerings: "the items on your " + ((typeof VOCAB === "object" && VOCAB && VOCAB.label) || "Menu") + " tab", faqs: "your questions and answers", testimonials: "your reviews", updates: "your updates" }[view] || "your details"; }
 function currentBlocks() {
+  if (dcBuiltinPage()) return [];   // item 314: a built-in page has no sections of its own
   if (DC_PAGE) { const p = dcPageObj(DC_PAGE); return Array.isArray(p && p.blocks) ? p.blocks.map((b) => ({ ...b })) : []; }
   return Array.isArray(S.settings && S.settings.blocks) ? S.settings.blocks.map((b) => ({ ...b })) : [];
 }
 // ── Multi-page: the Pages bar (Home + custom pages) — click a page to author it ──
 const DC_PAGE_RESERVED = new Set(["", "index", "home", "404", "about", "contact", "faq", "faqs", "services", "service", "menu", "products", "classes", "updates", "blog", "news", "post", "posts", "thanks", "thank-you", "privacy", "accessibility", "search", "sitemap", "robots", "assets", "img"]);
-// Section snapshots belong to the page they were taken on; the other steps don't.
-function dcResetHistory() { DC_UNDO = DC_UNDO.filter((x) => typeof x !== "string"); DC_REDO = DC_REDO.filter((x) => typeof x !== "string"); DC_HIST_LAST = null; if (typeof updateUndoButtons === "function") updateUndoButtons(); }
+// Builder item 320: a section step remembers its page (undoSectionsRec), so opening another
+// page keeps it; Undo switches back to that page first. Only the saved-list baseline resets.
+function dcResetHistory() { DC_HIST_LAST = null; if (typeof updateUndoButtons === "function") updateUndoButtons(); }
 // ── Editable GLOBAL top menu (header + footer are global — ONE edit changes every
 //    page). A small structured editor: order items, rename them, point each at one of
 //    your pages or an external link, and give any item a dropdown of child links.
@@ -8624,10 +8642,14 @@ const MEDIA_FILL_TYPES = new Set(["image", "gallery", "carousel", "video", "befo
 // same saveBlocks path (server re-validates), so nothing can drift out of the moat.
 let DC_UNDO = [], DC_REDO = [], DC_HIST_LAST = null, DC_HIST_SILENT = false;
 function histSnap() { try { return JSON.stringify(BLOCKS_WORK || []); } catch (_) { return null; } }
+// Item 320: a section step: the page's list as it was saved, and which page. The same "before"
+// twice in a row (a save that failed and was sent again) is one step, not two.
+const undoSectionsRec = (snap, page) => ({ kind: "sections", page: page == null ? DC_PAGE : page, snap });
+const undoSectionsSame = (rec, snap, page) => !!rec && rec.kind === "sections" && rec.page === (page == null ? DC_PAGE : page) && rec.snap === snap;
 function dcHistoryRecord() {   // called at the start of a USER save (pre-change state → undo)
   if (DC_HIST_SILENT) return;
   if (histSnap() === DC_HIST_LAST) return;   // nothing changed: not a step worth undoing
-  if (DC_HIST_LAST != null) { DC_UNDO.push(DC_HIST_LAST); while (DC_UNDO.length > 60) DC_UNDO.shift(); }
+  if (DC_HIST_LAST != null && !undoSectionsSame(DC_UNDO[DC_UNDO.length - 1], DC_HIST_LAST)) { DC_UNDO.push(undoSectionsRec(DC_HIST_LAST)); while (DC_UNDO.length > 60) DC_UNDO.shift(); }
   DC_REDO = [];
 }
 function dcHistoryCommit() { DC_HIST_LAST = histSnap(); updateUndoButtons(); }
@@ -8780,7 +8802,7 @@ async function undoStep(rec, dir) {
         UNDO_QUIET++; const call = api("PUT", rec.route, vals); UNDO_QUIET--;
         return call.then((r) => undoSync(rec, vals, r));
       });
-      if (DC_PAGE && !dcPageObj(DC_PAGE)) { await dcSavePendingEdits(); dcOpenPage(""); renderPagesBar(); renderBlocksCard(); }   // the page on screen is gone, and anything typed during that write went with it, not onto Home
+      if (dcPageMissing()) { await dcSavePendingEdits(); dcOpenPage(""); renderPagesBar(); renderBlocksCard(); }   // the page on screen is gone, and anything typed during that write went with it, not onto Home
     } else if (rec.kind === "put") {
       const vals = back ? rec.before : rec.after;
       const put = () => { UNDO_QUIET++; const call = api("PUT", rec.route, vals); UNDO_QUIET--; return call.then((r) => undoSync(rec, vals, r)); };
@@ -8825,29 +8847,42 @@ async function undoSync(rec, vals, r) {
     if ($("ann-text")) { $("ann-text").value = S.settings.announcement_text || ""; $("ann-url").value = S.settings.announcement_url || ""; $("ann-until").value = (S.settings.announcement_expires_at || "").slice(0, 10); }
   }
 }
+// Item 320: a section step taken on another page opens that page first, then runs again.
+function undoOnItsPage(rec, again, word) {
+  if (rec.kind !== "sections" || rec.page === DC_PAGE) return false;
+  if (typeof dcSwitchPage !== "function") return false;
+  const title = typeof dcPageTitle === "function" ? dcPageTitle(rec.page) : rec.page;
+  toast("That change was on " + title + ". Opening it to " + word + " it there.");
+  dcSwitchPage(rec.page).then((ok) => { if (ok && DC_PAGE === rec.page) again(); });
+  return true;
+}
 function dcUndo() {
   // an edit still waiting for its save is the newest step, so it's the one to take back
   if (blocksDirty()) { clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null; dcHistoryRecord(); dcHistoryCommit(); }
   if (!DC_UNDO.length) { toast("Nothing to undo"); return; }
-  const top = DC_UNDO.pop();
-  if (typeof top !== "string") {
+  const top = DC_UNDO[DC_UNDO.length - 1];
+  if (undoOnItsPage(top, dcUndo, "undo")) return;
+  DC_UNDO.pop();
+  if (top.kind !== "sections") {
     DC_REDO.push(top); updateUndoButtons();
     undoRun(top, "undo").then((ok) => { if (ok) toast("Undone"); else { DC_REDO.pop(); DC_UNDO.push(top); updateUndoButtons(); } });
     return;
   }
-  DC_REDO.push(DC_HIST_LAST != null ? DC_HIST_LAST : histSnap());
-  dcApplyHistory(top); toast("Undone");
+  DC_REDO.push(undoSectionsRec(DC_HIST_LAST != null ? DC_HIST_LAST : histSnap()));
+  dcApplyHistory(top.snap); toast("Undone");
 }
 function dcRedo() {
   if (blocksDirty() || !DC_REDO.length) { toast("Nothing to redo"); return; }   // a new edit outranks the redo list
-  const top = DC_REDO.pop();
-  if (typeof top !== "string") {
+  const top = DC_REDO[DC_REDO.length - 1];
+  if (undoOnItsPage(top, dcRedo, "redo")) return;
+  DC_REDO.pop();
+  if (top.kind !== "sections") {
     DC_UNDO.push(top); updateUndoButtons();
     undoRun(top, "redo").then((ok) => { if (ok) toast("Redone"); else { DC_UNDO.pop(); DC_REDO.push(top); updateUndoButtons(); } });
     return;
   }
-  DC_UNDO.push(DC_HIST_LAST != null ? DC_HIST_LAST : histSnap());
-  dcApplyHistory(top); toast("Redone");
+  DC_UNDO.push(undoSectionsRec(DC_HIST_LAST != null ? DC_HIST_LAST : histSnap()));
+  dcApplyHistory(top.snap); toast("Redone");
 }
 // ── One save rule: every section edit saves itself ──────────────────────────
 // A change is whatever makes the working list differ from what was last saved, so
@@ -8904,6 +8939,7 @@ function saveBlocks() {
 async function putBlocks() {
   BLOCKS_PUT_WAITING = false;
   clearTimeout(BLOCKS_SAVE_T); BLOCKS_SAVE_T = null;   // the save before it may have asked for one more
+  if (dcBuiltinPage()) { whisper("topWhisper", "saved"); return true; }   // item 314: nothing of its own to write
   dcHistoryRecord();   // snapshot the previously-persisted state for undo (skipped during undo/redo)
   const sentSnap = histSnap(), sentPage = DC_PAGE;   // what this save carries, and for which page
   whisper("topWhisper", "saving");
@@ -8943,16 +8979,20 @@ async function putBlocks() {
     // Item 195 (review finding 28): a save refused for a locked section is refused again while
     // the list still holds that change, so every later edit on the page was refused too, until a
     // reload threw them all away. The page goes back to how it was last saved; the refusal says why.
-    if (err && err.body && err.body.error === "section_locked" && DC_PAGE === sentPage) lockRefusedPutBack();
+    // Item 318: the page moved the moment the change was made, so a save the server REFUSES
+    // (its answer, not a dropped line or a lapse, which are sent again) puts the list and the
+    // page back the way they were saved, and says so. A stale draft keeps its Load the latest.
+    const refused = !!(err && !err.stale && !err.offline && !err.noSession && !err.timeout && Number(err.status) >= 400 && Number(err.status) < 500 && err.status !== 401);
+    if (refused && DC_PAGE === sentPage) { lockRefusedPutBack(); toast(nice(err) + " The page is back the way it was saved.", true); }
     // G7 "someone else is editing": a refused-stale save gets a calm LOAD-LATEST
     // action (with who, when the server knows) instead of a dead-end error.
-    if (!(err && err.stale)) toast(nice(err), true);   // a stale one already offers Load the latest (offerLoadLatest)
+    else if (!(err && err.stale)) toast(nice(err), true);   // a stale one already offers Load the latest (offerLoadLatest)
     return false;
   }
 }
 // The refused save's undo step never landed, so it goes too.
 function lockRefusedPutBack() {
-  if (DC_HIST_LAST != null && DC_UNDO[DC_UNDO.length - 1] === DC_HIST_LAST) DC_UNDO.pop();
+  if (DC_HIST_LAST != null && undoSectionsSame(DC_UNDO[DC_UNDO.length - 1], DC_HIST_LAST)) DC_UNDO.pop();
   BLOCKS_WORK = currentBlocks(); BLOCK_FOCUS = null; LIVE_WANTED = false; LIVE_DRAWN = null;
   dcHistoryCommit();
   dcCaptureScroll(); renderBlocksCard(); refreshDesignPreview();

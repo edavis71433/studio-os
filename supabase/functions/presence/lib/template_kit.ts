@@ -456,10 +456,11 @@ ${strip}`,
 
 function aboutBody(c: SnapshotContent, words: Words): string {
   const i = c.identity;
+  // builder item 314: the description and the area carry their stamps, so they can be typed on the page in the builder
   return `<section class="block wrap"><h1>About ${esc(i.business_name)}</h1>
-<p>${esc(i.description)}</p>
+<p${pr('identity.description')}>${esc(i.description)}</p>
 ${i.story ? `<div class="prose">${renderMarkdown(i.story)}</div>` : ''}
-${i.service_area ? `<h2>${esc(words.where)}</h2><p>${esc(i.service_area)}</p>` : ''}</section>`;
+${i.service_area ? `<h2>${esc(words.where)}</h2><p${pr('identity.service_area')}>${esc(i.service_area)}</p>` : ''}</section>`;
 }
 
 function faqBody(c: SnapshotContent): string {

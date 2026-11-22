@@ -418,14 +418,16 @@ export const pillNames = (page: Page) => page.locator('#pagesBar .page-pill .pp-
 export const lastTwo = async (page: Page) => (await menuRows(page)).slice(-2);
 export const OWN_MENU = [{ label: 'Home', href: '/' }, { label: 'Story', href: '/story/' }, { label: 'Gallery', href: '/gallery/' }];
 // A move on the Pages tab, then words on Story, then off that page so the page step is on top.
+// Builder item 320: a section step lives on for the visit, so the words are written on Story
+// BEFORE the move; an Undo then takes back the move and carries those words with it.
 export async function moveThenWrite(page: Page, frame: Frame, puts: Mounted['puts'], name: string, key: 'ArrowUp' | 'ArrowDown') {
   await openAbout(page, frame, 'Story');
-  await nudge(page, name, key);
-  await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
-  const moved = lastPut(puts);
-  await backToCanvas(page, frame);
   await writeOnAboutAndLeave(page, frame, puts, 'story');
   await page.evaluate(() => (window as unknown as { go: (v: string) => void }).go('pages'));
+  const before = puts.length;
+  await nudge(page, name, key);
+  await expect.poll(() => puts.length, { timeout: 6000 }).toBe(before + 1);
+  const moved = lastPut(puts);
   return { moved, count: puts.length };
 }
 
