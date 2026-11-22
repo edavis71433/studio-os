@@ -1,5 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { pinClock } from './helpers/clock';
 import { popupTags, POPUP_STYLE, POPUP_CLOSE, FORM_LINK_SCRIPT, senderTag, signupForm, type PopupSettings } from '../../supabase/functions/presence/lib/site_send';
 
 // Builder list item 148: one calm pop-up per site, with timing rules, driven through the
@@ -90,7 +91,7 @@ test.describe('the pop-up on a client’s page', () => {
   });
 
   test('outside its dates it doesn’t show; with phones switched off it shows only on bigger screens', async ({ page }) => {
-    await page.clock.install({ time: new Date('2026-11-10T12:00:00') });
+    await pinClock(page, '2026-11-10T12:00:00', { ticking: true });
     await openSite(page, { ...BASE, until: '2026-11-09' });
     await page.clock.runFor(9000);
     await expect(pop(page)).toBeHidden();

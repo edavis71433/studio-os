@@ -14,6 +14,7 @@
 //   · every call out of the database helpers carries a time limit.
 //   deno run --allow-read --allow-env --allow-net tests/presence/who_asks_401_test.mjs
 import { installFakePostgrest } from './fake_pgrst.mjs';
+import { pinClock } from './clock.mjs';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -22,10 +23,9 @@ const STUDIO = uuid('1'), CLIENT_SITE = uuid('2'), OWNER_CLIENT = uuid('3'), STU
 const STUDIO_USER = uuid('a'), OWNER_USER = uuid('b'), DESIGNER_USER = uuid('c'), STRANGER_USER = uuid('d');
 const SITE = (id, client) => ({ id, client_id: client, status: 'live', last_published_at: null, template_slug: 'atelier', template_version: '1', custom_domain: null, netlify_site_id: null, edition: 'presence', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' });
 
-// a pinned clock: Date.now moves only when the test says so
+// a pinned clock: it moves only when the test says so
 let NOW = Date.parse('2026-11-22T12:00:00Z');
-const realNow = Date.now;
-Date.now = () => NOW;
+let unpin = pinClock(NOW);
 
 const db = installFakePostgrest({
   users: {
@@ -141,7 +141,7 @@ ok('an owner asking for a site that isn\'t theirs is refused twice', w1.status =
   const ok1 = await call('jwt-studio', '/identity', CLIENT_SITE); await settle();
   db.tables.presence_agency_clients[0].status = 'archived';   // changed by another worker: no write seen here
   const still = await call('jwt-studio', '/identity', CLIENT_SITE); await settle();
-  NOW += 61_000;
+  unpin(); NOW += 61_000; unpin = pinClock(NOW);
   const gone = await call('jwt-studio', '/identity', CLIENT_SITE); await settle();
   ok('a client removed elsewhere: still answered inside the minute, refused after it', ok1.status === 200 && still.status === 200 && gone.status === 403 && gone.body?.error === 'scope_denied', `${ok1.status} ${still.status} ${gone.status}`);
   ok('…and that refusal is recorded as the studio\'s denied visit', db.tables.presence_scoped_access_events.some((e) => e.outcome === 'denied'));
@@ -165,7 +165,7 @@ ok('the first call still needs its chain (at least 5 trips cold)', studioFirst -
   ok('every database call from the helpers carries a 10-second limit', /DB_TIMEOUT_MS = 10_000/.test(dbTs) && (dbTs.match(/AbortSignal\.timeout\(DB_TIMEOUT_MS\)/g) || []).length >= 3 && /AbortSignal\.timeout\(/.test(authTs));
 }
 
-Date.now = realNow;
+unpin();
 const passed = results.filter((r) => r.p).length;
 console.log(`\n${passed}/${results.length} passed`);
 if (passed !== results.length) { for (const r of results) if (!r.p) console.log('  FAIL ' + r.n); Deno.exit(1); }
