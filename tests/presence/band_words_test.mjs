@@ -13,6 +13,7 @@
 // 4.61:1 on the templates' own boxes.
 import { renderSnapshot, devLayerFragments, listTemplates, FIXED_COLOR_TEMPLATES } from '../../supabase/functions/presence/lib/render.ts';
 import { BUTTON_SETS, FORM_STYLES, buttonStyle, siteColours } from '../../supabase/functions/presence/lib/site_buttons.ts';
+import { lookStyle, LOOK_COLOUR_TOKENS } from '../../supabase/functions/presence/lib/site_looks.ts';
 import { fixture, fullFixture, variantPages } from './full_fixture.mjs';
 import { parseHtml, elementsIn, sheetsOf, cascade, hexOf } from './style_cascade.mjs';
 import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
@@ -82,9 +83,11 @@ for (const { slug } of listTemplates()) {
     const looks = [...[null, ...BUTTON_SETS].map((set) => ({ set, form: null })), ...FORM_STYLES.map((form) => ({ set: null, form }))];
     for (const choice of fixed ? CHOICES.slice(0, 1) : CHOICES) {
       const dev = splitStyle(devLayerFragments({ theme_tokens: choice.tokens, custom_css: '', custom_html: '' }).style);
+      // item 333: a ready-made look's own layer comes after the set's, as a site carries it (lib/site_looks.ts)
+      const lookCss = lookStyle(choice.tokens, { fixed, template: slug }).replace(/^<style[^>]*>|<\/style>$/g, '');
       for (const { set, form } of looks) {
         const style = set || form ? splitStyle(buttonStyle(set, form, siteColours(css, fixed ? null : choice.tokens))) : { root: {}, rules: '' };
-        const extra = { root: { ...style.root, ...dev.root }, rules: style.rules };
+        const extra = { root: { ...style.root, ...dev.root }, rules: style.rules + lookCss };
         for (const view of VIEWS) {
           if (view.name === 'phone' && (set || form || choice !== CHOICES[0])) continue;   // a phone: the template's own look
           for (const page of pages) {
@@ -110,24 +113,28 @@ for (const { slug } of listTemplates()) {
     if (placeholders.size) console.log(`note  ${slug}, ${band} band: a box's example words in the browser's own grey read ${[...placeholders].sort().join(', ')}:1 (as in every section)`);
   }
 
-  // the way this check adds a set, a form style and a palette (above) is the way a site is drawn
-  {
-    const tokens = fixed ? { buttons: 'outline', forms: 'line' } : { ...CHOICES[1].tokens, buttons: 'outline', forms: 'line' };
+  // the way this check adds a set, a form style and a palette (above) is the way a site is drawn, and
+  // a dark ready-made look (item 333) with its own set and layer too
+  const darkLook = CHOICES.find((c) => c.tokens.scheme === 'dark');
+  for (const [what, tokens] of [[fixed ? 'a set and a form style' : 'a set, a form style and a palette', fixed ? { buttons: 'outline', forms: 'line' } : { ...CHOICES[1].tokens, buttons: 'outline', forms: 'line' }],
+    [`the ${darkLook.name} look and a form style`, { ...darkLook.tokens, forms: 'line' }]]) {
     const fx = onBand(fullFixture(slug), 'accent');
     const plain = await renderSnapshot(structuredClone(fx), SITE);
     fx.dev_customization = { theme_tokens: tokens, custom_css: '', custom_html: '' };
     const real = await renderSnapshot(fx, SITE);
     const css = String(plain[Object.keys(plain).find((k) => /^assets\/.*\.css$/.test(k))]);
-    const style = splitStyle(buttonStyle('outline', 'line', siteColours(css, fixed ? null : tokens)));
-    const dev = splitStyle(devLayerFragments({ theme_tokens: tokens, custom_css: '', custom_html: '' }).style);
+    const style = splitStyle(buttonStyle(tokens.buttons, 'line', siteColours(css, fixed ? null : tokens)));
+    // a template that keeps its own colours never takes a dark look's (lib/render.ts withoutLookColours)
+    const dev = splitStyle(devLayerFragments({ theme_tokens: fixed ? Object.fromEntries(Object.entries(tokens).filter(([k]) => !LOOK_COLOUR_TOKENS.includes(k))) : tokens, custom_css: '', custom_html: '' }).style);
+    const lookCss = lookStyle(tokens, { fixed, template: slug }).replace(/^<style[^>]*>|<\/style>$/g, '');
     let same = true, note = '';
     for (const path of pagesOf(plain)) {
       const a = wordsOf(readPage(String(real[path])), real, VIEWS[0]).out;
-      const b = wordsOf(readPage(String(plain[path])), plain, VIEWS[0], { root: { ...style.root, ...dev.root }, rules: style.rules }).out;
+      const b = wordsOf(readPage(String(plain[path])), plain, VIEWS[0], { root: { ...style.root, ...dev.root }, rules: style.rules + lookCss }).out;
       const diff = a.findIndex((w, i) => !b[i] || w.key !== b[i].key || w.fg !== b[i].fg || w.bg !== b[i].bg);
       if (a.length !== b.length || diff >= 0) { same = false; note = `${path}: ${a.length} vs ${b.length} words; first difference ${JSON.stringify(a[diff])} vs ${JSON.stringify(b[diff])}`; break; }
     }
-    ok(`${slug}: a set, a form style${fixed ? '' : ' and a palette'} added here draw every word exactly as a site drawn with them`, same, note);
+    ok(`${slug}: ${what} added here draw every word exactly as a site drawn with them`, same, note);
   }
 
   // the bands' section styles ship only with a band (a template's own .block--bg-* rules, such as

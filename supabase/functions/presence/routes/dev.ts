@@ -19,6 +19,7 @@ import type { SiteRole } from '../lib/site_roles.ts';
 import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import { svc } from '../lib/db.ts';
 import { ALLOWED_TOKENS, buildCustomization, projectFiles, validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from '../lib/devmode.ts';
+import { leaveDarkLook } from '../lib/site_looks.ts';
 import { sanitizeBrandKit, deriveBrandTokens } from '../lib/brand_kit.ts';
 import type { BrandKit } from '../lib/brand_kit.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
@@ -123,7 +124,7 @@ async function applyKitTokens(site: SiteRow, kit: BrandKit, principal: Principal
   const derived = deriveBrandTokens(kit);
   const existing = await svc(`presence_dev_customizations?site_id=eq.${site.id}&select=theme_tokens,custom_css,custom_html&limit=1`);
   const cur = (existing.ok && existing.json?.[0]) || {};
-  const clean = buildCustomization({ theme_tokens: { ...(cur.theme_tokens || {}), ...derived }, custom_css: cur.custom_css || '', custom_html: cur.custom_html || '' });
+  const clean = buildCustomization({ theme_tokens: { ...leaveDarkLook(cur.theme_tokens), ...derived }, custom_css: cur.custom_css || '', custom_html: cur.custom_html || '' });   // item 333: never brand colours on a dark look's page
   const w = await svc(`presence_dev_customizations?on_conflict=site_id`, {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ site_id: site.id, theme_tokens: clean.theme_tokens, custom_css: clean.custom_css, custom_html: clean.custom_html, updated_by: principal.userId || 'owner', updated_at: new Date().toISOString() }),
