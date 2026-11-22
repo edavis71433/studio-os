@@ -581,13 +581,16 @@ for (const days of [0, 91, -3, 'soon']) {
 {
   const idx = read('supabase/functions/presence/index.ts');
   const at = (s) => idx.indexOf(s);
-  const SEAT = "if (principal.kind === 'client') principal.member = seated.member;";
+  const SEAT = "if (principal.kind === 'client' && seat.member) principal.member = { ...seat.member };";
+  // builder item 401: the seat is worked out in lib/who_asks.ts (remembered a minute) and stamped by index.ts
+  const who = read('supabase/functions/presence/lib/who_asks.ts');
+  const wat = (s) => who.indexOf(s);
   const REVIEWER = "if (siteRole === 'client_reviewer' && !reviewerAllowed(route, method))";
   const GATE = 'const refused = await memberWriteGate(req, route, method, principal.member, cors);';
   const BUILD = 'const db = siteDb(jwt, site, principal);';
-  ok('index: the seat is stamped in one place, only for a client caller, so platform staff stay as they were', idx.split('principal.member =').length === 2 && at(SEAT) > 0);
-  ok('index: …only in the un-scoped branch, after RLS found no site of their own',
-    /\} else \{\s*site = await resolveSite\(jwt\);/.test(idx) && at('site = await resolveSite(jwt);') < at('if (!site && (principal.userId || principal.email))') && at('if (!site && (principal.userId || principal.email))') < at(SEAT) && at('principal.scope = {') < at('site = await resolveSite(jwt);'));
+  ok('index: the seat is stamped in one place, only for a client caller, so platform staff stay as they were', idx.split('principal.member =').length === 2 && at(SEAT) > 0 && who.split('member = seated.member').length === 2 && who.includes("if (principal.kind === 'client') member = seated.member;"));
+  ok('who_asks: …only in the un-scoped branch, after RLS found no site of their own',
+    /\} else \{\s*site = await resolveSite\(jwt\);/.test(who) && wat('site = await resolveSite(jwt);') < wat('if (!site && (principal.userId || principal.email))') && wat('if (!site && (principal.userId || principal.email))') < wat("if (principal.kind === 'client') member = seated.member;") && wat('scope = { site_id: sc.scoped.site_id') < wat('site = await resolveSite(jwt);'));
   ok('index: the reviewer boundary runs before the member gate, and the gate before the data path', at(REVIEWER) > 0 && at(REVIEWER) < at(GATE) && at(GATE) < at(BUILD));
   ok('index: the gate applies to every write method', idx.includes("const isWrite = method === 'PUT' || method === 'POST' || method === 'DELETE' || method === 'PATCH';") && idx.includes('if (principal.member && isWrite) {'));
   ok('index: the gate\'s refusal returns', idx.includes('if (refused) return refused;'));

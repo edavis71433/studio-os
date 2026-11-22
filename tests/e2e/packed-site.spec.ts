@@ -54,6 +54,27 @@ test.describe('the packed site (item 142)', () => {
     // the editor's styles are written into its page (data-inline), so it draws without a second request
     expect((page.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1].length, 'presence.css written in').toBeGreaterThan(100_000);
     expect(page, 'no request for presence.css').not.toMatch(/presence\.css/);
+    // builder item 407: the brand fonts preloaded and their style sheet fingerprinted, on every page that links it
+    const brand = page.match(/href="(\/v\/[0-9a-f]{12}\/brand\.css)"/);
+    expect(brand, 'the editor links a fingerprinted brand.css').not.toBeNull();
+    expect(existsSync(join(OUT, brand![1])), 'and the copy exists').toBe(true);
+    expect(page, 'no plain brand.css').not.toMatch(/["']\/fonts\/brand\.css["']/);
+    const preloads = page.match(/<link rel="preload" href="\/fonts\/[\w-]+\.woff2" as="font" type="font\/woff2" crossorigin>/g) || [];
+    expect(preloads.length, 'two font preloads').toBe(2);
+    expect(page.indexOf('rel="preload"'), 'the preloads come before the sheet').toBeLessThan(page.indexOf(brand![1]));
+    for (const f of ['sites.html', 'studio.html', 'portal.html', 'client.html', 'index.html']) {
+      const html = readFileSync(join(OUT, f), 'utf8');
+      expect((html.match(/rel="preload" href="\/fonts\//g) || []).length, `${f} preloads the two fonts`).toBe(2);
+      expect(html, `${f} links the fingerprinted sheet`).toMatch(/href="\/v\/[0-9a-f]{12}\/brand\.css"/);
+    }
+    // the tools host's pages keep the plain sheet (that host serves only the files _redirects lists)
+    expect(readFileSync(join(OUT, 'site-review.html'), 'utf8')).toContain('href="/fonts/brand.css"');
+    // builder item 412: the legal pages name their files from the root, so they are packed and pointed too
+    for (const f of ['privacy.html', 'terms.html', 'accessibility.html', 'ai-disclaimer.html']) {
+      const html = readFileSync(join(OUT, f), 'utf8');
+      expect(html, `${f} points at the fingerprinted styles and scripts`).toMatch(/href="\/v\/[0-9a-f]{12}\/styles\.css"/);
+      expect(html, `${f}: nav.js fingerprinted`).toMatch(/src="\/v\/[0-9a-f]{12}\/nav\.js"/);
+    }
   });
 
   for (const name of APP_PAGES()) {

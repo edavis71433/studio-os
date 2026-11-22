@@ -7,7 +7,8 @@
 // "Bacchus Kitchen + Wine Bar" counts for "Bacchus Kitchen" but a namesake in
 // another city does not.
 
-export const EXTRACT_MODEL = 'claude-haiku-5-5';
+import { SMALL_MODEL } from '../../ai_model.ts';
+export const EXTRACT_MODEL = SMALL_MODEL;   // builder item 409: the one small model
 const HAIKU_IN = 0.10 / 1_000_000, HAIKU_OUT = 0.50 / 1_000_000;
 
 export const FLAG_TYPES = ['wrong_address', 'wrong_hours', 'marked_closed', 'confused_with_other', 'outdated_offerings'] as const;
