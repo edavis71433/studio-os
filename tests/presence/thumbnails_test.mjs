@@ -36,8 +36,8 @@ ok('every template has its picture', TEMPLATES.length >= 8 && noTemplatePic.leng
   const want = TEMPLATES.flatMap((t) => FAMILIES.map((f) => `thumbs/templates/${t}/${f}.jpg`));
   const missing = want.filter((p) => !jpeg(p));
   ok('every design has a picture for each of the ten kinds of business', want.length === TEMPLATES.length * 10 && missing.length === 0, missing.slice(0, 4).join(', '));
-  const heavy = want.filter((p) => { try { return Deno.statSync(new URL(p, ROOT)).size > 25_000; } catch { return false; } });
-  ok('each kind picture stays small, under 25 KB', heavy.length === 0, heavy.join(', '));
+  const heavy = want.filter((p) => { try { return Deno.statSync(new URL(p, ROOT)).size > 60_000; } catch { return false; } });
+  ok('each kind picture stays small, under 60 KB', heavy.length === 0, heavy.join(', '));
 }
 
 // item 216: every ready-made page in Add a page has its picture, and each draws every section it brings

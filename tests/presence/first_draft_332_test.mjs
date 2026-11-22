@@ -152,8 +152,8 @@ const ASK = { services: ['Drain cleaning', 'Water heaters', 'Leaks'], town: 'Bur
 {
   ok('D1: a stand-in is known by its alt text', SI.isStandIn(SI.STAND_IN_ALT) && !SI.isStandIn('A plumber at work') && !SI.isStandIn(null));
   const families = Object.keys(G.STARTER_SERVICES);
-  const missing = families.filter((f) => { try { const b = Deno.readFileSync(new URL(`../../${SI.standInPath(f)}`, import.meta.url)); return !(b[0] === 0xff && b[1] === 0xd8 && b.length < 200_000); } catch { return true; } });
-  ok('D2: every kind of business has its stand-in picture in the app, a JPEG under 200 KB', families.length === 10 && missing.length === 0, missing.join(', '));
+  const missing = families.filter((f) => { try { const b = Deno.readFileSync(new URL(`../../${SI.standInPath(f)}`, import.meta.url)); return !(b[0] === 0xff && b[1] === 0xd8 && b.length < 300_000); } catch { return true; } });
+  ok('D2: every kind of business has its stand-in picture in the app, a JPEG under 300 KB', families.length === 10 && missing.length === 0, missing.join(', '));
   const { validateSnapshot } = await import('../../supabase/functions/presence/lib/manifest_validate.ts');
   const manifest = JSON.parse(Deno.readTextFileSync(new URL('../../supabase/functions/presence/templates/harbor/1.0.0/manifest.json', import.meta.url)));
   const content = (alt) => ({ identity: { business_name: 'Copper Line', description: 'Plumbers.', phone: '1', email: '' }, locations: [], settings: { cover: { alt, variants: { w800: '/img/x-800.webp' } } }, offerings: [], testimonials: [], faqs: [], posts: [], redirects: [] });

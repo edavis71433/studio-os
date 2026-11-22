@@ -1,13 +1,11 @@
 // ── Stand-in pictures, one per kind of business (builder list items 331 and 332) ──
-//   node scripts/stand-ins/make.mjs            (needs the e2e devDependencies: npm ci)
-// Writes thumbs/stand-ins/<family>.jpg, 1600 x 1000. Each is a plain, flat drawing made
-// here (no outside picture, font or file), so it can ship with the app. A first draft in
-// + New site opens with one until a real photo is swapped in (lib/stand_in.ts), and the
-// template pictures in + New site and Templates use them where a photo goes, so a salon
-// owner sees a salon. When real photos are approved they replace these files, same names.
+//   node scripts/stand-ins/make.mjs <folder>   (needs the e2e devDependencies: npm ci)
+// Writes <folder>/<family>.jpg, 1600 x 1000: a plain, flat drawing per kind, made here (no
+// outside picture, font or file). These were the stand-ins until real photos were approved
+// on Nov 22 2026; thumbs/stand-ins/ now holds those photos (see its CREDITS.md). Keep this
+// to draw a plain one back if a photo ever has to go; it never writes into thumbs/ itself.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
 const W = 1600, H = 1000;
 const bg = (a, b) => `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="${W}" height="${H}" fill="url(#g)"/>`;
@@ -103,7 +101,9 @@ const SCENES = {
     <rect x="520" y="800" width="560" height="24" rx="6" fill="#9AA696"/>`,
 };
 
-const out = fileURLToPath(new URL('../../thumbs/stand-ins/', import.meta.url));   // a path with spaces stays one path
+if (!process.argv[2]) { console.error('usage: make.mjs <folder>  (thumbs/stand-ins holds the approved photos)'); process.exit(2); }
+const out = process.argv[2].replace(/\/?$/, '/');
+if (out.includes('thumbs/stand-ins')) { console.error('thumbs/stand-ins holds the approved photos; draw into another folder'); process.exit(2); }
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: W, height: H } });
