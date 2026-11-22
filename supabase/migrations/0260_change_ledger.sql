@@ -23,7 +23,7 @@
 --   Only the service role (the server, the SQL editor) reads or writes it.
 
 create table if not exists public.presence_change_ledger (
-  number int primary key check (number between 1 and 9999),
+  number int primary key check (number between 0 and 9999),
   name text not null default '',
   how text not null default 'pack' check (how in ('pack', 'backfill')),
   first_at timestamptz not null default now(),

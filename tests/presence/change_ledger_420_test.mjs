@@ -52,7 +52,7 @@ ok('a second run counts the run and keeps the first time (on conflict)', /on con
 // The backfill: what production had before the ledger, written once as "backfill".
 const backfill = p260.slice(p260.indexOf('-- BACKFILL-LIST-START'), p260.indexOf('-- BACKFILL-LIST-END'));
 const listed = [...backfill.matchAll(/\((\d+), '([a-z0-9_-]*)', 'backfill'\)/g)].map((m) => Number(m[1]));
-ok('the pack backfills what production already had, each number once and all before 0260', listed.length >= 100 && new Set(listed).size === listed.length && listed.every((n) => n > 0 && n < FIRST), `${listed.length} numbers`);
+ok('the pack backfills what production already had, each number once, all before 0260, never the fenced 0003 to 0005', listed.length >= 100 && new Set(listed).size === listed.length && listed.every((n) => n >= 0 && n < FIRST) && !listed.some((n) => n >= 3 && n <= 5), `${listed.length} numbers`);
 ok('…and a re-run adds nothing (on conflict do nothing)', /'backfill'\)[\s\S]*?on conflict \(number\) do nothing;/.test(backfill));
 
 // ═══ 3. 0261: 0247's counts, plus the four new ones, in one trip ═══
