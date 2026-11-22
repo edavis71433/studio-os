@@ -64,7 +64,9 @@ for (const slug of TEMPLATES) {
 
 // ═══ 2. how the rules are chosen ═══
 {
-  ok('no classes, no section styles', sectionStyles(new Set()) === '');
+  // item 260: the three tag-level rules for real buttons and fields reach every page, sections or not
+  const bare = sectionStyles(new Set());
+  ok('no classes, only the tag-level button and field rules', bare.startsWith('button,input,select,textarea{font:inherit') && !bare.includes('.'), bare.slice(0, 80));
   const g = sectionStyles(new Set(['gallery', 'ga']));
   ok('a rule stays when the page carries every class it needs', g.includes('.gallery{display:grid') && g.includes('.gallery .ga img{'));
   ok('…and goes when one is missing', !g.includes('.block-gallery.v-masonry') && !g.includes('.bk-'));

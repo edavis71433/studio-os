@@ -78,7 +78,8 @@ export async function handlePreview(req: Request, site: SiteRow, cors: Record<st
     ({ snapshot, mediaManifest } = loaded);
   } else {
     const now = new Date().toISOString(); // preview timestamp = "as of right now" (never persisted)
-    ({ snapshot, mediaManifest } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now }));
+    // item 259: the draft's empty sections draw as placeholders here, and nowhere else
+    ({ snapshot, mediaManifest } = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now, keepEmpty: true }));
     // preview is allowed while INVALID — clients need to see drafts — but blockers ride along in headers
     const v = validateSnapshot(snapshot, t.manifest);
     blockers = v.blockers.length; warnings = v.warnings.length;

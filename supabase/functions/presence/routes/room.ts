@@ -38,6 +38,7 @@ interface RoomState {
   draftHash: string;               // M9: the M3 version token for optimistic locking
   blockers: number; warnings: number;
   blockerList: { field: string; message: string; at?: { page: string; index: number } }[];   // the same validation, by name, for the publish page
+  warningList: { field: string; message: string; at?: { page: string; index: number } }[];   // item 275: what can publish but deserves a look, by name
   changes: ReturnType<typeof describeChanges>;
   lastLive: { id: string; created_at: string; completed_at: string | null; actor_kind: string } | null;
   lastAny: { status: string } | null;
@@ -93,7 +94,7 @@ async function roomState(site: SiteRow): Promise<RoomState | null> {
     if (!liveDomain && nf.ok && nf.site) liveDomain = nf.site.default_domain ?? null;
   }
 
-  return { draftContent: snapshot.content, liveContent, draftHash, blockers: v.blockers.length, warnings: v.warnings.length, blockerList: v.blockers, changes, lastLive, lastAny, oldestDraftChangeAt: oldest, hostingProblem, liveDomain };
+  return { draftContent: snapshot.content, liveContent, draftHash, blockers: v.blockers.length, warnings: v.warnings.length, blockerList: v.blockers, warningList: v.warnings, changes, lastLive, lastAny, oldestDraftChangeAt: oldest, hostingProblem, liveDomain };
 }
 
 export async function handleHealth(site: SiteRow, cors: Record<string, string>) {
@@ -150,6 +151,7 @@ export async function handleChanges(site: SiteRow, cors: Record<string, string>)
       changes: st.changes.changes,
       blockers: st.blockers, warnings: st.warnings,
       blocker_list: st.blockerList,   // what is holding up the publish, each in plain words
+      warning_list: st.warningList,   // item 275: what can publish but deserves a look (sample words), each in plain words
       draft_hash: st.draftHash,   // M9: review these changes, then publish with If-Match this hash
     },
   }, 200, cors);
