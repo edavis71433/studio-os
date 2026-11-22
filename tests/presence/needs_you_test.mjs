@@ -136,8 +136,22 @@ const base = () => ({
   // sales review item 11: the route is a thin call; the gather lives in computeStudioNeeds (shared with the bell)
   ok('the needs-you gather is fixed-cost (no per-site loop)', (() => { const body = routes.slice(routes.indexOf('async function runStudioNeeds'), routes.indexOf('async function ownSiteOf')); return body.length > 200 && !/for\s*\(.*await svc/.test(body) && /Promise\.all/.test(body); })());
   ok('agency.html reads /agency/needs-you, never /agency/queues; no Starter kits card; roster chips are All · Needs you · Outstanding · Archived',
-    /api\('\/agency\/needs-you'(\+\(fresh\?'\?fresh=1':''\))?\)/.test(page) && !/agency\/queues/.test(page) && !/kitCardHtml|id="kitList"/.test(page) && /\[\['all','All'\],\['needs','Needs you'\],\['owed','Outstanding'\],\['archived','Archived'\]\]/.test(page));
+    /api\(NEEDS_PATH\(fresh\)\)/.test(page) && /NEEDS_PATH=\(fresh\)=>'\/agency\/needs-you\?'\+dayQ\(\)/.test(page) && !/agency\/queues/.test(page) && !/kitCardHtml|id="kitList"/.test(page) && /\[\['all','All'\],\['needs','Needs you'\],\['owed','Outstanding'\],\['archived','Archived'\]\]/.test(page));
   ok('agency.html: the roster columns are Name · Status · Next · Outstanding', /\['name','Name'/.test(page) && /\['status','Status'/.test(page) && /\['next','Next'/.test(page) && /\['owed','Outstanding'/.test(page) && !/\['edition','Edition'|\['attention','Waiting'|\['leads','Leads'|\['domain','Domain'/.test(page) && !/search issue\$\{/.test(page));
+}
+
+// ═══ sales item 151: the list runs on the studio's own day when the page sends it ═══
+{
+  // 01:00 UTC on Nov 22 is still the evening of Nov 21 in Burbank: an invoice due Nov 21 and a next step dated
+  // Nov 21 are "due today" and not late there, "overdue by 1 day" and "1 day late" by the UTC day
+  const evening = '2026-11-22T01:00:00Z';
+  const world = (today) => ({ ...base(), nowIso: evening, ...(today ? { today } : {}),
+    invoices: [{ id: 'i1', amount_cents: 160000, due_date: '2026-11-21', status: 'open', state: 'upcoming', deal_id: 'd9', client_id: 'c9', customer_site_id: null }],
+    deals: [{ id: 'd9', title: 'Ellis site', stage: 'lead', next_step: 'Call back', next_step_at: '2026-11-21', contact_id: null, converted_client_id: 'c9', converted_site_id: null, contact_name: 'Jordan Ellis' }],
+  });
+  const utc = buildNeedsYou(world(null)), own = buildNeedsYou(world('2026-11-21'));
+  ok('item 151: without the page’s day the server’s (UTC) day decides: overdue by 1 day, and the step is 1 day late', utc.some((r) => r.what === 'invoice $1,600 is overdue by 1 day') && utc.some((r) => /is 1 day late/.test(r.what)), JSON.stringify(utc.map((r) => r.what)));
+  ok('item 151: with the page’s day (?today=) the same rows read due today, and the step is not late yet', own.some((r) => r.what === 'invoice $1,600 is due today') && !own.some((r) => /day late/.test(r.what)), JSON.stringify(own.map((r) => r.what)));
 }
 
 const fails = results.filter((r) => !r.p);

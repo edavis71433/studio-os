@@ -39,7 +39,7 @@ test('Home, Customers and Contacts open the very same Add a customer box', async
   expect(seen.Customers).toEqual(seen.Home);
   expect(seen.Contacts).toEqual(seen.Home);
   const home = seen.Home as { labels: string[]; choices: number; button: string };
-  expect(home.labels).toEqual(['Their name', 'Business name (optional)', 'Email']);   // builder item 241: the customer and nothing else
+  expect(home.labels).toEqual(['Their name', 'Business name (optional)', 'Email (or a phone)', 'Phone (optional)']);   // builder item 241: the customer and nothing else; sales item 150: a phone does instead of an email
   expect(home.choices).toBe(0);
   expect(home.button).toBe('Save customer');
 });

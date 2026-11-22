@@ -480,6 +480,22 @@ const touched = (from, table) => db.log.slice(from).filter((c) => c.url.startsWi
   ok('migration: a deal maps to at most one project (unique index on created_project_id)', /presence_deals_created_project_uq[\s\S]*?created_project_id.*where created_project_id is not null/.test(mig));
 }
 
+// ═══ sales items 161 and 150: the name search reaches the database; an empty project says so ═══
+{
+  const from = db.log.length;
+  const r = await call(H.list(as('jwt-a'), '?q=Cove'));
+  const asked = db.log.slice(from).find((c) => c.method === 'GET' && c.url.includes('/rest/v1/presence_projects'));
+  ok('item 161: ?q= is sent as name=ilike.*…* (written without the "=" the database ignored it and gave back every project)', r.status === 200 && !!asked && /[?&]name=ilike\.\*Cove\*/.test(asked.url) && !/name\.ilike/.test(asked.url), asked && asked.url);
+  const empty = await call(H.create(as('jwt-a'), { name: 'Saved customer, nothing yet' }));
+  const pid = empty.body?.data?.id;
+  const p1 = await call(H.progress(as('jwt-a'), [pid]));
+  ok('item 150: a project with no step, no milestone, no approval and no deal behind it is flagged nothing_yet (the board leaves it out)', p1.status === 200 && p1.body?.data?.[pid]?.nothing_yet === true, JSON.stringify(p1.body?.data?.[pid]));
+  await call(H.addTask(as('jwt-a'), pid, { title: 'Kick-off call' }));
+  const p2 = await call(H.progress(as('jwt-a'), [pid]));
+  ok('item 150: its first step puts it on the board', p2.status === 200 && p2.body?.data?.[pid]?.nothing_yet === false && p2.body.data[pid].stage === 'kickoff', JSON.stringify(p2.body?.data?.[pid]));
+  ok('item 150 (pure): nothingYet is true only with nothing behind the project', P.nothingYet({ tasks: [], milestones: [], approvals: [] }) === true && P.nothingYet({ tasks: [], milestones: [], approvals: [], deal_id: SITE_A }) === false && P.nothingYet({ tasks: [{}], milestones: [], approvals: [] }) === false && P.nothingYet({ tasks: [], milestones: [{}], approvals: [] }) === false && P.nothingYet({ tasks: [], milestones: [], approvals: [{}] }) === false);
+}
+
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ PROJECTS ROUTES (P2-D): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 Deno.exit(passed === results.length ? 0 : 1);

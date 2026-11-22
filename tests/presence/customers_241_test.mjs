@@ -261,5 +261,24 @@ ok('gate: restoring, inviting and keeping the address of a site elsewhere are ev
   ok('gap: connect without save still only saves a contact (the CSV import), no customer record', plain.status === 200 && plain.body?.data?.mode === 'connect' && plain.body?.data?.connected === false && T().presence_contacts.some((c) => c.email === 'oz@plain.example' && !c.client_id) && T().clients.length === 3, JSON.stringify(plain.body));
 }
 
+// ═══ sales item 150: a name with a phone saves a customer; the refusal no longer talks about an invitation ═══
+{
+  db.reset(base());
+  const ray = await add({ mode: 'connect', save: true, name: 'Ray Plumb', business_name: 'Plumb Right', phone: '(818) 555-0100' });   // what the box sends
+  const person = T().presence_contacts.find((c) => c.name === 'Ray Plumb');
+  ok('item 150: a name and a phone, no email, saves a customer with a profile and the person in the contacts', ray.status === 201 && ray.body?.data?.saved === true && !!ray.body.data.client_id && person && person.phone === '(818) 555-0100' && person.client_id === ray.body.data.client_id && T().clients.some((c) => c.id === ray.body.data.client_id && c.name === 'Plumb Right'), JSON.stringify(ray.body));
+  const again = await add({ mode: 'save', name: 'Ray', phone: '(818) 555-0100' });
+  ok('item 150: the same phone saved again is the same customer, not a second one', again.status === 200 && again.body?.data?.already === true && again.body.data.client_id === ray.body.data.client_id, JSON.stringify(again.body));
+  const noName = await add({ mode: 'save', phone: '(818) 555-0199' });
+  ok('item 150: a phone with no name asks for the name', noName.status === 422 && /name/.test(noName.body?.message || ''), JSON.stringify(noName.body));
+  const nothing = await add({ mode: 'save', name: 'Nobody' });
+  ok('item 150: no email and no phone is refused in plain words, with no talk of a sign-in invitation', nothing.status === 422 && /email or phone/.test(nothing.body?.message || '') && !/invitation/.test(nothing.body?.message || ''), JSON.stringify(nothing.body));
+  const setup = await add({ mode: 'provision', name: 'Nobody' });
+  ok('item 150: setting them up now still needs the email their sign-in link goes to', setup.status === 422 && /sign-in link/.test(setup.body?.message || '') && !/invitation/.test(setup.body?.message || ''), JSON.stringify(setup.body));
+  const both = await add({ mode: 'save', name: 'Kim Lee', email: 'kim@lee.example', phone: '(818) 555-0123' });
+  const kim = T().presence_contacts.find((c) => c.email === 'kim@lee.example');
+  ok('item 150: with both, the phone is kept on the person too', both.status === 201 && kim && kim.phone === '(818) 555-0123', JSON.stringify(both.body));
+}
+
 console.log(`\n════ CUSTOMERS, ONE STEP AT A TIME (builder item 241): ${pass}/${pass + fail} ${fail ? 'FAILED' : 'PASSED'} ════`);
 if (fail) { console.log('Failed:\n  ' + failed.join('\n  ')); Deno.exit(1); }

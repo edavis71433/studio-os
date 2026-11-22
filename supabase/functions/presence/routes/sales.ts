@@ -3385,14 +3385,22 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const email = clean(b.email, 160).toLowerCase();
   const name = clean(b.name, 120);
+  const phone = clean(b.phone, 40);
   const businessNameIn = clean(b.business_name, 120);
-  if (!email || !validEmail(email)) return json({ error: 'validation', message: 'Enter the customer’s email — that’s where their sign-in invitation goes.' }, 422, cors);
-  const businessName = businessNameIn || name || (email.split('@')[0] || 'New customer');
   // builder item 241: 'save' is Add a customer's (the customer and nothing else); 'connect' is the
   // Customers CSV import's (the person in the contacts); 'provision' sets them up now (Duplicate site)
   // The box sends 'connect' with save: true, which a server from before item 241 reads as connect
   // (a contact, nobody emailed) in the time between the pages going live and the deploy.
   const mode = b.mode === 'save' || (b.mode === 'connect' && b.save === true) ? 'save' : b.mode === 'connect' ? 'connect' : 'provision';
+  // sales item 150: a customer can be saved with a name and a phone and no email (a plumber who
+  // gave a mobile number). Setting them up now (provision) still needs the address their sign-in
+  // link goes to. The refusal no longer talks about an invitation that is not sent.
+  if (!email || !validEmail(email)) {
+    if (mode === 'save' && !email && phone && name) return (await import('./customers.ts')).saveNewCustomer(site, { email: '', phone, name, businessName: businessNameIn, label: businessNameIn || name }, cors);
+    if (mode === 'save') return json({ error: 'validation', message: phone ? 'Enter their name too, so you know who this is.' : 'Enter their email or phone number to save them.' }, 422, cors);
+    return json({ error: 'validation', message: mode === 'connect' ? 'Enter their email address.' : 'Enter their email — that’s where their sign-in link goes.' }, 422, cors);
+  }
+  const businessName = businessNameIn || name || (email.split('@')[0] || 'New customer');
   const portalUrl = `${siteUrl()}/portal.html?studio=${site.id}`;   // builder list item 59: the sign-in page shows this studio's name and logo
 
   // ── B) CONNECT BY EMAIL — record intent; provision NOTHING ──────────────────
@@ -3420,7 +3428,7 @@ export async function handleSalesAddCustomer(req: Request, site: SiteRow, princi
       return json({ data: { mode, connected: true, created: false, client_id: clientId, site_id: customerSite?.id || null, project_id: projectId, managed, bridged, owned_elsewhere: ownedElsewhere, portal_url: portalUrl, message: 'Connected to their workspace.' } }, 200, cors);
     }
     // builder item 241: Add a customer saves the customer and nothing else (routes/customers.ts)
-    if (mode === 'save') return (await import('./customers.ts')).saveNewCustomer(site, { email, name, businessName: businessNameIn, label: businessName }, cors);
+    if (mode === 'save') return (await import('./customers.ts')).saveNewCustomer(site, { email, phone, name, businessName: businessNameIn, label: businessName }, cors);
     // No account yet → they're saved to the studio's contacts, and nothing else happens.
     // Nobody signs up by themselves (builder item 199), so the studio sets them up from
     // Add a customer when it's ready; no marker waits for a sign-up.

@@ -39,6 +39,7 @@ const { handleCommerce } = await import('../../supabase/functions/presence/route
 const { clientEvent } = await import('../../supabase/functions/presence/routes/client_delivery.ts');
 const { applyRetainerSync, retainerTransition, retainerNoticeCopy } = await import('../../supabase/functions/presence/commerce/retainers.ts');
 const { runDealTaskReminders, dealTaskDue, nextStepOverdue } = await import('../../supabase/functions/presence/commerce/lifecycle.ts');
+const { OPEN_DEAL_STAGES, CLOSED_DEAL_STAGES } = await import('../../supabase/functions/presence/lib/deal_stages.ts');   // sales item 146: the one shared list
 
 const realFetch = globalThis.fetch;
 const jr = (data, status = 200) => new Response(data === null ? '' : JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -294,6 +295,14 @@ try {
       nextStepOverdue({ stage: 'proposal', next_step_at: today, converted_client_id: null }, new Date().toISOString()) === false &&
       nextStepOverdue({ stage: 'won', next_step_at: '2020-01-01', converted_client_id: null }, new Date().toISOString()) === false &&
       nextStepOverdue({ stage: 'proposal', next_step_at: '2020-01-01', converted_client_id: OWNER_CLIENT }, new Date().toISOString()) === false);
+    // sales item 146: the rule read its stages from its own list, which said `new` where every deal says
+    // `lead`, so a first-stage deal's passed date never fired. It reads the shared list now, and this
+    // tries every stage on it, `lead` first.
+    ok('D0 (item 146): a passed next-step date fires on EVERY open stage of the shared list, lead included, and on no closed one',
+      OPEN_DEAL_STAGES[0] === 'lead' &&
+      OPEN_DEAL_STAGES.every((stage) => nextStepOverdue({ stage, next_step_at: '2020-01-01', converted_client_id: null }, new Date().toISOString()) === true) &&
+      CLOSED_DEAL_STAGES.every((stage) => nextStepOverdue({ stage, next_step_at: '2020-01-01', converted_client_id: null }, new Date().toISOString()) === false) &&
+      nextStepOverdue({ stage: 'new', next_step_at: '2020-01-01', converted_client_id: null }, new Date().toISOString()) === false);
   }
   {
     const { calls, sent } = installFake({
