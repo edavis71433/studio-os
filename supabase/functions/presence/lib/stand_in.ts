@@ -1,7 +1,7 @@
 // ── Stand-in pictures (builder list items 331 and 332) ─────────────────────────
 // Until the stock library's key is in (item 263), a first draft made in + New site has no
 // photo to open with. It gets a stand-in instead: one photo per kind of business, kept in the
-// app (thumbs/stand-ins/<family>.jpg; approved Pexels photos, credited in its CREDITS.md), the
+// app (thumbs/stand-ins/<family>.jpg; approved Pexels photos, credited in scripts/stand-ins/CREDITS.md), the
 // same pictures the template pictures in + New site use. A stand-in is imported into the site's own Files
 // like any photo, so it is self-hosted and replaceable in one click, and it says what it is:
 // its alt text starts with STAND_IN_ALT, the publish check warns while one is still the

@@ -2,7 +2,7 @@
 //   node scripts/stand-ins/make.mjs <folder>   (needs the e2e devDependencies: npm ci)
 // Writes <folder>/<family>.jpg, 1600 x 1000: a plain, flat drawing per kind, made here (no
 // outside picture, font or file). These were the stand-ins until real photos were approved
-// on Nov 22 2026; thumbs/stand-ins/ now holds those photos (see its CREDITS.md). Keep this
+// on Nov 22 2026; thumbs/stand-ins/ now holds those photos (credited in CREDITS.md here). Keep this
 // to draw a plain one back if a photo ever has to go; it never writes into thumbs/ itself.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
