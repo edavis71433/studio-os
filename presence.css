@@ -925,8 +925,8 @@ html.dc-zoomout .dp-stage:not(.dev-tablet):not(.dev-phone) #dcZoomNote{display:b
 .ins-pic[data-pic="features:numbered"]{grid-template-rows:4px 4px;row-gap:8px;align-content:center}
 .ins-pic[data-pic="features:numbered"] i.h{opacity:.9}
 .ins-pic[data-pic="features:numbered"] i:not(.h){width:70%}
-.ins-pic[data-pic="features:tiles"]{grid-template-columns:repeat(4,1fr);gap:4px;padding:8px;border-radius:6px;background:#1a1622}
-.ins-pic[data-pic="features:tiles"] i{background:#fff;opacity:.22}
+.ins-pic[data-pic="features:tiles"]{grid-template-columns:repeat(4,1fr);gap:4px;padding:8px;border-radius:6px;background:var(--ink)}
+.ins-pic[data-pic="features:tiles"] i{background:var(--sheet);opacity:.25}
 .ins-pic[data-pic="pricing:menu"]{grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);column-gap:12px;align-content:center;border-top:2px solid var(--ink-3)}
 .ins-pic[data-pic="pricing:menu"] i{height:3px;align-self:center;background:linear-gradient(90deg,var(--ink) 34%,transparent 34% 80%,var(--ink) 80%);opacity:.6}
 .ins-pic[data-pic="pricing:plans"]{grid-template-columns:repeat(3,1fr);column-gap:6px;align-items:center}
