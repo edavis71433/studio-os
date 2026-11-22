@@ -150,7 +150,7 @@ test.describe('item 234 — Settings › Pages for your clients', () => {
     await expect.poll(() => sent.length).toBe(1);
     expect(sent[0].method).toBe('PUT');
     expect(sent[0].url).toMatch(/^\/agency\/portal\/pages\/[0-9a-f-]{36}$/);
-    expect(sent[0].body).toEqual({ title: 'How we work', words: 'Each week you get a short update.', items: [{ kind: 'link', label: 'Our process', url: 'https://example.com/process' }, { kind: 'file', label: 'Logo pack.zip', media_id: M1 }], who: [S2] });
+    expect(sent[0].body).toEqual({ title: 'How we work', words: 'Each week you get a short update.', items: [{ kind: 'link', label: 'Our process', url: 'https://example.com/process' }, { kind: 'file', label: 'Logo pack.zip', media_id: M1 }], who: [S2], home: false });   // home: item 280
     await expect(dlg).toBeHidden();
     await expect(page.getByText('Saved. It’s at the top of their Help.')).toBeVisible();
   });

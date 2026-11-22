@@ -67,7 +67,22 @@ const client = read('client.html');
 ok('Help reads the pages whatever Help answers are, and draws them above the kit', client.includes("const pgP=api('/client/portal-pages').catch(()=>null);") && client.includes('+whatsNewDoorHtml()+portalPagesHtml()+(answers?kitHtml(kr):\'\')'));
 ok('a page opens full screen with a back arrow; a file asks for a fresh link', /function openPortalPage\(id\)/.test(client) && client.includes("sheetBackHtml({label:'Help'})") && client.includes("api('/client/portal-pages/files/'+encodeURIComponent(b.getAttribute('data-file'))+'?page='+encodeURIComponent(p.id))"));
 ok('a quick link to a place turned off for this client isn’t drawn', /function quickLinkShown\(l\)\{[^\n]*if\(t==='book'\)return partOn\('book'\);if\(t==='messages'\)return partOn\('messages'\);if\(t==='documents'\)return tabShown\('documents'\);/.test(client));
+// ── builder item 280 (Nov 22 review): quick links in the menu, one page pinned to Home ──
+ok('a page can be pinned to Home; anything but true is off', G.cleanPage({ title: 'T', home: true }, P1).home === true && G.cleanPage({ title: 'T' }, P1).home === false && G.cleanPage({ title: 'T', home: 'yes' }, P1).home === false);
+ok('pinning a page takes the pin from the page that had it (one page on Home at a time)', (() => {
+  const a = G.cleanPage({ title: 'A', home: true }, P1), b = G.cleanPage({ title: 'B', home: true }, P2);
+  const one = G.putPage(EMPTY, a), two = G.putPage(one, b);
+  const again = G.putPage(two, G.cleanPage({ title: 'B again', home: false }, P2));
+  return one.pages[0].home === true && two.pages.map((p) => p.home).join() === 'false,true' && again.pages.map((p) => p.home).join() === 'false,false';
+})());
+ok('the pin survives a reload of the stored pages', G.normalizePages({ pages: [{ id: P1, title: 'A', home: true }, { id: P2, title: 'B' }] }).pages.map((p) => p.home).join() === 'true,false');
+{
+  const cp = read('supabase/functions/presence/routes/client_pages.ts');
+  ok('the client read says which page is on Home', /home: p\.home === true/.test(cp));
+}
+
 const settings = read('settings.html');
+ok('the page editor has the Home switch and sends it', /id="pgHome"/.test(settings) && /home: \$\('pgHome'\)\.checked/.test(settings));
 ok('Settings has the pages card at studio level, with its two editors', /id="portalPages" aria-labelledby="portalPagesHead" hidden/.test(settings) && /id="pageDlg"/.test(settings) && /id="linkDlg"/.test(settings) && /function loadPortalPages\(\) \{\s*if \(!\(CTX && CTX\.is_agency\) \|\| SCOPE\) return Promise\.resolve\(\);/.test(settings));
 ok('a page saves by its id; delete asks twice on the same button', /api\('\/agency\/portal\/pages\/' \+ encodeURIComponent\(PG_EDIT\.id\), 'PUT'/.test(settings) && /if \(!ed\.sure\) \{ ed\.sure = true;/.test(settings));
 ok('a client-private file is never offered for a page', /a\.client_private !== true/.test(settings));

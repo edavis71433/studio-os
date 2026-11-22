@@ -9,7 +9,7 @@
 
 // ── mirrors (verbatim) of the pure helpers in client.html ──
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function wsCardState(d){if(!d||d.published!==true)return'hidden';const m=d.month;if(!m)return'bare';if(m.has_data===false||!(m.visitors>0))return'empty';return'stats';}
+function wsCardState(d){if(!d||d.published!==true)return'hidden';if(d.elsewhere===true)return'elsewhere';const m=d.month;if(!m)return'bare';if(m.has_data===false||!(m.visitors>0))return'empty';return'stats';}
 function wsSiteInfo(d){const s=(d&&d.site)||{};const url=typeof s.url==='string'&&/^https:\/\//.test(s.url)?s.url:'';return{url,host:url.replace(/^https:\/\//,''),published_at:(typeof s.last_published_at==='string'&&s.last_published_at)||''};}
 function rel(iso){const t=Date.parse(iso);if(!isFinite(t))return'';const s=Math.floor((Date.now()-t)/1000);if(s<60)return'just now';const m=Math.floor(s/60);if(m<60)return m+(m===1?' min ago':' mins ago');const h=Math.floor(m/60);if(h<24)return h+(h===1?' hour ago':' hours ago');const d=Math.floor(h/24);if(d<7)return d+(d===1?' day ago':' days ago');return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 function wsPeople(n){n=Math.max(0,n|0);return n===1?'1 person':n+' people';}
@@ -75,6 +75,16 @@ function wsCardHtml(d){
   const pic='<div class="wspic" id="wspic"><div class="wsini" aria-hidden="true">✦</div></div>';
   const bar='<div class="wsbar"><span class="pill-live">Live</span>'+(site.url?'<a class="wsdomain" href="'+esc(site.url)+'" target="_blank" rel="noopener">'+esc(site.host)+' ↗</a>':'')+(site.published_at?'<span class="wswhen">Published '+esc(rel(site.published_at))+'</span>':'')+'</div>';
   const see=site.url?'<a class="btn wssee" href="'+esc(site.url)+'" target="_blank" rel="noopener">See your site</a>':'';
+  if(state==='elsewhere'){   // item 258: live on its own host; the address and Visit, Google's numbers when connected
+    const search=d.search,clicks=search&&search.clicks!=null?Math.max(0,search.clicks|0):null;
+    const ebar='<div class="wsbar"><span class="pill-live">Live</span>'+(site.url?'<a class="wsdomain" href="'+esc(site.url)+'" target="_blank" rel="noopener">'+esc(site.host)+' ↗</a>':'')+'</div>';
+    const visit=site.url?'<a class="btn wssee" href="'+esc(site.url)+'" target="_blank" rel="noopener">Visit your site</a>':'';
+    return '<div class="card wscard wselse">'+pic+'<div class="wsin"><span class="tag">Your website</span>'+ebar
+      +'<h3>Your website is live'+(site.host?' at '+esc(site.host):'')+'.</h3>'
+      +'<p class="wslead">'+(clicks!=null?'<b>'+esc(String(clicks))+(clicks===1?' click':' clicks')+'</b> from Google search'+esc(wsGscQualifier(search.period))+'.':'It lives on its own host, so visits aren’t counted here.')+'</p>'
+      +(clicks!=null?'<div class="wsmini"><div class="m"><p class="n">'+esc(String(clicks))+'</p><p class="l">clicks from Google search'+esc(wsGscQualifier(search.period))+'</p></div>'+(search.impressions!=null?'<div class="m"><p class="n">'+esc(String(Math.max(0,search.impressions|0)))+'</p><p class="l">times seen in Google results</p></div>':'')+'</div>':'')
+      +'<div class="wsfoot">'+visit+'</div></div></div>';
+  }
   // 'bare' = the stats read inside the route failed (month:null) — the picture
   // and the live link still work, and the card says the numbers couldn't be
   // checked rather than pretending there are none (the A4 honesty rule).
@@ -99,6 +109,8 @@ const results=[];
 const ok=(n,p)=>{results.push({n,p});console.log(`${p?'PASS':'FAIL'}  ${n}`);};
 
 // ═══ wsCardState — hidden / bare / empty / stats ═══
+// builder item 258 (Nov 22 review): a site hosted elsewhere is live, with no visits counted here
+ok('state: hosted elsewhere → its own card, whatever the month read says', wsCardState({published:true,elsewhere:true,month:null})==='elsewhere' && wsCardState({published:true,elsewhere:true,month:{visitors:0,has_data:false}})==='elsewhere');
 ok('state: no payload / route missing / not published → hidden (the card never renders)',
   wsCardState(null)==='hidden' && wsCardState({})==='hidden' && wsCardState({published:false,month:{visitors:9}})==='hidden');
 ok('state: published but the month read FAILED (month:null) → bare — the picture and live link still render, but the card never claims the empty story for a transient DB failure',
@@ -216,6 +228,10 @@ ok('truncated month → the card carries the "based on recent activity" note; un
 const ROOT=new URL('../../',import.meta.url);
 const read=(p)=>Deno.readTextFileSync(new URL(p,ROOT));
 const cd=read('supabase/functions/presence/routes/client_delivery.ts');
+// builder item 258 (Nov 22 review): a site hosted elsewhere
+ok('route: a site of the monitor edition ("Hosted elsewhere") answers published:true and elsewhere:true, with its address',
+  /const elsewhere = site\.edition === 'monitor';/.test(cd) && /const published = elsewhere \|\| site\.status === 'live' \|\| !!site\.last_published_at;/.test(cd) && /published: true, elsewhere: true, month: null, search: searchE, site: \{ url: siteOrigin\(site\) \|\| null/.test(cd));
+ok('route: the hosted-elsewhere answer never reads the visit counter (it counts sites published from here)', (() => { const a = cd.indexOf('if (elsewhere) {'); const b = cd.indexOf('const statNowIso = nowIso();', a); return a > 0 && b > a && !/readVisitStats/.test(cd.slice(a, b)); })());
 const vs=read('supabase/functions/presence/lib/visit_stats.ts');
 const idx=read('supabase/functions/presence/index.ts');
 const page=read('client.html');
@@ -223,7 +239,7 @@ const page=read('client.html');
 ok('route: handleClientWebsiteStats exists with the standard client-handler signature',
   /export async function handleClientWebsiteStats\(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>\)/.test(cd));
 ok('route: unpublished sites short-circuit to published:false (the portal hides the card)',
-  /const published = site\.status === 'live' \|\| !!site\.last_published_at;\s*\n\s*if \(!published\) return json\(\{ data: \{ published: false/.test(cd));
+  /const published = elsewhere \|\| site\.status === 'live' \|\| !!site\.last_published_at;\s*\n\s*if \(!published\) return json\(\{ data: \{ published: false/.test(cd));   // item 258: a site hosted elsewhere counts as published
 ok('route: the visits read is scoped to the caller\'s OWN site, and counted in the database (item 207)',
   /readVisitStats\(site\.id, \{ startMs, weeks: DASH_WEEKS, nowMs \}\)/.test(cd) && !/presence_visits\?/.test(cd.slice(cd.indexOf('export async function handleClientWebsiteStats'), cd.indexOf('// search: null = genuinely not connected'))));
 ok('route: reuses the slice-8 pure helpers (dashRange · sourceShares) and the dashboard\'s own visits read',

@@ -20,7 +20,7 @@ export async function handleClientPortalPages(site: SiteRow, cors: Record<string
   const studio = await studioOf(site);
   if (!studio) return json({ data: { pages: [], links: [] } }, 200, cors);
   const all = await readPortalPages(studio);
-  const pages = pagesFor(all, site.id).map((p) => ({ id: p.id, title: p.title, sub: subLine(p.words), words: p.words, items: p.items, updated_at: p.updated_at }));
+  const pages = pagesFor(all, site.id).map((p) => ({ id: p.id, title: p.title, sub: subLine(p.words), words: p.words, items: p.items, home: p.home === true, updated_at: p.updated_at }));   // home: item 280, shown on their Home too
   return json({ data: { pages, links: all.links } }, 200, cors);
 }
 

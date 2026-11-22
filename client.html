@@ -114,6 +114,19 @@
   .tab[aria-current="page"] .ti{background:var(--p-soft);border-radius:999px;padding:3px 14px;margin:-3px 0}
   .toast{z-index:40}
   @media (max-width:719px){.toast{bottom:74px}}
+  /* builder item 280 (Nov 22 review): the studio's quick links sit in the menu. Wide screens
+     show them as tabs after the four fixed ones; a phone gets a More tab that opens a sheet
+     with the links and the studio's pages, above the tab bar. */
+  .qtab{text-decoration:none}
+  .morepanel{position:fixed;left:14px;right:14px;bottom:calc(66px + env(safe-area-inset-bottom));margin:0;z-index:35;background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow-lift);max-height:60vh;overflow:auto;padding:6px 0}
+  .morepanel[hidden]{display:none}
+  .morepanel .mhead{padding:10px 16px 4px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .morepanel .mitem{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);padding:12px 16px;font:inherit;font-size:14.5px;text-decoration:none;cursor:pointer;min-height:44px}
+  .morepanel .mitem:hover{background:var(--p-soft)}
+  .morepanel .mitem .mi{width:20px;text-align:center;color:var(--soft)}
+  .hpage{display:flex;align-items:center;gap:14px}.hpage .hpin{flex:1;min-width:0}.hpage h3{margin:0 0 3px;font-size:15.5px}.hpage p{margin:0;color:var(--soft);font-size:13.5px}
+  @media (max-width:719px){.qtab{display:none}}
+  @media (min-width:720px){.moretab{display:none}.morepanel{display:none}}
   @media (min-width:720px){
     /* the context bar (salesforce-reference §11.5): primary region = the studio
        identity as the "app name", secondary = flat tabs with the active-tab
@@ -775,9 +788,18 @@ const H=()=>Object.assign({'Content-Type':'application/json','Authorization':'Be
 // was said. No answer is now an ordinary failure (status 0, offline, a plain message),
 // so every caller's own "that didn't go through — try again" path runs.
 const OFFLINE_MSG='We couldn’t reach your studio — check your connection and try again.';
-async function api(path,method,body){
+// Builder item 256 (Nov 22 review): the booking addresses (/book/<site>/types, /slots and the
+// booking itself) are public: a client's own website calls them from its pages, and the server
+// answers them with the visitor rule, which allows the content-type and accept headers only
+// (_shared/cors.ts visitorCors). Sent with the portal's sign-in headers, the browser refused
+// every one before it left, so Book a call showed "We couldn't check on booking just now"
+// for every client whose studio had booking set up. `bare` sends them with no sign-in.
+const BARE_H=()=>({'Content-Type':'application/json','Accept':'application/json'});
+async function api(path,method,body,opts){
   if(PREVIEW&&method&&method!=='GET'){PREVIEW_REFUSED=Date.now();if(path!=='/client/notifications/read')toast(PREVIEW_MSG);return{ok:false,status:403,preview:true,body:{error:'preview',message:PREVIEW_MSG}};}   // item 232
-  let r;try{r=await fetch(FN+path,{method:method||'GET',headers:H(),body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,offline:true,body:{message:OFFLINE_MSG}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+  const headers=opts&&opts.bare?BARE_H():H();
+  let r;try{r=await fetch(FN+path,{method:method||'GET',headers,body:body?JSON.stringify(body):undefined});}catch(_){return{ok:false,status:0,offline:true,body:{message:OFFLINE_MSG}};}return{ok:r.ok,status:r.status,body:await r.json().catch(()=>({}))};}
+const bookApi=(path,method,body)=>api(path,method,body,{bare:true});
 function toast(m){if(PREVIEW&&Date.now()-PREVIEW_REFUSED<1500)m=PREVIEW_MSG;   // item 232: whatever a refused press says, it says this
   if(window.ddsToast)return void ddsToast(m);const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 // relative "when" — calm, human, no clock precision
@@ -891,7 +913,12 @@ function portalMoment(m){return !!m&&['needs_attention','reminder','opportunity'
 // hidden = no data / route missing / site not published / FAILED month read (a
 // transient DB failure must never masquerade as the "ready to be found" story);
 // empty = a SUCCESSFUL read with no visitors yet (gentle — never "0 people").
-function wsCardState(d){if(!d||d.published!==true)return'hidden';const m=d.month;if(!m)return'bare';if(m.has_data===false||!(m.visitors>0))return'empty';return'stats';}
+// Builder item 258 (Nov 22 review): a site that lives on its own host (the studio marks it
+// "Hosted elsewhere") is live, not "on its way": the read says elsewhere:true, and the card
+// shows its address with Visit, and its Google search numbers when they are connected.
+// Visits aren't counted there (the counter is on sites published from here), so no numbers
+// are claimed or denied.
+function wsCardState(d){if(!d||d.published!==true)return'hidden';if(d.elsewhere===true)return'elsewhere';const m=d.month;if(!m)return'bare';if(m.has_data===false||!(m.visitors>0))return'empty';return'stats';}
 // Item 179: the card while the site isn't live yet. Every client site starts here, so
 // Home still leads with the website: where it stands, and the one thing to do.
 // building = nothing to look at yet (or a change was asked for); ready = the studio
@@ -1044,15 +1071,28 @@ function showNav(){
   const badge=PORTAL.unread?`<span class="badge on" aria-hidden="true">${PORTAL.unread>9?'9+':PORTAL.unread}</span>`:'<span class="badge" aria-hidden="true"></span>';
   nav.innerHTML=`<div class="tabnav-inner">`+
     `<span class="cb-brand">${studioLogo()?`<img class="cb-logo" src="${esc(studioLogo())}" alt="">`:`<span class="cb-mark" aria-hidden="true">${esc(studioInitial())}</span>`}<span class="cb-name">${esc(studioBrand())}</span></span>`+
-    `<div class="cb-tabs">`+TABS.filter(t=>PORTAL.persona!=='client'||tabShown(t[0])).map(t=>`<button class="tab" type="button" data-tab="${t[0]}"><span class="ti" aria-hidden="true">${t[1]}</span><span class="tl">${t[2]}</span></button>`).join('')+`</div>`+
+    `<div class="cb-tabs">`+TABS.filter(t=>PORTAL.persona!=='client'||tabShown(t[0])).map(t=>`<button class="tab" type="button" data-tab="${t[0]}"><span class="ti" aria-hidden="true">${t[1]}</span><span class="tl">${t[2]}</span></button>`).join('')
+      +(PORTAL.persona==='client'?quickLinksShown().map(qlinkTabHtml).join(''):'')   // item 280: the studio's quick links, in the menu
+      +(PORTAL.persona==='client'&&(quickLinksShown().length||((PAGES&&PAGES.pages)||[]).length)?`<button class="tab moretab" type="button" id="navmore" aria-expanded="false" aria-controls="navmorep" aria-haspopup="true"><span class="ti" aria-hidden="true">⋯</span><span class="tl">More</span></button>`:'')
+      +`</div>`+
     `<span class="cb-right">`+
       `<button id="navbell" class="bell cb-bell" aria-label="What’s new${PORTAL.unread?` — ${PORTAL.unread} new`:''}" aria-expanded="false" aria-haspopup="true">${si('bell')}${badge}</button>`+
       `<button id="navacct" class="cb-acct" aria-label="Your account — opens Help" title="Your account">${esc(acct)}</button>`+
     `</span>`+
     `<div id="navnp" class="notifpanel navpanel" role="region" aria-label="What’s new" hidden></div>`+
+    `<div id="navmorep" class="morepanel" role="region" aria-label="More from your studio" hidden>${morePanelHtml()}</div>`+
   `</div>`;
   nav.hidden=false;
-  const tabs=[...nav.querySelectorAll('.tab')];
+  // item 280: the quick links and the phone's More sheet
+  const morep=$('navmorep'),moreb=$('navmore');
+  const moreClose=()=>{if(morep){morep.hidden=true;}if(moreb)moreb.setAttribute('aria-expanded','false');};
+  if(moreb)moreb.addEventListener('click',()=>{const open=morep.hidden;morep.hidden=!open;moreb.setAttribute('aria-expanded',open?'true':'false');});
+  document.addEventListener('click',(e)=>{if(morep&&!morep.hidden&&!morep.contains(e.target)&&e.target!==moreb&&!(moreb&&moreb.contains(e.target)))moreClose();});
+  document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&morep&&!morep.hidden){moreClose();if(moreb)moreb.focus();}});
+  nav.querySelectorAll('[data-ql]').forEach(b=>b.addEventListener('click',()=>{moreClose();quickLinkGo(b.getAttribute('data-ql'));}));
+  nav.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>{moreClose();openPortalPage(b.getAttribute('data-page'));}));
+  nav.querySelectorAll('.morepanel a').forEach(a=>a.addEventListener('click',moreClose));
+  const tabs=[...nav.querySelectorAll('.tab[data-tab]')];
   tabs.forEach(b=>b.addEventListener('click',()=>showTab(b.getAttribute('data-tab'))));
   // page navigation, not tabs: the outer <nav aria-label="Portal sections"> is the
   // landmark, the buttons are plain (aria-current="page" marks the active one).
@@ -1250,6 +1290,7 @@ function renderHome(){
   `</header>`;
   html+=connectAskHtml();
   if(PORTAL.welcome&&P.persona==='client')html+=welcomeNoteHtml();   // item 233: the studio's note, signed
+  if(P.persona==='client')html+=`<section id="home-page" hidden></section>`;   // item 280: the page the studio pinned to Home, filled when the pages read lands
   // item 179: the "Your website" card leads Home — the thing they pay for,
   // first. Filled by loadWebsiteCard (hidden for a reviewer / unpublished site).
   // A client's slot holds its place while the card loads, so nothing jumps when it lands.
@@ -1288,6 +1329,19 @@ function renderHome(){
   const view=VIEW_SEQ;
   Promise.allSettled([buildNeedsYou(),cardOn('website')?loadWebsiteCard():null]).then(()=>{if(view===VIEW_SEQ)saveHomeCache();});
   loadDomainCard();
+  loadHomePage();
+}
+// item 280: the one page the studio pinned to Home — its title and first line, and Open
+function loadHomePage(){
+  if(PORTAL.persona!=='client')return;
+  const view=VIEW_SEQ;
+  pagesStart().then(()=>{
+    if(view!==VIEW_SEQ)return;
+    const host=document.getElementById('home-page'),p=homePage();if(!host||!p)return;
+    host.innerHTML=`<div class="card hpage"><div class="hpin"><span class="tag">From ${esc(studioBrand())}</span><h3>${esc(p.title)}</h3>${p.sub?`<p>${esc(p.sub)}</p>`:''}</div><button type="button" data-home-page="${esc(p.id)}">Open</button></div>`;
+    host.hidden=false;
+    const b=host.querySelector('[data-home-page]');if(b)b.addEventListener('click',()=>openPortalPage(b.getAttribute('data-home-page')));
+  }).catch(()=>{});
 }
 // Fill glances + mini Paths + the aggregated "Needs you" QUEUE — one list-view
 // card of two-line rows (kind chip · title · context · inline action) from feed
@@ -1398,6 +1452,16 @@ function wsCardHtml(d){
   const pic='<div class="wspic" id="wspic"><div class="wsini" aria-hidden="true">✦</div></div>';
   const bar='<div class="wsbar"><span class="pill-live">Live</span>'+(site.url?'<a class="wsdomain" href="'+esc(site.url)+'" target="_blank" rel="noopener">'+esc(site.host)+' ↗</a>':'')+(site.published_at?'<span class="wswhen">Published '+esc(rel(site.published_at))+'</span>':'')+'</div>';
   const see=site.url?'<a class="btn wssee" href="'+esc(site.url)+'" target="_blank" rel="noopener">See your site</a>':'';
+  if(state==='elsewhere'){   // item 258: live on its own host; the address and Visit, Google's numbers when connected
+    const search=d.search,clicks=search&&search.clicks!=null?Math.max(0,search.clicks|0):null;
+    const ebar='<div class="wsbar"><span class="pill-live">Live</span>'+(site.url?'<a class="wsdomain" href="'+esc(site.url)+'" target="_blank" rel="noopener">'+esc(site.host)+' ↗</a>':'')+'</div>';
+    const visit=site.url?'<a class="btn wssee" href="'+esc(site.url)+'" target="_blank" rel="noopener">Visit your site</a>':'';
+    return '<div class="card wscard wselse">'+pic+'<div class="wsin"><span class="tag">Your website</span>'+ebar
+      +'<h3>Your website is live'+(site.host?' at '+esc(site.host):'')+'.</h3>'
+      +'<p class="wslead">'+(clicks!=null?'<b>'+esc(String(clicks))+(clicks===1?' click':' clicks')+'</b> from Google search'+esc(wsGscQualifier(search.period))+'.':'It lives on its own host, so visits aren’t counted here.')+'</p>'
+      +(clicks!=null?'<div class="wsmini"><div class="m"><p class="n">'+esc(String(clicks))+'</p><p class="l">clicks from Google search'+esc(wsGscQualifier(search.period))+'</p></div>'+(search.impressions!=null?'<div class="m"><p class="n">'+esc(String(Math.max(0,search.impressions|0)))+'</p><p class="l">times seen in Google results</p></div>':'')+'</div>':'')
+      +'<div class="wsfoot">'+visit+'</div></div></div>';
+  }
   // 'bare' = the stats read inside the route failed (month:null) — the picture
   // and the live link still work, and the card says the numbers couldn't be
   // checked rather than pretending there are none (the A4 honesty rule).
@@ -2594,7 +2658,7 @@ async function openBooking(){
   // portal walk (Nov 8): both "no times" ends hand over the next step — ask for a call, prefilled
   const askCall=(msg)=>{$('main').innerHTML=back+emptyCard(msg)+`<div class="row" style="justify-content:center;margin-top:-4px"><button class="approve" id="bk-ask">Ask for a call</button></div>`;backReq();const a=$('bk-ask');if(a)a.addEventListener('click',()=>openSupport(null,'messages',{subject:'A call',body:'I’d like to book a call. Times that work for me: '}));};
   if(!site){askCall('Online booking isn’t set up yet — ask for a call and your studio will find a time with you.');return;}
-  let typesRes=null;try{typesRes=await api('/book/'+site+'/types');}catch(_){}
+  let typesRes=null;try{typesRes=await bookApi('/book/'+site+'/types');}catch(_){}
   if(view!==VIEW_SEQ)return;   // re-check before every paint of #main
   if(!(typesRes&&typesRes.ok)){failCard();return;}
   const d=(typesRes.body&&typesRes.body.data)||{};
@@ -2630,7 +2694,7 @@ async function bookLoadSlots(date){
   const host=$('bk-slots');if(!host)return;host.innerHTML='<p class="muted">Finding open times…</p>';
   const view=VIEW_SEQ;   // captured — a newer view mid-fetch means this panel is gone
   const seq=++BK_SLOT_SEQ;   // per-panel token — two same-view day reads must not share VIEW_SEQ
-  let r=null;try{r=await api('/book/'+BOOK.site+'/slots?type='+encodeURIComponent(BOOK.type.id)+'&date='+encodeURIComponent(date));}catch(_){}
+  let r=null;try{r=await bookApi('/book/'+BOOK.site+'/slots?type='+encodeURIComponent(BOOK.type.id)+'&date='+encodeURIComponent(date));}catch(_){}
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
   if(seq!==BK_SLOT_SEQ)return;   // a newer day's read owns this panel — a stale day's slots never paint
   const h2=$('bk-slots');if(!h2)return;   // the panel was re-rendered away
@@ -2661,7 +2725,7 @@ async function submitBooking(){
   if(!email){toast('Please add your email.');return;}
   const btn=$('bk-go');btn.disabled=true;
   const view=VIEW_SEQ;   // captured — the success takeover must not paint over a newer view
-  let r=null;try{r=await api('/book/'+BOOK.site,'POST',{type_id:BOOK.type.id,slot_start:BOOK.slot,name,email});}catch(_){}
+  let r=null;try{r=await bookApi('/book/'+BOOK.site,'POST',{type_id:BOOK.type.id,slot_start:BOOK.slot,name,email});}catch(_){}
   if(view!==VIEW_SEQ)return;   // the user moved on mid-POST — the confirm UI is gone; never repaint #main
   if(r&&r.ok&&r.body&&r.body.data&&r.body.data.ok!==false){const day=bookDayLabel(BOOK.slot);$('main').innerHTML=`<header><h1>You’re booked 🎉</h1><p class="sub">${esc(BOOK.type.name)} · ${day?esc(day)+' · ':''}${esc(bookLabel(BOOK.slot))}. Your studio will confirm by email.</p></header><p><a class="link" href="#" id="bk-done">‹ Messages</a></p>`;const d=$('bk-done');if(d)d.addEventListener('click',(e)=>{e.preventDefault();showTab('messages');});bookFocusH1();}
   else{toast((r&&r.body&&r.body.message)||'Couldn’t book that time — try another.');btn.disabled=false;}
@@ -2702,6 +2766,7 @@ async function openServiceRequest(svc){
 // loaded, and a failure is never cached — tab re-entry retries free), and the
 // account card is a proper profile section whose "message your studio" pointers
 // only render for a persona that CAN message.
+function passwordWayOn(){const si=PORTAL.ctx&&PORTAL.ctx.portal&&PORTAL.ctx.portal.signin;return !(si&&si.password===false);}
 function accountSectionHtml(canMessage){
   const name=clientName();
   const email=PREVIEW?String((PORTAL.ctx&&PORTAL.ctx.preview&&PORTAL.ctx.preview.email)||''):(USER&&USER.email)?USER.email:'';
@@ -2709,7 +2774,9 @@ function accountSectionHtml(canMessage){
   return `<section id="sec-you"><h2>Your account</h2><div class="card">`+
     `<div class="acctid"><span class="acctav" aria-hidden="true">${esc(av)}</span><div class="acctwho"><strong>${name?esc(name):'Signed in'}</strong>${email?`<span class="muted">${esc(email)}</span>`:''}</div></div>`+
     `<div class="acctrow"><div class="acctlab"><strong>Appearance</strong><span class="muted">Light, dark, or match your device.</span></div><button id="appearance">${esc(themeLabel())}</button></div>`+
-    (email?`<div class="acctrow"><div class="acctlab"><strong>Password</strong><span class="muted">We’ll email you a link to set a new one.</span></div><button id="chgpw">Change password</button></div>`:'')+
+    // items 257 and 281 (Nov 22 review): the email carries a code, not a link; and a studio that
+    // turned passwords off for its clients (Settings › How clients sign in) hides this row too
+    (email&&passwordWayOn()?`<div class="acctrow"><div class="acctlab"><strong>Password</strong><span class="muted">We’ll email you a code to set a new one.</span></div><button id="chgpw">Change password</button></div>`:'')+
     // builder item 191: two-step sign-in, the client's own (the set-up sheet is fresh-code.js, Figma B)
     `<div class="acctrow" id="acctTwo"><div class="acctlab"><strong>Two-step sign-in</strong><span class="muted" id="acctTwoLine">Checking…</span></div><button id="twoStep" hidden>Turn on</button></div>`+
     `<div class="acctrow"><div class="acctlab"><strong>Session</strong><span class="muted">Signed in on this device.</span></div><button id="signout2">Sign out</button></div>`+
@@ -2740,7 +2807,7 @@ function wireAccountSection(){
   }
   const email=(USER&&USER.email)?USER.email:'';
   const ap=$('appearance');if(ap)ap.addEventListener('click',()=>{cycleClientTheme();ap.textContent=themeLabel();});
-  const cp=$('chgpw');if(cp)cp.addEventListener('click',async()=>{cp.disabled=true;try{await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/set-password.html?next=/portal.html'});toast('Check your email for a link to set a new password.');}catch(_){toast('Couldn’t send that just now.');cp.disabled=false;}});
+  const cp=$('chgpw');if(cp)cp.addEventListener('click',async()=>{cp.disabled=true;try{await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/set-password.html?next=/portal.html'});toast('Check your email for a code to set a new password.');}catch(_){toast('Couldn’t send that just now.');cp.disabled=false;}});
   const so=$('signout2');if(so)so.addEventListener('click',doSignOut);
   paintTwoStep().catch(()=>{});
 }
@@ -2768,7 +2835,7 @@ const STARTER_FAQ=[
   ['How do I approve something?','Anything waiting for your OK is at the top of Home, under Needs you, and in your project. Press Approve, or Request changes to say what you’d like different. Nothing changes until you approve.'],
   ['How do I pay an invoice?','Open Documents: what you owe is at the top, with Pay. You pay on Stripe’s secure page and come straight back here, where the invoice shows Processing and then Paid.'],
   ['How do I ask for something new?','Open Messages to book a call, ask for one of your studio’s services, or press Write and say what you need. Nothing is charged until your studio replies.'],
-  ['How do I change my password?','Under Your account, further down this page, press Change password and we’ll email you a link to set a new one.'],
+  ['How do I change my password?','Under Your account, further down this page, press Change password and we’ll email you a code to set a new one.'],
 ];
 // Builder list item 176: the hand-over kit the studio wrote for this client (GET
 // /client/kit) — who to call, how-tos, videos, files and the facts of their
@@ -2793,6 +2860,20 @@ function kitHtml(kr){
 //    screen with a back arrow; a file on it asks for a fresh link when it's pressed. A quick
 //    link to a place the studio turned off for this client isn't drawn. ──
 let PAGES=null;
+// item 280: one read per load, started with the other boot reads; the menu, Home and Help share it
+function pagesStart(){if(PORTAL.persona!=='client')return Promise.resolve(null);if(!PORTAL.pagesFetch)PORTAL.pagesFetch=api('/client/portal-pages').then(r=>{PAGES=(r&&r.ok&&r.body&&r.body.data)||null;return PAGES;}).catch(()=>null);return PORTAL.pagesFetch;}
+function quickLinksShown(){return ((PAGES&&PAGES.links)||[]).filter(quickLinkShown);}
+function homePage(){return ((PAGES&&PAGES.pages)||[]).find(p=>p&&p.home===true)||null;}
+// the quick links and pages in the menu: tabs on a wide screen, a More sheet on a phone
+function qlinkTabHtml(l){const ext=/^https:\/\//.test(l.to);return ext?`<a class="tab qtab" href="${esc(l.to)}" target="_blank" rel="noopener noreferrer"><span class="ti" aria-hidden="true">↗</span><span class="tl">${esc(l.label)}</span></a>`:`<button class="tab qtab" type="button" data-ql="${esc(l.to)}"><span class="ti" aria-hidden="true">${l.to==='book'?si('calendar'):l.to==='messages'?si('message'):si('folder')}</span><span class="tl">${esc(l.label)}</span></button>`;}
+function morePanelHtml(){
+  const links=quickLinksShown(),pages=(PAGES&&PAGES.pages)||[];
+  let h='';
+  if(links.length)h+=`<div class="mhead">Quick links</div>`+links.map(l=>/^https:\/\//.test(l.to)?`<a class="mitem" href="${esc(l.to)}" target="_blank" rel="noopener noreferrer"><span class="mi" aria-hidden="true">↗</span>${esc(l.label)}</a>`:`<button type="button" class="mitem" data-ql="${esc(l.to)}"><span class="mi" aria-hidden="true">›</span>${esc(l.label)}</button>`).join('');
+  if(pages.length)h+=`<div class="mhead">From ${esc(studioBrand())}</div>`+pages.map(p=>`<button type="button" class="mitem" data-page="${esc(p.id)}"><span class="mi" aria-hidden="true">›</span>${esc(p.title)}</button>`).join('');
+  return h;
+}
+function quickLinkGo(t){if(t==='book')openBooking();else showTab(t);}
 function quickLinkShown(l){const t=String(l&&l.to||'');if(/^https:\/\//.test(t))return true;if(t==='book')return partOn('book');if(t==='messages')return partOn('messages');if(t==='documents')return tabShown('documents');return false;}
 function portalPagesHtml(){
   const pages=(PAGES&&PAGES.pages)||[],links=((PAGES&&PAGES.links)||[]).filter(quickLinkShown);
@@ -2803,7 +2884,7 @@ function portalPagesHtml(){
 }
 function wirePortalPages(){
   document.querySelectorAll('#sec-pages [data-page]').forEach(b=>b.addEventListener('click',()=>openPortalPage(b.getAttribute('data-page'))));
-  document.querySelectorAll('#sec-qlinks [data-ql]').forEach(b=>b.addEventListener('click',()=>{const t=b.getAttribute('data-ql');if(t==='book')openBooking();else showTab(t);}));
+  document.querySelectorAll('#sec-qlinks [data-ql]').forEach(b=>b.addEventListener('click',()=>quickLinkGo(b.getAttribute('data-ql'))));
 }
 function openPortalPage(id){
   const p=((PAGES&&PAGES.pages)||[]).find(x=>x.id===id);if(!p){showTab('help');return;}
@@ -2873,7 +2954,7 @@ async function renderHelp(){
   let r=null,kr=null;if(answers){try{[r,kr]=await Promise.all([api('/client/faq').catch(()=>null),api('/client/kit').catch(()=>null)]);}catch(_){}}
   const pg=await pgP;
   if(view!==VIEW_SEQ)return;   // the user moved on mid-fetch — never paint over the newer view
-  PAGES=(pg&&pg.ok&&pg.body&&pg.body.data)||null;
+  if(pg&&pg.ok&&pg.body&&pg.body.data)PAGES=pg.body.data;   // item 280: a failed re-read keeps the load's copy
   const faqFailed=!(r&&r.ok);
   const faqHtml=(!faqFailed&&r.body&&r.body.data&&r.body.data.html)||'';
   let html=portalHeader('Help',answers?'Quick answers from your studio.':'Your account, and what’s new in your portal.')+whatsNewDoorHtml()+portalPagesHtml()+(answers?kitHtml(kr):'');
@@ -3848,12 +3929,19 @@ function clearHomeCaches(){try{Object.keys(localStorage).filter(k=>k.indexOf(HOM
 function landsOnHome(){try{const q=new URLSearchParams(location.search);if(q.get('support')||q.get('project')||q.get('approval')||q.get('paid')||q.get('connect'))return false;if(String(location.hash||'').length>1)return false;return !localStorage.getItem(RETURN_KEY);}catch(_){return false;}}
 function signedOut(){if(PREVIEW){$('main').innerHTML=`<div class="center"><h2>Sign in to your studio to see a client’s portal.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;return;}   // item 232: this device's client caches stay as they are
   dropHomeCacheView();clearHomeCaches();$('main').innerHTML=`<div class="center"><h2>Sign in to see your updates.</h2><p style="margin-top:20px"><a class="link" href="/portal.html">Sign in →</a></p></div>`;}
-function trouble(){dropHomeCacheView();$('main').innerHTML=`<div class="center"><h2>We couldn’t load your updates just now.</h2><p class="muted">Please refresh in a moment.</p></div>`;}
+// Builder item 273 (Nov 22 review): this used to be a dead end ("please refresh", no button).
+// Now it has Try again, and a way to the sign-in page.
+function trouble(){dropHomeCacheView();hideNav();$('main').innerHTML=`<div class="center"><h2>We couldn’t load your updates just now.</h2><p class="muted">Try again in a moment. If it keeps happening, signing in again usually clears it.</p><div class="row" style="justify-content:center;gap:14px;margin-top:20px"><button type="button" id="tryAgain">Try again</button><a class="link" href="${PREVIEW?'/studio.html':'/portal.html'}" style="align-self:center">Sign in</a></div></div>`;const b=$('tryAgain');if(b)b.addEventListener('click',()=>{b.disabled=true;load().catch(()=>trouble());});}
+// item 273: the server says this sign-in is no longer good (one sure case: two-step sign-in was
+// turned on from another device, so this device's older sign-in no longer counts). The sign-in
+// page knows what to do next (ask for the app's code, or sign in afresh); the place they were
+// opening is kept for after, as an emailed link's is.
+function toSignIn(params){keepReturn(params||new URLSearchParams(location.search));location.replace('/portal.html');}
 function ownerNote(){dropHomeCacheView();clearHomeCaches();$('main').innerHTML=`<div class="center"><div class="rolebadge">● Full access</div><h2 style="margin-top:14px">This is the client view.</h2><p class="muted">You have the full workspace.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
 
 async function load(){
   setWide(false);
-  PORTAL.snaps=null;PORTAL.snapsFetch=null;PORTAL.snapsBoot=null;PORTAL.billing=null;PORTAL.billingFetch=null;PORTAL.docsFetch=null;PORTAL.repsFetch=null;PORTAL.billingFailed=false;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;PORTAL.wsthumb=undefined;PORTAL.wsthumbFetch=null;   // fresh per-load caches (a re-load = fresh data)
+  PORTAL.snaps=null;PORTAL.snapsFetch=null;PORTAL.snapsBoot=null;PORTAL.billing=null;PORTAL.billingFetch=null;PORTAL.docsFetch=null;PORTAL.repsFetch=null;PORTAL.billingFailed=false;PORTAL.wstats=undefined;PORTAL.wstatsFetch=null;PORTAL.wsthumb=undefined;PORTAL.wsthumbFetch=null;PORTAL.pagesFetch=null;PAGES=null;   // fresh per-load caches (a re-load = fresh data)
   const first=!LOADED_ONCE;LOADED_ONCE=true;
   const params=new URLSearchParams(location.search);
   // G2: the destination kept through a sign-in; an address that names its own wins
@@ -3891,7 +3979,7 @@ async function load(){
   // …and each project's details go out the moment the list lands, not after the context
   if(early&&toHome)projP.then(r=>{const d=r&&r.ok&&r.body&&r.body.data;if(Array.isArray(d)&&d.length&&!PORTAL.projects.length){PORTAL.projects=d;PORTAL.snapsBoot=ensureSnaps();}}).catch(()=>{});
   const [ctx,proj0,feed]=await Promise.all([api('/portal/context'),projP,api('/portal/feed')]);
-  if(!ctx.ok){dropHomeCacheView();hideNav();trouble();return;}
+  if(!ctx.ok){if(ctx.status===401&&!PREVIEW){toSignIn(params);return;}dropHomeCacheView();hideNav();trouble();return;}
   const c=ctx.body.data||{};
   // …unless the answer says they are more than a reviewer now: then the read happens after all
   const proj=(skipProj&&(c.is_managed_client||c.site_role!=='client_reviewer'))?await api('/client/projects').catch(()=>null):proj0;
@@ -3909,6 +3997,7 @@ async function load(){
   try{const fb=$('footby');if(fb)fb.textContent='by '+(studioNamed()?studioBrand():'your studio');}catch(_){}
   PORTAL.persona=(projects.length||c.is_managed_client)?'client':'reviewer';
   rememberPersona(c);   // G12
+  if(PORTAL.persona==='client')pagesStart();   // item 280: the studio's quick links and pinned page, read beside the other boot reads
   PORTAL.projects=projects;
   // A FAILED /client/projects read must never masquerade as the zero-project
   // first-run: Home renders the couldn't-load line instead of the 🚀 card and
@@ -3935,6 +4024,7 @@ async function load(){
   if(a&&a.ok&&a.body&&a.body.data&&Array.isArray(a.body.data.providers)&&a.body.data.providers.length)PORTAL.ask=a.body.data;
   else if(a&&!a.ok&&askTok&&a.body&&a.body.message)PORTAL.askProblem=String(a.body.message);
   if(PORTAL.persona==='client')await decidePapers(toHome,paidId?'documents':tabOf(wantTab));   // item 238
+  if(PORTAL.persona==='client')await pagesStart();   // item 280: the menu carries the studio's quick links (read beside the papers decision, not after it)
   PORTAL.ready=true;
   // item 228: with the last Home on screen, swap only once Home's own reads have answered,
   // so the fresh Home replaces it whole instead of passing through grey placeholders

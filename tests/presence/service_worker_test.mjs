@@ -28,8 +28,14 @@ async function handled(path) {
 for (const p of ['/settings', '/settings.html', '/customers', '/broadcasts', '/sales/today', '/presence.html', '/today.html', '/inbox', '/a-page-added-next-year', '/shell.js', '/tokens.css', '/vendor/supabase.js', '/report/abc', '/site-review']) {
   ok(`app and unknown: ${p} is left to the network`, (await handled(p)) === 'network');
 }
-for (const p of ['/', '/about', '/about.html', '/about/', '/services', '/contact', '/burbank-web-design', '/privacy']) {
+// builder item 264 (Nov 22 review): only the pages still served on the app host are listed;
+// /about, /services, /contact and the city pages forward to the marketing site now, and a
+// forwarded page is left to the network (tests/presence/sw_precache_test.mjs reads the forwards)
+for (const p of ['/', '/privacy', '/privacy.html', '/privacy/', '/terms', '/accessibility', '/ai-disclaimer']) {
   ok(`marketing: ${p} comes fresh from the network, the cache only offline`, (await handled(p)) === 'network-first');
+}
+for (const p of ['/about', '/about.html', '/services', '/contact', '/burbank-web-design']) {
+  ok(`a page that forwards to the marketing site is left to the network: ${p}`, (await handled(p)) === 'network');
 }
 for (const p of ['/eric-davis.webp', '/icon-192.png', '/fonts/library/inter-400.woff2', '/favicon.png']) {
   ok(`pictures and fonts: ${p} from the cache, refreshed behind`, (await handled(p)) === 'cache-then-refresh');
@@ -38,7 +44,7 @@ ok('a POST is never touched', (() => { let a = null; listeners.fetch({ request: 
 ok('another origin is never touched', (() => { let a = null; listeners.fetch({ request: { method: 'GET', url: 'https://cdn.example/x.png' }, respondWith: (p) => { a = p; } }); return a === null; })());
 // list item 139: the old report card forwards to the Site Review, so the worker leaves it to the network
 ok('a retired page that forwards elsewhere is left to the network: /report-card', (await handled('/report-card')) === 'network');
-ok('the cache name moved on, so old copies are deleted on activate', /const CACHE_NAME = 'dds-v18'/.test(src));
+ok('the cache name moved on, so old copies are deleted on activate', /const CACHE_NAME = 'dds-v19'/.test(src));
 
 const passed = results.filter((r) => r.p).length;
 console.log(`\n════ SERVICE WORKER: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);

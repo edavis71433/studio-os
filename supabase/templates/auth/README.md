@@ -35,8 +35,10 @@ Then Authentication → Emails → SMTP Settings: **Sender name** `Eric Davis` �
 - The portal's sign-in page offers the link first and the 6-digit code second
   (portal.html), so the sign-in email does too; the code needs `{{ .Token }}`.
 - Reset and invitation lead with the code and ask people to type
-  davisdigitalstudio.com/set-password (it forwards to the app's set-password
-  page): some email apps open links in advance and use them up.
+  app.davisdigitalstudio.com/set-password, the app's own address (builder item 264,
+  Nov 22: the main site moved to Squarespace, and the old davisdigitalstudio.com
+  address only works while a forward there points at the app): some email apps
+  open links in advance and use them up.
 - No studio's name: one template serves every studio's clients, so the words name
   nobody, and the footer is the platform's postal line, as on the product's own
   emails.

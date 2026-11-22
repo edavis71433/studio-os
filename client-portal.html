@@ -55,7 +55,8 @@
   .step .sl{flex:1;min-width:0;font-size:14px}
   .step.done .sl{color:var(--soft)}
   /* pick a client to see their portal */
-  dialog.pick{border:1px solid var(--line);border-radius:var(--dds-r-lg,12px);padding:0;width:min(480px,calc(100vw - 32px));max-height:min(80vh,620px);background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+  /* item 287 (Nov 22 review): the page's reset (*{margin:0}) took away the box's margin:auto, so it sat in the top-left corner over the sidebar */
+  dialog.pick{margin:auto;border:1px solid var(--line);border-radius:var(--dds-r-lg,12px);padding:0;width:min(480px,calc(100vw - 32px));max-height:min(80vh,620px);background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
   dialog.pick::backdrop{background:rgba(27,21,37,.35)}
   .pick .pin{padding:var(--dds-s5,20px)}
   .pick ul{list-style:none;padding:0;margin:12px 0 0;max-height:52vh;overflow:auto}
@@ -131,7 +132,7 @@ function render(){
     `<div class="addr"><input id="addr" type="text" readonly value="${esc(d.address)}" aria-label="Your portal’s address"><button type="button" class="sbtn" id="copyAddr">Copy</button><a class="sbtn" href="${esc(d.address)}" target="_blank" rel="noopener">Open</a></div></section>`;
   const tile=(k,v)=>`<div><span class="k">${esc(k)}</span><b>${esc(String(v||0))}</b></div>`;
   html+=`<section class="card counts" aria-label="Your clients and the portal">${tile('Active clients',n.active)}${tile('Waiting to join',n.waiting)}${tile('Invites run out',n.expired)}${tile('In the last 30 days',n.recent)}`+
-    `<p class="how">People, not sign-ins. An invite runs out after 7 days without them coming in; their portal card in Settings sends a new one.</p></section>`;
+    `<p class="how">People, not sign-ins. An invite counts as run out after 7 days without them coming in. The email’s button signs them in once, for a short while; after that the sign-in page emails them a code any time. Their portal card in Settings sends a new invite.</p></section>`;
   html+=`<section class="card" aria-labelledby="setH"><h2 id="setH">Set up your portal</h2><p class="sub" id="setN">${done} of ${steps.length} done</p><ol class="steps">`+
     steps.map(s=>{const w=STEP_WORDS[s.key]||[s.key,'',''];
       const act=s.done?'<span class="sr-only">Done</span>':s.key==='preview'?`<button type="button" class="sbtn" data-see${clients.length?'':' disabled'}>${esc(w[1])}</button>`:`<a class="sbtn" href="${esc(w[2])}">${esc(w[1])}</a>`;
