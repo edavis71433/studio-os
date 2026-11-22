@@ -130,12 +130,18 @@ test.describe('Styles › Looks: gentle motion and the site icon (builder item 1
   test('Still or Gentle motion, saying what it does; Still takes the setting away', async ({ page }) => {
     const m = await looks(page);
     const card = page.locator('#designCard');
-    await expect(card.getByRole('button', { name: 'Still ✓' })).toBeVisible();
-    await expect(card).toContainText('Gentle motion fades each section up as visitors scroll to it. Anyone whose device asks for less motion sees it still, and nothing waits to show.');
-    await card.getByRole('button', { name: 'Gentle motion', exact: true }).click();
+    // item 302: five tiles that move (Still, Gentle, Slide, Scale, Zoom), the chosen one pressed
+    const tiles = card.locator('.ins-motion');
+    await expect(tiles).toHaveCount(5);
+    await expect(tiles.filter({ hasText: 'Still' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(card).toContainText('Nothing moves. Every section is simply there. Anyone whose device asks for less motion sees the site still, and nothing waits to show.');
+    await tiles.filter({ hasText: 'Gentle' }).click();
     await expect.poll(() => lastTokens(m)).toEqual({ motion: 'gentle' });
-    await expect(page.locator('#designCard').getByRole('button', { name: 'Gentle motion ✓' })).toBeVisible();
-    await page.locator('#designCard').getByRole('button', { name: 'Still', exact: true }).click();
+    await expect(tiles.filter({ hasText: 'Gentle' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(card).toContainText('Each section fades up a little as visitors scroll to it.');
+    await tiles.filter({ hasText: 'Zoom' }).click();
+    await expect.poll(() => lastTokens(m)).toEqual({ motion: 'zoom' });
+    await tiles.filter({ hasText: 'Still' }).click();
     await expect.poll(() => lastTokens(m)).toEqual({});
   });
 

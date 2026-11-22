@@ -10,11 +10,20 @@ name: E2E (Playwright)
 # the `browser` job always reports. When the suite doesn't need to run, `browser`
 # still reports green in under a minute.
 #
-# The three devices run at the same time, one machine each (`devices`), inside
-# Playwright's own image, which has the browsers and their system libraries in it.
-# Until Nov 8 2026 one machine ran all three on two workers and installed the
-# browsers every time: a run took 44 to 60 minutes against a 60-minute cap, and on
-# Nov 6 the browser install alone took 40 minutes on a slow package mirror.
+# The three devices run at the same time, split across eight machines (`devices`): the
+# desktop in two parts and the phone and the tablet in three each (Playwright's own
+# --shard), two workers on each machine. They run inside Playwright's own image,
+# which has the browsers and their system libraries in it. Until Nov 8 2026 one machine
+# ran all three on two workers and installed the browsers every time: a run took 44 to
+# 60 minutes against a 60-minute cap, and on Nov 6 the browser install alone took 40
+# minutes on a slow package mirror. Until Nov 22 2026 (builder item 419) each device had
+# one machine: the phone took 46 to 69 minutes, and a release waited 52 to 75 for it.
+# Four workers a machine was tried and measured slower on the phone's WebKit than two
+# (playwright.config.ts says the numbers), so the parts carry the gain.
+#
+# On pull requests and on main, the tablet runs only what a tablet adds: the tests
+# tagged @touch and @layout. The nightly run tests the tablet in full, with the desktop
+# and the phone, and GitHub emails a failed nightly run like any failed scheduled one.
 #
 # To make this a REQUIRED gate: Settings → Branches → protect `main` and add
 # "browser" as a required status check: the last job below, not a device. Leave
@@ -27,6 +36,10 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Builder item 419: every night at 3:23 am Pacific (11:23 UTC), main in full on all three
+  # devices, the tablet's whole suite included.
+  schedule:
+    - cron: "23 11 * * *"
 
 # A pull request pushed again stops its older run, so the machines go to the newest
 # push. On Nov 11 2026 older pushes of the same branches kept running beside the new
@@ -70,7 +83,7 @@ jobs:
           elif [ "$EVENT" = push ] && git fetch --quiet --no-tags --depth=1 origin "$BEFORE"; then
             base=$BEFORE
           else
-            # A manual run, a new branch (BEFORE is all zeros), or a force push whose old commit is gone.
+            # A manual run, the nightly run, a new branch (BEFORE is all zeros), or a force push whose old commit is gone.
             base=
           fi
           changed=
@@ -106,6 +119,10 @@ jobs:
               supabase/functions/presence/lib/site_buttons.ts) run=true ;;
               # new-site-gallery-198.spec.ts imports the gallery's kinds and designs from this (builder item 198).
               supabase/functions/presence/lib/design_gallery.ts) run=true ;;
+              # published-sites-nov-22.spec.ts presses the phone menu, the zoom view and the carousel drawn with these (builder items 288, 294, 298).
+              supabase/functions/presence/lib/site_shell.ts) run=true ;;
+              supabase/functions/presence/lib/site_block_scripts.ts) run=true ;;
+              supabase/functions/presence/lib/site_nav.ts) run=true ;;
               docs/*|supabase/*|runbooks/*|sql/*|templates/*) ;;
               tests/isolation/*|tests/presence/*|tests/smoke/*|tests/workflows/*) ;;
               .github/workflows/ci.yml|.github/workflows/deploy.yml|.github/workflows/rollback.yml|.github/workflows/schema-dump.yml) ;;
@@ -136,17 +153,20 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # One machine per device, all three at once.
+  # Eight machines at once: each device split into parts by Playwright's --shard, which
+  # gives each part an equal share of the tests in file order (measured on main's run of
+  # Nov 22 2026, 15:32 UTC: the phone's three parts held 29 to 31 minutes of test time each,
+  # the tablet's full suite 37 to 39, the desktop's two parts 27 and 32).
   devices:
     needs: scope
     if: needs.scope.outputs.run == 'true'
-    name: browser on ${{ matrix.project }}
+    name: browser on ${{ matrix.project }} (${{ matrix.shard }} of ${{ matrix.shards }})
     runs-on: ubuntu-latest
-    # A device takes about a third of what all three took together. A run that hits
-    # this cap is cancelled with no test summary at all. Main runs the tablet in full:
-    # on Nov 11 2026, with the machines busy, that took 30 to 45 minutes, and three of
-    # six runs hit the old 45-minute cap, so their deploys waited and shipped nothing.
-    timeout-minutes: 75
+    # One part takes about 10 to 15 minutes. A run that hits this cap is cancelled with
+    # no test summary at all, so it stays well under the 80 minutes deploy.yml waits for
+    # the check. Until item 419 one machine ran a whole device: the full tablet took up to
+    # 67 minutes against a 75-minute cap.
+    timeout-minutes: 40
     # Playwright's image for the exact version in package-lock.json: the browsers and
     # their system libraries are already in it, so nothing is downloaded or installed
     # per run. Move it with Playwright; tests/workflows/e2e_scope_test.mjs checks that
@@ -155,10 +175,19 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --user 1001
     strategy:
-      # A failure on one device doesn't stop the other two, so each run names all of its own.
+      # A failure on one machine doesn't stop the others, so each run names all of its own.
       fail-fast: false
       matrix:
-        project: [desktop-chromium, tablet, mobile]
+        include:
+          # The longest parts first: when GitHub's machines are busy, a matrix starts in this order.
+          - { project: mobile, shard: 1, shards: 3 }
+          - { project: mobile, shard: 2, shards: 3 }
+          - { project: mobile, shard: 3, shards: 3 }
+          - { project: desktop-chromium, shard: 1, shards: 2 }
+          - { project: desktop-chromium, shard: 2, shards: 2 }
+          - { project: tablet, shard: 1, shards: 3 }
+          - { project: tablet, shard: 2, shards: 3 }
+          - { project: tablet, shard: 3, shards: 3 }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -173,39 +202,42 @@ jobs:
       # to the same version, and let this check prove it.
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
-      # On a pull request the tablet runs only what a tablet adds, the tests tagged
-      # @touch and @layout. Every other test already ran on the desktop and the phone,
-      # and the iPad's touch quirks made most of the flaky failures. Pushes to main and
-      # manual runs test the tablet in full, and deploy.yml waits for main's run.
+      # On a pull request and on main the tablet runs only what a tablet adds, the tests
+      # tagged @touch and @layout. Every other test already ran on the desktop and the
+      # phone, and the iPad's touch quirks made most of the flaky failures. The nightly run
+      # and a manual run test the tablet in full. deploy.yml waits for the run on the commit
+      # it releases, so main's release waits for the touch and layout tests, not the rest.
       - name: Run the browser suite on this device
         env:
           PROJECT: ${{ matrix.project }}
           EVENT: ${{ github.event_name }}
+          SHARD: ${{ matrix.shard }}/${{ matrix.shards }}
         run: |
-          if [ "$PROJECT" = tablet ] && [ "$EVENT" = pull_request ]; then
-            npx playwright test --project=tablet --grep "@touch|@layout"
+          if [ "$PROJECT" = tablet ] && { [ "$EVENT" = pull_request ] || [ "$EVENT" = push ]; }; then
+            npx playwright test --project=tablet --grep "@touch|@layout" --shard="$SHARD"
           else
-            npx playwright test --project="$PROJECT"
+            npx playwright test --project="$PROJECT" --shard="$SHARD"
           fi
       # A test that fails and then passes on its retry leaves the run green, so its
       # name would sit in a log nobody opens. This puts it on the run's summary page.
       - name: Name the flaky and failed tests
         if: ${{ !cancelled() }}
         env:
-          PROJECT: ${{ matrix.project }}
-        run: node scripts/e2e-summary.mjs test-results/results.json "$PROJECT" >> "$GITHUB_STEP_SUMMARY"
+          PART: ${{ matrix.project }}, part ${{ matrix.shard }} of ${{ matrix.shards }}
+        run: node scripts/e2e-summary.mjs test-results/results.json "$PART" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ matrix.project }}
+          name: playwright-report-${{ matrix.project }}-${{ matrix.shard }}-of-${{ matrix.shards }}
           path: playwright-report/
           retention-days: 14
 
   # The check to require, and the one deploy.yml waits for. It always runs, so it
   # always reports, and it reads how the other jobs ended instead of trusting a skip:
-  # it passes only when every device passed, or when the decision found nothing the
-  # suite can reach.
+  # it passes only when every part of every device passed, or when the decision found
+  # nothing the suite can reach. GitHub reports a matrix job as one result: success only
+  # when every machine in it succeeded.
   browser:
     needs: [scope, devices]
     if: always()
@@ -232,7 +264,7 @@ jobs:
             exit 1
           fi
           if [ "$DEVICES" != success ]; then
-            echo "::error title=Browser check::At least one device didn't pass (the devices ended $DEVICES). Each device's run names its failures."
+            echo "::error title=Browser check::At least one part of one device didn't pass (the devices ended $DEVICES). Each part's run names its failures."
             exit 1
           fi
-          echo "The desktop, the tablet and the phone all passed."
+          echo "Every part of the desktop, the tablet and the phone passed."

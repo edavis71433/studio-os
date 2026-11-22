@@ -49,7 +49,7 @@ const ok = (n, c) => { if (c) pass++; else { fail++; console.log('  FAIL → ' +
   // no custom nav → byte-identical stylesheet (no dropdown CSS leaked in)
   const plain = businessClassic(structuredClone(fixture), manifest, { baseUrl: 'https://x.test' });
   const plainCss = Object.entries(plain).find(([k]) => k.startsWith('assets/site-'))?.[1] || '';
-  ok('a site with no custom nav gets NO dropdown CSS (byte-clean)', !plainCss.includes('ul.subnav'));
+  ok('a site with no custom nav gets NO dropdown CSS (byte-clean)', !plainCss.includes('nav.primary ul.subnav{position:absolute'));   // the phone menu's own sheet rules (lib/site_shell.ts) are on every site
   ok('NAV_DROPDOWN_CSS is zero-JS (no <script>, no url())', !/script|javascript:|url\(/i.test(NAV_DROPDOWN_CSS));
 }
 

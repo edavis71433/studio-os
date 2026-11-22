@@ -582,6 +582,42 @@ async function saveTokens(change, msg) {
 }
 // the tab a Styles row belongs to (the floating studio's Styles card hides the others)
 function stab(rowEl, tab) { const w = rowEl && (rowEl.classList && rowEl.classList.contains("ins-field") ? rowEl : rowEl.parentNode); if (w && w.dataset) w.dataset.stab = tab; return rowEl; }
+// ── Item 302: how sections come in as visitors scroll, picked from tiles that move ──
+// Still, or one of four (lib/site_motion.ts): gentle (fades up), slide (in from the side), scale (grows
+// from a touch smaller), zoom (the gentle rise and a slow zoom on the welcome photo). Each tile plays
+// its own motion when the pointer rests on it or it has the keyboard, and the chosen one plays once as
+// the card opens. A device asking for less motion sees the tiles still.
+const MOTIONS = [
+  ["", "Still", "Nothing moves. Every section is simply there."],
+  ["gentle", "Gentle", "Each section fades up a little as visitors scroll to it."],
+  ["slide", "Slide", "Each section slides in from the side, left and right in turn."],
+  ["scale", "Scale", "Each section grows in from a touch smaller."],
+  ["zoom", "Zoom", "The gentle rise, and the welcome photo zooms in slowly over the first few seconds."],
+];
+function motionRow(host, T) {
+  const wrap = el("div", "ins-field");
+  wrap.appendChild(el("div", "ins-lbl", "Motion"));
+  const row = el("div", "ins-motions"); row.setAttribute("role", "group"); row.setAttribute("aria-label", "Motion");
+  const now = String(T.motion || "");
+  const says = el("p", "ins-says");
+  MOTIONS.forEach(([v, name]) => {
+    const b = el("button", "ins-motion"); b.type = "button"; b.dataset.motion = v || "still"; b.setAttribute("aria-pressed", String(now === v));
+    const pic = el("span", "ins-motion-pic"); pic.setAttribute("aria-hidden", "true");
+    pic.append(el("i", "ph"), el("i", "ln"), el("i", "ln s"));
+    b.append(pic, document.createTextNode(name));
+    const play = () => { pic.classList.remove("play"); void pic.offsetWidth; pic.classList.add("play"); };
+    b.addEventListener("mouseenter", play); b.addEventListener("focus", play);
+    b.addEventListener("click", () => { if (v === String((DESIGN_TOKENS && DESIGN_TOKENS.motion) || "")) return; saveTokens({ motion: v }, v ? "Motion: " + name.toLowerCase() : "Motion: still"); row.querySelectorAll(".ins-motion").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); says.textContent = MOTIONS.find((m) => m[0] === v)[2] + MOTION_KIND; });
+    if (now === v && v) setTimeout(play, 300);
+    row.appendChild(b);
+  });
+  wrap.appendChild(row);
+  says.textContent = (MOTIONS.find((m) => m[0] === now) || MOTIONS[0])[2] + MOTION_KIND;
+  wrap.appendChild(says);
+  host.appendChild(wrap);
+  return wrap;
+}
+const MOTION_KIND = " Anyone whose device asks for less motion sees the site still, and nothing waits to show.";
 // The header's two arrangements. Styles has the row, and so does the Pages card's Header and footer;
 // `after` lets the second redraw its own row once the pick has landed.
 function navStyleRow(host, after, label) {
@@ -978,14 +1014,13 @@ async function mountDesignCard(fresh = true) {
   stab(pillRow(card, "Spacing", DENSITY_OPTS, (o) => String(T.spacing_scale || "") === o[1], (o) => saveTokens({ spacing_scale: o[1] }, "Spacing: " + o[0])), "text");
   // DS-6/DS-7: layout choices — every template family renders both variants,
   // each in its own visual voice, so the controls show for all templates (G2).
-  const heroRow = [["Classic", ""], ["Photo beside text", "split"]];
+  // item 292: words over the welcome photo, under a dark veil or a light one
+  const heroRow = [["Classic", ""], ["Photo beside text", "split"], ["Words over the photo", "photo"], ["Words over a light photo", "photo-light"]];
   stab(pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
     async (o) => { try { await settingsPut({ hero_layout: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } }), "looks");
   stab(navStyleRow(card), "looks");
   // item 158: a gentle "appear on scroll" (lib/site_motion.ts), and the site's own small icon (lib/site_icon.ts)
-  stab(pillRow(card, "Motion", [["Still", ""], ["Gentle motion", "gentle"]], (o) => String(T.motion || "") === o[1],
-    (o) => saveTokens({ motion: o[1] }, o[1] ? "Gentle motion: sections fade up as visitors scroll" : "Motion: still")), "looks");
-  card.appendChild(el("div", "hint", "Gentle motion fades each section up as visitors scroll to it. Anyone whose device asks for less motion sees it still, and nothing waits to show.")).dataset.stab = "looks";
+  stab(motionRow(card, T), "looks");   // item 302: four choices, each shown moving
   card.appendChild(siteIconRow());
   buttonSetRows(card, T);   // item 217
   // DS-8: suggest for my business (deterministic; owner approves by clicking Apply)
@@ -2601,6 +2636,7 @@ function renderBlocksCard() {
       sub.appendChild(ta);
       sub.appendChild(aiField(ta, {}));
       sub.appendChild(el("div", "hint", def.hint));
+      if (def.icons) sub.appendChild(iconGrid(ta));   // item 304: line icons for Why choose us
     }
     // Wave-1 G4: the "Style" pill row — only for block types with curated variants.
     blockVariantRow(idx, blk, panes ? panes.layout : sub);
@@ -3798,6 +3834,25 @@ function dcGuardNav(doc) {
     doc.addEventListener("submit", (e) => e.preventDefault(), true);
   } catch (_) { /* guard is best-effort; pointer events stay scoped to the frame */ }
 }
+// Item 288: the phone menu on the canvas. The page's own script never runs in the editor's frame
+// (item 190), so the editor does what it would: the Menu button opens and closes the sheet, and
+// Escape closes it. The Header card's "View the phone menu" opens it the same way.
+function dcMenuToggle(on) {
+  try {
+    const doc = $("designPreview").contentDocument, m = doc.querySelector(".site-menu"), b = doc.querySelector(".menu-btn");
+    if (!m || !b) return;
+    const open = on == null ? !m.classList.contains("open") : !!on;
+    m.classList.toggle("open", open); b.setAttribute("aria-expanded", open ? "true" : "false");
+  } catch (_) {}
+}
+function dcMenuWire(doc) {
+  try {
+    if (!doc || doc.__dcMenuWire) return;
+    doc.__dcMenuWire = true;
+    doc.addEventListener("click", (e) => { const b = e.target && e.target.closest && e.target.closest(".menu-btn"); if (b) { e.preventDefault(); e.stopPropagation(); dcMenuToggle(); } }, true);
+    doc.addEventListener("keydown", (e) => { if (e.key === "Escape") dcMenuToggle(false); });
+  } catch (_) {}
+}
 // Item 244: a page written to the canvas can be pressed before its load event, which waits for
 // its pictures, and the guard used to come only at load: every save draws the canvas again, so
 // on a slow connection a press on the business name while a photo was still coming loaded
@@ -3989,6 +4044,28 @@ function renderHFCard(which) {
       catch (err) { toast(nice(err), true); }
     });
     if (DESIGN_DEV) {
+      // item 296: the logo and the name, the logo alone, or the name alone; and the logo's height
+      const T = DESIGN_TOKENS || {};
+      const mode = logo ? String(T.header_brand || "both") : (T.header_brand === "name" ? "name" : "both");
+      pillRow(host, "Show", [["Logo and name", "both"], ["Logo only", "logo"], ["Name only", "name"]], (o) => mode === o[1], async (o) => {
+        if (o[1] === "logo" && !logo) { toast("Add a logo first, then it can stand on its own."); return; }
+        await saveTokens({ header_brand: o[1] === "both" ? "" : o[1] }, "Header: " + o[0].toLowerCase());
+        refreshDesignPreview(); if (PANEL_MODE === "header") renderHFCard("header");
+      });
+      if (logo && mode !== "name") {
+        const sr = el("div", "hf-size");
+        const lab = el("label", null, "Logo size"); lab.htmlFor = "hfLogoSize";
+        const rg = el("input"); rg.type = "range"; rg.id = "hfLogoSize"; rg.min = "24"; rg.max = "80"; rg.step = "2"; rg.value = String(T.logo_height || 34);
+        const out = el("output", null, rg.value + " px"); out.htmlFor = "hfLogoSize";
+        rg.addEventListener("input", () => { out.textContent = rg.value + " px"; try { const d = $("designPreview").contentDocument; d.querySelectorAll(".brand").forEach((a) => a.style.setProperty("--logo-h", rg.value + "px")); } catch (_) {} });
+        rg.addEventListener("change", async () => { await saveTokens({ logo_height: rg.value === "34" ? "" : rg.value }, "Logo size: " + rg.value + " px"); refreshDesignPreview(); });
+        sr.append(lab, rg, out); host.appendChild(sr);
+      }
+      // item 295: the search box can be left out
+      const sw = el("label", "pg-sw"); const st = el("span", null, "Show a search box in the header"); const cb = el("input"); cb.type = "checkbox"; cb.checked = T.site_search !== "off";
+      sw.append(st, cb);
+      cb.addEventListener("change", async () => { await saveTokens({ site_search: cb.checked ? "" : "off" }, cb.checked ? "Search box shown" : "Search box hidden"); refreshDesignPreview(); });
+      host.appendChild(sw);
       const now = hfScrollNow();
       hfTiles(host, "When the page scrolls", HF_SCROLLS.map((x) => [x[0], x[1]]), now, async (v) => {
         if (v === hfScrollNow()) return;
@@ -3999,6 +4076,14 @@ function renderHFCard(which) {
       host.appendChild(el("p", "hf-says", HF_SCROLLS.find((x) => x[0] === now)[2]));
     }
     host.appendChild(el("div", "ins-lbl", "Menu"));
+    // item 288: on a phone the menu folds behind a Menu button; the canvas's page runs no script, so the editor opens it
+    const ph = $("dpDevSeg") && $("dpDevSeg").querySelector('[data-dpdev="phone"]');
+    if (ph) {
+      const vr = el("div", "hf-row"), vm = el("button", "dc-modal-cancel", "View the phone menu"); vm.type = "button"; vm.id = "hfViewMenu";
+      vm.addEventListener("click", () => { if (ph.getAttribute("aria-pressed") !== "true") ph.click(); setTimeout(() => dcMenuToggle(true), 320); });
+      vr.appendChild(vm); vr.appendChild(el("span", "hint", "On a phone, visitors see your name and a Menu button; the menu and the search box open under it."));
+      host.appendChild(vr);
+    }
     const mr = el("div", "hf-row"), n = (typeof pgModel === "function" ? pgModel().menu.length : 0);
     mr.appendChild(el("span", null, n + (n === 1 ? " item" : " items") + " in the menu"));
     const ed = el("button", "dc-modal-cancel", "Edit the menu"); ed.type = "button"; ed.addEventListener("click", () => { closeSettingsPanel(); openPagesCard("dcPageSwitch"); });
@@ -4203,6 +4288,63 @@ function insThemeLook(v, c) {
   if (v === "dark") return { bg: "#1a1622", ink: "#f2eef8", btn: c.band };   // its buttons are filled with the band colour (BLOCK_CSS)
   return { bg: "linear-gradient(180deg," + c.card + " 0 55%," + c.wash + " 55%)", ink: c.ink, btn: c.accent };
 }
+// ── Item 304: a small set of line icons for "Why choose us", in the site's accent colour ──
+// The same drawings the live site uses (lib/site_blocks.ts LINE_ICONS). A press puts "icon:<name>"
+// as the third part of the line the cursor is on in the list above, so the item takes it.
+const LINE_ICONS = {
+  star: '<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/>',
+  check: '<path d="M20 6L9 17l-5-5"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  heart: '<path d="M12 20s-7-4.6-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.4-7 10-7 10z"/>',
+  leaf: '<path d="M4 20c0-9 5-14 16-16-1 11-6 16-15 16"/><path d="M4 20l8-8"/>',
+  bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  tool: '<path d="M14.7 6.3a4 4 0 0 0 5 5L22 8.5 15.5 2 12.7 4.3a4 4 0 0 0 2 2z"/><path d="M3 21l9.5-9.5"/>',
+  phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
+  home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  "map-pin": '<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  award: '<circle cx="12" cy="9" r="6"/><path d="M8.5 14L7 22l5-3 5 3-1.5-8"/>',
+  smile: '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  truck: '<path d="M1 7h13v9H1z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="5" cy="18" r="2"/><circle cx="18" cy="18" r="2"/>',
+  dollar: '<path d="M12 2v20"/><path d="M17 6.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.6 5 3.5-2.2 3.5-5 3.5-5-1.6-5-3.5"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><circle cx="17" cy="9" r="2.5"/><path d="M22 19c0-2.6-1.8-4.5-4.5-4.8"/>',
+  chat: '<path d="M21 12a8 8 0 0 1-8 8H6l-3 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2.5 2.5"/>',
+  gift: '<rect x="3" y="9" width="18" height="12" rx="2"/><path d="M12 9v12M3 14h18"/><path d="M12 9c-2-4-7-4-7-1s5 1 7 1zm0 0c2-4 7-4 7-1s-5 1-7 1z"/>',
+  eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+};
+const ICON_WORDS = { star: "Star", check: "Tick", shield: "Shield", clock: "Clock", heart: "Heart", leaf: "Leaf", bolt: "Bolt", tool: "Tool", phone: "Phone", home: "Home", "map-pin": "Map pin", award: "Award", smile: "Smile", sun: "Sun", truck: "Truck", dollar: "Dollar", users: "People", chat: "Chat", calendar: "Calendar", sparkle: "Sparkle", key: "Key", gift: "Gift", eye: "Eye", lock: "Lock" };
+function iconGrid(ta) {
+  const wrap = el("div", "ins-field");
+  wrap.appendChild(el("div", "ins-lbl", "Line icons, in your accent colour"));
+  const grid = el("div", "ins-icons"); grid.setAttribute("role", "group"); grid.setAttribute("aria-label", "Line icons");
+  const accent = dcSiteColours().accent;
+  Object.keys(LINE_ICONS).forEach((name) => {
+    const b = el("button", "ins-icon"); b.type = "button"; b.title = ICON_WORDS[name] || name; b.setAttribute("aria-label", ICON_WORDS[name] || name); b.style.color = accent;
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + LINE_ICONS[name] + "</svg>";
+    b.addEventListener("click", () => {
+      // the line the cursor is on (the first line before anything is typed): its third part becomes the icon
+      const lines = ta.value.split("\n"); const at = ta.value.slice(0, ta.selectionStart || 0).split("\n").length - 1;
+      const i = Math.min(at, Math.max(0, lines.length - 1));
+      const parts = (lines[i] || "").split("|").map((x) => x.trim());
+      while (parts.length < 2) parts.push("");
+      parts[2] = "icon:" + name;
+      lines[i] = parts.join(" | ");
+      ta.value = lines.join("\n"); ta.dispatchEvent(new Event("change", { bubbles: true }));
+      const pos = lines.slice(0, i + 1).join("\n").length; try { ta.focus(); ta.setSelectionRange(pos, pos); } catch (_) {}
+    });
+    grid.appendChild(b);
+  });
+  wrap.appendChild(grid);
+  wrap.appendChild(el("p", "ins-says", "Press one to put it on the line your cursor is on. Typed emoji still work, but these look the same on every phone and computer."));
+  return wrap;
+}
+// item 292: the sections that can carry a photo behind them (lib/site_blocks.ts PHOTO_BG_TYPES)
+const PHOTO_BG_TYPES = new Set(["cta", "spotlight", "title"]);
 function insThemes(host, idx, look, style) {
   const own = !!(style && style.bg_color);
   const cur = own ? null : String((look && look.background) || "");
@@ -4210,7 +4352,10 @@ function insThemes(host, idx, look, style) {
   const wrap = el("div", "ins-field"); wrap.dataset.group = "theme";
   wrap.appendChild(el("div", "ins-lbl", "Colour theme"));
   const row = el("div", "ins-themes"); row.setAttribute("role", "group"); row.setAttribute("aria-label", "Colour theme");
-  INS_THEMES.forEach(([v, name]) => {
+  const blkType = BLOCKS_WORK[idx] && BLOCKS_WORK[idx].type;
+  const themes = PHOTO_BG_TYPES.has(blkType) ? [...INS_THEMES, ["photo", "Photo", "Your own photo behind the section, under a veil so the words read."]] : INS_THEMES;
+  if (themes.length > 5) row.style.setProperty("--n", "6");
+  themes.forEach(([v, name]) => {
     const b = el("button", "ins-theme"); b.type = "button"; b.dataset.theme = v || "default";
     b.setAttribute("aria-pressed", String(cur === v));
     const look2 = insThemeLook(v, c), pic = el("span", "ins-theme-pic");
@@ -4218,13 +4363,38 @@ function insThemes(host, idx, look, style) {
     const h = el("i"), l = el("i"), k = el("b"); h.style.background = look2.ink; l.style.background = look2.ink; k.style.background = look2.btn;
     pic.append(h, l, k);
     b.append(pic, document.createTextNode(name));
-    b.addEventListener("click", () => lookSet(idx, "background", v));
+    if (v === "photo") { pic.classList.add("photo"); const m = look && look.photo_id && (S.media || []).find((x) => x.id === look.photo_id); if (m && m.thumb) pic.style.backgroundImage = "url(" + JSON.stringify(m.thumb) + ")"; }
+    b.addEventListener("click", () => {
+      if (v !== "photo") { lookSet(idx, "background", v); return; }
+      // the photo tile asks for the photo first; a section that already has one keeps it
+      const b0 = BLOCKS_WORK[idx] || {}, l0 = b0.look || {};
+      if (l0.photo_id) { lookSetMany(idx, { background: "photo", veil: l0.veil || "dark" }); return; }
+      openPicker((id) => { if (id) lookSetMany(idx, { background: "photo", photo_id: id, veil: "dark" }); });
+    });
     row.appendChild(b);
   });
   wrap.appendChild(row);
-  wrap.appendChild(el("p", "ins-says", own ? "A background colour of your own is set under Colours. Pick a theme to use it instead." : INS_THEMES.find((t) => t[0] === cur)[2]));
+  wrap.appendChild(el("p", "ins-says", own ? "A background colour of your own is set under Colours. Pick a theme to use it instead." : (themes.find((t) => t[0] === cur) || INS_THEMES[0])[2]));
+  if (cur === "photo") {   // the photo's own row: change it, and the veil over it
+    const pr = el("div", "hf-row");
+    const ch = el("button", "dc-modal-cancel", "Change the photo"); ch.type = "button";
+    ch.addEventListener("click", () => openPicker((id) => { if (id) lookSetMany(idx, { photo_id: id }); }));
+    pr.appendChild(ch); wrap.appendChild(pr);
+    pillRow(wrap, "Veil over the photo", [["Dark, light words", "dark"], ["Light, dark words", "light"]], (o) => String((look && look.veil) || "dark") === o[1], (o) => lookSetMany(idx, { veil: o[1] }));
+  }
   host.appendChild(wrap);
   return wrap;
+}
+// item 292: several look keys at once (the photo, its veil and the theme land together)
+function lookSetMany(idx, changes) {
+  const b = { ...BLOCKS_WORK[idx] }; const look = { ...(b.look || {}) };
+  Object.keys(changes).forEach((k) => { if (changes[k]) look[k] = changes[k]; else delete look[k]; });
+  if (look.background !== "photo") { delete look.photo_id; delete look.veil; }
+  if (Object.keys(look).length) b.look = look; else delete b.look;
+  if (changes.background && b.style && b.style.bg_color) { const s = { ...b.style }; delete s.bg_color; delete s.contrast_ack; if (Object.keys(s).length) b.style = s; else delete b.style; }
+  BLOCKS_WORK[idx] = b;
+  renderBlocksCard();
+  dcLiveFromPanel();
 }
 // The Layout tab's pictures: each layout drawn as itself (styles: .ins-pic[data-pic]).
 const INS_PIC_PARTS = {
@@ -4438,6 +4608,7 @@ function insSwatches(host, label, opts, cur, onPick) {
 function lookSet(idx, key, value) {
   const b = { ...BLOCKS_WORK[idx] }; const look = { ...(b.look || {}) };
   if (value) look[key] = value; else delete look[key];
+  if (key === "background" && value !== "photo") { delete look.photo_id; delete look.veil; }   // item 292
   if (Object.keys(look).length) b.look = look; else delete b.look;
   // one background owner at a time (G27): a band here clears a custom background colour
   if (key === "background" && value && b.style && b.style.bg_color) { const s = { ...b.style }; delete s.bg_color; delete s.contrast_ack; if (Object.keys(s).length) b.style = s; else delete b.style; }
@@ -8541,6 +8712,7 @@ function dcTreeSelect(el2, row) {
     // the editor's own address into the frame, on every device. This runs BEFORE the #main
     // check: even a document without the landmark (an error page, an old kept version) gets it.
     dcGuardNav(doc);
+    dcMenuWire(doc);   // item 288: the phone menu opens and closes on the canvas too
     // Slice D: Preview / Timewarp withhold ALL editing chrome — the injector is
     // simply never called; the page scrolls, links/forms are guarded read-only.
     if (DC_MODE === "timewarp") {
