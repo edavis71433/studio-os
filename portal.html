@@ -364,14 +364,16 @@ async function route(token){
       if (due.gone) { await signedOutHere(); return; }
     }
   } catch (e) { sawNetworkTrouble = true; }
-  // 2) team member → the Studio OS door
+  // 2) team member → the Studio OS door. Builder item 392: the main server answers who is on
+  //    the team; until its answer is live, the old server's does.
   try {
-    var w = await withTimeout(fetch(FN + "/clever-api", {
-      method: "POST",
-      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token, "x-region": FN_REGION },
-      body: JSON.stringify({ type: "whoami" })
-    }), 9000);
+    var th = { "Content-Type":"application/json", "Authorization":"Bearer " + SUPABASE_KEY, "x-dds-user-jwt": token, "x-region": FN_REGION };
+    var w = await withTimeout(fetch(FN + "/presence/team/whoami", { headers: th }), 9000);
     var wj = await w.json().catch(function(){ return {}; });
+    if (!wj || typeof wj.isTeam !== "boolean") {
+      w = await withTimeout(fetch(FN + "/clever-api", { method: "POST", headers: th, body: JSON.stringify({ type: "whoami" }) }), 9000);
+      wj = await w.json().catch(function(){ return {}; });
+    }
     if (wj && wj.isTeam) { location.href = "/studio.html"; return; }
   } catch (e) { sawNetworkTrouble = true; }
   // 3) nothing connected (or the network is flaky) — honest panel, never a dead spinner

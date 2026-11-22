@@ -1,6 +1,8 @@
 // ── clever-api characterization guard ─────────────────────────────────────────
 // The old monolith is still LIVE for a few things (the Growth page, the contact
-// form, the project survey, the help chat and one nightly job) but retires
+// form and the deploy's version check; builder item 392 moved the project survey
+// and the sign-in pages' team check to the main server and took out the help chat
+// and the switched-off nightly job) but retires
 // wholesale later — so it gets no refactor. This suite characterizes what is left
 // structurally: the deny-by-default gate, the request kinds it still answers and
 // who sends each one, and the security invariants that have bitten before. It
@@ -16,13 +18,12 @@ const src = read('supabase/functions/clever-api/index.ts');
 // ── builder item 213: the old server keeps only the requests something still sends ──
 // Every kind below has a sender today; the 123 others were removed (Nov 12 2026) after a
 // repo-wide search and seven days of the function's own request log showed none.
+// Builder item 392: the three sign-in pages ask the main server first (GET /team/whoami)
+// and ask here only until that answer is live, so they still count as senders for now.
 const SENT_BY = {
   whoami: ['studio.html', 'portal.html', 'set-password.html', 'admin-growth.html'],
   version: ['.github/workflows/deploy.yml', '.github/workflows/rollback.yml'],   // the deploy's smoke test
   lead_intake: ['contact.html'],
-  survey_response: ['project-survey.html'],
-  concierge: ['concierge.js'],
-  run_scheduled_jobs: ['supabase/ops/clever-api-legacy/02-schedule-cron.sql'],   // the nightly-data-sync job
 };
 const GROWTH = ['admin_query', 'partnership_dashboard', 'partnership_list', 'partnership_get', 'partnership_upsert',
   'partnership_delete', 'reminders_feed', 'review_upsert', 'review_draft', 'review_publish', 'rec_decide', 'rec_to_task',
@@ -40,22 +41,48 @@ for (const [kind, senders] of Object.entries(SENT_BY)) {
   const found = senders.filter((f) => { try { return new RegExp(`['"]${kind}['"]`).test(read(f)) || (kind === 'version' && /"type":"version"/.test(read(f))); } catch { return false; } });
   ok(`sender: ${kind} ← ${found.join(', ') || 'NONE'}`, found.length === senders.length && found.every((f) => !unshipped.has(f)));
 }
-ok('sender: concierge.js is loaded by a page the build ships', /src="\/concierge\.js"/.test(read('portal-terms.html')) && !unshipped.has('portal-terms.html'));
+// builder item 392: the help chat's script is gone, and no page the build ships still loads it
+{
+  const shipped = [...Deno.readDirSync(new URL('../../', import.meta.url))].map((e) => e.name).filter((f) => f.endsWith('.html') && !unshipped.has(f));
+  const loading = shipped.filter((f) => read(f).includes('/concierge.js'));
+  let gone = false; try { read('concierge.js'); } catch { gone = true; }
+  ok('the help chat is gone: no concierge.js, and no shipped page loads it', gone && loading.length === 0, loading.join(', '));
+}
 
 // ── the deny-by-default gate ──
 const setOf = (name) => { const m = src.match(new RegExp(`const ${name} = new Set\\(\\[([\\s\\S]*?)\\]\\);`)); return m ? [...m[1].matchAll(/'([a-z_0-9]+)'/g)].map((x) => x[1]).sort() : null; };
-ok('gate: PUBLIC_ROUTES is the six public kinds, each guarded inside', JSON.stringify(setOf('PUBLIC_ROUTES')) === JSON.stringify(['concierge', 'lead_intake', 'run_scheduled_jobs', 'survey_response', 'version', 'whoami']));
+ok('gate: PUBLIC_ROUTES is the three public kinds, each guarded inside', JSON.stringify(setOf('PUBLIC_ROUTES')) === JSON.stringify(['lead_intake', 'version', 'whoami']));
 const roles = src.match(/const ROUTE_MIN_ROLE[^{]*\{([\s\S]*?)\n\};/);
 const roleKeys = roles ? [...roles[1].matchAll(/^\s*([a-z_0-9]+)\s*:/gm)].map((m) => m[1]).sort() : [];
 ok('gate: every Growth kind needs a staff role, and nothing else is listed', JSON.stringify(roleKeys) === JSON.stringify([...GROWTH].sort()));
 ok('gate: deleting a partnership is owner-only', /partnership_delete:\s*'owner'/.test(src));
 ok('gate: an unknown kind is refused (unknown_route), and no relay answers invented kinds', /else if \(!PUBLIC_ROUTES\.has\(String\(type\)\)\) \{[\s\S]{0,400}unknown_route/.test(src) && !/NOTIFY_RELAY_TYPES/.test(src));
 ok('admin_query reads only the two lists the Growth page loads, and only with GET', JSON.stringify(setOf('ADMIN_READ_TABLES')) === JSON.stringify(['clients', 'contacts']) && /method: 'GET', \/\/ hard-coded/.test(src));
+// builder item 392 (review file 07, finding 11): the read is the server's own, whole; a path that climbs out is refused
+{
+  const { ADMIN_READS, adminReadTable } = await import('../../supabase/functions/clever-api/admin_reads.ts');
+  const tries = [
+    [{ path: 'clients?select=id,name,contact_email,website,url,site_url,domain&order=name.asc&limit=500' }, 'clients'],
+    [{ path: 'contacts?select=id,name,email&order=name.asc&limit=500' }, 'contacts'],
+    [{ table: 'contacts' }, 'contacts'],
+    [{ path: 'clients/../memberships?select=*' }, null],
+    [{ path: 'clients/%2e%2e/memberships' }, null],
+    [{ path: 'clients%2F..%2Fsuppressed_emails' }, null],
+    [{ path: '../auth/v1/admin/users' }, null],
+    [{ path: 'clients.json' }, null],
+    [{ path: 'memberships?select=*' }, null],
+    [{ table: 'clients/../x' }, null],
+    [{ table: '__proto__' }, null], [{ path: 'constructor' }, null], [{}, null], [null, null],
+  ];
+  const wrong = tries.filter(([b, want]) => adminReadTable(b) !== want);
+  ok('admin_query: only the two lists, named exactly; any path that climbs, a dot, a percent sign or another table is refused', wrong.length === 0, JSON.stringify(wrong));
+  ok('admin_query: each read is the server\'s own whole address (the page\'s own picker reads, nothing more)', Object.keys(ADMIN_READS).sort().join() === 'clients,contacts' && Object.values(ADMIN_READS).every((r) => /^(clients|contacts)\?select=[a-z_,]+&order=name\.asc&limit=500$/.test(r)));
+}
 ok('the operator console routes are NOT in the public gate', !/PUBLIC_ROUTES[\s\S]{0,800}dds-studio-manage/.test(src));
 
 // ── security invariants that have bitten before ──
 ok('lead/survey HTML injection: public input escaped in owner emails', /escLine/.test(src));
-ok('rate limits: the two public forms, the help chat and the two AI drafts', JSON.stringify(setOf('RATE_LIMITED_TYPES')) === JSON.stringify(['concierge', 'lead_intake', 'rec_generate', 'review_draft', 'survey_response']));
+ok('rate limits: the public form and the two AI drafts', JSON.stringify(setOf('RATE_LIMITED_TYPES')) === JSON.stringify(['lead_intake', 'rec_generate', 'review_draft']));
 ok('no route left takes a web address from a visitor, so the old address guard went with them', !/assertPublicHttpUrl|deepAudit\(|psi_fetch/.test(src));
 
 // ── email discipline (the domain is shared with the product) ──
@@ -64,8 +91,8 @@ ok('sender: suppression checked via the SHARED core', /_shared\/email_infra\.ts/
 ok('sender: one-click List-Unsubscribe on every send', /List-Unsubscribe-Post/.test(src) && (src.match(/List-Unsubscribe-Post/g) || []).length === (src.match(/api\.resend\.com\/emails/g) || []).length);
 // sales items 74 + 75: …on every send an unsubscribe can stop, with a plain Unsubscribe link at its foot; none on a critical send
 ok('sender: the header and the footer link ride only on mail an unsubscribe stops', /const optional = !\(opts && opts\.critical\);/.test(src) && /headers: optional \? \{/.test(src) && /html: optional \? withUnsubscribeLink\(/.test(src));
-// item 213 removed the quote and portal sign-in routes; the nightly job's two money emails remain
-ok('sender: an invoice reminder and a payment receipt always arrive', (src.match(/\{ \.\.\.CLIENT_OPTS, critical: true \}/g) || []).length === 2);
+// item 213 removed the quote and portal sign-in routes; item 392 the nightly job and its two money emails
+ok('sender: the old server sends no money email any more (the main server sends them all)', (src.match(/\{ \.\.\.CLIENT_OPTS, critical: true \}/g) || []).length === 0);
 ok('sender: plain-text alternative on the core sender', /text,\s*\n?\s*headers/.test(src) || /subject, html, text/.test(src));
 ok('sender: recipients masked in logs', /maskAddr\(to\)/.test(src));
 ok('sender: a suppressed address is refused with an honest message', /recipient_suppressed/.test(src));
@@ -77,14 +104,16 @@ for (const route of ['prospect_discover', 'prospect_insights', 'lead_brief', 'pr
   ok(`gone: ${route}, its handler and its place in the route table`, !src.includes(route));
 }
 // ── builder list item 213: a sample of what left, including the ones that could delete ──
+// builder item 392: the survey (now on the main server), the help chat and its knowledge, the nightly job and its engine
 for (const route of ['client_purge', 'delete_client_cascade', 'delete_client_auth', 'admin_db', 'admin_write', 'team_remove',
-  'client_archive', 'lead_delete', 'invite_client', 'create_client_auth', 'reset_password', 'public_audit_checkout', 'quote_view', 'integration_callback']) {
+  'client_archive', 'lead_delete', 'invite_client', 'create_client_auth', 'reset_password', 'public_audit_checkout', 'quote_view', 'integration_callback',
+  'survey_response', 'concierge', 'run_scheduled_jobs']) {
   ok(`gone: ${route}`, !new RegExp(`'${route}'`).test(src));
 }
 
 // ── size tripwire: wholesale-retirement plan assumes no NEW growth ──
 const lines = src.split('\n').length;
-ok(`size tripwire: monolith not growing (${lines} lines ≤ 3300)`, lines <= 3300, 'if this fails, new features are being added to a function slated for retirement — put them in presence instead');
+ok(`size tripwire: monolith not growing (${lines} lines ≤ 1250)`, lines <= 1250, 'if this fails, new features are being added to a function slated for retirement — put them in presence instead');
 
 const passed = results.filter(Boolean).length;
 console.log(`\n════ CLEVER-API CHARACTERIZATION: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);

@@ -28,6 +28,7 @@
 //     keyed by member, so no migration.
 // The pure builders take batched reads, so a page costs a fixed number of queries
 // whatever the client count. The routes are at the end; routes.ts hands them over.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { can, agencySiteIds } from './auth.ts';
@@ -816,6 +817,10 @@ export async function handleAgencySites(req: Request, route: string, method: str
         return json({ data: next }, 200, cors);
       }
       if (what === 'check' && method === 'POST') {
+        // builder item 396 (review file 06): a check can send the client's renewal reminder and
+        // the "your site is live" email, so it asks for the manager role, as the notes and Ask for
+        // access do. A view-only seat reads the panel and its last check.
+        if (!can(member.role, 'manage_clients')) return forbid(cors);
         const sq = rowsOf<{ id: string; client_id: string; custom_domain: string | null; netlify_site_id: string | null; edition: string | null; cert_pending_since: string | null; domain_checked_at: string | null }>(
           await svc(`presence_sites?id=eq.${siteId}&select=id,client_id,custom_domain,netlify_site_id,edition,cert_pending_since,domain_checked_at&limit=1`))[0];
         if (!sq || !sq.custom_domain) return json({ error: 'no_domain', message: 'This site has no domain of its own to check.' }, 409, cors);
@@ -823,13 +828,14 @@ export async function handleAgencySites(req: Request, route: string, method: str
         if (since < CHECK_NOW_GAP_MS) return json({ error: 'too_soon', message: 'Checked a moment ago. Give it a minute before checking again.' }, 429, cors);
         await (await import('../commerce/lifecycle.ts')).checkOneDomain({ ...sq, custom_domain: sq.custom_domain }, now);
         const detail = await domainDetail(siteId, now);
-        return detail ? json({ data: { ...detail, access_invite: detail.own ? '' : member.email || '' } }, 200, cors) : notYours(cors);   // item 222: as the panel's read
+        return detail ? json({ data: { ...detail, access_invite: detail.own ? '' : member.email || '', can_manage: true } }, 200, cors) : notYours(cors);   // item 222: as the panel's read
       }
       if (what === 'access') return domainAccessRoute(req, method, siteId, own, member, principal, now, cors);   // item 222
       if (what === '' && method === 'GET') {
         const detail = await domainDetail(siteId, now);
         // item 222: the address Ask for access invites, unless the studio types another
-        return detail ? json({ data: { ...detail, access_invite: detail.own ? '' : member.email || '' } }, 200, { ...cors, 'Cache-Control': 'no-store' }) : notYours(cors);
+        // item 396: whether this seat may press Check now and save notes (the page greys them otherwise)
+        return detail ? json({ data: { ...detail, access_invite: detail.own ? '' : member.email || '', can_manage: can(member.role, 'manage_clients') } }, 200, { ...cors, 'Cache-Control': 'no-store' }) : notYours(cors);
       }
       return null;
     }
@@ -957,7 +963,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_email: email }) }).catch(() => null);
     const invited = await sendCustomerInvite(own.id, email, true).catch(() => false);
     // builder item 192: the page to share when the email didn't go out (it shows this studio's name)
-    const portal_url = `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/portal.html?studio=${own.id}`;
+    const portal_url = `${appBase()}/portal.html?studio=${own.id}`;
     return json({ data: { site_id: siteId, email, invited, portal_url } }, 200, cors);
   }
 

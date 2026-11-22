@@ -11,12 +11,13 @@
 // The private link is signed with the key the time tickets use (lib/form_check.ts) and
 // kept nowhere. It works while the booking is upcoming, the owner lets customers change
 // bookings, and the time is further off than the notice a new booking needs.
+import { linkKey, signedWithAny } from '../../_shared/link_keys.ts';   // builder item 394: each kind of link has its own key
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { icsEscape, foldLine } from './calendar_feed.ts';
 import { svc } from './db.ts';
 import { readReservedJson, RESERVED_NAMES } from './reserved_store.ts';
 
-const signingKey = () => Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
+const signingKey = () => linkKey('booking');   // builder item 394: its own key
 const APP = () => (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '');
 const FN = () => `${(Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '')}/functions/v1/presence`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -32,7 +33,7 @@ export async function manageToken(apptId: string, key = signingKey()): Promise<s
 export async function readManageToken(token: unknown, key = signingKey()): Promise<string | null> {
   const m = /^([0-9a-f-]{36})\.([0-9a-f]{32})$/.exec(String(token ?? '').trim());
   if (!m || !key || !UUID.test(m[1])) return null;
-  return timingSafeEqual(m[2], (await hmacHex(key, `booking-manage|${m[1]}`)).slice(0, 32)) ? m[1] : null;
+  return (await signedWithAny('booking', key, async (k) => timingSafeEqual(m[2], (await hmacHex(k, `booking-manage|${m[1]}`)).slice(0, 32)))) ? m[1] : null;
 }
 
 // ── what the owner allows ──

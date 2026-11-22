@@ -4,6 +4,7 @@
 // per-site engines / read EXISTING rows. Nothing here has a power that a
 // single-site route lacks; nothing bypasses client ownership (drafts and
 // plans still wait on the client; publishing runs the one frozen pipeline).
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc, svcPages } from '../lib/db.ts';
 /** Builder item 411: every row, paged, in the shape of one svc() answer ([] when a page failed). */
@@ -199,7 +200,7 @@ export function forgetAgencyReads(agencyId: string): void {
 
 // builder list items 236 and 232: the portal's address (the one the invite email carries), the
 // clients a studio looks after in name order, and when each last got a sign-in link (two minutes apart)
-const portalAddress = (studioSiteId: string) => `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/portal.html?studio=${studioSiteId}`;
+const portalAddress = (studioSiteId: string) => `${appBase()}/portal.html?studio=${studioSiteId}`;
 const activeClientsOf = (input: { links: Array<{ site_id: string; status: string }>; clientNames: Record<string, string> }) => input.links.filter((l) => l.status === 'active')
   .map((l) => ({ site_id: l.site_id, name: input.clientNames[l.site_id] || 'A client' }))
   .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
@@ -1149,8 +1150,9 @@ async function ownSiteOf(jwt: string, principal: Principal): Promise<SiteRow | n
   try {
     const s = await resolveSite(jwt);
     if (s) return s;
-    if (!principal.userId && !principal.email) return null;
-    const or = `or=(user_id.eq.${encodeURIComponent(principal.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((principal.email || '').toLowerCase())})`;
+    const { seatFilter } = await import('../lib/workspace.ts');   // builder items 389 + 397
+    const or = seatFilter(principal);
+    if (!or) return null;
     const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id&order=created_at.asc&limit=1`);
     const siteId = Array.isArray(m.json) && (m.json as Array<{ site_id: string }>)[0]?.site_id;
     if (!siteId) return null;

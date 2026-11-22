@@ -9,7 +9,7 @@
 //   POST /unsubscribe?e=<email>&t=<hmac>   — RFC 8058 One-Click (and the form)
 //   POST /unsubscribe?…&resume=1 (JSON)    — "Start emails again" (sales item 74)
 //   POST /email/events                      — Resend webhook (svix-signed)
-import { unsubscribeToken, suppress, verifySvix, suppressionDetail, resubscribe } from '../../_shared/email_infra.ts';
+import { unsubscribeTokenOk, suppress, verifySvix, suppressionDetail, resubscribe } from '../../_shared/email_infra.ts';
 import { corsFor } from '../../_shared/cors.ts';
 export { isSuppressed, maskEmail, maySend, suppressionOf, suppressionDetail, unsubscribeUrl, unsubscribePageUrl } from '../../_shared/email_infra.ts';
 
@@ -33,7 +33,7 @@ export async function handleUnsubscribe(req: Request, method: string): Promise<R
   const u = new URL(req.url);
   const email = String(u.searchParams.get('e') || '').trim().toLowerCase();
   const token = String(u.searchParams.get('t') || '');
-  const valid = !!email && !!token && token === await unsubscribeToken(email);
+  const valid = !!email && !!token && await unsubscribeTokenOk(email, token);   // builder item 394: its own key, old links still good
   const wantsJson = (req.headers.get('accept') || '').includes('application/json');
   if (method === 'GET' && !wantsJson) {
     const app = (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '');

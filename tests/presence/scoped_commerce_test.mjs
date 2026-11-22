@@ -149,7 +149,7 @@ function matches(row, params) {
     if (['select', 'limit', 'order', 'on_conflict', 'offset'].includes(k)) continue;
     if (k === 'or') {
       const parts = v.slice(1, -1).split(',');
-      if (parts.every((p) => /^\w+\.eq\./.test(p)) && !parts.some((p) => { const [c, , ...val] = p.split('.'); return String(row[c]) === val.join('.'); })) return false;
+      if (parts.every((p) => /^\w+\.eq\./.test(p)) && !parts.some((p) => { const [c, , ...val] = p.split('.'); return String(row[c]) === val.join('.').replace(/^"(.*)"$/s, '$1').replace(/\\(.)/g, '$1'); })) return false;   // a quoted value reads as itself, as PostgREST reads it (builder item 397 quotes emails)
       continue;
     }
     if (k.includes('->')) continue;
@@ -171,7 +171,7 @@ globalThis.fetch = async (url, init = {}) => {
     return reply({ id: 'bps_1', url: `https://billing.stripe.test/${form.get('customer')}` });
   }
   const token = (headers.get('Authorization') || '').replace(/^Bearer /, '');
-  if (u.pathname === '/auth/v1/user') return USERS[token] ? reply(USERS[token]) : reply({}, 401);
+  if (u.pathname === '/auth/v1/user') return USERS[token] ? reply({ email_confirmed_at: '2026-01-01T00:00:00Z', ...USERS[token] }) : reply({}, 401);   // item 389: a sign-in has proved its email
   if (!u.pathname.startsWith('/rest/v1/')) return new Response('', { status: 404 });
 
   const table = u.pathname.replace('/rest/v1/', '');

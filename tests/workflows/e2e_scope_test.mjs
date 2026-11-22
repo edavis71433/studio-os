@@ -100,7 +100,7 @@ for (const { name } of Deno.readDirSync(new URL('.github/workflows/', ROOT))) {
 }
 ok('the decision has no if: of its own, which could skip it', !/^ {4}if:/m.test(JOBS.scope));
 ok('the decision hands its answer on', /^ {4}outputs:\n {6}run: \$\{\{ steps\.scope\.outputs\.run \}\}$/m.test(JOBS.scope));
-ok('the checkout reaches the first parent', /actions\/checkout@\S+\n {8}with:\n {10}fetch-depth: 2\n/.test(STEPS[0]));
+ok('the checkout reaches the first parent', /actions\/checkout@\S+(?: #[^\n]*)?\n {8}with:\n {10}fetch-depth: 2\n/.test(STEPS[0]));
 ok('the decision comes straight after the checkout, and is the last step', STEPS.length === 2 && STEPS[1].includes('id: scope'));
 ok('the devices run only on the decision\'s yes', /^ {4}needs: scope$/m.test(JOBS.devices) && /^ {4}if: needs\.scope\.outputs\.run == 'true'$/m.test(JOBS.devices));
 ok('nothing can pass on its own failure', !WORKFLOW.includes('continue-on-error'));

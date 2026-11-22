@@ -69,7 +69,7 @@ const splitTop = (s) => { const out = []; let depth = 0, cur = ''; for (const c 
 function cond(row, expr) {
   const m = /^(and|or)\((.*)\)$/.exec(expr);
   if (m) { const parts = splitTop(m[2]); return m[1] === 'and' ? parts.every((p) => cond(row, p)) : parts.some((p) => cond(row, p)); }
-  const [col, op, ...rest] = expr.split('.'); const val = rest.join('.');
+  const [col, op, ...rest] = expr.split('.'); const val = rest.join('.').replace(/^"(.*)"$/s, '$1').replace(/\\(.)/g, '$1');   // a quoted value reads as itself, as PostgREST reads it (builder item 397 quotes emails)
   if (op === 'eq') return String(row[col]) === val;
   if (op === 'neq') return String(row[col]) !== val;
   if (op === 'in') return val.slice(1, -1).split(',').includes(String(row[col]));
@@ -88,7 +88,7 @@ globalThis.fetch = async (url, init = {}) => {
   const u = new URL(String(url), 'http://stub.local');
   const method = (init.method || 'GET').toUpperCase();
   const token = (new Headers(init.headers).get('Authorization') || '').replace(/^Bearer /, '');
-  if (u.pathname === '/auth/v1/user') return USERS[token] ? reply(USERS[token]) : reply({}, 401);
+  if (u.pathname === '/auth/v1/user') return USERS[token] ? reply({ email_confirmed_at: '2026-01-01T00:00:00Z', ...USERS[token] }) : reply({}, 401);   // item 389: a sign-in has proved its email
   if (!u.pathname.startsWith('/rest/v1/')) return reply({}, 404);
   const table = u.pathname.replace('/rest/v1/', '');
   if (method === 'HEAD') return reply(null);

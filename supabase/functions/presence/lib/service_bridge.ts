@@ -4,6 +4,7 @@
 // reaches only their linked, client-visible delivery through this bridge. Used by
 // the convert handoff (create project + bridge, idempotent) and the /client/*
 // endpoints (resolve which projects a customer may see).
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { svc } from './db.ts';
 import { siteOrigin } from './site.ts';
 import { UUID_RE, UUID_RE as SUPPORT_UUID_RE, UUID_RE as UUID } from './uuid.ts';
@@ -267,7 +268,7 @@ export async function emailBridgedCustomer(agencySiteId: string, projectId: stri
     // Builder list item 179: an ask for an OK opens that approval itself (the portal
     // falls back to the project when it can't), so the button says what it opens.
     const approval = open?.approval && /^[0-9a-f-]{36}$/i.test(open.approval) ? open.approval : '';
-    const btn = `<a href="${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html?project=${encodeURIComponent(projectId)}${approval ? `&approval=${approval}` : ''}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${approval ? 'Take a look →' : 'Open your project →'}</a>`;
+    const btn = `<a href="${appBase()}/client.html?project=${encodeURIComponent(projectId)}${approval ? `&approval=${approval}` : ''}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${approval ? 'Take a look →' : 'Open your project →'}</a>`;
     // critical: this is the "your project needs you" nudge — an opted-out client's
     // approval/message must still reach them (bounces still suppress).
     return await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId: agencySiteId });
@@ -287,7 +288,7 @@ export async function emailCustomerByClient(agencySiteId: string, customerClient
     const { sendEmail } = await import('../commerce/account.ts');
     const { loadEmailBrand } = await import('./email_brand.ts');
     const brand = await loadEmailBrand(agencySiteId);
-    const btn = `<a href="${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open your project →</a>`;
+    const btn = `<a href="${appBase()}/client.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open your project →</a>`;
     return await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId: agencySiteId });
   } catch { return false; }
 }
@@ -352,7 +353,7 @@ export async function emailCustomerSiteLive(customerSiteId: string): Promise<boo
  *  also a `presence_plan_notices.kind` — widened by migration 0116. */
 export type ClientActionKind = 'client_message' | 'client_upload' | 'client_request' | 'client_approval';
 
-const SITE_BASE = () => (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+const SITE_BASE = () => appBase();
 const escHtml = (s: string) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
 
 /** THROTTLE WINDOW. The notice model's unique key is (client_id, kind, period),

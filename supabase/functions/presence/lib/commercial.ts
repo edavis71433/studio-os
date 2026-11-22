@@ -5,6 +5,7 @@
 // no new architecture: scheduled runs fire the ONE publish pipeline; forms feed
 // the CRM timeline; one-tap approve calls the existing decide logic via a signed
 // stateless token.
+import { signedWithAny } from '../../_shared/link_keys.ts';   // builder item 394: links signed before still open
 
 // ── FD-1: scheduling ─────────────────────────────────────────────────────────
 // G5 adds 'offline' — the "unpublish at" leg of a publish window: at the
@@ -206,8 +207,8 @@ export async function verifyApprovalToken(token: string, secret: string, nowSec:
   const parts = String(token || '').split('.');
   if (parts.length !== 2) return { ok: false, error: 'malformed' };
   const [body, sig] = parts;
-  const expected = await hmac(body, secret);
-  if (!timingSafeEqual(b64urlToBytes(sig), expected)) return { ok: false, error: 'bad_signature' };
+  const got = b64urlToBytes(sig);
+  if (!(await signedWithAny('approval', secret, async (k) => timingSafeEqual(got, await hmac(body, k))))) return { ok: false, error: 'bad_signature' };   // item 394
   let payload: ApprovalTokenPayload;
   try { payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(body))); } catch { return { ok: false, error: 'malformed' }; }
   if (!payload || typeof payload.exp !== 'number' || payload.exp < nowSec) return { ok: false, error: 'expired' };

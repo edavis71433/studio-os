@@ -147,14 +147,15 @@ const stamped = (over = {}) => ({ id: MEDIA, alt_text: 'Photo', mime: 'image/png
 
 // ═══ G6 — the older survey page and its route ═══
 {
-  const api = read('supabase/functions/clever-api/index.ts');
   const page = read('project-survey.html');
-  const route = (api.match(/if \(type === 'survey_response'\) \{[\s\S]*?\n {4}\}\n/) || [''])[0];
-  ok('G6: the survey route reports whether the answers were really saved (saved: the insert’s own ok)',
-    /saved = ins\.ok;/.test(route) && /return json\(\{ ok: true, saved, emailed: ericEmailed \}\)/.test(route));
-  ok('G6: the name comes from the client record when the link carries only an id', /if \(!name && clientId\)[\s\S]*?clients\?id=eq\.\$\{clientId\}&select=name/.test(route));
-  ok('G6: the survey email link carries the client id only — no name — on the app’s own address',
-    /\/project-survey\?c=\$\{encodeURIComponent\(c\.id\)\}`;/.test(api) && !/project-survey\?c=[^`]*&n=/.test(api) && /APP_URL'\) \|\| 'https:\/\/app\.davisdigitalstudio\.com'\)[^\n]*\/project-survey\?c=/.test(api));
+  // Builder item 392: the survey route moved from the old server to the main one
+  // (routes/project_survey.ts); old_server_392_test.mjs drives it end to end: kept first,
+  // then the owner emailed, both said truthfully, the name read from the record. The old
+  // server's survey email went with its switched-off nightly job.
+  const { readSurvey } = await import('../../supabase/functions/presence/routes/project_survey.ts');
+  const kept = readSurvey({ clientName: '', message: 'Rating: 5/5', meta: { client_id: 'AAAAAAAA-1111-4111-8111-111111111111' } });
+  ok('G6: the survey route keeps the client id a link carries, and no name it didn\'t send', kept?.clientId === 'aaaaaaaa-1111-4111-8111-111111111111' && kept?.name === '');
+  ok('G6: a client id that isn\'t one is dropped, and an empty answer is nothing to keep', readSurvey({ message: 'x', meta: { client_id: 'n=Jane' } })?.clientId === null && readSurvey({ message: '  ' }) === null);
   ok('G6: one send at a time — the button switches off and a second tap does nothing',
     /if \(sending\) return;/.test(page) && /sending = true;/.test(page) && /btn\.disabled = true;/.test(page));
   ok('G6: thanks only once the server says the answers arrived; otherwise the form stays with a try-again line',

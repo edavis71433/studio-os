@@ -20,6 +20,10 @@
 /deno.lock         /404.html   404!
 /playwright.config.ts /404.html 404!
 
+# Builder item 397: the security contact file at its standard address (RFC 9116), served
+# from the one file at /security.txt so the two can never disagree.
+/.well-known/security.txt  /security.txt  200
+
 # ── MS6: internal pages excluded from the public build (doc §MS7.2) ────────────
 # email-signature (mail-provider setup steps), styleguide (internal design
 # instructions), a11y (internal check page). build-public.sh keeps them out of

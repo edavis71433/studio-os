@@ -16,7 +16,7 @@
 // others block images. Before APPLY-0144 the column doesn't exist: the stamp
 // fails quietly and the reads fall back, so nothing else changes.
 import { svc } from './db.ts';
-import { openToken } from '../../_shared/email_infra.ts';
+import { openToken, openTokenOk } from '../../_shared/email_infra.ts';
 import { UUID_RE } from './uuid.ts';
 
 
@@ -52,7 +52,7 @@ export const PIXEL_HEADERS: Record<string, string> = {
  *  link checker, not a person — gets the headers and stamps nothing: index.ts.) */
 export async function handleEmailOpen(sendId: string, sig: string): Promise<Response> {
   try {
-    if (UUID_RE.test(sendId) && sig === await openToken(sendId)) {
+    if (UUID_RE.test(sendId) && await openTokenOk(sendId, sig)) {   // builder item 394
       await svc(`presence_broadcast_sends?id=eq.${sendId.toLowerCase()}&status=eq.sent&opened_at=is.null`, {
         method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ opened_at: new Date().toISOString() }),
       });

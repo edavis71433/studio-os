@@ -4,8 +4,9 @@
 // the SAFE default: an unknown caller on their own site is the business_owner
 // (today's behavior), so nothing regresses. Only an explicit client_reviewer
 // membership narrows the view. Never touches tenant isolation (still site-scoped).
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { svc } from './db.ts';
-import { authUser } from '../../_shared/auth.ts';
+import { authUser, orValue, provenEmail } from '../../_shared/auth.ts';
 import type { SiteRole } from './site_roles.ts';
 import { isSiteRole, seesSite, SEAT_WORDS, publishWords } from './site_roles.ts';
 import { SITE_COLS, type SiteRow } from './site.ts';
@@ -28,8 +29,10 @@ export async function resolveSiteRole(jwt: string, siteId: string, principalKind
   if (!(any.ok && any.json?.length)) return 'business_owner';
   const user = await callerOf(jwt);
   if (!user?.id && !user?.email) return 'business_owner';
-  const email = (user.email || '').toLowerCase();
-  const q = await svc(`presence_site_members?site_id=eq.${siteId}&status=eq.active&or=(user_id.eq.${user.id ?? '00000000-0000-0000-0000-000000000000'},email.eq.${encodeURIComponent(email)})&select=id,role,user_id&limit=1`);
+  // builder item 389: a seat is found by email only once the address is proved (provenEmail)
+  const by = seatFilter({ userId: user.id ? String(user.id) : null, email: provenEmail(user) || null });
+  if (!by) return 'business_owner';
+  const q = await svc(`presence_site_members?site_id=eq.${siteId}&status=eq.active&${by}&select=id,role,user_id&limit=1`);
   const row = (q.ok && q.json?.[0]) || null;
   if (!row || !isSiteRole(row.role)) return 'business_owner';
   if (!row.user_id && user.id) {
@@ -42,7 +45,8 @@ export async function resolveSiteRole(jwt: string, siteId: string, principalKind
  *  so RLS can't find it. `member` is that seat as the row states it, and is null for
  *  a role this code doesn't know, which leaves the caller under RLS. */
 export async function resolveMemberSite(principal: { userId: string | null; email: string | null }): Promise<{ site: SiteRow; member: { site_id: string; role: SiteRole; can_publish: boolean } | null } | null> {
-  const or = `or=(user_id.eq.${encodeURIComponent(principal.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((principal.email || '').toLowerCase())})`;
+  const or = seatFilter(principal);
+  if (!or) return null;
   const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id,role,can_publish&order=created_at.asc&limit=1`);
   const seat = Array.isArray(m.json) ? (m.json as any[])[0] : null;
   if (!seat?.site_id) return null;
@@ -57,15 +61,24 @@ export async function resolveMemberSite(principal: { userId: string | null; emai
 // that isn't a studio's client (lib/scope.ts asks the studio's rules first), it is
 // one of the caller's own businesses or nothing: a site they own (RLS proves it), else
 // one where they hold an active seat, which then decides their role there.
-const personOr = (p: { userId: string | null; email: string | null }) => `or=(user_id.eq.${encodeURIComponent(p.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((p.email || '').toLowerCase())})`;
+/** A person's seats: by their user id, and by their email once they've proved it (the
+ *  principal carries no email for a sign-in that never confirmed one, builder item 389).
+ *  Never an empty email: `email.eq.` would match a seat that has none. The address is
+ *  quoted, so a comma or a bracket in it can't end the filter (item 397). Null when there
+ *  is nothing to match by. Pure. */
+export function seatFilter(p: { userId: string | null; email: string | null }): string | null {
+  const parts = [p.userId ? `user_id.eq.${encodeURIComponent(p.userId)}` : '', p.email ? `email.eq.${orValue(p.email.toLowerCase())}` : ''].filter(Boolean);
+  return parts.length ? `or=(${parts.join(',')})` : null;
+}
 export async function resolveHeldBusiness(jwt: string, principal: { kind: string; userId: string | null; email: string | null }, siteId: string): Promise<{ site: SiteRow; member: { site_id: string; role: SiteRole; can_publish: boolean } | null } | null> {
   if (principal.kind !== 'client' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId)) return null;
   const { asUser } = await import('./db.ts');
   const own = await asUser(jwt, `presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`);
   const mine = own.ok && Array.isArray(own.json) ? (own.json as SiteRow[])[0] : null;
   if (mine) return { site: mine, member: null };
-  if (!principal.userId && !principal.email) return null;
-  const m = await svc(`presence_site_members?site_id=eq.${siteId}&status=eq.active&${personOr(principal)}&select=site_id,role,can_publish&limit=1`);
+  const by = seatFilter(principal);
+  if (!by) return null;
+  const m = await svc(`presence_site_members?site_id=eq.${siteId}&status=eq.active&${by}&select=site_id,role,can_publish&limit=1`);
   const seat = Array.isArray(m.json) ? (m.json as any[])[0] : null;
   if (!seat || !isSiteRole(seat.role)) return null;
   const s = await svc(`presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`);
@@ -80,7 +93,9 @@ export async function resolveHeldBusiness(jwt: string, principal: { kind: string
 export async function listBusinesses(jwt: string, principal: { kind: string; userId: string | null; email: string | null }): Promise<Array<{ site_id: string; name: string; role: SiteRole; owned: boolean }>> {
   if (principal.kind !== 'client' || (!principal.userId && !principal.email)) return [];
   try {
-    const seatQ = await svc(`presence_site_members?status=eq.active&${personOr(principal)}&select=site_id,role,created_at&order=created_at.asc&limit=50`);
+    const by = seatFilter(principal);
+    if (!by) return [];
+    const seatQ = await svc(`presence_site_members?status=eq.active&${by}&select=site_id,role,created_at&order=created_at.asc&limit=50`);
     const seats = (Array.isArray(seatQ.json) ? seatQ.json as any[] : []).filter((s) => s.site_id && isSiteRole(s.role));
     if (!seats.length) return [];
     const { asUser } = await import('./db.ts');
@@ -152,7 +167,7 @@ export async function mintSignInLink(email: string, next: string, origin?: strin
   const key = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   if (!base || !key) return '';
   // `origin` for a page that needs its query string: the marketing domain's redirect to the app drops it
-  const site = origin || Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com';
+  const site = origin || appBase();
   const gen = async (type: string) => {
     try {
       const r = await fetch(`${base}/auth/v1/admin/generate_link`, {
@@ -175,7 +190,7 @@ export async function sendInviteLink(email: string, opts: { subject: string; int
   // setting (Authentication › Sign In / Providers › Email › "Email OTP expiration": an hour
   // unless changed, a day at most), while the studio is told an invite lasts 7 days. The
   // words say so, and name the door that works any time: the sign-in page emails a code.
-  const door = `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}${opts.next}`;
+  const door = `${appBase()}${opts.next}`;
   const { sendEmail } = await import('../commerce/account.ts');
   // builder item 220: the role in one sentence, in a box under the welcome (the words are ours, not the inviter's)
   const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));

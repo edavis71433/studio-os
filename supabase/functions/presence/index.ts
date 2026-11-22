@@ -209,6 +209,15 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (route === '/join' && method === 'GET') return handleJoinGet(req, cors);
     if (route === '/join' && method === 'POST') return handleJoinPost(req, cors);
   }
+  // ── Builder item 392: two doors that lived on the old server (clever-api) ──
+  //    The three sign-in pages ask whether the signed-in person is on the platform's own
+  //    team (the old whoami), answered for anyone: it only reflects the caller's own seat.
+  //    The project survey a studio sends after launch is public, like a site's form.
+  if (route === '/team/whoami' && method === 'GET') {
+    const team = principal.kind === 'staff';
+    return json(team ? { role: principal.role, isTeam: true, email: principal.email } : { role: null, isTeam: false }, 200, { ...cors, 'Cache-Control': 'no-store' });
+  }
+  if (route === '/survey' && method === 'POST') return (await import('./routes/project_survey.ts')).handleSurveyResponse(req, cors);
   // ── Phase BK: PUBLIC native booking — a website visitor lists services, reads
   //    open slots, and books an appointment. No session; authorized by the site id
   //    itself (like the form submit + analytics collector). Honeypot + rate-limit +

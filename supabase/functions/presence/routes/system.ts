@@ -85,9 +85,11 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
     { name: 'AWS_SECRET_ACCESS_KEY', required: false, enables: 'the Route 53 key’s secret half, for managed domains' },
   ],
   approvals: [
-    { name: 'APPROVAL_SECRET', required: false, enables: 'one-tap client approval links (falls back to SCHEDULER_SECRET; without either: /approve/send returns 503)' },
-    { name: 'PREVIEW_LINK_SECRET', required: false, enables: 'signing shared draft links (falls back to APPROVAL_SECRET, then STATE_SIGNING_SECRET, then SCHEDULER_SECRET)' },
-    { name: 'STATE_SIGNING_SECRET', required: false, enables: 'an older signing secret, kept only as a fallback for draft links and the sales pages’ signed links' },
+    // builder item 394: every kind of signed link has its own key, made from one root (_shared/link_keys.ts)
+    { name: 'LINK_SECRET', required: false, enables: 'the root every signed link’s own key is made from (any long random value; optional: without it APPROVAL_SECRET is the root, else the database key; never the scheduler’s secret). Setting it later breaks no link already sent' },
+    { name: 'APPROVAL_SECRET', required: false, enables: 'the root for signed links when LINK_SECRET isn’t set (one-tap approvals, proposals and agreements, booking, form and Join our list links each get a key of their own from it); links signed with it directly before Nov 23 2026 still open until Feb 21 2027' },
+    { name: 'PREVIEW_LINK_SECRET', required: false, enables: 'shared draft links’ own key (without it: one made from the link root)' },
+    { name: 'STATE_SIGNING_SECRET', required: false, enables: 'an older signing secret, read only to open links signed with it before Nov 23 2026, until Feb 21 2027' },
   ],
   operator: [
     { name: 'OPERATOR_SECRET', required: false, enables: 'the programmatic operator caller (x-operator-secret header) for marketplace/enterprise management (without it: those surfaces are operable only by an interactive staff login)' },
@@ -128,7 +130,7 @@ const SECRET_GROUPS: Record<string, SecretDef[]> = {
     { name: 'CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET', required: false, enables: 'optional: that app’s secret. Whichever app is used must list https://app.davisdigitalstudio.com/connections-callback.html (APP_URL) as a redirect' },
   ],
   site: [
-    { name: 'SITE_URL', required: false, enables: 'absolute links in emails (defaults to the production host)' },
+    { name: 'SITE_URL', required: false, enables: 'the app’s address for every link in an email and every return from Stripe (without it: APP_URL, then app.davisdigitalstudio.com; never the main site, whose pages are gone)' },
     { name: 'APP_URL', required: false, enables: 'the app’s own address: the Google return page, font files and links back to the app (defaults to app.davisdigitalstudio.com)' },
     { name: 'VISITS_SALT', required: false, enables: 'salting the visit counter’s visitor fingerprints (falls back to APPROVAL_SECRET)' },
   ],
@@ -155,7 +157,7 @@ export function validateSecrets() {
     email: has('RESEND_KEY'),
     publishing: has('NETLIFY_AUTH_TOKEN'),
     scheduled_publishing: has('SCHEDULER_SECRET'), // + an external cron actually calling /system/run
-    one_tap_approvals: has('APPROVAL_SECRET') || has('SCHEDULER_SECRET'),
+    one_tap_approvals: has('LINK_SECRET') || has('APPROVAL_SECRET') || has('SERVICE_ROLE_KEY'),   // item 394: the link root (the database key at the last)
     operator_management: has('OPERATOR_SECRET'), // marketplace/enterprise via x-operator-secret
     ai: has('ANTHROPIC_KEY'),
     visual_studio: has('VISUAL_MODEL_KEY'),

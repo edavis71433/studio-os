@@ -25,6 +25,8 @@
 // query returns not-ok and we answer calmly ("reviews need a database update" /
 // "not available") rather than erroring — the routes are dormant until owner-apply.
 
+import { linkKey } from '../../_shared/link_keys.ts';
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
@@ -40,9 +42,8 @@ import { normEmail, emailMatch } from '../lib/contact_email.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
-const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
 const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
-const siteBase = () => (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
+const siteBase = () => appBase();
 const appUrl = () => (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '');
 /** Where a review request email sends a customer: the viewer page on the app (review.html).
  *  Supabase serves an HTML answer from the function's own address as plain text, so the
@@ -57,7 +58,7 @@ const googleReviewLink = (placeId: string) => `https://search.google.com/local/w
 async function hashIp(req: Request): Promise<string> {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
   if (!ip) return '';
-  const salt = APPROVAL_SECRET || Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'salt';
+  const salt = linkKey('ip_hash') || 'salt';   // builder item 394: its own key, never the scheduler's secret
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip + '|' + salt));
   return Array.from(new Uint8Array(buf)).slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
