@@ -6,6 +6,8 @@
 // person, a customer or nobody (your own), from the same to-dos table, so Home's
 // Done works the same way for it. Pure: the route reads the rows, this decides.
 
+import { OPEN_DEAL_STAGES } from './deal_stages.ts';   // sales item 146: the one list of open stages
+
 export type MyTaskKind = 'next_step' | 'deal_task' | 'project_task';
 export interface MyTask {
   kind: MyTaskKind;
@@ -21,7 +23,7 @@ export interface MyTask {
   for?: 'deal' | 'person' | 'customer' | 'me';   // item 85: whose a to-do (deal_task) is
   owner?: string | null;   // item 37: who owns the deal or to-do (their sign-in id); null = the business owner
 }
-export const MY_TASKS_OPEN_STAGES = ['lead', 'qualified', 'proposal', 'contract'];
+export const MY_TASKS_OPEN_STAGES: string[] = [...OPEN_DEAL_STAGES];
 export const MY_TASKS_MAX = 50;
 const ymd = (v: unknown) => { const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(v || '')); return m ? m[1] : null; };
 const KIND_ORDER: Record<MyTaskKind, number> = { next_step: 0, deal_task: 1, project_task: 2 };

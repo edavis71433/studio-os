@@ -493,7 +493,7 @@ const lmetaText=(list)=>{
     if(!PEOPLE||PEOPLE_FAILED)return '';
     // item 66: while some people are not loaded, say how many of how many
     if(pHasMore())return PTOTAL!=null?`${PEOPLE.length} of ${PTOTAL} people`:`${PEOPLE.length} people so far`;
-    const not=PEOPLE.filter(p=>!p.client_id).length;
+    const not=PEOPLE.filter(p=>!custOf(p)).length;   // sales item 156
     return `${PEOPLE.length} ${PEOPLE.length===1?'person':'people'}${not?` · ${not} not ${not===1?'a customer':'customers'} yet`:''}`;
   }
   const count=list.length;
@@ -662,12 +662,23 @@ function tabsHtml(){
 let PFILTER='all';
 function peopleChipsHtml(){
   if(!PEOPLE||PEOPLE_FAILED||!PEOPLE.length)return '';
-  const yes=PEOPLE.filter(p=>p.client_id).length;
+  const yes=PEOPLE.filter(p=>!!custOf(p)).length;   // sales item 156
   // item 66: while some people are not loaded, only the chip the server counted carries a
   // number (its total); a count of the loaded ones would read as everyone
   const whole=pWhole(),n=(k,local)=>whole?local:(PLOADED===k?PTOTAL:null);
   const ch=[['all','All',n('all',PEOPLE.length)],['customers','Customers',n('customers',yes)],['not','Not yet',n('not',PEOPLE.length-yes)]];
   return `<div class="trow"><div class="chips" role="group" aria-label="Show">${ch.map(([v,l,n])=>(n===0&&v!=='all'&&PFILTER!==v)?'':`<button type="button" class="chip" data-pchip="${v}" aria-pressed="${PFILTER===v?'true':'false'}">${l}${n!=null?` <span class="n">${n}</span>`:''}</button>`).join('')}</div></div>`;
+}
+// sales item 156: a person is a customer by the link on their record (client_id) OR because a customer's own
+// email is theirs. Two paying customers read "Not yet" because their people carried no link.
+let CUST_IDX=null;   // the two lookups, rebuilt when the customers list is a new one
+function custOf(c){
+  if(!c)return null;
+  if(!CUST_IDX||CUST_IDX.of!==CUSTOMERS){const byClient={},byEmail={};for(const k of CUSTOMERS){byClient[String(k.client_id)]=k;const e=String(k.email||'').trim().toLowerCase();if(e&&!byEmail[e])byEmail[e]=k;}CUST_IDX={of:CUSTOMERS,byClient,byEmail};}
+  const {byClient,byEmail}=CUST_IDX;
+  if(c.client_id)return byClient[String(c.client_id)]||{client_id:c.client_id};
+  const e=String(c.email||'').trim().toLowerCase();
+  return (e&&byEmail[e])||null;
 }
 function peopleHtml(){
   if(PEOPLE===null)return'<div class="spin" role="status" aria-label="Loading people"></div>';
@@ -675,14 +686,13 @@ function peopleHtml(){
   const q=Q.trim().toLowerCase();
   const s=pSrchNow();   // item 66: past the loaded pages, the server's matches answer the search
   if(!s&&!pWhole()&&PLOADED!==PFILTER)return'<div class="spin" role="status" aria-label="Loading people"></div>';   // item 110: that chip's people are on their way
-  const list=(s?s.rows:PEOPLE).filter(c=>(PFILTER==='all'||(PFILTER==='customers')===!!c.client_id)&&(!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q)));
+  const list=(s?s.rows:PEOPLE).filter(c=>(PFILTER==='all'||(PFILTER==='customers')===!!custOf(c))&&(!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')).toLowerCase().includes(q)));
   if(!list.length)return`<p class="muted" style="padding:20px 0">${q?(!pHaveAll()&&!s?(PSRCH_ERR===Q.trim()?'We couldn’t search everyone just now. These are the people loaded so far.':'Looking through everyone…'):'No one matches “'+esc(Q)+'”.'):PEOPLE.length?'No one here — try “All”.':'No people yet — a website enquiry, a deal or an added customer puts someone here.'}</p>${!q&&!PEOPLE.length?'<p><a class="btn" href="/contacts.html?add=1">+ Add a person</a></p>':''}`+pMoreHtml();
-  const byClient={}; for(const c of CUSTOMERS)byClient[String(c.client_id)]=c;
   const trs=list.map(c=>{
-    const cust=c.client_id?byClient[String(c.client_id)]:null;
-    const rec=c.client_id?(cust&&cust.customer_site_id?`/crm.html?client=${esc(cust.customer_site_id)}`:`/crm.html?client_id=${esc(c.client_id)}`):`/crm.html?contact=${esc(c.id)}&tab=details`;
+    const cust=custOf(c),cid=c.client_id||(cust&&cust.client_id);
+    const rec=cid?(cust&&cust.customer_site_id?`/crm.html?client=${esc(cust.customer_site_id)}`:`/crm.html?client_id=${esc(cid)}`):`/crm.html?contact=${esc(c.id)}&tab=details`;
     const nm=c.name||c.email||'Someone';
-    return `<tr data-person="${esc(c.id)}" tabindex="0" aria-label="Preview ${esc(nm)}"><td data-col="name"><span class="nm"><span class="av sm" aria-hidden="true">${esc(ini2(nm))}</span><span><a href="${rec}" data-noscope="1">${esc(nm)}</a>${c.company?`<span class="pn">${esc(c.company)}</span>`:''}</span></span></td><td data-col="email">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td><td data-col="phone">${c.phone&&telOf(c.phone)?`<a href="${esc(telOf(c.phone))}">${esc(c.phone)}</a>`:esc(c.phone||'—')}</td><td data-col="customer">${c.client_id?`<a href="${rec}" data-noscope="1">${esc((cust&&cust.name)||c.company||'Customer')} ↗</a>`:'<span class="pill lead">Not yet</span>'}</td><td class="acts"><a class="rowact" href="${rec}" data-noscope="1">Open record</a></td></tr>`;
+    return `<tr data-person="${esc(c.id)}" tabindex="0" aria-label="Preview ${esc(nm)}"><td data-col="name"><span class="nm"><span class="av sm" aria-hidden="true">${esc(ini2(nm))}</span><span><a href="${rec}" data-noscope="1">${esc(nm)}</a>${c.company?`<span class="pn">${esc(c.company)}</span>`:''}</span></span></td><td data-col="email">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'—'}</td><td data-col="phone">${c.phone&&telOf(c.phone)?`<a href="${esc(telOf(c.phone))}">${esc(c.phone)}</a>`:esc(c.phone||'—')}</td><td data-col="customer">${cid?`<a href="${rec}" data-noscope="1">${esc((cust&&cust.name)||c.company||'Customer')} ↗</a>`:'<span class="pill lead">Not yet</span>'}</td><td class="acts"><a class="rowact" href="${rec}" data-noscope="1">Open record</a></td></tr>`;
   }).join('');
   return `<div class="tscroll people"><table aria-label="People"><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Phone</th><th scope="col">Customer</th><th scope="col" class="acts"><span class="sr-only">Actions</span></th></tr></thead><tbody>${trs}</tbody></table></div>`+pMoreHtml();
 }

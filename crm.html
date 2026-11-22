@@ -293,7 +293,9 @@
   .abtn:hover{border-color:var(--dds-line-strong,#d2d2db);color:var(--ink);background:var(--bg)}
   .abtn.primary:hover{background:var(--p-deep);color:#fff}
   .more{position:relative;display:inline-block}
-  .more-menu{position:absolute;top:calc(100% + 4px);left:0;z-index:5;min-width:200px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));padding:var(--dds-s1,4px);display:flex;flex-direction:column}
+  /* sales item 154: the menu hangs from its button's RIGHT edge (right:0, not left:0) and never grows past the
+     window, so its rows aren't cut to "Request dep…" and the page gets no sideways scroll bar */
+  .more-menu{position:absolute;top:calc(100% + 4px);right:0;z-index:5;min-width:200px;max-width:min(320px,calc(100vw - 24px));background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));padding:var(--dds-s1,4px);display:flex;flex-direction:column}
   .more-menu[hidden]{display:none}
   .more-menu .abtn{border:none;background:transparent;justify-content:flex-start;border-radius:var(--dds-r-sm,6px);height:34px;width:100%;box-shadow:none}
   .more-menu .abtn:hover{background:var(--bg)}
@@ -1053,6 +1055,20 @@ async function loadPanels(){
 // ── highlights panel: up to 6 label-over-value tiles, data-only ─────────────
 let HL_EDIT=false;   // an OPEN next-step inline editor owns the panel — async re-renders skip it
 let STAGE_CHANCE={};   // item 69's per-stage chances (Settings), for the deal fact
+// sales item 155 (tests/e2e/sales-fixes-nov22.spec.ts): the newest moment anyone talked, from the deal's logged
+// contact day and the timeline's items as /crm/activity types them (kind + type; convItem mirrors it)
+const TALK_KINDS={message:1,support:1,support_reply:1,enquiry:1,booking:1,activity:1};
+const TALK_ACTIVITY={call:1,email:1,meeting:1};
+function lastTalked(dealAt,items){
+  let at=dealAt||null,theirs=false;
+  for(const it of (items||[])){
+    if(!it||!it.at||!TALK_KINDS[it.kind])continue;
+    if(it.kind==='activity'&&!TALK_ACTIVITY[it.type])continue;   // a logged call, email or meeting counts; a note or a system line isn't talking
+    if(at&&!(Date.parse(it.at)>Date.parse(at)))continue;
+    at=it.at;theirs=/^The client/.test(String(it.title||''));
+  }
+  return{at,theirs};
+}
 function renderHighlights(){
   const host=$('hlpanel'); if(!host)return;
   if(HL_EDIT)return;   // don't destroy the open editor + typed text; the render after save/cancel catches up
@@ -1083,8 +1099,11 @@ function renderHighlights(){
   // bold redesign: the fifth fact — when you last spoke (the deal's last contact). item 98 (B4): the
   // date comes BESIDE the deal in the deal read (as the Deal tab reads it), never inside the deal row,
   // so looking for it there said "Nothing logged yet" on every record
-  const lastTalk=DEAL&&DEAL.last_contacted_at;
-  if(d.id)tiles.push({k:'Last talked',v:lastTalk?esc(when(lastTalk)):'—',ico:'phone',tone:'',s:lastTalk?'':'Nothing logged yet'});
+  // sales item 155: the newest of the deal's last contact day and anything in the timeline that is talking —
+  // a logged call, email or meeting, a message or support note either way, a booking — so a client who wrote
+  // last week never reads "4 months ago". The sub-line says who spoke last.
+  const lt=lastTalked(DEAL&&DEAL.last_contacted_at,ACT_LOADED?ACT.items:null);
+  if(d.id)tiles.push({k:'Last talked',v:lt.at?esc(when(lt.at)):'—',ico:'phone',tone:'',s:lt.at?(lt.theirs?'They wrote last':''):'Nothing logged yet'});
   if(!d.id&&p&&p.health)tiles.push({k:'Health',v:`<span class="word">${esc(p.health==='attention'?'Needs attention':p.health==='new'?'Getting set up':p.health)}</span>`,ico:'health',tone:p.health==='attention'?'warn':'good',s:''});
   if(!d.id&&p)tiles.push({k:'Website',v:esc(siteWord(p)),ico:'site',tone:'',s:''});
   if(!tiles.length){host.innerHTML='';return;}
@@ -2064,6 +2083,7 @@ function insertSavedReplies(taId){
 let ACT_LOADED=false;   // the history has been read once (the Activity tab can draw it at once after that)
 function renderRail(){
   ACT_LOADED=true;
+  if(!HL_EDIT)renderHighlights();   // sales item 155: "Last talked" counts what the timeline just read
   const host=$('acard'); if(!host)return;
   if(ACT.failed){host.innerHTML='<p class="muted">Couldn’t load this record’s activity just now. <button id="actRetry" style="font-size:12.5px;padding:5px 12px">Try again</button></p>';const rt=$('actRetry');if(rt)rt.addEventListener('click',loadActivity);return;}
   const draft=snapComposer();

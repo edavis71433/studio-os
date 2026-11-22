@@ -24,6 +24,8 @@
 //
 // Pure: no DB, no network, no clock (nowIso is an input). routes.ts gathers the
 // rows (fixed query count) and calls needsYouPayload().
+import { OPEN_DEAL_STAGES } from '../lib/deal_stages.ts';   // sales item 146: the one list of open stages
+
 export type NeedsKind = 'money' | 'enquiry' | 'support' | 'message' | 'deal' | 'broken' | 'plan' | 'publish' | 'account' | 'notice';
 
 export interface NeedsRow {
@@ -49,6 +51,8 @@ export interface NeedsRow {
 
 export interface NeedsInput {
   nowIso: string;
+  /** sales item 151: the studio's own day (YYYY-MM-DD, from the page's ?today=); without it, nowIso's UTC day */
+  today?: string;
   /** the agency's client links — only ACTIVE links feed the list */
   links: Array<{ site_id: string; status: string }>;
   /** site_id → customer name (the portfolio's names) */
@@ -156,7 +160,7 @@ const providerLabel = (k: string) => PROVIDER_LABEL[k] || k.replace(/[_-]+/g, ' 
 /** The whole list, in the fixed order above. Every row names a customer and
  *  carries exactly one verb. Archived clients never appear. */
 export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
-  const today = ymdOf(i.nowIso) || '';
+  const today = i.today || ymdOf(i.nowIso) || '';
   const active = new Set((i.links || []).filter((l) => l.status === 'active').map((l) => l.site_id));
   const archivedSites = new Set((i.links || []).filter((l) => l.status === 'archived' || l.status === 'trashed').map((l) => l.site_id));   // item 154: a trashed site asks for nothing
   const names = i.clientNames || {};
@@ -273,7 +277,7 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
 
   // ── d. deals whose next step is past its date (most late first) ──
   {
-    const OPEN = new Set(['lead', 'qualified', 'proposal', 'contract']);
+    const OPEN = new Set<string>(OPEN_DEAL_STAGES);
     const late = (i.deals || [])
       // open stages only; a step the deal has outgrown (signed → "sign the
       // contract") is already cleared by routes/sales.ts via nextStepStaleAfter
@@ -504,7 +508,7 @@ export function nextByClient(rows: NeedsRow[]): Record<string, NextLine> {
 /** The one honest line under "Nothing needs you." — the next invoice coming
  *  due when there is one, else the plain truth. */
 export function emptyLine(i: NeedsInput): string {
-  const today = ymdOf(i.nowIso) || '';
+  const today = i.today || ymdOf(i.nowIso) || '';
   const names = i.clientNames || {}, byClient = i.namesByClient || {};
   const open = (i.invoices || []).filter((v) => String(v.status || 'open') === 'open' && !v.processing_since && v.state !== 'processing' && v.state !== 'paid');
   if (!open.length) return 'Everything is paid and published.';

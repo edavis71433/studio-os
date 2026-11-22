@@ -21,6 +21,7 @@
 //                emails go out only when the notice row is newly inserted.
 // Pure decision logic + copy up top (tested); the impure runner below.
 import { svc, svcCount } from '../lib/db.ts';
+import { isOpenDealStage, OPEN_DEAL_STAGES_FILTER } from '../lib/deal_stages.ts';   // sales item 146: the one list of open stages (the first is `lead`, never `new`)
 import { rateAllow } from '../lib/ratelimit.ts';
 import { deleteSite } from '../lib/netlify.ts';
 import { getSite } from '../lib/netlify.ts';
@@ -868,7 +869,7 @@ export function dealTaskDue(t: { status?: string; due_date?: string | null }, to
  *  pipeline stages — a won/lost/converted deal's old date is history. Pure. */
 export function nextStepOverdue(d: { stage?: string; next_step_at?: string | null; converted_client_id?: string | null }, todayIso: string): boolean {
   if (!d.next_step_at || d.converted_client_id) return false;
-  if (!['new', 'qualified', 'proposal', 'contract'].includes(String(d.stage || ''))) return false;
+  if (!isOpenDealStage(d.stage)) return false;   // sales item 146: this said `new`, a stage no deal has, so a first-stage deal never got the reminder
   return String(d.next_step_at).slice(0, 10) < todayIso.slice(0, 10);
 }
 
@@ -938,7 +939,7 @@ export async function runDealTaskReminders(limit = 20): Promise<{ nudged: number
   }
 
   // ── passed next-step dates (presence_deals.next_step_at, 0089) ──
-  const dq = await svc(`presence_deals?deleted_at=is.null&converted_client_id=is.null&stage=in.(new,qualified,proposal,contract)&next_step_at=not.is.null&next_step_at=lt.${today}&select=id,site_id,title,stage,next_step_at,next_step&order=next_step_at.asc&limit=${limit}`).catch(() => ({ ok: false, json: null as any }));
+  const dq = await svc(`presence_deals?deleted_at=is.null&converted_client_id=is.null&${OPEN_DEAL_STAGES_FILTER}&next_step_at=not.is.null&next_step_at=lt.${today}&select=id,site_id,title,stage,next_step_at,next_step&order=next_step_at.asc&limit=${limit}`).catch(() => ({ ok: false, json: null as any }));
   for (const d of (dq.ok && Array.isArray(dq.json) ? dq.json : []) as Array<{ id: string; site_id: string; title?: string; stage: string; next_step_at: string; next_step?: string }>) {
     if (!nextStepOverdue({ stage: d.stage, next_step_at: d.next_step_at, converted_client_id: null }, nowIso)) continue;
     const clientId = await clientFor(d.site_id);

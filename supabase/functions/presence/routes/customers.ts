@@ -67,10 +67,13 @@ async function elsewhereAddress(siteId: string): Promise<string> {
  *  owner, the studio's project and link, and the person in the studio's contacts, linked to
  *  it. The same person saved twice is the same customer. The caller (handleSalesAddCustomer)
  *  has already asked someone else's account and reconnected one of the studio's own. */
-export async function saveNewCustomer(site: SiteRow, o: { email: string; name: string; businessName: string; label: string }, cors: Record<string, string>): Promise<Response> {
+export async function saveNewCustomer(site: SiteRow, o: { email: string; phone?: string; name: string; businessName: string; label: string }, cors: Record<string, string>): Promise<Response> {
   const email = normEmail(o.email);
-  // the person, found or made in the studio's contacts (one email, one person: K1)
-  const findPerson = async () => one(await svc(`presence_contacts?site_id=eq.${site.id}&${emailMatch(email)}&deleted_at=is.null&select=id,client_id,company,name&limit=1`));
+  const phone = String(o.phone || '').trim().slice(0, 40);
+  if (!email && !phone) return json({ error: 'validation', message: 'Enter their email or phone number to save them.' }, 422, cors);
+  // the person, found or made in the studio's contacts (one email, one person: K1); with no email
+  // (sales item 150), the same phone is the same person
+  const findPerson = async () => one(await svc(`presence_contacts?site_id=eq.${site.id}&${email ? emailMatch(email) : `phone=eq.${encodeURIComponent(phone)}`}&deleted_at=is.null&select=id,client_id,company,name,phone&limit=1`));
   let person = await findPerson();
   if (person && UUID_RE.test(String(person.client_id || '')) && (await studioLinks(site.id, String(person.client_id))).length) {
     return json({ data: { mode: 'save', saved: true, already: true, created: false, client_id: person.client_id, contact_id: person.id, email } }, 200, cors);
@@ -89,13 +92,14 @@ export async function saveNewCustomer(site: SiteRow, o: { email: string; name: s
   if (!br.bridged || !br.projectId) { await undo(); return json({ error: 'write_failed', message: 'We couldn’t save them just now. Please try again.' }, 502, cors); }
   // the person, linked to the customer (their business name on the contact, when it has none)
   if (!person) {
-    const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: site.id, name: o.name || '', email, company: o.businessName || '', notes: '', client_id: clientId }) });
+    const ins = await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: site.id, name: o.name || '', email, phone, company: o.businessName || '', notes: '', client_id: clientId }) });
     person = ins.ok ? one(ins) : (isUniqueViolation(ins) ? await findPerson() : null);
   }
   if (person && String(person.client_id || '') !== clientId) {
     const patch: Record<string, unknown> = { client_id: clientId };
     if (o.businessName && !String(person.company || '').trim()) patch.company = o.businessName;
     if (o.name && !String(person.name || '').trim()) patch.name = o.name;
+    if (phone && !String(person.phone || '').trim()) patch.phone = phone;
     await svc(`presence_contacts?id=eq.${person.id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify(patch) }).catch(() => null);
   }
   return json({ data: { mode: 'save', saved: true, created: true, client_id: clientId, contact_id: person?.id || null, project_id: br.projectId, email } }, 201, cors);

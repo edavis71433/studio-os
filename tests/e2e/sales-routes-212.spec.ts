@@ -74,7 +74,7 @@ test.describe('Add a customer on Contacts (sales routes, item 212)', () => {
     expect((await dlg.textContent()) || '').not.toMatch(/subscription|SaaS|per month|\/mo\b/i);
     // each label names its field: filling by the words on screen reaches the right input
     await dlg.getByLabel('Their name').fill('Jane Doe');
-    await dlg.getByLabel('Email', { exact: true }).fill('jane@acmebakery.example');
+    await dlg.getByLabel(/^Email/).fill('jane@acmebakery.example');
     await dlg.getByLabel('Business name (optional)').fill('Acme Bakery');
     await page.locator('#cu-submit').click();
     await expect.poll(() => posts.length).toBe(1);
@@ -84,7 +84,7 @@ test.describe('Add a customer on Contacts (sales routes, item 212)', () => {
     // the same person again: the server says they're already a customer, and so does the box
     await done.getByRole('button', { name: 'Add another' }).click();
     await expect(page.locator('#cu-name')).toBeFocused();
-    await dlg.getByLabel('Email', { exact: true }).fill('sam@example.com');
+    await dlg.getByLabel(/^Email/).fill('sam@example.com');
     await page.locator('#cu-submit').click();
     await expect(done.locator('h3')).toHaveText('Already your customer');
     await expect(done).toContainText('Nothing new was made.');

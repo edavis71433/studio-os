@@ -158,7 +158,7 @@ export async function handleProjects(req: Request, jwt: string, site: SiteRow, p
     let path = `presence_projects?site_id=eq.${site.id}&deleted_at=is.null&select=id,name,status,client_visible,client_id,deal_id,owner_user_id,start_date,target_date,updated_at&order=updated_at.desc&limit=${limit}&offset=${offset}`;
     if (status && isProjectStatus(status)) path += `&status=eq.${status}`;
     if (!studio) path += `&client_visible=is.true`;                 // client side: visible projects only
-    if (q) path += `&name.ilike.*${encodeURIComponent(q)}*`;
+    if (q) path += `&name=ilike.*${encodeURIComponent(q)}*`;   // sales item 161: written without the "=" the database ignored it and gave back every project (item 121's slip, again)
     const r = await svc(path);
     if (!r.ok) return json({ error: 'read_failed', message: 'We couldn’t load projects just now.' }, 502, cors);
     return json({ data: rows(r), limit, offset, is_studio_view: studio }, 200, cors);
@@ -364,6 +364,11 @@ export async function handleProjectReport(req: Request, jwt: string, site: SiteR
  *  answer where each project stands and whose move it is (boardFacts) — one more table,
  *  the milestones, whose words place a project that isn't on the checklist. */
 export const PROGRESS_BATCH_MAX = 60;
+/** Pure (sales item 150): a project with nothing behind it yet — no step, no milestone, no approval
+ *  and no deal — is the empty one Add a customer makes; the board keeps it off until it has one. */
+export function nothingYet(p: { tasks: unknown[]; milestones: unknown[]; approvals: unknown[]; deal_id?: unknown }): boolean {
+  return !(p.tasks || []).length && !(p.milestones || []).length && !(p.approvals || []).length && !UUID_RE.test(String(p.deal_id || ''));
+}
 export async function handleProjectsProgress(req: Request, jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   const asked = (new URL(req.url).searchParams.get('ids') || '').split(',').map((s) => s.trim().toLowerCase()).filter((s) => UUID_RE.test(s));
   const ids = [...new Set(asked)].slice(0, PROGRESS_BATCH_MAX);
@@ -371,22 +376,26 @@ export async function handleProjectsProgress(req: Request, jwt: string, site: Si
   const studio = await isStudioSide(jwt, site, principal);
   const inIds = `in.(${ids.join(',')})`;
   const [pj, tasks, approvals, milestones] = await Promise.all([
-    svc(`presence_projects?id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,client_visible`),
+    svc(`presence_projects?id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,client_visible,deal_id`),
     svcAll(`presence_tasks?project_id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,project_id,status,client_visible,title,client_action_required,source,milestone_id,sort_order,due_date,created_at`, 'id'),
     svcAll(`presence_approvals?project_id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,project_id,status,client_visible,title,created_at`, 'id'),
     svcAll(`presence_milestones?project_id=${inIds}&site_id=eq.${site.id}&deleted_at=is.null&select=id,project_id,title,status,sort_order,created_at,client_visible`, 'id'),
   ]);
   if (!pj.ok) return json({ error: 'read_failed', message: 'The projects couldn’t be read just now.' }, 502, cors);
   const now = overdueLine(req);   // C11: "N steps overdue" and Late on the caller's day
-  const out: Record<string, { progress: { total: number; done: number; pct: number }; pending_approvals: number } & BoardFacts> = {};
+  const out: Record<string, { progress: { total: number; done: number; pct: number }; pending_approvals: number; nothing_yet: boolean } & BoardFacts> = {};
   for (const p of rows(pj)) {
     if (!studio && !p.client_visible) continue;
     const mine = <T extends { project_id: string }>(list: T[]) => list.filter((x) => x.project_id === p.id);
-    const myTasks = forViewer(mine(tasks), studio), myApprovals = forViewer(mine(approvals), studio);
+    const myTasks = forViewer(mine(tasks), studio), myApprovals = forViewer(mine(approvals), studio), myMilestones = forViewer(mine(milestones), studio);
     out[p.id] = {
       progress: progressOf(myTasks),
       pending_approvals: myApprovals.filter((a: any) => a.status === 'pending').length,
-      ...boardFacts({ tasks: myTasks, milestones: forViewer(mine(milestones), studio), approvals: myApprovals }, now, checklistStageOf),
+      // sales item 150: Add a customer makes a project with nothing in it (the service link needs
+      // one). With no step, no milestone, no approval and no deal behind it, the board leaves it
+      // out until something is; the Table view and the customer's profile still reach it.
+      nothing_yet: nothingYet({ tasks: myTasks, milestones: myMilestones, approvals: myApprovals, deal_id: p.deal_id }),
+      ...boardFacts({ tasks: myTasks, milestones: myMilestones, approvals: myApprovals }, now, checklistStageOf),
     };
   }
   return json({ data: out }, 200, cors);
