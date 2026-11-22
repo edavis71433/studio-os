@@ -519,13 +519,13 @@ test.describe('what a real site showed', () => {
     await h1.dispatchEvent('dblclick');
     await expect(page.locator('html')).toHaveClass(/dc-edit/);
     await expect(h1).not.toHaveAttribute('contenteditable', /.+/);
-    // the toast's action is the way there, and the way back is offered on arrival
+    // the toast's action opens the Business details form in a card beside the page (builder item 314); Edit mode stays
     await toast.getByRole('button', { name: 'Edit them there' }).click();
-    await expect(page.locator('html')).not.toHaveClass(/dc-edit/);
-    await expect(page.locator('#view-business')).toBeVisible();
-    const back = page.getByRole('button', { name: 'Back to your page' });
-    await expect(back).toBeVisible();
-    await back.click();
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    await expect(page.locator('#settingsPanel')).toHaveAttribute('data-mode', 'core');
+    await expect(page.locator('#settingsPanel #view-business')).toBeVisible();
+    await page.locator('#btnSettingsClose').click();
+    await expect(page.locator('#settingsPanel #view-business')).toHaveCount(0);   // back on its tab
     await expect(page.locator('html')).toHaveClass(/dc-edit/);
   });
 
