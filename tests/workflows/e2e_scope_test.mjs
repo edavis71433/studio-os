@@ -91,7 +91,7 @@ ok('the check to require is called browser', !!JOBS.browser && !/^ {4}name:/m.te
 // A job that is skipped reports as a pass, so the check to require must run whatever happened before it.
 ok('browser always runs, so it always reports', /^ {4}if: always\(\)$/m.test(JOBS.browser));
 ok('browser reads how the decision and the devices ended', /^ {4}needs: \[scope, devices\]$/m.test(JOBS.browser));
-ok('no device is called browser', /^ {4}name: browser on \$\{\{ matrix\.project \}\}$/m.test(JOBS.devices));
+ok('no device is called browser: each machine is named for its device and part', /^ {4}name: browser on \$\{\{ matrix\.project \}\} \(\$\{\{ matrix\.shard \}\} of \$\{\{ matrix\.shards \}\}\)$/m.test(JOBS.devices));
 // GitHub matches a required check by name alone, so a job called browser anywhere else could answer for this one.
 for (const { name } of Deno.readDirSync(new URL('.github/workflows/', ROOT))) {
   if (name === 'e2e.yml' || !name.endsWith('.yml')) continue;
@@ -121,8 +121,19 @@ ok('no job sets a stop rule of its own', !/^ {4}concurrency:/m.test(WORKFLOW));
 // ── The devices ──────────────────────────────────────────────────────────────
 const CONFIG = Deno.readTextFileSync(new URL('playwright.config.ts', ROOT));
 const projects = [...CONFIG.matchAll(/\{ name: '([\w-]+)'/g)].map((m) => m[1]);
-const matrix = JOBS.devices?.match(/^ {8}project: \[([^\]]*)\]$/m)?.[1].split(',').map((x) => x.trim()) || [];
-ok('each device in playwright.config.ts gets a machine, and only those', projects.length === 3 && matrix.join() === projects.join(), matrix.join());
+// Builder item 419: each device is split into parts (Playwright's --shard), one machine each.
+const parts = [...(JOBS.devices || '').matchAll(/^ {10}- \{ project: ([\w-]+), shard: (\d+), shards: (\d+) \}$/gm)].map((m) => ({ project: m[1], shard: +m[2], shards: +m[3] }));
+const partsOf = (p) => parts.filter((x) => x.project === p);
+ok('each device in playwright.config.ts gets machines, and only those', projects.length === 3 && parts.length > 0 && parts.every((x) => projects.includes(x.project)) && projects.every((p) => partsOf(p).length > 0), parts.map((x) => `${x.project} ${x.shard}/${x.shards}`).join(', '));
+for (const p of projects) {
+  const list = partsOf(p), n = list[0]?.shards;
+  ok(`${p}: each part from 1 to ${n} once, and every part agrees how many there are`, !!n && list.length === n && list.every((x) => x.shards === n) && list.map((x) => x.shard).sort((a, b) => a - b).join() === Array.from({ length: n }, (_, i) => i + 1).join(), list.map((x) => `${x.shard}/${x.shards}`).join(', '));
+}
+ok('the desktop in two parts, the phone and the tablet in three (item 419)', partsOf('desktop-chromium').length === 2 && partsOf('mobile').length === 3 && partsOf('tablet').length === 3);
+// Four workers were measured slower than two on the phone's WebKit, and timed out a test (item 419).
+ok('each machine runs two workers, the number measured fastest', /^ {2}workers: process\.env\.CI \? 2 : undefined,$/m.test(CONFIG));
+// Two parts uploading under one name make the second upload fail, and that part with it.
+ok('each part uploads its report under a name of its own', /^ {10}name: playwright-report-\$\{\{ matrix\.project \}\}-\$\{\{ matrix\.shard \}\}-of-\$\{\{ matrix\.shards \}\}$/m.test(JOBS.devices || ''));
 ok('one device failing doesn\'t cancel the others', /^ {6}fail-fast: false$/m.test(JOBS.devices));
 const lock = JSON.parse(Deno.readTextFileSync(new URL('package-lock.json', ROOT)));
 const pw = lock.packages?.['node_modules/@playwright/test']?.version;
@@ -131,29 +142,35 @@ ok('the devices run in Playwright\'s own image, at the version package-lock.json
 ok('Playwright\'s two packages are on the same version', lock.packages?.['node_modules/playwright-core']?.version === pw);
 // A device stopped by its cap leaves no `browser` pass, and deploy.yml waits its time out for nothing.
 const cap = Number(JOBS.devices?.match(/^ {4}timeout-minutes: (\d+)$/m)?.[1]);
-ok('a device may take 75 minutes (main\'s full tablet run took up to 45 with the machines busy)', cap === 75, String(cap));
+ok('a part may take 40 minutes (a part takes 10 to 15; before item 419 a whole device took up to 69)', cap === 40, String(cap));
 const gateWait = Number(Deno.readTextFileSync(new URL('.github/workflows/deploy.yml', ROOT)).match(/\$\{WAIT_MINUTES:-(\d+)\}/)?.[1]);
 ok('a device\'s cap stays under the time deploy.yml waits for the check', cap > 0 && gateWait > cap, `${cap} < ${gateWait}`);
 
 // The device step's real script, with a stand-in npx that prints what it was asked to run.
-const RUN_DEVICE = script('name: Run the browser suite on this device\\n {8}env:\\n[\\s\\S]*?EVENT: .*');
+const RUN_DEVICE = script('name: Run the browser suite on this device\\n {8}env:\\n[\\s\\S]*?SHARD: .*');
 const bin = await Deno.makeTempDir({ prefix: 'e2e-device-bin-' });
 await Deno.writeTextFile(`${bin}/npx`, '#!/bin/sh\necho "$@"\n');
 await Deno.chmod(`${bin}/npx`, 0o755);
 await Deno.writeTextFile(`${bin}/step.sh`, RUN_DEVICE || 'exit 9');
-async function device(PROJECT, EVENT) {
+async function device(PROJECT, EVENT, SHARD = '1/3') {
   const { code, stdout } = await new Deno.Command('bash', {
     args: ['-e', `${bin}/step.sh`], stdout: 'piped', stderr: 'null', clearEnv: true,
-    env: { PATH: `${bin}:${Deno.env.get('PATH')}`, PROJECT, EVENT },
+    env: { PATH: `${bin}:${Deno.env.get('PATH')}`, PROJECT, EVENT, SHARD },
   }).output();
   return { code, ran: new TextDecoder().decode(stdout).trim() };
 }
-const tabletPr = await device('tablet', 'pull_request');
-ok('on a pull request the tablet runs the touch and layout tests', tabletPr.code === 0 && tabletPr.ran === 'playwright test --project=tablet --grep @touch|@layout', tabletPr.ran);
-for (const [p, e] of [['tablet', 'push'], ['tablet', 'workflow_dispatch'], ['desktop-chromium', 'pull_request'], ['mobile', 'pull_request'], ['mobile', 'push']]) {
-  const r = await device(p, e);
-  ok(`${p} on ${e} runs everything`, r.code === 0 && r.ran === `playwright test --project=${p}`, r.ran);
+ok('the step hands each machine its part', JOBS.devices?.includes('SHARD: ${{ matrix.shard }}/${{ matrix.shards }}'));
+const tabletPr = await device('tablet', 'pull_request', '2/3');
+ok('on a pull request the tablet runs the touch and layout tests, in its part', tabletPr.code === 0 && tabletPr.ran === 'playwright test --project=tablet --grep @touch|@layout --shard=2/3', tabletPr.ran);
+// Builder item 419: main's release waits for the tablet's touch and layout tests; the rest runs nightly.
+const tabletMain = await device('tablet', 'push', '3/3');
+ok('on main the tablet runs the touch and layout tests too', tabletMain.code === 0 && tabletMain.ran === 'playwright test --project=tablet --grep @touch|@layout --shard=3/3', tabletMain.ran);
+for (const [p, e, part] of [['tablet', 'schedule', '1/3'], ['tablet', 'workflow_dispatch', '2/3'], ['desktop-chromium', 'pull_request', '1/2'], ['desktop-chromium', 'schedule', '2/2'], ['mobile', 'pull_request', '3/3'], ['mobile', 'push', '1/3']]) {
+  const r = await device(p, e, part);
+  ok(`${p} on ${e} runs everything in part ${part}`, r.code === 0 && r.ran === `playwright test --project=${p} --shard=${part}`, r.ran);
 }
+const nightly = WORKFLOW.match(/^ {2}schedule:\n {4}- cron: "([^"]+)"$/m)?.[1] || '';
+ok('the tablet\'s full suite runs every night, with the desktop and the phone', nightly.split(' ').length === 5 && nightly.split(' ').slice(2).join(' ') === '* * *', nightly);
 // A tag nobody carries would leave the tablet with nothing to run, and an empty run passes.
 const specs = [...Deno.readDirSync(new URL('tests/e2e/', ROOT))].filter((e) => e.name.endsWith('.spec.ts'))
   .map((e) => Deno.readTextFileSync(new URL(`tests/e2e/${e.name}`, ROOT))).join('\n');
@@ -318,6 +335,8 @@ ok('a push with no old commit runs it', missing.code === 0 && missing.run === 'r
 // ── Manual runs: someone asked ───────────────────────────────────────────────
 const manual = await decide('push-docs', { EVENT: 'workflow_dispatch', BEFORE: '' });
 ok('a manual run always runs it', manual.code === 0 && manual.run === 'run=true' && manual.log.includes('Compared with nothing'));
+const night = await decide('push-docs', { EVENT: 'schedule', BEFORE: '' });
+ok('the nightly run always runs it', night.code === 0 && night.run === 'run=true' && night.log.includes('Compared with nothing'));
 
 await Deno.remove(dir, { recursive: true });
 const passed = results.filter((x) => x.p).length;
