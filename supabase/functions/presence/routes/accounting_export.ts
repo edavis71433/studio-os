@@ -14,7 +14,7 @@ import { siteCan, isSiteRole } from '../lib/site_roles.ts';
 import { callerToday } from '../lib/sales_lifecycle.ts';
 import { retainerPayments } from '../lib/invoice_billing.ts';
 import { UUID_RE } from '../lib/uuid.ts';
-import { exportNo, exportPeriod, invoiceExportRows, paymentExportRows, exportReadMe, INVOICE_HEAD, PAYMENT_HEAD, type RetainerCharge, type MoneyBack, type ExportPeriod } from '../lib/accounting_export.ts';
+import { exportNo, exportPeriod, invoiceExportRows, paymentExportRows, exportReadMe, costExportRows, INVOICE_HEAD, PAYMENT_HEAD, COST_HEAD, type RetainerCharge, type MoneyBack, type ExportPeriod, type CostOut } from '../lib/accounting_export.ts';
 import { RETURNED_SELECT, returnedPayments, disputeFees } from '../lib/money_returns.ts';
 import { indexPayments, attachPayouts, stripeSide, payoutExportRows, PAYOUT_HEAD } from '../lib/stripe_ledger.ts';
 import { stripeConfigured, listPaymentBalanceTransactions, listPayouts, listPayoutTransactions, paymentIntentForInvoice } from '../commerce/stripe.ts';
@@ -24,6 +24,7 @@ import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any)?.json) ? (r as any).json : []) as any[];
+const HAND = new Set(['check', 'cash', 'bank_transfer', 'zelle', 'other']);   // sales item 165: money given back by hand, in payments.csv under how it went
 
 // ── Sales item 133: what reached the bank ─────────────────────────────────────
 // Stripe's fee on each payment it took, the day the payout carrying it arrived, and
@@ -111,12 +112,16 @@ export async function handleAccountingExport(req: Request, site: SiteRow, princi
     return { customer: (d && (clientOf.get(String(d.converted_client_id || '')) || personOf.get(String(d.contact_id || '')))) || '', invoice_no: '', what: `Retainer${d && d.title ? ': ' + d.title : ''}` };
   };
   const back: MoneyBack[] = [
-    ...backs.map((b) => ({ kind: b.kind, amount_cents: b.amount_cents, at: b.paid_at, bank: b.bank, ...backOf(b) })),
+    ...backs.map((b) => ({ kind: b.kind, amount_cents: b.amount_cents, at: b.paid_at, bank: b.bank, ...(b.kind === 'refund' && HAND.has(b.method) ? { by_hand: b.method } : {}), ...backOf(b) })),
     ...fees.map((f) => ({ kind: 'fee' as const, amount_cents: f.amount_cents, at: f.paid_at, ...backOf(f) })),
   ];
   // sales item 133: Stripe's fees and payouts; a Stripe that can't be read downloads nothing, like the rest
   const books = seesStripeBooks(principal) && stripeConfigured() ? await readStripeBooks(p, charges.map((c) => c.stripe_invoice || '')).catch(() => null) : undefined;
   if (books === null) return json({ error: 'read_failed', message: 'Stripe’s fees and payouts couldn’t load just now, so nothing was downloaded. Try again in a moment.' }, 502, cors);
+  // sales item 176: costs paid for customers in these days (APPLY-0250; none before it)
+  const costQ = await svc(`presence_customer_costs?site_id=eq.${site.id}&deleted_at=is.null&spent_on=gte.${p.from}&spent_on=lte.${p.to}&select=spent_on,label,amount_cents,invoice_id,note,deal_id,customer_client_id&order=spent_on.asc&limit=2000`).catch(() => ({ ok: false, json: null }));
+  const costRows: CostOut[] = (costQ.ok ? rows(costQ) : []).map((c: any) => { const i = c.invoice_id ? bookById.get(String(c.invoice_id)) : null; const d = deals.get(String(c.deal_id || '')); return { spent_on: String(c.spent_on || ''), customer: String(i?.business || i?.person || (c.customer_client_id && clientOf.get(String(c.customer_client_id))) || (d && (clientOf.get(String(d.converted_client_id || '')) || personOf.get(String(d.contact_id || '')))) || ''), label: String(c.label || ''), amount_cents: Math.round(Number(c.amount_cents) || 0), invoice_no: i ? exportNo(i.number) : '', note: String(c.note || '') }; });
+  const costs = costExportRows(costRows, p);
   const inv = invoiceExportRows(book.items, p, tzo);
   const pay = paymentExportRows(book.items, charges, p, tzo, back, books ? books.lookup : null);
   const outs = books ? payoutExportRows(books.payouts, books.carried, p) : null;
@@ -125,7 +130,8 @@ export async function handleAccountingExport(req: Request, site: SiteRow, princi
     { name: 'invoices.csv', data: enc.encode(toCsv(INVOICE_HEAD, inv.rows)) },
     { name: 'payments.csv', data: enc.encode(toCsv(PAYMENT_HEAD, pay.rows)) },
     ...(outs ? [{ name: 'payouts.csv', data: enc.encode(toCsv(PAYOUT_HEAD, outs.rows)) }] : []),
-    { name: 'READ-ME.txt', data: enc.encode(exportReadMe(p, inv, pay, book.partial, books && outs ? { payouts: outs.payouts, cents: outs.cents, capped: books.capped } : null)) },
+    ...(costs.costs ? [{ name: 'costs.csv', data: enc.encode(toCsv(COST_HEAD, costs.rows)) }] : []),
+    { name: 'READ-ME.txt', data: enc.encode(exportReadMe(p, inv, pay, book.partial, books && outs ? { payouts: outs.payouts, cents: outs.cents, capped: books.capped } : null, costs)) },
   ]);
   return new Response(zip.buffer as ArrayBuffer, { status: 200, headers: { ...cors, 'Access-Control-Expose-Headers': 'Content-Disposition', 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="for-your-bookkeeper-${p.from}-to-${p.to}.zip"`, 'Cache-Control': 'no-store' } });
 }

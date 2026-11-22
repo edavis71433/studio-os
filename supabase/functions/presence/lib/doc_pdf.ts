@@ -8,7 +8,7 @@
 // loads the row, the brand and the context; same input, same bytes.
 import { PdfDoc, rgb, textWidth, wrapText, type PdfFont, type Rgb } from './pdf.ts';
 import {
-  money, utcStamp, invoiceNo, dayLabel, paidLine, partyLines, invoiceLines, invoiceDocLabel, mixHex, invoiceReturnWords,
+  money, utcStamp, invoiceNo, dayLabel, paidLine, partyLines, invoiceLines, invoiceDocLabel, mixHex, invoiceReturnWords, payOtherLines,
   type DocBrand, type DocContext, type DocKind,
 } from './documents.ts';
 import { splitLineItems, computeProposalTotals, subtotalOf } from './sales_lifecycle.ts';
@@ -203,10 +203,51 @@ export function invoicePdf(v: any, brandIn?: Partial<DocBrand> | null, ctx?: Doc
     pdf.link(L, f.y, Math.min(W, textWidth(url, 'R', 9.5)), before - f.y, url);
     f.gap(6);
   }
+  const other = !paid && !voided ? payOtherLines(ctx?.payOther) : [];   // sales item 168
+  if (other.length) { f.para('Other ways to pay:', { font: 'B', size: 10 }); for (const l of other) f.para(l, { size: 9.5, color: SOFT }); f.gap(6); }
   f.para(paid ? 'Thank you. This is your receipt of payment.'
     : voided ? 'This request was voided and is no longer payable.'
     : `${no ? `Please quote ${no} with any payment by check or transfer. ` : ''}Keep this document for your records.`, { size: 9, color: SOFT });
   feet(pdf, `${brand.name}${no ? ' · ' + label + ' ' + no : ''}`, { name: brand.name, what: `${label}${no ? ' ' + no : ''}`, color: t.band });
+  return pdf.bytes();
+}
+
+// ── STATEMENT (sales item 171) ────────────────────────────────────────────────
+export interface StatementLine { day: string; what: string; ref: string; owed: string; paid: string; balance: string }
+export interface StatementIn { from: string; to: string; opening: string; closing: string; lines: StatementLine[]; who: string; studio: { name?: string; email?: string; phone?: string; address?: string; taxId?: string }; billTo: { name?: string; company?: string; email?: string; address?: string } | null; issued: string }
+/** One page (more when it must): the customer, the days, every invoice, payment, charge and
+ *  refund with its day, and the balance as it went. Pure. */
+export function statementPdf(s: StatementIn, brandIn?: Partial<DocBrand> | null): Uint8Array<ArrayBuffer> {
+  const brand = brandOf(brandIn);
+  const pdf = newPdf(`Statement — ${s.who}`);
+  const t = tones(brand);
+  const f = head(pdf, brand, { label: `Statement for ${s.who}`, title: `${s.from.slice(5, 7)}/${s.from.slice(8, 10)}/${s.from.slice(0, 4)} to ${s.to.slice(5, 7)}/${s.to.slice(8, 10)}/${s.to.slice(0, 4)}`, sub: `Issued ${s.issued}`, figureLabel: 'Balance', figure: s.closing });
+  boxes(f, [{ title: 'From', lines: partyLines({ ...s.studio, name: brand.name }) }, { title: 'For', lines: partyLines(s.billTo) }, { title: 'Days', lines: [`Opening balance ${s.opening}`, `Closing balance ${s.closing}`, `${s.lines.length} line${s.lines.length === 1 ? '' : 's'}`] }]);
+  // the table: Day · What · Owed · Paid · Balance
+  const size = 9.5, lead = 13;
+  const col = { day: L, what: L + 70, ref: L + 290, owed: R - 170, paid: R - 90, bal: R };
+  f.need(24);
+  f.pdf.text(col.day, f.y - 10, 'DAY', { font: 'B', size: 8, color: SOFT }); f.pdf.text(col.what, f.y - 10, 'WHAT', { font: 'B', size: 8, color: SOFT }); f.pdf.text(col.ref, f.y - 10, 'NO.', { font: 'B', size: 8, color: SOFT });
+  f.pdf.textRight(col.owed, f.y - 10, 'OWED', { font: 'B', size: 8, color: SOFT }); f.pdf.textRight(col.paid, f.y - 10, 'PAID', { font: 'B', size: 8, color: SOFT }); f.pdf.textRight(col.bal, f.y - 10, 'BALANCE', { font: 'B', size: 8, color: SOFT });
+  f.gap(16); f.rule(INK);
+  f.need(20); f.pdf.text(col.what, f.y - 13, 'Balance before these days', { size, color: SOFT }); f.pdf.textRight(col.bal, f.y - 13, s.opening, { size, color: SOFT }); f.gap(lead + 6); f.rule();
+  for (const l of s.lines) {
+    const what = wrapText(l.what, 'R', size, col.ref - col.what - 8);
+    const h = what.length * lead + 8;
+    f.need(h);
+    f.pdf.text(col.day, f.y - 13, l.day, { size, color: SOFT });
+    what.forEach((w, i) => f.pdf.text(col.what, f.y - 13 - i * lead, w, { size, color: INK }));
+    f.pdf.text(col.ref, f.y - 13, l.ref, { size, color: SOFT });
+    if (l.owed) f.pdf.textRight(col.owed, f.y - 13, l.owed, { size, color: INK });
+    if (l.paid) f.pdf.textRight(col.paid, f.y - 13, l.paid, { size, color: GOOD });
+    f.pdf.textRight(col.bal, f.y - 13, l.balance, { size, font: 'B', color: INK });
+    f.gap(h); f.rule();
+  }
+  if (!s.lines.length) { f.need(20); f.pdf.text(col.what, f.y - 13, 'Nothing in these days.', { size, color: SOFT }); f.gap(lead + 6); }
+  f.gap(10);
+  panel(f, [`Balance at the end of these days: ${s.closing}`], { bg: t.tint, bold: true });
+  f.para('A statement, not an invoice: each invoice has its own pay link. Have a question about it? Reply to the email it came with.', { size: 9, color: SOFT });
+  feet(pdf, `${brand.name} · Statement for ${s.who}`, { name: brand.name, what: 'Statement', color: t.band });
   return pdf.bytes();
 }
 
@@ -313,7 +354,7 @@ export function contractPdf(c: any, brandIn?: Partial<DocBrand> | null, ctx?: Do
 
 /** Dispatch by kind, like renderDocument. Pure. */
 export function documentPdf(kind: DocKind, data: any, brand?: Partial<DocBrand> | null, ctx?: DocContext | null): Uint8Array<ArrayBuffer> {
-  if (kind === 'invoice') return invoicePdf(data, brand, ctx);
+  if (kind === 'invoice' || kind === 'charge') return invoicePdf(data, brand, ctx);
   if (kind === 'proposal') return proposalPdf(data, brand, ctx);
   if (kind === 'estimate') return estimatePdf(data, brand, ctx);
   return contractPdf(data, brand, ctx);
@@ -322,6 +363,7 @@ export function documentPdf(kind: DocKind, data: any, brand?: Partial<DocBrand> 
  *  "Proposal-Website-refresh.pdf". Pure. */
 export function pdfFileName(kind: DocKind, data: any): string {
   const slug = (s: unknown) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  if (kind === 'charge') return `Receipt-${slug(data?.title) || 'retainer'}.pdf`;   // sales item 163
   if (kind === 'invoice') {
     const label = invoiceDocLabel(data).replace(/ /g, '-');
     const no = invoiceNo(data?.number).replace('#', '');

@@ -136,7 +136,7 @@ const iso = (n: number) => new Date(Date.now() + n * 86400000).toISOString();
 const INVOICES = { data: { today: day(0), partial: false, items: [
   { id: I(1), number_label: '#0064', title: 'Website rebuild — balance', amount_cents: 180000, status: 'open', state: 'upcoming', due_date: day(6), issued_at: iso(-8), paid_at: null, paid_method: '', processing: false, payment_for: null, deal_id: 'dddddddd-0000-4000-8000-000000000001', business: 'Maple & Rye Bakery', person: 'Jordan Lee' },
   { id: I(2), number_label: '#0063', title: 'Care plan — November', amount_cents: 35000, status: 'open', state: 'processing', due_date: day(4), issued_at: iso(-10), paid_at: null, paid_method: '', processing: true, payment_for: null, deal_id: null, business: 'Northside Dental', person: 'Priya Shah' },
-  { id: I(3), number_label: '#0062', title: 'Booking page add-on', amount_cents: 65000, status: 'open', state: 'overdue', due_date: day(-11), issued_at: iso(-18), paid_at: null, paid_method: '', processing: false, payment_for: null, deal_id: 'dddddddd-0000-4000-8000-000000000003', business: 'Harbor Yoga', person: 'Sam Ortiz' },
+  { id: I(3), number_label: '#0062', title: 'Booking page add-on', amount_cents: 65000, status: 'open', state: 'overdue', due_date: day(-11), issued_at: iso(-18), paid_at: null, paid_method: '', processing: false, payment_for: null, has_link: true, pay_url: 'https://pay.example/62', deal_id: 'dddddddd-0000-4000-8000-000000000003', business: 'Harbor Yoga', person: 'Sam Ortiz' },
   { id: I(4), number_label: '#0061', title: 'Deposit — new site', amount_cents: 120000, status: 'paid', state: 'paid', due_date: day(-5), issued_at: iso(-20), paid_at: iso(-1), paid_method: 'check', processing: false, payment_for: null, deal_id: null, business: 'Blue Heron Plumbing', person: 'Alex Kim' },
   { id: I(5), number_label: '', title: 'Part payment', amount_cents: 20000, status: 'paid', state: 'paid', due_date: null, issued_at: iso(-2), paid_at: iso(-2), paid_method: 'zelle', processing: false, payment_for: I(3), deal_id: 'dddddddd-0000-4000-8000-000000000003', business: 'Harbor Yoga', person: 'Sam Ortiz' },
   { id: I(6), number_label: '#0058', title: 'Holiday banner', amount_cents: 25000, status: 'void', state: '', due_date: day(-30), issued_at: iso(-40), paid_at: null, paid_method: '', processing: false, payment_for: null, deal_id: null, business: 'Lakeside Books', person: 'Chris Park' },
@@ -151,7 +151,7 @@ test.describe('The Invoices page (item 85)', () => {
     await expect(tot.nth(0).locator('.v')).toHaveText('$2,800');      // open: 1,800 + 350 + 650
     await expect(tot.nth(1).locator('.v')).toHaveText('$650');        // one overdue
     await expect(tot.nth(2).locator('.v')).toHaveText(new Date(Date.now() - 86400000).getMonth() === new Date().getMonth() ? '$1,400' : /\$/);
-    await expect(page.locator('.chip')).toHaveText([/All\s*5/, /Unpaid\s*3/, /Overdue\s*1/, /Paid\s*1/, /Void\s*1/]);
+    await expect(page.locator('.chip')).toHaveText([/All\s*5/, /Unpaid\s*3/, /Overdue\s*1/, /Paid\s*1/, /Void\s*1/, /Who owes/]);   // sales item 171: who owes what, how old
     if (!isPhone(page)) {
       const rows = page.locator('tbody tr:not(.part)');
       await expect(rows).toHaveCount(5);
@@ -188,7 +188,8 @@ test.describe('The Invoices page (item 85)', () => {
     await page.getByRole('menuitem', { name: 'Download PDF' }).click();
     await expect.poll(() => page.evaluate(() => (window as unknown as { __opened: string[] }).__opened)).toEqual(['https://fn.example/sales/doc/x?format=pdf']);
     await menuOf('#0062').click();
-    await expect(page.getByRole('menuitem')).toHaveText(['Open the deal', 'Download PDF', 'Record a payment']);
+    // sales item 169: every action the deal page has, from the row (this one was sent: it has a pay link)
+    await expect(page.getByRole('menuitem')).toHaveText(['Resend', 'Copy the pay link', 'Record a payment', 'Send a reminder now', 'Change it', 'Open the deal', 'Download PDF', 'Void']);
     await page.getByRole('menuitem', { name: 'Record a payment' }).click();
     const dlg = page.getByRole('dialog', { name: 'Record a payment' });
     await expect(dlg).toBeVisible();

@@ -25,7 +25,7 @@ import { runSiteTrashPurge } from '../ops/site_trash.ts';
 import { runCustomerTrashSweep } from '../ops/customer_trash.ts';
 import { runFileTrashPurge } from '../ops/file_trash.ts';
 import { runDuePosts } from '../ops/scheduled_posts.ts';
-import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runSalesDocReminders, runReviewRequests, runProspectNurture, runSupportAging, runAgreementRenewalReminders, runBookingReminders, runBookingFollowups, runEmailAuthNudges, runApexDriftWatch, runApprovalReminders } from '../commerce/lifecycle.ts';
+import { runLifecycleSweep, runWeeklyDigest, runDomainWatch, runLeadFollowups, runDealFollowups, runRenewalReminders, runInvoiceReminders, runRetainerRenewalNotes, runSalesDocReminders, runReviewRequests, runProspectNurture, runSupportAging, runAgreementRenewalReminders, runBookingReminders, runBookingFollowups, runEmailAuthNudges, runApexDriftWatch, runApprovalReminders } from '../commerce/lifecycle.ts';
 import { runScheduledBroadcasts } from '../lib/broadcast.ts';
 import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
@@ -444,6 +444,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['renewals', () => runRenewalReminders(50)],
             ['agreement_renewals', () => runAgreementRenewalReminders(50)],
             ['invoice_nudges', () => runInvoiceReminders(20)],
+            ['retainer_notes', () => runRetainerRenewalNotes(20)],   // sales item 163: a week before a yearly retainer charge
             ['doc_reminders', () => runSalesDocReminders(20)],
             ['recurring_invoices', () => runRecurringInvoices(20)],   // item 47: send the recurring invoices that are due (and the heads-up three days before)
             ['approval_reminders', () => runApprovalReminders(50)],   // audit change 8: chase a dated client approval (day before + daily overdue), once a day
@@ -545,6 +546,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       const renewals = await step('renewals', () => runRenewalReminders(50));      // PP-2: annual renewal heads-up
       const agreementRenewals = await step('agreement_renewals', () => runAgreementRenewalReminders(50)); // signed-agreement term-end heads-up (owner-only)
       const invoiceNudges = await step('invoice_nudges', () => runInvoiceReminders(20)); // MONEY: unpaid invoice reminders
+      await step('retainer_notes', () => runRetainerRenewalNotes(20));                  // sales item 163: a week before a yearly retainer charge
       const docReminders = await step('doc_reminders', () => runSalesDocReminders(20));  // SALES: unsigned doc reminders
       const recurringInvoices = await step('recurring_invoices', () => runRecurringInvoices(20));  // item 47: recurring invoices due today (and the heads-up three days before)
       const approvalReminders = await step('approval_reminders', () => runApprovalReminders(50)); // audit change 8: chase a dated client approval (day before + daily overdue), once a day

@@ -523,6 +523,9 @@ html.dc-edit:not(.plan-watch) .dp-stage.dev-tablet .dp-frame,html.dc-edit:not(.p
 /* ── the floating bar: one white pill at the top centre ── */
 html.dc-edit:not(.plan-watch) .dc-bar{position:absolute;top:var(--dc-bar-top);left:0;right:0;z-index:90;width:fit-content;max-width:calc(100vw - 32px);height:var(--dc-bar-h);margin:0 auto;padding:8px;display:flex;flex-wrap:nowrap;align-items:center;gap:var(--dds-s2,8px);box-sizing:border-box;background:var(--sheet);border:1px solid color-mix(in srgb,var(--hair) 55%,transparent);border-radius:999px;box-shadow:var(--dds-shadow-pop)}
 .dc-bar>*{flex:none}
+/* builder item 319: on a wide screen the bar keeps one width, so Exit and Publish stay put while the
+   status words in the middle change; the saved line takes up the slack */
+@media (min-width:1100px){html.dc-edit:not(.plan-watch) .dc-bar{width:min(calc(100vw - 200px),1120px)}html.dc-edit:not(.plan-watch) .dc-bar #dcWhisper{flex:1 1 auto;min-width:0;text-align:center}}
 .dc-sep{width:1px;height:22px;background:var(--hair)}
 .dc-bar .dc-actbtn{height:36px;padding:0 14px;border:1px solid transparent;border-radius:999px;background:transparent;color:var(--ink);font-size:13px;font-weight:600;gap:6px}
 .dc-bar .dc-actbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -680,6 +683,12 @@ html.dc-edit:not(.plan-watch) .dc-twbar[hidden]{display:none}
 #settingsPanel[data-mode="styles"] #blocksCard,#settingsPanel[data-mode="styles"] #formsCard{display:none}
 /* items 41, 50 and 123: the header's and footer's own card */
 #settingsPanel:not([data-mode="header"]):not([data-mode="footer"]) #hfCard{display:none}
+/* builder item 314: a tab's form (Business details, Questions, Reviews, Updates) hosted beside the page */
+#settingsPanel[data-mode="core"] .dc-panel-scroll>:not(.dc-hosted){display:none !important}
+#settingsPanel .view.dc-hosted{display:block !important;padding:4px 18px 24px}
+#settingsPanel .view.dc-hosted h1.doc{font-size:18px;margin:8px 0 4px}
+#settingsPanel .view.dc-hosted .docsub{font-size:13px;margin-bottom:12px}
+#settingsPanel .view.dc-hosted .biz-grid{grid-template-columns:1fr;max-width:none}
 #settingsPanel[data-mode="header"] .dc-panel-scroll>:not(#hfCard),#settingsPanel[data-mode="footer"] .dc-panel-scroll>:not(#hfCard){display:none !important}
 #hfCard{display:flex;flex-direction:column;gap:14px;padding:4px 20px 20px}
 #hfCard .ins-lbl{margin-top:4px}
@@ -763,6 +772,30 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 #settingsPanel[data-mode="section"] #blocksCard .ins-field input{margin-bottom:0 !important}
 #settingsPanel[data-mode="section"] #blocksCard input:focus-visible,#settingsPanel[data-mode="section"] #blocksCard textarea:focus-visible,#settingsPanel[data-mode="section"] #blocksCard select:focus-visible{outline:2px solid var(--plum);outline-offset:0}
 #settingsPanel[data-mode="section"] #blocksCard .hint{font-size:12px;color:var(--ink-3)}
+/* builder item 315: the list sections' item cards */
+.rw-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.rw-card{padding:8px 10px 10px;border:1px solid var(--hair);border-radius:12px;background:var(--sheet);display:flex;flex-direction:column;gap:6px}
+.rw-card.rw-dragging{opacity:.5}.rw-card.rw-over{outline:2px solid var(--plum);outline-offset:2px}
+.rw-head{display:flex;align-items:center;gap:4px;margin-bottom:2px}
+.rw-grip{display:inline-flex;color:var(--ink-3);cursor:grab;width:18px;justify-content:center}.rw-grip svg{width:14px;height:14px}
+.rw-n{flex:1;font-size:12px;font-weight:600;color:var(--ink-2)}
+.rw-b{width:32px;height:32px;display:grid;place-items:center;padding:0;border:0;border-radius:999px;background:transparent;color:var(--ink-2);cursor:pointer}
+.rw-b:hover{background:var(--dc-raised,var(--paper));color:var(--ink)}.rw-b:disabled{opacity:.35;cursor:default}.rw-b.rw-rm:hover{color:var(--clay,#a3423a)}
+.rw-b svg{width:14px;height:14px}
+@media (pointer:coarse){.rw-b{width:44px;height:44px}}
+.rw-fold{margin-top:10px}.rw-fold summary{font-size:12px;font-weight:600;color:var(--ink-2);cursor:pointer}
+/* a feature's icon on its card (item 304's line icons) */
+.rw-icon{display:flex;flex-direction:column;gap:6px}
+.rw-icon-now{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 12px;border:1px solid var(--hair);border-radius:999px;background:var(--sheet);color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.rw-icon-now[aria-expanded="true"]{border-color:var(--plum);color:var(--plum)}
+.rw-icon-pic{display:inline-flex;font-size:16px;line-height:1;color:var(--rw-accent,var(--plum))}
+.rw-icon .ins-icon:not(.rw-icon-none){color:var(--rw-accent,var(--plum))}
+.ins-icon[aria-pressed="true"]{border-color:var(--plum);box-shadow:0 0 0 2px var(--plum-soft)}
+.rw-icon-none{font-size:12px;font-weight:600;color:var(--ink-2)}
+@media (pointer:coarse){.rw-icon-now{min-height:44px}}
+.rw-table{display:grid;gap:6px;align-items:center;overflow-x:auto;padding-bottom:4px}
+.rw-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+#settingsPanel[data-mode="section"] #blocksCard .rw-card input,#settingsPanel[data-mode="section"] #blocksCard .rw-card textarea,#settingsPanel[data-mode="section"] #blocksCard .rw-table input{margin-bottom:0 !important}
 .ai-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .ai-chip{font:600 12px/18px var(--sans);padding:3px 10px;border-radius:999px;border:0;background:var(--dc-raised,var(--paper));color:var(--ink-2);cursor:pointer}
 .ai-chip:hover{color:var(--ink)}
@@ -1628,6 +1661,22 @@ html.plan-watch #svWords{display:none}
 .mcell .fldot.on{background:#8fd0a5}
 /* in-picker source switch: Your photos / Stock photos (FD-T10 in-builder stock) */
 .pickerTabs{display:flex;gap:6px;margin:var(--dds-s4,16px) 0 var(--dds-s1,4px);border-bottom:1px solid var(--hair)}
+/* builder item 317: upload from the chooser, pick several, drop photos on the panel, describe them after */
+.pickUpload{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 12px}
+.pickUploadHint{font-size:12.5px;color:var(--ink-2)}
+.ph-over{outline:2px dashed var(--plum);outline-offset:4px;border-radius:12px}
+.mcell.picked{outline:3px solid var(--plum);outline-offset:2px}
+.mcell.picked::after{content:"✓";position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:var(--plum);color:var(--sheet);font:700 13px/22px var(--sans);text-align:center}
+.ph-desc-row{display:flex;align-items:center;gap:12px;margin:8px 0}
+.ph-desc-row img{width:56px;height:56px;object-fit:cover;border-radius:8px;background:var(--paper);flex:none}
+.ph-desc-row input{flex:1;padding:9px 11px;font:inherit;font-size:13.5px;border:1px solid var(--hair-2);border-radius:10px;background:var(--sheet);color:var(--ink)}
+.gal-cell{display:flex;flex-direction:column;gap:4px;width:96px}
+.gal-cell .gal-mv{display:flex;gap:2px;justify-content:center}
+.gal-cell .gal-mv button{width:32px;height:32px;display:grid;place-items:center;padding:0;border:0;border-radius:999px;background:transparent;color:var(--ink-2);cursor:pointer}
+.gal-cell .gal-mv button:hover{background:var(--dc-raised,var(--paper));color:var(--ink)}.gal-cell .gal-mv button:disabled{opacity:.35;cursor:default}
+.gal-cell .gal-mv button svg{width:14px;height:14px}
+@media (pointer:coarse){.gal-cell{width:120px}.gal-cell .gal-mv button{width:44px;height:44px}}
+.gal-cell.rw-dragging{opacity:.5}.gal-cell.rw-over{outline:2px solid var(--plum);outline-offset:2px;border-radius:8px}
 .pickerTab{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--ink-2);background:transparent;border:0;border-bottom:2px solid transparent;padding:var(--dds-s2,8px) var(--dds-s1,4px);margin-bottom:-1px;cursor:pointer;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease)}
 .pickerTab.on{color:var(--ink);border-bottom-color:var(--plum)}
 .pickerStockBar{display:flex;gap:var(--dds-s2,8px);align-items:center;margin:var(--dds-s4,16px) 0 10px}
@@ -1977,6 +2026,9 @@ html.dc-edit:not(.plan-watch) .scrim{z-index:96}
    Edit mode draws them as floating cards (the floating studio block above). */
 .dc-slideover{position:fixed;top:0;bottom:0;z-index:82;width:360px;max-width:88vw;background:var(--sheet,#fff);display:flex;flex-direction:column;visibility:hidden;box-shadow:0 0 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);transition:transform var(--dur,200ms) var(--ease,ease-out),visibility 0s linear var(--dur,200ms)}
 .dc-slideover.on{visibility:visible;transition:transform var(--dur,200ms) var(--ease,ease-out),visibility 0s}
+/* a card that is closing (it stays visible while it slides away) takes no presses: a tap meant for the page
+   landed on the Pages card's rows and opened another page (found by the slow-connection check on a phone) */
+.dc-slideover:not(.on){pointer-events:none}
 .dc-left{left:0;border-right:1px solid var(--hair);transform:translateX(-102%)}
 .dc-right{right:0;border-left:1px solid var(--hair);transform:translateX(102%)}
 .dc-slideover.on{transform:translateX(0)}
@@ -2169,6 +2221,12 @@ body.pd-dragging *{cursor:grabbing !important}
 #designPreviewEmpty .eq{font-family:var(--serif);font-style:italic;font-size:17px;line-height:1.5;max-width:26ch}
 #designPreviewEmpty .eh{font-size:13px;color:var(--ink-2);margin-top:10px;line-height:1.7;max-width:40ch}
 #designPreviewEmpty .ea{margin-top:var(--dds-s4,16px);display:flex;gap:var(--dds-s5,20px);flex-wrap:wrap}
+/* in Edit mode the note sits in the middle of the canvas, clear of the dock on the left (and of the
+   dock along the bottom on a phone), so its words show and its button takes a press */
+html.dc-edit:not(.plan-watch) #designPreviewEmpty{align-items:center;text-align:center;padding:var(--dds-s7,32px) 24px var(--dds-s7,32px) calc(16px + var(--dc-dock-w) + 24px)}
+html.dc-edit:not(.plan-watch) #designPreviewEmpty .ea{justify-content:center}
+html.dc-edit:not(.plan-watch) #designPreviewEmpty .textact{min-height:44px}
+@media (max-width:760px){html.dc-edit:not(.plan-watch) #designPreviewEmpty{padding:24px 16px calc(96px + env(safe-area-inset-bottom,0px))}}
 /* narrow screens: gallery to one column, panels become bottom sheets (no h-scroll) */
 @media(max-width:1180px){
   .tg-grid{grid-template-columns:1fr}

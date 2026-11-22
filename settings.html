@@ -85,6 +85,20 @@
   .form2 .how{font-size:12.5px;color:var(--faint);margin-top:-4px}   /* sales item 88: under who signs */
   .form2 [data-signer][hidden]{display:none}
   .form2 .note{grid-column:1/-1;font-size:12.5px;color:var(--faint)}
+  /* sales items 167, 168: On every invoice. Its hints sit under their box (the signer's -4px would
+     lay them over the bottom of the box above, inside its 44px finger box); the late fee's three
+     controls sit in a row, and stack, each the full width, on a phone */
+  .invform .how{margin-top:6px}
+  .invform textarea{width:100%;min-height:72px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px;font:inherit;font-size:13.5px;line-height:1.45;background:var(--card);color:var(--ink);resize:vertical}
+  .invform textarea:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .invform .latefee{border-top:1px solid var(--line);padding-top:12px}
+  .lfrow{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto;gap:10px;align-items:center}
+  .lfval{min-width:0}
+  .lfdays{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--soft);white-space:nowrap}
+  .form2 .lfdays label{display:inline;margin:0;font-size:13.5px;color:var(--soft)}
+  .lfdays input{width:72px;flex:0 0 72px}
+  @media (max-width:640px){.lfrow{grid-template-columns:minmax(0,1fr)}.lfdays input{width:96px;flex-basis:96px}}
+  @media (max-width:767px){.invform input,.invform select{height:44px;font-size:16px}.invform textarea{font-size:16px}}
   .btn{display:inline-flex;align-items:center;gap:var(--dds-s2,8px);height:32px;padding:0 var(--dds-s3,12px);border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
   .btn:hover{border-color:var(--dds-line-strong,#d2d2db)} .btn:disabled{opacity:.55;cursor:default}
   .btn.primary{background:var(--p);border-color:var(--p);color:#fff} .btn.primary:hover{background:var(--p-deep)}
@@ -782,6 +796,27 @@
   </section>
   <!-- builder list item 191: two-step sign-in (Figma B1 off, B3 on; the set-up sheet B2 and the code before
        Turn off are fresh-code.js). It is the signed-in person's own, so it lives at studio level only. -->
+  <!-- sales items 168 and 167 (Nov 22 2026 review): what goes on every invoice. How else to pay (check,
+       Zelle), the studio's tax or licence number, the next invoice number (a studio moving from another
+       tool carries on from 1042), and an optional late fee, off to start. The studio's own, never a
+       client's; each box saves when it is left (saveAutomation, the same path as the switches). -->
+  <section class="card" id="invoiceCard" aria-labelledby="invoiceHead" hidden data-needs="configure">
+    <div class="card-h"><h2 id="invoiceHead" tabindex="-1">On every invoice</h2><span class="hint">Printed on each invoice, its PDF and its email. Changes save as you go.</span></div>
+    <form class="form2 invform" id="invoiceForm">
+      <div class="full"><div class="flab"><label for="f-payother">Other ways to pay <span class="muted">(optional)</span></label><span class="fs" id="fs-f-payother" role="status"></span></div><textarea id="f-payother" maxlength="600" rows="2" placeholder="e.g. Zelle: pay@yourstudio.com · Checks to Your Studio, 12 Main St" aria-describedby="fs-f-payother"></textarea>
+        <div class="how">Clients see this under the card button, with the invoice number to quote. One way per line, or separate them with a dot.</div></div>
+      <div><div class="flab"><label for="f-taxid">Tax or licence number <span class="muted">(optional)</span></label><span class="fs" id="fs-f-taxid" role="status"></span></div><input id="f-taxid" maxlength="80" placeholder="e.g. EIN 12-3456789" aria-describedby="fs-f-taxid"></div>
+      <div><div class="flab"><label for="f-nextno">Next invoice number</label><span class="fs" id="fs-f-nextno" role="status"></span></div><input id="f-nextno" type="number" min="1" max="999999" step="1" placeholder="e.g. 1043" aria-describedby="fs-f-nextno"></div>
+      <div class="full how">Set this once when moving from another tool: the next invoice takes this number, and the count carries on from it. Numbers already given never change.</div>
+      <div class="full latefee"><div class="flab"><label for="f-latemode">Late fee</label><span class="fs" id="fs-f-latemode" role="status"></span></div>
+        <div class="lfrow">
+          <select id="f-latemode" aria-describedby="fs-f-latemode"><option value="off">None</option><option value="flat">A flat amount</option><option value="percent">A percent of the invoice</option></select>
+          <div class="lfval"><label for="f-latevalue" class="sr-only">How much</label><input id="f-latevalue" inputmode="decimal" placeholder="25" aria-describedby="fs-f-latevalue"><span class="fs" id="fs-f-latevalue" role="status"></span></div>
+          <div class="lfdays"><label for="f-latedays">after</label><input id="f-latedays" type="number" min="1" max="90" step="1" value="7" aria-describedby="fs-f-latedays"><span>days late</span><span class="fs" id="fs-f-latedays" role="status"></span></div>
+        </div>
+        <div class="how" id="lateHow">Off to start. Added once, as a line on the invoice with a fresh pay link, and said plainly in the next reminder. Only fair if your agreement says so.</div></div>
+    </form>
+  </section>
   <section class="card" id="security" aria-labelledby="securityHead" hidden>
     <div class="card-h"><h2 id="securityHead" tabindex="-1">Sign-in and security</h2><span class="hint">How you get in, and who hears about the big changes.</span></div>
     <div class="tsrow" aria-live="polite">
@@ -937,6 +972,7 @@ const CARDS = [
   // Bold redesign (Nov 2026): the deal stages are a section of their own (the studio's book, like Automations)
   { key: 'stages', href: '#stages', title: 'Deal stages', desc: 'Your names for the four open stages, the chance each one closes, and when a deal counts as stalled.', words: 'pipeline deals stalled chance close', studioOnly: true, needs: 'configure' },
   // sales item 94: the month's goal and the AI help switch (the studio's own, like the stages)
+  { key: 'invoiceCard', href: '#invoiceCard', title: 'On every invoice', desc: 'Other ways to pay, your tax number, the next invoice number, and an optional late fee.', words: 'invoice check zelle tax ein licence number late fee pay', studioOnly: true, needs: 'configure' },
   { key: 'goal', href: '#goal', title: 'Goal and AI help', desc: 'A monthly sales goal for Home and Pipeline, and AI help that drafts a reply or sums a customer up.', words: 'goal target monthly sales number ai help draft reply summary claude assistant cost', studioOnly: true, needs: 'configure' },
   { key: 'auto', href: '#automations', title: 'Automations', desc: 'Ready-made recipes: answer and follow up enquiries, remind unpaid invoices and quotes about to run out, nudge quiet deals, ask for a review. Each shows what it sends.', words: 'automatic reminders emails nudge review request unpaid recipes follow up quote expires auto reply', studioOnly: true, needs: 'configure' },
   // sales item 87: inside a client, the replies THEIR website sends: the acknowledgement and the follow-ups
@@ -1636,6 +1672,7 @@ function paintAutomations() {
   $('automations').hidden = false;
   if (inClient()) return;   // the studio's own sections stay out of a client's settings
   $('stages').hidden = false;
+  paintInvoiceCard();   // sales items 167, 168
   loadStageNames();
   loadMenu();
 }
@@ -2892,7 +2929,44 @@ function saveStageNames(k) {
     paintStageNames(r.body && r.body.data); stagesStatus(r.body && r.body.data);
   });
 }
+// ── sales items 168 and 167: the "On every invoice" card ──
+const LATE_WORDS = { off: 'Off. Nothing is added to a late invoice.', flat: 'Added once, as a line on the invoice with a fresh pay link, and said plainly in the next reminder.', percent: 'A percent of the invoice’s amount, added once, as a line with a fresh pay link, and said in the next reminder.' };
+function paintInvoiceCard() {
+  const st = SETTINGS || {}; const typing = document.activeElement;
+  const set = (id, v, key) => { const el = $(id); if (el && el !== typing && !AUTO_FLIGHT[key] && !AUTO_KEEP[key]) { el.value = v; markBad(el, false); } };
+  set('f-payother', String(st.invoice_pay_other || ''), 'invoice_pay_other');
+  set('f-taxid', String(st.invoice_tax_id || ''), 'invoice_tax_id');
+  set('f-nextno', st.invoice_number_start ? String(st.invoice_number_start) : '', 'invoice_number_start');
+  const mode = ['flat', 'percent'].includes(st.late_fee_mode) ? st.late_fee_mode : 'off';
+  set('f-latemode', mode, 'late_fee_mode');
+  set('f-latevalue', mode === 'flat' ? (Number(st.late_fee_value) ? (Number(st.late_fee_value) / 100).toFixed(2) : '') : mode === 'percent' ? String(Number(st.late_fee_value) || '') : '', 'late_fee_value');
+  set('f-latedays', String(Number(st.late_fee_days) >= 1 ? Math.trunc(Number(st.late_fee_days)) : 7), 'late_fee_days');
+  $('f-latevalue').placeholder = mode === 'percent' ? '5' : '25.00';
+  $('f-latevalue').disabled = mode === 'off'; $('f-latedays').disabled = mode === 'off';
+  $('lateHow').textContent = LATE_WORDS[mode] + (mode === 'off' ? '' : ' Only fair if your agreement says so.');
+  $('invoiceCard').hidden = false;
+}
+function wireInvoiceCard() {
+  const text = (id, key, max) => { const el = $(id); el.addEventListener('change', () => { const v = el.value.trim().slice(0, max); markBad(el, false); saveAutomation({ [key]: v }, null, fsSlot(id), key).then((ok) => { if (!ok) markBad(el, true); }); }); };
+  text('f-payother', 'invoice_pay_other', 600); text('f-taxid', 'invoice_tax_id', 80);
+  $('f-nextno').addEventListener('change', () => { const el = $('f-nextno'); const n = Math.trunc(Number(el.value)); if (!el.value.trim()) { saveAutomation({ invoice_number_start: null }, null, fsSlot('f-nextno'), 'invoice_number_start'); return; } if (!Number.isFinite(n) || n < 1 || n > 999999) { markBad(el, true); saidFailed(fsSlot('f-nextno'), null, 'Enter a whole number from 1 to 999999.'); return; } markBad(el, false); saveAutomation({ invoice_number_start: n }, null, fsSlot('f-nextno'), 'invoice_number_start').then((ok) => { if (!ok) markBad(el, true); }); });
+  const fee = () => {
+    const mode = $('f-latemode').value; const raw = String($('f-latevalue').value || '').replace(/[^0-9.]/g, ''); const days = Math.trunc(Number($('f-latedays').value));
+    const patch = { late_fee_mode: mode };
+    if (mode !== 'off') {
+      const v = mode === 'flat' ? Math.round(parseFloat(raw || '0') * 100) : Math.trunc(Number(raw || '0'));
+      if (!(v > 0) || (mode === 'percent' && v > 100)) { markBad($('f-latevalue'), true); saidFailed(fsSlot('f-latevalue'), null, mode === 'percent' ? 'Enter a percent from 1 to 100.' : 'Enter the fee amount.'); return; }
+      patch.late_fee_value = v;
+      patch.late_fee_days = Number.isFinite(days) && days >= 1 && days <= 90 ? days : 7;
+    }
+    markBad($('f-latevalue'), false);
+    saveAutomation(patch, null, [fsSlot('f-latemode'), fsSlot('f-latevalue'), fsSlot('f-latedays')], ['late_fee_mode', 'late_fee_value', 'late_fee_days']).then(() => paintInvoiceCard());
+  };
+  $('f-latemode').addEventListener('change', () => { const m = $('f-latemode').value; $('f-latevalue').disabled = m === 'off'; $('f-latedays').disabled = m === 'off'; $('lateHow').textContent = LATE_WORDS[m]; if (m === 'off') fee(); else $('f-latevalue').focus(); });
+  $('f-latevalue').addEventListener('change', fee); $('f-latedays').addEventListener('change', fee);
+}
 function wireAutomations() {
+  wireInvoiceCard();   // sales items 167, 168
   for (const k of STAGE_KEYS) {   // item 165: the stage boxes save when they're left
     $('sn-' + k).addEventListener('change', () => saveStageNames(k));
     $('sc-' + k).addEventListener('change', () => saveStageChances(k));   // item 69
@@ -3059,6 +3133,7 @@ const SHELL_READY = document.readyState === 'loading' ? new Promise((r) => docum
     if (location.hash === '#studio') { const n = $('f-name'); if (n) n.focus(); }
     if (location.hash === '#billing' && !inClient()) holdAnchor($('billing'));   // I7: billing is the studio's own, never a client's (a client's "Update payment" link lands at the top)
     if (location.hash === '#automations' && automationsHere()) holdAnchor($('automations'));
+    if (location.hash === '#invoiceCard' && !inClient()) holdAnchor($('invoiceCard'));   // sales item 168
     if (location.hash === '#stages' && !inClient()) holdAnchor($('stages'));   // item 83: a second business is not a client
     if (location.hash === '#goal' && !inClient()) holdAnchor($('goal'));   // sales item 94: Home's goal card and AI help's Open Settings land here
     if (location.hash === '#security' && !inClient()) holdAnchor($('security'));   // item 191: the studio home's nudge lands here

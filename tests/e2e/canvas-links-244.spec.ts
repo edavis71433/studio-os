@@ -98,9 +98,19 @@ test.describe('a link on the canvas never loads another page into it (builder it
     await expect(frame(page).locator('#a h2')).toHaveText('Fresh bread, every morning');
   });
 
-  test('the menu still opens the Pages card, and the canvas stays', async ({ page }) => {
+  // builder items 314 and 319: a link in the menu opens that page on the canvas (a draft read,
+  // never a page loaded into the frame); the menu's own bar still opens the Pages card
+  test('a menu link opens its page on the canvas, and the canvas never leaves the draft', async ({ page }) => {
     const { went } = await mount(page);
     await pressButton(frame(page).locator('header nav.primary a', { hasText: 'About' }));
+    await expect(page.locator('#dcPageName')).toHaveText('About');
+    await settled(page);
+    expect(went.filter((u) => u !== 'about:srcdoc')).toEqual([]);   // the redraw is the only page the canvas took
+    await expect(page.locator('#pagesCard')).not.toHaveClass(/\bon\b/);
+  });
+  test('the menu’s own bar still opens the Pages card, and the canvas stays', async ({ page }) => {
+    const { went } = await mount(page);
+    await frame(page).locator('header nav.primary').click({ position: { x: 2, y: 2 } });
     await expect(page.locator('#pagesCard')).toHaveClass(/\bon\b/);
     await settled(page);
     expect(went).toEqual([]);
