@@ -94,7 +94,7 @@ test.describe('the header and footer, picked on the page (builder items 41, 50 a
     await page.locator('#hfCard').getByRole('button', { name: 'Edit the menu' }).click();
     await expect(page.locator('#pagesCard')).toHaveClass(/\bon\b/);
     await page.locator('#btnPagesClose').click();
-    await frame(page).locator('header.site nav.primary').click();
+    await frame(page).locator('header.site nav.primary').click({ position: { x: 2, y: 2 } });   // the menu's own bar; a link in it opens its page (item 319)
     await expect(page.locator('#pagesCard')).toHaveClass(/\bon\b/);
     await expect(panel(page)).not.toHaveClass(/\bon\b/);   // one card at a time
   });
