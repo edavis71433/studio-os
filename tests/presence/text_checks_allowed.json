@@ -19,6 +19,7 @@
  "audit_hardening_test.mjs": 8,
  "audit_rewalk_gaps_test.mjs": 5,
  "auth_emails_test.mjs": 10,
+ "backup_codes_347_test.mjs": 7,
  "billing_reconcile_test.mjs": 11,
  "billing_surfaces_test.mjs": 12,
  "blog_40_test.mjs": 7,
@@ -178,6 +179,7 @@
  "projects_ui_test.mjs": 27,
  "proposal_schedule_test.mjs": 16,
  "prospects_routes_test.mjs": 1,
+ "public_frame_349_test.mjs": 8,
  "public_pages_test.mjs": 4,
  "publish_offline_share_test.mjs": 3,
  "publish_sends_what_changed_208_test.mjs": 3,
@@ -275,5 +277,6 @@
  "welcome_templates_221_test.mjs": 1,
  "whats_new_128_test.mjs": 5,
  "who_asks_401_test.mjs": 1,
- "window_flag_test.mjs": 5
+ "window_flag_test.mjs": 5,
+ "portal_working_parts_nov22_test.mjs": 21
 }

@@ -462,6 +462,8 @@ export async function handleTasksCreate(req: Request, jwt: string, site: SiteRow
   if (!ins.ok || !rows(ins)[0]) return json({ error: 'write_failed', message: 'That task didn’t save — please try again.' }, 502, cors);
   const task = rows(ins)[0];
   await projectEvent(site.id, projectId, 'task_created', principal, task.client_visible, { task_id: task.id, title });
+  // builder item 336: a to-do put to the client is emailed to them (once per project every ten minutes; the reminders follow)
+  if (task.client_action_required === true) await import('../lib/client_reminders.ts').then((m) => m.emailClientAsk(site.id, projectId, 'todo', title)).catch(() => false);
   return json({ data: task }, 201, cors);
 }
 
@@ -501,6 +503,7 @@ export async function handleTask(req: Request, jwt: string, site: SiteRow, princ
   // B1: a task newly flagged as a client action → tell the client (an activity event)
   if (task.client_action_required !== true && rows(up)[0].client_action_required === true) {
     await projectEvent(site.id, projectId, 'client_action', principal, true, { task_id: taskId, title: rows(up)[0].title });
+    await import('../lib/client_reminders.ts').then((m) => m.emailClientAsk(site.id, projectId, 'todo', String(rows(up)[0].title || ''))).catch(() => false);   // item 336
   }
   return json({ data: rows(up)[0] }, 200, cors);
 }

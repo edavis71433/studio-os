@@ -104,7 +104,9 @@ export function detectDuplicates(assets: Asset[]): Array<{ key: string; ids: str
 export type FileKind = 'image' | 'document' | 'other';
 export function fileKind(mime: string | null | undefined): FileKind {
   const m = (mime || '').toLowerCase();
-  if (m.startsWith('image/')) return 'image';
+  // builder item 337: only the website's own photo kinds are photos; an SVG or an
+  // iPhone HEIC sent for the studio is a file (no thumbnail, no transform, never placed)
+  if (m === 'image/jpeg' || m === 'image/png' || m === 'image/webp') return 'image';
   if (m === 'application/pdf') return 'document';
   return 'other';
 }

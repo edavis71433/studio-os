@@ -83,6 +83,7 @@ function unreadKeysFrom(notifs){
   }
   return keys;
 }
+function projectTitle(p){const n=String((p&&p.name)||'').trim();return !n||/^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+\/?$/i.test(n)?'Your new website':n;}   // item 351 (mirrored from client.html)
 function convRows(projects,support,latest,studio){
   const names={};for(const p of (projects||[]))if(p&&p.id)names[p.id]=p.name;
   const who=String(studio||'').trim()||'Your studio';
@@ -91,7 +92,7 @@ function convRows(projects,support,latest,studio){
     if(!p||!p.id)continue;
     const fetched=Object.prototype.hasOwnProperty.call(latest||{},p.id);
     const lm=fetched?(latest||{})[p.id]:null;
-    rows.push({id:'proj:'+p.id,kind:'project',pid:p.id,title:p.name||'Project',when:(lm&&lm.created_at)||'',
+    rows.push({id:'proj:'+p.id,kind:'project',pid:p.id,title:projectTitle(p),when:(lm&&lm.created_at)||'',
       preview:lm?(lm.body||''):(fetched?'No messages yet — say hello any time.':'Open this conversation'),
       unfetched:!fetched,chip:'',chipCls:'',unreadKey:'msgs-'+p.id});
   }

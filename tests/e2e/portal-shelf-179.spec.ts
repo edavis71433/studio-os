@@ -184,7 +184,7 @@ test.describe('Client portal part four — the papers shelf (item 179)', () => {
     await page.goto('/client.html');
     await openShelf(page);
     await page.locator('#ffile').setInputFiles({ name: 'Team photo.png', mimeType: 'image/png', buffer: Buffer.from('png') });
-    await expect(page.locator('#fsend .fshare-d')).toHaveText('JPEG, PNG or WebP images up to 10MB, or PDFs up to 25MB. It lands in your project’s files right away.');
+    await expect(page.locator('#fsend .fshare-d')).toHaveText('Photos (JPEG, PNG, WebP or iPhone HEIC), PDFs, Word documents, text files, SVG, Illustrator and EPS files, zips, and short videos (MP4 or MOV). Photos and documents up to 25MB; videos and zips up to 100MB. It lands in your project’s files right away.');   // item 337
     await page.locator('#fgo').click();
     await expect(page.locator('#toast')).toContainText('Sent to your studio');
     await expect(row(page, 'Team photo.png').locator('.fst')).toHaveText('You shared');

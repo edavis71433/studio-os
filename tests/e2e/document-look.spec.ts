@@ -124,23 +124,23 @@ test.describe('The pay pages in the new look (Sales item 125)', () => {
     await page.addInitScript(() => { try { localStorage.setItem('dds-studio-brand', JSON.stringify({ name: 'Brightline Studio', logo_url: null, accent: '#b4532a' })); } catch (e) { /* private window */ } });
     for (const path of ['/payment-success.html?paid=inv-123', '/payment-canceled.html']) {
       await page.goto(path);
-      await expect(page.locator('#studio')).toHaveText('BBrightline Studio');   // the mark's letter, then the name
-      expect(await page.locator('.band').evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('rgb(180, 83, 42)');
-      await expect(page.locator('.card h1')).toBeVisible();
+      await expect(page.locator('#pf-studio')).toHaveText('BBrightline Studio');   // the mark's letter, then the name (item 349: the one public frame)
+      expect(await page.locator('.pf-band').evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('rgb(180, 83, 42)');
+      await expect(page.locator('.pf-card h1')).toBeVisible();
       expect(await noSideScroll(page)).toBe(true);
     }
   });
   test('a first-time payer: the band names no one and keeps the product’s plum', async ({ page }) => {
     await page.goto('/payment-success.html?paid=inv-123');
-    await expect(page.locator('#studio')).toBeEmpty();
-    expect(await page.locator('.band').evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('rgb(91, 63, 160)');
+    await expect(page.locator('#pf-studio')).toBeEmpty();
+    expect(await page.locator('.pf-band').evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('rgb(91, 63, 160)');
   });
   test('a saved colour that is not a plain hex is ignored, and a name is only ever text', async ({ page }) => {
     await page.addInitScript(() => { try { localStorage.setItem('dds-studio-brand', JSON.stringify({ name: '<img src=x onerror=window.__x=1>', accent: 'red;background:url(//evil.example)' })); } catch (e) { /* private window */ } });
     await page.goto('/payment-canceled.html');
-    await expect(page.locator('#studio img')).toHaveCount(0);
+    await expect(page.locator('#pf-studio img')).toHaveCount(0);
     expect(await page.evaluate(() => (window as unknown as { __x?: number }).__x)).toBeUndefined();
-    expect(await page.locator('.band').evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('rgb(91, 63, 160)');
+    expect(await page.locator('.pf-band').evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('rgb(91, 63, 160)');
   });
   for (const path of ['/payment-success.html?paid=inv-123', '/payment-canceled.html']) {
     test(`${path}: no serious accessibility problems`, async ({ page }) => {

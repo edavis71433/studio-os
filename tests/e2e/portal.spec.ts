@@ -48,7 +48,7 @@ test.describe('Client portal', () => {
     await page.route(/\/functions\/v1\/presence\/public\/studio\/[0-9a-f-]{36}\/brand$/, (r) => { reads++; return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: STUDIO }) }); });
     await page.route('https://store.example/**', (r) => r.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
     await page.goto('/portal.html');
-    await expect(page.locator('#brand .word')).toHaveText('Studio OS');
+    await expect(page.locator('#brand .word')).toHaveText('Client sign in');   // item 341: never the product's name
     expect(reads).toBe(0);
     await page.goto(`/portal.html?studio=${SITE}`);
     await expect(page.locator('#brand img.logo')).toHaveAttribute('alt', 'Marlow & Co');
@@ -66,13 +66,15 @@ test.describe('Client portal', () => {
     // a bad id is ignored
     await page.evaluate(() => localStorage.removeItem('dds-studio-brand'));
     await page.goto('/portal.html?studio=not-a-site');
-    await expect(page.locator('#brand .word')).toHaveText('Studio OS');
+    await expect(page.locator('#brand .word')).toHaveText('Client sign in');
     expect(reads).toBe(1);
   });
 
-  test('item 137 — both sign-in doors underline the link to the other door, and the client door has a search description', async ({ page }) => {
+  test('item 137 — the studio door underlines the link to the other door (item 341: the client door no longer names the product), and the client door has a search description', async ({ page }) => {
     await installApp(page, { session: null, api: {} });
-    for (const path of ['/portal.html', '/studio.html']) {
+    await page.goto('/portal.html');
+    await expect(page.getByText('Studio OS')).toHaveCount(0);
+    for (const path of ['/studio.html']) {
       await page.goto(path);
       const link = page.locator('.muted a[href$=".html"]').first();
       await expect(link).toBeVisible();
@@ -390,9 +392,10 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(page.locator('#navbell')).toBeVisible();
     await expect(page.locator('#navbell .badge')).toHaveText('1');
     await expect(page.locator('#navacct')).toBeVisible();
-    // the account chip routes to Help (where the account card lives)
+    // item 352: the account chip opens a small menu; Your account goes to the account card in Help
     await page.locator('#navacct').click();
-    await expect(page.getByRole('heading', { name: 'Your account' })).toBeVisible();
+    await page.locator('#navacctp').getByRole('menuitem', { name: 'Your account' }).click();
+    await expect(page.getByRole('heading', { name: 'Your account', exact: true })).toBeVisible();
   });
 
   test('mobile: the bottom tab bar keeps its four tabs and the ONE persistent bell shows', async ({ page }, testInfo) => {
@@ -887,9 +890,10 @@ test.describe('Client portal — Messages split view', () => {
       // the support list AND the per-project ?limit=1 preview fan-out must both stay silent
       if (r.url().includes('/client/support') || /\/client\/projects\/[^/?]+\/messages/.test(r.url())) listCalls.push(r.url());
     });
-    await page.goto('/client.html');
-    await page.locator('#tabnav [data-tab="messages"]').click();
-    await expect(page.getByText('Your studio will reach you here. Messaging opens up once they’ve set up your account.')).toBeVisible();
+    // item 355: a reviewer has no Messages door at all (the server would refuse it); Home and their account only
+    await page.goto('/client.html#messages');
+    await expect(page.locator('#main h1')).toHaveText('Your account');
+    await expect(page.locator('#tabnav [data-tab="messages"]')).toHaveCount(0);
     expect(listCalls).toHaveLength(0);
   });
 });
@@ -1773,14 +1777,14 @@ test.describe('Client portal — Documents shelf: files and documents (slice 12,
     await page.goto('/client.html');
     await openFilesTab(page);
     // the input itself advertises exactly what the store accepts
-    await expect(page.locator('#ffile')).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf');
-    await page.locator('#ffile').setInputFiles({ name: 'Team photos.zip', mimeType: 'application/zip', buffer: Buffer.from('zip') });
-    await expect(page.locator('#toast')).toContainText('a JPEG, PNG or WebP image, or a PDF');
+    await expect(page.locator('#ffile')).toHaveAttribute('accept', /^image\/jpeg,image\/png,image\/webp,image\/heic,.*,video\/quicktime,\.jpg,.*\.mov$/);   // item 337: every kind the studio door takes, with its extensions
+    await page.locator('#ffile').setInputFiles({ name: 'Team photos.exe', mimeType: 'application/x-msdownload', buffer: Buffer.from('exe') });   // item 337: a zip is welcome now; a program is not
+    await expect(page.locator('#toast')).toContainText('That kind of file can’t be sent here');
     await expect(page.locator('#fsend')).toBeHidden();      // the compose never opens
     expect(calls).toBe(0);
     // a file it can take opens the send form, which names the caps
     await page.locator('#ffile').setInputFiles(SHARE_FILE);
-    await expect(page.locator('#fsend .fshare-d')).toContainText('10MB');
+    await expect(page.locator('#fsend .fshare-d')).toContainText('25MB');   // item 337
     await expect(page.locator('#fsend .fshare-d')).toContainText('25MB');
   });
 
@@ -1790,8 +1794,8 @@ test.describe('Client portal — Documents shelf: files and documents (slice 12,
     page.on('request', (r) => { if (/upload-url|\/uploads$|storage\.example/.test(r.url())) calls++; });
     await page.goto('/client.html');
     await openFilesTab(page);
-    await page.locator('#ffile').setInputFiles({ name: 'huge.png', mimeType: 'image/png', buffer: Buffer.alloc(10 * 1024 * 1024 + 1) });
-    await expect(page.locator('#toast')).toContainText('images can be up to 10MB');
+    await page.locator('#ffile').setInputFiles({ name: 'huge.png', mimeType: 'image/png', buffer: Buffer.alloc(25 * 1024 * 1024 + 1) });   // item 337: photos up to 25MB now
+    await expect(page.locator('#toast')).toContainText('Photos and documents can be up to 25MB');
     await expect(page.locator('#fsend')).toBeHidden();
     expect(calls).toBe(0);
   });
@@ -1881,9 +1885,9 @@ test.describe('Client portal — Documents shelf: files and documents (slice 12,
       route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'forbidden' }) }));
     const calls: string[] = [];
     page.on('request', (r) => { if (/\/client\/(documents|projects\/)/.test(r.url())) calls.push(r.url()); });
-    await page.goto('/client.html');
-    await openFilesTab(page);
-    await expect(page.getByText('Your studio’s files and documents will appear here', { exact: false })).toBeVisible();
+    await page.goto('/client.html#documents');
+    await expect(page.locator('#main h1')).toBeVisible();
+    await expect(page.locator('#tabnav [data-tab="documents"]')).toHaveCount(0);   // item 355: no door the server keeps shut
     await expect(page.locator('#fchoose')).toHaveCount(0);
     await expect(page.getByText('We couldn’t load', { exact: false })).toHaveCount(0);   // never the error line
     expect(calls).toHaveLength(0);   // the reviewer render makes NO /client/* reads at all
@@ -1964,9 +1968,9 @@ test.describe('Batch A regressions — portal', () => {
     page.on('request', (r) => {
       if (r.url().includes('/client/support') || r.url().includes('/client/services')) calls.push(r.url());
     });
-    await page.goto('/client.html');
-    await page.locator('#tabnav [data-tab="messages"]').click();
-    await expect(page.getByText('Your studio will reach you here. Messaging opens up once they’ve set up your account.')).toBeVisible();
+    await page.goto('/client.html#messages');   // item 355: the old door's address opens their account
+    await expect(page.locator('#main h1')).toHaveText('Your account');
+    await expect(page.locator('#tabnav [data-tab="messages"]')).toHaveCount(0);
     // never the couldn't-load cards…
     await expect(page.getByText('We couldn’t load', { exact: false })).toHaveCount(0);
     // …the reviewer gets NO way to act: no Write, no Book a call, no Ask for a service
@@ -2050,7 +2054,7 @@ test.describe('PS1 — failed-read honesty (portal)', () => {
     await expect(page.getByText('When your studio starts a project', { exact: false })).toHaveCount(0);
     // the rolebadge derives from the persona, not projects.length — a managed
     // client with a failed read is still in THEIR workspace, not "Client view"
-    await expect(page.locator('.rolebadge')).toHaveText(/Your workspace/);
+    await expect(page.locator('.rolebadge')).toHaveText(/Your client portal/);   // item 351
   });
 
   // a managed client with genuinely nothing going on — the world where a failed
@@ -2473,10 +2477,9 @@ test.describe('PS2 — Invoices on the Documents shelf (B1, item 179 part four)'
       '/portal/feed': { data: { role: 'client_reviewer', moments: [], pending_approvals: [], last_published: null } },
     } });
     page.on('request', (r) => { if (r.url().includes('/client/billing')) calls.push(r.url()); });
-    await page.goto('/client.html');
-    await openInvoices(page);
-    // the calm read-only copy — billing belongs to the account owner…
-    await expect(page.getByText('Invoices go to the account owner — there’s nothing here for you to pay.', { exact: false })).toBeVisible();
+    await page.goto('/client.html#invoices');
+    await expect(page.locator('#main h1')).toBeVisible();
+    await expect(page.locator('#tabnav [data-tab="documents"]')).toHaveCount(0);   // item 355
     // …never the client-shaped "No invoices yet" story, and never an error line
     await expect(page.getByText('No invoices yet', { exact: false })).toHaveCount(0);
     await expect(page.getByText('We couldn’t load', { exact: false })).toHaveCount(0);
@@ -2656,7 +2659,8 @@ test.describe('PS2 — Invoices on the Documents shelf (B1, item 179 part four)'
     await installApp(page, { session: null, api: INV_API });
     await page.goto('/client.html?paid=v2');
     await expect(page).toHaveURL(/\/payment-success\.html\?paid=v2$/);
-    await expect(page.getByRole('link', { name: 'Sign in to see your invoice →' })).toBeVisible();
+    // item 349: a first-time payer may have no sign-in; the button shows only when the server says they do
+    await expect(page.getByRole('link', { name: 'Sign in to see your invoice →' })).toBeHidden();
     const remembered = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('dds-paid-pending') || 'null'); } catch { return null; } });
     expect(remembered?.id).toBe('v2');
   });
@@ -2958,7 +2962,7 @@ test.describe('PS4 — Help tab (B2)', () => {
     await installApp(page, { api: { ...CLIENT_API, '/client/faq': { data: { html: '', faq: { items: [] } } } } });
     await page.goto('/client.html');
     await openHelpTab(page);
-    await expect(page.getByText('Your studio hasn’t added its own help articles yet', { exact: false })).toBeVisible();
+    await expect(page.getByText('hasn’t added its own help articles', { exact: false })).toHaveCount(0);   // item 352: no apology, the basics simply are the answers
     await expect(page.locator('#faqBody .faq-item')).toHaveCount(5);   // Nov 10 walk: never an empty box
     await expect(page.getByText('We couldn’t load help articles', { exact: false })).toHaveCount(0);
   });
@@ -2975,8 +2979,8 @@ test.describe('PS4 — Help tab (B2)', () => {
     const calls: string[] = [];
     page.on('request', (r) => { if (r.url().includes('/client/faq')) calls.push(r.url()); });
     await page.goto('/client.html');
-    await openHelpTab(page);
-    await expect(page.getByText('Help articles will appear here once your studio has set up your account.')).toBeVisible();
+    await page.locator('#tabnav [data-tab="help"]').click();   // item 355: the reviewer's second tab is their account
+    await expect(page.locator('#main h1')).toHaveText('Your account');   // honest, no promise of articles
     await expect(page.getByText('We couldn’t load', { exact: false })).toHaveCount(0);   // never the error line
     expect(calls).toHaveLength(0);   // the reviewer render makes NO FAQ read at all
   });
@@ -2988,8 +2992,8 @@ test.describe('PS4 — Help tab (B2)', () => {
     } });
     await page.route('**/functions/v1/presence/client/**', (route) =>
       route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'forbidden' }) }));
-    await page.goto('/client.html');
-    await openHelpTab(page);
+    await page.goto('/client.html#help');   // item 355: a reviewer's last tab is their account
+    await expect(page.locator('#main h1')).toHaveText('Your account');
     // no "Still need help?" message card, no name/email-change pointer…
     await expect(page.locator('#helpMsg')).toHaveCount(0);
     await expect(page.getByText('Message your studio and they’ll update it', { exact: false })).toHaveCount(0);
@@ -3393,7 +3397,7 @@ test.describe('PS6 — project-record cohesion (B3)', () => {
     page.on('request', (r) => { if (/upload-url|\/uploads$/.test(new URL(r.url()).pathname) || r.method() === 'PUT') sends.push(r.url()); });
     await page.goto(`/client.html?project=${PID}`);
     await expect(page.locator('#sec-files #fchoose')).toBeVisible();
-    await page.locator('#ffile').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hi') });
+    await page.locator('#ffile').setInputFiles({ name: 'notes.exe', mimeType: 'application/x-msdownload', buffer: Buffer.from('hi') });   // item 337: a text file is welcome now; a program is not
     await expect(page.locator('#toast')).toContainText('That kind of file can’t be sent here');
     expect(sends).toHaveLength(0);
   });

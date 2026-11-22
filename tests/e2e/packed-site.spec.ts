@@ -70,10 +70,17 @@ test.describe('the packed site (item 142)', () => {
     // the tools host's pages keep the plain sheet (that host serves only the files _redirects lists)
     expect(readFileSync(join(OUT, 'site-review.html'), 'utf8')).toContain('href="/fonts/brand.css"');
     // builder item 412: the legal pages name their files from the root, so they are packed and pointed too
-    for (const f of ['privacy.html', 'terms.html', 'accessibility.html', 'ai-disclaimer.html']) {
+    for (const f of ['accessibility.html', 'ai-disclaimer.html']) {
       const html = readFileSync(join(OUT, f), 'utf8');
       expect(html, `${f} points at the fingerprinted styles and scripts`).toMatch(/href="\/v\/[0-9a-f]{12}\/styles\.css"/);
       expect(html, `${f}: nav.js fingerprinted`).toMatch(/src="\/v\/[0-9a-f]{12}\/nav\.js"/);
+    }
+    // builder item 349: privacy and terms wear the one public frame (the studio's band), packed and pointed the same way
+    for (const f of ['privacy.html', 'terms.html']) {
+      const html = readFileSync(join(OUT, f), 'utf8');
+      expect(html, `${f} points at the fingerprinted frame styles`).toMatch(/href="\/v\/[0-9a-f]{12}\/public-frame\.css"/);
+      expect(html, `${f}: public-frame.js fingerprinted`).toMatch(/src="\/v\/[0-9a-f]{12}\/public-frame\.js"/);
+      expect(html, `${f}: no plain frame files`).not.toMatch(/["']\/public-frame\.(css|js)["']/);
     }
   });
 

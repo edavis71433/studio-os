@@ -643,7 +643,8 @@
     <div class="card-h"><h2 id="portalPartsHead" tabindex="-1">What your clients see</h2><span class="hint" id="portalPartsHint">Turn a part off to hide it from every client. To change it for one client, open them and choose their portal in Settings.</span></div>
     <div class="pwho" id="portalWho" hidden>
       <p class="how" id="portalWhoLine"></p>
-      <div class="row"><a class="btn sm primary" id="portalSee" href="#">See their portal</a><button type="button" class="btn sm" id="portalLink" hidden>Send a sign-in link</button></div>
+      <div class="row"><a class="btn sm primary" id="portalSee" href="#">See their portal</a><button type="button" class="btn sm" id="portalLink" hidden>Send a sign-in link</button><button type="button" class="btn sm" id="portalTwoOff" hidden>Turn off their two-step sign-in</button></div>
+      <p class="how" id="portalTwoNote" hidden>For a client who lost their phone and has no backup codes. Asks you for a fresh code first, then emails them.</p>
     </div>
     <div id="portalPartsRows"></div>
     <div class="row" id="portalResetRow" hidden style="margin-top:10px"><button type="button" class="btn sm" id="portalReset">Back to your studio’s choices</button></div>
@@ -655,6 +656,25 @@
       <div class="t"><b><label for="portalWelcome">Welcome note</label><span id="portalWelcomeSaved"></span></b><div class="how">At the top of every client’s Home, signed with your studio’s name. Leave it empty for none.</div>
         <textarea id="portalWelcome" maxlength="500" rows="4" placeholder="e.g. Thanks for working with us! Everything for your website is here. Anything you need, write to us in Messages." style="width:100%;margin-top:8px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical"></textarea>
         <div class="how" id="portalWelcomeCount" aria-live="polite">0 / 500</div></div>
+    </div>
+    <!-- builder item 350 (Nov 22 review): a short name in the portal's address, saved on its own
+         (PUT /agency/portal { slug }); the long address keeps working. -->
+    <div class="swrow pw-note" id="portalSlugRow">
+      <div class="t"><b><label for="portalSlug">Your portal’s address</label><span id="portalSlugSaved"></span></b><div class="how" id="portalSlugHow">A short name clients can read out or type, like your studio’s name. Letters, numbers and hyphens. Changes save as you go.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px"><span class="how" id="portalSlugBase" style="margin:0"></span><input id="portalSlug" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="your-studio" aria-label="Short name" style="flex:1 1 180px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;min-height:44px"></div>
+        <div class="how" id="portalSlugAddr" style="margin-top:6px"></div></div>
+    </div>
+    <!-- builder item 353 (Nov 22 review): the reply time and working hours in the studio's own words.
+         The portal used to promise "they usually reply within a day" in four places; now it says
+         what the studio chose here, or nothing. Saved with the portal's other choices (PUT /agency/portal { reply }). -->
+    <div class="swrow pw-note" id="portalReplyRow">
+      <div class="t"><b><label for="portalReplyWithin">When you reply</label><span id="portalReplySaved"></span></b><div class="how">What your clients read next to Messages. Leave it unsaid and the portal promises nothing.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <select id="portalReplyWithin" aria-label="Reply time" style="flex:1 1 220px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;min-height:44px">
+            <option value="">Don’t say</option><option value="within a few hours">Within a few hours</option><option value="within one business day">Within one business day</option><option value="within two business days">Within two business days</option><option value="within a week">Within a week</option>
+          </select>
+          <input id="portalReplyHours" type="text" maxlength="60" placeholder="Working hours, e.g. Mon to Fri, 9 to 5" aria-label="Working hours" style="flex:2 1 260px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;min-height:44px">
+        </div></div>
     </div>
     <div class="plabel">Cards on Home</div>
     <div id="portalCardRows"></div>
@@ -788,7 +808,7 @@
     <div class="tsrow" aria-live="polite">
       <div class="tshead"><b>Two-step sign-in</b><span class="tspill" id="tsPill">Checking…</span></div>
       <p class="tsline" id="tsLine"></p>
-      <div class="tsacts"><button class="btn primary" type="button" id="tsOn" hidden>Turn on two-step sign-in</button><button class="btn" type="button" id="tsOff" hidden>Turn off</button><span class="tsnote" id="tsOffNote" hidden>Asks for a code from the app first.</span><button class="btn" type="button" id="tsRetry" hidden>Try again</button></div>
+      <div class="tsacts"><button class="btn primary" type="button" id="tsOn" hidden>Turn on two-step sign-in</button><button class="btn" type="button" id="tsCodes" hidden>Backup codes</button><button class="btn" type="button" id="tsOff" hidden>Turn off</button><span class="tsnote" id="tsOffNote" hidden>Asks for a code from the app first.</span><button class="btn" type="button" id="tsRetry" hidden>Try again</button></div>
     </div>
     <div class="tsalerts" data-needs="owner">
       <p class="tsto"><b>Alerts go to</b><span>the email on this account</span></p>
@@ -825,6 +845,7 @@
   </div>
 </div>
 <script src="/fresh-code.js?v=191"></script>
+<script src="/backup-codes.js?v=347"></script>
 <script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
@@ -1334,8 +1355,8 @@ async function loadSecurity() {
   paintSecurity();
 }
 function paintSecurity() {
-  const pill = $('tsPill'), line = $('tsLine'), on = $('tsOn'), off = $('tsOff'), note = $('tsOffNote'), retry = $('tsRetry');
-  on.hidden = off.hidden = note.hidden = retry.hidden = true;
+  const pill = $('tsPill'), line = $('tsLine'), on = $('tsOn'), off = $('tsOff'), note = $('tsOffNote'), retry = $('tsRetry'), codes = $('tsCodes');
+  on.hidden = off.hidden = note.hidden = retry.hidden = true; if (codes) codes.hidden = true;
   if (!TWO || !TWO.read) {
     // C4: a read that failed is not "off"
     pill.className = 'tspill'; pill.textContent = 'Couldn’t check';
@@ -1348,6 +1369,8 @@ function paintSecurity() {
     pill.className = 'tspill on'; pill.textContent = since ? 'On since ' + since : 'On';
     line.textContent = 'Codes come from the authenticator app you set up' + (TWO.since && longDate(TWO.since) ? ' on ' + longDate(TWO.since) : '') + '. Signing in on a new device, or after signing out, asks for one.';
     off.hidden = note.hidden = false;
+    // item 347: ten one-use backup codes, made on this page and shown once
+    if (codes && window.ddsBackup) { codes.hidden = false; window.ddsBackup.remaining(api).then((d) => { if (d && typeof d.remaining === 'number' && !TWO.codesSaid) { TWO.codesSaid = true; line.textContent += d.total ? ` ${d.remaining} of ${d.total} backup codes left.` : ' No backup codes yet: make some in case you lose your phone.'; } }); }
     setStatus('security', { text: 'Two-step sign-in is on', cls: '' });
   } else {
     pill.className = 'tspill off'; pill.textContent = 'Off';
@@ -1372,6 +1395,16 @@ function wireSecurity() {
     TWO = await window.ddsFresh.status(sb); paintSecurity();
   });
   retry.addEventListener('click', () => { loadSecurity().catch(() => {}); });
+  const codes = $('tsCodes');
+  if (codes && window.ddsBackup) codes.addEventListener('click', async () => {
+    codes.disabled = true;
+    try {
+      const { r, codes: list } = await window.ddsBackup.save(api);
+      if (!r || !r.ok) { toast(nice(r && r.body, 'Couldn’t make backup codes just now.'), true); return; }
+      await window.ddsBackup.show(list, { studio: 'Studio OS' });
+      TWO = await window.ddsFresh.status(sb); paintSecurity();
+    } finally { codes.disabled = false; }
+  });
 }
 async function loadPlan() {
   if (inClient()) return;
@@ -2241,7 +2274,7 @@ function loadPortalSettings() {
     paintPortalParts(); wirePortal();
     $('portalParts').hidden = false;
     if (SCOPE) loadPortalWho();   // item 232: when they were invited and last in, and their portal
-    if (!SCOPE) { paintPortalHome(); $('portalHome').hidden = false; paintSignIn(); $('portalSignIn').hidden = false; }   // the note, Home's cards and the sign-in ways are every client's: kept at studio level
+    if (!SCOPE) { paintPortalHome(); paintReply(); paintSlug(); $('portalHome').hidden = false; paintSignIn(); $('portalSignIn').hidden = false; }   // the note, Home's cards, the reply words and the sign-in ways are every client's: kept at studio level
   }).catch(() => { PORTAL_ASKED = null; });
   return PORTAL_ASKED;
 }
@@ -2267,6 +2300,20 @@ function paintPortalParts() {
   }).join('');
   $('portalPartsRows').querySelectorAll('[data-pp]').forEach((b) => b.addEventListener('click', () => { if (b.getAttribute('aria-disabled') === 'true') return; const k = b.getAttribute('data-pp'); savePortalPart(k, b.getAttribute('aria-checked') !== 'true'); }));
   $('portalResetRow').hidden = !(c && Object.keys(c.choices || {}).length) || locked;
+  // builder item 336: whether this client gets the gentle reminders about to-dos and questionnaires
+  if (c) {
+    const on = c.reminders !== false, busy = PORTAL_BUSY.has('reminders');
+    $('portalPartsRows').insertAdjacentHTML('beforeend', `<div class="swrow" data-portal-part="reminders"><button type="button" class="sw" role="switch" id="sw-pp-reminders" aria-checked="${on ? 'true' : 'false'}" aria-labelledby="sw-pp-reminders-l"${locked || busy ? ' aria-disabled="true"' : ''}></button><div class="t"><b id="sw-pp-reminders-l">Reminders${PORTAL_SAVED === 'reminders' ? '<span class="nsaved" role="status">Saved</span>' : ''}</b><div class="how">One email when you put a to-do or a questionnaire to ${esc(who)}, then a gentle reminder after 3 and 7 days while it waits. Off, they get nothing about it by email.</div></div></div>`);
+    $('sw-pp-reminders').addEventListener('click', async (e) => {
+      const b = e.currentTarget; if (b.getAttribute('aria-disabled') === 'true') return;
+      const want = b.getAttribute('aria-checked') !== 'true';
+      PORTAL_BUSY.add('reminders'); b.setAttribute('aria-disabled', 'true');
+      const r = await api('/agency/portal/clients/' + encodeURIComponent(c.site_id), 'PUT', { reminders: want });
+      PORTAL_BUSY.delete('reminders');
+      if (!r.ok || !r.body || !r.body.data) { toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); paintPortalParts(); return; }
+      c.reminders = r.body.data.reminders !== false; PORTAL_SAVED = 'reminders'; paintPortalParts();
+    });
+  }
   if (had) { const n = $(had); if (n) n.focus(); }   // the redraw keeps your place
   $('portalPartsNote').textContent = locked ? 'Your role can see these but not change them. Your studio’s owner, an admin or an account manager can.' : 'Needs you is always on your clients’ Home. A part that’s off is refused by the server too, not only hidden.';
 }
@@ -2323,6 +2370,19 @@ async function loadPortalWho() {
   link.hidden = !p || p.state === 'none' || p.can_edit === false;
   link.textContent = p && p.state === 'expired' ? 'Send a new invite' : 'Send a sign-in link';
   if (!link.dataset.wired) { link.dataset.wired = '1'; link.addEventListener('click', () => sendPortalLink(c, link)); }
+  // item 347: the owner can turn a client's two-step sign-in off (a fresh code first; the client is emailed)
+  const two = $('portalTwoOff'), twoNote = $('portalTwoNote');
+  const owner = !!((TEAM_ME && TEAM_ME.role === 'owner') || (CTX && CTX.site_role === 'business_owner' && !(CTX.is_agency && TEAM_ME && TEAM_ME.role !== 'owner'))) && !(p && p.can_edit === false);
+  two.hidden = twoNote.hidden = !(owner && p && p.state === 'joined');
+  if (!two.dataset.wired) { two.dataset.wired = '1'; two.addEventListener('click', async () => {
+    if (two.disabled) return; two.disabled = true;
+    const send = (extra) => api('/agency/clients/' + encodeURIComponent(c.site_id) + '/two-step/off', 'POST', extra || {}).catch(() => null);
+    const r = window.ddsFresh ? await window.ddsFresh.run(send, { sb }) : await send({});
+    two.disabled = false;
+    if (!r || r.cancelled) return;
+    if (!r.ok) { toast(nice(r.body, 'That didn’t go through. Nothing changed.'), true); return; }
+    toast(`Two-step sign-in is off for ${c.name}. We emailed them.`);
+  }); }
   $('portalWho').hidden = false;
 }
 async function sendPortalLink(c, btn) {
@@ -2358,9 +2418,53 @@ function paintPortalHome() {
   $('portalCardRows').querySelectorAll('[data-pc]').forEach((b) => b.addEventListener('click', () => { if (b.getAttribute('aria-disabled') === 'true') return; savePortalCard(b.getAttribute('data-pc'), b.getAttribute('aria-checked') !== 'true'); }));
   if (had) { const n = $(had); if (n) n.focus(); }
 }
+async function paintSlug() {   // item 350
+  const r = await api('/agency/portal/overview', 'GET').catch(() => null);
+  const d = r && r.ok && r.body && r.body.data;
+  const inp = $('portalSlug'); if (!inp) return;
+  const base = (location.origin || '') + '/portal/';
+  $('portalSlugBase').textContent = base;
+  if (d) { if (document.activeElement !== inp) { inp.value = d.slug || ''; inp.dataset.kept = inp.value; } $('portalSlugAddr').textContent = 'Today: ' + (d.address || ''); }
+  inp.disabled = portalLocked();
+}
+async function saveSlug() {
+  const inp = $('portalSlug'); if (!inp || portalLocked() || inp.dataset.saving) return;
+  const want = inp.value.trim();
+  if (want === (inp.dataset.kept || '')) return;   // item 165: nothing changed, nothing sent
+  inp.dataset.saving = '1';
+  const r = await api('/agency/portal', 'PUT', { slug: want });
+  delete inp.dataset.saving;
+  if (!r.ok || !r.body || !r.body.data) { toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
+  inp.value = r.body.data.slug || ''; inp.dataset.kept = inp.value; $('portalSlugAddr').textContent = 'Today: ' + (r.body.data.address || '');
+  $('portalSlugSaved').innerHTML = '<span class="nsaved" role="status">Saved</span>';
+  toast(r.body.data.slug ? 'Your portal’s address is ' + r.body.data.address : 'Back to the long address.');
+}
+function paintReply() {   // item 353
+  const r = (PORTALSET && PORTALSET.reply) || { within: '', hours: '' }, locked = portalLocked();
+  const sel = $('portalReplyWithin'), hrs = $('portalReplyHours');
+  if (document.activeElement !== sel) sel.value = r.within || '';
+  if (document.activeElement !== hrs) hrs.value = r.hours || '';
+  sel.disabled = locked; hrs.disabled = locked;
+}
+async function saveReply() {
+  if (!PORTALSET || portalLocked()) return;
+  const want = { within: $('portalReplyWithin').value || '', hours: ($('portalReplyHours').value || '').trim() };
+  const cur = PORTALSET.reply || { within: '', hours: '' };
+  if (want.within === (cur.within || '') && want.hours === (cur.hours || '')) return;
+  const r = await api('/agency/portal', 'PUT', { reply: want });
+  if (!r.ok || !r.body || !r.body.data) { toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); paintReply(); return; }
+  PORTALSET.reply = r.body.data.reply || { within: '', hours: '' };
+  paintReply();
+  $('portalReplySaved').innerHTML = '<span class="nsaved" role="status">Saved</span>';
+}
 function wirePortal() {
   const ta = $('portalWelcome');
   if (ta.dataset.wired) return; ta.dataset.wired = '1';
+  $('portalSlug').addEventListener('change', saveSlug);   // item 350; item 165: saves when you leave the box, no Save button
+  $('portalSlug').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveSlug(); } });
+  $('portalReplyWithin').addEventListener('change', saveReply);   // item 353
+  $('portalReplyHours').addEventListener('change', saveReply);
+  $('portalReplyHours').addEventListener('input', () => { $('portalReplySaved').innerHTML = ''; });
   ta.addEventListener('input', () => { $('portalWelcomeCount').textContent = `${ta.value.length} / ${PORTALSET.welcome_max || 500}`; $('portalWelcomeSaved').innerHTML = ''; });
   ta.addEventListener('change', savePortalWelcome);   // when you leave the box
   $('portalReset').addEventListener('click', resetPortalClient);

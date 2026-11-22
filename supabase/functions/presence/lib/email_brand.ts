@@ -34,7 +34,7 @@ export function emailFooterHtml(brand: EmailBrand, opts: EmailShellOpts = {}): s
     lines.push(`<strong style="color:#6b6478;font-weight:600">${name}</strong>${address ? ` · ${esc(address)}` : ''}`);
     if (unsub && !address) lines.push(`Sent through ${PLATFORM_POSTAL}`);
   } else {
-    lines.push(brand.name === EMAIL_BRAND_DEFAULT.name ? 'Sent by Studio OS.' : `Sent by ${name} on Studio OS.`);
+    lines.push(brand.name === EMAIL_BRAND_DEFAULT.name ? 'Sent by Studio OS.' : `Sent by ${name}.`);   // item 348: a client has never heard of Studio OS
     lines.push(PLATFORM_POSTAL);
   }
   if (unsub) lines.push(`Don’t want these emails? <a href="${esc(unsub)}" style="color:#6b6478;text-decoration:underline">Unsubscribe</a>`);
@@ -52,6 +52,15 @@ export function brandFromKit(kit: { primary?: string } | null | undefined, busin
 // Sales item 125: the emails wear the new look. The card opens with a band in the brand's colour
 // carrying its logo or name; an email about a document says what it is there too (emailBand).
 const BAND_MARK = /^\s*<!--band:([^\u001f]*)\u001f(.*?)-->/;
+// builder item 348: a short preview line, the words a mail app shows under the subject before
+// the email is opened. Put FIRST in the body (before emailBand); the shell lifts it into a
+// hidden span at the top, so it is never seen as text inside the email.
+const PRE_MARK = /^\s*<!--pre:(.*?)-->/;
+export const PREHEADER_MAX = 110;
+export function emailPreheader(words: unknown): string {
+  const t = esc(String(words ?? '').replace(/\s+/g, ' ').trim().slice(0, PREHEADER_MAX)).replace(/--/g, '&#45;&#45;');
+  return t ? `<!--pre:${t}-->` : '';
+}
 const bandSafe = (s: unknown) => esc(String(s ?? '').trim().slice(0, 140)).replace(/--/g, '&#45;&#45;');
 /** A headline for the band, to put FIRST in an email's body: small words over a title
  *  ("Invoice #0013" over "Website refresh"). The shell lifts it into the band; a mail app never
@@ -80,6 +89,10 @@ export function brandEmailShell(bodyHtml: string, brand: EmailBrand = EMAIL_BRAN
   let b = String(bodyHtml || '');
   if (/^\s*<!doctype|<html[\s>]/i.test(b)) return b;
   const name = esc(brand.name);
+  // item 348: the preview line, lifted out of the body (hidden in the mail, read by the preview)
+  const pre = PRE_MARK.exec(b);
+  if (pre) b = b.slice(pre[0].length);
+  const preheader = pre && pre[1] ? `<div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;color:#f4f2ef;opacity:0">${pre[1]}${'&nbsp;&zwnj;'.repeat(40)}</div>` : '';
   // a headline the caller set for the band (emailBand), lifted out of the body
   const mark = BAND_MARK.exec(b);
   if (mark) b = b.slice(mark[0].length);
@@ -89,7 +102,7 @@ export function brandEmailShell(bodyHtml: string, brand: EmailBrand = EMAIL_BRAN
   const logo = typeof brand.logoUrl === 'string' && /^https:\/\//.test(brand.logoUrl) ? `<img src="${esc(brand.logoUrl)}" alt="${name}" style="display:block;height:34px;width:auto;max-width:220px;border:0;background:#ffffff;border-radius:9px;padding:6px 10px">` : '';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>a{color:${brand.accentDark}} .cta a{color:#ffffff!important;padding:12px 22px!important;font-weight:600}</style></head>
-<body style="margin:0;padding:0;background:#f4f2ef;-webkit-font-smoothing:antialiased">
+<body style="margin:0;padding:0;background:#f4f2ef;-webkit-font-smoothing:antialiased">${preheader}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f2ef"><tr><td align="center" style="padding:28px 14px">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 1px 3px rgba(27,21,37,.08)">
 <tr><td bgcolor="${brand.accent}" style="background:${brand.accent};padding:22px 30px ${mark ? '26px' : '22px'}">${logo || `<div style="font-family:${sans};font-weight:600;font-size:19px;color:#ffffff;letter-spacing:-.01em">${name}</div>`}${headline}</td></tr>
@@ -118,9 +131,21 @@ export async function loadEmailBrand(siteId: string, opts: { logoTtl?: number } 
     const address = addressOf((l?.ok && Array.isArray(l.json) && l.json[0]) || null).split('\n').filter(Boolean).join(', ');
     if (address) brand.address = address;
     const logoId = String(row?.logo_media_id || kit?.logo_media_id || '');
-    const logoUrl = logoId ? await studioLogoUrl(siteId, logoId, opts.logoTtl ?? EMAIL_LOGO_TTL) : null;
+    // builder item 348: an email is read for years, and a signed address runs out. Mail gets a
+    // stable public address that forwards to a fresh signed one each time (routes/studio_brand.ts
+    // handlePublicStudioLogo); a page, which asks for a short logoTtl, keeps the signed address.
+    const logoUrl = !logoId ? null : opts.logoTtl == null ? await stableLogoUrl(siteId, logoId) : await studioLogoUrl(siteId, logoId, opts.logoTtl);
     return logoUrl ? { ...brand, logoUrl } : brand;
   } catch { return EMAIL_BRAND_DEFAULT; }
+}
+
+/** The public, never-expiring address of a site's logo for email (a 302 to a fresh signed
+ *  address on every open), or null when there is no usable logo file. */
+export async function stableLogoUrl(siteId: string, mediaId: string): Promise<string | null> {
+  const signed = await studioLogoUrl(siteId, mediaId, 60);   // only to know the file is there and is an image
+  if (!signed) return null;
+  const base = String(Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
+  return base ? `${base}/functions/v1/presence/public/studio/${siteId}/logo` : signed;
 }
 
 /** A signed https URL for a site's logo, or null when the file is gone, isn't an

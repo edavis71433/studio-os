@@ -12,6 +12,7 @@ import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { getTemplate } from '../lib/render.ts';
 import { serializeDraft } from '../lib/serializer.ts';
 import { WIDTH_ONLY_RESIZE } from '../lib/media.ts';
+import { hiddenFromPicker } from '../lib/client_files.ts';
 import { validateSnapshot } from '../lib/manifest_validate.ts';
 import { describeChanges } from '../lib/diff.ts';
 import { computeDraftHash } from '../lib/draft_hash.ts';
@@ -280,7 +281,10 @@ export async function handleMediaList(site: SiteRow, cors: Record<string, string
   const SB_URL = Deno.env.get('SUPABASE_URL') || '';
   const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   // Item 88: all at once; one after another, sixty photos was sixty round trips in a row.
-  const rows = await Promise.all((media.json ?? []).map(async (m: any) => {
+  // builder item 337: a file sent for the studio (a Word file, an SVG, a zip…) is never
+  // offered to the website: out of the picker by its kind, derived from the mime
+  const listed = ((media.json ?? []) as any[]).filter((m) => !hiddenFromPicker(m?.mime));
+  const rows = await Promise.all(listed.map(async (m: any) => {
     let thumb: string | null = null;
     try {
       const objectPath = m.storage_path.replace(/^presence-media\//, '');
