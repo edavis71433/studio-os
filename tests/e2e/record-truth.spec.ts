@@ -232,7 +232,7 @@ test.describe('item 98 — the small ones on the record (B21)', () => {
     await page.addInitScript(() => { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: () => Promise.reject(new Error('denied')) } }); });
     await page.route(`**/functions/v1/presence/sales/deals/${DEAL}/retainer`, (route) => route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ data: { retainer: { status: 'pending' }, url: 'https://pay.example/r', emailed: false } }) }));
     await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
-    await page.locator('#tabbody').getByRole('button', { name: 'Set up a retainer' }).click();
+    await page.locator('#sendMore').click(); await page.locator('#sendMoreMenu [data-bform="retainer"]').click();   // sales item 164: under More
     await page.locator('#bf-amt').fill('500');
     await page.locator('#bf-go').click();
     await expect(toastWith(page, 'Retainer set up — copy its authorization link from Invoices.')).toBeVisible();

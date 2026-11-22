@@ -67,6 +67,33 @@
   .link-btn:hover{text-decoration:underline}
   .bform{background:var(--card);border:1px solid var(--p);border-radius:var(--dds-r-lg,10px);padding:var(--dds-s4,16px) var(--dds-s4,16px);margin-bottom:var(--dds-s3,12px);box-shadow:var(--shadow)}
   .brow2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  /* sales item 164: one money panel, and forms shaped like the document */
+  .mp{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;align-items:start}
+  .mp-facts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .mp-f{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .mp-k{font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
+  .mp-v{font-size:24px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.2}
+  .mp-f.late .mp-v{color:var(--bad)}
+  .mp-s{font-size:12.5px;color:var(--soft)}
+  .mp-next{display:flex;flex-direction:column;gap:6px;border-left:1px solid var(--line);padding-left:18px;min-width:0}
+  .mp-why{margin:0;font-size:13.5px}
+  .mp .rbtn{min-height:36px}
+  @media (max-width:760px){.mp{grid-template-columns:1fr}.mp-next{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:12px}.mp-facts{grid-template-columns:repeat(3,1fr);gap:8px}.mp-v{font-size:19px}.mp .rbtn{min-height:44px}}
+  .papers .pp{padding:4px 0}.papers .pp+.pp{border-top:1px solid var(--line);margin-top:8px;padding-top:10px}
+  .pp-h{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin:0 0 4px}
+  .papers .rrow:first-of-type{border-top:0}
+  .docform .docf-head{margin-bottom:10px}
+  .docf-title{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--faint);font-weight:600}
+  .docf-title input{font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px;width:100%}
+  .docf-lines{display:grid;gap:6px;margin-top:10px}
+  .dl{display:grid;grid-template-columns:1fr 64px 120px 36px;gap:6px;align-items:center}
+  .dl input{font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px;width:100%;min-height:40px}
+  .dl input:focus,.docf-title input:focus{outline:none;border-color:var(--p)}
+  .dl-x{font:inherit;border:0;background:none;color:var(--soft);min-height:36px;min-width:36px;cursor:pointer;border-radius:8px}
+  .dl-x:hover{background:var(--bad-soft,#fbeaea);color:var(--bad)}
+  .docf-total{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);margin-top:10px;padding-top:8px;font-size:14px}
+  .docf-total b{font-size:18px}
+  @media (max-width:560px){.dl{grid-template-columns:1fr 56px 100px 36px}.dl input{min-height:44px}.dl-x{min-height:44px;min-width:44px}}
   .brow2 label{display:flex;flex-direction:column;gap:var(--dds-s1,4px);font-size:12.5px;color:var(--faint);font-weight:600}
   .brow2 input,.brow2 select{font-family:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) 10px;width:100%}
   .brow2 input:focus,.brow2 select:focus{outline:none;border-color:var(--p)}
@@ -481,6 +508,7 @@ const ownBusiness=()=>studioScoped()?'':scopeParam();   // the business ?client=
 // API helper (shell-kit.js ddsApi) answers that way on every page now.
 const api=(path,method,body)=>ddsApi(path,{method,body,scope:scopeParam()});
 const apiAg=(path,method,body)=>ddsApi(path,{method,body,scope:ownBusiness()});
+if(window.ddsContext)window.ddsContext().then(c=>{if(c&&(c.studio_name||c.business_name))IDENT_NAME=String(c.studio_name||c.business_name);}).catch(()=>{});   // sales item 164: the From line on the document-shaped forms
 // Same doctrine for the outbound pipeline/projects links: the trailing `client=`
 // is deliberate — it pins these links UNSCOPED so shell.js's scope-carry
 // (carryScopeGlobally) doesn't rewrite them onto the customer's site.
@@ -1426,7 +1454,8 @@ function renderDealTab(host){
   }else if(d.stage==='proposal'){ now='Your proposal is with them. <button class="link-btn" data-go="billing">See proposals →</button>'; }
   else if(d.stage==='lost'){ now='Marked not a fit. The record stays so you can pick it back up.'; }
   if(now)html+=`<section><h2>What now</h2><div class="card"><p style="font-size:14.5px;margin:0">${now}</p></div></section>`;
-  const sum=(label,n,extra)=>`<div class="rrow"><span class="rt">${label}<span class="s">${extra}</span></span><button class="link-btn" data-go="billing">Invoices →</button></div>`;
+  // sales item 170: each link says where it goes (they all read "Invoices")
+  const sum=(label,n,extra)=>`<div class="rrow"><span class="rt">${label}<span class="s">${extra}</span></span><button class="link-btn" data-go="billing">${esc(label==='Invoices'?'Invoices':label==='Recurring invoice'?'Ongoing':label+(label.endsWith('s')?'':''))} →</button></div>`;
   // item 107 (J9): the total leaves voided invoices out, as the Money card does
   const live=inv.filter(v=>v.status==='open'||v.status==='paid');
   const ests=DEAL.estimates||[]; const recs=(DEAL.recurring||[]).filter(s=>s.status==='active'||s.status==='paused');
@@ -1456,72 +1485,123 @@ function renderDealTab(host){
 // deposit and retainer open as small inline forms. The proposal and agreement
 // EDITORS, payment-schedule builder and templates stay on pipeline.html (linked),
 // so nothing there is rebuilt — the routes below are the same ones it calls.
+// ── Invoices tab: ONE money panel per deal (sales item 164, Nov 22 2026 review) ──
+// Billing a customer used to be seven grey panels with look-alike buttons (send both,
+// invoices, estimates, proposals, agreement, retainer, recurring), and three of the
+// record's links sent you to the pipeline for a form. Now one money panel leads:
+// what's agreed, what's paid, what's next, ONE main button for the next step and the
+// rest under More. Under it, three cards: the invoices (every action on the row:
+// Record payment · Send/Resend · Copy link · Remind now · Change · Void · Undo · Give
+// money back · PDF), the papers (estimates, proposals, the agreement) and the ongoing
+// money (retainer, recurring invoice). An invoice, an estimate or a proposal is made by
+// filling in the document itself (billingForm below: the lines, each with its words,
+// quantity and amount, a due date, a note), without leaving the record.
+function nextMoneyStep(){
+  const d=(DEAL&&DEAL.deal)||{}; const inv=(DEAL&&DEAL.invoices)||[]; const today=recTodayYmd();
+  const both=sendBothDocs();
+  if(both)return{label:'Send proposal & agreement',act:'both',why:'Both are drafted: one email, one link. They accept, sign, then pay the deposit.'};
+  const closed=d.stage==='won'||d.stage==='lost'||!!d.converted_client_id;
+  const draftProp=(DEAL.proposals||[]).find(p=>p.status==='draft'&&!propReplaced(p));
+  if(draftProp&&!closed)return{label:'Send the proposal',act:'prop:'+draftProp.id,why:'The proposal is drafted and waiting to go out.'};
+  const draftCon=(DEAL.contracts||[]).find(k=>k.status==='draft');
+  if(draftCon&&!closed)return{label:'Send the agreement for signature',act:'con:'+draftCon.id,why:'The agreement is drafted and waiting for a signature.'};
+  const late=invWaiting(inv).filter(v=>invState(v)==='overdue'&&!v.payment_for).sort((a,b)=>String(a.due_date||'').localeCompare(String(b.due_date||'')))[0];
+  if(late)return{label:'Remind about '+(invNo(late.number)||'the invoice'),act:late.stripe_url?'remind:'+late.id:'send:'+late.id,why:`${invNo(late.number)||'An invoice'} for ${fmtC(late.amount_cents)} was due ${dueLabel(late.due_date)} and is still unpaid.`};
+  const unsent=inv.find(v=>v.status==='open'&&!v.payment_for&&!v.processing_since&&!v.stripe_url);
+  if(unsent)return{label:'Send '+(invNo(unsent.number)||'the invoice'),act:'send:'+unsent.id,why:`${invNo(unsent.number)||'An invoice'} for ${fmtC(unsent.amount_cents)} is ready but hasn’t gone out.`};
+  const waiting=invWaiting(inv).filter(v=>!v.payment_for)[0];
+  if(waiting)return{label:'Record a payment',act:'pay:'+waiting.id,why:`${invNo(waiting.number)||'An invoice'} for ${fmtC(waiting.amount_cents)} is out${waiting.due_date?', due '+dueLabel(waiting.due_date):''}. Paid by check or Zelle? Record it here.`};
+  const lp=leftOfProposal();
+  if(lp&&lp.left>=50)return{label:lp.billed?'Bill what’s left ('+fmtC(lp.left)+')':'Request the deposit',act:lp.billed?'invoice':'deposit',why:lp.billed?`${fmtC(lp.left)} of the accepted ${fmtC(lp.total)} proposal is still to bill.`:`The proposal was accepted for ${fmtC(lp.total)}. Ask for the deposit to start.`};
+  if(d.stage==='won'||d.converted_client_id)return{label:'Send an invoice',act:'invoice',why:'Nothing is owed. Send the next invoice when a milestone lands.'};
+  if(!(DEAL.proposals||[]).length)return{label:'Draft a proposal',act:'proposal',why:'Nothing is agreed yet. A proposal is the first step.'};
+  return{label:'Send an invoice',act:'invoice',why:'Nothing is waiting on them.'};
+}
 function renderBillingTab(host){
   if(!DEAL){host.innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';return;}
   if(DEAL.error||!DEAL.deal){host.innerHTML='<p class="muted">Couldn’t load invoices just now.</p>';return;}
   const d=DEAL.deal||{}; const link=agHref('pipeline.html','deal='+encodeURIComponent(d.id||''));
   const c=DEAL.contact||REC.header||{}; const noEmail=!(c&&c.email);
-  const propChip=(s)=>s==='accepted'?'good':s==='declined'?'bad':s==='sent'?'':'warn';
   const conChip=(s)=>s==='signed'?'good':s==='sent'?'':'warn';
-  const inv=(DEAL.invoices||[]); const open=invWaiting(inv); const paid=inv.filter(v=>invState(v)==='paid');
-  const owed=open.reduce((a,b)=>a+(b.amount_cents||0),0); const got=paid.reduce((a,b)=>a+(b.amount_cents||0),0);
+  const inv=(DEAL.invoices||[]); const open=invWaiting(inv); const paid=inv.filter(v=>invState(v)==='paid'||invState(v)==='refunded');
+  const owed=open.reduce((a,b)=>a+(b.amount_cents||0),0);
+  const rp=retainerPaidNow();
+  const got=paid.reduce((a,b)=>a+Math.max(0,(b.amount_cents||0)-(b.refunded_cents||0)),0)+rp.cents;
   const act=(attrs,label,title)=>`<button type="button" class="rbtn" ${attrs}${title?` title="${esc(title)}"`:''}>${label}</button>`;
   let html='';
-  // visual refresh: the money facts live in the header tiles now (value · paid ·
-  // outstanding) — the tab opens straight on the invoices.
-  if(noEmail)html+=`<p class="muted" style="margin:0 0 12px;font-size:13.5px">There’s no email on this client, so nothing can be emailed — links are copied for you to send. Add their email under Details.</p>`;
-  // ONE LINK (benchmark 2026-10, item 5): both drafted → one filled "Send
-  // proposal & agreement"; the per-document sends and Request deposit go under
-  // More, and "+ Invoice" steps back to a quiet button (one filled per screen).
+  // ── the money panel ──
+  const acc=((DEAL.proposals||[]).filter(p=>p.status==='accepted').sort((a,b)=>String(b.decided_at||'').localeCompare(String(a.decided_at||''))))[0];
+  const agreed=acc?(acc.total_cents!=null?Number(acc.total_cents):Number(acc.subtotal_cents))||0:(Number(d.expected_value_cents)||0);
+  const agreedHow=acc?'accepted proposal':d.expected_value_cents?'deal value':'';
+  const overdue=open.filter(v=>invState(v)==='overdue');
+  const next=nextMoneyStep();
+  const r=d.retainer; const retLive=r&&r.status&&r.status!=='canceled';
+  const owedLine=owed?`${open.length} invoice${open.length===1?'':'s'} out${overdue.length?` · ${fmtC(overdue.reduce((a,b)=>a+(b.amount_cents||0),0))} overdue`:''}`:(retLive?`Retainer ${fmtC(r.amount_cents)} every ${r.interval==='year'?'year':'month'}`:'Nothing owed');
   const both=sendBothDocs();
-  if(both)html+=`<section id="sendBoth"><div class="card"><p class="muted" style="margin:0 0 10px;font-size:13.5px">The proposal and the agreement are drafted. Send them together — one email, one link: they accept, sign, then pay the deposit on one page.</p>
-    <span class="racts" style="display:inline-flex;gap:6px;align-items:center"><button type="button" class="rbtn primary" id="sendBothBtn" data-send-both="1" data-prop="${esc(both.prop.id)}" data-con="${esc(both.con.id)}">Send proposal &amp; agreement</button><span class="more"><button type="button" class="rbtn" id="sendMore" aria-haspopup="true" aria-expanded="false" aria-controls="sendMoreMenu">More ▾</button><div class="more-menu" id="sendMoreMenu" hidden><button type="button" class="abtn" data-send-prop="${esc(both.prop.id)}">Send the proposal only</button><button type="button" class="abtn" data-send-con="${esc(both.con.id)}">Send the agreement only</button><button type="button" class="abtn" data-bform="deposit">Request deposit</button></div></span></span></div></section>`;
-  // invoices + the new-invoice / deposit forms
-  html+=`<section><h2>Invoices <span class="sec-acts" style="display:flex;gap:6px">${both?'':'<button type="button" class="rbtn" data-bform="deposit">Request deposit</button>'}<a class="rbtn" href="${esc(link)}#schedule" style="text-decoration:none">Payment schedule</a><button type="button" class="rbtn${both?'':' primary'}" data-bform="invoice">+ Invoice</button></span></h2>
-    <div id="bform"></div>`;
-  // item 81: who the invoices are billed to, and the address they print — one line, Edit beside it
+  html+=`<section id="moneyPanel"><div class="card mp">
+    <div class="mp-facts">
+      <div class="mp-f"><span class="mp-k">Agreed</span><b class="mp-v">${agreed?esc(fmtC(agreed)):'—'}</b><span class="mp-s">${esc(agreedHow||'no proposal yet')}</span></div>
+      <div class="mp-f"><span class="mp-k">Paid</span><b class="mp-v">${esc(fmtC(got))}</b><span class="mp-s">${paid.length?`${paid.length} payment${paid.length===1?'':'s'}`:''}${rp.cents?`${paid.length?' · ':''}${esc(fmtC(rp.cents))} from the retainer`:''}${!paid.length&&!rp.cents?'nothing yet':''}</span></div>
+      <div class="mp-f${overdue.length?' late':''}"><span class="mp-k">Owed</span><b class="mp-v">${esc(fmtC(owed))}</b><span class="mp-s">${esc(owedLine)}</span></div>
+    </div>
+    <div class="mp-next"><span class="mp-k">What’s next</span><p class="mp-why">${esc(next.why)}</p>
+      <span class="racts" style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap"><button type="button" class="rbtn primary" id="${both?'sendBothBtn':'moneyNext'}" data-next="${esc(next.act)}"${both?` data-send-both="1" data-prop="${esc(both.prop.id)}" data-con="${esc(both.con.id)}"`:''}>${esc(next.label)}</button>
+      <span class="more"><button type="button" class="rbtn" id="sendMore" aria-haspopup="true" aria-expanded="false" aria-controls="sendMoreMenu">More ▾</button><div class="more-menu" id="sendMoreMenu" hidden>
+        <button type="button" class="abtn" data-bform="invoice">+ Invoice</button>
+        <button type="button" class="abtn" data-bform="deposit">Request a deposit</button>
+        <button type="button" class="abtn" data-bform="proposal">+ Proposal</button>
+        <button type="button" class="abtn" data-bform="estimate">+ Estimate</button>
+        ${both?`<button type="button" class="abtn" data-send-prop="${esc(both.prop.id)}">Send the proposal only</button><button type="button" class="abtn" data-send-con="${esc(both.con.id)}">Send the agreement only</button>`:''}
+        <a class="abtn" href="${esc(link)}" style="text-decoration:none">+ Agreement (in pipeline)</a>
+        <a class="abtn" href="${esc(link)}#schedule" style="text-decoration:none">Payment schedule (in pipeline)</a>
+        ${retLive?'':'<button type="button" class="abtn" data-bform="retainer">Set up a retainer</button>'}
+        <a class="abtn" href="${esc(link)}#recSec" style="text-decoration:none">Recurring invoice (in pipeline)</a>
+      </div></span></span></div>
+  </div></section>`;
+  if(noEmail)html+=`<p class="muted" style="margin:0 0 12px;font-size:13.5px">There’s no email on this client, so nothing can be emailed — links are copied for you to send. Add their email under Details.</p>`;
+  html+=`<div id="bform"></div>`;
+  // ── invoices ──
+  html+=`<section><h2>Invoices</h2>`;
   if(inv.length||!noEmail){const bt=billedToLine();html+=`<p class="muted" id="billedTo" style="margin:0 0 10px;font-size:13px">${bt.text}${bt.can?` <button type="button" class="link-btn" data-edit-address>${bt.has?'Edit':'Add their address'}</button>`:''}</p>`;}
   html+=inv.length?`<div class="card tcard"><table class="btable"><thead><tr><th>Invoice</th><th>Status</th><th class="amt">Amount</th><th>Due</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>`+inv.map(v=>{
-    // item 81: the studio's running number leads the name; a part payment names the invoice it paid toward
     const no=invNo(v.number), parent=v.payment_for?inv.find(x=>x.id===v.payment_for):null;
     const name=v.payment_for?esc('Part payment'+(parent&&invNo(parent.number)?' · '+invNo(parent.number):'')):(no?esc(no)+' · ':'')+esc(v.title||(v.purpose==='deposit'?'Deposit':'Invoice'));
-    // Oct 2026 (item 2): the chip is the money state word — Paid · Processing ·
-    // Upcoming · Overdue — in its one colour; sent-ness moves to the sub-line.
     const st=invState(v);
     let sub=esc(v.payment_for?(parent?parent.title||'':''):v.purpose==='deposit'?'Initial deposit':(v.description||v.purpose||''));
     let state, acts='', due='', dueCls='';
-    // item 77: a payment recorded by hand says how it came in, and can be undone (it changes the books, so delete)
+    const parts=inv.filter(x=>x.payment_for===v.id&&x.status==='paid');
     if(st==='paid'){state=`<span class="schip good">Paid</span>`;due=v.paid_at?esc(atLabel(v.paid_at)):'';
       sub=(sub?sub+' · ':'')+esc(PAY_WORDS[v.paid_method]||'Paid online')+(v.paid_note?' · '+esc(v.paid_note):'')+(v.paid_private_note?' · <span title="Only you see this. It is not on their receipt.">Private: '+esc(v.paid_private_note)+'</span>':'');
-      if(v.refunded_cents>0)sub+=' · '+esc(fmtC(v.refunded_cents))+' refunded';   // sales item 126: part of it went back through Stripe
+      if(v.refunded_cents>0)sub+=' · '+esc(fmtC(v.refunded_cents))+' refunded';
+      // sales item 165: money given back by hand on an invoice paid by hand; item 77: Undo
+      if(v.paid_method&&!v.payment_for)acts+=act(`data-back-inv="${esc(v.id)}" data-needs="delete"`,'Give money back','A part refund, a credit: amount, day, how. It reads Paid with that much refunded.');
       if(v.paid_method)acts+=act(`data-undo-pay="${esc(v.id)}" data-needs="delete"`,'Undo','Recorded by mistake? The invoice goes back to unpaid');}
     else if(st==='refunded'||st==='disputed'||st==='lost'){
-      // sales items 126, 127: money that came back through Stripe. Nothing to send, record or void; a dispute
-      // that can still be answered says by when, and links to Stripe (the deal page has the proof download)
       const dsp=((DEAL&&DEAL.returns)||[]).find(r=>r.kind==='dispute'&&r.invoice_id===v.id&&r.status===(st==='lost'?'lost':'open'));
       state=`<span class="schip ${MONEY_TONE[st]}">${MONEY_WORD[st]}</span>`;due=v.paid_at?esc(atLabel(v.paid_at)):'';
-      sub=(sub?sub+' · ':'')+(st==='refunded'?'Refunded in full through Stripe':st==='lost'?'Went back to them'+(dsp&&dsp.fee_cents>0?', plus Stripe’s '+esc(fmtC(dsp.fee_cents))+' fee':''):dsp&&dsp.bank&&!dsp.inquiry?'Their bank took it back. Bank disputes are final':dsp&&dsp.due_by?'Answer in Stripe by '+esc(atLabel(dsp.due_by)):'Disputed');
+      sub=(sub?sub+' · ':'')+(st==='refunded'?(v.paid_method?'Refunded in full, by hand':'Refunded in full through Stripe'):st==='lost'?'Went back to them'+(dsp&&dsp.fee_cents>0?', plus Stripe’s '+esc(fmtC(dsp.fee_cents))+' fee':''):dsp&&dsp.bank&&!dsp.inquiry?'Their bank took it back. Bank disputes are final':dsp&&dsp.due_by?'Answer in Stripe by '+esc(atLabel(dsp.due_by)):'Disputed');
       if(st==='disputed'&&dsp&&dsp.answer_url)acts+=`<a class="rbtn" href="${esc(dsp.answer_url)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block">Answer in Stripe</a>`;}
     else if(!st){state=`<span class="schip" style="background:var(--bg);color:var(--faint)">Voided</span>`;}
-    else if(st==='processing'){state=`<span class="schip info">Processing</span>`;sub=(sub?sub+' · ':'')+'Payment on its way';due=v.due_date?esc(dueLabel(v.due_date)):'';}   // the client paid — nothing to resend or void
+    else if(st==='processing'){state=`<span class="schip info">Processing</span>`;sub=(sub?sub+' · ':'')+'Payment on its way';due=v.due_date?esc(dueLabel(v.due_date)):'';}
     else{state=`<span class="schip ${MONEY_TONE[st]}">${MONEY_WORD[st]}</span>`;
-      const parts=inv.filter(x=>x.payment_for===v.id&&x.status==='paid');   // item 77: part payments already came off it
       if(parts.length)sub=(sub?sub+' · ':'')+esc(fmtC(parts.reduce((a,b)=>a+(b.amount_cents||0),0)))+' paid so far';
       if(!v.stripe_url)sub=(sub?sub+' · ':'')+(parts.length?'Send it for a link for what’s left':'Not sent yet');
-      due=v.due_date?esc(dueLabel(v.due_date)):'Due now'; dueCls=st==='overdue'?'due':'';
+      due=v.due_date?esc(dueLabel(v.due_date)):'On receipt'; dueCls=st==='overdue'?'due':'';
       acts+=act(`data-pay-inv="${esc(v.id)}"`,'Record payment','Paid by check, cash, bank transfer or Zelle? Mark it paid here');
       acts+=act(`data-send-inv="${esc(v.id)}"`,v.stripe_url?'Resend':'Send');
-      if(v.stripe_url)acts+=act(`data-copy="${esc(v.stripe_url)}"`,'Copy link');
+      if(v.stripe_url)acts+=act(`data-copy="${esc(v.stripe_url)}"`,'Copy link')+act(`data-remind-inv="${esc(v.id)}"`,'Remind now','One reminder email now, in words for where the invoice stands');   // sales item 166
+      acts+=act(`data-edit-inv="${esc(v.id)}"`,'Change','Change the title, due date or note; the amount and lines too while nothing was paid toward it. The number stays.');   // sales item 162
       acts+=act(`data-void-inv="${esc(v.id)}" data-needs="delete"`,'Void','Withdraw this invoice — the payment link stops working');}
-    acts+=act(`data-pdf="invoices:${esc(v.id)}"`,'PDF','Download it as a PDF — the same copy the client gets');   // item 82
+    acts+=act(`data-pdf="invoices:${esc(v.id)}"`,'PDF','Download it as a PDF — the same copy the client gets');
     return `<tr class="brow" data-inv-row="${esc(v.id)}"><td><span class="rt">${name}${sub?`<span class="s">${sub}</span>`:''}</span></td><td>${state}</td><td class="amt">${esc(fmtC(v.amount_cents))}</td><td class="${dueCls}">${due}</td><td class="racts"><span class="racts">${acts}</span></td></tr>`;
-  }).join('')+`</tbody></table></div><div id="payhost"></div>`:`<div class="card"><p class="muted" style="font-size:13.5px">No invoices yet. Send one, or request a deposit.</p></div>`;
+  }).join('')+`</tbody></table></div><div id="payhost"></div>`:`<div class="card"><p class="muted" style="font-size:13.5px">No invoices yet. The More menu above sends one, or asks for a deposit.</p><div id="payhost"></div></div>`;
   html+=`</section>`;
-  // item 108 (J6): estimates — a price before anything is agreed (drafted on the deal page;
-  // sent, copied, turned into a proposal or billed from here, by the same routes)
-  const ests=DEAL.estimates||[];
-  if(Array.isArray(DEAL.estimates)&&ests.length){
-    html+=`<section id="bEstimates"><h2>Estimates <a class="rbtn" href="${esc(link)}" style="text-decoration:none">+ Estimate (in pipeline)</a></h2><div class="card">`+ests.map(e=>{
+  // ── the papers: estimates, proposals, the agreement, in one card ──
+  const ests=DEAL.estimates||[]; const props=DEAL.proposals||[]; const cons=DEAL.contracts||[];
+  const closed=d.stage==='won'||d.stage==='lost'||!!d.converted_client_id;
+  const paper=(h,body,attrs)=>`<div class="pp"${attrs||''}><h3 class="pp-h">${h}</h3>${body}</div>`;
+  let papers='';
+  if(Array.isArray(DEAL.estimates)&&ests.length)papers+=paper('Estimates',ests.map(e=>{
       const [w,tone]=estWord(e); let acts='';
       if(e.status==='draft'&&!noEmail)acts+=act(`data-send-est="${esc(e.id)}"`,'Send to client','Emails the estimate with an Approve button');
       else if(e.status==='draft')acts+=act(`data-send-est="${esc(e.id)}"`,'Get the link');
@@ -1537,17 +1617,9 @@ function renderBillingTab(host){
       if(e.decided_note)bits.push('Their note: “'+e.decided_note+'”');
       if(e.proposal_id)bits.push('Turned into a proposal');else if(e.invoice_id)bits.push('Billed as an invoice');
       return `<div class="rrow brow"><span class="rt">${esc(e.title||'Estimate')}<span class="s">${esc([fmtC(e.total_cents!=null?e.total_cents:e.subtotal_cents)].concat(bits).join(' · '))}</span></span><span class="racts"><span class="schip ${tone}">${esc(w)}</span>${acts}</span></div>`;
-    }).join('')+`</div></section>`;
-  }
-  // proposals
-  html+=`<section><h2>Proposals <a class="rbtn" href="${esc(link)}" style="text-decoration:none">+ Proposal (in pipeline)</a></h2><div class="card">`;
-  const props=DEAL.proposals||[];
-  html+=props.length?props.map(p=>{
+    }).join(''),' id="bEstimates"');
+  papers+=paper('Proposals',props.length?props.map(p=>{
     let acts='';
-    // Phase 3 (stage-aware): a won or lost deal never pushes an unsent draft
-    const closed=d.stage==='won'||d.stage==='lost'||!!d.converted_client_id;
-    // item 107 (J3): an expired proposal's link no longer opens — no Copy link; a declined or
-    // expired one (not yet revised) points at the revise, which lives on the deal page
     const expired=propExpired(p), replaced=propReplaced(p), [w,tone]=propWord(p);
     if(p.status==='draft'&&!closed&&!both)acts+=act(`data-send-prop="${esc(p.id)}"`,'Send to client','Emails the proposal with an accept link');
     else if(p.status==='sent'&&!expired&&!replaced)acts+=act(`data-send-prop="${esc(p.id)}" data-resend="1"`,'Copy link');
@@ -1557,41 +1629,26 @@ function renderBillingTab(host){
     if(p.status==='declined'&&!replaced)sub.push('They declined'+(p.decided_at?' on '+atLabel(p.decided_at):''));
     else if(expired&&!replaced)sub.push('Expired'+(p.expires_at?' '+atLabel(p.expires_at):'')+', so the link no longer opens');
     return `<div class="rrow brow"><span class="rt">${esc(p.title||'Proposal')}${p.version>1?' · v'+esc(p.version):''}<span class="s">${esc(sub.filter(Boolean).join(' · '))}</span></span><span class="racts"><span class="schip ${tone}">${esc(w)}</span>${acts}</span></div>`;
-  }).join(''):`<p class="muted" style="font-size:13.5px">No proposals yet — draft one in the pipeline.</p>`;
-  html+=`</div></section>`;
-  // agreement
-  html+=`<section><h2>Agreement <a class="rbtn" href="${esc(link)}" style="text-decoration:none">+ Agreement (in pipeline)</a></h2><div class="card">`;
-  const cons=DEAL.contracts||[];
-  html+=cons.length?cons.map(k=>{
+  }).join(''):`<p class="muted" style="font-size:13.5px;margin:0">No proposals yet. “+ Proposal” under More drafts one here.</p>`);
+  papers+=paper('Agreement',cons.length?cons.map(k=>{
     let acts='';
     if(k.status==='draft'&&!both)acts+=act(`data-send-con="${esc(k.id)}"`,'Send for signature');
     else if(k.status==='sent')acts+=act(`data-send-con="${esc(k.id)}" data-resend="1"`,'Copy signing link');
     acts+=act(`data-doc="contracts:${esc(k.id)}"`,k.status==='signed'?'View signed copy':'View / print');
     return `<div class="rrow brow"><span class="rt">${esc(k.title||'Agreement')}<span class="s">${k.signer_name?'Signed by '+esc(k.signer_name)+(k.signed_at?' on '+esc(atLabel(k.signed_at)):''):(k.status==='sent'?'Out for signature':'Draft')}</span></span><span class="racts"><span class="schip ${conChip(k.status)}">${esc(k.status||'draft')}</span>${acts}</span></div>`;
-  }).join(''):`<p class="muted" style="font-size:13.5px">No agreement yet.</p>`;
-  html+=`</div></section>`;
-  // retainer
-  const r=d.retainer; const rp=retainerPaidNow();
-  // item 108 (J4): what the retainer has brought in — its charges are payments, counted in Paid above
+  }).join(''):`<p class="muted" style="font-size:13.5px;margin:0">No agreement yet. <a class="link" href="${esc(link)}">Draft one in the pipeline →</a></p>`);
+  html+=`<section><h2>Proposals and papers</h2><div class="card papers">${papers}</div></section>`;
+  // ── ongoing money: the retainer and the recurring invoice, in one card ──
   const rpLine=rp.cents?`Paid so far: ${fmtC(rp.cents)} · ${rp.count} payment${rp.count===1?'':'s'}${rp.last_at?', the last on '+atLabel(rp.last_at):''}`:'';
-  html+=`<section><h2>Retainer</h2><div class="card">`;
-  if(r&&r.status&&r.status!=='canceled'){
+  let ongoing='';
+  if(retLive){
     const st=r.status==='active'?'<span class="schip good">Active</span>':r.status==='past_due'?'<span class="schip bad">Payment overdue</span>':'<span class="schip warn">Awaiting authorization</span>';
-    // sales item 129: a live retainer's card can be put right from here, on Stripe's own page
     const cardLink=(r.status==='active'||r.status==='past_due')&&r.stripe_customer_id?act('data-ret-cardlink="1"','Email the card link','Email the client a link to Stripe’s page for a new card'):'';
-    html+=`<div class="rrow brow"><span class="rt"><strong>${esc(fmtC(r.amount_cents))}</strong> every ${r.interval==='year'?'year':'month'}${rpLine?`<span class="s">${esc(rpLine)}</span>`:''}</span><span class="racts">${st}${(r.status==='pending'&&r.checkout_url)?act(`data-copy="${esc(r.checkout_url)}"`,'Copy authorization link'):''}${cardLink}${act('data-ret-cancel="1" data-needs="delete"','Cancel retainer')}</span></div>`;
-    if(r.status==='past_due')html+=`<p class="muted" style="font-size:13.5px;margin:0 0 10px">The last charge didn’t go through. Stripe tries the card again over the next few days. ${cardLink?'Email the card link so the client can put in a new card on Stripe’s own page; they can also do it from their portal.':'The client can put in a new card once Stripe names their customer.'}</p>`;
-  }else{
-    if(rpLine)html+=`<p style="font-size:13.5px;margin:0 0 10px"><strong>Earlier retainer.</strong> <span class="muted">${esc(rpLine)}</span></p>`;
-    html+=`<p class="muted" style="font-size:13.5px;margin-bottom:10px">Bill this client the same amount every month or year. They authorize it once with Stripe; nothing is charged until they do.</p><button type="button" class="rbtn" data-bform="retainer">Set up a retainer</button><div id="rform"></div>`;
-  }
-  html+=`</div></section>`;
-  // item 108 (J6): the recurring invoice — a fresh bill on a schedule that they pay themselves.
-  // Skip · Pause · Resume · Stop from here; setting one up and Change stay on the deal page's form.
-  if(Array.isArray(DEAL.recurring)){
-    const recs=DEAL.recurring;
-    html+=`<section id="bRecurring"><h2>Recurring invoice <a class="rbtn" href="${esc(link)}#recSec" style="text-decoration:none">${recs.some(s=>s.status==='active'||s.status==='paused')?'Change (in pipeline)':'Set one up (in pipeline)'}</a></h2><div class="card">`;
-    html+=recs.length?recs.map(s=>{
+    ongoing+=`<div class="rrow brow"><span class="rt"><strong>Retainer</strong> · ${esc(fmtC(r.amount_cents))} every ${r.interval==='year'?'year':'month'}${rpLine?`<span class="s">${esc(rpLine)}</span>`:''}</span><span class="racts">${st}${(r.status==='pending'&&r.checkout_url)?act(`data-copy="${esc(r.checkout_url)}"`,'Copy authorization link'):''}${cardLink}${act('data-ret-cancel="1" data-needs="delete"','Cancel retainer')}</span></div>`;
+    if(r.status==='past_due')ongoing+=`<p class="muted" style="font-size:13.5px;margin:6px 0 4px">The last charge didn’t go through. Stripe tries the card again over the next few days. ${cardLink?'Email the card link so the client can put in a new card on Stripe’s own page; they can also do it from their portal.':'The client can put in a new card once Stripe names their customer.'}</p>`;
+  }else if(rpLine){ongoing+=`<div class="rrow brow"><span class="rt"><strong>Earlier retainer</strong><span class="s">${esc(rpLine)}</span></span><span class="racts">${act('data-bform="retainer"','Set up a retainer')}</span></div>`;}
+  const recs=Array.isArray(DEAL.recurring)?DEAL.recurring:[];
+  ongoing+=recs.map(s=>{
       const live=s.status==='active'||s.status==='paused';
       const chip=s.status==='active'?'<span class="schip good">Active</span>':s.status==='paused'?'<span class="schip warn">Paused</span>':s.status==='finished'?'<span class="schip">Finished</span>':'<span class="schip">Stopped</span>';
       const count=s.times?`${s.sent_count||0} of ${s.times} sent`:(s.sent_count?`${s.sent_count} sent`:'');
@@ -1600,12 +1657,23 @@ function renderBillingTab(host){
       if(s.status==='active')acts+=act(`data-rec-skip="${esc(s.id)}"`,'Skip this one')+act(`data-rec-pause="${esc(s.id)}"`,'Pause');
       else if(s.status==='paused')acts+=act(`data-rec-resume="${esc(s.id)}"`,'Resume');
       if(live)acts+=act(`data-rec-stop="${esc(s.id)}" data-needs="delete"`,'Stop');
-      return `<div class="rrow brow"><span class="rt">${esc(s.title||'Invoice')} · ${esc(fmtC(s.amount_cents))} ${esc(everyWord(s.every))}<span class="s">${esc([state,count].filter(Boolean).join(' · '))}</span></span><span class="racts">${chip}${acts}</span></div>`;
-    }).join(''):`<p class="muted" style="font-size:13.5px">Send them a fresh invoice on a schedule. They pay each one themselves; nothing is charged automatically.</p>`;
-    html+=`</div></section>`;
-  }
+      return `<div class="rrow brow"><span class="rt"><strong>Recurring invoice</strong> · ${esc(s.title||'Invoice')} · ${esc(fmtC(s.amount_cents))} ${esc(everyWord(s.every))}<span class="s">${esc([state,count].filter(Boolean).join(' · '))}</span></span><span class="racts">${chip}${acts}</span></div>`;
+    }).join('');
+  html+=`<section id="bRecurring"><h2>Ongoing</h2><div class="card">${ongoing||`<p class="muted" style="font-size:13.5px;margin:0">Nothing recurring. A retainer charges the same amount every month or year once they authorize it with Stripe; a recurring invoice sends them a fresh bill on a schedule that they pay themselves. Both are under More.</p>`}<div id="rform"></div></div></section>`;
   host.innerHTML=html;
   wireBilling(host,d);
+  // the one main button does the next step
+  const nx=host.querySelector('#moneyNext'); if(nx)nx.addEventListener('click',async()=>{
+    const a=nx.getAttribute('data-next')||'';   // 'both' never lands here: that button is #sendBothBtn, which wireBilling's [data-send-both] handles
+    if(a==='invoice'||a==='deposit'||a==='proposal'||a==='estimate'){billingForm(a);return;}
+    const [kind,id]=a.split(':');
+    const find=(sel)=>host.querySelector(`[${sel}="${id}"]`);
+    if(kind==='prop'){const b=find('data-send-prop');if(b)b.click();}
+    else if(kind==='con'){const b=find('data-send-con');if(b)b.click();}
+    else if(kind==='send'){const b=find('data-send-inv');if(b)b.click();}
+    else if(kind==='remind'){const b=find('data-remind-inv');if(b)b.click();}
+    else if(kind==='pay'){const b=find('data-pay-inv');if(b)b.click();}
+  });
   if(BILLING_OPEN){const w=BILLING_OPEN;BILLING_OPEN='';
     if(w==='invoice'||w==='deposit')billingForm(w);
     else if(w==='retainer')billingForm('retainer');
@@ -1628,6 +1696,7 @@ async function billingSend(path,okLabel,body){
   // a resend inside two minutes of the last one is held back by the server (no second email)
   const msg=b.emailed?okLabel+' — emailed to the client':(b.double_tap?'Already sent a moment ago — link copied':(/copied$/.test(okLabel)?okLabel:(url?okLabel.replace('sent','prepared')+' — link copied, nothing was emailed':okLabel)));
   toast(msg+depNote);
+  if(b.ask_reminders&&window.ddsAskReminders)window.ddsAskReminders(ownBusiness());   // sales item 166: asked once
   return b;
 }
 async function reloadDeal(){
@@ -1661,6 +1730,12 @@ function wireBilling(host,d){
       toast((v.payment_for?'Part payment undone. Its amount is due again.':`Payment undone. ${no} is open again.`)+link+(x.moved_back?' The deal is back where it was.':''));reloadDeal();}
     else{toast((r.body&&r.body.message)||'Couldn’t undo it.','err');b.disabled=false;}}));
   const ea=host.querySelector('[data-edit-address]'); if(ea)ea.addEventListener('click',()=>{WANT_EDIT='ec-address';showTab('details');});   // item 81
+  // sales item 166: one reminder now
+  host.querySelectorAll('[data-remind-inv]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await apiAg('/sales/invoices/'+b.getAttribute('data-remind-inv')+'/remind?today='+recTodayYmd(),'POST',{});if(r.ok){const x=(r.body&&r.body.data)||{};toast('Reminder emailed to '+(x.to_first||'the client')+'.');}else toast((r.body&&r.body.message)||'The reminder didn’t go out.','err');b.disabled=false;}));
+  // sales item 162: change an unpaid invoice, under its row
+  host.querySelectorAll('[data-edit-inv]').forEach(b=>b.addEventListener('click',()=>{const v=((DEAL&&DEAL.invoices)||[]).find(x=>x.id===b.getAttribute('data-edit-inv'));const row=b.closest('tr');if(v&&row)editForm(row,v);}));
+  // sales item 165: money given back by hand, under its row
+  host.querySelectorAll('[data-back-inv]').forEach(b=>b.addEventListener('click',()=>{const v=((DEAL&&DEAL.invoices)||[]).find(x=>x.id===b.getAttribute('data-back-inv'));const row=b.closest('tr');if(v&&row)backForm(row,v);}));
   host.querySelectorAll('[data-send-inv]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await billingSend('/sales/invoices/'+b.getAttribute('data-send-inv')+'/send',(b.textContent==='Resend'?'Invoice re-sent':'Invoice sent'));if(r)reloadDeal();else b.disabled=false;}));
   // item 107 (J1): Stripe may not have switched the link off (link_deactivated:false) — then the
   // client can still pay the withdrawn amount, and "Invoice voided" alone would say otherwise
@@ -1711,6 +1786,7 @@ function leftOfProposal(){
   return {total,billed,left:Math.max(0,total-billed)};
 }
 // item 81: the studio's running invoice number — "#0013"; '' before the number exists (APPLY-0167)
+let IDENT_NAME='';   // the studio's name on the document-shaped forms (filled from the context when it is in)
 const invNo=(n)=>{const v=Math.trunc(Number(n));return v>0?'#'+String(v).padStart(4,'0'):'';};
 // item 77: how a payment came in; '' is a payment Stripe took (card or bank, online)
 const PAY_WORDS={check:'Paid by check',cash:'Paid in cash',bank_transfer:'Paid by bank transfer',zelle:'Paid by Zelle',other:'Paid'};
@@ -1788,6 +1864,84 @@ function payForm(row,v){
     reloadDeal();
   });
 }
+// sales item 162: change an unpaid invoice under its row. The title, the note and the due date
+// always; the amount and the lines while nothing was paid toward it. The number is kept, a new
+// amount gets a fresh pay link, and one already sent goes again as corrected.
+function editForm(row,v){
+  const host=$('payhost'); if(!host)return;
+  const open=host.querySelector('.editform');
+  const clear=()=>{host.innerHTML='';document.querySelectorAll('#tabbody tr.paying').forEach(r=>r.classList.remove('paying'));};
+  if(open){const same=open.getAttribute('data-for')===v.id;clear();if(same)return;}
+  const inv=(DEAL&&DEAL.invoices)||[]; const parts=inv.filter(x=>x.payment_for===v.id&&x.status==='paid').reduce((a,b)=>a+(b.amount_cents||0),0);
+  const no=invNo(v.number)||'this invoice'; const sent=!!(v.stripe_url||v.first_sent_at||Number(v.link_gen)>0);
+  const lines=Array.isArray(v.lines)&&v.lines.length>1?v.lines:[{label:v.title||'Invoice',qty:1,amount_cents:v.amount_cents}];
+  const c=DEAL.contact||REC.header||{}; const first=(String(c.name||'').trim().split(/\s+/)[0])||'';
+  row.classList.add('paying');
+  host.innerHTML=`<div class="bform payform editform docform" role="group" aria-labelledby="ef-h" data-for="${esc(v.id)}"><p class="pf-h" id="ef-h">Change ${esc(no)} · the number stays</p>
+    <label class="docf-title">Title<input type="text" id="ef-title" maxlength="200" value="${esc(v.title||'')}"></label>
+    <div class="docf-lines" id="ef-lines">${lines.map((l,i)=>docLine(l,i)).join('')}</div>
+    ${parts>0?`<p class="muted" style="font-size:12.5px;margin:6px 0 0">${esc(fmtC(parts))} was already paid toward it, so the amount and lines stay. The title, the note and the due date can still change.</p>`:'<button type="button" class="link-btn" id="ef-add">+ another line</button>'}
+    <div class="brow2" style="margin-top:10px"><label>Due (blank = on receipt)<input type="date" id="ef-due" value="${esc(String(v.due_date||'').slice(0,10))}"></label><label>Note on the invoice (optional)<input type="text" id="ef-note" maxlength="300" value="${esc(v.description||'')}"></label></div>
+    <div class="docf-total"><span>Amount due</span><b id="ef-total">${esc(fmtC(v.amount_cents))}</b></div>
+    ${sent?`<label class="pf-rcpt"><input type="checkbox" id="ef-resend" checked> Send the corrected copy to ${esc(first||'them')} (same number)</label>`:''}
+    <div class="bacts"><button type="button" id="ef-cancel">Cancel</button><button type="button" class="primary" id="ef-go">Save changes</button></div></div>`;
+  const box=host.firstElementChild, ls=$('ef-lines');
+  if(parts>0)ls.querySelectorAll('input,button').forEach(el=>{el.disabled=true;});
+  const total=()=>{$('ef-total').textContent=fmtC(docLines(ls).reduce((n,l)=>n+l.amount_cents,0));};
+  const add=$('ef-add'); if(add)add.addEventListener('click',()=>{ls.insertAdjacentHTML('beforeend',docLine({label:'',qty:1,amount_cents:0},ls.children.length));ls.lastElementChild.querySelector('.dl-l').focus();total();});
+  ls.addEventListener('input',total);
+  ls.addEventListener('click',(e)=>{const x=e.target.closest('.dl-x');if(!x||parts>0)return;if(ls.children.length<=1){toast('Keep at least one line.','err');return;}x.closest('.dl').remove();total();});
+  $('ef-cancel').addEventListener('click',()=>{clear();const b=row.querySelector('[data-edit-inv]');if(b)b.focus();});
+  box.scrollIntoView({block:'nearest',behavior:'smooth'});
+  setTimeout(()=>{$('ef-title').focus({preventScroll:true});},50);
+  $('ef-go').addEventListener('click',async()=>{
+    const go=$('ef-go'); const title=($('ef-title').value||'').trim(); if(!title){toast('Give the invoice a title.','err');return;}
+    const body={title,due_date:$('ef-due').value||null,description:($('ef-note').value||'').trim(),resend:!!($('ef-resend')&&$('ef-resend').checked)};
+    if(parts===0){const l=docLines(ls);if(l.some(x=>!x.label)){toast('Every line needs a few words saying what it is for.','err');return;}body.amount_cents=l.reduce((n,x)=>n+x.amount_cents,0);if(l.length>1)body.lines=l;else body.lines=null;}
+    go.disabled=true;
+    const r=await apiAg('/sales/invoices/'+encodeURIComponent(v.id)+'?today='+recTodayYmd(),'PATCH',body);
+    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save. Nothing changed.','err');go.disabled=false;return;}
+    const b=r.body||{};
+    if(!b.changed){toast('Nothing changed.');clear();return;}
+    let m='Changed '+no+': '+(b.words||[]).join('; ')+'.';
+    if(b.resent)m+=' Sent again to '+(first||'them')+' as corrected.';else if(b.sent_before&&body.resend)m+=' The corrected copy didn’t email; press Resend to send it.';
+    if(b.fresh_link===false)m+=' A new payment link couldn’t be made just now: press Send on it to make one.';
+    if(b.link_deactivated===false)m+=' Its old card link may still be live, so switch it off in Stripe.';
+    toast(m,(b.fresh_link===false||b.link_deactivated===false)?'err':undefined);
+    reloadDeal();
+  });
+}
+// sales item 165: money given back by hand on an invoice paid by hand, under its row
+function backForm(row,v){
+  const host=$('payhost'); if(!host)return;
+  const open=host.querySelector('.backform');
+  const clear=()=>{host.innerHTML='';document.querySelectorAll('#tabbody tr.paying').forEach(r=>r.classList.remove('paying'));};
+  if(open){const same=open.getAttribute('data-for')===v.id;clear();if(same)return;}
+  const today=recTodayYmd(); const no=invNo(v.number)||'this invoice';
+  const inv=(DEAL&&DEAL.invoices)||[]; const parts=inv.filter(x=>x.payment_for===v.id&&x.status==='paid').reduce((a,b)=>a+(b.amount_cents||0),0);
+  const kept=(Number(v.amount_cents)||0)+parts-(Number(v.refunded_cents)||0);
+  row.classList.add('paying');
+  host.innerHTML=`<div class="bform payform backform" role="group" aria-labelledby="gb-h" data-for="${esc(v.id)}"><p class="pf-h" id="gb-h">Give money back on ${esc(no)}</p>
+    <div class="brow2"><label>Amount given back (USD)<input type="number" id="gb-amt" inputmode="decimal" step="0.01" min="0.01" max="${(kept/100).toFixed(2)}" placeholder="${(kept/100).toFixed(2)}"></label><label>The day you gave it back<input type="date" id="gb-on" max="${today}" value="${today}"></label><label>Why, in a few words (optional)<input type="text" id="gb-note" maxlength="300" placeholder="e.g. Goodwill credit"></label></div>
+    <fieldset class="pf-how"><legend>How</legend>${[['check','Check'],['cash','Cash'],['bank_transfer','Bank transfer'],['zelle','Zelle'],['other','Other']].map(([k,l])=>`<label class="pf-chip"><input type="radio" name="gb-how" value="${k}"${k===(v.paid_method||'check')?' checked':''}><span>${l}</span></label>`).join('')}</fieldset>
+    <p class="muted pf-what">${esc(fmtC(kept))} is kept from this invoice${v.refunded_cents>0?' after '+esc(fmtC(v.refunded_cents))+' already given back':''}. It will read Paid with the amount refunded, come off the month it went back, and the receipt will say so. Nothing is emailed.</p>
+    <div class="bacts"><button type="button" id="gb-cancel">Cancel</button><button type="button" class="primary" id="gb-go">Record it</button></div></div>`;
+  const box=host.firstElementChild;
+  $('gb-cancel').addEventListener('click',()=>{clear();const b=row.querySelector('[data-back-inv]');if(b)b.focus();});
+  box.scrollIntoView({block:'nearest',behavior:'smooth'});
+  setTimeout(()=>{$('gb-amt').focus({preventScroll:true});},50);
+  $('gb-go').addEventListener('click',async()=>{
+    const a=Math.round((parseFloat($('gb-amt').value)||0)*100); const how=(box.querySelector('input[name="gb-how"]:checked')||{}).value||'';
+    if(!(a>0)){toast('Enter the amount you gave back.','err');$('gb-amt').focus();return;}
+    if(a>kept){toast('That’s more than the '+fmtC(kept)+' kept from this invoice.','err');return;}
+    const go=$('gb-go'); go.disabled=true;
+    const r=await apiAg('/sales/invoices/'+encodeURIComponent(v.id)+'/money-back?today='+today,'POST',{amount_cents:a,on:$('gb-on').value||today,method:how,note:($('gb-note').value||'').trim()});
+    if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save.','err');go.disabled=false;return;}
+    const x=(r.body&&r.body.data)||{};
+    toast('Recorded '+fmtC(a)+' given back on '+no+'. It reads Paid, '+fmtC(x.refunded_cents||a)+' refunded.');
+    reloadDeal();
+  });
+}
 // item 108 (J4): the retainer's payments, which the deal read totals beside the deal (a retainer
 // charge settles in Stripe and writes no invoice). Zero when the read couldn't count them.
 function retainerPaidNow(){const r=DEAL&&DEAL.retainer_paid;return r&&typeof r==='object'?{cents:Number(r.cents)||0,count:Number(r.count)||0,last_at:r.last_at||null}:{cents:0,count:0,last_at:null};}
@@ -1796,30 +1950,52 @@ const estExpired=(e)=>!!(e&&e.status==='sent'&&e.expires_at&&Date.parse(e.expire
 function estWord(e){if(e.status==='approved')return['Approved','good'];if(e.status==='declined')return['Not now','bad'];if(estExpired(e))return['Expired',''];if(e.status==='sent')return['Sent',''];return['Draft','warn'];}
 const everyWord=(e)=>e==='quarter'?'every 3 months':e==='year'?'every year':'every month';
 const pauseWhy=(r)=>r==='unpaid'?'the last two invoices are still unpaid':r==='no_email'?'there’s no client email on this deal':r==='no_stripe'?'Stripe isn’t connected':'you paused it';
-// the small inline forms: invoice · deposit · retainer
+// the inline forms: invoice · deposit · proposal · estimate (each filled in like the document
+// itself, sales item 164: lines with words, quantity and amount, "+ another line", a due date
+// and a note) · retainer
+const docLine=(l,i,first)=>`<div class="dl"><input type="text" class="dl-l" maxlength="200" placeholder="${i?'Another line':'What this is for'}" value="${esc(l.label||'')}" aria-label="Line ${i+1}"><input type="number" class="dl-q" min="1" max="999" step="1" value="${Number(l.qty)||1}" aria-label="Quantity"><input type="text" class="dl-a" inputmode="decimal"${first?' id="bf-amt"':''} placeholder="${l.placeholder||'0.00'}" value="${l.amount_cents?((Number(l.amount_cents)||0)/100).toFixed(2):''}" aria-label="Amount"><button type="button" class="dl-x" aria-label="Remove line ${i+1}">×</button></div>`;
+function docLines(host){return [...host.querySelectorAll('.dl')].map(r=>({label:r.querySelector('.dl-l').value.trim(),qty:Math.max(1,Math.trunc(Number(r.querySelector('.dl-q').value)||1)),amount_cents:Math.round(parseFloat(String(r.querySelector('.dl-a').value).replace(/[^0-9.\-]/g,'')||'0')*100)}));}
 function billingForm(kind){
   const d=(DEAL&&DEAL.deal)||{}; const host=kind==='retainer'?$('rform'):$('bform'); if(!host)return;
   const today=recTodayYmd();   // item 65: after 5pm in Los Angeles the UTC slice refused today as a due date
+  const c=DEAL.contact||REC.header||{};
+  const who=[c.company,c.name].filter(Boolean).join(', ')||'the client';
   if(kind==='retainer'){
     host.innerHTML=`<div class="bform"><div class="brow2"><label>Amount (USD)<input type="number" id="bf-amt" step="0.01" min="1" placeholder="500"></label><label>Every<select id="bf-int"><option value="month">month</option><option value="year">year</option></select></label></div><div class="bacts"><button type="button" id="bf-cancel">Cancel</button><button type="button" class="primary" id="bf-go">Start retainer</button></div></div>`;
   }else{
-    const dep=kind==='deposit';
-    // item 107 (J2): blank bills what's LEFT of the accepted proposal — the hint says how much
+    const dep=kind==='deposit', prop=kind==='proposal', est=kind==='estimate';
     const lp=leftOfProposal();
-    const hint=!lp?'Enter the amount to bill.':lp.left<50?`The accepted proposal (${fmtC(lp.total)}) is billed in full. Enter an amount to bill something else.`:lp.billed?`Leave the amount blank to bill what’s left of the accepted proposal: ${fmtC(lp.left)} of ${fmtC(lp.total)}.`:`Leave the amount blank to bill the accepted proposal (${fmtC(lp.left)}).`;
-    const html=`<div class="bform"><div class="brow2"><label>${dep?'Deposit amount (USD)':'Amount (USD)'}<input type="number" id="bf-amt" step="0.01" min="1" placeholder="${dep?'500':(lp&&lp.left>=50?esc(String(lp.left/100)):'2500')}"${dep?'':' aria-describedby="bf-hint"'}></label><label>Label<input type="text" id="bf-title" maxlength="80" placeholder="${dep?'Deposit':'e.g. Balance at launch'}"></label><label>Due<input type="date" id="bf-due" min="${today}"></label></div>${dep?'':`<p class="muted" id="bf-hint" style="font-size:12.5px;margin-top:6px">${esc(hint)}</p>`}<div class="bacts"><button type="button" id="bf-cancel">Cancel</button><button type="button" class="primary" id="bf-go">${dep?'Request deposit':'Send invoice'}</button></div></div>`;
+    // item 107 (J2): blank bills what's LEFT of the accepted proposal — the hint says how much
+    const hint=dep?'':prop?'A proposal is what they accept before any work. Nothing is sent until you press Send to client.':est?'An estimate is a price before anything is agreed. Nothing is sent until you press Send to client.':!lp?'Enter the amount to bill.':lp.left<50?`The accepted proposal (${fmtC(lp.total)}) is billed in full. Enter an amount to bill something else.`:lp.billed?`Leave the amount blank to bill what’s left of the accepted proposal: ${fmtC(lp.left)} of ${fmtC(lp.total)}.`:`Leave the amount blank to bill the accepted proposal (${fmtC(lp.left)}).`;
+    const first=dep?{label:'Deposit',qty:1,amount_cents:0,placeholder:'500'}:{label:'',qty:1,amount_cents:0,placeholder:(!prop&&!est&&lp&&lp.left>=50?String(lp.left/100):'2500')};
+    const label=dep?'Deposit request':prop?'Proposal':est?'Estimate':'Invoice';
+    const html=`<div class="bform docform" role="group" aria-labelledby="bf-h"><div class="docf-head"><p class="pf-h" id="bf-h">${label}${(prop||est)?'':' · numbered when it is saved'}</p><p class="muted" style="margin:0;font-size:13px">From ${esc((IDENT_NAME||'your studio'))} · ${prop?'Prepared for':est?'Prepared for':'Billed to'} ${esc(who)}</p></div>
+      <label class="docf-title">Title<input type="text" id="bf-title" maxlength="200" placeholder="${dep?'Deposit':prop?'e.g. Website for Maple & Rye':est?'e.g. Logo refresh':'e.g. Balance at launch'}" value="${dep?'Deposit':''}"></label>
+      <div class="docf-lines" id="bf-lines">${docLine(first,0,true)}</div>
+      <button type="button" class="link-btn" id="bf-add">+ another line</button>
+      ${(prop||est)?'':`<div class="brow2" style="margin-top:10px"><label>Due<input type="date" id="bf-due" min="${today}"></label><label>Note on the ${dep?'request':'invoice'} (optional)<input type="text" id="bf-note" maxlength="300" placeholder="e.g. Thank you for choosing us"></label></div>`}
+      ${(prop||est)?`<label class="docf-title" style="margin-top:10px">Good to know (optional)<input type="text" id="bf-terms" maxlength="2000" placeholder="e.g. Good for 30 days. Two rounds of changes included."></label>`:''}
+      <div class="docf-total"><span>${(prop||est)?'Total':dep?'Deposit':'Amount due'}</span><b id="bf-total">$0.00</b></div>
+      ${hint?`<p class="muted" id="bf-hint" style="font-size:12.5px;margin:6px 0 0">${esc(hint)}</p>`:''}
+      <div class="bacts"><button type="button" id="bf-cancel">Cancel</button>${(prop||est)?'':'<button type="button" id="bf-save">Save without sending</button>'}<button type="button" class="primary" id="bf-go">${dep?'Request deposit':prop?'Save the draft':est?'Save the draft':'Send invoice'}</button></div></div>`;
     host.innerHTML=html;
+    const lines=$('bf-lines');
+    const total=()=>{const t=docLines(lines).reduce((n,l)=>n+(prop||est?l.qty*Math.max(0,l.amount_cents):l.amount_cents),0);$('bf-total').textContent=fmtC(t);};
+    $('bf-add').addEventListener('click',()=>{lines.insertAdjacentHTML('beforeend',docLine({label:'',qty:1,amount_cents:0},lines.children.length));lines.lastElementChild.querySelector('.dl-l').focus();total();});
+    lines.addEventListener('input',total);
+    lines.addEventListener('click',(e)=>{const x=e.target.closest('.dl-x');if(!x)return;if(lines.children.length<=1){toast('Keep at least one line.','err');return;}x.closest('.dl').remove();total();});
+    total();
+    const save=$('bf-save'); if(save)save.addEventListener('click',()=>$('bf-go').dispatchEvent(new CustomEvent('click',{detail:{save:true}})));
   }
   host.scrollIntoView({block:'center',behavior:'smooth'});
-  setTimeout(()=>{const a=$('bf-amt');if(a)a.focus({preventScroll:true});},150);
+  setTimeout(()=>{const a=$('bf-amt')||$('bf-title');if(a)a.focus({preventScroll:true});},150);
   $('bf-cancel').addEventListener('click',()=>{host.innerHTML='';});
-  $('bf-go').addEventListener('click',async()=>{
+  $('bf-go').addEventListener('click',async(ev)=>{
     const go=$('bf-go'); go.disabled=true;
-    const amt=parseFloat(($('bf-amt').value||'').trim());
     if(kind==='retainer'){
+      const amt=parseFloat(($('bf-amt').value||'').trim());
       if(!amt||amt<1){toast('Enter a retainer amount of at least $1.','err');go.disabled=false;return;}
       const r=await apiAg('/sales/deals/'+d.id+'/retainer','POST',{amount_cents:Math.round(amt*100),interval:$('bf-int').value||'month'});
-      // B21: "copied" only once the link IS on the clipboard — it said so before trying, and a refused copy stayed quiet
       if(r.ok){const x=r.body.data||{},noCopy='Retainer set up — copy its authorization link from Invoices.';
         if(x.emailed)toast('Retainer set up — the authorization link was emailed');
         else if(x.url&&navigator.clipboard)navigator.clipboard.writeText(x.url).then(()=>toast('Retainer set up — authorization link copied'),()=>toast(noCopy));
@@ -1828,12 +2004,29 @@ function billingForm(kind){
       else{toast((r.body&&r.body.message)||'Couldn’t set that up.','err');go.disabled=false;}
       return;
     }
-    const dep=kind==='deposit';
-    if(dep&&(!amt||amt<1)){toast('Enter a deposit amount.','err');go.disabled=false;return;}
+    const dep=kind==='deposit', prop=kind==='proposal', est=kind==='estimate';
+    const ls=docLines($('bf-lines'));
+    // one line may go without words (the invoice's title, or the server's own, names it); every extra line needs them
+    if(ls.slice(1).some(l=>!l.label)){toast('Every line needs a few words saying what it is for.','err');go.disabled=false;return;}
+    const title=($('bf-title').value||'').trim()||(ls.length>1?ls[0].label:'');
+    if(prop||est){
+      if(ls.some(l=>l.amount_cents<0)){toast('A price can’t be less than nothing.','err');go.disabled=false;return;}
+      const body={title,line_items:ls.map(l=>({label:l.label,qty:l.qty,unit_cents:l.amount_cents})),terms:($('bf-terms').value||'').trim()};
+      const r=await apiAg('/sales/deals/'+d.id+(prop?'/proposals':'/estimates'),'POST',body);
+      if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save.','err');go.disabled=false;return;}
+      toast((prop?'Proposal':'Estimate')+' drafted — press Send to client when you’re ready.');host.innerHTML='';reloadDeal();return;
+    }
+    const amount=ls.reduce((n,l)=>n+l.amount_cents,0);
+    const lp2=leftOfProposal();
+    if(!(amount>0)&&(dep||ls.length>1||!lp2||lp2.left<50)){toast(dep?'Enter a deposit amount.':'Enter the amount to bill.','err');go.disabled=false;return;}
+    // item 107 (J2): left blank with an accepted proposal, the server bills what's left of it
     const body={purpose:dep?'deposit':'service'};
-    if(amt)body.amount_cents=Math.round(amt*100);
-    const title=($('bf-title').value||'').trim(); if(title)body.title=title; else if(dep)body.title='Deposit';
+    if(amount>0)body.amount_cents=amount;
+    if(title)body.title=title;else if(dep)body.title='Deposit';
+    if(ls.length>1)body.lines=ls.map((l,i)=>({...l,label:l.label||title||'Invoice'}));
     const due=$('bf-due').value; if(due)body.due_date=due;
+    const note=($('bf-note').value||'').trim(); if(note)body.description=note;
+    if(ev&&ev.detail&&ev.detail.save)body.send=false;   // saved as a draft: numbered, not sent (sales item 141's "Not sent yet")
     await sendMoney(body,host);
   });
 }
@@ -1843,8 +2036,10 @@ async function sendMoney(body,host){
   if(r.ok){
     const b=r.body||{}; const url=b.url||'';
     if(b.warning==='link_failed'){toast(b.message||'Invoice saved, but the payment link didn’t generate — tap Send again.','err');if(host)host.innerHTML='';reloadDeal();return;}
+    if(b.saved){toast(label+' saved as a draft (not sent yet). Press Send on it when you’re ready.');if(host)host.innerHTML='';reloadDeal();return;}   // sales item 164: Save without sending
     if(url&&navigator.clipboard)navigator.clipboard.writeText(url).catch(()=>{});
     toast(b.double_tap?label+' already sent a moment ago'+(url?' — link copied':''):b.emailed?label+(b.reused?' re-sent':' sent')+' — emailed to the client':(url?label+' prepared — payment link copied, nothing was emailed':label+' sent'));
+    if(b.ask_reminders&&window.ddsAskReminders)window.ddsAskReminders(ownBusiness());   // sales item 166: asked once
     if(host)host.innerHTML='';
     reloadDeal(); return;
   }

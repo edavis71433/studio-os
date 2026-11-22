@@ -29,6 +29,7 @@ const { resolveSiteRoleCached } = await import(`${P}/lib/workspace.ts`);
 const { memberWriteGate, reviewerAllowed } = await import(`${P}/routes/workspace.ts`);
 const { handleMediaDelete } = await import(`${P}/routes/media.ts`);
 const { handleInvoicePaymentUndo } = await import(`${P}/routes/invoice_payments.ts`);   // sales review item 77
+const { handleInvoiceMoneyBack } = await import(`${P}/routes/invoice_changes.ts`);   // sales item 165
 const { handleAssetDelete, handleAssetStatus, handleAssetDeleteForGood } = await import(`${P}/routes/assets.ts`);
 const { handleRedirectDelete } = await import(`${P}/routes/search.ts`);
 const { handleContentLibraryDelete } = await import(`${P}/routes/content_library.ts`);
@@ -153,6 +154,7 @@ const DECIDED = {
     // sales review items 86 + 105: undoing an import takes people off; a merge folds a record away (and back)
     'POST /sales/contacts/imports/:id/undo', 'POST /sales/contacts/:id/merge', 'POST /sales/contacts/:id/unmerge',
     'POST /sales/invoices/:id/payment/undo',   // sales review item 77: taking back a recorded payment changes the books, like a void
+    'POST /sales/invoices/:id/money-back',   // sales item 165: money given back by hand changes the books, like an undo
     'DELETE /projects/templates/:id',   // sales item 106: removing a saved project template
     'DELETE /sales/todo-templates/:id',   // sales item 106: removing a saved to-do list
     'DELETE /assets/:id/forever',   // builder list item 218: a file in the Trash deleted for good, like the Delete that put it there
@@ -198,6 +200,7 @@ const DECIDED = {
     'PATCH /assets/:id', 'PATCH /bookings/types/:id', 'PATCH /broadcasts/:id', 'PATCH /projects/:id',
     'PATCH /projects/:id/deliverables/:id2', 'PATCH /projects/:id/milestones/:id2', 'PATCH /projects/:id/tasks/:id2',
     'PATCH /sales/contacts/:id', 'PATCH /sales/deal-tasks/:id', 'PATCH /sales/deals/:id', 'PATCH /support/:id',
+    'PATCH /sales/invoices/:id', 'POST /sales/invoices/:id/remind',   // sales items 162, 166: changing an unpaid invoice and a reminder now are everyday bookkeeping, like sending it
     'POST /visibility/check', 'PUT /visibility/follow', 'PUT /visibility/phrases', 'PUT /site/usable', 'PUT /visibility/ai/questions', 'POST /approve/send', 'POST /assets/:id/duplicate', 'POST /assets/:id/remove-background', 'POST /assets/:id/cutout',
     'POST /assets/:id/replace', 'POST /assets/:id/rollback', 'POST /assets/:id/suggest', 'POST /assets/bulk', 'POST /assets/folders/move',
     'POST /assets/:id/put-back',   // builder list item 218: taking a file out of the Trash deletes nothing
@@ -359,6 +362,7 @@ const CHANGED = [
   { name: 'POST /sales/contacts/:id/unmerge', fx: { rows: { presence_contacts: { merged_into: ROW2, merge_record: { at: new Date().toISOString(), into: ROW2, moved: { deals: [], appointments: [], reviews: [] }, keep_before: {}, keep_after: {} } } } }, run: (r, p) => handleContactUnmerge(r, A, p, ROW, cors) },
   { name: 'POST /sales/customers/:id/delete', body: { site: 'keep' }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/customers.ts')).handleCustomerDelete(r, A, p, ROW, cors) },   // builder list item 241
   { name: 'POST /sales/invoices/:id/payment/undo', fx: { rows: { presence_invoices: { status: 'paid', paid_method: 'check', payment_for: null } } }, run: (r, p) => handleInvoicePaymentUndo(r, A, p, ROW, cors) },   // sales review item 77
+  { name: 'POST /sales/invoices/:id/money-back', body: { amount_cents: 100, on: '2020-01-02', method: 'check' }, fx: { rows: { presence_invoices: { status: 'paid', paid_method: 'check', payment_for: null, amount_cents: 100000, refunded_cents: 0 } } }, run: (r, p) => handleInvoiceMoneyBack(r, A, p, ROW, cors) },   // sales item 165
   { name: 'POST /foundations/domain', body: { domain: 'beta.example' }, run: (r, p) => handleDomain(r, 'POST', A, p, cors) },
   { name: 'DELETE /foundations/domain', body: { confirm: 'alpha.example' }, run: (r, p) => handleDomain(r, 'DELETE', A, p, cors) },   // item 163: removing needs the name typed back
   { name: 'POST /foundations/domain/forward', body: { domain: 'gamma.example' }, run: (r, p) => handleDomainForward(r, 'POST', A, p, cors) },   // item 174
@@ -520,6 +524,7 @@ const WRITE_HANDLERS = [
   'handleEstimateCreate', 'handleEstimateSend', 'handleEstimateToProposal', 'handleEstimateToInvoice', 'handleEstimateDelete',
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
   'handleInvoicePayment', 'handleInvoicePaymentUndo',   // sales review item 77 (see DECIDED.edit and .delete)
+  'handleInvoiceEdit', 'handleInvoiceRemindNow', 'handleInvoiceMoneyBack',   // sales items 162, 166, 165 (see DECIDED.edit and .delete)
   'handleSalesRetainerCardLink', 'handleClientRetainerCard',   // sales item 129 (see DECIDED.edit)
   // sales review item 112: prospects (DELETE and PATCH /sales/prospects/:id share handleProspect)
   'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft', 'handleProspectPack',
