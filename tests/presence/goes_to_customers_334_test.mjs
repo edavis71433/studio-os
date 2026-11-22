@@ -146,27 +146,58 @@ const fields = (content) => validateSnapshot(snap(content), manifest).blockers.m
   const { privacyBody } = await import('../../supabase/functions/presence/lib/legal_pages.ts');
   const priv = (loc) => privacyBody(base({ email: 'hi@example.com' }, loc), 'November 22, 2026', { formEndpoint: '', bookEndpoint: '' });
   ok('E2: the privacy page names the street only for a shopfront', priv({}).includes('12 Main St') && !priv({ goes_to_customers: true }).includes('12 Main St'));
-  const ev = read('supabase/functions/presence/evidence/providers.ts');
-  ok('E3: the details check asks a business that comes to you for its places, not a street', /if \(loc\.goes_to_customers === true\) \{\s*if \(!String\(id\.service_area \|\| ''\)\.trim\(\)\) emit\('business_info\.address_incomplete', 'draft', 'service_area', \{ field: 'service area' \}\);/.test(ev));
-  ok('E4: and the map-signal and citation checks don’t miss a street it never shows', /loc\.goes_to_customers !== true && !home\.html\.includes\(loc\.address_line1\)/.test(ev) && /loc\.goes_to_customers !== true && !text\.includes\(loc\.address_line1\)/.test(read('supabase/functions/presence/optimization/providers.ts')));
+  // the health checks, run on the real providers: a business that comes to you is asked for its
+  // places, never a street, and a home page that rightly shows no street isn't marked down for it
+  const { PROVIDERS, runProviders } = await import('../../supabase/functions/presence/evidence/providers.ts');
+  const { OPTIMIZATION_PROVIDERS } = await import('../../supabase/functions/presence/optimization/providers.ts');
+  const draftOf = (ident, loc) => ({ ...base(ident, loc), faqs: [] });
+  const input = (draft, html) => ({ site: { id: '00000000-0000-4000-8000-000000000001', status: 'live', template_slug: 'harbor', template_version: '1.0.0', client_id: 'c1' }, now: '2026-11-22T12:00:00.000Z', draft, live: draft,
+    lastLiveAt: null, everPublished: true, fileMap: {}, fileMapFrom: 'draft', pages: [{ path: '/', html }], mediaRows: [], usedMediaIds: [], lastOfferingChangeAt: null, lastLocationChangeAt: null,
+    oldestUnpublishedChangeAt: null, unpublishedChangeEvents: 0, liveFetch: null, opt: null, connected: [], connectedPrior: [], industry: 'plumber', external: false });
+  const run = (providers, names, draft, html) => runProviders(input(draft, html), providers.filter((p) => names.includes(p.name))).items;
+  const noStreet = { address_line1: '', city: '', postal_code: '' };
+  const asked = (items) => items.filter((x) => x.type === 'business_info.address_incomplete').map((x) => x.resource).join();
+  ok('E3: the details check asks a shopfront for its street, town and ZIP, and a business that comes to you for its places instead',
+    asked(run(PROVIDERS, ['business_info'], draftOf({}, noStreet), '<p>hi</p>')) === 'address_line1,city,postal_code'
+    && asked(run(PROVIDERS, ['business_info'], draftOf({ service_area: '' }, { ...noStreet, goes_to_customers: true }), '<p>hi</p>')) === 'service_area'
+    && asked(run(PROVIDERS, ['business_info'], draftOf({ service_area: AREA }, { ...noStreet, goes_to_customers: true }), '<p>hi</p>')) === '');
+  const home = '<a href="tel:+18185550199">(818) 555-0199</a> Copper Line Plumbing 7am';
+  const facts = (items, type) => items.filter((x) => x.type === type).map((x) => String(x.facts?.missing || '')).join();
+  ok('E4: a home page that rightly shows no street isn’t marked down for it, on the map signal or the facts AI tools quote',
+    /street address/.test(facts(run(PROVIDERS, ['local_presence'], draftOf({}, {}), home), 'local_presence.map_signal_missing'))
+    && !/street address/.test(facts(run(PROVIDERS, ['local_presence'], draftOf({}, { goes_to_customers: true }), home), 'local_presence.map_signal_missing'))
+    && /address/.test(facts(run(OPTIMIZATION_PROVIDERS, ['aeo'], draftOf({}, {}), home), 'aeo.citation_facts_incomplete'))
+    && !/address/.test(facts(run(OPTIMIZATION_PROVIDERS, ['aeo'], draftOf({}, { goes_to_customers: true }), home), 'aeo.citation_facts_incomplete')));
   const { TEMPLATES } = await import('../../supabase/functions/presence/moments/rules.ts');
   const missing = TEMPLATES.find((t) => t.key === 'missing_basics').counted([{ type: 'business_info.address_incomplete', resource: 'service_area', facts: {} }]);
   ok('E5: the nudge says “Add the places you serve”', /Add the places you serve in Business details/.test(missing.summary));
-  ok('E6: the writer never writes the street of a business that comes to you', /address: l\.goes_to_customers === true \? '' :/.test(read('supabase/functions/presence/writer/facts.ts')) && /select=\*&limit=1/.test(read('supabase/functions/presence/writer/facts.ts')));
-  ok('E7: nor does a booking email give one', /l\.address_line1 && l\.goes_to_customers !== true \?/.test(read('supabase/functions/presence/lib/booking_links.ts')));
+  // the writer's facts and a booking email, read through a stand-in database
+  const { buildFactSheet } = await import('../../supabase/functions/presence/writer/facts.ts');
+  const { bookingBits } = await import('../../supabase/functions/presence/lib/booking_links.ts');
+  const realFetch = globalThis.fetch;
+  const withDb = async (loc, fn) => {
+    globalThis.fetch = async (u) => {
+      const url = String(u);
+      const rows = url.includes('/presence_locations?') ? [{ ...MAIN, ...loc }] : url.includes('/presence_identity?') ? [{ business_name: 'Copper Line', phone: '(818) 555-0199', email: 'hi@example.com', service_area: AREA }] : [];
+      return new Response(JSON.stringify(rows), { status: 200, headers: { 'Content-Type': 'application/json', 'Content-Range': '0-0/0' } });
+    };
+    try { return await fn(); } finally { globalThis.fetch = realFetch; }
+  };
+  const SID = '00000000-0000-4000-8000-000000000001';
+  const sheet = (loc) => withDb(loc, () => buildFactSheet({ id: SID, client_id: 'c1', template_slug: 'harbor', template_version: '1.0.0' }));
+  const [shop, mobile] = [await sheet({}), await sheet({ goes_to_customers: true })];
+  ok('E6: the writer never writes the street of a business that comes to you', shop.address.startsWith('12 Main St') && mobile.address === '' && mobile.service_area === AREA && mobile.hours_text.length > 0);
+  const [shopBits, mobileBits] = [await withDb({}, () => bookingBits(SID)), await withDb({ goes_to_customers: true }, () => bookingBits(SID))];
+  ok('E7: nor does a booking email give one', shopBits.biz.location.startsWith('12 Main St') && mobileBits.biz.location === '' && mobileBits.biz.tel === '(818) 555-0199');
 }
 
-// ═══ F. the migration, the pack, the editor ═══
+// ═══ F. the migration and its pack (their SQL is the contract) ═══
 {
   for (const [name, sql] of [['migration', read('supabase/migrations/0255_goes_to_customers.sql')], ['pack', read('docs/presence/APPLY-0255-prod.sql')]]) {
     ok(`F1 ${name}: one yes-or-no column, off for every site that exists, re-runnable`, /alter table public\.presence_locations\s+add column if not exists goes_to_customers boolean not null default false;/.test(sql) && /drop column if exists goes_to_customers/.test(sql));
   }
-  const html = read('presence.html'), core = read('presence-core.js');
-  ok('F2: the switch sits at the top of Locations, hidden until /site says the database can save it', /<label class="closedrow" id="goesRow" hidden><input type="checkbox" id="goesSwitch" aria-describedby="goesHint"> We go to our customers<\/label>/.test(html) && /row\.hidden = !goesKnown\(\);/.test(core) && /\(S\.locationFields \|\| \[\]\)\.includes\("goes_to_customers"\)/.test(core));
-  ok('F3: on, the address folds away and Where you work moves into its place; off, it goes back', /\$\("bizAddr"\)\.hidden = on;/.test(core) && /const home = on \? \$\("goesArea"\) : \$\("areaHome"\);/.test(core) && /<div id="areaHome"><div class="field" id="areaField">/.test(html));
-  ok('F4: a failed save puts the switch back, as the closed switch does', /\$\("goesSwitch"\)\.checked = !now; S\.location = \{ \.\.\.\(S\.location \|\| \{\}\), goes_to_customers: !now \}; paintGoes\(\);/.test(core));
-  ok('F5: the words on screen have no em-dashes', !/—/.test((core.match(/hint\.textContent = on \? "[^"]*"/) || [''])[0]));
 }
+// the editor's switch is driven in a browser: tests/e2e/goes-to-customers-334.spec.ts
 
 const failed = results.filter((x) => !x).length;
 console.log(`\n${results.length - failed}/${results.length} passed`);
