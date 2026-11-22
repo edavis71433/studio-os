@@ -103,6 +103,14 @@ const devicesForever = await gate(['devices'], { WAIT_MINUTES: '0' });
 ok('…and devices that never finish stop the deploy in the end', devicesForever.code === 1 && devicesForever.log.includes("hadn't passed after 0 minutes"));
 const never = await gate(['NONE'], { START_MINUTES: '0' });
 ok('no browser check on the commit stops the deploy', never.code === 1 && never.log.includes('No browser check started on this commit'));
+// Builder item 418: the urgent switch releases without waiting, and says so; nothing else changes.
+const urgent = await gate(['in_progress '], { URGENT: 'true' });
+ok('an urgent fix doesn\'t wait for the browser check, and asks GitHub nothing', urgent.code === 0 && urgent.calls.length === 0 && urgent.log.includes('::warning title=Urgent fix::Released without waiting for the browser check'), urgent.log.trim());
+const notUrgent = await gate(['completed failure'], { URGENT: 'false' });
+ok('…while a release that isn\'t urgent still stops on a failed browser check', notUrgent.code === 1);
+ok('the switch is a yes/no that starts at no', /^ {6}urgent:\n {8}description: .+\n {8}type: boolean\n {8}default: false$/m.test(DEPLOY));
+ok('…and arrives as data, never pasted into the script', (JOBS['browser-gate'] || '').includes('URGENT: ${{ inputs.urgent }}'));
+ok('…and an urgent release still needs the fast checks, the walls between studios and the database changes', /^ {4}needs: \[test, browser-gate, isolation, ledger-gate\]$/m.test(JOBS['deploy-production'] || '') && !/urgent/.test((JOBS.test || '') + (JOBS.isolation || '') + (JOBS['ledger-gate'] || '')));
 const flaky = await gate(['FAIL', 'FAIL', 'completed success']);
 ok('a failed read of the checks is tried again', flaky.code === 0 && flaky.calls.length === 3 && flaky.log.includes("Couldn't read the checks"));
 const forever = await gate(['in_progress '], { WAIT_MINUTES: '0' });
@@ -187,6 +195,37 @@ lg = await ledgerGate('0259', '201', '[]');
 ok('a commit whose newest change is from before the ledger asks nothing', lg.exit === 0 && lg.calls.length === 0 && lg.log.includes('from before the ledger'));
 ok('the answer\'s body never reaches the log', !lg.log.includes('unexpected'));
 await Deno.remove(ldir, { recursive: true });
+
+// ── Builder item 418: the rollback can put back the version that is live (`live`) ──
+const WHICH = ROLLBACK.match(/id: which\n[\s\S]*?run: \|\n((?: {10}.*\n|\n)+)/)?.[1].replace(/^ {10}/gm, '');
+ok('the rollback\'s choice of commit is found', !!WHICH);
+const wdir = await Deno.makeTempDir({ prefix: 'rollback-which-test-' });
+await Deno.writeTextFile(`${wdir}/which.sh`, WHICH || 'exit 9');
+await Deno.writeTextFile(`${wdir}/gh`, `#!/bin/bash
+echo "$*" >> "${wdir}/calls"
+case "$*" in *deploy.yml/runs*) cat "${wdir}/release" ;; *rollback.yml/runs*) cat "${wdir}/undone" ;; esac
+`);
+await Deno.chmod(`${wdir}/gh`, 0o755);
+async function which(asked, release, undone) {
+  await Deno.writeTextFile(`${wdir}/release`, release); await Deno.writeTextFile(`${wdir}/undone`, undone);
+  await Deno.writeTextFile(`${wdir}/out`, ''); await Deno.remove(`${wdir}/calls`).catch(() => {});
+  const { code, stdout } = await new Deno.Command('bash', {
+    args: ['-e', `${wdir}/which.sh`], stdout: 'piped', stderr: 'null', clearEnv: true,
+    env: { PATH: `${wdir}:${Deno.env.get('PATH')}`, GH_TOKEN: 't', REPO: 'owner/repo', ASKED: asked, GITHUB_OUTPUT: `${wdir}/out` },
+  }).output();
+  return { code, log: new TextDecoder().decode(stdout), out: (await Deno.readTextFile(`${wdir}/out`)).trim(), calls: (await Deno.readTextFile(`${wdir}/calls`).catch(() => '')).trim() };
+}
+const LIVE = 'd'.repeat(40);
+let w = await which('abc1234', '', '');
+ok('a commit given by hand is used as it is, asking GitHub nothing', w.code === 0 && w.out === 'ref=abc1234' && !w.calls);
+w = await which('live', `${LIVE} 2026-11-22T16:33:00Z`, '2026-11-20T10:00:00Z');
+ok('live: the commit the last green release shipped', w.code === 0 && w.out === `ref=${LIVE}` && w.log.includes('live is dddddddd'), w.log.trim());
+w = await which('live', `${LIVE} 2026-11-22T16:33:00Z`, '2026-11-22T17:00:00Z');
+ok('live, when a rollback went out after that release: refuses and asks for the commit', w.code === 1 && w.log.includes('A rollback went out after the last release') && !w.out);
+w = await which('live', ' ', '');
+ok('live, with no green release to read: refuses', w.code === 1 && w.log.includes('No green release was found'));
+ok('the rollback checks out the commit it chose', ROLLBACK.includes('ref: ${{ steps.which.outputs.ref }}') && /ASKED: \$\{\{ github\.event\.inputs\.ref \}\}/.test(ROLLBACK));
+await Deno.remove(wdir, { recursive: true });
 
 // ── Every function, deployed and rolled back ─────────────────────────────────
 const FUNCTIONS = new URL('supabase/functions/', ROOT);

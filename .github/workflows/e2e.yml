@@ -126,7 +126,7 @@ jobs:
               docs/*|supabase/*|runbooks/*|sql/*|templates/*) ;;
               tests/isolation/*|tests/presence/*|tests/smoke/*|tests/workflows/*) ;;
               .github/workflows/ci.yml|.github/workflows/deploy.yml|.github/workflows/rollback.yml|.github/workflows/schema-dump.yml) ;;
-              .github/workflows/uptime.yml|.github/workflows/rehearsal.yml) ;;
+              .github/workflows/uptime.yml|.github/workflows/rehearsal.yml|.github/workflows/storage-copy.yml|.github/workflows/restore-drill.yml|.github/workflows/publish-journey.yml) ;;
               # Any other folder runs. Root-level .md and .sql don't, but one inside an asset
               # folder would reach dist/ and trip build-public.sh, which a spec runs.
               */*) run=true ;;

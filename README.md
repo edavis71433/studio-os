@@ -94,7 +94,7 @@ Live in production. New work lands through pull requests, and the server ships o
 
 ## A note on what's public
 
-This repository contains the application source, schema migrations, and published policy documents. Secrets live in environment variables and are never committed; `docs/SECRETS-INVENTORY.md` lists which variables exist without their values. The Supabase keys visible in client code are anonymous publishable keys, which are safe by design — access is enforced by row-level security, not by key secrecy.
+This repository contains the application source, schema migrations, and published policy documents. Secrets live in environment variables and are never committed; `docs/presence/ENV-AND-SECRETS.md` lists which variables exist without their values, and `docs/RUN-SHEET.md` says how to run, release, restore and change them. The Supabase keys visible in client code are anonymous publishable keys, which are safe by design — access is enforced by row-level security, not by key secrecy.
 
 ---
 

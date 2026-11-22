@@ -2,15 +2,20 @@ name: Rollback Functions
 
 # Manual, confirmation-gated rollback. The edge functions are STATELESS, so
 # rolling back = redeploying a known-good git ref. Production requires a typed
-# confirmation phrase. This never touches the database — MIGRATION rollback is
-# intentionally manual (apply the target migration's `-- rollback:` inverse via
-# the hold-back technique; see docs/presence/DEPLOYMENT-AND-OPERATIONS.md).
+# confirmation phrase. This never touches the database: database changes only add,
+# so an older server runs on a newer database, and taking one back is a hand step
+# (its migration's `-- rollback:` line; docs/RUN-SHEET.md, "Undo a release").
+#
+# Builder item 418: `ref` may be `live`, which puts back the version the last green
+# release shipped: the drill that proves this workflow works, with nothing changing for
+# anyone. And (item 400) once scripts/pages-go-live.txt says "release", the pages go back
+# with the functions.
 
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Git ref (commit SHA or tag, e.g. v1.0.0-rc1) to redeploy — the known-good version"
+        description: "The commit to put back (a SHA or tag), or live for the version the last green release shipped"
         required: true
       confirm:
         description: "Type rollback-production to roll back PRODUCTION"
@@ -36,6 +41,10 @@ concurrency:
 jobs:
   rollback:
     runs-on: ubuntu-latest
+    # actions: read finds the last green release, for `live`.
+    permissions:
+      contents: read
+      actions: read
     steps:
       # The typed inputs arrive as data, never pasted into a script.
       - name: Confirmation gate
@@ -46,9 +55,35 @@ jobs:
             echo "A rollback requires the confirmation phrase 'rollback-production'. Aborting."; exit 1
           fi
 
+      # Builder item 418: `live` is the head commit of the newest green release. A rollback
+      # that went out after that release means `live` can't be read from the release list,
+      # so it asks for the commit instead.
+      - name: Which commit to put back
+        id: which
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ASKED: ${{ github.event.inputs.ref }}
+        run: |
+          if [ "$ASKED" != live ]; then
+            echo "ref=$ASKED" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          release=$(gh api "repos/$REPO/actions/workflows/deploy.yml/runs?status=success&per_page=1" --jq '.workflow_runs[0] | "\(.head_sha) \(.updated_at)"' 2>/dev/null || true)
+          undone=$(gh api "repos/$REPO/actions/workflows/rollback.yml/runs?status=success&per_page=1" --jq '.workflow_runs[0].updated_at // empty' 2>/dev/null || true)
+          sha=${release%% *}; at=${release#* }
+          if ! printf '%s' "$sha" | grep -qE '^[0-9a-f]{40}$'; then
+            echo "::error title=Rollback::No green release was found to put back. Give the commit instead of live."; exit 1
+          fi
+          if [ -n "$undone" ] && [[ "$undone" > "$at" ]]; then
+            echo "::error title=Rollback::A rollback went out after the last release, so what is live isn't that release's commit. Give the commit instead of live."; exit 1
+          fi
+          echo "live is ${sha:0:8}, the commit the last green release shipped ($at)."
+          echo "ref=$sha" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.ref }}
+          ref: ${{ steps.which.outputs.ref }}
 
       # Production is the only project releases go to (item 112, Nov 9 2026: the staging jobs went;
       # the staging project runs only the watchdog).
@@ -103,3 +138,23 @@ jobs:
           code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$base/ai-visibility" -H "Content-Type: application/json" -d '{"business_name":"Smoke Test","city":"Burbank"}')
           [ "$code" = "403" ] || { echo "ai-visibility expected 403 without a Turnstile token, got $code"; exit 1; }
           echo "Free Tools smoke passed (tool-report 404, send-lead-alert 401, site-review and ai-visibility 403 without Turnstile)."
+
+      # Builder item 400: the pages go back too, once the release publishes them
+      # (scripts/pages-go-live.txt says "release"). The scripts come from main, since an older
+      # commit may not have them; the pages are built from the commit being put back.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-tools
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Put the pages back too
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
+        run: |
+          sha=$(git rev-parse HEAD)   # the commit checked out above
+          bash main-tools/scripts/publish-pages.sh "$sha" "$PWD"
+          cd main-tools && bash scripts/pages-live.sh "$sha" rollback

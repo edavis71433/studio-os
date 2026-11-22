@@ -74,3 +74,11 @@ jobs:
         run: deno run --allow-read --allow-write --allow-run --allow-env --allow-net tests/workflows/uptime_test.mjs
       - name: The database changes rehearsal's shape (every pull request, no secrets, the release's own question)
         run: deno run --allow-read tests/workflows/rehearsal_test.mjs
+      - name: The pages (the Netlify skip rule, the release's own upload, the live pages check; real scripts, stand-in Netlify)
+        run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/pages_release_test.mjs
+      - name: The weekly copy of uploaded files (real script, stand-in Supabase, real encryption)
+        run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/storage_copy_test.mjs
+      - name: The restore drill (by hand only; never production, never a project that isn't empty)
+        run: deno run --allow-read --allow-write --allow-run --allow-env tests/workflows/restore_drill_test.mjs
+      - name: The publish journey (designed, switched off, never a production secret)
+        run: deno run --allow-read tests/workflows/publish_journey_test.mjs

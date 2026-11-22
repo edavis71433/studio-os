@@ -135,7 +135,7 @@ ok('/system/run knows the tasks the jobs send', ['gsc_sync', 'ga4_sync'].every((
 ok('clever-api run_scheduled_jobs reads the body secret', /if \(type === 'run_scheduled_jobs'\) \{\s+if \(!SCHEDULER_SECRET \|\| body\.secret !== SCHEDULER_SECRET\)/.test(clever));
 
 // ═══ 9. the docs say where the jobs get the secret ═══
-for (const p of ['docs/presence/ENV-AND-SECRETS.md', 'docs/SECRETS-INVENTORY.md']) {
+for (const p of ['docs/presence/ENV-AND-SECRETS.md', 'docs/RUN-SHEET.md']) {   // builder item 422: the secrets list and the run sheet
   const d = read(p);
   ok(`${p}: names the Vault entry, no longer "embedded in the pg_cron job body"`, d.includes('presence_scheduler_secret') && !/embedded in the pg_cron job body/.test(d));
 }

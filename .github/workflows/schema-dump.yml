@@ -1,15 +1,19 @@
-name: Schema dump (one-time provisioning foundation)
+name: Schema copy (weekly, encrypted)
 
-# Runs ONLY when you click "Run workflow" in the Actions tab.
-# Produces a schema-ONLY dump of production (structure, no business data)
-# as a downloadable artifact. Nothing is committed to the repo.
+# A schema-ONLY dump of production (structure, no business data) as a downloadable
+# artifact. Nothing is committed to the repo. Builder item 415 (Nov 22 2026): it runs
+# every week again, beside the copy of the uploaded files (storage-copy.yml), and keeps
+# each copy 35 days. It last ran on Jul 5 2026: its passphrase was never set, so every
+# run since would have refused. One passphrase, BACKUP_PASSPHRASE, now opens both copies.
 #
 # This repo is public: anyone signed in to GitHub can download its artifacts and
 # read its run logs. So the artifact is encrypted, and no step may print a line
-# of the dump. Setting the passphrase and decrypting are in
-# docs/runbooks/ENVIRONMENTS.md, step C.
+# of the dump. Setting the passphrase and opening a copy are in docs/RUN-SHEET.md,
+# "Backups".
 
 on:
+  schedule:
+    - cron: "23 9 * * 0"   # Sundays, 1:23 am Pacific
   workflow_dispatch:
 
 # No token needed. There is no checkout on purpose, so no repo code runs beside
@@ -28,11 +32,11 @@ jobs:
     steps:
       - name: Refuse to read production without a passphrase
         env:
-          SCHEMA_DUMP_PASSPHRASE: ${{ secrets.SCHEMA_DUMP_PASSPHRASE }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
           # The ciphertext is public, so a short passphrase could be guessed offline.
-          if [ "${#SCHEMA_DUMP_PASSPHRASE}" -lt 32 ]; then
-            echo "::error::Repo secret SCHEMA_DUMP_PASSPHRASE is missing or under 32 characters. Nothing was read. See docs/runbooks/ENVIRONMENTS.md, step C."
+          if [ "${#BACKUP_PASSPHRASE}" -lt 32 ]; then
+            echo "::error::Repo secret BACKUP_PASSPHRASE is missing or under 32 characters. Nothing was read. See docs/RUN-SHEET.md, \"Backups\"."
             exit 1
           fi
 
@@ -87,11 +91,11 @@ jobs:
 
       - name: Encrypt the dump
         env:
-          SCHEMA_DUMP_PASSPHRASE: ${{ secrets.SCHEMA_DUMP_PASSPHRASE }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
-          openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -salt -pass env:SCHEMA_DUMP_PASSPHRASE -in 00-schema-foundation.sql -out 00-schema-foundation.sql.enc
+          openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -salt -pass env:BACKUP_PASSPHRASE -in 00-schema-foundation.sql -out 00-schema-foundation.sql.enc
           # Prove it opens before anyone relies on it, then drop the plaintext.
-          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -pass env:SCHEMA_DUMP_PASSPHRASE -in 00-schema-foundation.sql.enc | cmp - 00-schema-foundation.sql
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -pass env:BACKUP_PASSPHRASE -in 00-schema-foundation.sql.enc | cmp - 00-schema-foundation.sql
           rm 00-schema-foundation.sql
 
       - name: Upload the encrypted dump (download from the run page)
@@ -100,4 +104,4 @@ jobs:
           name: schema-foundation-encrypted
           path: 00-schema-foundation.sql.enc
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 35
