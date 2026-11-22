@@ -38,6 +38,7 @@ interface RoomState {
   draftHash: string;               // M9: the M3 version token for optimistic locking
   blockers: number; warnings: number;
   blockerList: { field: string; message: string; at?: { page: string; index: number } }[];   // the same validation, by name, for the publish page
+  warningList: { field: string; message: string; at?: { page: string; index: number } }[];   // item 275: what can publish but deserves a look, by name
   changes: ReturnType<typeof describeChanges>;
   lastLive: { id: string; created_at: string; completed_at: string | null; actor_kind: string } | null;
   lastAny: { status: string } | null;
