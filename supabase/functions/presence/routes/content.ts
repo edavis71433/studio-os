@@ -451,7 +451,7 @@ async function singleton(req: Request, db: SiteDb, site: SiteRow, principal: Pri
 export const handleLocation = (req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>) =>
   singleton(req, db, site, principal, cors, {
     table: 'presence_locations', entityType: 'location', noun: 'address & hours', fields: LOCATION_FIELDS,
-    select: 'id,address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note,updated_at,' + PLACE_SETTINGS_COLS + ',' + GOES_LOCATION_COLS,
+    select: 'id,address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note,updated_at,' + PLACE_SETTINGS_COLS + ',' + GOES_SETTINGS_COLS,
     conflict: 'site_id', summary: 'Updated hours & location',
   });
 
@@ -486,10 +486,10 @@ const ICON_SETTINGS_COLS = 'icon_media_id';
 // The 0255 column on presence_locations (builder list item 334's "We go to our customers").
 // Business details shows the switch only when a read returns it, so before the pack the
 // switch stays hidden and every other field reads and saves as before.
-const GOES_LOCATION_COLS = 'goes_to_customers';
+const GOES_SETTINGS_COLS = 'goes_to_customers';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-const OPTIONAL_SETTINGS_COLS = [GOES_LOCATION_COLS, ICON_SETTINGS_COLS, PLACE_SETTINGS_COLS, BLOG_SETTINGS_COLS, SIGNER_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+const OPTIONAL_SETTINGS_COLS = [GOES_SETTINGS_COLS, ICON_SETTINGS_COLS, PLACE_SETTINGS_COLS, BLOG_SETTINGS_COLS, SIGNER_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;
