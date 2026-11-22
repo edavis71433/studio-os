@@ -52,7 +52,8 @@ jobs:
   browser-gate:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    # The browser check takes about 20 minutes; this leaves room for one that starts late.
+    # Since builder item 419 the browser check takes about 15 minutes on eight machines (it
+    # took 52 to 75 before); this leaves room for one that starts late or waits in a queue.
     timeout-minutes: 90
     permissions:
       checks: read
@@ -69,9 +70,9 @@ jobs:
           give_up=$(( $(date +%s) + ${WAIT_MINUTES:-80} * 60 ))
           while :; do
             # The newest `browser` check from GitHub Actions on this commit, as "status conclusion".
-            # That job starts only once every device has finished, about 25 minutes in, so until
-            # then a device job ("browser on mobile" and the others) shows the check is under way:
-            # "devices". Empty when neither has started yet.
+            # That job starts only once every part of every device has finished, about 15 minutes
+            # in, so until then a device job ("browser on mobile (1 of 3)" and the others) shows
+            # the check is under way: "devices". Empty when neither has started yet.
             state=$(gh api "repos/$REPO/commits/$SHA/check-runs?filter=latest&per_page=100" \
               --jq '[.check_runs[] | select(.app.slug == "github-actions")] | ([.[] | select(.name == "browser")] | sort_by(.started_at) | last) as $v | if $v != null then "\($v.status) \($v.conclusion // "")" elif any(.[]; .name | startswith("browser on ")) then "devices" else empty end') || state=unreadable
             case "$state" in
