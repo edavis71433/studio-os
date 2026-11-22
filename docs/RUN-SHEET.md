@@ -14,7 +14,7 @@ The one page for running Studio OS: how a release goes out, how to undo one, how
 
 Release in batches, a few times a day (morning, early afternoon, evening Pacific are good times), not after every merge. Each release carries everything merged before it, and its summary lists those commits.
 
-1. Merge the pull requests for the batch. Each merge runs the fast checks and the browser check on main: about 20 minutes since builder item 419 (it was 52 to 75).
+1. Merge the pull requests for the batch. Each merge runs the fast checks and the browser check on main: about 25 minutes since builder item 419 (it was 52 to 75).
 2. Apply any database changes the batch carries, **before** releasing (next section but one). The release checks, and stops if one is missing.
 3. Start it: Actions, "Deploy Edge Functions", Run workflow, type `deploy-production`. Or: `gh workflow run deploy.yml --repo edavis71433/studio-os --ref main -f confirm=deploy-production`.
 4. The release runs the fast checks again, the walls between studios on a scratch database, waits for main's browser check, and asks production whether it has the newest database change in the code. Any one red: nothing is deployed, and the run says why.
