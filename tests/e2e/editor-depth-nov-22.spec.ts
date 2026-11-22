@@ -27,11 +27,12 @@ type Win = Window & Record<string, (...a: unknown[]) => unknown>;
 const run = (page: Page, code: string) => page.evaluate((c) => (0, eval)(c), code);
 const order = (frame: Frame) => frame.locator('#main > section').evaluateAll((ns) => ns.map((n) => n.id || n.className.split(' ')[0])).catch(() => null);   // null while a redraw replaces the document
 // the page's sections, with the menu, and FAQ/About drawn for their addresses (item 314)
-async function mountDepth(page: Page, opts: { settings?: Record<string, unknown>; api?: Record<string, unknown> } = {}): Promise<Mounted & { pages: string[] }> {
+async function mountDepth(page: Page, opts: { settings?: Record<string, unknown>; api?: Record<string, unknown>; missing?: string[] } = {}): Promise<Mounted & { pages: string[] }> {
   const pages: string[] = [];
   const m = await mountCanvas(page, { settings: opts.settings, beforeGoto: async (p) => {
     await p.route('**/functions/v1/presence/preview**', (route: Route) => {
       const pg = new URL(route.request().url()).searchParams.get('page') || '/'; pages.push(pg);
+      if ((opts.missing || []).includes(pg)) return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'page_not_found', message: 'No page at ' + pg + '.' }) });   // item 297: not drawn until it has something
       const body = pg === '/about/' ? PAGE(ABOUT, NAV) : pg === '/faq/' ? PAGE(FAQ, NAV) : PAGE(SECTIONS, NAV);
       return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body });
     });
@@ -269,6 +270,23 @@ test.describe('314: every page on the canvas', () => {
     await expect(page.locator('#btnUndo')).toBeEnabled();                              // and it is a step
   });
 
+  test('an FAQ page with no questions yet (not drawn, item 297) says so on the canvas, and its button opens the Questions card', async ({ page }) => {
+    await mountDepth(page, { missing: ['/faq/'] });
+    await run(page, 'dcSwitchPage("~faq")');
+    await expect(page.locator('#dcPageName')).toHaveText('FAQ');
+    const note = page.locator('#designPreviewEmpty');
+    await expect(note).toBeVisible();
+    await expect(note.locator('#dpEmptyTitle')).toHaveText('Your FAQ page isn’t on your site yet.');
+    await expect(note).not.toContainText('couldn’t load');
+    await pressButton(note.getByRole('button', { name: 'Add a question →' }));
+    await expect(page.locator('#settingsPanel')).toHaveAttribute('data-mode', 'core');
+    await expect(page.locator('#settingsPanel #view-faqs')).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(/dc-edit/);
+    await page.locator('#btnSettingsClose').click();
+    await run(page, 'dcSwitchPage("")');   // back on Home the note goes and the page is drawn
+    await expect(note).toBeHidden();
+  });
+
   test('a built-in page takes no sections; the dock’s Add says why', async ({ page }) => {
     const { puts } = await mountDepth(page);
     await run(page, 'dcSwitchPage("~about")');
@@ -305,6 +323,31 @@ test.describe('315: the list sections are item cards', () => {
     await card.getByRole('button', { name: 'Remove feature 1' }).click();
     await expect.poll(() => puts.length).toBe(n + 2);
     expect((lastPut(puts) as { blocks?: Array<typeof FEATURES> }).blocks?.[3].items).toEqual([{ title: 'Fast', text: 'Very fast' }]);
+  });
+
+  test('a feature card picks one of the line icons (or None, or a typed emoji); the folded lines keep the icon grid', async ({ page }) => {
+    const { puts } = await mountDepth(page);
+    await page.route('**/functions/v1/presence/preview/section', (route: Route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { html: FEATURES2 } }) }));
+    await run(page, 'eeEditBlock(3)');
+    const card = page.locator('#blocksCard .rw-card').first();
+    const now = card.locator('.rw-icon-now');
+    await expect(now).toHaveText('Add an icon');
+    if (touchScreen()) expect((await now.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await pressButton(now);
+    const star = page.locator('#blocksCard .rw-card').first().getByRole('button', { name: 'Star', exact: true });
+    await expect(star).toBeVisible();
+    if (touchScreen()) expect((await star.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await pressButton(star);
+    await expect(page.locator('#blocksCard .rw-card').first().locator('.rw-icon-now')).toHaveText('Star');
+    await expect.poll(() => puts.length).toBeGreaterThanOrEqual(1);
+    expect((lastPut(puts) as { blocks?: Array<{ items: Array<{ icon?: string }> }> }).blocks?.[3].items[0].icon).toBe('icon:star');
+    const n = puts.length;
+    await pressButton(page.locator('#blocksCard .rw-card').first().locator('.rw-icon-now'));
+    await pressButton(page.locator('#blocksCard .rw-card').first().getByRole('button', { name: 'None', exact: true }));
+    await expect.poll(() => puts.length).toBe(n + 1);
+    expect((lastPut(puts) as { blocks?: Array<{ items: Array<{ icon?: string }> }> }).blocks?.[3].items[0].icon).toBeUndefined();
+    await page.locator('#blocksCard .rw-fold summary').click();
+    await expect(page.locator('#blocksCard .rw-fold .ins-icons .ins-icon')).toHaveCount(24);   // the lines box keeps item 304's grid
   });
 
   test('a Table is a grid of cells with a row and a column to add', async ({ page }) => {

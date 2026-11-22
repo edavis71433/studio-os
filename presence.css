@@ -788,7 +788,8 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 .rw-icon{display:flex;flex-direction:column;gap:6px}
 .rw-icon-now{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 12px;border:1px solid var(--hair);border-radius:999px;background:var(--sheet);color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
 .rw-icon-now[aria-expanded="true"]{border-color:var(--plum);color:var(--plum)}
-.rw-icon-pic{display:inline-flex;font-size:16px;line-height:1}
+.rw-icon-pic{display:inline-flex;font-size:16px;line-height:1;color:var(--rw-accent,var(--plum))}
+.rw-icon .ins-icon:not(.rw-icon-none){color:var(--rw-accent,var(--plum))}
 .ins-icon[aria-pressed="true"]{border-color:var(--plum);box-shadow:0 0 0 2px var(--plum-soft)}
 .rw-icon-none{font-size:12px;font-weight:600;color:var(--ink-2)}
 @media (pointer:coarse){.rw-icon-now{min-height:44px}}

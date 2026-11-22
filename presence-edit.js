@@ -3148,7 +3148,8 @@ function rwIconPick(r, k, one, put, again) {
   const open = RW_ICON_OPEN === r;
   const btn = el("button", "rw-icon-now"); btn.type = "button"; btn.setAttribute("aria-expanded", String(open));
   btn.setAttribute("aria-label", "Icon for " + one + " " + (k + 1) + ": " + (line ? (ICON_WORDS[line] || line) : cur ? cur : "none") + ". Press to change it");
-  if (line && LINE_ICONS[line]) { const i = el("span", "rw-icon-pic"); i.style.color = accent; i.innerHTML = svg(line, 20); btn.appendChild(i); }
+  wrap.style.setProperty("--rw-accent", accent);   // the line icons draw in the site's accent colour
+  if (line && LINE_ICONS[line]) { const i = el("span", "rw-icon-pic"); i.innerHTML = svg(line, 20); btn.appendChild(i); }
   else if (cur) btn.appendChild(el("span", "rw-icon-pic", cur));
   btn.appendChild(el("span", null, line ? (ICON_WORDS[line] || line) : cur ? "Emoji" : "Add an icon"));
   btn.addEventListener("click", () => { RW_ICON_OPEN = open ? null : r; again(); });
@@ -3159,7 +3160,7 @@ function rwIconPick(r, k, one, put, again) {
   const none = el("button", "ins-icon rw-icon-none", "None"); none.type = "button"; none.setAttribute("aria-pressed", String(!cur)); none.addEventListener("click", () => set(""));
   grid.appendChild(none);
   Object.keys(LINE_ICONS).forEach((name) => {
-    const b = el("button", "ins-icon"); b.type = "button"; b.title = ICON_WORDS[name] || name; b.setAttribute("aria-label", ICON_WORDS[name] || name); b.setAttribute("aria-pressed", String(line === name)); b.style.color = accent;
+    const b = el("button", "ins-icon"); b.type = "button"; b.title = ICON_WORDS[name] || name; b.setAttribute("aria-label", ICON_WORDS[name] || name); b.setAttribute("aria-pressed", String(line === name));
     b.innerHTML = svg(name, 22);
     b.addEventListener("click", () => set("icon:" + name));
     grid.appendChild(b);
@@ -3179,7 +3180,7 @@ function renderTableBlockBody(blk, idx, sub, ti) {
   rows.forEach((r) => { while (r.length < cols) r.push(""); });
   const put = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "table", title: ti.value.trim(), headers: headers.map((h) => h.trim()), rows: rows.map((r) => r.map((c) => c.trim())) }); };
   const again = () => { put(); renderBlocksCard(); dcLiveFromPanel(); };
-  const grid = el("div", "rw-table"); grid.style.gridTemplateColumns = "repeat(" + cols + ",minmax(96px,1fr)) 36px";
+  const grid = el("div", "rw-table"); grid.style.setProperty("grid-template-columns", "repeat(" + cols + ",minmax(96px,1fr)) 36px");
   const cell = (val, label, onChange, head) => {
     const inp = el("input"); inp.type = "text"; inp.value = val; inp.maxLength = head ? 80 : 200; inp.setAttribute("aria-label", label); inp.style.cssText = RW_IN + (head ? ";font-weight:600" : "");
     inp.addEventListener("change", () => { onChange(inp.value); put(); });
@@ -7276,7 +7277,7 @@ function dcFloatClear(doc, node, bar, gap) {
   else if (r.top - h - g >= 4) { y = r.top - h - g; right = true; }
   else y = r.bottom + g;
   const x = Math.max(sx + 8 + ins.left, Math.min((right ? r.right - w : r.left - 6) + sx, sx + vw - ins.right - w - 8));
-  bar.style.left = x + "px"; bar.style.top = (y + sy) + "px";
+  bar.style.setProperty("left", x + "px"); bar.style.setProperty("top", (y + sy) + "px");
 }
 // ── Builder item 316: one small bar on every piece of text ──
 // Words with formatting (a text box, a card's words) get bold, italic, a link, heading, list
@@ -7397,7 +7398,7 @@ function ipeShowBar(doc, el2) {
     if (open) {
       const sw = (hex, aria) => {
         const b2 = doc.createElement('button'); b2.type = 'button'; b2.className = 'ipe-sw' + ((st.text_color || '') === hex ? ' ipe-on' : '') + (hex ? '' : ' ipe-none');
-        if (hex) b2.style.background = hex;
+        if (hex) b2.style.setProperty("background", hex);
         b2.setAttribute('aria-label', aria); b2.title = aria;
         b2.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); ipeStyle({ text_color: hex }); });
         return b2;
@@ -7410,7 +7411,7 @@ function ipeShowBar(doc, el2) {
   // item 319: clear of the heading above; on a phone the bar takes the foot of the page, over the
   // dock, where it covers no words at all (its ten buttons would wrap to three rows up there)
   bar.classList.toggle('ipe-foot', window.innerWidth <= 760);
-  if (window.innerWidth > 760) dcFloatClear(doc, el2, bar); else { bar.style.left = ''; bar.style.top = ''; }
+  if (window.innerWidth > 760) dcFloatClear(doc, el2, bar); else { bar.style.removeProperty("left"); bar.style.removeProperty("top"); }
 }
 function ipeHideBar(doc) { try { const b = doc.getElementById('dds-ipe-bar'); if (b) b.classList.remove('on'); } catch (_) {} }
 // Direct Range wrapping (execCommand is deprecated): wrap the selection in
