@@ -94,7 +94,7 @@ export interface RetainerCharge { amount_cents: number; paid_at: string; custome
 /** Money that went back (sales items 126, 127): a refund made in Stripe or a dispute lost,
  *  on the day it happened, or Stripe's dispute fee, on the day Stripe took it. `what` is
  *  the invoice's or the retainer's name; `invoice_no` its number ('' for a retainer). */
-export interface MoneyBack { kind: 'refund' | 'dispute' | 'fee'; amount_cents: number; at: string; customer: string; invoice_no: string; what: string; bank?: boolean }
+export interface MoneyBack { kind: 'refund' | 'dispute' | 'fee'; amount_cents: number; at: string; customer: string; invoice_no: string; what: string; bank?: boolean; by_hand?: string }   // by_hand: how money given back by hand went (sales item 165)
 /** Stripe's side of a payment it took: its fee, and the day the payout carrying it
  *  arrived ('' while it hasn't). lib/stripe_ledger.ts stripeSide makes one. */
 export interface StripeSide { fee_cents: number; paid_out_on: string }
@@ -137,7 +137,7 @@ export function paymentExportRows(items: BookRow[], retainers: RetainerCharge[],
     const day = localYmd(r.at, tzo);
     if (!inPeriod(day, p) || !(r.amount_cents > 0)) continue;
     const label = r.kind === 'refund' ? 'Refund' : r.kind === 'dispute' ? 'Dispute lost' : 'Stripe dispute fee';
-    const how = r.kind === 'refund' ? 'Refunded through Stripe' : r.kind === 'dispute' ? (r.bank ? 'Bank dispute, through Stripe' : 'Card dispute, through Stripe') : 'Stripe fee';
+    const how = r.kind === 'refund' ? (r.by_hand ? `Given back by ${PAY_METHOD_LABEL[r.by_hand as PayMethod] ? PAY_METHOD_LABEL[r.by_hand as PayMethod].toLowerCase() : r.by_hand}` : 'Refunded through Stripe') : r.kind === 'dispute' ? (r.bank ? 'Bank dispute, through Stripe' : 'Card dispute, through Stripe') : 'Stripe fee';
     rows.push({ at: r.at, cents: -r.amount_cents, row: [usDate(day), r.customer || 'Customer', r.invoice_no, `${label}: ${r.what || 'Invoice'}`.slice(0, 200), how, dollars(-r.amount_cents), '', dollars(-r.amount_cents), '', ''] });   // ten columns: no fee of its own, kept = the minus amount, never paid out
   }
   rows.sort((a, b) => a.at.localeCompare(b.at));

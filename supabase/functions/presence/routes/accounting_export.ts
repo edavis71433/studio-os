@@ -24,6 +24,7 @@ import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any)?.json) ? (r as any).json : []) as any[];
+const HAND = new Set(['check', 'cash', 'bank_transfer', 'zelle', 'other']);   // sales item 165: money given back by hand, in payments.csv under how it went
 
 // ── Sales item 133: what reached the bank ─────────────────────────────────────
 // Stripe's fee on each payment it took, the day the payout carrying it arrived, and
@@ -111,7 +112,7 @@ export async function handleAccountingExport(req: Request, site: SiteRow, princi
     return { customer: (d && (clientOf.get(String(d.converted_client_id || '')) || personOf.get(String(d.contact_id || '')))) || '', invoice_no: '', what: `Retainer${d && d.title ? ': ' + d.title : ''}` };
   };
   const back: MoneyBack[] = [
-    ...backs.map((b) => ({ kind: b.kind, amount_cents: b.amount_cents, at: b.paid_at, bank: b.bank, ...backOf(b) })),
+    ...backs.map((b) => ({ kind: b.kind, amount_cents: b.amount_cents, at: b.paid_at, bank: b.bank, ...(b.kind === 'refund' && HAND.has(b.method) ? { by_hand: b.method } : {}), ...backOf(b) })),
     ...fees.map((f) => ({ kind: 'fee' as const, amount_cents: f.amount_cents, at: f.paid_at, ...backOf(f) })),
   ];
   // sales item 133: Stripe's fees and payouts; a Stripe that can't be read downloads nothing, like the rest

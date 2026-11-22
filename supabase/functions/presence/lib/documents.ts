@@ -98,7 +98,7 @@ export interface DocContext {
   pdfName?: string | null;         // the file name it downloads as
   payments?: DocPayment[] | null;  // part payments recorded toward this invoice
   forWhat?: string | null;         // the deal it bills ("Website refresh")
-  returned?: Array<{ cents: number; at: string | null; kind: string }> | null;   // sales item 145: each refund or lost dispute on it, with its day
+  returned?: Array<{ cents: number; at: string | null; kind: string; method?: string }> | null;   // sales item 145: each refund or lost dispute on it, with its day; item 165: how, when given back by hand
 }
 /** Sales item 145 (Nov 22 2026 review): what a paid invoice's page and PDF say when money went
  *  back after it. The row stays `paid` and carries refunded_cents and dispute_status (APPLY-0233);
@@ -114,7 +114,9 @@ export function invoiceReturnWords(v: any, ctx?: DocContext | null): { state: 'r
   const returns = (Array.isArray(ctx?.returned) ? ctx!.returned! : []).filter((r) => r && Number(r.cents) > 0);
   const latest = returns.slice().sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')))[returns.length - 1] || null;
   const day = latest?.at ? dayLabel(latest.at, tz) : '';
-  const on = day ? ` on ${day}` : '';
+  // sales item 165: money given back by hand says how ("refunded by check on Nov 20")
+  const how = latest && latest.kind === 'refund' ? payMethodWords(latest.method) : '';
+  const on = (how && how !== 'online' ? ` ${how}` : '') + (day ? ` on ${day}` : '');
   if (dispute === 'lost') return { state: 'lost', pill: 'Dispute lost', line: `The payment went back to you through a dispute${on}.`, note: `This payment was returned to you through a dispute${on}. This document is your record of the invoice and of that.` };
   if (dispute === 'open') return { state: 'disputed', pill: 'Disputed', line: 'This payment is under dispute with your card company or bank.', note: 'This payment is under dispute with your card company or bank. Until that closes, this document is your record of the invoice.' };
   const paidTotal = Math.round(Number(v?.amount_cents) || 0) + (Array.isArray(ctx?.payments) ? ctx!.payments! : []).reduce((n, p) => n + Math.max(0, Math.round(Number(p?.amount_cents) || 0)), 0);

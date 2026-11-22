@@ -233,7 +233,8 @@ const pinned = (c, site) => c.query.includes(`site_id=eq.${site}`) || c.body?.si
     // sales item 87 (0175): the recipes are automations, so they need configure like the switches above
     'auto_ack_message', 'enquiry_followups', 'enquiry_followup_1_days', 'enquiry_followup_2_days', 'enquiry_followup_1_message', 'enquiry_followup_2_message', 'invoice_overdue_repeat', 'quote_expiry_reminders',
     // sales item 88 (0176): who signs agreements for the studio
-    'signs_as_name', 'signs_as_title'];
+    'signs_as_name', 'signs_as_title',
+    'invoice_reminders_asked'];   // sales item 166 (0246): the reminders question, answered once; a setting like the switch it belongs to
   ok('fields: the settings field list was read', FIELDS_IN_SOURCE.length >= 25, FIELDS_IN_SOURCE.join(','));
   ok('fields: every settings field is on one side, and the audited split still holds',
     FIELDS_IN_SOURCE.every((f) => SETTINGS_CONTENT_FIELDS.has(f) !== CONFIG.includes(f)), FIELDS_IN_SOURCE.filter((f) => SETTINGS_CONTENT_FIELDS.has(f) === CONFIG.includes(f)).join(','));

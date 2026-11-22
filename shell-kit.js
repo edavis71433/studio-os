@@ -370,7 +370,23 @@
   }
   var DATE = { parse: toDate, ymd: ymd, days: days, short: short, day: day, time: time, ago: ago, since: since };
 
-  window.ddsKit = { api: api, toast: toast, confirm: confirmBox, ask: askBox, money: money, date: DATE };
+  // ── "Remind them if it isn't paid?" asked once (sales item 166) ─────────────
+  // The first send of an invoice with reminders off answers ask_reminders: true. The page
+  // calls this; the answer either way is written (invoice_reminders_asked), so it is asked
+  // once per studio. `scope` is the page's ?client= business, when it has one.
+  //   ddsAskReminders(scope) → Promise<boolean>  (true when reminders were switched on)
+  function askReminders(scope) {
+    return confirmBox({ title: 'Remind them if it isn’t paid?', text: 'A friendly email a week before the due date, on the due date, and two days after. You can change this any time under Settings, Automations.', yes: 'Yes, remind them', no: 'No thanks' })
+      .then(function (yes) {
+        var body = yes ? { invoice_reminders: true, invoice_reminders_asked: true } : { invoice_reminders_asked: true };
+        return api('/settings', { method: 'PUT', body: body, scope: scope || '' }).then(function (r) {
+          if (yes) toast(r.ok ? 'Reminders are on for every unpaid invoice.' : 'Couldn’t switch reminders on just now. Settings, Automations has the switch.', r.ok ? 'ok' : 'err');
+          return !!(yes && r.ok);
+        }, function () { return false; });
+      });
+  }
+  window.ddsAskReminders = askReminders;
+  window.ddsKit = { api: api, toast: toast, confirm: confirmBox, ask: askBox, money: money, date: DATE, askReminders: askReminders };
   window.ddsApi = api;
   window.ddsToast = toast;
   window.ddsConfirm = confirmBox;

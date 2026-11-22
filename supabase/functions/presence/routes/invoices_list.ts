@@ -15,6 +15,12 @@ import { invoiceNo } from '../lib/documents.ts';
 import { callerToday } from '../lib/sales_lifecycle.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any)?.json) ? (r as any).json : []) as any[];
+/** Sales item 170: a customer's name printed twice when the business and the person were the
+ *  same words. The person is dropped when it is the business, ignoring case and spacing. Pure. */
+export function oneName(business: string, person: string): string {
+  const norm = (x: string) => x.toLowerCase().replace(/\s+/g, ' ').trim();
+  return business && person && norm(business) === norm(person) ? '' : person;
+}
 export const INVOICES_MAX = 2000;
 const PAGE = 500;
 
@@ -30,11 +36,12 @@ export async function handleSalesInvoicesList(req: Request, site: SiteRow, cors:
  *  the export needs: each invoice's lines and its payment note. null = a page couldn't be read
  *  (part of the book is not the book). */
 export async function readInvoiceBook(site: SiteRow, today: string, more = false): Promise<{ items: any[]; partial: boolean } | null> {
-  const base = 'id,title,amount_cents,purpose,status,due_date,paid_at,created_at,deal_id,customer_client_id,stripe_url';
+  const base = 'id,title,description,amount_cents,purpose,status,due_date,paid_at,created_at,deal_id,customer_client_id,stripe_url';
   // number, how it was paid and part payments land with APPLY-0167; processing_since with 0132;
   // what came back through Stripe with APPLY-0233 (sales items 126, 127)
   // sales item 141: first_sent_at and link_gen (APPLY-0188) say whether an invoice ever went out
-  const shapes = [`${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status,first_sent_at,link_gen${more ? ',lines' : ''}`, `${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status${more ? ',lines' : ''}`, `${base},processing_since,number,paid_method,paid_note,payment_for${more ? ',lines' : ''}`, `${base},processing_since`, base];
+  // sales item 162: lines ride along (the page's Change dialog edits them); the export asked for them before
+  const shapes = [`${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status,first_sent_at,link_gen,lines`, `${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status${more ? ',lines' : ''}`, `${base},processing_since,number,paid_method,paid_note,payment_for${more ? ',lines' : ''}`, `${base},processing_since`, base];
   const page = (sel: string, off: number) => svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&select=${sel}&order=created_at.desc,id.desc&limit=${PAGE}&offset=${off}`);
   let sel = shapes[0], r = await page(sel, 0);
   for (let i = 1; !r.ok && i < shapes.length; i++) { sel = shapes[i]; r = await page(sel, 0); }
@@ -74,11 +81,15 @@ export async function readInvoiceBook(site: SiteRow, today: string, more = false
       refunded_cents: Number(i.refunded_cents) || 0, dispute_status: i.dispute_status || null,
       deal_id: i.deal_id || null, deal_title: d ? String(d.title || '') : '',
       business: k ? String(k.name || k.email || '') : (p && p.company ? String(p.company) : ''),
-      person: p ? String(p.name || p.email || '') : '',
+      // sales item 170: the person once, never under a business of the same name
+      person: oneName(k ? String(k.name || k.email || '') : (p && p.company ? String(p.company) : ''), p ? String(p.name || p.email || '') : ''),
+      // sales item 169: the row's menu copies the pay link and sends from here
+      pay_url: i.stripe_url && /^https:\/\//.test(String(i.stripe_url)) ? String(i.stripe_url) : null,
       // sales item 148: the page's Record a payment box offers a receipt only when there is someone to email
       has_email: !!(p && p.email), first: p ? String(p.name || '').trim().split(/\s+/)[0] || '' : '',
       returned: returnedBy.get(String(i.id)) || [],
-      ...(more ? { paid_note: String(i.paid_note || ''), lines: Array.isArray(i.lines) ? i.lines : [] } : {}),
+      note: String(i.description || ''), lines: Array.isArray(i.lines) ? i.lines : [],
+      ...(more ? { paid_note: String(i.paid_note || '') } : {}),
     };
   });
   return { items, partial: all.length >= INVOICES_MAX };
