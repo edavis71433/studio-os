@@ -111,7 +111,9 @@ ok('prod: the verify also counts run history still holding the secret (expect 0)
 
 // ═══ 6. the repo's schedule matches the live names ═══
 const ops = byName('ops');
-ok('ops: the live job names, not presence_ops_*', JSON.stringify(Object.keys(ops).sort()) === JSON.stringify(['presence-cycle', 'presence_ga4_sync', 'presence_gsc_sync']));
+// builder item 404: presence-keep-awake (every 4 minutes, task 'ping', asking for Oregon) joins the schedule; docs/presence/APPLY-keep-awake-prod.sql adds it to production
+ok('ops: the live job names, not presence_ops_*', JSON.stringify(Object.keys(ops).sort()) === JSON.stringify(['presence-cycle', 'presence-keep-awake', 'presence_ga4_sync', 'presence_gsc_sync']));
+ok('ops: the keep-awake job every 4 minutes, a ping that asks for Oregon', ops['presence-keep-awake']?.schedule === '*/4 * * * *' && /'task', 'ping'/.test(ops['presence-keep-awake'].cmd) && /"x-region":"us-west-2"/.test(ops['presence-keep-awake'].cmd));
 ok('ops: same timing as production', ['presence-cycle', 'presence_gsc_sync', 'presence_ga4_sync'].every((n) => ops[n]?.schedule === prod[n]?.schedule));
 ok('ops: same command as production, apart from the project ref', ['presence-cycle', 'presence_gsc_sync', 'presence_ga4_sync'].every((n) => ops[n]?.cmd.replaceAll('<PROJECT_REF>', PROD) === prod[n]?.cmd));
 ok('ops: stops if <PROJECT_REF> was not replaced (the template trap behind dds_product_intelligence)', /if position\('<' in 'https:\/\/<PROJECT_REF>\.supabase\.co'\) > 0 then\s+raise exception/.test(code.ops));

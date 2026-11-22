@@ -12,7 +12,8 @@
 
 import { andList, pillarName, priorityOf, type Check, type Priority } from './checks.ts';
 
-export const NARRATIVE_MODEL = 'claude-haiku-5-5';
+import { SMALL_MODEL } from '../../ai_model.ts';
+export const NARRATIVE_MODEL = SMALL_MODEL;   // builder item 409: the one small model, with the app's own AI
 // $ per token for the cost log (Haiku 5.5: $0.10 / $0.50 per million).
 const PRICE_IN = 0.10 / 1_000_000, PRICE_OUT = 0.50 / 1_000_000;
 

@@ -4,7 +4,8 @@
 // before any of the paid engine calls. Fails open: if the check itself errors,
 // the scan runs (the fuzzy name + city match still guards the counting).
 
-const MODEL = 'claude-haiku-5-5';
+import { SMALL_MODEL } from '../../ai_model.ts';
+const MODEL = SMALL_MODEL;   // builder item 409: the one small model
 const PRICE_IN = 0.10 / 1_000_000, PRICE_OUT = 0.50 / 1_000_000;
 
 const SCHEMA = {
