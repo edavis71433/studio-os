@@ -50,7 +50,7 @@ const onScreen = async (page: Page, sel: string) => page.locator(sel).evaluate((
 });
 
 test.describe('item 154 — the record’s More menu stays on screen', () => {
-  test('the menu hangs from the button’s right edge, every row reads in full, and the page gets no sideways scroll bar', async ({ page }) => {
+  test('the menu hangs from the button and stays on screen, every row reads in full, and the page gets no sideways scroll bar', async ({ page }) => {
     await installApp(page, { api: RECORD_API() });
     await page.goto(`/crm.html?client=${CLIENT}`);
     const more = page.locator('#act-more');
@@ -61,7 +61,10 @@ test.describe('item 154 — the record’s More menu stays on screen', () => {
     const m = await onScreen(page, '#act-menu'), b = await onScreen(page, '#act-more');
     expect(m.right).toBeLessThanOrEqual(m.vw + 0.5);
     expect(m.left).toBeGreaterThanOrEqual(-0.5);
-    expect(Math.abs(m.right - b.right)).toBeLessThanOrEqual(1);   // hung from the button's right edge
+    // hung from the button's right edge; on a phone the button wraps to the left of its row, so the menu hangs from its left edge instead
+    const fromRight = Math.abs(m.right - b.right) <= 1, fromLeft = Math.abs(m.left - b.left) <= 1;
+    expect(fromRight || fromLeft, `menu ${m.left}–${m.right}, button ${b.left}–${b.right}`).toBe(true);
+    if (!fromRight) expect(b.right - (m.right - m.left)).toBeLessThan(8);   // it only switches edges when the right-hung menu would run off the left
     expect(m.sideways).toBe(false);
     // no row is cut: each button's text fits inside its own box
     const cut = await menu.locator('.abtn').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));

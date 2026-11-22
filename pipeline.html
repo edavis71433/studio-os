@@ -3110,7 +3110,9 @@ let ND_CONTACT=null;
 // sales item 105: an empty board's one button is the header's + New deal
 document.addEventListener('click',(e)=>{const x=e.target&&e.target.closest?e.target.closest('[data-first-deal]'):null;if(x){const nd=document.getElementById('newDeal');if(nd)nd.click();}});
 // sales item 153: the stage list (your own stage names) and the How-they-found-you list, drawn when the box opens
-function clearNewDeal(){ $('f-title').value=''; $('f-email').value=''; $('f-name').value=''; $('f-phone').value=''; $('f-value').value=''; $('f-close').value=''; $('f-stage').innerHTML=OPEN_STAGES_LIST.map(s=>`<option value="${s}">${esc(stageLabel(s))}</option>`).join(''); $('f-via').innerHTML=foundOpts(''); }
+// reset() rather than value='' on each field: iPhone Safari keeps a cleared date field invalid after value='', which
+// silently blocks the next submit (the form just focuses the date). A form reset clears that state.
+function clearNewDeal(){ $('dealForm').reset(); $('f-stage').innerHTML=OPEN_STAGES_LIST.map(s=>`<option value="${s}">${esc(stageLabel(s))}</option>`).join(''); $('f-via').innerHTML=foundOpts(''); }
 // "$ 2,500" or "2500.50" → cents; anything unreadable is no value
 const centsOf=(s)=>{const n=Number(String(s||'').replace(/[^0-9.]/g,''));return Number.isFinite(n)&&n>0?Math.round(n*100):0;};
 function openNewDeal(){ ND_CONTACT=null; clearNewDeal(); $('formDlg').showModal(); setTimeout(()=>$('f-title').focus(),20); }

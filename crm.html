@@ -1000,10 +1000,13 @@ function renderActions(){
   host.innerHTML=front.map(render).join('')+(rest.length?`<div class="more"><button type="button" class="abtn" id="act-more" aria-haspopup="true" aria-expanded="false">More ▾</button><div class="more-menu" id="act-menu" hidden>${rest.map(render).join('')}</div></div>`:'');
   btns.forEach(b=>{if(b.on){const el=$(b.id);if(el)el.addEventListener('click',()=>{closeMore();b.on();});}});
   const mb=$('act-more');
-  if(mb)mb.addEventListener('click',(e)=>{e.stopPropagation();const m=$('act-menu');const open=m.hidden;m.hidden=!open;mb.setAttribute('aria-expanded',open?'true':'false');if(open){const f=m.querySelector('button,a');if(f)f.focus();}});
+  if(mb)mb.addEventListener('click',(e)=>{e.stopPropagation();const m=$('act-menu');const open=m.hidden;m.hidden=!open;mb.setAttribute('aria-expanded',open?'true':'false');if(open){placeMore(m);const f=m.querySelector('button,a');if(f)f.focus();}});
 }
 // back: Escape hands focus to the More button when it was inside the menu (B21: the menu hid
 // around the focused item and a keyboard user was left on nothing)
+// sales item 154: the menu hangs from the button's right edge; on a phone the More button can wrap to the left of its row,
+// so when that would run off the left of the screen it hangs from the button's left edge instead (and is nudged back in if even that overflows)
+function placeMore(m){m.style.left='';m.style.right='';const vw=document.documentElement.clientWidth;const r=m.getBoundingClientRect();if(r.left<8){m.style.right='auto';m.style.left='0';const r2=m.getBoundingClientRect();if(r2.right>vw-8)m.style.left=Math.round(vw-8-r2.right)+'px';}}
 function closeMore(back){const m=$('act-menu');const b=$('act-more');if(m&&!m.hidden){const inside=m.contains(document.activeElement);m.hidden=true;if(b){b.setAttribute('aria-expanded','false');if(back===true&&inside)b.focus();}}}
 document.addEventListener('click',()=>closeMore());
 document.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeMore(true);});
