@@ -46,6 +46,13 @@
   .counts .k{display:block;font-size:12.5px;color:var(--soft)}
   .counts b{display:block;font-family:var(--serif);font-weight:500;font-size:30px;line-height:1.2;margin-top:4px;font-variant-numeric:tabular-nums}
   .counts .how{grid-column:1/-1;font-size:12.5px;color:var(--faint)}
+  /* item 346: the client list */
+  .who{list-style:none;padding:0;margin-top:10px}
+  .who-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);min-height:56px}
+  .who-row:first-child{border-top:none}
+  .who-row .dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:var(--faint)}
+  .who-row .dot.joined{background:var(--good)}.who-row .dot.waiting{background:#c9a56a}.who-row .dot.expired{background:#b4533f}
+  .who-row .nm{flex:1;min-width:0}.who-row .nm b{display:block;font-weight:600;font-size:14px}.who-row .nm span{font-size:12.5px;color:var(--soft)}
   /* the set-up list */
   .steps{list-style:none;padding:0;margin-top:10px}
   .step{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line);min-height:56px}
@@ -133,6 +140,12 @@ function render(){
   const tile=(k,v)=>`<div><span class="k">${esc(k)}</span><b>${esc(String(v||0))}</b></div>`;
   html+=`<section class="card counts" aria-label="Your clients and the portal">${tile('Active clients',n.active)}${tile('Waiting to join',n.waiting)}${tile('Invites run out',n.expired)}${tile('In the last 30 days',n.recent)}`+
     `<p class="how">People, not sign-ins. An invite counts as run out after 7 days without them coming in. The email’s button signs them in once, for a short while; after that the sign-in page emails them a code any time. Their portal card in Settings sends a new invite.</p></section>`;
+  // item 346 (Nov 22 review): the people behind the numbers, each with where they stand, and
+  // Send again on a row that is waiting or whose invite ran out (POST /agency/portal/clients/:id/sign-in-link)
+  html+=`<section class="card" aria-labelledby="whoH"><h2 id="whoH">Your clients</h2><p class="sub">Where each one stands with the portal.</p>`+
+    (clients.length?`<ul class="who">`+clients.map(c=>`<li class="who-row" data-who="${esc(c.site_id)}"><span class="dot ${esc(c.state)}" aria-hidden="true"></span><span class="nm"><b>${esc(c.name)}</b><span>${esc(stateWords(c))}</span></span>`+
+      ((c.state==='waiting'||c.state==='expired')&&d.can_edit!==false?`<button type="button" class="sbtn" data-again="${esc(c.site_id)}" aria-label="Send ${esc(c.name)} a new invite">Send again</button>`:c.state==='none'&&d.can_edit!==false?`<a class="sbtn" href="/settings.html?client=${encodeURIComponent(c.site_id)}#portalParts" aria-label="Invite ${esc(c.name)}">Invite</a>`:'')+`</li>`).join('')+`</ul>`
+    :`<p class="muted" style="margin-top:10px">No clients yet. Invite one and they’ll appear here.</p>`)+`</section>`;
   html+=`<section class="card" aria-labelledby="setH"><h2 id="setH">Set up your portal</h2><p class="sub" id="setN">${done} of ${steps.length} done</p><ol class="steps">`+
     steps.map(s=>{const w=STEP_WORDS[s.key]||[s.key,'',''];
       const act=s.done?'<span class="sr-only">Done</span>':s.key==='preview'?`<button type="button" class="sbtn" data-see${clients.length?'':' disabled'}>${esc(w[1])}</button>`:`<a class="sbtn" href="${esc(w[2])}">${esc(w[1])}</a>`;
@@ -147,6 +160,13 @@ function render(){
   $('seeOne').addEventListener('click',open);
   document.querySelectorAll('[data-see]').forEach(b=>b.addEventListener('click',open));
   $('pickClose').addEventListener('click',()=>{if(pick.close)pick.close();else pick.removeAttribute('open');});
+  document.querySelectorAll('[data-again]').forEach(b=>b.addEventListener('click',async()=>{
+    const id=b.getAttribute('data-again');const c=clients.find(x=>x.site_id===id);b.disabled=true;
+    const r=await api('/agency/portal/clients/'+encodeURIComponent(id)+'/sign-in-link','POST',{});
+    if(!r.ok){b.disabled=false;toast((r.body&&r.body.message)||'The email didn’t go out. Try again in a moment.',true);return;}
+    b.textContent='Sent';b.setAttribute('aria-label',`A new invite went to ${c?c.name:'them'}`);
+    toast(`A new invite is on its way to ${c?c.name:'them'}.`);
+  }));
   $('copyAddr').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(d.address);toast('Copied. Paste it wherever your clients will see it.');}catch(_){const i=$('addr');i.focus();i.select();toast('Your browser didn’t allow copying here. It’s selected: press Ctrl or ⌘ and C.',true);}});
 }
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t a studio account.</h2><p class="muted">The client portal page is for a studio and the clients it looks after.</p></div>`;}

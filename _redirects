@@ -120,6 +120,8 @@ https://tools.davisdigitalstudio.com/ai-visibility       /ai-visibility.html  20
 https://tools.davisdigitalstudio.com/ai-visibility.html  /ai-visibility       301!
 https://tools.davisdigitalstudio.com/report/*            /report.html         200!
 https://tools.davisdigitalstudio.com/privacy             /privacy.html        200!
+https://tools.davisdigitalstudio.com/public-frame.js     /public-frame.js     200!
+https://tools.davisdigitalstudio.com/public-frame.css    /public-frame.css    200!
 https://tools.davisdigitalstudio.com/ai-disclaimer       /ai-disclaimer.html  200!
 https://tools.davisdigitalstudio.com/analytics.js        /analytics.js        200!
 https://tools.davisdigitalstudio.com/tools-common.js     /tools-common.js     200!
@@ -216,6 +218,8 @@ https://app.davisdigitalstudio.com/report.html           https://tools.davisdigi
 # Clean URLs for the marketing pages (extensionless links resolve to the .html file)
 # /portal: the marketing chrome's "Client login" uses the clean URL; portal.html
 # itself intentionally keeps working at .html (externally-shared URLs unchanged).
+# builder item 350: a studio's short portal address (app.example/portal/<name>) opens its sign-in page
+/portal/*               /portal.html?studio=:splat  200
 /portal                 /portal.html                200
 /                       /index.html                 200
 /about                  /about.html                 200

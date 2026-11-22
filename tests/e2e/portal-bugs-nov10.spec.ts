@@ -389,7 +389,7 @@ test.describe('the live walk — what a client sees', () => {
     await installApp(page, { api: { ...CLIENT_API, '/client/faq': { data: { html: '', faq: { items: [] } } } } });
     await page.goto('/client.html');
     await tab(page, 'help');
-    await expect(page.locator('#faqStarter')).toHaveText('Your studio hasn’t added its own help articles yet, so here are the basics.');
+    await expect(page.locator('#faqStarter')).toHaveCount(0);   // item 352: no "hasn’t added" line; the basics simply are the answers
     await expect(page.locator('#faqBody .faq-item')).toHaveCount(5);
     await page.locator('#faqSearch').fill('password');
     await expect(page.locator('#faqBody .faq-item:visible')).toHaveCount(1);

@@ -74,7 +74,7 @@ test.describe('Client portal part three — one Messages door (item 179)', () =>
     await expect(page).toHaveTitle('Messages — Marlow & Co');
     await expect(page.locator('#mnew')).toHaveText('Write');
     await expect(page.locator('#mnew')).toHaveAttribute('aria-label', 'Write to Marlow & Co');
-    await expect(page.locator('.mlsub')).toHaveText('Talk to Marlow & Co. They usually reply within a day.');
+    await expect(page.locator('.mlsub')).toHaveText('Talk to Marlow & Co.');
     await expect(page.locator('#mbook')).toContainText('Pick a time to talk');
     await expect(page.locator('#msvc')).toContainText('See what they offer');
     await expect(page.locator('#mlmeta')).toHaveText('Conversations · 3');
@@ -100,7 +100,7 @@ test.describe('Client portal part three — one Messages door (item 179)', () =>
     await conv(page, 'Website build').click();
     const pane = page.locator('#mpane');
     await expect(pane.locator('.mpname')).toHaveText('Website build');
-    await expect(pane.locator('.mpsub')).toContainText('With Marlow & Co · they usually reply within a day');
+    await expect(pane.locator('.mpsub')).toContainText('With Marlow & Co');
     const bubbles = pane.locator('.cmsg');
     await expect(bubbles).toHaveCount(2);
     // oldest first: the studio's draft, then your answer on your side

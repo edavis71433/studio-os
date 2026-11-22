@@ -246,7 +246,7 @@ export async function handleCustomerInvite(req: Request, site: SiteRow, principa
   if (ownerEmail || client.contact_id) {
     // already invited: the sign-in link again, to the address they sign in with
     if (!ownerEmail) return json({ error: 'has_owner', message: INVITE_REFUSED.has_owner[1] }, 409, cors);
-    const again = await sendCustomerInvite(site.id, ownerEmail, false).catch(() => false);
+    const again = await sendCustomerInvite(site.id, ownerEmail, false, { firstName: String(client.name || '') }).catch(() => false);
     return json({ data: { invited: again, again: true, email: ownerEmail, portal_url: portalUrlFor(site.id) } }, 200, cors);
   }
   const person = one(await svc(`presence_contacts?site_id=eq.${site.id}&client_id=eq.${clientId}&deleted_at=is.null&select=id,name,email&order=created_at.asc&limit=1`).catch(() => null));
@@ -269,7 +269,7 @@ export async function handleCustomerInvite(req: Request, site: SiteRow, principa
   const login = await attachOwnerLogin(clientId, email, String(person?.name || client.name || ''));
   if (!login.ok) { const [status, message] = INVITE_REFUSED[login.error]; return json({ error: login.error, message }, status, cors); }
   if (am && ws) await svc(`presence_agency_clients?site_id=eq.${ws.id}&agency_id=eq.${am.agency_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_email: email }) }).catch(() => null);
-  const invited = await sendCustomerInvite(site.id, email, true).catch(() => false);   // item 192: true only when the email left
+  const invited = await sendCustomerInvite(site.id, email, true, { firstName: String(person?.name || client.name || '') }).catch(() => false);   // item 192: true only when the email left
   return json({ data: { invited, again: false, email, site_id: ws?.id || null, portal_url: portalUrlFor(site.id) } }, 200, cors);
 }
 

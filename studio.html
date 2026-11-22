@@ -86,6 +86,21 @@
   .stepstay{margin-top:12px}
   .steplost{color:var(--soft);font-size:13.5px;line-height:1.55;margin:8px 0 0}
   .steplost a{color:var(--p);text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+  /* builder item 338: a second way in beside the password. Invited team members have no
+     password, so the door emails them a 6-digit code (the portal's way, item 230). */
+  .alt{display:flex;align-items:center;gap:12px;margin:18px 0 0;color:var(--soft);font-size:13px}
+  .alt::before,.alt::after{content:"";flex:1;height:1px;background:var(--line)}
+  button.second{background:var(--card);color:var(--p);border-color:var(--line);margin-top:14px}
+  @media (prefers-color-scheme:dark){button.second{color:var(--p)}}
+  .codehint{margin-top:10px}
+  #codePanel .sub{margin-bottom:16px}
+  #codePanel .sub .em{color:var(--ink);font-weight:600;overflow-wrap:anywhere}
+  #codePanel .ddsf-code{max-width:none;margin-top:6px}
+  #codePanel .ddsf-boxes span{max-width:none;background:var(--card);border-color:var(--line);color:var(--ink)}
+  #codePanel .ddsf-code.on .ddsf-boxes span.at{border-color:var(--p)}
+  #codePanel .muted.stepl{text-align:left}
+  /* every link-looking button is a 44px tap target where fingers do the tapping */
+  @media (max-width:899px),(pointer:coarse){button.linky{min-height:44px;display:inline-flex;align-items:center}}
   @media (min-width:900px){
     .s1,.s2{gap:16px}
     .door.step2 .appcard{display:flex;gap:18px;align-items:center;margin-top:18px;max-width:520px;padding:20px 22px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18)}
@@ -147,8 +162,31 @@
     </form>
     <div class="err" id="err" role="alert"></div>
     <p class="muted"><button class="linky" id="forgot" type="button">Forgot your password?</button></p>
+    <!-- builder item 338: no password? The door emails a code (team members invited by link have none) -->
+    <div class="alt" aria-hidden="true">or</div>
+    <button id="codeSend" type="button" class="second">Email me a code</button>
+    <p class="muted codehint">No password needed. Type your email above and we send a 6-digit code to it.</p>
     <div class="rule" aria-hidden="true"></div>
     <p class="muted">A client of the studio? <a href="/portal.html">Your sign-in is here</a>.</p>
+  </div>
+
+  <!-- CODE ENTRY (builder item 338): after a code is sent -->
+  <div id="codePanel" class="panel">
+    <h2 class="steph" id="codeHead" tabindex="-1">Check your email</h2>
+    <p class="sub" id="codeSub">If that email has a place here, we sent it a 6-digit code. Type it below. The code works for a short while.</p>
+    <div class="mailbtns"><a class="qbtn" href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">Open Gmail</a><a class="qbtn" href="https://outlook.live.com/mail/0/" target="_blank" rel="noopener">Open Outlook</a></div>
+    <form id="fCode" novalidate>
+      <label for="code">6-digit code</label>
+      <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code"
+             maxlength="6" pattern="[0-9]*" placeholder="······"
+             autocorrect="off" autocapitalize="off" spellcheck="false"
+             name="dds-signin-code" data-lpignore="true" data-1p-ignore="true"
+             oninput="this.value=this.value.replace(/[^0-9]/g,'')" required>
+      <button id="codeGo" type="submit">Check the code</button>
+    </form>
+    <div class="err" id="errCode" role="alert"></div>
+    <p class="muted stepl" aria-live="polite" id="resendLine"><button class="linky" id="resend" type="button">Send a new code</button></p>
+    <p class="muted stepl"><button class="linky" id="toLogin" type="button">Use a password instead</button></p>
   </div>
 
   <!-- SECOND STEP (builder list item 191): two-step sign-in is on for this person -->
@@ -161,7 +199,8 @@
     <p class="muted stepl stepstay">You’ll stay signed in on this device.</p>
     <div class="rule" aria-hidden="true"></div>
     <p class="muted stepl"><button class="linky" id="stepHelp" type="button" aria-expanded="false" aria-controls="stepLost">Can’t get a code?</button></p>
-    <p class="steplost" id="stepLost" hidden>Lost or changed your phone? Email <a href="mailto:support@davisdigitalstudio.com">support@davisdigitalstudio.com</a> from this address. We check it’s you before turning two-step sign-in off.</p>
+    <p class="steplost" id="stepLost" hidden>Lost or changed your phone? Use one of your backup codes below. No codes? Email <a href="mailto:support@davisdigitalstudio.com">support@davisdigitalstudio.com</a> from this address and we check it’s you before turning two-step sign-in off.</p>
+    <div id="stepBackup" hidden></div>
     <p class="muted stepl"><button class="linky" id="stepOut" type="button">Sign in as someone else →</button></p>
   </div>
 
@@ -194,6 +233,7 @@
 </div>
 
 <script src="/fresh-code.js?v=191"></script>
+<script src="/backup-codes.js?v=347"></script>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── Studio OS — the ONE owner front door ─────────────────────────────────────
@@ -215,8 +255,10 @@ if (typeof supabase !== "undefined") {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-portal-auth', persistSession: true, autoRefreshToken: true } });
 }
 var $ = function(id){ return document.getElementById(id); };
-function show(id){ ['loginPanel','stepPanel','routing','noWorkspace','resetSent'].forEach(function(p){ $(p).style.display = p===id ? 'block' : 'none'; }); $('main-door').classList.toggle('step2', id === 'stepPanel'); }
-function err(m){ var e=$('err'); e.textContent=m; e.style.display='block'; }
+function show(id){ ['loginPanel','codePanel','stepPanel','routing','noWorkspace','resetSent'].forEach(function(p){ $(p).style.display = p===id ? 'block' : 'none'; }); $('main-door').classList.toggle('step2', id === 'stepPanel'); }
+function errIn(id, m){ var e=$(id); e.textContent=m; e.style.display='block'; }
+function clearErr(id){ var e=$(id); e.textContent=''; e.style.display='none'; }
+function err(m){ errIn('err', m); }
 if (!sb) err("Connection problem — check your internet and refresh this page.");
 
 function withTimeout(p, ms){ return Promise.race([p, new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })]); }
@@ -367,6 +409,108 @@ $('retry').addEventListener('click', async function(){
   if (ss && ss.access_token) signedIn(ss); else show('loginPanel');
 });
 
+// ── Builder item 338: the second way in, an emailed code. A team member invited by link
+// (Staff, Designer, Developer seats) has no password, so the door emails them a 6-digit
+// code, the way the client door does (item 230): signInWithOtp sends it, verifyOtp checks
+// it, and the sign-in then goes where a password sign-in goes (signedIn: the second step
+// first when it's on, then the landing). Five wrong codes and the page asks for a new one;
+// a new code can go out once a minute.
+var pendingEmail = "";   // the email a code was last sent to (for verify + resend)
+var CODEBOX = null, WRONG = 0, WRONG_MAX = 5;
+(function(){
+  if (!window.ddsFresh || !window.ddsFresh.boxes) return;
+  var old = $('code'); if (!old) return;
+  CODEBOX = window.ddsFresh.boxes({ id: 'code', describedBy: 'codeSub', onEnter: function(){ if (!$('codeGo').disabled) $('codeGo').click(); } });
+  old.parentNode.replaceChild(CODEBOX.el, old);
+  CODEBOX.el.parentNode.insertBefore(CODEBOX.err, CODEBOX.el.nextSibling);
+})();
+function codeValue(){ return (CODEBOX ? CODEBOX.value() : ($('code').value || '')).replace(/[^0-9]/g, ''); }
+function codeClear(){ if (CODEBOX) CODEBOX.clear(); else $('code').value = ''; }
+function codeFocus(){ if (CODEBOX) CODEBOX.focus(); else $('code').focus(); }
+
+// a minute between codes, counted down on the button
+var cooldownTimer = null;
+function startResendCooldown(secs){
+  var b = $('resend'); if (!b) return;
+  var left = secs;
+  b.disabled = true;
+  if (cooldownTimer) clearInterval(cooldownTimer);
+  var tick = function(){
+    if (left <= 0) { clearInterval(cooldownTimer); cooldownTimer = null; b.disabled = false; b.textContent = "Send a new code"; return; }
+    b.textContent = "Send a new code in " + Math.floor(left / 60) + ":" + ("0" + (left % 60)).slice(-2);
+    left--;
+  };
+  tick();
+  cooldownTimer = setInterval(tick, 1000);
+}
+
+// send the sign-in code: never says whether the address has an account, never makes one
+async function sendCode(email){
+  if (!sb) { err("Connection problem: check your internet and refresh this page."); return false; }
+  try {
+    // shouldCreateUser:false → signing in never silently makes a new account.
+    // emailRedirectTo → a link in the same email lands back at this door.
+    await sb.auth.signInWithOtp({ email: email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + '/studio.html' } });
+  } catch (e) { /* the same calm outcome either way: nothing to learn from this door */ }
+  return true;
+}
+function freshCodeButton(){ var b = $('codeGo'); if (b) { b.disabled = false; b.textContent = 'Check the code'; } }
+
+$('codeSend').addEventListener('click', async function(){
+  if (!sb) { err("Connection problem: check your internet and refresh this page."); return; }
+  $('err').style.display = 'none';
+  var em = $('em').value.trim();
+  if (!em || em.indexOf('@') < 1) { err('Type your email above first, then tap “Email me a code” again.'); $('em').focus(); return; }
+  var b = $('codeSend'); b.disabled = true; b.textContent = 'Sending…';
+  await sendCode(em);
+  pendingEmail = em;
+  $('codeSub').innerHTML = "If <span class=\"em\"></span> has a place here, we sent it a 6-digit code. Type it below. The code works for a short while.";
+  $('codeSub').querySelector('.em').textContent = em;
+  b.disabled = false; b.textContent = 'Email me a code';
+  clearErr('errCode');
+  WRONG = 0; codeClear(); freshCodeButton();
+  show('codePanel');
+  startResendCooldown(60);
+  codeFocus();
+});
+
+$('fCode').addEventListener('submit', async function(ev){
+  ev.preventDefault();
+  clearErr('errCode');
+  if (!sb) { errIn('errCode', "Connection problem: check your internet and refresh this page."); return; }
+  var token = codeValue();
+  if (WRONG >= WRONG_MAX) { errIn('errCode', 'That’s five wrong tries. Send a new code to keep going.'); return; }
+  if (token.length < 6) { errIn('errCode', 'Type all six digits from your email.'); codeFocus(); return; }
+  var b = $('codeGo'); b.disabled = true; b.textContent = 'Checking…';
+  try {
+    var r = await sb.auth.verifyOtp({ email: pendingEmail, token: token, type: 'email' });
+    if (r.error || !r.data || !r.data.session) {
+      codeClear();
+      WRONG++;
+      b.textContent = 'Check the code';
+      // five wrong tries and the page asks for a new code (the button waits for it)
+      if (WRONG >= WRONG_MAX) { errIn('errCode', 'That’s five wrong tries. Send a new code to keep going.'); b.disabled = true; return; }
+      errIn('errCode', 'That code didn’t work. It may have expired: check the latest email, or send a new code.');
+      b.disabled = false; codeFocus(); return;
+    }
+    signedIn(r.data.session);
+  } catch (e) {
+    codeClear();
+    errIn('errCode', 'Something went wrong. Give it another try, or send a new code.');
+    b.disabled = false; b.textContent = 'Check the code';
+  }
+});
+
+$('resend').addEventListener('click', async function(){
+  if (this.disabled || !pendingEmail) return;
+  clearErr('errCode');
+  await sendCode(pendingEmail);
+  WRONG = 0; codeClear(); freshCodeButton();
+  startResendCooldown(60);
+  codeFocus();
+});
+$('toLogin').addEventListener('click', function(){ clearErr('errCode'); show('loginPanel'); $('pw').focus(); });
+
 // ── Builder item 191: the second step. Someone who turned two-step sign-in on types the
 // code from their phone after their password (Figma A1). Until they do, the server treats
 // them as signed out, so nothing opens before it. Supabase checks the code (aal2).
@@ -407,23 +551,45 @@ async function stepConfirm(){
 async function signedOutHere(){
   if (sb) { try { await sb.auth.signOut(); } catch (e) {} }
   var g = $('go'); g.disabled = false; g.textContent = 'Sign in';
+  freshCodeButton();
   show('loginPanel');
 }
 $('stepGo').addEventListener('click', stepConfirm);
-$('stepHelp').addEventListener('click', function(){ var l = $('stepLost'), open = l.hidden; l.hidden = !open; this.setAttribute('aria-expanded', open ? 'true' : 'false'); });
+$('stepHelp').addEventListener('click', function(){ var l = $('stepLost'), open = l.hidden; l.hidden = !open; this.setAttribute('aria-expanded', open ? 'true' : 'false');
+  // item 347: a backup code turns the second step off for this account, so they can sign in and set it up again
+  var bk = $('stepBackup'); if (!bk || !window.ddsBackup) return; bk.hidden = !open;
+  if (open && !bk.childNodes.length) window.ddsBackup.useForm(bk, { fn: FN, key: SUPABASE_KEY, email: (document.getElementById('em') && document.getElementById('em').value) || '', onDone: function () {
+    try { sb.auth.signOut(); } catch (e) {}
+    show('loginPanel'); err('Two-step sign-in is off for your account. Sign in again, then turn it back on from Settings when you have your new phone.');
+  } });
+});
 $('stepOut').addEventListener('click', function(){ signedOutHere().then(function(){ $('em').focus(); }); });
 // Builder item 192: Sign in was left greyed out, saying "Signing in…", by the sign-in that
 // led to this panel. Signing out gives it back.
-$('signout1').addEventListener('click', async function(){ if (sb) { try{ await sb.auth.signOut(); }catch(e){} } var b = $('go'); b.disabled = false; b.textContent = 'Sign in'; show('loginPanel'); });
+$('signout1').addEventListener('click', async function(){ if (sb) { try{ await sb.auth.signOut(); }catch(e){} } var b = $('go'); b.disabled = false; b.textContent = 'Sign in'; freshCodeButton(); show('loginPanel'); });
 
-// Already signed in? Route straight through — this page is a door, not a stop. Someone
-// who still owes the code from their phone (item 191) is asked for it here first.
+// Already signed in, or arriving from the link in a code email (item 338)? Route straight
+// through — this page is a door, not a stop. Someone who still owes the code from their
+// phone (item 191) is asked for it here first. A tapped link lands here with the session
+// in the URL hash; the sign-in library takes it up asynchronously, so give it a beat.
 (async function(){
   if (!sb) return;
+  var hash = location.hash || "";
+  // an expired or used link comes back as #error=...otp_expired: say so, honestly
+  if (/error=/.test(hash)) {
+    err("That sign-in link expired or was already used. Type your email and tap “Email me a code” for a fresh one.");
+    try { history.replaceState(null, "", location.pathname + location.search); } catch(e){}
+    return;
+  }
+  var hasTokens = /access_token|refresh_token/.test(hash);
   try {
-    var s = await sb.auth.getSession();
-    var ss = s && s.data && s.data.session;
-    if (ss && ss.access_token) signedIn(ss);
+    for (var i = 0; i < (hasTokens ? 20 : 1); i++) {
+      var s = await sb.auth.getSession();
+      var ss = s && s.data && s.data.session;
+      if (ss && ss.access_token) { signedIn(ss); return; }
+      if (!hasTokens) break;
+      await new Promise(function(res){ setTimeout(res, 150); });
+    }
   } catch (e) { /* stay on the login form */ }
 })();
 </script>

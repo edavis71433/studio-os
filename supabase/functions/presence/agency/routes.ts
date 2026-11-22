@@ -37,6 +37,7 @@ import { handleAgencyChangeLog } from '../routes/change_log.ts';
 import { handleDoNext } from './do_next.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
 import { readReservedJson, readReservedJsonOrThrow, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
+import { cleanSlug, slugRefusal, portalAddressOf } from '../lib/portal_slug.ts';   // builder item 350
 import { readNotify, normalizeNotify, prefFor, quietSites, applyNotifyChange, pickFlags, isSiteId, foldNews } from '../lib/site_notify.ts';
 import { normalizePortal, pickStudioChange, applyStudioChange, pickClientChange, applyClientChange, resolveOff, forgetPortalOff, isSiteId as isPortalSiteId, PORTAL_PARTS, PART_WORDS, HOME_CARDS, CARD_WORDS, WELCOME_MAX } from '../lib/portal_settings.ts';
 import { sendInviteLink } from '../lib/workspace.ts';
@@ -200,7 +201,13 @@ export function forgetAgencyReads(agencyId: string): void {
 
 // builder list items 236 and 232: the portal's address (the one the invite email carries), the
 // clients a studio looks after in name order, and when each last got a sign-in link (two minutes apart)
-const portalAddress = (studioSiteId: string) => `${appBase()}/portal.html?studio=${studioSiteId}`;
+// builder item 350: the short address when the studio chose a name (lib/portal_slug.ts), else the long one;
+// on the app's own address (item 388)
+const portalAddress = (studioSiteId: string, slug?: string | null) => portalAddressOf(appBase(), studioSiteId, slug);
+async function portalSlugOf(siteId: string): Promise<string | null> {
+  const r = await svc(`presence_sites?id=eq.${siteId}&select=portal_slug&limit=1`).catch(() => ({ ok: false, json: null }));
+  return r.ok && Array.isArray(r.json) ? (r.json[0]?.portal_slug ?? null) : null;   // pre-0254: no column, no name
+}
 const activeClientsOf = (input: { links: Array<{ site_id: string; status: string }>; clientNames: Record<string, string> }) => input.links.filter((l) => l.status === 'active')
   .map((l) => ({ site_id: l.site_id, name: input.clientNames[l.site_id] || 'A client' }))
   .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
@@ -297,22 +304,36 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     catch { return json({ error: 'read_failed', message: 'Your portal choices couldn’t load just now.' }, 502, cors); }   // never switches that lie
     const ps = normalizePortal(stored);
     const input = await sharedGather(member.agency_id, now);
-    const clients = activeClientsOf(input).map((c) => ({ ...c, choices: ps.clients[c.site_id] || {} }));
-    return json({ data: { off: ps.off, welcome: ps.welcome, home_off: ps.home_off, signin: ps.signin, clients,
+    const clients = activeClientsOf(input).map((c) => ({ ...c, choices: ps.clients[c.site_id] || {}, reminders: !ps.reminders_off.includes(c.site_id) }));   // item 336: whether we remind them
+    return json({ data: { off: ps.off, welcome: ps.welcome, home_off: ps.home_off, signin: ps.signin, reply: ps.reply, look: ps.look, clients,
       parts: PORTAL_PARTS.map((k) => ({ key: k, label: PART_WORDS[k][0], sub: PART_WORDS[k][1] })),
       cards: HOME_CARDS.map((k) => ({ key: k, label: CARD_WORDS[k][0], sub: CARD_WORDS[k][1] })),
       welcome_max: WELCOME_MAX, can_edit: can(member.role, 'manage_clients') } }, 200, cors);
   }
   if (route === '/agency/portal' && method === 'PUT') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
-    const change = pickStudioChange(await body());
-    if (!Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which part or card to show or hide, the welcome note, or a way to sign in.' }, 400, cors);
+    const raw = await body();
+    // builder item 350: the short name in the portal's address, its own write (presence_sites.portal_slug)
+    if (raw && typeof raw === 'object' && 'slug' in (raw as Record<string, unknown>)) {
+      const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
+      if (!own) return json({ error: 'no_studio_site', message: 'Your portal’s address belongs to your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
+      const want = String((raw as Record<string, unknown>).slug ?? '').trim();
+      const slug = want ? cleanSlug(want) : '';
+      if (want && !slug) return json({ error: 'bad_slug', message: slugRefusal(want) }, 400, cors);
+      const up = await svc(`presence_sites?id=eq.${own.id}&select=id,portal_slug`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ portal_slug: slug || null }) });
+      if (up.status === 409) return json({ error: 'slug_taken', message: 'Another studio already uses that name. Try a different one.' }, 409, cors);
+      if (up.status === 400) return json({ error: 'unavailable', message: 'Short names need a one-time database update first.' }, 503, cors);   // pre-0254
+      if (!up.ok) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
+      return json({ data: { slug, address: portalAddress(own.id, slug) } }, 200, cors);
+    }
+    const change = pickStudioChange(raw);
+    if (!Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which part or card to show or hide, the welcome note, a way to sign in, your reply time, or the portal’s look.' }, 400, cors);
     const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
     if (!own) return json({ error: 'no_studio_site', message: 'Portal choices are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
     const saved = await updateReservedJson(own.id, RESERVED_NAMES.portalSettings, (cur) => applyStudioChange(normalizePortal(cur), change), member.email);
     if (!saved) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
     forgetPortalOff();
-    return json({ data: { off: saved.off, welcome: saved.welcome, home_off: saved.home_off, signin: saved.signin } }, 200, cors);
+    return json({ data: { off: saved.off, welcome: saved.welcome, home_off: saved.home_off, signin: saved.signin, reply: saved.reply, look: saved.look } }, 200, cors);
   }
   {
     const pm = route.match(/^\/agency\/portal\/clients\/([^/]+)$/);
@@ -328,7 +349,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       const saved = await updateReservedJson(own.id, RESERVED_NAMES.portalSettings, (cur) => applyClientChange(normalizePortal(cur), siteId, change), member.email);
       if (!saved) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
       forgetPortalOff();
-      return json({ data: { site_id: siteId, choices: saved.clients[siteId] || {}, off: resolveOff(saved, siteId) } }, 200, cors);
+      return json({ data: { site_id: siteId, choices: saved.clients[siteId] || {}, off: resolveOff(saved, siteId), reminders: !saved.reminders_off.includes(siteId) } }, 200, cors);
     }
   }
 
@@ -339,20 +360,22 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     if (!can(member.role, 'read')) return forbid(cors);
     const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
     if (!own) return json({ error: 'no_studio_site', message: 'The portal is kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
-    const [input, stored, brand] = await Promise.all([
+    const [input, stored, brand, slug] = await Promise.all([
       sharedGather(member.agency_id, now),
       readReservedJson(own.id, RESERVED_NAMES.portalSettings).catch(() => null),
       import('../routes/studio_brand.ts').then((m) => m.studioBrandOf(own.id)).catch(() => null),
+      portalSlugOf(own.id),
     ]);
     const { portalPeople, portalCounts, setupList } = await import('../lib/portal_people.ts');
     const nowMs = Date.parse(now);
     const people = await portalPeople(activeClientsOf(input), nowMs);
     const ps = normalizePortal(stored);
     return json({ data: {
-      address: portalAddress(own.id),
+      address: portalAddress(own.id, slug),
+      slug: slug || '',
       counts: portalCounts(people, nowMs),
       clients: people.map((p) => ({ site_id: p.site_id, name: p.name, state: p.state, invited_at: p.invited_at, seen_at: p.seen_at })),
-      setup: setupList({ hasLogo: !!(brand && !brand.is_default && brand.logo_url), partsAt: ps.parts_at, welcome: ps.welcome, previewedAt: ps.previewed_at, invitedAny: people.some((p) => p.state !== 'none') }),
+      setup: setupList({ hasLogo: !!(brand && !brand.is_default && (brand.logo_url || brand.accent !== '#5b3fa0')), partsAt: ps.parts_at, welcome: ps.welcome, previewedAt: ps.previewed_at, invitedAny: people.some((p) => p.state !== 'none') }),   // item 342: a studio colour counts, so a studio whose website already has its brand starts further along
       can_edit: can(member.role, 'manage_clients'),
     } }, 200, cors);
   }
@@ -990,6 +1013,18 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       const row = await decideOrgOperation(m[2], verb);
       if (!row) return json({ error: 'not_found', message: 'That rollout isn’t open for a decision.' }, 404, cors);
       return json({ data: row }, 200, cors);
+    }
+  }
+
+  // ── Builder item 347: the owner turns off a client's two-step sign-in for them (a lost
+  //    phone, no backup code). Owner only, a fresh code first; the email carries the
+  //    studio's brand (routes/backup_codes.ts). ──
+  {
+    const m = route.match(/^\/agency\/clients\/([^/]+)\/two-step\/off$/);
+    if (m && method === 'POST') {
+      const { handleTwoStepOff } = await import('../routes/backup_codes.ts');
+      const own = member.role === 'owner' ? await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal).catch(() => null) : null;
+      return handleTwoStepOff(req, member, principal, decodeURIComponent(m[1]), own?.id || null, cors);
     }
   }
 

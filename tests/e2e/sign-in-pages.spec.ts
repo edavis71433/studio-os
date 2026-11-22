@@ -52,7 +52,7 @@ test.describe('Sign-in pages in the new look (builder list item 188)', () => {
     const errors: string[] = []; page.on('pageerror', (e) => errors.push(String(e)));
     await installApp(page, { session: null, api: {} });
     await page.goto('/portal.html');
-    await expect(page.locator('#brand .word')).toHaveText('Studio OS');
+    await expect(page.locator('#brand .word')).toHaveText('Client sign in');   // item 341: never the product's name to a client
     await expect(page.locator('.side .lede')).toHaveText('Your website, your project, one place.');
     await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
     await bandThenSheet(page);

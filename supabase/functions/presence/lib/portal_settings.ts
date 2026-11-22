@@ -46,8 +46,35 @@ export type ClientChoices = Partial<Record<PortalPart, boolean>>;
  *  always on so nobody is locked out. Google is off until the studio turns it on; a password
  *  stays on, as it was before the switch existed. */
 export interface SignIn { google: boolean; password: boolean }
+/** Builder item 353 (Nov 22 review): what the studio says about replying, in its own words.
+ *  "They usually reply within a day" was fixed text no studio set; now the studio picks a reply
+ *  time and may add its working hours, and the portal says exactly that, or nothing at all. */
+export interface ReplyWords { within: ReplyWithin; hours: string }
+/** Builder items 247 and 335 (Nov 22 review), direction A: the portal's look is the studio's.
+ *  A cover picture (one of the studio's own files) for the sign-in page, and the heading font. */
+export interface PortalLook { cover_media_id: string | null; heading_font: HeadingFont }
+export const HEADING_FONTS = ['fraunces', 'inter'] as const;
+export type HeadingFont = typeof HEADING_FONTS[number];
+const MEDIA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function cleanLook(v: unknown): PortalLook {
+  const r = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const cover = typeof r.cover_media_id === 'string' && MEDIA_ID.test(r.cover_media_id) ? r.cover_media_id.toLowerCase() : null;
+  const font = (HEADING_FONTS as readonly string[]).includes(String(r.heading_font || '')) ? String(r.heading_font) as HeadingFont : 'fraunces';
+  return { cover_media_id: cover, heading_font: font };
+}
+export const REPLY_WITHIN = ['', 'within a few hours', 'within one business day', 'within two business days', 'within a week'] as const;
+export type ReplyWithin = typeof REPLY_WITHIN[number];
+export const REPLY_HOURS_MAX = 60;
+/** The reply words as kept: a known reply time (else none) and working hours as one short plain line. Pure. */
+export function cleanReply(v: unknown): ReplyWords {
+  const r = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const w = String(r.within ?? '');
+  const within = (REPLY_WITHIN as readonly string[]).includes(w) ? w as ReplyWithin : '';
+  const hours = String(typeof r.hours === 'string' ? r.hours : '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, REPLY_HOURS_MAX);
+  return { within, hours };
+}
 export const SIGNIN_KEYS = ['google', 'password'] as const;
-export interface PortalSettings { off: PortalPart[]; clients: Record<string, ClientChoices>; welcome: string; home_off: HomeCard[]; parts_at: string | null; previewed_at: string | null; signin: SignIn }
+export interface PortalSettings { off: PortalPart[]; clients: Record<string, ClientChoices>; welcome: string; home_off: HomeCard[]; parts_at: string | null; previewed_at: string | null; signin: SignIn; reply: ReplyWords; reminders_off: string[]; look: PortalLook }
 
 const SITE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isSiteId = (v: unknown): v is string => typeof v === 'string' && SITE_ID.test(v);
@@ -97,7 +124,10 @@ export function normalizePortal(raw: unknown): PortalSettings {
   if (keys.length > PORTAL_MAX_CLIENTS) for (const k of keys.slice(0, keys.length - PORTAL_MAX_CLIENTS)) delete clients[k];
   const si = (r.signin && typeof r.signin === 'object' ? r.signin : {}) as Record<string, unknown>;
   return { off: partsOf(r.off), clients, welcome: cleanWelcome(r.welcome), home_off: cardsOf(r.home_off), parts_at: isoOrNull(r.parts_at), previewed_at: isoOrNull(r.previewed_at),
-    signin: { google: si.google === true, password: si.password !== false } };
+    signin: { google: si.google === true, password: si.password !== false }, reply: cleanReply(r.reply),
+    // builder item 336: the clients the studio asked us not to remind (their site ids)
+    reminders_off: Array.from(new Set((Array.isArray(r.reminders_off) ? r.reminders_off : []).filter(isSiteId).map((id) => String(id).toLowerCase()))).slice(0, PORTAL_MAX_CLIENTS),
+    look: cleanLook(r.look) };
 }
 
 /** Is this part shown to this client? The client's own choice first, else the studio's. Pure. */
@@ -114,7 +144,7 @@ export function resolveOff(s: PortalSettings, clientSiteId: string | null | unde
   return PORTAL_PARTS.filter((p) => off.has(p));
 }
 
-export interface StudioChange { part?: { key: PortalPart; shown: boolean }; card?: { key: HomeCard; shown: boolean }; welcome?: string; signin?: { key: typeof SIGNIN_KEYS[number]; on: boolean } }
+export interface StudioChange { part?: { key: PortalPart; shown: boolean }; card?: { key: HomeCard; shown: boolean }; welcome?: string; signin?: { key: typeof SIGNIN_KEYS[number]; on: boolean }; reply?: ReplyWords; look?: PortalLook }
 /** The studio-wide change Settings sends, one thing at a time so two quick flips (or two
  *  people) never undo each other: { part, shown }, { card, shown } or { welcome }. Pure. */
 export function pickStudioChange(b: unknown): StudioChange {
@@ -125,6 +155,8 @@ export function pickStudioChange(b: unknown): StudioChange {
   if (typeof r.welcome === 'string') out.welcome = cleanWelcome(r.welcome);
   const si = (r.signin && typeof r.signin === 'object' ? r.signin : {}) as Record<string, unknown>;
   if ((SIGNIN_KEYS as readonly string[]).includes(String(si.key)) && typeof si.on === 'boolean') out.signin = { key: si.key as typeof SIGNIN_KEYS[number], on: si.on };
+  if (r.reply && typeof r.reply === 'object') out.reply = cleanReply(r.reply);   // item 353
+  if (r.look && typeof r.look === 'object') out.look = cleanLook(r.look);   // items 247 and 335
   return out;
 }
 /** The change applied to what's stored now (read just before the write). A part's switch
@@ -134,13 +166,14 @@ export function applyStudioChange(cur: PortalSettings, change: StudioChange, now
   if (change.part) { if (change.part.shown) off.delete(change.part.key); else off.add(change.part.key); }
   if (change.card) { if (change.card.shown) homeOff.delete(change.card.key); else homeOff.add(change.card.key); }
   const signin = change.signin ? { ...cur.signin, [change.signin.key]: change.signin.on } : cur.signin;
-  return normalizePortal({ ...cur, off: [...off], home_off: [...homeOff], welcome: change.welcome === undefined ? cur.welcome : change.welcome, parts_at: change.part ? nowIso : cur.parts_at, signin });
+  return normalizePortal({ ...cur, off: [...off], home_off: [...homeOff], welcome: change.welcome === undefined ? cur.welcome : change.welcome, parts_at: change.part ? nowIso : cur.parts_at, signin, reply: change.reply || cur.reply, look: change.look || cur.look });
 }
 /** One client's change: { part, shown: true | false | null } (null: back to the studio's
  *  choice for that part) or { reset: true } (every part back to the studio's). Pure. */
-export function pickClientChange(b: unknown): { reset: true } | { part: PortalPart; shown: boolean | null } | null {
+export function pickClientChange(b: unknown): { reset: true } | { part: PortalPart; shown: boolean | null } | { reminders: boolean } | null {
   const r = (b && typeof b === 'object' ? b : {}) as Record<string, unknown>;
   if (r.reset === true) return { reset: true };
+  if (typeof r.reminders === 'boolean') return { reminders: r.reminders };   // item 336: remind this client, or not
   if (!isPart(r.part)) return null;
   if (r.shown === null || typeof r.shown === 'boolean') return { part: r.part, shown: r.shown as boolean | null };
   return null;
@@ -148,6 +181,11 @@ export function pickClientChange(b: unknown): { reset: true } | { part: PortalPa
 export function applyClientChange(cur: PortalSettings, clientSiteId: string, change: NonNullable<ReturnType<typeof pickClientChange>>, nowIso = new Date().toISOString()): PortalSettings {
   const id = clientSiteId.toLowerCase();
   const clients = { ...cur.clients };
+  if ('reminders' in change) {   // item 336: the switch is its own thing; parts_at stays
+    const off = new Set(cur.reminders_off);
+    if (change.reminders) off.delete(id); else off.add(id);
+    return normalizePortal({ ...cur, reminders_off: [...off] });
+  }
   if ('reset' in change) delete clients[id];
   else {
     const c: ClientChoices = { ...(clients[id] || {}) };
