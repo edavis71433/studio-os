@@ -101,6 +101,14 @@ const WORDS: Words = {
 // ═════════ helpers ═════════
 
 const loc0 = (c: SnapshotContent): LocationContent | null => c.locations?.[0] ?? null;
+/** Builder list item 334: the business goes to its customers, so no street address and no
+ *  directions are drawn; the areas it serves (identity.service_area) stand where they were. */
+const goesOut = (c: SnapshotContent): boolean => loc0(c)?.goes_to_customers === true;
+/** "We come to you" and the areas served, as one block of lines ('' when there's nothing to say). */
+function areaBlock(c: SnapshotContent, heading: string): string {
+  const area = (c.identity.service_area || '').trim();
+  return goesOut(c) && area ? `<p class="area"${pr('identity.service_area')}><strong>${esc(heading)}</strong><br>${esc(area)}</p>` : '';
+}
 /** Region marker (reconciliation R3): a stable attribute tying a drawn region to the content
  *  it shows, so the builder can outline it. Deterministic and invisible. */
 const pr = (region: string): string => ` data-pr="${attr(region)}"`;
@@ -204,7 +212,7 @@ function hoursTable(c: SnapshotContent, caption: string): string {
 
 function contactBits(c: SnapshotContent): { addr: string; tel: string; mail: string } {
   const l = loc0(c); const i = c.identity;
-  const addr = l ? [l.address_line1, l.address_line2, `${l.city}, ${l.region} ${l.postal_code}`].filter(Boolean).map(esc).join('<br>') : '';
+  const addr = l && !goesOut(c) ? [l.address_line1, l.address_line2, `${l.city}, ${l.region} ${l.postal_code}`].filter(Boolean).map(esc).join('<br>') : '';
   const phone = (l?.phone || i.phone || '').trim();
   const tel = phone ? `<a href="tel:${attr(phone.replace(/[^\d+]/g, ''))}">${esc(phone)}</a>` : '';
   const mail = i.email ? `<a href="mailto:${attr(i.email)}">${esc(i.email)}</a>` : '';
@@ -212,7 +220,7 @@ function contactBits(c: SnapshotContent): { addr: string; tel: string; mail: str
 }
 
 function mapsHref(c: SnapshotContent): string | null {
-  const l = loc0(c); if (!l) return null;
+  const l = loc0(c); if (!l || goesOut(c)) return null;
   const q = encodeURIComponent(`${c.identity.business_name}, ${l.address_line1}, ${l.city}, ${l.region} ${l.postal_code}`);
   return `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
@@ -230,7 +238,9 @@ function ldBusiness(c: SnapshotContent, site: SiteConfig, v: IndustryVocab, rese
     '@context': 'https://schema.org', '@type': v.schemaType,
     name: c.identity.business_name, description: c.identity.short_description || c.identity.description, url: site.baseUrl,
     telephone: l?.phone || c.identity.phone || undefined, email: c.identity.email || undefined,
-    address: l ? { '@type': 'PostalAddress', streetAddress: [l.address_line1, l.address_line2].filter(Boolean).join(', '), addressLocality: l.city, addressRegion: l.region, postalCode: l.postal_code, addressCountry: l.country } : undefined,
+    // item 334: a business that goes to its customers shows no street; its town and state, when kept, still place it
+    address: l && !goesOut(c) ? { '@type': 'PostalAddress', streetAddress: [l.address_line1, l.address_line2].filter(Boolean).join(', '), addressLocality: l.city, addressRegion: l.region, postalCode: l.postal_code, addressCountry: l.country }
+      : l && (l.city || l.region) ? { '@type': 'PostalAddress', addressLocality: l.city || undefined, addressRegion: l.region || undefined, addressCountry: l.country } : undefined,
     openingHoursSpecification: spec, specialOpeningHoursSpecification: special.length ? special : undefined,
     areaServed: reservations ? undefined : c.identity.service_area || undefined,
     menu: v.isMenu ? `${site.baseUrl}${v.offeringPath}` : undefined,
@@ -314,7 +324,7 @@ ${o.body}
 </main>
 <footer class="site"><div class="wrap">
   <div class="cols">
-    <div><h2>${esc(i.business_name)}</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${footerPlace(c)}${(c.settings?.footer?.social !== false) && social ? `<p>${social}</p>` : ''}</div>
+    <div><h2>${esc(i.business_name)}</h2>${addr ? `<address>${addr}</address>` : ''}${areaBlock(c, 'We come to you')}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${footerPlace(c)}${(c.settings?.footer?.social !== false) && social ? `<p>${social}</p>` : ''}</div>
     <div>${(c.settings?.footer?.hours !== false) && loc0(c) ? hoursTable(c, 'Hours') : ''}</div>
   </div>
   <div class="credit"><span>© ${esc(i.business_name)}</span><span>${legalFooterLinks()}</span>${credit}</div>
@@ -455,7 +465,7 @@ function homeBody(look: TemplateLook, c: SnapshotContent, v: IndustryVocab, word
   const showMail = panel && !!mail;
   const strip = (loc0(c) || tel || maps || showMail) ? `<div class="strip"><div class="wrap">
   <span id="open-now" class="open-now" aria-live="polite"></span>
-  ${loc0(c) ? `<span${pr('location.address')}>${esc(loc0(c)!.address_line1)}, ${esc(loc0(c)!.city)}</span>` : ''}
+  ${loc0(c) && !goesOut(c) ? `<span${pr('location.address')}>${esc(loc0(c)!.address_line1)}, ${esc(loc0(c)!.city)}</span>` : ''}${goesOut(c) && plain && i.service_area ? `<span${pr('identity.service_area')}>${esc(i.service_area)}</span>` : ''}
   ${tel ? `<span>${tel}</span>` : ''}${panel ? `
   ${mail ? `<span>${mail}</span>` : ''}` : ''}
   ${maps ? `<span><a href="${attr(maps)}" rel="noopener">Get directions</a></span>` : ''}
@@ -534,7 +544,7 @@ function contactBody(look: TemplateLook, c: SnapshotContent, site: SiteConfig, w
     : (mail ? `<p style="margin-top:18px"><a class="btn" href="mailto:${attr(i.email)}">Email us</a></p>` : '');
   return `<section class="block wrap"><h1>Contact &amp; hours</h1>
 <div class="cards"${inline ? '' : ' style="margin-top:8px"'}>
-  <div class="card"><h2>${esc(words.reach)}</h2>${addr ? `<address>${addr}</address>` : ''}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${maps ? `<p><a href="${attr(maps)}" rel="noopener">Get directions</a></p>` : ''}</div>
+  <div class="card"><h2>${esc(words.reach)}</h2>${addr ? `<address>${addr}</address>` : ''}${areaBlock(c, words.where)}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${maps ? `<p><a href="${attr(maps)}" rel="noopener">Get directions</a></p>` : ''}</div>
   <div class="card">${loc0(c) ? hoursTable(c, 'Hours') : ''}</div>${contactPlace(c, hoursTable)}
 </div>${form}</section>`;
 }
@@ -630,7 +640,8 @@ export function makeRender(look: TemplateLook): RenderFn {
 
     // Item 299: an event happens at the business's address unless it names its own place
     const l0 = loc0(c);
-    const place = l0 && l0.address_line1 ? { name: i.business_name, address: [l0.address_line1, l0.address_line2, l0.city, [l0.region, l0.postal_code].filter(Boolean).join(' ')].map((x) => String(x || '').trim()).filter(Boolean).join(', ') } : undefined;
+    // item 334: a business that goes to its customers lends no address to an event that has no place of its own
+    const place = l0 && l0.address_line1 && !goesOut(c) ? { name: i.business_name, address: [l0.address_line1, l0.address_line2, l0.city, [l0.region, l0.postal_code].filter(Boolean).join(' ')].map((x) => String(x || '').trim()).filter(Boolean).join(', ') } : undefined;
     const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at, src: c.settings?.blocks_src, place });   // Phase T-BLOCKS (+ FB form blocks + BK booking + EXP window)
     const ldBiz = ldBusiness(c, site, v, !!classic?.reservations);
     // Phase RV: fold the HONEST reviews schema (AggregateRating + Review, approved rows
@@ -646,7 +657,7 @@ export function makeRender(look: TemplateLook): RenderFn {
       page('/faq/', { ...seoOv('faq', `FAQ — ${i.business_name}`, `Answers to common questions about ${i.business_name}.`), ld: [ldFaq(c)], active: 'faq', body: faqBody(c) });
       if (noidx.has('faq')) markNoindex('faq/index.html');
     }
-    page('/contact/', { ...seoOv('contact', `Contact & Hours — ${i.business_name}`, words.contactDescription(i.business_name)), ld: [ldBiz, ...ldPlaces(c, site, v.schemaType)], active: 'contact', body: contactBody(look, c, site, words) });
+    page('/contact/', { ...seoOv('contact', `Contact & Hours — ${i.business_name}`, goesOut(c) ? `Phone, hours and the places ${i.business_name} serves.` : words.contactDescription(i.business_name)), ld: [ldBiz, ...ldPlaces(c, site, v.schemaType)], active: 'contact', body: contactBody(look, c, site, words) });
     if (noidx.has('contact')) markNoindex('contact/index.html');
     page('/thanks/', { title: `Thank you — ${i.business_name}`, description: `Your message to ${i.business_name} was sent.`, ld: [], active: 'contact', body: band(look, `<h1>Thank you — your message was sent.</h1><p class="tagline">${esc(i.business_name)} will get back to you soon.</p><div class="cta-row"><a class="btn" href="/">Back to the site</a></div>`) });
     files['thanks/index.html'] = (files['thanks/index.html'] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">');

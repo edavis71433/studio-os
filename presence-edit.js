@@ -4111,7 +4111,7 @@ function pbButtons() {
   const i = S.identity || {}, loc = S.location || {}, out = [];
   const tel = String(loc.phone || i.phone || "").trim().replace(/\s*(?:ext\.?|extension|x|#)\s*\d+\s*$/i, "").replace(/\D/g, "");
   if (tel.length >= 7) out.push("Call");
-  if (String(loc.address_line1 || "").trim()) out.push("Directions");
+  if (String(loc.address_line1 || "").trim() && loc.goes_to_customers !== true) out.push("Directions");   // item 334: as the live bar (lib/phone_bar.ts)
   if (loc.temporarily_closed || (loc.hours || []).some((d) => d && !d.closed && (d.intervals || []).length)) out.push("Hours");
   if (/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(String(i.email || "").trim())) out.push("Email");
   return out;

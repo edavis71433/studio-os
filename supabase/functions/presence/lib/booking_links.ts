@@ -100,13 +100,15 @@ export interface BookingBits { name: string; location: string; tel: string; mail
 export async function bookingBits(siteId: string): Promise<{ biz: BookingBits; opts: BookingOptions; leadHours: number }> {
   const [ident, loc, set, opts] = await Promise.all([
     svc(`presence_identity?site_id=eq.${siteId}&select=business_name,email,phone&limit=1`).catch(() => null),
-    svc(`presence_locations?site_id=eq.${siteId}&select=address_line1,address_line2,city,region,postal_code,phone&limit=1`).catch(() => null),
+    // every column (*): reads the same before and after 0255 adds goes_to_customers
+    svc(`presence_locations?site_id=eq.${siteId}&select=*&limit=1`).catch(() => null),
     svc(`presence_booking_settings?site_id=eq.${siteId}&select=lead_time_hours&limit=1`).catch(() => null),
     bookingOptions(siteId),
   ]);
   const i = rows(ident)[0] || {}, l = rows(loc)[0] || {};
   const line = (...xs: unknown[]) => xs.map((x) => String(x ?? '').trim()).filter(Boolean);
-  const location = l.address_line1 ? [line(l.address_line1, l.address_line2).join(' '), line(l.city, line(l.region, l.postal_code).join(' ')).join(', ')].filter(Boolean).join(', ') : '';
+  // builder list item 334: a business that goes to its customers comes to them, so no address to give
+  const location = l.address_line1 && l.goes_to_customers !== true ? [line(l.address_line1, l.address_line2).join(' '), line(l.city, line(l.region, l.postal_code).join(' ')).join(', ')].filter(Boolean).join(', ') : '';
   const tel = String(l.phone || i.phone || '').trim().slice(0, 40), mail = String(i.email || '').trim().slice(0, 254);
   const lead = Number(rows(set)[0]?.lead_time_hours);
   return {

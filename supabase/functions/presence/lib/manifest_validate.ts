@@ -37,7 +37,11 @@ export function validateSnapshot(snapshot: Snapshot, manifest: TemplateManifest)
   const l = c.locations?.[0] ?? null;
   if (!l) b.push({ field: 'location', message: 'Your address and hours are required before publishing.' });
   else {
-    for (const [f, label] of [['address_line1', 'street address'], ['city', 'city'], ['region', 'state'], ['postal_code', 'ZIP code'], ['timezone', 'timezone']] as const) {
+    // Builder list item 334: a business that goes to its customers has no shopfront to show,
+    // so it names the places it serves instead of a street, city, state and ZIP.
+    const goes = l.goes_to_customers === true;
+    if (goes && !i?.service_area?.trim()) b.push({ field: 'identity.service_area', message: 'Say where you work, the towns or areas you serve. It shows where an address would.' });
+    for (const [f, label] of (goes ? [['timezone', 'timezone']] : [['address_line1', 'street address'], ['city', 'city'], ['region', 'state'], ['postal_code', 'ZIP code'], ['timezone', 'timezone']]) as ReadonlyArray<readonly [string, string]>) {
       if (!(l as any)[f]?.trim?.()) b.push({ field: `location.${f}`, message: `Your ${label} is required before publishing.` });
     }
     const days = Array.isArray(l.hours) ? l.hours : [];

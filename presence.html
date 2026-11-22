@@ -134,7 +134,7 @@
           <h5 class="rune" id="bizContactH">Contact</h5>
           <div class="field"><label for="f-phone">Phone</label><input type="tel" class="mono" id="f-phone" data-sing="identity" data-field="phone" maxlength="32"><div class="hint" data-shows="phone"></div></div>
           <div class="field"><label for="f-email">Email</label><input type="email" id="f-email" data-sing="identity" data-field="email" maxlength="160"><div class="hint" data-shows="email"></div></div>
-          <div class="field"><label for="f-service_area">Where you work</label><input type="text" id="f-service_area" data-sing="identity" data-field="service_area" maxlength="200" placeholder="e.g. Serving Austin and the Hill Country"><div class="hint" data-shows="service_area"></div></div>
+          <div id="areaHome"><div class="field" id="areaField"><label for="f-service_area">Where you work</label><input type="text" id="f-service_area" data-sing="identity" data-field="service_area" maxlength="200" placeholder="e.g. Serving Austin and the Hill Country"><div class="hint" data-shows="service_area"></div></div></div>
           <div class="field"><label for="f-booking_url">Reservation link</label><input type="url" id="f-booking_url" data-sing="identity" data-field="booking_url" placeholder="https://…"><div class="hint" data-shows="booking_url"></div></div>
           <div class="field"><label for="f-ordering_url">Online ordering link</label><input type="url" id="f-ordering_url" data-sing="identity" data-field="ordering_url" placeholder="https://…"><div class="hint" data-shows="ordering_url"></div></div>
           </section>
@@ -142,6 +142,10 @@
           <div class="biz-col">
           <section class="biz-card" aria-labelledby="bizPlacesH">
           <h5 class="rune" id="bizPlacesH">Locations <span class="whisper" id="save-location"></span></h5>
+          <label class="closedrow" id="goesRow" hidden><input type="checkbox" id="goesSwitch" aria-describedby="goesHint"> We go to our customers</label>
+          <p class="hint" id="goesHint" hidden></p>
+          <div id="goesArea"></div>
+          <div id="bizAddr">
           <p class="biz-place"><span class="biz-pin" aria-hidden="true"></span>Main location <span class="biz-chip">Shows first</span></p>
           <div class="field"><label for="f-address_line1">Street address</label><input type="text" id="f-address_line1" data-sing="location" data-field="address_line1" maxlength="160"><div class="hint" data-shows="address"></div></div>
           <div class="biz-row3">
@@ -151,6 +155,7 @@
           </div>
           <div class="field"><label for="f-locphone">Phone at this location</label><input type="tel" class="mono" id="f-locphone" data-sing="location" data-field="phone" maxlength="32"><div class="hint" data-shows="locphone"></div></div>
           <div class="biz-place2" id="place2"></div>
+          </div>
           </section>
           <section class="biz-card" aria-labelledby="bizHoursH">
           <h5 class="rune" id="bizHoursH">Hours <span class="whisper" id="save-hours"></span></h5>
