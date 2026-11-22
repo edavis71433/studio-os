@@ -43,8 +43,11 @@ const SITE_FAMILIES: Family[] = ['jpeg', 'png', 'webp', 'pdf'];   // lib/media.t
 export const STUDIO_ONLY_MIME = new Set([...STUDIO_FILE_MIME].filter((m) => !SITE_FAMILIES.includes(STUDIO_KINDS[m].family)));
 /** The file extensions those kinds are stored under (a storage path's tail). */
 export const STUDIO_ONLY_EXT = new Set([...STUDIO_ONLY_MIME].map((m) => STUDIO_KINDS[m].ext));
-/** What the page may offer in its file box (the `accept` list), in this order. */
-export const STUDIO_ACCEPT = [...STUDIO_FILE_MIME, '.jpg', '.jpeg', '.png', '.webp', '.pdf', '.docx', '.doc', '.txt', '.svg', '.ai', '.eps', '.heic', '.heif', '.zip', '.mp4', '.mov'].join(',');
+/** What the page may offer in its file box (the `accept` list), in this order. The
+ *  extensions sit on their own line: the walls check reads a quoted string on an
+ *  `export` line as a path to follow (tests/workflows/isolation_scope_test.mjs). */
+const STUDIO_ACCEPT_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.docx', '.doc', '.txt', '.svg', '.ai', '.eps', '.heic', '.heif', '.zip', '.mp4', '.mov'];
+export const STUDIO_ACCEPT = [...STUDIO_FILE_MIME, ...STUDIO_ACCEPT_EXT].join(',');
 
 export const isStudioFileMime = (m: string) => STUDIO_FILE_MIME.has(m);
 /** A kind the website editor's picker must never list (derived from the mime; no new column). */
