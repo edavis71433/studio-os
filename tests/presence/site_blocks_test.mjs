@@ -296,7 +296,8 @@ const ctx = { esc, attr, safeHref };
     { label: 'Basic', body: 'Cheap **plan**' }, { label: 'Pro', body: 'Better' },
     { label: '<script>x</script>', body: 'safe' },
   ] }]), REF), ctx)[0];
-  ok('tabs render the zero-JS radio pattern (radios + labels + panels) with a tablist', tabR.html.includes('block-tabs') && tabR.html.includes('type="radio"') && (tabR.html.match(/class="tab-panel"/g) || []).length === 3 && tabR.html.includes('role="tablist"') && tabR.html.includes('<strong>plan</strong>'));
+  // item 307: no tablist role, since the labels aren't tabs (automated checkers flagged the pair)
+  ok('tabs render the zero-JS radio pattern (radios + labels + panels), with no tablist role', tabR.html.includes('block-tabs') && tabR.html.includes('type="radio"') && (tabR.html.match(/class="tab-panel"/g) || []).length === 3 && !tabR.html.includes('role="tablist"') && tabR.html.includes('<strong>plan</strong>'));
   ok('tabs are zero-JS (no <script>) and exactly the first tab is pre-selected', !/<script/i.test(tabR.html) && tabR.html.includes('id="site-tabs-0" class="tab-radio" checked') && (tabR.html.match(/checked/g) || []).length === 1);
   ok('tabs escape a hostile label (no executable markup survives)', tabR.html.includes('&lt;script&gt;x&lt;/script&gt;') && !tabR.html.includes('<script>x'));
   ok('tabs CSS (hidden radios + hidden panels + checked-reveal) is defined in BLOCK_CSS', /\.block-tabs \.tab-panel\{display:none/.test(BLOCK_CSS) && /\.tab-radio:nth-of-type\(1\):checked~\.tab-panels \.tab-panel:nth-of-type\(1\)/.test(BLOCK_CSS) && /display:block\}/.test(BLOCK_CSS));
@@ -517,11 +518,11 @@ const ctx = { esc, attr, safeHref };
     const plain = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', title: 'Work', image_ids: [G, H] }]), REF), ctx)[0].html;
     const junk = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', title: 'Work', image_ids: [G, H], zoom: 'yes' }]), REF), ctx)[0].html;
     return plain === junk && !plain.includes('v-zoom') && !plain.includes('class="lb') && !plain.includes('ga-zoom') && !plain.includes('#lb-')
-      && plain.includes('<figure class="ga"><picture>') && plain.includes('<figcaption data-dds-field="captions.0">Our work</figcaption>');
+      && plain.includes('<figure class="ga"><picture>') && !plain.includes('<figcaption');   // item 298: the alt text is no caption
   })());
-  ok('captions without zoom show in the grid figcaption (alt stays the fallback)', (() => {
+  ok('captions without zoom show in the grid figcaption, only where the owner wrote one (item 298)', (() => {
     const r = renderSiteBlocks(resolveBlockMedia(validateBlocks([{ type: 'gallery', image_ids: [G, H], captions: ['Front porch', ''] }]), REF), ctx)[0].html;
-    return r.includes('<figcaption data-dds-field="captions.0">Front porch</figcaption>') && r.includes('<figcaption data-dds-field="captions.1">Our work</figcaption>') && !r.includes('v-zoom');
+    return r.includes('<figcaption data-dds-field="captions.0">Front porch</figcaption>') && !r.includes('captions.1') && (r.match(/<figcaption/g) || []).length === 1 && !r.includes('v-zoom');
   })());
 
   // — render: zoom markup — thumbs are anchors, overlays are :target figures —

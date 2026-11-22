@@ -357,6 +357,13 @@ export async function handleCollection(req: Request, db: SiteDb, site: SiteRow, 
     if (v.fields.length === 0) return json({ error: 'empty_update', message: 'No editable fields were provided.' }, 400, cors);
     if ('media_id' in v.cleanBody && !(await mediaBelongs(site.id, v.cleanBody.media_id))) return json({ error: 'bad_media', message: 'That photo isn’t in your library.' }, 422, cors);
     if ('hero_media_id' in v.cleanBody && !(await mediaBelongs(site.id, v.cleanBody.hero_media_id))) return json({ error: 'bad_media', message: 'That photo isn’t in your library.' }, 422, cors);
+    // Item 300: a published update whose address changes keeps the old one working: a forward is added after the save
+    let oldSlug = '';
+    if (entity === 'posts' && typeof v.cleanBody.slug === 'string' && v.cleanBody.slug) {
+      const cur = await svc(`presence_posts?id=eq.${id}&site_id=eq.${site.id}&select=slug,published_at&limit=1`);
+      const row = cur.json?.[0];
+      if (row?.published_at && row.slug && row.slug !== v.cleanBody.slug) oldSlug = String(row.slug);
+    }
     if (entity === 'posts' && v.cleanBody.status) {
       const cur = await svc(`presence_posts?id=eq.${id}&site_id=eq.${site.id}&select=status,published_at&limit=1`);
       const row = cur.json?.[0];
@@ -376,6 +383,7 @@ export async function handleCollection(req: Request, db: SiteDb, site: SiteRow, 
     const action = v.fields.length === 1 && v.fields[0] === 'is_visible' ? (v.cleanBody.is_visible ? 'show' : 'hide')
       : v.fields.length === 1 && v.fields[0] === 'sort_order' ? 'reorder' : 'update';
     await writeChangeEvent({ siteId: site.id, entityType: spec.entityType, entityId: id, action, summary: `Updated a ${spec.noun}`, principal, provenance: 'human', fields: v.fields });
+    if (oldSlug) await forwardPostRename(site, principal, oldSlug, String(v.cleanBody.slug));
     return json({ data: w.json[0] }, 200, cors);
   }
 
@@ -500,6 +508,22 @@ const SETTINGS_CFG = {
     + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + AD_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS + ',' + POPUP_SETTINGS_COLS + ',' + SEARCH_SETTINGS_COLS + ',' + RECIPE_SETTINGS_COLS + ',' + BLOG_SETTINGS_COLS + ',' + SIGNER_SETTINGS_COLS + ',' + ICON_SETTINGS_COLS + ',' + ASKED_SETTINGS_COLS + ',' + INVOICE_SETTINGS_COLS,
   conflict: 'site_id', summary: 'Updated site settings',
 } as const;
+
+// Item 300: an update's address changed after it went live: the old address forwards to the new
+// one, through the same redirects manager a page rename uses (below). Best-effort after the save.
+async function forwardPostRename(site: SiteRow, principal: Principal, fromSlug: string, toSlug: string): Promise<void> {
+  try {
+    const from = `/updates/${fromSlug}/`, to = `/updates/${toSlug}/`;
+    await svc(`presence_redirects?site_id=eq.${site.id}&from_path=eq.${encodeURIComponent(to)}&to_path=eq.${encodeURIComponent(from)}`, { method: 'DELETE' });
+    await svc(`presence_redirects?site_id=eq.${site.id}&to_path=eq.${encodeURIComponent(from)}`, { method: 'PATCH', body: JSON.stringify({ to_path: to }) });
+    const existing = await svc(`presence_redirects?site_id=eq.${site.id}&from_path=eq.${encodeURIComponent(from)}&select=id&limit=1`);
+    if (Array.isArray(existing.json) && existing.json.length) return;
+    const cnt = await svc(`presence_redirects?site_id=eq.${site.id}&select=id&limit=51`);
+    if ((cnt.json ?? []).length >= 50) return;
+    const w = await svc('presence_redirects', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ site_id: site.id, from_path: from, to_path: to }) });
+    if (w.ok) await writeChangeEvent({ siteId: site.id, entityType: 'settings', entityId: null, action: 'update', summary: `Changed an update's address ${from} → ${to} and added a forward so old links keep working`, principal, provenance: 'human', fields: ['posts', 'redirect'] });
+  } catch { /* best-effort — the rename itself already succeeded */ }
+}
 
 // Wave-1 G7 (SC-7): a page-slug RENAME automatically forwards the old address —
 // through the EXISTING redirects manager (presence_redirects; same rows the

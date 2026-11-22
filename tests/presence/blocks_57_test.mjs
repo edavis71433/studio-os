@@ -227,7 +227,8 @@ const draw = (list) => renderSiteBlocks(resolveBlockMedia(validateBlocks(list), 
     fx.content.settings = { ...fx.content.settings, pages: [{ slug: 'blocks', title: 'Blocks', blocks: page.blocks, blocks_src: page.src }] };
     const files = await renderSnapshot(fx, { baseUrl: 'https://shop.example', formEndpoint: EP });
     const cssPath = Object.keys(files).find((k) => /^assets\/site-[0-9a-f]+\.css$/.test(k));
-    const html = String(files['blocks/index.html']).replace(`<link rel="stylesheet" href="/${cssPath}">`, () => `<style>${files[cssPath]}</style>`);
+    // the site's script file (items 288 and 298) is left out of the browser fixture: the spec serves no files
+    const html = String(files['blocks/index.html']).replace(`<link rel="stylesheet" href="/${cssPath}">`, () => `<style>${files[cssPath]}</style>`).replace(/<script src="\/assets\/site-[0-9a-f]+\.js" defer><\/script>\n?/, '');
     ok(`[${slug}] the browser page carries its Blocks section, its stylesheet and the form sender`, html.includes('block-stack') && html.includes('.block-stack .stk{') && html.includes(`action="${EP}"`) && /<script[^>]*>[^<]*presence-form|data-dds-item="9"/.test(html) && !html.includes('/assets/site-'));
     const url = new URL(`tests/e2e/fixtures/blocks-57/${slug}.html`, ROOT);
     if (Deno.args.includes('--update-fixtures')) { Deno.mkdirSync(new URL('.', url), { recursive: true }); Deno.writeTextFileSync(url, html); }

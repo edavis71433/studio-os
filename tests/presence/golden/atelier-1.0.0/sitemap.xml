@@ -19,6 +19,12 @@
 <loc>https://vermilionandvine.example/updates/</loc>
 </url>
 <url>
+<loc>https://vermilionandvine.example/updates/category/news/</loc>
+</url>
+<url>
+<loc>https://vermilionandvine.example/updates/category/events/</loc>
+</url>
+<url>
 <loc>https://vermilionandvine.example/privacy/</loc>
 </url>
 <url>
@@ -31,12 +37,6 @@
 <url>
 <loc>https://vermilionandvine.example/updates/open-house/</loc>
 <lastmod>2026-02-02</lastmod>
-</url>
-<url>
-<loc>https://vermilionandvine.example/updates/category/news/</loc>
-</url>
-<url>
-<loc>https://vermilionandvine.example/updates/category/events/</loc>
 </url>
 <url>
 <loc>https://vermilionandvine.example/our-work/</loc>
