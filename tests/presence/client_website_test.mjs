@@ -230,7 +230,7 @@ const read=(p)=>Deno.readTextFileSync(new URL(p,ROOT));
 const cd=read('supabase/functions/presence/routes/client_delivery.ts');
 // builder item 258 (Nov 22 review): a site hosted elsewhere
 ok('route: a site of the monitor edition ("Hosted elsewhere") answers published:true and elsewhere:true, with its address',
-  /const elsewhere = site\.edition === 'monitor';/.test(cd) && /const published = elsewhere \|\| site\.status === 'live' \|\| !!site\.last_published_at;/.test(cd) && /published: true, elsewhere: true, month: null, search: searchE, site: \{ url: siteOrigin\(site\) \|\| null/.test(cd));
+  /const elsewhere = site\.edition === 'monitor';/.test(cd) && /const published = elsewhere \|\| publishedOnce\(site\);/.test(cd) && /published: true, elsewhere: true, month: null, search: searchE, site: \{ url: siteOrigin\(site\) \|\| null/.test(cd));
 ok('route: the hosted-elsewhere answer never reads the visit counter (it counts sites published from here)', (() => { const a = cd.indexOf('if (elsewhere) {'); const b = cd.indexOf('const statNowIso = nowIso();', a); return a > 0 && b > a && !/readVisitStats/.test(cd.slice(a, b)); })());
 const vs=read('supabase/functions/presence/lib/visit_stats.ts');
 const idx=read('supabase/functions/presence/index.ts');
