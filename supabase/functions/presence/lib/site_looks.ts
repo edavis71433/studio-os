@@ -54,17 +54,22 @@ const TEMPLATE_LAYER: Record<string, string> = {
 
 // A dark page. The template's cards, rules and shaded bands take the look's dark colours through
 // their variables (and a box's own fill, which some templates leave to the page colour, follows
-// it); what a template draws in its text colour (footers, top strips) or in a light see-through
-// colour (headers) is drawn on the dark card colour; what carries white words on the accent (the
-// announcement bar, the page's place in the menu, the steps' numbers) sits on the deeper accent
-// band; links a template leaves in the browser's blue take the accent's shade.
+// it); what a template draws in its text colour (footers, top strips) is drawn on the dark card
+// colour and its header on the page's own; what carries white words on the accent (the
+// announcement bar, the steps' numbers, and on Aurora and Meadow the page's place in the menu)
+// sits on the deeper accent band; links a template leaves in the browser's blue take the accent's shade.
 const DARK_LAYER = `${R}{color-scheme:dark;--paper:var(--bg)}`
   + `${R} header.site{background:var(--paper)}`
   + `${R} footer.site,${R} .strip{background:var(--card)}`
-  + `${R} .annbar,${R} .skip:focus,${R} nav.primary a[aria-current="page"],${R} .bk-done-ic{background:var(--accent-band);color:#fff}`
+  + `${R} .annbar,${R} .skip:focus,${R} .bk-done-ic{background:var(--accent-band);color:#fff}`
   + `${R} ol.process li::before{background:var(--accent-band);color:#fff}`
   + `${R} .annbar a{color:#fff}`
   + `${R} :where(a:not([class])){color:var(--accent-dark)}`;
+
+const TEMPLATE_DARK_LAYER: Record<string, string> = {
+  aurora: `${R} nav.primary a[aria-current="page"]{background:var(--accent-band)}`,
+  meadow: `${R} nav.primary a[aria-current="page"]{background:var(--accent-band)}`,
+};
 
 /** The settings, as stored, that this layer reads. Anything else (or a value the style layer
  *  refuses) draws nothing. Pure. */
@@ -88,7 +93,7 @@ export interface LookPlace { fixed?: boolean; template?: string }
 export function lookStyle(tokens: Record<string, unknown> | null | undefined, place: LookPlace = {}): string {
   const s = lookSettings(tokens), colours = !place.fixed;
   const css = (s.upper ? HEADINGS_UPPER : '') + (s.regular ? HEADINGS_REGULAR : '') + (s.corners ? BUTTON_CORNERS : '') + (s.offset ? BUTTON_OFFSET : '')
-    + (s.look && colours ? LOOK_LAYER + (TEMPLATE_LAYER[place.template || ''] || '') : '') + (s.dark && colours ? DARK_LAYER : '');
+    + (s.look && colours ? LOOK_LAYER + (TEMPLATE_LAYER[place.template || ''] || '') : '') + (s.dark && colours ? DARK_LAYER + (TEMPLATE_DARK_LAYER[place.template || ''] || '') : '');
   return css ? `<style id="dds-look">${css}</style>` : '';
 }
 
