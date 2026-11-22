@@ -175,7 +175,8 @@ export function signupForm(id: string, endpoint: string | undefined, button: str
   return `<form class="card nl-form" method="post"${action}><input type="hidden" name="form_kind" value="signup"><input type="hidden" name="source_page" value="/">` +
     `<p class="hp" aria-hidden="true"><label for="${attr(id)}-hp">Leave this field empty</label><input id="${attr(id)}-hp" name="_hp" tabindex="-1" autocomplete="off"></p>` +
     `<div class="nl-row"><label class="nl-label" for="${attr(id)}-email">Your email</label><input type="email" id="${attr(id)}-email" name="email" required maxlength="254" autocomplete="email" placeholder="you@example.com"><button class="btn" type="submit"${buttonAttrs}>${esc(button)}</button></div>` +
-    `<p class="nl-consent"><label><input type="checkbox" name="consent" value="yes" required> ${esc(SIGNUP_CONSENT)}</label></p></form>`;
+    `<p class="nl-consent"><label><input type="checkbox" name="consent" value="yes" required> ${esc(SIGNUP_CONSENT)}</label></p>` +
+    `<noscript><p class="ff-noscript">Please call or email us; this form needs scripts turned on.</p></noscript></form>`;   // item 305
 }
 
 // ── Builder list item 148: the pop-up and the forms a link opens ──────────────

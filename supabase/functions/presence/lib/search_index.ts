@@ -43,6 +43,9 @@ export interface SearchIndexOpts {
   /** the offerings page path + label for this site's industry (e.g. '/menu/' 'Menu'). */
   offeringPath: string;
   offeringLabel: string;
+  /** Item 297: false when the FAQ or Updates page is left out of the site for having nothing on it. */
+  faqPage?: boolean;
+  updatesPage?: boolean;
 }
 
 /** Build the site's search index from its published content. Deterministic order:
@@ -187,7 +190,7 @@ export function searchPageBody(esc: Esc, opts: SearchIndexOpts): string {
 </form>
 <p class="search-status" id="search-status" role="status" aria-live="polite"></p>
 <ol class="search-results" id="search-results"></ol>
-<noscript><p class="search-note">Search needs JavaScript turned on. In the meantime you can browse: <a href="/">Home</a> · <a href="${off}">${label}</a> · <a href="/faq/">FAQ</a> · <a href="/updates/">Updates</a> · <a href="/contact/">Contact</a>.</p></noscript>
+<noscript><p class="search-note">Search needs JavaScript turned on. In the meantime you can browse: <a href="/">Home</a> · <a href="${off}">${label}</a> · ${opts.faqPage === false ? '' : '<a href="/faq/">FAQ</a> · '}${opts.updatesPage === false ? '' : '<a href="/updates/">Updates</a> · '}<a href="/contact/">Contact</a>.</p></noscript>
 </section>`;
 }
 

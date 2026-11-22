@@ -165,11 +165,18 @@ export interface SectionMapEntry { sid: string; key: string; src_index: number }
 // keeps NO `look` key and renders byte-identically (goldens only drift by CSS).
 /** Item 225: the shapes a section's bottom edge can take (BLOCK_CSS .block--edge-*). */
 export const SECTION_EDGES = ['wave', 'slant', 'curve', 'peak', 'zigzag'] as const;
-function parseLook(raw: unknown): BlockLook | undefined {
+/** Item 292: the sections that can carry a photo behind them. */
+export const PHOTO_BG_TYPES: ReadonlySet<string> = new Set(['cta', 'spotlight', 'title']);
+function parseLook(raw: unknown, type = ''): BlockLook | undefined {
   const l = (raw && typeof raw === 'object') ? (raw as any).look : undefined;
   if (!l || typeof l !== 'object') return undefined;
   const out: BlockLook = {};
   if (l.background === 'tinted' || l.background === 'plain' || l.background === 'accent' || l.background === 'dark') out.background = l.background;
+  // item 292: a photo behind the section, with a veil so the words read; only with a photo chosen
+  else if (l.background === 'photo' && PHOTO_BG_TYPES.has(type) && uid(l.photo_id)) {
+    out.background = 'photo'; out.photo_id = uid(l.photo_id);
+    out.veil = l.veil === 'light' ? 'light' : 'dark';
+  }
   if (l.width === 'full') out.width = 'full';
   if (l.spacing === 'tight' || l.spacing === 'roomy') out.spacing = l.spacing;
   if (l.align === 'center') out.align = 'center';
@@ -408,7 +415,9 @@ function validateBlocksTracked(raw: unknown): { blocks: StoredBlock[]; src: numb
     let block: StoredBlock | null = null;
     switch (type as SiteBlockType) {
       case 'features': {
-        const items = arr((b as any).items).map((it) => ({ title: s(it?.title, 80), text: s(it?.text, 240) || undefined, icon: s(it?.icon, 12) || undefined })).filter((it) => it.title).slice(0, CAP.features);
+        // item 304: an icon is one of the line icons ("icon:<name>") or, as before, a few typed characters
+        const iconOf = (v: unknown) => { const t = s(v, 20); return /^icon:/.test(t) ? (LINE_ICONS[t.slice(5)] ? t : '') : t.slice(0, 12); };
+        const items = arr((b as any).items).map((it) => ({ title: s(it?.title, 80), text: s(it?.text, 240) || undefined, icon: iconOf(it?.icon) || undefined })).filter((it) => it.title).slice(0, CAP.features);
         if (items.length) block = { type: 'features', title, items } as SiteBlockFeatures;
         break;
       }
@@ -538,6 +547,7 @@ function validateBlocksTracked(raw: unknown): { blocks: StoredBlock[]; src: numb
           const ev: SiteBlockEvents['items'][number] = { name: s(it?.name, 100), date: s(it?.date, 40) };
           const time = s(it?.time, 40); if (time) ev.time = time;
           const detail = s(it?.detail, 240); if (detail) ev.detail = detail;
+          const place = s(it?.place, 160); if (place) ev.place = place;   // item 299: where it happens
           const url = s(it?.url, 300); if (/^https?:\/\//i.test(url)) ev.url = url;
           return ev;
         }).filter((it) => it.name && it.date).slice(0, CAP.events);
@@ -803,7 +813,7 @@ function validateBlocksTracked(raw: unknown): { blocks: StoredBlock[]; src: numb
       }
     }
     if (block) {
-      const look = parseLook(b);   // Phase T-STYLE: attach validated per-section style (or nothing)
+      const look = parseLook(b, type);   // Phase T-STYLE: attach validated per-section style (or nothing)
       // G27: attach the validated per-element style override (or nothing). Precedence
       // rule (VALIDATED, not just rendered): style.bg_color and look.background are
       // mutually exclusive — the look bands force light text for contrast
@@ -860,9 +870,30 @@ const lk = (b: StoredBlock) => ({
   ...(b.variant ? { variant: b.variant } : {}),   // Wave-1 G4: the style variant rides the rebuild too
   ...(isAnchor(b.anchor) ? { anchor: b.anchor } : {}),   // item 225: so does the section's link name
 });
+// Item 292: the photo behind a section rides the look. Resolved here like any other photo
+// (through the one ref(), so it lands in the media manifest); gone from the library, the
+// section falls back to its template's own band.
+function lookPhotoIn(b: StoredBlock, ref: (id: string) => MediaRef | null): StoredBlock {
+  const look = b.look as BlockLook | undefined;
+  if (!look || look.background !== 'photo') return b;
+  const { photo_id, ...rest } = look;
+  const photo = photo_id ? ref(photo_id) : null;
+  if (!photo) { const { background: _bg, veil: _v, ...plain } = rest; return { ...b, look: Object.keys(plain).length ? plain : undefined } as StoredBlock; }
+  return { ...b, look: { ...rest, photo } } as StoredBlock;
+}
+// deno-lint-ignore no-explicit-any
+function lookPhotoOut(b: any, idOf: (m: MediaRef) => string | null): any {
+  const look = b.look as BlockLook | undefined;
+  if (!look || look.background !== 'photo') return b;
+  const { photo, ...rest } = look;
+  const id = photo && typeof photo === 'object' ? idOf(photo) : null;
+  if (!id) { const { background: _bg, veil: _v, ...plain } = rest; return { ...b, look: Object.keys(plain).length ? plain : undefined }; }
+  return { ...b, look: { ...rest, photo_id: id } };
+}
 export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => MediaRef | null, extras?: BlockResolveExtras): SiteBlock[] {
   const out: SiteBlock[] = [];
-  for (const b of blocks) {
+  for (const raw of blocks) {
+    const b = lookPhotoIn(raw, ref);
     switch (b.type) {
       case 'team':
         out.push({ type: 'team', title: b.title, members: b.members.map((m) => ({ name: m.name, role: m.role, bio: m.bio, media: m.media_id ? ref(m.media_id) : null })), ...lk(b) });
@@ -1016,8 +1047,9 @@ export function unresolveBlockMedia(blocks: unknown, idOf: (m: MediaRef) => stri
   const id = (m: MediaRef | null | undefined): string | null => (m && typeof m === 'object' ? idOf(m) : null);
   const put = (key: string, m: MediaRef | null | undefined): Record<string, string> => { const v = id(m); return v ? { [key]: v } : {}; };
   const out: StoredBlock[] = [];
-  for (const b of arr(blocks)) {
-    if (!b || typeof b !== 'object') continue;
+  for (const raw of arr(blocks)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const b = lookPhotoOut(raw, idOf);
     switch (b.type) {
       case 'team':
         out.push({ type: 'team', title: b.title, members: arr(b.members).map((m) => ({ name: m.name, role: m.role, bio: m.bio, ...put('media_id', m.media) })), ...lk(b) });
@@ -1213,6 +1245,8 @@ export interface BlockRenderCtx {
    *  steps that shift the per-type sid counters. Absent (an old snapshot, a
    *  direct unit call) → no attribute; the canvas falls back to the sid join. */
   src?: number[];
+  /** Item 299: the business's name and address, the place an event has unless it names its own. */
+  place?: { name: string; address: string };
 }
 
 // G13: a rendered block's ROOT tag — the applyStyle idiom widened one character
@@ -1234,6 +1268,19 @@ const numericPrice = (p?: string): string | undefined => {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME_24_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+/** Item 299: has this event's day passed at `nowIso`? An event stays listed through its own day,
+ *  everywhere on earth (its day ends at the end of that date in UTC plus nothing: the sweep's
+ *  "until" bound, lib/content_window.ts eventUntil, is the same instant). Pure. */
+export const eventUntil = (ymd: string): string | null => (ISO_DATE_RE.test(ymd) ? `${ymd}T23:59:59.999Z` : null);
+export function eventPassed(ymd: string, nowIso: string): boolean {
+  const until = eventUntil(ymd);
+  return !!until && until < nowIso;
+}
+/** Item 303: "2026-05-02" → "May 2, 2026" (null when not a plausible ISO date). */
+const humanDateLong = (d: string): string | null => {
+  const m = ISO_DATE_RE.exec(d); if (!m) return null;
+  const short = humanDate(d); return short ? `${short}, ${m[1]}` : null;
+};
 /** "2026-07-26" → "Jul 26" (null when not a plausible ISO date). */
 const humanDate = (d: string): string | null => {
   const m = ISO_DATE_RE.exec(d); if (!m) return null;
@@ -1264,6 +1311,38 @@ const socialIcon = (network: string): string => {
   const key = network === 'twitter' ? 'x' : network;
   return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SOCIAL_ICONS[key] || SOCIAL_ICONS.link}</svg>`;
 };
+
+// ── Item 304: a small set of line icons for "Why choose us", drawn in the site's accent colour.
+//    One stroke weight, 24-unit box, no outside file. The editor offers the same set in a grid;
+//    a feature's icon is stored as "icon:<name>". ──
+export const LINE_ICONS: Record<string, string> = {
+  star: '<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/>',
+  check: '<path d="M20 6L9 17l-5-5"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  heart: '<path d="M12 20s-7-4.6-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.4-7 10-7 10z"/>',
+  leaf: '<path d="M4 20c0-9 5-14 16-16-1 11-6 16-15 16"/><path d="M4 20l8-8"/>',
+  bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  tool: '<path d="M14.7 6.3a4 4 0 0 0 5 5L22 8.5 15.5 2 12.7 4.3a4 4 0 0 0 2 2z"/><path d="M3 21l9.5-9.5"/>',
+  phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
+  home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  'map-pin': '<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  award: '<circle cx="12" cy="9" r="6"/><path d="M8.5 14L7 22l5-3 5 3-1.5-8"/>',
+  smile: '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  truck: '<path d="M1 7h13v9H1z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="5" cy="18" r="2"/><circle cx="18" cy="18" r="2"/>',
+  dollar: '<path d="M12 2v20"/><path d="M17 6.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.5 5 3 5 1.6 5 3.5-2.2 3.5-5 3.5-5-1.6-5-3.5"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><circle cx="17" cy="9" r="2.5"/><path d="M22 19c0-2.6-1.8-4.5-4.5-4.8"/>',
+  chat: '<path d="M21 12a8 8 0 0 1-8 8H6l-3 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2.5 2.5"/>',
+  gift: '<rect x="3" y="9" width="18" height="12" rx="2"/><path d="M12 9v12M3 14h18"/><path d="M12 9c-2-4-7-4-7-1s5 1 7 1zm0 0c2-4 7-4 7-1s-5 1-7 1z"/>',
+  eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+};
+export const lineIcon = (name: string): string =>
+  `<svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${LINE_ICONS[name] || LINE_ICONS.star}</svg>`;
 
 // ── Anchors + Table of contents ──────────────────────────────────────────────
 // Blocks whose section ALWAYS shows an <h2> (title or this fallback). The fallback
@@ -1324,6 +1403,7 @@ function lookClasses(look?: BlockLook): string {
   else if (look.background === 'plain') c.push('block--bg-plain');
   else if (look.background === 'accent') c.push('block--bg-accent');
   else if (look.background === 'dark') c.push('block--bg-dark');
+  else if (look.background === 'photo' && look.photo) c.push('block--bg-photo', look.veil === 'light' ? 'veil-light' : 'veil-dark');   // item 292
   if (look.width === 'full') c.push('block--full');
   if (look.spacing === 'tight') c.push('block--space-tight');
   else if (look.spacing === 'roomy') c.push('block--space-roomy');
@@ -1351,7 +1431,7 @@ const EMPTY_WORDS: Record<string, [string, string]> = {
 // width limit: the colour and the limit were on one element, with the page colour either
 // side. The colour now goes on the full-width band and the limit on an inner box, the way the
 // `alt` sections are built. A section with no colour of its own is untouched. ──
-const BAND_CLASS_RE = /(?:^| )(?:block--bg-(?:tint|accent|dark)|ov-bg)(?: |$)/;
+const BAND_CLASS_RE = /(?:^| )(?:block--bg-(?:tint|accent|dark|photo)|ov-bg)(?: |$)/;
 function fullBand(html: string): string {
   const m = /^<(section|nav|div)((?:\s+[a-z-]+="[^"]*")*?)\s+class="([^"]*)"([^>]*)>/.exec(html);
   if (!m) return html;
@@ -1369,6 +1449,15 @@ function applyLook(html: string, look?: BlockLook): string {
   const cls = lookClasses(look);
   if (!cls || !html) return html;
   return html.replace('class="block ', `class="block ${cls} `);
+}
+/** Item 292: the photo behind a section, as the section's first child (after fullBand, so it
+ *  spans the band, not the inner box). The veil is drawn by the stylesheet (BLOCK_CSS). */
+function withPhoto(html: string, look: BlockLook | undefined, esc: (s: string) => string, attr: (s: string) => string): string {
+  if (!look || look.background !== 'photo' || !look.photo || !html) return html;
+  const open = /^<(section|nav|div)\b[^>]*>/.exec(html);
+  if (!open) return html;
+  const pic = `<div class="bg-photo" aria-hidden="true">${blockImg(look.photo, esc, attr, '100vw', { decorative: true })}</div>`;
+  return html.slice(0, open[0].length) + pic + html.slice(open[0].length);
 }
 
 // ── G27 · per-element style overrides → the HYBRID render (design doc §4). The
@@ -1555,7 +1644,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
     switch (b.type) {
       case 'features':
         html = `<section class="block wrap block-features">${h2(b.title, 'Why choose us', 'title')}<div class="svc-grid">${b.items.map((it, i) =>
-          `<div class="svc">${it.icon ? `<div class="svc-ic" aria-hidden="true">${esc(it.icon)}</div>` : ''}<div class="nm"${dds(`items.${i}.title`)}>${esc(it.title)}</div>${it.text ? `<div class="ds"${dds(`items.${i}.text`)}>${esc(it.text)}</div>` : ''}</div>`).join('')}</div></section>`;
+          `<div class="svc">${it.icon ? (LINE_ICONS[it.icon.replace(/^icon:/, '')] && it.icon.startsWith('icon:') ? `<div class="svc-ic svc-ic-line" aria-hidden="true">${lineIcon(it.icon.slice(5))}</div>` : `<div class="svc-ic" aria-hidden="true">${esc(it.icon)}</div>`) : ''}<div class="nm"${dds(`items.${i}.title`)}>${esc(it.title)}</div>${it.text ? `<div class="ds"${dds(`items.${i}.text`)}>${esc(it.text)}</div>` : ''}</div>`).join('')}</div></section>`;
         break;
       case 'stats':
         html = `<section class="block alt block-stats"><div class="wrap">${h2(b.title, 'By the numbers', 'title')}<div class="cards stats">${b.items.map((it, i) =>
@@ -1623,19 +1712,22 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         // HONEST LIMIT: without JavaScript there is no Escape-key close and no
         // focus trap — the close affordance is large (48px pill, top corner) and
         // the whole backdrop closes; documented in BLOCK_CSS too.
+        // Item 298: a caption shows only when the owner wrote one; the photo's description is for
+        // screen readers (the alt text) and names the photo in the zoom link, not under it.
         const caps = (b as { captions?: string[] }).captions || [];
-        const capOf = (m: MediaRef, i: number) => caps[i] || m.alt || '';
+        const capOf = (_m: MediaRef, i: number) => caps[i] || '';
+        const nameOf = (m: MediaRef, i: number) => caps[i] || m.alt || '';
         if ((b as { zoom?: true }).zoom) {
           const gid = `lb-${zoomSeq++}`;
           const n = b.images.length;
           const thumbs = b.images.map((m, i) => {
-            const cap = capOf(m, i);
-            return `<figure class="ga"><a class="ga-zoom" href="#${gid}-${i + 1}" aria-label="${attr(cap ? `View larger: ${cap}` : `View image ${i + 1} larger`)}">${blockImg(m, esc, attr, '(max-width:640px) 50vw, 320px')}</a>${cap ? `<figcaption${dds(`captions.${i}`)}>${esc(cap)}</figcaption>` : ''}</figure>`;
+            const cap = capOf(m, i), nm = nameOf(m, i);
+            return `<figure class="ga"><a class="ga-zoom" href="#${gid}-${i + 1}" aria-label="${attr(nm ? `View larger: ${nm}` : `View image ${i + 1} larger`)}">${blockImg(m, esc, attr, '(max-width:640px) 50vw, 320px')}</a>${cap ? `<figcaption${dds(`captions.${i}`)}>${esc(cap)}</figcaption>` : ''}</figure>`;
           }).join('');
           const overlays = b.images.map((m, i) => {
-            const cap = capOf(m, i);
+            const cap = capOf(m, i), nm = nameOf(m, i);
             const prev = i === 0 ? n : i, next = i === n - 1 ? 1 : i + 2;   // wrap around
-            return `<figure class="lb" id="${gid}-${i + 1}" aria-label="${attr(`Image ${i + 1} of ${n}${cap ? `: ${cap}` : ''}`)}">` +
+            return `<figure class="lb" id="${gid}-${i + 1}" role="dialog" aria-modal="true" aria-label="${attr(`Image ${i + 1} of ${n}${nm ? `: ${nm}` : ''}`)}">` +
               `<a class="lb-bg" href="#${gid}" aria-hidden="true" tabindex="-1"></a>` +
               `<a class="lb-close" href="#${gid}" aria-label="Close and return to the gallery">✕<span class="lb-close-t">Close</span></a>` +
               `<span class="lb-frame">${blockImg(m, esc, attr, '100vw')}</span>` +
@@ -1683,23 +1775,34 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
         break;
       }
       case 'events': {   // clean list; ISO dates show human ("Jul 26") inside <time>
-        const rows = b.items.map((it, i) => {
+        // Item 299: an event whose day has passed at publish time is left out (the window sweep,
+        // lib/content_window.ts, republishes the day after one passes); a section with none left
+        // draws nothing. Each event has a place: its own, else the business's address.
+        const keep = (it: { date: string }) => !ctx.now || !eventPassed(it.date, ctx.now);
+        const items = b.items.filter(keep);
+        if (!items.length) break;
+        const placeOf = (it: { place?: string }) => it.place || ctx.place?.address || '';
+        const rows = b.items.flatMap((it, i) => {   // i is the stored index: the in-place editor's path
+          if (!keep(it)) return [];
           const nice = humanDate(it.date);
           const when = nice ? `<time datetime="${attr(it.date)}">${esc(nice)}</time>` : esc(it.date);
           const href = it.url ? safeHref(it.url) : null;
           const name = href ? `<a href="${attr(href)}" rel="noopener">${esc(it.name)}</a>` : esc(it.name);
           // G13: date is NOT stamped — the shown text ("Jul 26") isn't the stored
           // ISO string, so an in-place read-back would corrupt it. Exact-text fields only.
-          return `<li class="ev"><span class="ev-when">${when}${it.time ? `<span class="ev-time"${dds(`items.${i}.time`)}>${esc(it.time)}</span>` : ''}</span><span class="ev-body"><span class="ev-name"${dds(`items.${i}.name`)}>${name}</span>${it.detail ? `<span class="ev-detail"${dds(`items.${i}.detail`)}>${esc(it.detail)}</span>` : ''}</span></li>`;
+          const place = it.place ? `<span class="ev-place"${dds(`items.${i}.place`)}>${esc(it.place)}</span>` : placeOf(it) ? `<span class="ev-place">${esc(placeOf(it))}</span>` : '';
+          return [`<li class="ev"><span class="ev-when">${when}${it.time ? `<span class="ev-time"${dds(`items.${i}.time`)}>${esc(it.time)}</span>` : ''}</span><span class="ev-body"><span class="ev-name"${dds(`items.${i}.name`)}>${name}</span>${it.detail ? `<span class="ev-detail"${dds(`items.${i}.detail`)}>${esc(it.detail)}</span>` : ''}${place}</span></li>`];
         });
         html = `<section class="block alt block-events"><div class="wrap">${h2(b.title, 'Upcoming events', 'title')}<ul class="events">${rows.join('')}</ul></div></section>`;
         // Honest Event schema: only items with a machine-readable ISO date, and only
         // the fields actually present (startDate gains a time only when it's HH:MM).
-        const ldEvents = b.items.filter((it) => humanDate(it.date) !== null).map((it) => {
+        const ldEvents = items.filter((it) => humanDate(it.date) !== null).map((it) => {
           const t24 = it.time ? TIME_24_RE.exec(it.time) : null;
+          const where = placeOf(it);   // item 299: Google requires a place
           return {
             '@type': 'Event', name: it.name,
             startDate: t24 ? `${it.date}T${t24[1].padStart(2, '0')}:${t24[2]}` : it.date,
+            ...(where ? { location: { '@type': 'Place', name: it.place ? it.place : (ctx.place?.name || where), address: where } } : {}),
             ...(it.detail ? { description: it.detail } : {}),
             ...(it.url && safeHref(it.url) ? { url: it.url } : {}),
           };
@@ -1767,7 +1870,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           const prose = t.body ? `<div class="prose"${dds(`tabs.${i}.body`, true)}>${renderMarkdown(t.body)}</div>` : '';
           return `<div class="tab-panel">${img}${prose}</div>`;
         }).join('');
-        html = `<section class="block wrap block-tabs">${b.title ? h2(b.title, '', 'title') : ''}<div class="tabs">${radios}<div class="tab-strip" role="tablist">${strip}</div><div class="tab-panels">${panels}</div></div></section>`;
+        html = `<section class="block wrap block-tabs">${b.title ? h2(b.title, '', 'title') : ''}<div class="tabs">${radios}<div class="tab-strip">${strip}</div><div class="tab-panels">${panels}</div></div></section>`;
         break;
       }
       case 'carousel': {   // swipeable slideshow — ZERO JS (CSS scroll-snap). Keyboard-
@@ -1844,7 +1947,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           const reply = r.reply
             ? `<div class="rw-reply"><p class="rw-reply-lbl">Response from the owner</p><p class="rw-reply-body">${esc(r.reply)}</p></div>`
             : '';
-          const when = r.date ? `<time class="rw-date" datetime="${attr(r.date)}">${esc(r.date)}</time>` : '';
+          const when = r.date ? `<time class="rw-date" datetime="${attr(r.date)}">${esc(humanDateLong(r.date) || r.date)}</time>` : '';
           return `<figure class="rw-card"><p class="rw-stars" aria-label="${attr(r.rating + ' out of 5')}">${stars}</p>` +
             `<blockquote class="rw-body"><p>${esc(r.body)}</p></blockquote>` +
             `<figcaption class="rw-author">${esc(r.author)}${when}</figcaption>${reply}</figure>`;
@@ -1858,7 +1961,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           const quotes = b.reviews.map((r) => {
             const full = Math.min(5, Math.max(0, Math.round(r.rating)));
             const stars = '★'.repeat(full) + '☆'.repeat(5 - full);
-            const when = r.date ? `<time class="rw-date" datetime="${attr(r.date)}">${esc(r.date)}</time>` : '';
+            const when = r.date ? `<time class="rw-date" datetime="${attr(r.date)}">${esc(humanDateLong(r.date) || r.date)}</time>` : '';
             const reply = r.reply
               ? `<div class="rw-reply"><p class="rw-reply-lbl">Response from the owner</p><p class="rw-reply-body">${esc(r.reply)}</p></div>`
               : '';
@@ -2012,7 +2115,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       const href = safeHref(b.url);
       html = href ? `<section class="block wrap block-appt">${h2(b.title, 'Book an appointment', 'title')}${b.text ? `<p class="appt-text"${dds('text')}>${esc(b.text)}</p>` : ''}<p class="appt-cta"><a class="btn" href="${attr(href)}" rel="noopener"${dds('button')}>${esc(b.button || 'Book now')}</a></p></section>` : '';
     }
-    built.push({ b, bi, html: fullBand(applyStyle(applyLook(html, (b as { look?: BlockLook }).look), (b as { style?: BlockStyle }).style)), ld });
+    built.push({ b, bi, html: withPhoto(fullBand(applyStyle(applyLook(html, (b as { look?: BlockLook }).look), (b as { style?: BlockStyle }).style)), (b as { look?: BlockLook }).look, esc, attr), ld });
   }
 
   // Second pass: stamp a stable, de-duped anchor id onto every rendered <section>,
@@ -2120,7 +2223,7 @@ const EDGE_CSS = '.block.block--edge{position:relative;border-bottom:0}'
 // what the dark band fills them with (tests/presence/accent_band_test.mjs).
 const BAND = 'var(--accent-band,var(--accent-dark,var(--accent)))';
 /** Both bands' copies of a selector, inside the section; `self` adds classes to the section. */
-const onBands = (sel: string, self = '') => `.block.block--bg-accent${self} ${sel},.block.block--bg-dark${self} ${sel}`;
+const onBands = (sel: string, self = '') => `.block.block--bg-accent${self} ${sel},.block.block--bg-dark${self} ${sel},.block.block--bg-photo.veil-dark${self} ${sel}`;   // item 292: a photo under a dark veil reads like the dark band
 // The tab that's showing: the Tabs section's own rule gives it the accent at (0,7,0); on a band
 // these (0,8,0) give it the band's words, and an underline in them that stands out on the strip's
 // fainter line.
@@ -2199,6 +2302,7 @@ ul.events .ev{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(-
 .ev-time{display:block;font-weight:400;color:var(--soft);font-size:.9rem}
 .ev-name{display:block;font-weight:700}
 .ev-detail{display:block;color:var(--soft);font-size:.95rem;margin-top:2px}
+.ev-place{display:block;color:var(--soft);font-size:.9rem;margin-top:2px}
 .block-map .map-img img{width:100%;height:auto;border-radius:12px;display:block}
 .map-addr{margin:10px 0 0;font-size:1.05rem}
 .map-dir{margin-top:6px}
@@ -2270,6 +2374,15 @@ ${SP} a{color:var(--accent-dark,var(--accent))}
 .block-carousel .cr-cap{margin-top:8px;color:var(--soft);font-size:.95rem;text-align:center}
 .block-carousel .cr-hint{margin:8px 0 0;text-align:center;color:var(--soft);font-size:.8rem;letter-spacing:.03em}
 @media(min-width:760px){.block-carousel .cr-slide{flex-basis:72%}.block-carousel .cr-hint{display:none}}
+/* item 298: arrows and dots, added by the page's script (lib/site_blocks.ts BLOCK_JS); the track still swipes and scrolls */
+.block-carousel .cr-nav{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px}
+.block-carousel .cr-prev,.block-carousel .cr-next{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--card,#fff);color:var(--ink);font-size:1.5rem;line-height:1;cursor:pointer}
+.block-carousel .cr-prev:hover,.block-carousel .cr-next:hover{border-color:var(--accent);color:var(--accent-dark,var(--accent))}
+.block-carousel .cr-dots{display:flex;gap:0}
+.block-carousel .cr-dot{width:44px;height:44px;border:0;background:none;padding:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.block-carousel .cr-dot::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--line,#ccc)}
+.block-carousel .cr-dot[aria-current="true"]::before{background:var(--accent);transform:scale(1.2)}
+.block-carousel .cr-prev:focus-visible,.block-carousel .cr-next:focus-visible,.block-carousel .cr-dot:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 /* Progress bars — labeled, animated-in, width set inline (0..100%). */
 .block-progress .pgbars{margin-top:8px;display:flex;flex-direction:column;gap:16px}
 .block-progress .pgb-head{display:flex;justify-content:space-between;font-weight:600;margin-bottom:6px}
@@ -2278,6 +2391,9 @@ ${SP} a{color:var(--accent-dark,var(--accent))}
 .block-progress .pgb-fill{background:var(--accent);height:100%;border-radius:999px;min-width:2px}
 /* optional icon on a feature/highlight item (decorative — aria-hidden in markup) */
 .svc-ic{font-size:1.9rem;line-height:1;margin-bottom:8px}
+/* item 304: a line icon in the site's accent colour */
+.svc-ic-line{color:var(--accent);width:36px;height:36px;margin-bottom:10px}
+.svc-ic-line svg{display:block;width:36px;height:36px}
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:8px}
 .teaser-card{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card,#fff)}
 a.teaser-card{text-decoration:none;color:inherit}
@@ -2371,6 +2487,19 @@ ${onBands('ul.areas li')},${onBands('.bk-summary')}{background:var(--band-box,rg
 .block.block-cta.v-card.block--bg-accent .cta-inner{background:var(--band-box,${BAND});border-color:transparent}
 .block.block-cta.v-card.block--bg-dark .cta-inner{background:var(--band-box,#1a1622);border-color:transparent}
 ${onBands(':is(.ba-lab,.v-play)')}{color:#fff}
+/* item 292: a photo behind the section, under a dark veil (light words, as on the dark band) or a light one
+   (the page's own ink). The photo is the section's first child, cropped to the band around its focal point. */
+.block.block--bg-photo{position:relative;isolation:isolate;overflow:hidden;border-top:0;border-bottom:0;background:#1a1622}
+.block--bg-photo>.bg-photo{position:absolute;inset:0;z-index:-2}
+.block--bg-photo>.bg-photo picture,.block--bg-photo>.bg-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.block.block--bg-photo::before{content:"";position:absolute;inset:0;z-index:-1;background:rgba(12,10,16,.58)}
+.block.block--bg-photo.veil-dark{color:#fff;--soft:currentColor}
+.block.block--bg-photo.veil-light{background:#f4f2ee}
+.block.block--bg-photo.veil-light::before{background:rgba(255,255,255,.76)}
+.block.block--bg-photo.veil-dark .btn{background:#fff;color:#1a1622;border-color:#fff}
+.block.block--bg-photo.veil-dark .btn.ghost,.block.block--bg-photo.veil-dark .btn-outline{background:transparent;color:#fff;border-color:#fff}
+.block.block--bg-photo .sp-inner,.block.block-cta.v-card.block--bg-photo .cta-inner{background:rgba(0,0,0,.28);border-color:rgba(255,255,255,.25);backdrop-filter:blur(2px)}
+.block.block--bg-photo.veil-light .sp-inner,.block.block-cta.v-card.block--bg-photo.veil-light .cta-inner{background:rgba(255,255,255,.7);border-color:rgba(0,0,0,.08)}
 /* spacing: vertical padding, honouring the site's --spacing-scale like .block does */
 .block--space-tight{padding-top:calc(28px * var(--spacing-scale,1));padding-bottom:calc(28px * var(--spacing-scale,1))}
 .block--space-roomy{padding-top:calc(84px * var(--spacing-scale,1));padding-bottom:calc(84px * var(--spacing-scale,1))}
@@ -2591,6 +2720,10 @@ a.ff-el.btn{display:inline-flex;align-items:center;justify-content:center;text-a
 .stk-map .map-img img{width:100%;height:auto;border-radius:12px;display:block}
 .block-stack.block--align-center .stk-form .presence-form,.stk .stk-form.stk-ac .presence-form{margin-left:auto;margin-right:auto;text-align:left}
 @media(max-width:620px){.stk-hide-m{display:none!important}}`;
+
+// Item 298: the gallery's zoom view and the carousel script live in lib/site_block_scripts.ts (a file that
+// imports nothing, so the browser spec that presses them reaches only it); the shell appends it.
+export { BLOCK_JS } from './site_block_scripts.ts';
 
 // ── Item 106 · a site ships only the section styles it uses ──
 // BLOCK_CSS is read once into its rules. A site keeps a rule when one of its selectors can

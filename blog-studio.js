@@ -388,7 +388,7 @@ ${live ? `<div><span class="bs-lbl">It went out</span><p class="bs-hint" style="
 <div><label for="bsAu">Written by</label><select id="bsAu"><option value="">Nobody named</option>${aus}</select><button type="button" class="bs-add" data-k="newau">+ Add an author</button></div></div>
 <div><label for="bsSum">Summary</label><textarea id="bsSum" maxlength="300" placeholder="One or two sentences about the post">${escH(sum)}</textarea><div class="bs-count" id="bsSumN"></div><p class="bs-hint">Shows on your Updates page, in Google results, and at the top of the email when you send it to your list.</p></div>
 <div><label for="bsTags">Tags</label><input type="text" id="bsTags" value="${escH((p.tags || []).join(", "))}" placeholder="events, seasonal"><p class="bs-hint">Separate with commas. Visitors can filter your Updates page by them.</p></div>
-<div><label for="bsSlug">Web address</label><input type="text" id="bsSlug" value="${escH(p._slugDraft || p.slug || "")}"${p.published_at ? " readonly" : ""} spellcheck="false"><p class="bs-hint">${escH((host.origin || "") + "/updates/")}… ${p.published_at ? "It stays as it is now, so links to it keep working." : "Set when it first goes live, then it stays, so links to it keep working."}</p></div>
+<div><label for="bsSlug">Web address</label><input type="text" id="bsSlug" value="${escH(p._slugDraft || p.slug || "")}" spellcheck="false"><p class="bs-hint">${escH((host.origin || "") + "/updates/")}… ${p.published_at ? "Change it and the old address forwards to the new one, so links keep working." : "Set from the title when it first goes live. You can change it here."}</p></div>
 <label class="bs-switch"><input type="checkbox" id="bsGoogle"${p.noindex ? "" : " checked"}> Show this post on Google</label>
 ${host.canDelete && !host.canDelete() ? "" : `<button type="button" class="bs-danger" data-k="remove">Remove post</button>`}`;
       const $c = (sel) => card.querySelector(sel);
@@ -402,7 +402,8 @@ ${host.canDelete && !host.canDelete() ? "" : `<button type="button" class="bs-da
       $c("#bsAu").addEventListener("change", (e) => { p.author = e.target.value; paintByline(); queue({ author: p.author }, true); });
       $c("#bsGoogle").addEventListener("change", (e) => queue({ noindex: !e.target.checked }, true));
       const slug = $c("#bsSlug");
-      if (!p.published_at) slug.addEventListener("change", () => { const s = slugify(slug.value); slug.value = s; p._slugTouched = true; if (s) queue({ slug: s }, true); });
+      // item 300: the address is the owner's to change, before or after it went live (the server adds a forward from the old one)
+      slug.addEventListener("change", () => { const s = slugify(slug.value); slug.value = s; p._slugTouched = true; if (s && s !== p.slug) queue({ slug: s }, true); });
       $c('[data-k="newcat"]').addEventListener("click", async () => {
         const name = await host.askText("A new category", { hint: "Like News, Recipes or Events. Each category gets its own page on your site.", ok: "Add it" });
         if (!name || !name.trim()) return;

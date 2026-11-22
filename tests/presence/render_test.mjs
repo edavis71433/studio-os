@@ -120,6 +120,7 @@ const h = await renderSnapshot(hostile, SITE);
       .replace(/<style>[\s\S]*?<\/style>/g, '')
       .replace(/<script id="hours-data" type="application\/json">[\s\S]*?<\/script>/, '')
       .replace(/<script>\(function\(\)\{[\s\S]*?<\/script>/g, '')
+      .replace(/<script src="\/assets\/site-[0-9a-f]+\.js" defer><\/script>/g, '')   // items 288 and 298: the site's own script file
       .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '');
     if (/<script[\s>]/i.test(stripped)) bad.push(`${k}: <script survived`);
     // a real event handler = on\w+= INSIDE an actual element tag (escaped text can't be)
