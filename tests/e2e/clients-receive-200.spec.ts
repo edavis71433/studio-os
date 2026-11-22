@@ -45,7 +45,7 @@ test.describe('The monthly report waits until the website is live (item 200)', (
     const sec = page.locator('#report');
     await expect(sec.locator('#reportNext')).toHaveText('Waits for the site to go live');
     await expect(sec.locator('#reportNext')).toHaveClass(/wait/);
-    await expect(sec.locator('#reportLast')).toHaveText('Waiting for their website to go live. The first report goes out on the 1st of the month after it does.');
+    await expect(sec.locator('#reportLast')).toHaveText('Waiting for their website to go live. The first report goes out early in the month after it does.');
     await expect(sec).not.toContainText('Next one:');
     await noSideScroll(page);
   });
@@ -64,7 +64,7 @@ test.describe('The monthly report waits until the website is live (item 200)', (
     await openCard(page, { live: true, last_month: '2026-10', last_result: { month: '2026-10', status: 'skipped', reason: 'not_live', at: '2026-11-01T09:00:00Z' } });
     const sec = page.locator('#report');
     await expect(sec.locator('#reportLast')).toHaveText('The October 2026 report wasn’t sent: the website wasn’t live yet.');
-    await expect(sec.locator('#reportNext')).toHaveText('Next one: December 1 · to 1 person');
+    await expect(sec.locator('#reportNext')).toHaveText('Next one: December 4 to 6 · to 1 person');
     await expect(sec.locator('#reportNext')).not.toHaveClass(/wait/);
   });
 
@@ -73,7 +73,7 @@ test.describe('The monthly report waits until the website is live (item 200)', (
     await installApp(page, { api: { '/identity': { data: { site_id: 's1', business_name: 'Studio', email: 'hello@example.com' } }, '/settings': { data: { industry_key: 'generic' } }, '/portal/context': SCOPED_CTX } as never });
     await page.route(/\/functions\/v1\/presence\/report\/monthly$/, (route) => route.fulfill(json({ data: older })));
     await page.goto(`/settings.html?client=${CLIENT}#report`);
-    await expect(page.locator('#reportNext')).toHaveText('Next one: December 1 · to 1 person');
+    await expect(page.locator('#reportNext')).toHaveText('Next one: December 4 to 6 · to 1 person');
   });
 
   test('the studio’s list: a client still being built waits, and a skipped month says why', async ({ page }) => {

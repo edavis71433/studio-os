@@ -36,6 +36,7 @@ import { emailMatch, normEmail, isUniqueViolation } from '../lib/contact_email.t
 import { UUID_RE } from '../lib/uuid.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { publishedOnce } from '../lib/site_live.ts';
 
 export const CUSTOMER_KEEP_DAYS = 30;
 const DAY_MS = 86_400_000;
@@ -143,7 +144,7 @@ export async function handleCustomerRead(site: SiteRow, principal: Principal, cl
     client_id: clientId,
     business_name: String(client.name || ''),
     person: person ? { name: String(person.name || ''), email: String(person.email || ''), company: String(person.company || '') } : null,
-    website: { state: website, site_id: ws?.id || null, address: website === 'ours' ? siteOrigin(ws) || null : (elsewhere || null), live: !!(ws && (ws.status === 'live' || ws.last_published_at)), last_published_at: ws?.last_published_at || null, in_trash: pf?.status === 'trashed' },
+    website: { state: website, site_id: ws?.id || null, address: website === 'ours' ? siteOrigin(ws) || null : (elsewhere || null), live: publishedOnce(ws), last_published_at: ws?.last_published_at || null, in_trash: pf?.status === 'trashed' },
     portal: { state: portalState, email: pp?.email || String(client.email || client.contact_email || '') || (person ? String(person.email || '') : ''), invited_at: pp?.invited_at || null, seen_at: pp?.seen_at || null },
     offers: { ...customerOffers(website, portalState), delete: true, can_manage_sites: !!(am && can(am.role, 'manage_clients')) },
   } }, 200, { ...cors, 'Cache-Control': 'no-store' });

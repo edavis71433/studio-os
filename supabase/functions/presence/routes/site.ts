@@ -11,6 +11,7 @@ import { draftHashForSite } from '../lib/draft_hash.ts';
 import { writeChangeEvent, draftChangesOnly } from '../lib/provenance.ts';
 import { resolveSiteRoleCached } from '../lib/workspace.ts';
 import type { Principal } from '../../_shared/auth.ts';
+import { siteLive } from '../lib/site_live.ts';
 
 // ── Phase CP-1 (FD-T8): template catalog + switch ───────────────────────────
 // Switching NEVER touches content — the same structured facts re-render through
@@ -47,7 +48,7 @@ export async function handleGetSite(db: SiteDb, site: SiteRow, cors: Record<stri
   // Everything the home view needs runs in ONE concurrent batch: the three
   // singletons through siteDb (RLS proves an owner's ownership), the five counts,
   // and the two draft-status probes. One round-trip depth, not three.
-  const [ident, loc, voice, nOff, nTes, nFaq, nPos, nMed, evR, pubR, draftHash] = await Promise.all([
+  const [ident, loc, voice, nOff, nTes, nFaq, nPos, nMed, evR, pubR, draftHash, liveR] = await Promise.all([
     db(`presence_identity?site_id=eq.${site.id}&select=business_name,tagline,description,phone,email,service_area,booking_url,ordering_url,social,seo_title,seo_description&limit=1`),
     db(`presence_locations?site_id=eq.${site.id}&select=address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note&limit=1`),
     // M9.5G: voice now lives in the Brand Profile (one canonical source);
@@ -65,6 +66,8 @@ export async function handleGetSite(db: SiteDb, site: SiteRow, cors: Record<stri
     // M3: the canonical draft-version hash (compute-on-read from the ONE serializer).
     // Fail-soft — a serialize hiccup returns null and never blocks the home view.
     draftHashForSite(site).catch(() => null),
+    // item 261: the two facts the one "live" rule needs that the site row the request carries doesn't hold
+    svc(`presence_sites?id=eq.${site.id}&select=offline_at,uptime_fail_streak&limit=1`).catch(() => ({ json: null as unknown })),
   ]);
   const counts = { offerings: nOff, testimonials: nTes, faqs: nFaq, posts: nPos, media: nMed };
   const lastEvent = Array.isArray(evR.json) && evR.json.length ? evR.json[0].created_at : null;
@@ -88,6 +91,10 @@ export async function handleGetSite(db: SiteDb, site: SiteRow, cors: Record<stri
         : null,
       counts,
       last_published_at: site.last_published_at,
+      // builder list item 261: ONE rule for "is this site live" (lib/site_live.ts siteLive), the
+      // same one Sites, Home and Health Center use. The editor's bar, its "See live site" and the
+      // blog's Publish menu read `live.is_live`; `live.published` says it has gone live once.
+      live: siteLive(site, { id: site.id, ...((Array.isArray((liveR as { json?: unknown }).json) && ((liveR as { json: Array<Record<string, unknown>> }).json[0])) || {}) }),
       has_unpublished_changes: hasUnpublishedChanges,
       // M3: canonical draft fingerprint. Foundation for M8/M9 + unpublished-changes
       // detection + publish summaries — surfaced here, consumed later. Null only if

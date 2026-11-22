@@ -32,6 +32,7 @@ import { siteOrigin } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { quotedTo, peopleOf, offeredTo } from '../lib/portal_services.ts';
+import { publishedOnce } from '../lib/site_live.ts';
 
 const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
 
@@ -883,7 +884,7 @@ export async function handleClientSupportMessage(req: Request, site: SiteRow, pr
 // section (the card degrades), never a 500; an unpublished site returns
 // published:false and the portal hides the card entirely. Zero schema change.
 export async function handleClientWebsiteStats(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>): Promise<Response> {
-  const published = site.status === 'live' || !!site.last_published_at;
+  const published = publishedOnce(site);   // item 261: the one rule
   if (!published) return json({ data: { published: false, month: null, search: null } }, 200, cors);
   const statNowIso = nowIso();
   const nowMs = Date.parse(statNowIso);

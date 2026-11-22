@@ -104,7 +104,7 @@ export async function syncGscForSite(site: { id: string; client_id: string; cust
 
   // aggregate metrics → signals (mapped site → client_id, the store AN-3 reads)
   const totals = parseTotals(totalsResp);
-  await svc('signals?on_conflict=client_id,metric,period,source', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(signalRowsFor(site.client_id, period, totals)) }).catch(() => {});
+  await svc('signals?on_conflict=client_id,metric,period,source', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(signalRowsFor(site.client_id, period, totals, now.toISOString())) }).catch(() => {});
 
   // detail breakdowns → presence_search_terms (top queries + pages; bounded rows = quota-safe)
   for (const dim of ['query', 'page'] as const) {
@@ -133,7 +133,7 @@ export async function syncGscForSite(site: { id: string; client_id: string; cust
         const t = parseTotals(res.json);
         // Months before the site was on Google are absent, not zero. Storing
         // zeros would draw a flat year that never happened.
-        if (t.impressions > 0) await svc('signals?on_conflict=client_id,metric,period,source', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(signalRowsFor(site.client_id, month.period, t)) }).catch(() => {});
+        if (t.impressions > 0) await svc('signals?on_conflict=client_id,metric,period,source', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(signalRowsFor(site.client_id, month.period, t, now.toISOString())) }).catch(() => {});
       }
     }
   }

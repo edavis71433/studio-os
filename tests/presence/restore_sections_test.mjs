@@ -384,5 +384,49 @@ const websiteNow = () => Object.fromEntries(SETTINGS_CONTENT_FIELDS ? [...SETTIN
   ok('sentence: with the longest name it reaches the editor as it is', nice(new Error(longest)) === longest && longest.length < 160, String(longest.length));
 }
 
+// ═══ 10. builder item 254: a restore that can't keep a safety copy doesn't start; one that stops
+// part-way says so and offers to put the draft back ═══
+{
+  const { restoreFailedBody } = await import('../../supabase/functions/presence/lib/draft_writer.ts');
+  const restore = async (cp) => res(await P.handleCheckpointRestore(req(`/publishes/checkpoints/${cp.body.data.id}/restore`), site, owner, cp.body.data.id, cors));
+  const written = () => canon({ settings: settings(), snapshots: db.tables.presence_snapshots.length, events: db.tables.presence_change_events.length, identity: db.tables.presence_identity, offerings: db.tables.presence_offerings });
+
+  // the safety copy can't be kept: nothing is changed, and the words say so
+  world();
+  let cp = await saveCheckpoint('Before the edit');
+  editSince();
+  db.tables.presence_identity[0].tagline = 'Words typed since';
+  let was = written();
+  db.failMethod.set('presence_snapshots', 'POST');
+  let back = await restore(cp);
+  db.failMethod.delete('presence_snapshots');
+  ok('254: no safety copy, no restore: refused with honest words', back.status === 502 && back.body?.error === 'restore_failed' && back.body?.message === 'We couldn’t set your current draft aside as a safety copy, so nothing was changed. Try again in a moment.', JSON.stringify(back.body));
+  ok('254: …and the draft is exactly as it was', written() === was);
+
+  // a write after the safety copy fails: the draft is part-way, and the answer says which copy puts it back
+  world();
+  cp = await saveCheckpoint('Before the edit');
+  editSince();
+  db.tables.presence_identity[0].tagline = 'Words typed since';
+  const draftNow = () => canon({ blocks: settings().blocks, pages: settings().pages, nav: settings().nav, tagline: db.tables.presence_identity[0].tagline });   // (short_description comes back as '' for null: the same words)
+  const before = draftNow();
+  db.failMethod.set('presence_settings', 'POST');   // the details come back, then the sections and pages can't
+  back = await restore(cp);
+  db.failMethod.delete('presence_settings');
+  const safety = db.tables.presence_snapshots.at(-1);
+  ok('254: a part-way stop is named as one, not "unchanged"', back.status === 502 && back.body?.error === 'restore_partial' && /stopped part-way/.test(back.body?.message) && back.body?.put_back === 'Put my draft back', JSON.stringify(back.body));
+  ok('254: …it names the safety copy, which holds the draft as it was', back.body?.safety_snapshot_id === safety?.id && safety?.draft_settings?.pages?.some((p) => p.slug === 'new-page'));
+  ok('254: …and the draft really is part-way (the details came back, the sections didn’t)', db.tables.presence_identity[0].tagline === 'Good food' && !settings().blocks.some((b) => b.type === 'gallery'), db.tables.presence_identity[0].tagline);
+  // Put my draft back: the same restore route, by the safety copy's id
+  const put = await res(await R.handleRestoreToDraft(req('/restore-to-draft', { snapshot_id: back.body.safety_snapshot_id }), site, owner, cors));
+  ok('254: Put my draft back brings the draft back as it was before the restore', put.status === 200 && put.body?.data?.message === 'Your draft is back as it was before the restore.' && draftNow() === before, '\nBEFORE ' + before + '\nAFTER  ' + draftNow());
+  const other = await res(await R.handleRestoreToDraft(req('/restore-to-draft', { snapshot_id: uuid('9') }), site, owner, cors));
+  ok('254: a copy that isn’t this site’s is refused', other.status === 410, JSON.stringify(other.body));
+  // the pure words
+  ok('254: the words for each outcome', restoreFailedBody({ ok: false, error: 'unusable_snapshot' }).message === 'That didn’t work — your draft is unchanged and nothing was lost.'
+    && restoreFailedBody({ ok: false, error: 'x', partial: true, safety_snapshot_id: 'abc' }).safety_snapshot_id === 'abc'
+    && restoreFailedBody({ ok: false, error: 'x', partial: true }).put_back === undefined);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) Deno.exit(1);

@@ -1,5 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar, touchScreen } from './helpers/app';
 import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave } from './helpers/editor';
 import { pointAt, pressButton, settled } from './helpers/app';
 
@@ -38,23 +38,31 @@ test.describe('G13 in-place canvas text editor — editing in place: enter, comm
     expect(blocks[1]).toEqual(BLOCKS[1]);                  // other blocks ride whole
   });
 
-  test('double-click enters editing; Escape cancels: the DOM reverts and NO save fires; click-away with no change also saves nothing', async ({ page }) => {
+  // Builder item 255: Escape used to throw the words away with no message and nothing to redo
+  test('double-click enters editing; Escape keeps the words and leaves the box (Undo takes them back); click-away with no change saves nothing', async ({ page }) => {
     const { frame, puts } = await mountCanvas(page);
     const sub = frame.locator('[data-dds-field="subtitle"]');
     await sub.dblclick();
     await expect(sub).toHaveAttribute('contenteditable', /.+/);
     await page.keyboard.press('ControlOrMeta+a');
-    await page.keyboard.insertText('junk that must vanish');
+    await page.keyboard.insertText('words that stay');
+    await markCanvas(frame);
     await page.keyboard.press('Escape');
-    await expect(sub).toHaveText('A quiet sub line');      // the original DOM is back
+    await expect(sub).toHaveText('words that stay');       // kept, and the box is left
     await expect(sub).not.toHaveAttribute('contenteditable', /.+/);
-    // an unchanged commit (blur without typing) is a no-op too
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    expect((puts[0].blocks as typeof BLOCKS)[0].subtitle).toBe('words that stay');
+    await expect(page.locator('#btnUndo')).toBeEnabled();  // Undo is the way back
+    await canvasReplaced(frame);                            // the save's repaint (the fixture's page) has landed
+    // an unchanged commit (blur without typing) is a no-op: a mouse idiom (a finger's tap keeps the
+    // section's toolbar up over the heading; site-home.spec.ts walks the touch path)
+    if (touchScreen()) return;
     const h2 = frame.locator('section.block-titleonly [data-dds-field="title"]');
     await h2.dblclick();
     await expect(h2).toHaveAttribute('contenteditable', /.+/);
     await frame.locator('section.block-cta').click();      // click away = commit (unchanged)
     await settled(page);   // the 1.2s debounce, if anything set it, has fired
-    expect(puts.length).toBe(0);
+    expect(puts.length).toBe(1);
   });
 
   test('a markdown field round-trips markdown SOURCE — never rendered HTML — and the mini-bar bolds via markdown', async ({ page }) => {

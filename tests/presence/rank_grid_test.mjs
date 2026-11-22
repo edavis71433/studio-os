@@ -36,7 +36,7 @@ const ME = 'ChIJ_copperline_plumbing_01';
   eq('failure: the month is given back for a later tick', [t1.month, t1.tries], ['2026-10', { month: '2026-11', count: 1 }]);
   const t3 = G.afterGridFailure({ ...on, month: '2026-11', tries: { month: '2026-11', count: 2 } }, '2026-11', '2026-10', 'google_refused', NOV);
   eq('failure: the third in a month is the last, and says why', [t3.month, t3.last_result.status, t3.last_result.reason], ['2026-11', 'failed', 'google_refused']);
-  eq('next scan: the 1st of next month', [G.nextScanDay(NOV), G.nextScanDay('2026-12-31T23:00:00Z')], ['Dec 1', 'Jan 1']);
+  eq('next scan: the start of the month’s last week (item 266)', [G.nextScanDay(NOV), G.nextScanDay('2026-12-31T23:00:00Z')], ['Nov 24', 'Jan 25']);
 }
 
 // ── 2. the grid of spots ──

@@ -67,7 +67,7 @@ globalThis.fetch = async (url, init = {}) => {
 const P = '../../supabase/functions/presence';
 const { runMonthlyReports } = await import(`${P}/ops/monthly_report.ts`);
 const quiet = async (fn) => { const e = console.error, w = console.warn; console.error = () => {}; console.warn = () => {}; try { return await fn(); } finally { console.error = e; console.warn = w; } };
-const DEC2 = '2026-12-02T09:00:00.000Z';   // November's report is due
+const DEC2 = '2026-12-05T09:00:00.000Z';   // November's report is due (item 266: the 4th to 6th)
 const visit = (i) => ({ ts: '2026-11-10T12:00:00Z', kind: 'pageview', path: '/', ref_host: '', utm_source: '', device: 'mobile', country: 'US', visitor_hash: 'v' + i });
 
 // everyone gets one: the client, two more people, the studio's copy

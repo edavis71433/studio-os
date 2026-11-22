@@ -12,7 +12,7 @@ import { svc } from './db.ts';
 import { isImageMime } from './media.ts';
 import type { Snapshot, SnapshotContent, MediaRef, TemplateManifest, SnapshotDevLayer, SiteBlock } from './render_types.ts';
 import { validateThemeTokens, sanitizeDevCss, sanitizeDevHtml } from './devmode.ts';
-import { validateBlocksWithMap, resolveBlockMediaTracked, renderSiteBlocks, type BlockResolveExtras } from './site_blocks.ts';
+import { validateBlocksWithMap, resolveBlockMediaTracked, renderSiteBlocks, REALIZED_BLOCK_TYPES, type BlockResolveExtras } from './site_blocks.ts';
 import { esc, attr, safeHref } from './markdown.ts';
 import { linkedRefIds, resolveLinkedBlocksTracked } from './linked_sections.ts';
 import { RESERVED_PAGE_SLUGS } from './page_ops.ts';
@@ -139,11 +139,28 @@ export function composeBlocks(
   lookup: (id: string) => unknown,
   ref: (id: string) => MediaRef | null,
   extras?: BlockResolveExtras,
+  keepEmpty = false,
 ): { blocks: SiteBlock[]; src: number[] } {
   const r1 = resolveLinkedBlocksTracked(raw, lookup);
   const vm = validateBlocksWithMap(r1.blocks);
   const m = resolveBlockMediaTracked(vm.blocks, ref, extras);
-  return { blocks: m.blocks, src: m.src.map((i) => r1.src[vm.map[i].src_index]) };
+  const blocks = m.blocks, src = m.src.map((i) => r1.src[vm.map[i].src_index]);
+  if (!keepEmpty) return { blocks, src };
+  // Item 259: for the builder's canvas only, a section that validation or the photo step
+  // dropped because it has nothing to show yet comes back as a placeholder in its place, with
+  // its stored index, so the owner sees it, finds it in Layers and can fill it in.
+  const kept = new Set(src);
+  const rows = blocks.map((b, i) => ({ b, i: src[i] }));
+  r1.blocks.forEach((rb, j) => {
+    const at = r1.src[j];
+    if (kept.has(at)) return;
+    const type = rb && typeof rb === 'object' ? String((rb as { type?: unknown }).type || '') : '';
+    if (!type || !(REALIZED_BLOCK_TYPES as readonly string[]).includes(type) || type === 'toc' || type === 'divider') return;
+    const title = String((rb as { title?: unknown }).title || '').trim().slice(0, 80);
+    rows.push({ b: { type: 'empty', of: type, ...(title ? { title } : {}) } as SiteBlock, i: at });
+  });
+  rows.sort((x, y) => x.i - y.i);
+  return { blocks: rows.map((r) => r.b), src: rows.map((r) => r.i) };
 }
 
 // Wave-1 G7: per-page SHARE image — the owner stores a media ID in
@@ -285,7 +302,7 @@ export async function readDraftRows(siteId: string, prev?: DraftRows, only?: Rea
   return rows;
 }
 
-export async function serializeDraft(siteId: string, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): Promise<{ snapshot: Snapshot; mediaManifest: MediaManifestEntry[]; draftSettings: DraftSettings }> {
+export async function serializeDraft(siteId: string, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string; keepEmpty?: boolean }): Promise<{ snapshot: Snapshot; mediaManifest: MediaManifestEntry[]; draftSettings: DraftSettings }> {
   return buildSnapshot(await readDraftRows(siteId), manifest, opts);
 }
 
@@ -310,7 +327,7 @@ export function postEntry(p: any, lists: { categories: PostCategory[]; authors: 
 
 /** Build the snapshot from a draft's rows (readDraftRows), with the website's settings as
  *  stored beside it (lib/draft_settings.ts), which a snapshot keeps for a restore. Pure. */
-export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string }): { snapshot: Snapshot; mediaManifest: MediaManifestEntry[]; draftSettings: DraftSettings } {
+export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts: { templateSlug: string; templateVersion: string; now: string; keepEmpty?: boolean }): { snapshot: Snapshot; mediaManifest: MediaManifestEntry[]; draftSettings: DraftSettings } {
   const { presence_identity: identArr, presence_locations: locArr, presence_offerings: offerings, presence_testimonials: testimonials, presence_faqs: faqs, presence_posts: posts,
     presence_media: media, presence_redirects: redirects, presence_settings: settingsArr, presence_dev_customizations: devArr, presence_reviews: reviewsArr } = rows;
   // Phase RV: resolve the approved reviews → display items + HONEST aggregate (only
@@ -343,7 +360,7 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
   for (const r of (rows.presence_content_library || []) as Array<{ id: string; payload: unknown }>) libMap.set(r.id, r.payload);
   // G13: home + every custom page run the SAME exported composeBlocks (above)
   // over this request's library lookup / media ref / approved reviews.
-  const compose = (raw: unknown[]) => composeBlocks(raw, (id) => libMap.get(id) ?? null, ref, reviewsWall ? { reviewsWall } : undefined);
+  const compose = (raw: unknown[]) => composeBlocks(raw, (id) => libMap.get(id) ?? null, ref, reviewsWall ? { reviewsWall } : undefined, opts.keepEmpty === true);
   const homeBlocks = compose(rawBlocks);
   // Build the custom pages: each page's blocks run through the SAME validate →
   // resolve pipeline as the home blocks, so they're identical structured/safe blocks.
@@ -517,7 +534,7 @@ export async function draftSectionHtml(siteId: string, manifest: TemplateManifes
   const ref = (id: string | null | undefined): MediaRef | null => { const m = id ? mediaById.get(id) : undefined; if (m) used.add(m.id); return toRef(m, manifest); };
   const approved = reviewsArr as any[];
   const extras = approved.length ? { reviewsWall: { items: shapeReviewsForDisplay(approved, 24), aggregate: aggregateApproved(approved) } } : undefined;
-  const composed = composeBlocks(rawBlocks, (id) => lib.get(id) ?? null, ref, extras);
+  const composed = composeBlocks(rawBlocks, (id) => lib.get(id) ?? null, ref, extras, true);   // item 259: the canvas shows an empty section as a placeholder
   const rendered = renderSiteBlocks(composed.blocks, { esc, attr, safeHref, now, src: composed.src });
   const hit = rendered.find((r) => r.html.includes(` data-dds-src="${index}"`));
   const html = hit ? hit.html : '';
