@@ -331,15 +331,18 @@ export function contactsOrder(sort: unknown, dir: unknown): string {
 // calls, emails and meetings since the cutoff say who was contacted; the invoices still waiting
 // say who owes you. null = a read failed (the page says so, never a wrong list).
 const CONTACT_FILTER_CAP = 5000;
+/** Builder item 411: a read of every row, paged, in the shape of one svc() answer. */
+const pagedOk = async (path: string, order: string): Promise<{ ok: boolean; json: any[] }> => { const r = await svcPages(path, order).catch(() => null); return r ? { ok: true, json: r.rows } : { ok: false, json: [] }; };
 async function contactFilterIds(siteId: string, more: string, order: string, lf: ListFilters, nowMs: number): Promise<{ ids: string[]; partial: boolean } | null> {
   const ok = (r: { ok: boolean }) => r.ok;
   const cutoff = lf.quiet ? quietCutoff(lf.quiet, nowMs) : '';
   const [dealsR, eventsR, invR, orderedR, personR] = await Promise.all([
     svc(`presence_deals?site_id=eq.${siteId}&contact_id=not.is.null&select=id,contact_id,deleted_at&limit=${CONTACT_FILTER_CAP}`),
     lf.quiet ? svc(`presence_deal_events?site_id=eq.${siteId}&kind=eq.note&created_at=gte.${encodeURIComponent(cutoff)}&select=deal_id,detail,created_at&limit=${CONTACT_FILTER_CAP}`) : Promise.resolve(null),
-    lf.owes ? svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&${SENT_INVOICE_FILTER}&select=deal_id,customer_client_id,status,processing_since&limit=2000`)   // sales item 141: sent ones only
-      .then((r) => r.ok ? r : svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status,processing_since&limit=2000`))
-      .then((r) => r.ok ? r : svc(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status&limit=2000`)) : Promise.resolve(null),
+    // builder item 411: every open invoice, a page at a time (limit=2000 quietly got 1,000)
+    lf.owes ? pagedOk(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&${SENT_INVOICE_FILTER}&select=deal_id,customer_client_id,status,processing_since`, 'id')   // sales item 141: sent ones only
+      .then((r) => r.ok ? r : pagedOk(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status,processing_since`, 'id'))
+      .then((r) => r.ok ? r : pagedOk(`presence_invoices?site_id=eq.${siteId}&status=eq.open&deleted_at=is.null&select=deal_id,customer_client_id,status`, 'id')) : Promise.resolve(null),
     svc(`presence_contacts?site_id=eq.${siteId}${more}&select=id&order=${order}&limit=${CONTACT_FILTER_CAP}`),
     // item 85: a call, email or meeting logged for the person with no deal counts too (APPLY-0173;
     // before it there is no such table, and nothing to count)
@@ -1040,12 +1043,13 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
     pages('revenue', `presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${encodeURIComponent(since24)}&select=amount_cents,paid_at`, 'paid_at'),
     pages('revenue', `presence_deal_events?site_id=eq.${site.id}&kind=eq.invoice_paid&detail->>retainer=eq.true&created_at=gte.${encodeURIComponent(since24)}&select=kind,detail,created_at`, 'created_at'),
     // item 69: found_via rides along; before APPLY-0143 the same read without it
+    // builder item 411: every deal and every enquiry, a page at a time (limit=2000 and 5000 quietly got 1,000)
     (async () => {
       const cols = 'id,title,stage,source,source_submission_id,expected_value_cents,created_at,updated_at,converted_client_id,converted_at,lost_reason';
-      const r = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${cols},found_via&limit=2000`).catch(() => null);
-      return r && r.ok ? rows(r) : read('deals', `presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${cols}&limit=2000`);
+      const r = await svcPages(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${cols},found_via`, 'id').catch(() => null);
+      return r ? r.rows : pages('deals', `presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=${cols}`, 'id');
     })(),
-    read('enquiries', `presence_form_submissions?site_id=eq.${site.id}&spam=is.false&created_at=gte.${encodeURIComponent(since365)}&select=id,source_page,status,created_at&limit=5000`),
+    pages('enquiries', `presence_form_submissions?site_id=eq.${site.id}&spam=is.false&created_at=gte.${encodeURIComponent(since365)}&select=id,source_page,status,created_at`, 'id'),
     loadReceivables(site).catch(() => { failed.add('overdue'); return null; }),
     // sales items 126, 127: refunds made in Stripe and disputes lost, off the month they happened
     pages('revenue', `presence_money_returns?site_id=eq.${site.id}&counted_cents=gt.0&counted_at=gte.${encodeURIComponent(since24)}&select=${RETURNED_SELECT}`, 'counted_at'),
@@ -1057,14 +1061,15 @@ export async function handleSalesReports(_req: Request, site: SiteRow, _principa
   const openChunks: string[][] = [];
   for (let i = 0; i < open.length; i += 100) { const ids = open.slice(i, i + 100).map((d: any) => String(d.id)).filter((x: string) => UUID_RE.test(x)); if (ids.length) openChunks.push(ids); }
   // batch B (final pass, Nov 8): the batches side by side, like the close dates below
-  for (const ev of await Promise.all(openChunks.map((ids) => read('stages', `presence_deal_events?site_id=eq.${site.id}&kind=eq.stage_change&deal_id=in.(${ids.join(',')})&select=deal_id,to_stage,created_at&order=created_at.desc&limit=2000`)))) {
+  // builder item 411: paged, oldest first, then turned so the newest move wins below
+  for (const ev of await Promise.all(openChunks.map((ids) => pages('stages', `presence_deal_events?site_id=eq.${site.id}&kind=eq.stage_change&deal_id=in.(${ids.join(',')})&select=deal_id,to_stage,created_at`, 'created_at').then((x) => x.reverse())))) {
     for (const e of ev) { const k = String(e.deal_id); if (!lastMoveInto[k] && String(e.to_stage) === stageOf.get(k)) lastMoveInto[k] = String(e.created_at); }
   }
   // F5 (final pass): when each closed deal actually closed — its newest move into
   // Won or Not a fit — so a later edit can't pull an old deal into the window.
   // Chunks run side by side; a failed read marks the report partial, never wrong.
   // Bug hunt H1: one reader, shared with the dashboard's tiles (lib/deal_closes.ts)
-  const { closedAt } = await readCloseDates(deals, `site_id=eq.${site.id}`, (path) => read('closes', path));
+  const { closedAt } = await readCloseDates(deals, `site_id=eq.${site.id}`, async (path) => { const r = await svcPages(path, 'created_at').catch(() => null); if (!r) { failed.add('closes'); return null; } return r.rows.reverse(); });
   const becameDeal = new Set<string>(deals.map((d: any) => String(d.source_submission_id || '')).filter(Boolean));
   const dealsOff = failed.has('deals');   // the pipeline and won/lost reports both stand on the deals read
   return json({ data: {

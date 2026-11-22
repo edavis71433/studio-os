@@ -471,7 +471,7 @@ export async function handleAnalyticsDashboard(req: Request, site: SiteRow, cors
   const wantTerms = !!gsc && gsc.ok && readiness !== 'no_domain' && readiness !== 'draft' && readiness !== 'waiting' && gsc.hasData;
   const [closes, termsAndPages, g4] = await Promise.all([
     deals && dealSites.length
-      ? readCloseDates(deals, `site_id=in.(${dealSites.join(',')})`, async (path) => { const r = await svc(path); return r.ok ? arr(r) : null; })
+      ? readCloseDates(deals, `site_id=in.(${dealSites.join(',')})`)   // builder item 411: paged, newest first
       : Promise.resolve({ closedAt: {} as Record<string, string>, partial: false }),
     wantTerms ? Promise.all([safe(readSearchTerms(site.client_id || '', gsc!.period)), safe(readSearchPages(site.client_id || '', gsc!.period))]) : Promise.resolve(null),
     connState?.ga ? safe(readGa4Signals(site.client_id)) : Promise.resolve(null),

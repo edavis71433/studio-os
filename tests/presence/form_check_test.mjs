@@ -178,7 +178,7 @@ const hoursAgo = (h) => new Date(Date.now() - h * 3600_000).toISOString();
   ok('the ticket route: a ticket for this site, never kept by a cache', r.status === 200 && r.headers.get('cache-control') === 'no-store' && await readTicket(j?.data?.ticket, SID, now() + 3) === 'ok' && j.data.wait_s === 3);
   ok('the ticket routes are visitor routes (any address may ask)', VISITOR_ROUTE.test(`/forms/${SID}/ticket`) && VISITOR_ROUTE.test(`/book/${SID}/ticket`) && !VISITOR_ROUTE.test(`/forms/${SID}/tickets`) && !VISITOR_ROUTE.test('/forms/spam'));
   const idx = read('supabase/functions/presence/index.ts');
-  ok('index.ts routes the ticket and the email link before sign-in', /route\.match\(\/\^\\\/\(\?:forms\|book\)\\\/\(\[0-9a-f-\]\{36\}\)\\\/ticket\$\/\)/.test(idx) && idx.includes("if (route === '/forms/spam' && method === 'POST') return handleSpamLinkPost(req, cors);") && idx.indexOf("'/forms/spam'") < idx.indexOf('resolveSite(') );
+  ok('index.ts routes the ticket and the email link before sign-in', /route\.match\(\/\^\\\/\(\?:forms\|book\)\\\/\(\[0-9a-f-\]\{36\}\)\\\/ticket\$\/\)/.test(idx) && idx.includes("if (route === '/forms/spam' && method === 'POST') return handleSpamLinkPost(req, cors);") && idx.indexOf("'/forms/spam'") < idx.indexOf('resolveSeat(') );   // builder item 401: the seat is resolved by lib/who_asks.ts
 }
 {
   seed(hoursAgo(2));

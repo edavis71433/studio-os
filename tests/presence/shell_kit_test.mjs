@@ -72,6 +72,12 @@ ok('the kit puts its helpers on the page', !!(ddsKit && ddsMoney && ddsDate && d
   let reads = 0;
   const client = { auth: { getSession: async () => { reads++; return { data: { session } }; }, onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) } };
   ddsApi.use(client);
+  // builder item 414: the page's client is the shared one now, so shell.js starts no second
+  ok('use(): a studio page\'s client becomes the shared one (window.__ddsSb) for shell.js to reuse', globalThis.__ddsSb === client);
+  const portalClient = { auth: { getSession: async () => ({ data: { session } }), onAuthStateChange: () => ({}) } };
+  ddsApi.use(portalClient, { signIn: '/portal.html' });
+  ok('use(): a client\'s portal page keeps its client to itself (another storage key)', globalThis.__ddsSb === client);
+  ddsApi.use(client);
 
   const r = await ddsApi('/studio/customers');
   const h = sent[0].init.headers;

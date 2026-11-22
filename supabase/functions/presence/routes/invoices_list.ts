@@ -7,7 +7,7 @@
 // it under that invoice and counts it as money in. The page works out its totals and month
 // picker from these rows on its own day. Up to INVOICES_MAX; past that, `partial` says so.
 import { json } from '../../_shared/http.ts';
-import { svc } from '../lib/db.ts';
+import { svc, svcPages } from '../lib/db.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { moneyState, invoiceNotSent } from '../lib/money_state.ts';
@@ -59,7 +59,8 @@ export async function readInvoiceBook(site: SiteRow, today: string, more = false
   const contactIds = [...new Set(dealRows.map((d: any) => String(d.contact_id || '')).filter((x: string) => UUID_RE.test(x)))];
   const clientIds = [...new Set([...ids('customer_client_id'), ...dealRows.map((d: any) => String(d.converted_client_id || '')).filter((x: string) => UUID_RE.test(x))])];
   // sales item 152: each refund or lost dispute with the day it happened, so the page takes it off that month, not the month the invoice was paid (APPLY-0233; [] before it)
-  const returnedQ = svc(`presence_money_returns?site_id=eq.${site.id}&applies_to=eq.invoice&counted_cents=gt.0&select=invoice_id,counted_cents,counted_at,kind&order=counted_at.asc&limit=2000`).then((r) => r.ok ? rows(r) : []).catch(() => [] as any[]);
+  // builder item 411: every refund and lost dispute, a page at a time (limit=2000 quietly got 1,000)
+  const returnedQ = svcPages(`presence_money_returns?site_id=eq.${site.id}&applies_to=eq.invoice&counted_cents=gt.0&select=invoice_id,counted_cents,counted_at,kind`, 'counted_at').then((r) => r ? r.rows : []).catch(() => [] as any[]);
   const [people, customers, returnedRows] = await Promise.all([
     Promise.all(chunk(contactIds).map((c) => svc(`presence_contacts?id=in.(${c.join(',')})&site_id=eq.${site.id}&select=id,name,email,company`).then(rows).catch(() => [] as any[]))).then((x) => x.flat()),
     Promise.all(chunk(clientIds).map((c) => svc(`clients?id=in.(${c.join(',')})&select=id,name,email`).then(rows).catch(() => [] as any[]))).then((x) => x.flat()),

@@ -436,7 +436,7 @@ const clientRow = () => DB.clients.find((c) => c.id === CLIENT);
 {
   const idx = read('supabase/functions/presence/index.ts');
   const transfers = idx.indexOf("if (route === '/transfers' || route.startsWith('/transfers/'))");
-  ok('index: the answers sit before any site is resolved (the new owner has none)', transfers > 0 && transfers < idx.indexOf('// 3. resolve the caller\'s site'));
+  ok('index: the answers sit before any site is resolved (the new owner has none)', transfers > 0 && transfers < idx.indexOf('// 3. resolve the caller\'s seat'));   // builder item 401
   ok('index: …and after the sign-in gate', transfers > idx.indexOf("if (principal.kind !== 'client' && principal.kind !== 'staff') {"));
   ok('index: start, stop and the role change sit with the other people routes', /'\/portal\/transfer' && method === 'POST'/.test(idx) && /'\/portal\/transfer\/cancel' && method === 'POST'/.test(idx) && /portal\\\/members\\\/\(\[0-9a-f-\]\{36\}\)\\\/role\$/.test(idx));
   ok('members: the three new writes check the role themselves (open on the member list)', memberWriteNeeds(`/portal/members/${uuid('2')}/role`, 'POST') === 'open' && memberWriteNeeds('/portal/transfer', 'POST') === 'open' && memberWriteNeeds('/portal/transfer/cancel', 'POST') === 'open');

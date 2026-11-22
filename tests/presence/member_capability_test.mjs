@@ -572,7 +572,9 @@ const WRITE_HANDLERS = [
   const at = (s) => idx.indexOf(s);
   ok('index: the gate runs for every write by a seated member, after the reviewer boundary and before any route', at("if (siteRole === 'client_reviewer'") > 0 && at("if (siteRole === 'client_reviewer'") < at('if (principal.member && isWrite) {') && at('if (principal.member && isWrite) {') < at('// 5. router'));
   ok('index: its refusal returns', /const refused = await memberWriteGate\(req, route, method, principal\.member, cors\);\s*if \(refused\) return refused;/.test(idx));
-  ok('index: a seat is stamped for a client caller alone, so staff and a scoped studio never meet the gate', idx.includes("if (principal.kind === 'client') principal.member = seated.member;") && idx.split('principal.member =').length === 2);
+  // builder item 401: the seat is worked out in lib/who_asks.ts and stamped by index.ts
+  const who = read('supabase/functions/presence/lib/who_asks.ts');
+  ok('index: a seat is stamped for a client caller alone, so staff and a scoped studio never meet the gate', idx.includes("if (principal.kind === 'client' && seat.member) principal.member = { ...seat.member };") && idx.split('principal.member =').length === 2 && who.includes("if (principal.kind === 'client') member = seated.member;"));
   const beforeGate = idx.slice(idx.indexOf('async function route_'), at('if (principal.member && isWrite) {'));
   ok('index: the routes that run before the gate are the public, operator and account ones', ['/system', '/agency', '/commerce', '/admin', '/marketplace', '/push/subscribe', '/help/ask'].every((r) => beforeGate.includes(`'${r}`)));
 
