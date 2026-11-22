@@ -219,7 +219,7 @@ export interface SiteBlockBooking { type: 'booking'; title?: string; intro?: str
 // update's "People who joined your list"); otherwise `url` links out to another company's page.
 export interface SiteBlockNewsletter { type: 'newsletter'; title?: string; text?: string; button?: string; url?: string; collect?: boolean }
 export interface SiteBlockSocial { type: 'social'; title?: string; links: Array<{ network: string; url: string }> }
-export interface SiteBlockEvents { type: 'events'; title?: string; items: Array<{ name: string; date: string; time?: string; detail?: string; url?: string }> }
+export interface SiteBlockEvents { type: 'events'; title?: string; items: Array<{ name: string; date: string; time?: string; detail?: string; url?: string; place?: string }> }   // place: item 299, where it happens
 export interface SiteBlockMap { type: 'map'; title?: string; image?: MediaRef | null; address?: string; directions_url?: string }
 // Text & layout staples (T-BLOCKS r3) — prose bodies render through renderMarkdown
 // (escape-first, output-allowlisted); media resolved to MediaRef; links via safeHref.
@@ -325,7 +325,13 @@ export interface BlockLook {
   /** 'tinted' = a brand-derived, contrast-safe light wash; 'plain' = no background
    *  (clears the auto-alternate band); 'accent' = a bold brand-accent band with
    *  light text; 'dark' = a dark band with light text; omitted = template default. */
-  background?: 'tinted' | 'plain' | 'accent' | 'dark';
+  background?: 'tinted' | 'plain' | 'accent' | 'dark' | 'photo';
+  /** Item 292: with background 'photo', the owner's photo behind the section (a call to action,
+   *  a spotlight or a title section): stored as photo_id, resolved to photo at serialize time
+   *  (lib/site_blocks.ts resolveBlockMedia), and a veil over it so the words read. */
+  photo_id?: string;
+  photo?: MediaRef | null;
+  veil?: 'dark' | 'light';
   /** 'full' = edge-to-edge section; inner content still capped for readability. */
   width?: 'full';
   /** vertical padding vs the default. */

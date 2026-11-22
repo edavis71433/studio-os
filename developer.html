@@ -117,7 +117,7 @@ const api=(path,method,body)=>ddsApi(path,{method,body,scope:ownBusiness()});
 // ── state ──
 let STATE={files:[],template:{},cust:{theme_tokens:{},custom_css:'',custom_html:'',allowed_tokens:[]},active:'theme/tokens.json'};
 const FIXED_COLOR_TEMPLATES=new Set(['slate']);   // templates whose own colours win over these tokens (presence.html has the same list)
-const TOKEN_META={accent:{label:'Accent',type:'color'},accent_soft:{label:'Accent soft',type:'color'},ink:{label:'Text',type:'color'},bg:{label:'Background',type:'color'},radius:{label:'Corner radius',type:'text',ph:'8px'},font_scale:{label:'Type scale',type:'text',ph:'1.0'}};
+const TOKEN_META={accent:{label:'Accent',type:'color'},accent_soft:{label:'Accent soft',type:'color'},ink:{label:'Text',type:'color'},bg:{label:'Background',type:'color'},radius:{label:'Corner radius',type:'text',ph:'8px'},font_scale:{label:'Type scale',type:'text',ph:'1.0'},header_brand:{label:'Header shows (both, logo, name)',type:'text',ph:'both'},logo_height:{label:'Logo height in px (24 to 80)',type:'text',ph:'34'},site_search:{label:'Search box (on or off)',type:'text',ph:'on'},motion:{label:'Motion (gentle, slide, scale, zoom)',type:'text',ph:''},html_pages:{label:'HTML block pages (all, home, inner)',type:'text',ph:'all'}};
 
 function iconFor(kind){return kind==='theme'?'◆':kind==='css'?'{}':kind==='html'?'<>':kind==='template'?'⌘':'▤';}
 
@@ -173,8 +173,15 @@ function cssEditor(){
 }
 function htmlEditor(){
   return `<label class="fld" for="html">A block of your own HTML</label>
-    <p class="hint" style="margin-bottom:8px">It shows in one set place on your site. Scripts, embedded frames and anything else that could run code are taken out when it saves.</p>
-    <textarea id="html" spellcheck="false" aria-label="Custom HTML block" placeholder="<p class=&quot;note&quot;>Family-owned since 1998.</p>">${esc(STATE.cust.custom_html||'')}</textarea>${previewBlock()}${approvalBlock()}`;
+    <p class="hint" style="margin-bottom:8px">It sits inside the page, just above the footer. Scripts, embedded frames and anything else that could run code are taken out when it saves.</p>
+    <textarea id="html" spellcheck="false" aria-label="Custom HTML block" placeholder="<p class=&quot;note&quot;>Family-owned since 1998.</p>">${esc(STATE.cust.custom_html||'')}</textarea>
+    <label class="fld" for="htmlPages" style="margin-top:14px">Which pages carry it</label>
+    <select id="htmlPages" data-tok="html_pages" aria-label="Which pages carry the HTML block" style="font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--code-bg);color:var(--code-ink)">
+      <option value=""${(STATE.cust.theme_tokens||{}).html_pages?'':' selected'}>Every page</option>
+      <option value="home"${(STATE.cust.theme_tokens||{}).html_pages==='home'?' selected':''}>The home page only</option>
+      <option value="inner"${(STATE.cust.theme_tokens||{}).html_pages==='inner'?' selected':''}>Every page but the home page</option>
+    </select>
+    <p class="hint" style="margin-top:6px">Never on the privacy and accessibility pages, the thank-you pages, search, or the “not found” page.</p>${previewBlock()}${approvalBlock()}`;
 }
 function assetView(){
   return `<div class="readonly"><h2>Photos and documents</h2><div class="box">Your photos and documents live in Files. <a class="link" href="/files.html">Open Files →</a><br><br>The styles here change how your site shows them; they don’t replace Files.</div></div>`;

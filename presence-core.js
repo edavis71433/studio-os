@@ -3656,8 +3656,9 @@ function hbStandardPages() {
     { key: "home", path: "/", title: "Home", sum: "Your welcome, what you offer, testimonials", view: "design", slug: "", icon: "home", sections: ["business", "testimonials", "media"] },
     { key: "menu", path: v.path || "/menu/", title: v.label || "Menu", sum: "What you offer", view: "offerings", icon: "menu", sections: ["offerings"] },
     { key: "about", path: "/about/", title: "About", sum: "Your story, in your words", view: "business", icon: "about", sections: ["business"] },
-    { key: "faq", path: "/faq/", title: "FAQ", sum: "The questions customers ask, answered", view: "faqs", icon: "faq", sections: ["faqs"] },
-    { key: "updates", path: "/updates/", title: "Updates", sum: "News and seasonal notes", view: "updates", icon: "updates", sections: ["updates"] },
+    // item 297: an empty FAQ or Updates page stays off the live site (and out of its menu) until it has something on it
+    { key: "faq", path: "/faq/", title: "FAQ", sum: (S.faqs || []).length ? "The questions customers ask, answered" : "Not on your live site until it has a question", view: "faqs", icon: "faq", sections: ["faqs"] },
+    { key: "updates", path: "/updates/", title: "Updates", sum: (S.posts || []).some((p) => p.status === "published") ? "News and seasonal notes" : "Not on your live site until an update is published", view: "updates", icon: "updates", sections: ["updates"] },
     { key: "contact", path: "/contact/", title: "Contact", sum: "Hours, map, how to reach you", view: "business", icon: "contact", sections: ["business"] },
   ];
 }
@@ -8525,7 +8526,7 @@ const FIXED_COLOR_TEMPLATES = new Set(["slate"]);
 const BLOCK_DEFS = [
   // item 57: a section built from blocks (a heading, words, photos, buttons…) stacked top to bottom
   { type: "stack", name: "Blocks", stackSimple: true, hint: "Build your own section: a heading, words, photos, buttons and more, stacked top to bottom." },
-  { type: "features", name: "Features / highlights", field: "items", hint: "One per line:  Title | short description | icon (optional emoji, e.g. ✅ 🚚 ⭐)",
+  { type: "features", name: "Features / highlights", field: "items", hint: "One per line:  Title | short description | icon   (pick a line icon from the grid below, or type an emoji)", icons: true,
     parse: (p) => ({ title: p[0] || "", text: p[1] || "", icon: p[2] || "" }), fmt: (o) => { const c = [o.title, o.text || "", o.icon || ""]; while (c.length && !c[c.length - 1]) c.pop(); return c.join(" | "); } },
   { type: "stats", name: "Numbers that build trust", field: "items", hint: "One per line:  Value | Label   (e.g.  15 | Years in business)",
     parse: (p) => ({ value: p[0] || "", label: p[1] || "" }), fmt: (o) => [o.value, o.label].filter(Boolean).join(" | ") },
@@ -8553,9 +8554,9 @@ const BLOCK_DEFS = [
   { type: "newsletter", name: "Newsletter sign-up", newsletterSimple: true, hint: "" },
   { type: "social", name: "Social links", field: "links", hint: "One per line:  network | link   (e.g.  instagram | https://instagram.com/yourbusiness — icons appear automatically)",
     parse: (p) => ({ network: p[0] || "", url: p[1] || "" }), fmt: (o) => [o.network, o.url].filter(Boolean).join(" | ") },
-  { type: "events", name: "Upcoming events", field: "items", hint: "One per line:  Name | date | time | detail | link   (a date like 2026-07-26 shows as “Jul 26”; time, detail and link are optional)",
-    parse: (p) => ({ name: p[0] || "", date: p[1] || "", time: p[2] || "", detail: p[3] || "", url: p[4] || "" }),
-    fmt: (o) => { const a = [o.name || "", o.date || "", o.time || "", o.detail || "", o.url || ""]; while (a.length > 2 && !a[a.length - 1]) a.pop(); return a.join(" | "); } },
+  { type: "events", name: "Upcoming events", field: "items", hint: "One per line:  Name | date | time | detail | link | place   (a date like 2026-07-26 shows as “Jul 26”; time, detail, link and place are optional. An event with no place is at your business address. Past events come off the site by themselves.)",
+    parse: (p) => ({ name: p[0] || "", date: p[1] || "", time: p[2] || "", detail: p[3] || "", url: p[4] || "", place: p[5] || "" }),
+    fmt: (o) => { const a = [o.name || "", o.date || "", o.time || "", o.detail || "", o.url || "", o.place || ""]; while (a.length > 2 && !a[a.length - 1]) a.pop(); return a.join(" | "); } },
   { type: "map", name: "Map & directions", mapSimple: true, hint: "" },
   // Text & layout staples (r3) — the everyday building blocks.
   { type: "richtext", name: "Text box", proseSimple: true, hint: "" },

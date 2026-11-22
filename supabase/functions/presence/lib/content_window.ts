@@ -90,8 +90,16 @@ export function visibilityChanged(item: { show_from?: string | null; show_until?
 export function blocksNeedRewindow(blocks: unknown, liveIso: string, nowIso: string): boolean {
   if (!Array.isArray(blocks)) return false;
   return blocks.some((b) => b && typeof b === 'object'
-    && ((b as any).show_from || (b as any).show_until)
-    && visibilityChanged(b as any, liveIso, nowIso));
+    && (((b as any).show_from || (b as any).show_until) && visibilityChanged(b as any, liveIso, nowIso)
+      || eventDays(b).some((until) => visibilityChanged({ show_until: until }, liveIso, nowIso))));
+}
+
+/** Item 299: an Events section's days, each as the instant its event comes off the site (the end of
+ *  that date, lib/site_blocks.ts eventPassed draws by the same instant). Pure. */
+export function eventDays(b: unknown): string[] {
+  if (!b || typeof b !== 'object' || (b as any).type !== 'events') return [];
+  const items = Array.isArray((b as any).items) ? (b as any).items : [];
+  return items.map((it: any) => String(it?.date || '')).filter((d: string) => DATE_RE.test(d)).map((d: string) => `${d}T23:59:59.999Z`);
 }
 
 /** Every section a snapshot's settings can put on the site: the home page's and each of
@@ -116,7 +124,7 @@ export function nextWindowBoundary(blocks: unknown, afterIso: string): string | 
     if (!b || typeof b !== 'object') continue;
     const from = (b as any).show_from || undefined, until = (b as any).show_until || undefined;
     if (from && until && from > until) continue;
-    for (const at of [from, until]) if (at && at > afterIso && (!next || at < next)) next = at;
+    for (const at of [from, until, ...eventDays(b)]) if (at && at > afterIso && (!next || at < next)) next = at;
   }
   return next;
 }

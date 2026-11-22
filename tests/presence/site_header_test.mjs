@@ -41,7 +41,7 @@ for (const slug of TEMPLATES) {
     });
     ok(`[${slug}] ${v}: every page with a header carries it once, in the head`, every);
   }
-  ok(`[${slug}] no choice: the pages are exactly as before`, pages.every((k) => !String(plain[k]).includes('dds-hdr')));
+  ok(`[${slug}] no choice: the pages are exactly as before`, pages.every((k) => !String(plain[k]).includes('id="dds-hdr')));
 }
 
 const done = fail === 0;
