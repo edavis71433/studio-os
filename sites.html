@@ -281,6 +281,28 @@
   .kind:has(input:checked) b,.kind:has(input:checked) span{color:var(--p-deep)}
   .kind:has(input:focus-visible),.dcard:has(input:focus-visible),.tcard:has(input:focus-visible){outline:2px solid var(--p);outline-offset:2px}
   .srule{border:none;border-top:1px solid var(--line);margin:4px 0}
+  /* item 331: each design card has "See it full size" under it; the viewer draws a sample live */
+  .dcell{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .dfull{align-self:flex-start;min-height:36px;padding:6px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--p);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  .dfull:hover{border-color:var(--p)}
+  @media (pointer:coarse){.dfull{min-height:44px}}
+  dialog.bigview{width:min(1240px,96vw);max-width:none;height:92vh;max-height:none;padding:0;border:none;border-radius:20px;background:var(--bg);color:var(--ink);overflow:hidden}
+  dialog.bigview[open]{display:flex;flex-direction:column}
+  dialog.bigview::backdrop{background:rgba(23,21,34,.55)}
+  .bvtop{flex:0 0 auto;display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--line)}
+  .bvt{flex:1 1 auto;min-width:0} .bvt h3{margin:0;font-size:20px} .bvt p{margin:2px 0 0;font-size:13px;color:var(--soft)}
+  .bvseg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;flex:0 0 auto}
+  .bvseg button{min-height:44px;padding:0 16px;border:none;background:var(--card);color:var(--soft);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+  .bvseg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p-deep)}
+  .bvbody{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;background:var(--card)}
+  .bvwait{position:absolute;inset:0;display:grid;place-items:center;margin:0;color:var(--soft);font-size:14px}
+  .bvframe{position:absolute;inset:0;overflow:hidden}
+  .bvframe iframe{display:block;border:0;background:#fff;transform-origin:0 0}
+  .bvframe.phone{display:flex;justify-content:center;padding:16px 0;background:var(--bg)}
+  .bvframe.phone iframe{width:390px;height:100%;border-radius:18px;box-shadow:0 10px 30px -10px rgba(0,0,0,.35)}
+  .bvfoot{flex:0 0 auto;display:flex;justify-content:flex-end;gap:12px;padding:12px 20px;border-top:1px solid var(--line)}
+  .bvfoot .btn{min-height:44px;padding:10px 18px;border-radius:10px;font-weight:600}
+  @media (max-width:760px){dialog.bigview{width:100%;height:100vh;height:100dvh;border-radius:0}.bvtop{flex-wrap:wrap;padding:12px 16px}.bvt{flex-basis:calc(100% - 60px)}}
   /* item 332: the optional first draft */
   .ndraft{display:flex;flex-direction:column;gap:12px}
   .ndraft-on{display:flex;align-items:flex-start;gap:12px;min-height:44px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;background:var(--card)}
@@ -553,6 +575,16 @@
     </div>
     <div id="new-done" class="dbody sdone" style="display:none"></div>
   </form>
+</dialog>
+<!-- item 331: "See it full size", a kind's sample site drawn live in one design -->
+<dialog id="bigDlg" class="bigview" aria-labelledby="bigHead">
+  <div class="bvtop">
+    <div class="bvt"><h3 id="bigHead">Design</h3><p id="bigSub"></p></div>
+    <div class="bvseg" role="group" aria-label="See it on"><button type="button" id="bigDesk" aria-pressed="true">Computer</button><button type="button" id="bigPhone" aria-pressed="false">Phone</button></div>
+    <button type="button" class="sx" id="bigX" aria-label="Close">×</button>
+  </div>
+  <div class="bvbody" id="bigBody"><p class="bvwait" id="bigWait" role="status">Drawing the sample…</p><div class="bvframe" id="bigWrap"><iframe id="bigFrame" title="A sample site in this design" sandbox="" referrerpolicy="no-referrer"></iframe></div></div>
+  <div class="bvfoot"><button type="button" class="btn ghost" id="bigBack">Back</button><button type="button" class="btn" id="bigUse">Use this design</button></div>
 </dialog>
 <!-- Invite the owner (item 135): the later, separate step for a site with no owner
      yet. Their sign-in email goes out from the studio (POST /agency/sites/:id/invite) -->
@@ -1697,6 +1729,8 @@ const kitHintOf=(k)=>k&&k.kind==='template'
   :'Starter kit: the services, FAQs, voice and colors it was saved with.';
 const kindOf=(key)=>((DESIGNS&&DESIGNS.kinds)||[]).find(k=>k.key===key)||null;
 const designOf=(slug)=>((DESIGNS&&DESIGNS.designs)||[]).find(d=>d.slug===slug)||null;
+// item 331: with a kind picked, each design is pictured with that kind's own sample business
+const picOf=(d)=>{const k=kindOf(NEWS.kind);return (k&&d.pictures&&d.pictures[k.family])||d.picture;};
 function newSuggested(){const k=kindOf(NEWS.kind);return k&&DESIGNS&&DESIGNS.suggested?(DESIGNS.suggested[k.family]||[]):[];}
 function roomFull(){const r=META.room;return !!(r&&typeof r.limit==='number'&&r.used>=r.limit);}
 async function loadDesigns(){
@@ -1721,7 +1755,7 @@ function paintDesigns(){
   const sug=newSuggested(),k=kindOf(NEWS.kind),badge=k&&DESIGNS.badges?DESIGNS.badges[k.family]||'':'';
   const order=[...sug.map(designOf).filter(Boolean),...all.filter(d=>!sug.includes(d.slug))];
   $('new-designs').innerHTML=order.map(d=>{const on=!NEWS.tpl&&NEWS.look===d.slug;
-    return `<label class="dcard" data-design="${esc(d.slug)}"><input type="radio" name="newlook" value="${esc(d.slug)}"${on?' checked':''}><span class="dpic"><img src="${esc(d.picture)}" alt="" loading="lazy" width="640" height="440">${badge&&sug.includes(d.slug)?`<span class="dbadge"><span aria-hidden="true">★</span>${esc(badge)}</span>`:''}<span class="dtick" aria-hidden="true">✓</span></span><b>${esc(d.name)}</b><span class="dline">${esc(d.line)}</span></label>`;}).join('');
+    return `<div class="dcell"><label class="dcard" data-design="${esc(d.slug)}"><input type="radio" name="newlook" value="${esc(d.slug)}"${on?' checked':''}><span class="dpic"><img src="${esc(picOf(d))}" alt="" loading="lazy" width="640" height="440">${badge&&sug.includes(d.slug)?`<span class="dbadge"><span aria-hidden="true">★</span>${esc(badge)}</span>`:''}<span class="dtick" aria-hidden="true">✓</span></span><b>${esc(d.name)}</b><span class="dline">${esc(d.line)}</span></label><button type="button" class="dfull" data-full="${esc(d.slug)}" aria-label="See ${esc(d.name)} full size">See it full size</button></div>`;}).join('');
   const good=badge.replace(/^Good for /,'');
   $('new-lookline').textContent=(k?(k.family==='other'?'Three good places to start come first.':`The three that suit ${good} come first.`):'Pick the kind of business and the designs that suit it come first.')+' Your words stay yours; a look can be changed any time in the editor, under Styles.';
 }
@@ -1777,7 +1811,7 @@ function paintNewSum(){
   const k=kindOf(NEWS.kind),ex=k&&(k.exact||[]).find(e=>e.key===NEWS.industry);
   const word=ex?ex.label:k?k.label:'';
   const tpl=NEWS.tpl?KITS.find(x=>x.id===NEWS.kit):null,d=tpl?null:designOf(NEWS.look);
-  $('new-sum-pic').innerHTML=d?`<img src="${esc(d.picture)}" alt="" width="640" height="440">`:'▤';
+  $('new-sum-pic').innerHTML=d?`<img src="${esc(picOf(d))}" alt="" width="640" height="440">`:'▤';
   $('new-sum-a').textContent=name+(word?' · '+word:'');
   $('new-sum-b').textContent=(tpl?'From your “'+tpl.name+'” template':d?d.name+' look':'The usual look')+' · starts private, nothing published';
 }
@@ -1817,6 +1851,43 @@ async function openNewSite(preset,forCustomer){
   }
   paintKinds();paintExact();paintDesigns();paintTemplates();paintStarter();paintDraft();paintNewSum();
 }
+// item 331: "See it full size". The server draws the kind's sample site in the design (no
+// scripts, photos from the app); the frame shows it at a computer's width scaled to fit, or a phone's.
+let BIG=null;
+function paintBig(){
+  if(!BIG)return;
+  const wrap=$('bigWrap'),f=$('bigFrame'),phone=BIG.phone;
+  $('bigDesk').setAttribute('aria-pressed',String(!phone));$('bigPhone').setAttribute('aria-pressed',String(phone));
+  wrap.classList.toggle('phone',phone);
+  if(phone){f.style.transform='';f.style.width='';f.style.height='';return;}
+  const w=wrap.clientWidth||1,h=wrap.clientHeight||1,scale=Math.min(1,w/1280);
+  f.style.width='1280px';f.style.height=Math.ceil(h/scale)+'px';f.style.transform=`scale(${scale})`;
+}
+async function openBig(slug){
+  const d=designOf(slug);if(!d)return;
+  const k=kindOf(NEWS.kind),fam=k?k.family:(d.family||'other'),noun=(DESIGNS.sample_nouns||{})[fam]||'business';
+  BIG={slug,phone:window.innerWidth<761};
+  $('bigHead').textContent=d.name;
+  $('bigSub').textContent=`A sample ${noun} in this design. The site’s own words and photos replace it.`;
+  $('bigWait').hidden=false;$('bigWait').textContent='Drawing the sample…';$('bigFrame').srcdoc='';
+  $('bigDlg').showModal();paintBig();$('bigX').focus();
+  let r=null;try{r=await api('/agency/designs/'+encodeURIComponent(slug)+'/sample?kind='+encodeURIComponent(NEWS.industry||fam));}catch(_){r=null;}
+  if(!BIG||BIG.slug!==slug||!$('bigDlg').open)return;
+  const html=r&&r.ok&&r.body&&r.body.data&&r.body.data.html;
+  if(!html){$('bigWait').textContent='We couldn’t draw this design just now. Its picture shows how it starts.';return;}
+  $('bigFrame').srcdoc=html;$('bigWait').hidden=true;paintBig();
+}
+$('new-designs').addEventListener('click',(e)=>{const b=e.target.closest('[data-full]');if(b)openBig(b.getAttribute('data-full'));});
+$('bigDesk').onclick=()=>{if(BIG){BIG.phone=false;paintBig();}};
+$('bigPhone').onclick=()=>{if(BIG){BIG.phone=true;paintBig();}};
+$('bigX').onclick=$('bigBack').onclick=()=>$('bigDlg').close();
+$('bigUse').onclick=()=>{
+  if(BIG&&designOf(BIG.slug)){NEWS.look=BIG.slug;NEWS.chosen=true;NEWS.byHand=true;if(NEWS.tpl){NEWS.tpl=false;NEWS.kit='';}paintDesigns();paintStarter();paintDraft();paintNewSum();}
+  const slug=BIG&&BIG.slug;$('bigDlg').close();
+  const i=slug&&document.querySelector(`#new-designs input[value="${CSS.escape(slug)}"]`);if(i)i.focus();
+};
+$('bigDlg').addEventListener('close',()=>{BIG=null;$('bigFrame').srcdoc='';});
+window.addEventListener('resize',()=>{if(BIG)paintBig();});
 $('new-x').onclick=()=>$('newDlg').close();
 $('new-cancel').onclick=()=>$('newDlg').close();
 $('new-back').onclick=()=>{$('newDlg').close();const h=$('pagehead');if(h)h.focus();};   // back to the list, to move one to the Trash

@@ -2,6 +2,7 @@
 //   node scripts/thumbnails/shoot.mjs <out-dir>
 // Serves what render.ts wrote and saves small JPEGs the builder shows:
 //   thumbs/templates/<slug>.jpg  — the top of each template's sample home page, 640×440
+//   thumbs/templates/<slug>/<family>.jpg — the same, with each kind of business's sample (item 331)
 //   thumbs/sections/<type>.jpg   — each section type on its own, 440×248
 //   thumbs/pages/<key>.jpg       — the top of each ready-made page in Add a page, 440×460 (item 216)
 // and, once every picture is taken, tests/presence/golden/pictures.json: each picture's
@@ -17,7 +18,7 @@ import { chromium } from '@playwright/test';
 const src = process.argv[2];
 if (!src) { console.error('usage: shoot.mjs <out-dir>'); process.exit(2); }
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));   // a decoded path: the folder may hold a space
-const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.js': 'text/javascript', '.json': 'application/json', '.pdf': 'application/pdf' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.js': 'text/javascript', '.json': 'application/json', '.pdf': 'application/pdf' };
 
 const server = createServer(async (req, res) => {
   let p = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname));
@@ -45,6 +46,28 @@ for (const slug of templates) {
   await page.waitForTimeout(200);
   await page.screenshot({ path: join(ROOT, `thumbs/templates/${slug}.jpg`), type: 'jpeg', quality: 72 });
   await page.close();
+}
+
+// Item 331: every design with every kind's sample business, the same view as the templates':
+//   thumbs/templates/<slug>/<family>.jpg
+const kinds = [];
+for (const slug of await readdir(join(src, 'kinds')).catch(() => [])) {
+  await mkdir(join(ROOT, `thumbs/templates/${slug}`), { recursive: true });
+  for (const family of await readdir(join(src, 'kinds', slug))) {
+    const dir = `kinds/${slug}/${family}`;
+    const page = await browser.newPage({ viewport: { width: 1280, height: 880 }, deviceScaleFactor: 0.5 });
+    await page.route('**/*', (route) => {
+      const u = new URL(route.request().url());
+      if (u.origin !== base) return route.abort();
+      return route.continue({ url: `${base}/${dir}${u.pathname.replace(`/${dir}`, '')}` });
+    });
+    await page.goto(`${base}/${dir}/`, { waitUntil: 'networkidle' });
+    await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, 0); });
+    await page.waitForTimeout(150);
+    await page.screenshot({ path: join(ROOT, `thumbs/templates/${slug}/${family}.jpg`), type: 'jpeg', quality: 72 });
+    await page.close();
+    kinds.push(`templates/${slug}/${family}.jpg`);
+  }
 }
 
 // Sections: the section alone, with the site's header and footer out of the picture.
@@ -89,8 +112,8 @@ server.close();
 // The record: what each picture shows (render.ts's digest of its page) and the picture itself.
 const sources = JSON.parse(await readFile(join(src, 'sources.json'), 'utf8'));
 const record = {};
-for (const name of [...templates.map((s) => `templates/${s}.jpg`), ...sections.map((t) => `sections/${t}.jpg`), ...pages.map((k) => `pages/${k}.jpg`)].sort()) {
+for (const name of [...templates.map((s) => `templates/${s}.jpg`), ...kinds, ...sections.map((t) => `sections/${t}.jpg`), ...pages.map((k) => `pages/${k}.jpg`)].sort()) {
   record[name] = { page: sources[name], picture: createHash('sha256').update(await readFile(join(ROOT, 'thumbs', name))).digest('hex') };
 }
 await writeFile(join(ROOT, 'tests/presence/golden/pictures.json'), JSON.stringify(record, null, 1) + '\n');
-console.log(`shot ${templates.length} templates, ${sections.length} sections and ${pages.length} pages`);
+console.log(`shot ${templates.length} templates, ${kinds.length} kind pictures, ${sections.length} sections and ${pages.length} pages`);

@@ -252,35 +252,355 @@
   "picture": "39a64a928aa2e0264356fe29dfd458c980245c29b17af750c9ed0406909f5493"
  },
  "templates/atelier.jpg": {
-  "page": "e891ac2915aa700fda5fbada225c51873d7132fb1f500ebc286961738b4ec259",
-  "picture": "53d9af50282e20670f41cc50615c65bdba7749b9d33e8c6e94445c1d4d2ee48d"
+  "page": "286ff3743179bfb94483c08eae3ab1d6a605b7b9a655712111b7d947a0b25afc",
+  "picture": "8b70d4d98a1cdb7b277b2943e05e31cebd8b3093629de6bc11a2260e89ee2986"
+ },
+ "templates/atelier/beauty.jpg": {
+  "page": "0f1dfdf91125214c08d066c80f068bc4acbde7597b64208269fccfc2f47ddf84",
+  "picture": "8b70d4d98a1cdb7b277b2943e05e31cebd8b3093629de6bc11a2260e89ee2986"
+ },
+ "templates/atelier/community.jpg": {
+  "page": "717bbd0f2cb0a5623645b02fb1e8e7d7845fce032a91674685dc76eb77c39df9",
+  "picture": "496e8ea71a7eb9173bb87f0ce6fdac75ae2d32c736ce5610bc383182e66b1ff8"
+ },
+ "templates/atelier/creative.jpg": {
+  "page": "a9673c6d971a136b952a2f30957b968ffd955e83e38c0de5b8146e0840ed1644",
+  "picture": "387eebe219c79c6e00198066c125a199f282ebdb4c806ec334092b66e8144dc4"
+ },
+ "templates/atelier/fitness.jpg": {
+  "page": "3ce3eb472b8021fb24eec80e5f82003120ad1c1496c2739e4d52b7ed5f4281ee",
+  "picture": "c480e9db0451f093f8418406464924bcd3830f1660f92747286056d42e59c5c8"
+ },
+ "templates/atelier/food.jpg": {
+  "page": "565cb33a16f28144cd17b22caff1bf9841900365fd8705e0514c108fd3172fad",
+  "picture": "f0c1635f7eb6cdd1e91de8e19e4d0b8d2cbfb7cb97d83d2ec70b3619c6d7ea86"
+ },
+ "templates/atelier/health.jpg": {
+  "page": "b48753ce30139ec6a6f7468a359c1033e1930cdafab0c357ee7fd3d52b65e460",
+  "picture": "417355448b0a511e476358056cf286e6709b0be39f9787fdc86dc329b29285aa"
+ },
+ "templates/atelier/home.jpg": {
+  "page": "020ba1a948358e5b78b5d80f72316e79e8ed417a8026f90a14aca16a37e3292a",
+  "picture": "314ee8bfe96f0bcf54f4e12370384e1cc1a856a0206ca9e45939422305226a4f"
+ },
+ "templates/atelier/other.jpg": {
+  "page": "1969046efacd0167bfe32f0aab4e6abe0f3c5a86fe92102b34b44f05fec271e1",
+  "picture": "a19a6275f1280f6968cd0aaacd1f008d7a149ebc1f1fe7ba878a3eb19190d3c0"
+ },
+ "templates/atelier/professional.jpg": {
+  "page": "5cfef6d2c216164ff8d445ddfa0fa01291d0960934038ad1992de37c7f003ed2",
+  "picture": "479b8800f1928a1cf476385aba15c22449888931779eff407696211d03e05880"
+ },
+ "templates/atelier/retail.jpg": {
+  "page": "a9944d15eb28286eab50b08aaca4ee99176aace25891dccca04ee10fd91c2225",
+  "picture": "1840fb861fec9a34162356a18b072f71e801f9145ae133538d60b3d5485bb382"
  },
  "templates/aurora.jpg": {
-  "page": "4697a60bb56d64860a37c5b068c5be9026ed4faa806f2c769461f967f7b3dc5d",
-  "picture": "bf0be3b52ddf222441e6732a024c78a9437ba9e9f12c5727d13f51785436be76"
+  "page": "be040142858c0e7145a5965a63012fd315a5d869247b4b70ba862b89e9fd5aa9",
+  "picture": "88e4199fe34355111e08dfba125eedfd665420a207afcfb297996590c81f57a8"
+ },
+ "templates/aurora/beauty.jpg": {
+  "page": "090fdfa178ce2202d9e6d59b7f759ae5d1c1216ddcb52f2c7b71d7824b59ecdb",
+  "picture": "04e04aa47057e72caf38f15ae93f3f3b155e566297f404f5f4649d95ef1eed81"
+ },
+ "templates/aurora/community.jpg": {
+  "page": "874dd32492e3d57cf1a96ee83c5c60db6fe43e23bf08e1813cab0fead68d9308",
+  "picture": "9bd8e0917513228fabe893a3dafca529fb0c8fe464d93688dc60f39273a91ff7"
+ },
+ "templates/aurora/creative.jpg": {
+  "page": "f841b47e2ff9d63f9542d702948be16f6aafdda61d6b228b08c006987395cff3",
+  "picture": "88e4199fe34355111e08dfba125eedfd665420a207afcfb297996590c81f57a8"
+ },
+ "templates/aurora/fitness.jpg": {
+  "page": "76c84904fd2cad70c1796ee5c1e2b9ba55bed488c54f86b11f390d14af4c1d87",
+  "picture": "203116ae90819a6fd7031df38fe45097105992b86452b58cf76475faabf5ecf1"
+ },
+ "templates/aurora/food.jpg": {
+  "page": "5c7189fb13e763784cdcf1d3367f588c718b549404beb00695cdae0530bd8002",
+  "picture": "24ecad1cf40f5cebb1c4258983b566190a56e90e3d9ecdd8847309e8ae9e0063"
+ },
+ "templates/aurora/health.jpg": {
+  "page": "25c1d9056ace34027c9bc48aedbed7ae97f54aacebaca454dee05752ac42938b",
+  "picture": "0afd0cec91cea7d727e5f1866663b068fdeca7d1730653325f51673b3f0e09ce"
+ },
+ "templates/aurora/home.jpg": {
+  "page": "c0c7eadec2ef495db5d8d2f1d4a241475dd0a982e81306d1b34c33ef3961dac7",
+  "picture": "bd1075002063ef70b6c8f55e1cf746c8635a3f881fd7ebf189ecb7588e9c3361"
+ },
+ "templates/aurora/other.jpg": {
+  "page": "bb16cb63450c05e98b24f8174b34c50f1a69ae294bce54799fd59d7cfd6d9287",
+  "picture": "b48b085e6de821094f23f551ed71c9cdbfb1e2f8bb0e592624b0181b57706e1a"
+ },
+ "templates/aurora/professional.jpg": {
+  "page": "45352ab1e17d3651ff1921f72c72a0842570630c7e0668d79a1255e57bd1dc2d",
+  "picture": "8faf7fd70a2c9ff6e8762ed07389697a384c30ff2b971d64693012132375dc56"
+ },
+ "templates/aurora/retail.jpg": {
+  "page": "2237b90f0b802fd7bfd12f145064d76ea77d379eccec94377368294555a92e02",
+  "picture": "7a178097ca95e00fff9b6c0108f69088a4980de8c4ac7d7071573f6ae2d61e96"
  },
  "templates/business-classic.jpg": {
-  "page": "8f1f8736dfbbbc4bbb271b78022f248c21dd93390438aae95647178f9a5b9d84",
-  "picture": "3e3966d308ee62fb6a197db23ec46d9bc5dcf360e85bd57d955be66d6b880dde"
+  "page": "17a8b944e3c068370ffa8e493fb710e68796e5a4b051da987aba5762ecc080c9",
+  "picture": "997e73bc249710eaf30ea2319ef92e0c123c5d004a10a0d6dfca71ea27db90df"
+ },
+ "templates/business-classic/beauty.jpg": {
+  "page": "738889a13cc278ff8cefd5f5e37e26427c4bdb764e029431f4cec0d0795173f7",
+  "picture": "a09d5f79d1d8b434004785416fe08c75738d1eaaca732d61b4c38f2598942ccd"
+ },
+ "templates/business-classic/community.jpg": {
+  "page": "a66a0e07734f42d7b2792fdd430736036f2221e47843b00eff71006835422d09",
+  "picture": "54bdd83a630dcc4068c6acb674de8ef9b721a9680e58780f5fa2993e4db5e0b1"
+ },
+ "templates/business-classic/creative.jpg": {
+  "page": "d0f7f1f69c686aebafc4ca0d748fd56761b5fca73a68d1527c525242d341ca8d",
+  "picture": "11a94de6b0d23f351064cb0db0f7a4a69eed8c36c3a539e63f4e092881e383c4"
+ },
+ "templates/business-classic/fitness.jpg": {
+  "page": "ca8f240479019e69c430fb07a9db1d77bc2967202e719748109a36d85de65b92",
+  "picture": "16c7c4aab2d1d985835001c8ed8839916137eba1f6fd3f9868fdddd7a92e2e60"
+ },
+ "templates/business-classic/food.jpg": {
+  "page": "70aeacee823d81e9e0531fe4de64455a49f214eae9a31393a06b7b3718d8f7a7",
+  "picture": "cb513f25127103c496e67abb834d923b28d3973af557aa116941d449456bf35f"
+ },
+ "templates/business-classic/health.jpg": {
+  "page": "de1ca18e414f4e6167925908b574b31ff46dc1041ca279806462319ea44b46a8",
+  "picture": "ef9bebcb12063595466d8d5b5653c331d126adac3a8fe347e4f1478026b7ead3"
+ },
+ "templates/business-classic/home.jpg": {
+  "page": "39973235d4d30461b6b10eea9835fbe83b708bfa502a42c9daed90ce26f36c3f",
+  "picture": "20af492a29b28049ef9e51efb0ffa523b6a8729ade47478ae9a42b9bd43e5968"
+ },
+ "templates/business-classic/other.jpg": {
+  "page": "d3b0f18070d44497f57f370b9cbe66609b707d0e95b7e37b6e34b6d4beda455d",
+  "picture": "5d8a33c1ecc5fe167ac4feabec887097ebf564ad62331db88d20bed4f086d74f"
+ },
+ "templates/business-classic/professional.jpg": {
+  "page": "a47b04767ee1b2fa0168a787ffaa546e3a9c174cedcbb8c3840f68517d58718e",
+  "picture": "997e73bc249710eaf30ea2319ef92e0c123c5d004a10a0d6dfca71ea27db90df"
+ },
+ "templates/business-classic/retail.jpg": {
+  "page": "ee547d308554dab4c6279b3a00429453fc271b5834a1fda6946d3d1851166a5b",
+  "picture": "58ea113f9c09ca57ddf8717ff8d29234fd3493d20ce42419941faa30fb7588a6"
  },
  "templates/editorial.jpg": {
-  "page": "ae5dfe42532c98e6f4772360238b02cffc64be5bb941e5d96f3ff6a88c73899c",
-  "picture": "03d5187edbb6545f0bccfab7d2f6e888d0e57ca843e41647b93c6d59f67f78b3"
+  "page": "d4071df7c81cd54d5cde7b728457265f69f47232484d5b7c407e9f7a1ec0c3ca",
+  "picture": "92201636f6fb617875d9e708ed492a76e88632c401764657a2ef00b382cf53c8"
+ },
+ "templates/editorial/beauty.jpg": {
+  "page": "9eed09f0ac5ec1b3b6dcea16fa7e4d9f20eff9951df280ecc07eed7e6d433c10",
+  "picture": "de6ca6f1f401f7499a6bb300c76b1ae8e343013007f32d6cc1f643c13b7c0496"
+ },
+ "templates/editorial/community.jpg": {
+  "page": "f0bc2c05032d320357f23d62824ddae47f204a2a43e13815b2f230ce1ea7ca4b",
+  "picture": "7b51545e105c4f35772afbc30d9b0f68bfb07a690b7218f8351655c6411b52f7"
+ },
+ "templates/editorial/creative.jpg": {
+  "page": "307a3624cab507f56bf1070735e473ff2f8c319e252a9e25ae434135d603cfb8",
+  "picture": "a227dc9c7932d3d3dd7d41d1d3494ccaaa57d089a3a00dbbe2b614c7e226b16a"
+ },
+ "templates/editorial/fitness.jpg": {
+  "page": "c273eb2245118c7e38ea32d1d9cfa401557124aa40db6b36962eaca7ddb37577",
+  "picture": "ad13d3c962cae6c89c419f6261bd52a8de21f1e6ecd83f29bb43fd0a76449ceb"
+ },
+ "templates/editorial/food.jpg": {
+  "page": "6134bba66529c5be17053aa155353e8cf2f9e19382f92b04e3a466d930681ee3",
+  "picture": "cfc01c9f8a494cefda91cb2201b8366b5f558eb7a1be71f962e884c9b214c345"
+ },
+ "templates/editorial/health.jpg": {
+  "page": "e0bc35b42592621f7c8841408e352b905e8906ee4cef28be1d6820de539410c7",
+  "picture": "15746438c27319c64eb5030cb4f84de195576ce5d6033367a59354a4858c39fe"
+ },
+ "templates/editorial/home.jpg": {
+  "page": "90060b38bc2c4f3fb683e33a58d00c6c82fa5c25362c224770241568b270ef75",
+  "picture": "9fa86f7699db621484e3de3a5c959b68033d16d5e2f4b31c7a07e88a06ef978d"
+ },
+ "templates/editorial/other.jpg": {
+  "page": "d998f9a71afe0ba0ae7c635281206420a3306963df0896b29b766794ea18624c",
+  "picture": "baa444f477a4dec53d9dd0b7ecdade394b326c08c7916e06fd5652bcd3558b01"
+ },
+ "templates/editorial/professional.jpg": {
+  "page": "df2c829b03339465e39582fe75ee2ea0e4e1354fb76ecd0e4ebc287f3f1395ff",
+  "picture": "f6d51c3ad02a4104fc6be752f1abd23301c767c8ac9a08d7b1d949e065008827"
+ },
+ "templates/editorial/retail.jpg": {
+  "page": "ab4902bb20e8e4e259bb05cf22d6ff9279d40a4d38ba26fefdc0aa7343825701",
+  "picture": "1126f5de9c142543d0f17ab0c1b5ecf9820035db2684dcebb6833a7c1d88c34e"
  },
  "templates/harbor.jpg": {
-  "page": "dbf991938032cf2ebfb70c3efb4507cf83490721c6c2740d703d58e686f73655",
-  "picture": "a3aff10c5492684b2ea1fff1d3cc177c294bcd6cd4f0b811a49ca75b85307e56"
+  "page": "127146273750778ac36b4fd25ae0330f4f666986d391ebec46236921db9632a6",
+  "picture": "ca88e8177f9ce2c5766fe3b59687c4570f3ce3b9f6264c68c6325838edc086f4"
+ },
+ "templates/harbor/beauty.jpg": {
+  "page": "5fa7d6dd7c8407209f7e5e6838fa525e018934eae5ccfbe1f06635b1879b572f",
+  "picture": "7105fea30e320122c5758e6e02fe2a78ac283a4654abcafbc6b049cd01f1f85a"
+ },
+ "templates/harbor/community.jpg": {
+  "page": "5dcfe74a17d13ab3d60437a5dea88fcab13a6cfbf84dc75d1170bb31d9300e7f",
+  "picture": "a265233787f9101589b11ba33211e43a8ec0475a78dfd3c3aaa5f42488fef859"
+ },
+ "templates/harbor/creative.jpg": {
+  "page": "ddcb61a6366fa35cd784ea40654b34fde2f520131f08dc7b7d5240c61feccaac",
+  "picture": "de3bfa876192bb27d3ffca126de043c6086662410122012f95ad87ddae167566"
+ },
+ "templates/harbor/fitness.jpg": {
+  "page": "6e5bacdcac6b4abc82a75cc5605ea1b5469c008970a2275649aaf9a147912fc5",
+  "picture": "cb0099dd0ed5a51616d13a259445dc238e6c8c15409b351e4bebd62c726953fd"
+ },
+ "templates/harbor/food.jpg": {
+  "page": "a6a53bb9d74f63b5b109a7d13c810b415ffd9ffba7b7e98c37b48a597d2bb1a4",
+  "picture": "80bd80e9f2c7a0743797c90cfbdbb58d783819e31e3ba25d6def567a7d1657f9"
+ },
+ "templates/harbor/health.jpg": {
+  "page": "990bb8c99d531cf4514bc62e9e5e62990785f4a2e0774709886c7bf4593d7760",
+  "picture": "73d5b93c25679982484c51bf54d25e075ef0e9d12339143ff7676f640520eb05"
+ },
+ "templates/harbor/home.jpg": {
+  "page": "0ad970ca51de1a087e0073a673ebfed60c16a821cfef4511fbc44e7662be582d",
+  "picture": "ca88e8177f9ce2c5766fe3b59687c4570f3ce3b9f6264c68c6325838edc086f4"
+ },
+ "templates/harbor/other.jpg": {
+  "page": "15b411c6141c7d9f89c21179eb94dbfe561e68dd3c606a21243d2842bdb0242b",
+  "picture": "f92d9676803873dbf4e85c1b9a8c03e015ad315b312e6259e92308716da51fc7"
+ },
+ "templates/harbor/professional.jpg": {
+  "page": "d567b0b0ae2a718dcae093b3017c5cea38620e4fbac33441c7acb9609511f83f",
+  "picture": "9fd866033dd41da0f94749de3dad13585f5980b57aa7c2185952085977af9272"
+ },
+ "templates/harbor/retail.jpg": {
+  "page": "0de2f1a9cde2097de8a066a64469259fdbf7dcb060383e052846e975d5e3d040",
+  "picture": "935714b319b6981bc632e2022fa35c77706b4ffc0b39260b6d69f73832b9f995"
  },
  "templates/meadow.jpg": {
-  "page": "00a05e5fc0cb0b0ded56b0109308953ca8cc3bc2e0f00a8b16e96bb6a619d7c3",
-  "picture": "9516acd40bee64657e1289752594e18977f4dbebb3012fc58c6bf86b6ef90f57"
+  "page": "decc3968fdd8008f7ee9672f1ecae3c4884c499c088ecf6b6c77a5656ad595ce",
+  "picture": "8d811a2b0560546843560fd7aa2ab8253b7106ca8c039f9673235c2815c5f969"
+ },
+ "templates/meadow/beauty.jpg": {
+  "page": "7f4e3b4df67389158e689bfe47fd93a87f8879ded241fe54ef65e367d2b3db00",
+  "picture": "e1c7decc944f292d2b30e6bcb0ed7bc3dc6a3c21f3dc075471ab5da3cbeb2afd"
+ },
+ "templates/meadow/community.jpg": {
+  "page": "d9d51f5ece7ad94bdf76ef453d2533295be57873b2cfdb11915b3afe7594d2c3",
+  "picture": "0c8eb1e443d0ee836309abf97c4bfdd3a3ae8c0f02f4065059c45781ab3cb011"
+ },
+ "templates/meadow/creative.jpg": {
+  "page": "e5045ffe4a78ba9ae3c9a147ad51e60f7102da09985ef7da31e3a9d53aed8c74",
+  "picture": "efc3b26c4dcbbfa13405a293adcd23b56d31c885dc178d4534a70bc1d6a6b92a"
+ },
+ "templates/meadow/fitness.jpg": {
+  "page": "4dc05a5099fb5fce648a0afedcfccc8e19ac1556f7671eb4306067a68bd41028",
+  "picture": "3061a0a9882aff13eb1adeb8420b8a21aaf4e003e9b7d41a78eb45c5e8ff4b65"
+ },
+ "templates/meadow/food.jpg": {
+  "page": "a3cc68efd22e96ead6cbfc432a4d4f8923e7df3d17c4f8fbde806a17c631d73b",
+  "picture": "74972defb5df6c467669728837f9d9a08cbb22cde983ce191907f3480bf15057"
+ },
+ "templates/meadow/health.jpg": {
+  "page": "60f48ce0b9a00d333103b8478561f4020de4646eb460425cb142e81765a2f519",
+  "picture": "1239c6106f2a1e82e8c91aedc063124206eb25a00db7bb005f276c1c1b815a68"
+ },
+ "templates/meadow/home.jpg": {
+  "page": "a887600eb420934da294f0309d1230715399075512b5f5f6feaacf7a9614c683",
+  "picture": "77dbb41eaff5f0b108cc6796b0f1b4287fb8222fd5fb52e13caba05cfef598be"
+ },
+ "templates/meadow/other.jpg": {
+  "page": "fc88db5d21084f6d433f4e36c1ec7c755d24daac298afbef8e8e5ee96ef7743f",
+  "picture": "ae5e391ae692cdc3bd0977573f253a521dfa9736a4e0c46aec5a4f0b2abdcc12"
+ },
+ "templates/meadow/professional.jpg": {
+  "page": "394c81d171a1cc8e1d71f61ed560e84cd951001b4103101d5b5d08ba24c134dc",
+  "picture": "37bdb9d2daf17c29f8d94fe0efee1c46a603d6df15069f5203ddb92a7abfdd80"
+ },
+ "templates/meadow/retail.jpg": {
+  "page": "4eab5df03d2e20e2e0655bde77a85cd3dfb2294e7953c7b3a9f82d394ce65913",
+  "picture": "8d811a2b0560546843560fd7aa2ab8253b7106ca8c039f9673235c2815c5f969"
  },
  "templates/restaurant-classic.jpg": {
-  "page": "7a7cd545e8ffd327a014302367b8a042572b1afd2552cb2109abf4eea8c19203",
-  "picture": "cef2e99404024006db3ff35fe2f69119827c6820409e561dce8163275c7bd242"
+  "page": "5e78b503aaafc16705ea614bd13d92c7ed23ede2905c0c76195b4b01ef59853e",
+  "picture": "0f172850466434362804fb10f7d4e38028cd133833a10085de12b1361f1b4433"
+ },
+ "templates/restaurant-classic/beauty.jpg": {
+  "page": "ec326f1f1506915ab041f8bf1b69c75b28daced3a218a82f18c9dc6360c12d25",
+  "picture": "98817cdce7442f29e67abf7d191f47a587a3e8c2347d419b1dd8b43ebc8f1627"
+ },
+ "templates/restaurant-classic/community.jpg": {
+  "page": "554ab8600c318ca5f94ba49329a8f25c97ed50dd080c35078bdafcde2e0936fc",
+  "picture": "a3c483b94c33cff283ad4f6fc06a89c36b77614ca0ec3ab22ea1d5cabfae0f6b"
+ },
+ "templates/restaurant-classic/creative.jpg": {
+  "page": "5ccf6194ad8879d50f0d5c01ead15a26944da7e9dfee7a81cd0390c1c3451ed2",
+  "picture": "fe433cfd2b8933a5dc7481a8f3f9b3de8b1092356391a685e7c6220c499b8519"
+ },
+ "templates/restaurant-classic/fitness.jpg": {
+  "page": "f7eccba102a62d4b9d3d792c106f9585c5ec1723ccc6e2928c293729396c8661",
+  "picture": "2b1f920cf945c21f824347f0d9e0d811d95c9e81012ac02344127c173c69d3cc"
+ },
+ "templates/restaurant-classic/food.jpg": {
+  "page": "f353301ec9c27e5d00ce4e8d8964eaf35064b77b9877ac371768c0ad53497614",
+  "picture": "0f172850466434362804fb10f7d4e38028cd133833a10085de12b1361f1b4433"
+ },
+ "templates/restaurant-classic/health.jpg": {
+  "page": "994a5be67de64e5e5f5f3cde695582ed58db6b0b2fcd889845f1d15b2108d35e",
+  "picture": "3834db570ce270b28fed4f9ac0d165ae8c03717ffa5de0589fbb09a6c83b5b3f"
+ },
+ "templates/restaurant-classic/home.jpg": {
+  "page": "ae8a3f85541d246439266ad9c8fa289f4c480f84bd1a9ff23a187841ca5aa0b3",
+  "picture": "0dc4dc40215afd739bd32e3eab13baa9f28e6466d92d87ddee04ff5ab8ab64fd"
+ },
+ "templates/restaurant-classic/other.jpg": {
+  "page": "a37b9cad3676d3a7c0b1a25a5d41e51ca022edd85cfc5f30f22d5e31a6ae4136",
+  "picture": "d82d23b326817623947546b3764441e8dc6009365de59c55ef4e487113fdf506"
+ },
+ "templates/restaurant-classic/professional.jpg": {
+  "page": "453039da752f05d4d24f703dc05a5b111f681a91ab6c928da8c66967b239c080",
+  "picture": "2beef01d70110b7d6f9b627287fb55871a43c816dfdbd3e36cb13c2a9dd84d77"
+ },
+ "templates/restaurant-classic/retail.jpg": {
+  "page": "f8f2249d78cfd66c364aee29ad53a6a07de59771f5ddee98fce0611bc1e628c4",
+  "picture": "b247c93374fb94de82aa3b549e5a2befbdf782caf30d6daf6e359f29abb3afab"
  },
  "templates/slate.jpg": {
-  "page": "658466502db46d9e7d7cefbe2700fc8f9590b126cd40393d9065b8c7b6156f52",
-  "picture": "4d880f43b56ebbc3af009e6f7e14da78b1e75061e39450c34e0cff21a2c93fd6"
+  "page": "084f12747720a31ac33712b8773eb17fcb941f77be57d00c8549cdfdb2849baa",
+  "picture": "e7fe1f30f81398180b1685350eb05e0f69d1267b33a333baf0d3a66108980b51"
+ },
+ "templates/slate/beauty.jpg": {
+  "page": "63dfa34076b0ecc3b7c4a90221665e1d83ef050aed774cca5dfb8b3c17ae1a9c",
+  "picture": "a02ed1cd55841246ec729a8b3fd23d37a1389cdd2a57a8503eca21506dca34b1"
+ },
+ "templates/slate/community.jpg": {
+  "page": "f92fb19751706d34af48eee23bab29508620a758c0ed199426532f30fb533346",
+  "picture": "26293ef82ba4e3ca02b06ccbfbd875739b400ebabf71fb398971a017e00ea2d3"
+ },
+ "templates/slate/creative.jpg": {
+  "page": "5aff5c1be87dceabaefb380075e0f2d06daf3cd916895307c5a4fa04419df0b6",
+  "picture": "82dda2d5dfd0db17562dae5bbf4343a43cbf160fbd7c7608177a3bc09515d308"
+ },
+ "templates/slate/fitness.jpg": {
+  "page": "a0825beec3c45c3818b4ee65f7bb1e97a0a579623af2bde1098445045c485373",
+  "picture": "e7fe1f30f81398180b1685350eb05e0f69d1267b33a333baf0d3a66108980b51"
+ },
+ "templates/slate/food.jpg": {
+  "page": "223e8f80ef2630b22dcccc467780dedcf97782e201dbab6d18ea19237b325f06",
+  "picture": "71dd3e407fce3b48631d6bfd4f98f45b59613d40479e7851759c9932e8395a76"
+ },
+ "templates/slate/health.jpg": {
+  "page": "29433f53441b7752b48f48cb527e4dfa55a0b5eb9cf7820e4aad586d2b012b4f",
+  "picture": "465c8c5a6be9d2b428ee2903bb0dd372efd0635d34d2565907792845fb43d425"
+ },
+ "templates/slate/home.jpg": {
+  "page": "df626a465585fb1ba3e8b519798337e340a96316d6d7aa033e9b623be7aef6bd",
+  "picture": "40aa4815abc7f2157c9ead624fc69c03fe5c1e4acc189d4231ff078a77a947f7"
+ },
+ "templates/slate/other.jpg": {
+  "page": "f342a79fe8c9032d0b777e559c3bfaceeb06af373c898404c1e2ad3e525a04fd",
+  "picture": "9cdf77a827aaddcfd744f29ca6071c10f886135b777e502f8ec7bd1d0a204244"
+ },
+ "templates/slate/professional.jpg": {
+  "page": "8b1c9ec10bde6de0a84d1deb321f0e6ef8f1abcb65ee92fbdb3dfa43890100ed",
+  "picture": "48f23107ff1b8f18feab8e131136c0fd2409545c986731be2c5158faf8da17b9"
+ },
+ "templates/slate/retail.jpg": {
+  "page": "ab25fe0e0b5cee1a81cf287128c3b010fdccd16902f2cf30443da97ec74bc46f",
+  "picture": "a6aa360f197cee9c4752283180ffc4f2f83be09a4476fa2bf761a9cedbfcf40f"
  }
 }

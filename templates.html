@@ -71,6 +71,25 @@
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation:none}}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
+  /* item 331: "See it full size", the design's own sample drawn live, at a computer's width or a phone's */
+  .dfull{min-height:40px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--p);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  @media (pointer:coarse){.dfull{min-height:44px}}
+  dialog.bigview{width:min(1240px,96vw);max-width:none;height:92vh;max-height:none;padding:0;border:none;border-radius:20px;background:var(--bg);color:var(--ink);overflow:hidden}
+  dialog.bigview[open]{display:flex;flex-direction:column}
+  dialog.bigview::backdrop{background:rgba(23,21,34,.55)}
+  .bvtop{flex:0 0 auto;display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--line)}
+  .bvt{flex:1 1 auto;min-width:0} .bvt h3{margin:0;font-size:20px} .bvt p{margin:2px 0 0;font-size:13px;color:var(--soft)}
+  .bvseg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;flex:0 0 auto}
+  .bvseg button{min-height:44px;padding:0 16px;border:none;background:var(--card);color:var(--soft);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+  .bvseg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p)}
+  .bvx{width:44px;height:44px;border:1px solid var(--line);border-radius:12px;background:transparent;color:var(--soft);font:inherit;font-size:22px;cursor:pointer;flex:0 0 auto}
+  .bvbody{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;background:var(--card)}
+  .bvwait{position:absolute;inset:0;display:grid;place-items:center;margin:0;color:var(--soft);font-size:14px}
+  .bvframe{position:absolute;inset:0;overflow:hidden}
+  .bvframe iframe{display:block;border:0;background:#fff;transform-origin:0 0}
+  .bvframe.phone{display:flex;justify-content:center;padding:16px 0;background:var(--bg)}
+  .bvframe.phone iframe{width:390px;height:100%;border-radius:18px;box-shadow:0 10px 30px -10px rgba(0,0,0,.35)}
+  @media (max-width:760px){dialog.bigview{width:100%;height:100vh;height:100dvh;border-radius:0}.bvtop{flex-wrap:wrap;padding:12px 16px}.bvt{flex-basis:calc(100% - 60px)}}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
 </head>
@@ -78,6 +97,14 @@
 <div class="wrap">
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
+<dialog id="bigDlg" class="bigview" aria-labelledby="bigHead">
+  <div class="bvtop">
+    <div class="bvt"><h3 id="bigHead">Design</h3><p id="bigSub"></p></div>
+    <div class="bvseg" role="group" aria-label="See it on"><button type="button" id="bigDesk" aria-pressed="true">Computer</button><button type="button" id="bigPhone" aria-pressed="false">Phone</button></div>
+    <button type="button" class="bvx" id="bigX" aria-label="Close">×</button>
+  </div>
+  <div class="bvbody"><p class="bvwait" id="bigWait" role="status">Drawing the sample…</p><div class="bvframe" id="bigWrap"><iframe id="bigFrame" title="A sample site in this design" sandbox="" referrerpolicy="no-referrer"></iframe></div></div>
+</dialog>
 
 <script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
@@ -105,7 +132,7 @@ let KITS=[],DESIGNS=[],CAN=false,EDITING=null,BUSY=false;
 // item 198: a built-in design's card, its picture and its words ("Quiet and elegant. Good for …")
 function designHtml(d){
   const what=String(d.line||'').split(':')[0].replace(/\.$/,'');
-  return `<div class="dcell" data-design="${esc(d.slug)}"><div class="dcard"><span class="dpic"><img src="${esc(d.picture)}" alt="" loading="lazy" width="640" height="440"></span><b>${esc(d.name)}</b><span class="dline">${esc(what)}.${d.good_for?' Good for '+esc(d.good_for)+'.':''}</span></div>${CAN?`<a class="rowact dgo" href="/sites.html#new=${encodeURIComponent(d.slug)}" aria-label="New site with ${esc(d.name)}">New site with this</a>`:''}</div>`;
+  return `<div class="dcell" data-design="${esc(d.slug)}"><div class="dcard"><span class="dpic"><img src="${esc(d.picture)}" alt="" loading="lazy" width="640" height="440"></span><b>${esc(d.name)}</b><span class="dline">${esc(what)}.${d.good_for?' Good for '+esc(d.good_for)+'.':''}</span></div><button type="button" class="dfull" data-full="${esc(d.slug)}" aria-label="See ${esc(d.name)} full size">See it full size</button>${CAN?`<a class="rowact dgo" href="/sites.html#new=${encodeURIComponent(d.slug)}" aria-label="New site with ${esc(d.name)}">New site with this</a>`:''}</div>`;
 }
 // what a kit brings, in the words its row says
 function brings(k){
@@ -139,6 +166,37 @@ function render(){
   $('main').innerHTML=h;
   wire();
 }
+// item 331: "See it full size", the design's own sample business drawn live by the server
+let BIG=null,SAMPLE_NOUNS={};
+function paintBig(){
+  if(!BIG)return;
+  const wrap=$('bigWrap'),f=$('bigFrame'),phone=BIG.phone;
+  $('bigDesk').setAttribute('aria-pressed',String(!phone));$('bigPhone').setAttribute('aria-pressed',String(phone));
+  wrap.classList.toggle('phone',phone);
+  if(phone){f.style.transform='';f.style.width='';f.style.height='';return;}
+  const w=wrap.clientWidth||1,h=wrap.clientHeight||1,scale=Math.min(1,w/1280);
+  f.style.width='1280px';f.style.height=Math.ceil(h/scale)+'px';f.style.transform=`scale(${scale})`;
+}
+async function openBig(slug){
+  const d=DESIGNS.find(x=>x.slug===slug);if(!d)return;
+  const fam=d.family||'other';
+  BIG={slug,phone:window.innerWidth<761};
+  $('bigHead').textContent=d.name;
+  $('bigSub').textContent=`A sample ${SAMPLE_NOUNS[fam]||'business'} in this design. A site’s own words and photos replace it.`;
+  $('bigWait').hidden=false;$('bigWait').textContent='Drawing the sample…';$('bigFrame').srcdoc='';
+  $('bigDlg').showModal();paintBig();$('bigX').focus();
+  let r=null;try{r=await api('GET','/agency/designs/'+encodeURIComponent(slug)+'/sample?kind='+encodeURIComponent(fam));}catch(_){r=null;}
+  if(!BIG||BIG.slug!==slug||!$('bigDlg').open)return;
+  const html=r&&r.ok&&r.body&&r.body.data&&r.body.data.html;
+  if(!html){$('bigWait').textContent='We couldn’t draw this design just now. Its picture shows how it starts.';return;}
+  $('bigFrame').srcdoc=html;$('bigWait').hidden=true;paintBig();
+}
+$('main').addEventListener('click',(e)=>{const b=e.target.closest('[data-full]');if(b)openBig(b.getAttribute('data-full'));});
+$('bigDesk').onclick=()=>{if(BIG){BIG.phone=false;paintBig();}};
+$('bigPhone').onclick=()=>{if(BIG){BIG.phone=true;paintBig();}};
+$('bigX').onclick=()=>$('bigDlg').close();
+$('bigDlg').addEventListener('close',()=>{const slug=BIG&&BIG.slug;BIG=null;$('bigFrame').srcdoc='';const b=slug&&document.querySelector(`[data-full="${CSS.escape(slug)}"]`);if(b)b.focus();});
+window.addEventListener('resize',()=>{if(BIG)paintBig();});
 function wire(){
   const list=$('klist');if(!list)return;
   list.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>{EDITING=b.getAttribute('data-edit');render();const i=document.getElementById('kn-'+EDITING);if(i){i.focus();i.select();}}));
@@ -183,6 +241,7 @@ async function boot(){
     KITS=Array.isArray(r.body.data)?r.body.data:[];CAN=r.body.can_manage!==false;
     // item 198: the built-in designs; a failed read just leaves them out
     DESIGNS=dz.ok&&dz.body&&dz.body.data&&Array.isArray(dz.body.data.designs)?dz.body.data.designs:[];
+    SAMPLE_NOUNS=(dz.ok&&dz.body&&dz.body.data&&dz.body.data.sample_nouns)||{};   // item 331: "A sample salon in this design"
     render();
   }catch(_){trouble();}
 }

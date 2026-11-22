@@ -108,6 +108,20 @@ export const DRAFT_TONES: ReadonlyArray<{ key: string; label: string; words: str
   { key: 'calm', label: 'Calm', words: 'calm and reassuring' },
 ];
 
+/** Item 331: the kind of business each design's own sample is (its picture with no kind
+ *  picked), and what each kind's sample business is, in words ("A sample salon"). */
+export const DESIGN_FAMILY: Record<string, Family> = {
+  'atelier': 'beauty', 'aurora': 'creative', 'business-classic': 'professional', 'editorial': 'professional',
+  'harbor': 'home', 'meadow': 'retail', 'restaurant-classic': 'food', 'slate': 'fitness',
+};
+export const SAMPLE_NOUN: Record<Family, string> = {
+  food: 'restaurant', beauty: 'salon', home: 'plumber', health: 'dental practice', professional: 'bookkeeper',
+  retail: 'florist', fitness: 'gym', creative: 'events company', community: 'community kitchen', other: 'auto repair shop',
+};
+
+/** The ten families, in the order + New site lists the kinds. */
+export const FAMILIES: readonly Family[] = ['food', 'beauty', 'home', 'health', 'professional', 'retail', 'fitness', 'creative', 'community', 'other'];
+
 /** Which family an industry key belongs to; anything unknown is "other". */
 export function familyOf(industryKey: string | null | undefined): Family {
   const k = String(industryKey || '');
@@ -129,7 +143,10 @@ export function galleryIndustryKeys(): string[] {
  *  and the suggestions. A template with no words yet still shows, with its name only. */
 export function galleryPayload(templates: ReadonlyArray<{ slug: string; name: string }>) {
   return {
-    designs: templates.map((t) => ({ slug: t.slug, name: t.name, line: DESIGN_WORDS[t.slug]?.line || '', good_for: DESIGN_WORDS[t.slug]?.good_for || '', picture: `/thumbs/templates/${t.slug}.jpg` })),
+    // item 331: each design drawn with each kind's own sample business (scripts/thumbnails)
+    designs: templates.map((t) => ({ slug: t.slug, name: t.name, line: DESIGN_WORDS[t.slug]?.line || '', good_for: DESIGN_WORDS[t.slug]?.good_for || '', picture: `/thumbs/templates/${t.slug}.jpg`,
+      pictures: Object.fromEntries(FAMILIES.map((f) => [f, `/thumbs/templates/${t.slug}/${f}.jpg`])), family: DESIGN_FAMILY[t.slug] || 'other' })),
+    sample_nouns: SAMPLE_NOUN,
     kinds: BUSINESS_KINDS.map((k) => ({ key: k.key, label: k.label, hint: k.hint, family: k.family, exact: k.exact, services: STARTER_SERVICES[k.family] })),
     tones: DRAFT_TONES.map((t) => ({ key: t.key, label: t.label })),
     suggested: SUGGESTED,
