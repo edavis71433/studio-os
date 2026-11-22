@@ -54,7 +54,7 @@ test.describe('+ New site: the first draft (builder item 332)', () => {
     await dlg.locator('#new-kinds .kind', { hasText: 'Home services' }).click();
     await dlg.locator('label.ndraft-on').click();
     await expect(dlg.locator('#new-draft-fields')).toBeVisible();
-    await expect(dlg.locator('#new-svc-0')).toBeFocused();
+    await expect(dlg.locator('#new-svc-0')).not.toBeFocused();   // focus stays on the box: no keyboard over filled-in fields
     await expect(dlg.locator('#new-svc-0')).toHaveValue('Repairs');
     await expect(dlg.locator('#new-svc-1')).toHaveValue('Installations');
     await expect(dlg.locator('#new-svc-2')).toHaveValue('Maintenance');
