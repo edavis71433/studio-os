@@ -10,7 +10,7 @@ import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { svc } from '../lib/db.ts';
 
-export interface StudioBrand { name: string; logo_url: string | null; accent: string; is_default: boolean }
+export interface StudioBrand { name: string; logo_url: string | null; accent: string; is_default: boolean; cover_url: string | null; font: string }
 
 const PAGE_LOGO_TTL = 60 * 60;
 
@@ -21,7 +21,15 @@ export async function studioBrandOf(siteId: string): Promise<StudioBrand> {
   // on its account. Its clients see that, never the platform's.
   const named = b.name !== EMAIL_BRAND_DEFAULT.name;
   const name = named ? b.name : (await accountNameOf(siteId)) || b.name;
-  return { name, logo_url: b.logoUrl || null, accent: b.accent, is_default: name === EMAIL_BRAND_DEFAULT.name && !b.logoUrl };
+  // items 247 and 335 (direction A): the studio's cover picture and heading font go with its brand
+  const look = await import('../lib/portal_settings.ts').then((m) => m.readPortalSettings(siteId)).then((s) => s.look).catch(() => ({ cover_media_id: null, heading_font: 'fraunces' as const }));
+  const cover_url = look.cover_media_id ? await coverUrlOf(siteId, look.cover_media_id) : null;
+  return { name, logo_url: b.logoUrl || null, accent: b.accent, is_default: name === EMAIL_BRAND_DEFAULT.name && !b.logoUrl, cover_url, font: look.heading_font };
+}
+/** A signed address for the studio's cover picture (one of its own image files), good for an hour. */
+export async function coverUrlOf(siteId: string, mediaId: string): Promise<string | null> {
+  const { studioLogoUrl } = await import('../lib/email_brand.ts');
+  return await studioLogoUrl(siteId, mediaId, PAGE_LOGO_TTL).catch(() => null);
 }
 
 /** The business name on a site's account (clients.name), '' when there is none or the read fails. */
