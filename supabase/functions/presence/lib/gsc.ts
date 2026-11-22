@@ -120,8 +120,9 @@ export function parseTermRows(resp: any, max = 25): GscTermRow[] {
 }
 
 /** Build the `signals` upsert rows for the aggregate metrics of one period. Pure. */
-export function signalRowsFor(clientId: string, period: string, t: GscTotals): Array<Record<string, unknown>> {
-  const base = { client_id: clientId, period, source: 'gsc', unit: 'count', confidence: 'measured', scope: 'client' };
+export function signalRowsFor(clientId: string, period: string, t: GscTotals, observedAt?: string): Array<Record<string, unknown>> {
+  // item 266: each read stamps when it ran, so the monthly report can tell a whole month from one read early
+  const base = { client_id: clientId, period, source: 'gsc', unit: 'count', confidence: 'measured', scope: 'client', ...(observedAt ? { observed_at: observedAt } : {}) };
   const rows: Array<Record<string, unknown>> = [
     { ...base, metric: 'search_impressions', value: t.impressions },
     { ...base, metric: 'search_clicks', value: t.clicks },

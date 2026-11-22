@@ -7,11 +7,12 @@ import type { Snapshot, TemplateManifest } from './render_types.ts';
 import type { SiteBlock, SnapshotContent } from './render_types.ts';
 import { sectionIdsFor } from './site_blocks.ts';
 import { jumpTarget, sectionLinks } from './section_links.ts';
+import { sampleWordWarnings } from './sample_words_check.ts';
 
 export interface ValidationResult {
   ok: boolean;
   blockers: Array<{ field: string; message: string }>;
-  warnings: Array<{ field: string; message: string }>;
+  warnings: Array<{ field: string; message: string; at?: { page: string; index: number } }>;
 }
 
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -95,6 +96,8 @@ export function validateSnapshot(snapshot: Snapshot, manifest: TemplateManifest)
 
   // item 225: a menu item or a button that jumps to a link name no section has any more
   for (const message of deadJumps(c)) w.push({ field: 'links', message });
+  // item 275: sections still carrying the sample words a new section arrives with (a warning, never a block)
+  for (const warn of sampleWordWarnings(c)) w.push(warn);
 
   // contract/template compatibility
   if (snapshot.content_contract_version !== manifest.content_contract_version) {

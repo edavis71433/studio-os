@@ -959,7 +959,7 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
     const box = read('customer-add.js');
     const dlg = box.slice(box.indexOf("'<dialog id=\"custDlg\""), box.indexOf("'</dialog>'"));   // the box's own markup
     ok('ui: no sign-up wording, sign-up link or price page in the box', !/cu-signup|sign up themselves|pricing\.html/.test(box));
-    ok('ui: saving sends who they are, as connect with save (builder item 241: the customer and nothing else)', /var body = \{ mode: 'connect', save: true, name: name \|\| undefined, business_name: business_name \|\| undefined, email: email \};/.test(box) && !/mode: 'provision'/.test(box));
+    ok('ui: saving sends who they are, as connect with save (builder item 241: the customer and nothing else)', /var body = \{ mode: 'connect', save: true, name: name \|\| undefined, business_name: business_name \|\| undefined, email: email \|\| undefined, phone: phone \|\| undefined \};/.test(box) && !/mode: 'provision'/.test(box));   // sales item 150: a phone does instead of an email
     ok('ui: distinct outcomes — request sent / connected again / already yours / saved', /heading = 'Request sent'/.test(box) && /heading = 'Connected again'/.test(box) && /heading = 'Already your customer'/.test(box) && /heading = 'Saved to your customers'/.test(box));
     ok('the box: no "set their password" and no set-up or plan anywhere in it', !/set their password|Set up \+ invite|never pay for software/.test(dlg));
     ok('the box says what saving does', /Saves them to your customers\. No website is made and nobody is emailed\. Their profile has Create website and Invite to their portal for when you’re ready\./.test(dlg));

@@ -15,6 +15,28 @@ export function clientIp(req: Request): string {
     || 'unknown';
 }
 
+// ── Item 279: the limiter never keeps a visitor's address. Every bucket that carries one
+// (`…:ip:<address>`) is stored with a scrambled code in its place: a keyed hash of the address
+// and the day, so the same visitor still counts in one bucket for the window, and nobody
+// reading the table can get the address back. The key is the same secret the visit counter
+// scrambles with (routes/collect.ts VISITS_SALT), or a fixed one where none is set. ──
+const IP_SALT = Deno.env.get('VISITS_SALT') || Deno.env.get('APPROVAL_SECRET') || 'presence-visits';
+/** fnv1a-64 of a string, as 16 hex characters. Pure. */
+function fnv64(s: string): string {
+  let h1 = 0x811c9dc5, h2 = 0xcbf29ce4;
+  for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0; h2 = Math.imul(h2 ^ c, 0x01000193) >>> 0; }
+  return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+}
+/** `forms:ip:203.0.113.9` → `forms:ip:<16 hex>`, the address scrambled with the salt and today's
+ *  date; a bucket with no `:ip:` part is returned as it is. Pure given the salt and the day. */
+export function scrambleIpBucket(bucket: string, salt = IP_SALT, day = new Date().toISOString().slice(0, 10)): string {
+  const i = bucket.indexOf(':ip:');
+  if (i < 0) return bucket;
+  const ip = bucket.slice(i + 4);
+  if (!ip || /^[0-9a-f]{16}$/.test(ip)) return bucket;
+  return bucket.slice(0, i + 4) + fnv64(`${salt}|${day}|${ip}`);
+}
+
 /** Floor `now` to the window start (ISO) for a fixed-window bucket. */
 function windowStart(windowSec: number): string {
   const ms = windowSec * 1000;
@@ -28,7 +50,7 @@ export async function rateAllow(bucket: string, max: number, windowSec: number):
   try {
     const r = await svc('rpc/rate_hit', {
       method: 'POST',
-      body: JSON.stringify({ p_bucket: bucket.slice(0, 200), p_window: windowStart(windowSec), p_max: max }),
+      body: JSON.stringify({ p_bucket: scrambleIpBucket(bucket).slice(0, 200), p_window: windowStart(windowSec), p_max: max }),
     });
     // rate_hit returns a bare boolean; PostgREST wraps it as the body.
     if (!r.ok) return true;                       // limiter unavailable → allow
@@ -47,7 +69,7 @@ export async function rateAllowBoth(first: { bucket: string; max: number }, seco
   try {
     const r = await svc('rpc/rate_hit_both', {
       method: 'POST',
-      body: JSON.stringify({ p_first: first.bucket.slice(0, 200), p_first_max: first.max, p_second: second.bucket.slice(0, 200), p_second_max: second.max, p_window: windowStart(windowSec) }),
+      body: JSON.stringify({ p_first: scrambleIpBucket(first.bucket).slice(0, 200), p_first_max: first.max, p_second: scrambleIpBucket(second.bucket).slice(0, 200), p_second_max: second.max, p_window: windowStart(windowSec) }),
     });
     if (r.ok) return r.json === true || r.json === null;
     if (r.status !== 404) return true;             // limiter unavailable → allow

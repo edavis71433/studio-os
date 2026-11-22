@@ -16,14 +16,14 @@ const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url)
 const S1 = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', S2 = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb', S3 = 'cccccccc-3333-4333-8333-cccccccccccc';
 
 // ── the setting ──
-ok('a site with no entry hears everything', JSON.stringify(N.prefFor({ sites: {} }, S1)) === JSON.stringify({ on: true, dashboard: true, email: true }));
+ok('a site with no entry hears everything, and the client is told of outages (item 267)', JSON.stringify(N.prefFor({ sites: {} }, S1)) === JSON.stringify({ on: true, dashboard: true, email: true, client_down: true }));
 ok('an unreadable setting hears everything', JSON.stringify(N.normalizeNotify('nonsense')) === '{"sites":{}}' && N.hears(N.normalizeNotify(null), S1, 'email'));
 ok('only real site ids are kept, and all-on entries are dropped (that is the default)', (() => {
   const s = N.normalizeNotify({ sites: { [S1]: { on: false }, 'not-a-site': { on: false }, [S2]: { on: true, dashboard: true, email: true } } });
   return Object.keys(s.sites).join() === S1 && s.sites[S1].on === false && s.sites[S1].dashboard === true;
 })());
 ok('ids are kept lower-case, so a stored site always matches', N.prefFor(N.normalizeNotify({ sites: { [S1.toUpperCase()]: { email: false } } }), S1).email === false);
-ok('a malformed flag reads as on', JSON.stringify(N.normalizePref({ on: 'no', dashboard: 0, email: null })) === JSON.stringify({ on: true, dashboard: true, email: true }));
+ok('a malformed flag reads as on', JSON.stringify(N.normalizePref({ on: 'no', dashboard: 0, email: null, client_down: 'x' })) === JSON.stringify({ on: true, dashboard: true, email: true, client_down: true }));
 ok('the switch off silences both channels', !N.hears({ sites: { [S1]: { on: false, dashboard: true, email: true } } }, S1, 'dashboard') && !N.hears({ sites: { [S1]: { on: false, dashboard: true, email: true } } }, S1, 'email'));
 ok('one channel off leaves the other', (() => { const s = { sites: { [S1]: { on: true, dashboard: false, email: true } } }; return !N.hears(s, S1, 'dashboard') && N.hears(s, S1, 'email'); })());
 ok('quiet sites are the ones off Home and the bell', (() => { const q = N.quietSites({ sites: { [S1]: { on: false, dashboard: true, email: true }, [S2]: { on: true, dashboard: false, email: true }, [S3]: { on: true, dashboard: true, email: false } } }); return q.has(S1) && q.has(S2) && !q.has(S3); })());

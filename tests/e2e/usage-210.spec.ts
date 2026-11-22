@@ -33,7 +33,8 @@ const USAGE = {
   totals: { publishes: 19, restores: 2, skipped: 2, cost_cents: 190, bytes: 925 * MB, files: 292, visits: 2309 },
   days: days({ '2026-11-02': 1, '2026-11-04': 2, '2026-11-09': 10, '2026-11-10': 3, '2026-11-11': 2, '2026-11-12': 1 }),
   month: '2026-11', month_label: 'November', visits_month: '2026-10', visits_label: 'October', prior_label: 'September',
-  plan: { publishes: 330, cost_cents: 10 }, storage_limit: 1024 ** 3, partial: false,
+  // item 269: the host's own answer about the plan (credits used is a real figure here)
+  plan: { cost_cents: 10, credits: 15, host: { ok: true, team: 'Studio', plan: 'Pro', credits_included: 3000, credits_used: 714.5, period_start: '2026-11-11T00:00:00Z', next_period_start: '2026-12-11T00:00:00Z', exceeded: false, read_at: '2026-11-12T12:00:00Z', why: null } }, storage_limit: 1024 ** 3, partial: false,
 };
 const OCTOBER = { ...USAGE, month: '2026-10', month_label: 'October', days: Array.from({ length: 31 }, (_, i) => ({ day: `2026-10-${String(i + 1).padStart(2, '0')}`, publishes: i === 20 ? 4 : 0 })),
   data: { ...USAGE.data, s1: use({ publishes: 1, cost_cents: 10, storage: { bytes: 300 * MB, files: 110 }, visits: { value: 389, prior: 660 } }), s2: use({ publishes: 3, cost_cents: 30, storage: { bytes: 250 * MB, files: 80 } }) },
@@ -74,8 +75,9 @@ test.describe('Usage (builder list item 210)', () => {
     await expect(band.locator('.bars i.peak')).toContainText('10 on Nov 9');
     await expect(band.locator('.chart')).toHaveAttribute('aria-label', 'Publishes each day: most on Nov 9, with 10.');
     await expect(band.locator('.axis')).toHaveText(/Nov 1\s*Nov 12 \(today\)/);
-    await expect(band.locator('.gauge .gl')).toContainText('19 of about 330 publishes Netlify’s plan covers a month');
-    await expect(band.locator('.gauge .gl')).toContainText('6%');
+    await expect(band.locator('.gauge .gl')).toContainText('714.5 of 3,000 credits used on the host’s plan, renews Dec 11');
+    await expect(band.locator('.gauge .gl')).toContainText('24%');
+    await expect(band.locator('.gauge .gc')).toContainText('Read from the host today');
     const facts = band.locator('.fact');
     await expect(facts.nth(0)).toContainText('2 restores');
     await expect(facts.nth(0)).toContainText('already counted in the 19');
@@ -116,6 +118,24 @@ test.describe('Usage (builder list item 210)', () => {
     const tabs = page.getByRole('navigation', { name: 'Sites, domains, templates, usage and changes' });
     await expect(tabs.getByRole('link')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage', 'Changes']);
     await expect(tabs.getByRole('link', { name: 'Usage' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('item 269: when the host’s figure can’t be believed the gauge says "not known", never a typed-in number', async ({ page }) => {
+    const host = { ok: true, team: 'Studio', plan: 'Pro', credits_included: 3000, credits_used: null, period_start: '2026-11-11T00:00:00Z', next_period_start: '2026-12-11T00:00:00Z', exceeded: false, read_at: '2026-11-12T12:00:00Z', why: null };
+    await openUsage(page, { usage: { ...USAGE, plan: { cost_cents: 10, credits: 15, host } } });
+    const g = page.locator('.uband .gauge');
+    await expect(g.locator('.gl')).toContainText('How much of the host’s plan is used: not known');
+    await expect(g.locator('.gc')).toContainText('The host reports 0 credits used, which it does even when credits were spent');
+    await expect(g.locator('.gc')).toContainText('Plan: Pro · 3,000 credits a period · renews Dec 11');
+    await expect(g.locator('.track')).toHaveCount(0);
+    await expect(page.locator('.uband')).not.toContainText('330');
+  });
+
+  test('item 269: a used-up plan says publishes are paused', async ({ page }) => {
+    const host = { ok: true, team: 'Studio', plan: 'Pro', credits_included: 3000, credits_used: 3000, period_start: '2026-11-11T00:00:00Z', next_period_start: '2026-12-11T00:00:00Z', exceeded: true, read_at: '2026-11-12T12:00:00Z', why: null };
+    await openUsage(page, { usage: { ...USAGE, plan: { cost_cents: 10, credits: 15, host } } });
+    await expect(page.locator('.uband .gauge .gl')).toContainText('3,000 of 3,000 credits used');
+    await expect(page.locator('.uband .gauge .gc')).toContainText('The plan is used up: publishes are paused until it renews.');
   });
 
   test('sort by storage, visits or name; the choice is kept', async ({ page }) => {

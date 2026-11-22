@@ -32,6 +32,7 @@ import { siteOrigin } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { quotedTo, peopleOf, offeredTo } from '../lib/portal_services.ts';
+import { publishedOnce } from '../lib/site_live.ts';
 
 const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
 
@@ -889,7 +890,7 @@ export async function handleClientWebsiteStats(_req: Request, site: SiteRow, _pr
   // counter is on sites published from here), so month stays null and elsewhere:true says why;
   // Google's search numbers come along when they are connected, as for any site.
   const elsewhere = site.edition === 'monitor';
-  const published = elsewhere || site.status === 'live' || !!site.last_published_at;
+  const published = elsewhere || publishedOnce(site);   // item 261: the one rule; 258: elsewhere counts too
   if (!published) return json({ data: { published: false, month: null, search: null } }, 200, cors);
   if (elsewhere) {
     const gscE = await (async () => { try { return await readGsc(site.client_id); } catch { return null; } })();

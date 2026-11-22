@@ -223,7 +223,7 @@ html.dds-has-shell.dds-has-ctxbar body{padding-top:calc(var(--dds-shell-h) + var
 .dds-pop h4{margin:6px var(--dds-s2) var(--dds-s2);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--dds-faint)}
 .dds-pop .row{padding:var(--dds-s2) 10px;border-radius:var(--dds-r);font-size:13.5px;color:var(--dds-ink);display:block;text-decoration:none}
 .dds-pop .row:hover{background:var(--dds-p-soft)}
-.dds-pop .row .sub{color:var(--dds-soft);font-size:12.5px;margin-top:1px}
+.dds-pop .row .sub{display:block;color:var(--dds-soft);font-size:12.5px;margin-top:1px}   /* item 283: the hint on its own line, never run into the name */
 .dds-pop .row .sub .go{color:var(--dds-p);font-weight:600;white-space:nowrap}   /* item 126: the line's one link, named */
 .dds-pop .muted{color:var(--dds-soft);font-size:13px;padding:var(--dds-s3) 10px;text-align:center}
 .dds-pop .who{padding:10px;border-bottom:1px solid var(--dds-line);margin-bottom:6px}

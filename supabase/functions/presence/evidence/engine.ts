@@ -4,6 +4,7 @@
 // that is how improvement becomes provable (constitution 05 §10).
 // This module never judges, never ranks, never talks to customers.
 import { svc } from '../lib/db.ts';
+import { publishedOnce } from '../lib/site_live.ts';
 import { collect } from './collect.ts';
 import { PROVIDERS, runProviders } from './providers.ts';
 import type { EvidenceItem } from './contract.ts';
@@ -76,7 +77,7 @@ export async function runEvidence(site: SiteRow, trigger: 'operator' | 'schedule
  *  from last month and Website health can draw its line and say what was fixed.
  *  Best-effort: before migration 0170 the table isn't there and nothing is kept. */
 export async function recordHealthDay(site: SiteRow, runId: string, items: EvidenceItem[], nowIso: string): Promise<boolean> {
-  const live = site.edition === 'monitor' || site.status === 'live' || !!site.last_published_at;
+  const live = site.edition === 'monitor' || publishedOnce(site);   // item 261: the one rule
   const h = healthOf(items, { live });
   const r = await svc('presence_health_days?on_conflict=site_id,day', {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },

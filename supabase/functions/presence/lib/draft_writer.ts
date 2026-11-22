@@ -31,6 +31,22 @@ export interface ApplyResult {
   error?: string;
   applied?: { entities: number; hidden: number; dropped_media: number };
   locked?: LockedEdit[];   // error 'section_locked': what the client's restore would have done to them
+  partial?: boolean;              // builder item 249/254: a write after the safety copy failed, so the draft is part-way
+  safety_snapshot_id?: string;    // the copy taken first, to put the draft back from
+}
+
+/** Builder item 254: the answer a restore route gives when the Draft Writer says no. Pure.
+ *  Before the safety copy nothing is written, so "unchanged" is true. After it, the draft
+ *  may hold some of the version and not the rest, and the honest offer is to put the
+ *  draft back from that copy (POST /restore-to-draft { snapshot_id }). */
+export function restoreFailedBody(res: ApplyResult): { error: string; message: string; safety_snapshot_id?: string; put_back?: string } {
+  if (res.error === 'safety_copy_failed') return { error: 'restore_failed', message: 'We couldn’t set your current draft aside as a safety copy, so nothing was changed. Try again in a moment.' };
+  if (res.partial) return {
+    error: 'restore_partial',
+    message: 'That stopped part-way: some of that version is in your draft and some isn’t. “Put my draft back” brings back the copy we set aside first.',
+    ...(res.safety_snapshot_id ? { safety_snapshot_id: res.safety_snapshot_id, put_back: 'Put my draft back' } : {}),
+  };
+  return { error: 'restore_failed', message: 'That didn’t work — your draft is unchanged and nothing was lost.' };
 }
 
 interface MediaManifestRow { media_id: string; storage_path: string; variants: Array<{ output_path: string }> }
@@ -129,7 +145,11 @@ export async function applySnapshotToDraft(
     back = { ...back, blocks: kept.blocks, pages: kept.pages };
   }
 
-  // 2. safety snapshot — the current draft is set aside, never lost
+  // 2. safety snapshot — the current draft is set aside, never lost. Builder item 254: it
+  // used to be best-effort, so "your previous draft was set aside" could be said of a copy
+  // that was never kept. Now the restore refuses to start unless the copy saved, and every
+  // write after it says which copy to put the draft back from if it fails.
+  let safetyId = '';
   try {
     let cur = current || null;
     if (!cur) {
@@ -138,15 +158,19 @@ export async function applySnapshotToDraft(
       if (t) cur = await serializeDraft(site.id, t.manifest, { templateSlug: site.template_slug, templateVersion: site.template_version, now: new Date().toISOString() });
     }
     if (cur) {
-      await insertSnapshot({
+      const ins = await insertSnapshot({
         site_id: site.id, content: cur.snapshot.content, media_manifest: cur.mediaManifest,
         content_contract_version: cur.snapshot.content_contract_version,
         template_slug: site.template_slug, template_version: site.template_version,
         dev_customization: cur.snapshot.dev_customization ?? null,  // Phase B1: safety snapshot keeps the current dev layer too
         created_by: principal.userId, created_by_kind: actorKind,
-      }, cur.draftSettings ?? (cur.rows ? draftSettingsOf(cur.rows.presence_settings?.[0]) : null), 'return=minimal');   // and the sections, pages and menu as stored
+      }, cur.draftSettings ?? (cur.rows ? draftSettingsOf(cur.rows.presence_settings?.[0]) : null));   // and the sections, pages and menu as stored
+      safetyId = ins.ok ? String(ins.json?.[0]?.id || '') : '';
     }
-  } catch { /* safety snapshot is best-effort; the restore itself is still explicit */ }
+  } catch { safetyId = ''; }
+  if (!safetyId) return { ok: false, error: 'safety_copy_failed' };
+  // a refusal from here on leaves the draft part-way, and names the copy to put it back from
+  const partWay = (error: string): ApplyResult => ({ ok: false, error, partial: true, safety_snapshot_id: safetyId });
 
   // 3. identity (singleton upsert)
   const i = c.identity || ({} as SnapshotContent['identity']);
@@ -162,7 +186,7 @@ export async function applySnapshotToDraft(
   });
   let identRes = await putIdent(identBody);
   if (!identRes.ok && identRes.status === 400) { const { short_description: _s, ...old } = identBody; identRes = await putIdent(old); }   // before 0182
-  if (!identRes.ok) return { ok: false, error: `identity: ${identRes.status}` };
+  if (!identRes.ok) return partWay(`identity: ${identRes.status}`);
   entities++;
 
   // 4. location (v1 singleton; unique site_id)
@@ -184,7 +208,7 @@ export async function applySnapshotToDraft(
       : svc('presence_locations', { method: 'POST', body });
     let r = await write(JSON.stringify(fields));
     if (!r.ok && r.status === 400) { const { second_location: _s, ...old } = fields; r = await write(JSON.stringify(old)); }   // before 0182
-    if (!r.ok) return { ok: false, error: `location: ${r.status}` };
+    if (!r.ok) return partWay(`location: ${r.status}`);
     entities++;
   }
 
@@ -193,7 +217,7 @@ export async function applySnapshotToDraft(
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ site_id: site.id, ...back }),
   });
-  if (opts.settings && !setRes.ok) return { ok: false, error: `settings: ${setRes.status}` };
+  if (opts.settings && !setRes.ok) return partWay(`settings: ${setRes.status}`);
   if (opts.settings) entities++;
 
   // 6. collection sync — upsert by original id; hide what the snapshot lacks
@@ -225,7 +249,7 @@ export async function applySnapshotToDraft(
     await syncCollection('presence_faqs', new Set(c.faqs.map((f) => f.id)),
       c.faqs.map((f, idx) => ({ id: f.id, site_id: site.id, question: f.question, answer: f.answer, is_visible: true, sort_order: f.sort_order ?? idx, deleted_at: null })));
   } catch (e) {
-    return { ok: false, error: String(e).slice(0, 200) };
+    return partWay(String(e).slice(0, 200));
   }
 
   // 7. posts: snapshot posts return to published; published drafts not in the snapshot step back to draft
@@ -267,5 +291,5 @@ export async function applySnapshotToDraft(
   // 8. provenance — one event, names only
   await writeChangeEvent({ siteId: site.id, entityType: 'restore', entityId: null, action: 'restore', summary, principal, provenance: 'human' });
 
-  return { ok: true, applied: { entities, hidden, dropped_media: gone.size } };
+  return { ok: true, applied: { entities, hidden, dropped_media: gone.size }, safety_snapshot_id: safetyId };
 }

@@ -86,7 +86,7 @@ export function explainRecord(r: DnsRecord): string {
  *      a live apex still points home (drift detection). */
 export const NETLIFY_APEX_IP = '75.2.60.5';
 
-export interface ApexExpectation { target: string | null; ip?: string }
+export interface ApexExpectation { target: string | null; ip?: string; ips?: ReadonlyArray<string> }   // item 265: `ips` is every address Netlify answers with today
 
 /** The apex setup we hand a customer: the universally-valid A record (sourced from
  *  the ONE constant) plus a plain-language recommendation to prefer an ALIAS/ANAME/
@@ -115,9 +115,10 @@ export function apexMatchesExpected(
   const c = observed.cnames.map(norm).filter(Boolean);
   const target = expected.target ? norm(expected.target) : null;
   const ip = (expected.ip ?? NETLIFY_APEX_IP).toLowerCase();
+  const ips = new Set([ip, ...(expected.ips || []).map((x) => String(x).toLowerCase())]);
   const resolved = a.length > 0 || c.length > 0;
   if (!resolved) return { ok: false, resolved: false, reason: 'The bare domain doesn’t answer yet.' };
-  if ((target !== null && c.includes(target)) || a.includes(ip)) {
+  if ((target !== null && c.includes(target)) || a.some((x) => ips.has(x))) {
     return { ok: true, resolved: true, reason: 'The bare domain points at your site.' };
   }
   const where = [...c, ...a].slice(0, 3).join(', ') || 'an unexpected address';
@@ -128,10 +129,10 @@ export function apexMatchesExpected(
  *  be. Fenced I/O + a pure comparison. Returns drift with the observed values so a
  *  caller can surface a plain-language finding. */
 export async function verifyApex(domain: string, expected: ApexExpectation, nowIso: string): Promise<{ ok: boolean; resolved: boolean; reason: string; aRecords: string[]; cnames: string[] }> {
-  const zone = await readZone(domain, nowIso);
+  const [zone, ours] = await Promise.all([readZone(domain, nowIso), import('../lib/domain_health.ts').then((m) => m.netlifyAddresses(expected.target)).catch(() => null)]);
   const aRecords = zone.records.filter((r) => r.type === 'A' && r.name === domain).map((r) => r.value);
   const cnames = zone.records.filter((r) => r.type === 'CNAME' && r.name === domain).map((r) => r.value);
-  const cmp = apexMatchesExpected({ aRecords, cnames }, expected);
+  const cmp = apexMatchesExpected({ aRecords, cnames }, { ...expected, ips: ours ? [...ours] : expected.ips });   // item 265: every Netlify address counts
   return { ...cmp, aRecords, cnames };
 }
 

@@ -58,8 +58,11 @@ const agencyApi = {
   '/agency/needs-you': needsYou([SSL_ROW]),
   '/agency/kits': { data: [] },
   // the FIX 7 delivery map: Marlow has a delivery project, the others don't
+  // sales item 158: Home's "N customers you look after" counts THESE rows (the Customers page's list)
   '/studio/customers': { data: [
     { client_id: 'c1', customer_site_id: 'a1', project_id: 'p1', name: 'Marlow’s Kitchen' },
+    { client_id: 'c2', customer_site_id: 'a2', project_id: null, name: 'Bright Dental' },
+    { client_id: 'c3', customer_site_id: 'a3', project_id: null, name: 'Cedar Garage' },
   ] },
 };
 

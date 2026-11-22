@@ -57,8 +57,10 @@
     + '<input id="cu-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">'
     + '<label for="cu-biz">Business name <span class="opt">(optional)</span></label>'
     + '<input id="cu-biz" maxlength="120" placeholder="Acme Bakery" autocomplete="off">'
-    + '<label for="cu-email">Email</label>'
+    + '<label for="cu-email">Email <span class="opt">(or a phone)</span></label>'
     + '<input id="cu-email" type="email" maxlength="160" placeholder="jane@acmebakery.com" autocomplete="off">'
+    + '<label for="cu-phone">Phone <span class="opt">(optional)</span></label>'
+    + '<input id="cu-phone" type="tel" maxlength="40" placeholder="(555) 123-4567" autocomplete="off">'
     + '<div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Save customer</button></div>'
     + '</div>'
     + '<div id="cust-done" style="display:none"></div>'
@@ -78,7 +80,7 @@
 
   function open() {
     ensure();
-    $('cu-name').value = ''; $('cu-biz').value = ''; $('cu-email').value = '';
+    $('cu-name').value = ''; $('cu-biz').value = ''; $('cu-email').value = ''; $('cu-phone').value = '';
     $('cust-fields').style.display = ''; $('cust-done').style.display = 'none'; $('cust-done').innerHTML = '';
     var sb = $('cu-submit'); if (sb) { sb.disabled = false; sb.textContent = 'Save customer'; }
     // Name is the box's first field, so showModal already focuses it; the late nudge never
@@ -89,21 +91,23 @@
 
   function submit(e) {
     e.preventDefault();
-    var name = $('cu-name').value.trim(), business_name = $('cu-biz').value.trim(), email = $('cu-email').value.trim();
-    if (!email) { toastWith(O, 'Enter their email to save them.', true); $('cu-email').focus(); return; }
+    var name = $('cu-name').value.trim(), business_name = $('cu-biz').value.trim(), email = $('cu-email').value.trim(), phone = $('cu-phone').value.trim();
+    // sales item 150: an email or a phone saves them; with a phone alone, a name says who this is
+    if (!email && !phone) { toastWith(O, 'Enter their email or phone number to save them.', true); $('cu-email').focus(); return; }
+    if (!email && !name) { toastWith(O, 'Enter their name too, so you know who this is.', true); $('cu-name').focus(); return; }
     var btn = $('cu-submit'); btn.disabled = true; btn.textContent = 'Saving…';
     var failed = function (m) { toastWith(O, m || 'We couldn’t save them just now.', true); btn.disabled = false; btn.textContent = 'Save customer'; };
     // The pages go live on merge and the server only with the deploy that follows. A server from
     // before item 241 reads every mode but 'connect' as "set up their website and invite them",
     // so the box asks for 'connect' with save: true. This server saves the customer; an older one
     // only saves them to the contacts and emails nobody.
-    var body = { mode: 'connect', save: true, name: name || undefined, business_name: business_name || undefined, email: email };
+    var body = { mode: 'connect', save: true, name: name || undefined, business_name: business_name || undefined, email: email || undefined, phone: phone || undefined };
     return Promise.resolve().then(function () { return O.request('POST', '/sales/customers', body); }).then(function (r) {
       if (!r || !r.ok) {
         failed(r && r.status === 403 ? 'Customers are part of your plan’s business tools — an upgrade adds them.' : (r && r.body && r.body.message) || '');
         return 'stop';
       }
-      showDone((r.body && r.body.data) || {}, name, business_name, email);
+      showDone((r.body && r.body.data) || {}, name, business_name, email || phone);
     }).then(function (how) {
       if (how === 'stop') return;
       // the save SUCCEEDED: the list refresh is best-effort and never repaints that success as

@@ -39,6 +39,8 @@ import { daysBetween, DOMAIN_SOON_DAYS, PADLOCK_SOON_DAYS, PADLOCK_STUCK_HOURS }
 import { registryWarnings, sameCompany, whereToGo } from '../lib/rdap.ts';
 import { accessGuide, accessCompanies, accessEmail, cleanInvite, normalizeAccess, askedAccess, tickAccess, accessBadge, firstWord } from '../lib/domain_access.ts';
 import { DOWN_THRESHOLD } from '../monitor/heartbeat.ts';
+import { siteState, publishedOnce } from '../lib/site_live.ts';
+import type { SiteExtra, StateKey } from '../lib/site_live.ts';
 import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { siteOrigin, hostedName, SITE_COLS } from '../lib/site.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -97,25 +99,9 @@ export function planOf(row: PlanRow | null | undefined, nowIso: string): SitePla
   return { key, words, status, term, renews };
 }
 
-/* ── the website's own state ── */
-export interface SiteExtra { id: string; client_id?: string | null; netlify_site_id?: string | null; offline_at?: string | null; uptime_ok?: boolean | null; uptime_fail_streak?: number | null; domain_checked_at?: string | null; template_slug?: string | null; created_at?: string | null }
-export type StateKey = 'live' | 'not_live' | 'elsewhere' | 'offline' | 'down' | 'paused';
-const STATE_WORDS: Record<StateKey, string> = { live: 'Live', not_live: 'Not live yet', elsewhere: 'Hosted elsewhere', offline: 'Offline', down: 'Not answering', paused: 'Paused' };
-
-/** Home's rule (agency.html statusWord) for live, not live yet and hosted
- *  elsewhere, plus the three facts only the website knows: taken offline, not
- *  answering the uptime probe (two misses in a row, monitor/heartbeat.ts), paused.
- *  "Needs you" is Home's own list; the page lays it over this. Pure. */
-export function siteState(p: { edition?: string | null; status?: string | null; last_published_at?: string | null }, x?: SiteExtra | null, comingSoon = false): { key: StateKey; words: string } {
-  const at = (key: StateKey) => ({ key, words: STATE_WORDS[key] });
-  if (p.edition === 'monitor') return at('elsewhere');
-  if (p.status === 'paused') return at('paused');
-  // builder list item 158: still not live, but its address shows a Coming soon page, so the card says so
-  if (!(p.status === 'live' || p.last_published_at)) return comingSoon ? { key: 'not_live', words: 'Coming soon' } : at('not_live');
-  if (x?.offline_at) return at('offline');
-  if ((Number(x?.uptime_fail_streak) || 0) >= DOWN_THRESHOLD) return at('down');
-  return at('live');
-}
+/* ── the website's own state: ONE rule, lib/site_live.ts (builder list item 261) ── */
+export { siteState };
+export type { SiteExtra, StateKey };
 
 /* ── who can edit ── */
 export interface SeatRow { site_id: string; email: string; role: string; status?: string | null }
@@ -305,7 +291,7 @@ export function domainStatus(d: DomainIn, nowIso: string): { key: string; words:
   if (days !== null && days < 0) return is('expired', `Expired ${plural(-days)} ago`, 'bad');
   if (days !== null && days <= DOMAIN_SOON_DAYS) return is('expiring', days === 0 ? 'Expires today' : `Expires in ${plural(days)}`, 'warn');
   if (d.edition === 'monitor') return is('elsewhere', 'On their own host', 'quiet');
-  if (!(d.status === 'live' || d.last_published_at)) return is('not_live', 'Site not live yet', 'quiet');
+  if (!publishedOnce(d)) return is('not_live', 'Site not live yet', 'quiet');
   if (d.offline_at) return is('offline', 'Site offline', 'warn');
   // item 134: the padlock, on the same lines as Home's Needs you (needs_you.ts)
   const stuckH = d.cert_pending_since ? (Date.parse(nowIso) - Date.parse(d.cert_pending_since)) / 3600_000 : null;
@@ -903,7 +889,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     if (!ids.includes(siteId) || !ids.includes(target)) return notYours(cors);
     const [src, dst] = await Promise.all([siteId, target].map(async (id) => rowsOf<SiteRow>(await svc(`presence_sites?id=eq.${id}&select=${SITE_COLS}&limit=1`))[0]));
     if (!src || !dst) return notYours(cors);
-    if (dst.last_published_at || dst.status === 'live') return json({ error: 'not_new', message: 'Duplicate only starts a new site — that one is already live.' }, 409, cors);
+    if (publishedOnce(dst)) return json({ error: 'not_new', message: 'Duplicate only starts a new site — that one is already live.' }, 409, cors);
     if (src.edition === 'monitor' || dst.edition === 'monitor') return json({ error: 'hosted_elsewhere', message: 'A site that lives on their own host has no setup here to copy.' }, 409, cors);
     const names = rowsOf<{ id: string; name: string }>(await svc(`clients?id=eq.${src.client_id}&select=id,name&limit=1`).catch(() => null));
     const from = String(names[0]?.name || 'another site').trim();
@@ -1011,7 +997,7 @@ export async function trashClientSite(siteId: string, member: AgencyMember, prin
   if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notOurs;
   const site = rowsOf<SiteRow & { offline_at?: string | null }>(await svc(`presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`))[0];
   if (!site) return notOurs;
-  const wasLive = site.edition !== 'monitor' && !!(site.status === 'live' || site.last_published_at);
+  const wasLive = site.edition !== 'monitor' && publishedOnce(site);
   const at = new Date().toISOString();
   const w = await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}&status=eq.active&select=site_id`, {
     method: 'PATCH', headers: { Prefer: 'return=representation' },

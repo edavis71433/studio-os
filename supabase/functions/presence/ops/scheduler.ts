@@ -24,6 +24,7 @@ import { SITE_COLS, type SiteRow } from '../lib/site.ts';
 import { checkAgainInAnHour, checkDueBefore } from '../lib/check_soon.ts';
 import { lockStop } from '../lib/publish_lock.ts';
 import { schedulerPrincipal } from '../lib/actor_kind.ts';
+import { raiseNotice } from '../lib/notice.ts';
 
 const DEFAULT_LIMIT = 40;               // sites per invocation — cron cadence covers the rest
 const OPS_ALERT_EMAIL = Deno.env.get('OPS_ALERT_EMAIL') || 'eric@davisdigitalstudio.com';
@@ -103,6 +104,13 @@ async function markedOffline(siteId: string): Promise<boolean> {
 // A due row loads its frozen snapshot and runs runPipeline (publish or restore),
 // exactly as a manual publish would — no second publish path. Each row's outcome
 // is recorded; one failure never stops the others.
+/** Builder item 249: did a version other than this row's go live after the row was made? */
+export const SKIPPED_NEWER_LIVE = 'skipped: a newer version went live after this was scheduled';
+export async function newerVersionLiveSince(siteId: string, since: string, snapshotId: string): Promise<boolean> {
+  if (!since) return false;
+  const r = await svc(`presence_publishes?site_id=eq.${siteId}&status=eq.live&created_at=gt.${encodeURIComponent(since)}&snapshot_id=neq.${snapshotId}&select=id&limit=1`);
+  return r.ok && Array.isArray(r.json) && r.json.length > 0;
+}
 export async function runDuePublishes(limit = 25): Promise<CycleResult> {
   const nowIso = new Date().toISOString();
   // A publish claimed (fired_at set) but never finalized — the invocation died
@@ -114,7 +122,7 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
   await svc(`presence_scheduled_publishes?status=eq.pending&fired_at=not.is.null&fired_at=lt.${encodeURIComponent(hourAgo)}`, {
     method: 'PATCH', body: JSON.stringify({ status: 'failed', last_error: 'interrupted: claimed but never finalized (invocation died mid-publish)' }),
   }).catch(() => {});
-  const q = await svc(`presence_scheduled_publishes?status=eq.pending&scheduled_for=lte.${encodeURIComponent(nowIso)}&select=id,site_id,snapshot_id,kind,summary,created_by&order=scheduled_for.asc&limit=${limit}`);
+  const q = await svc(`presence_scheduled_publishes?status=eq.pending&scheduled_for=lte.${encodeURIComponent(nowIso)}&select=id,site_id,snapshot_id,kind,summary,created_by,created_at&order=scheduled_for.asc&limit=${limit}`);
   const rows = (q.ok && Array.isArray(q.json)) ? q.json : [];
   const results: SiteRunResult[] = [];
   for (const row of rows) {
@@ -156,13 +164,25 @@ export async function runDuePublishes(limit = 25): Promise<CycleResult> {
         continue;
       }
       const snap = (await svc(`presence_snapshots?id=eq.${row.snapshot_id}&select=content,media_manifest,content_contract_version,template_slug,template_version,created_at,dev_customization&limit=1`)).json?.[0];
+      // Phase EXP: a boundary-republish row (created_by sentinel) re-emits the CURRENT
+      // live snapshot but with its render clock set to the FIRE time, so the pure
+      // window filter re-evaluates and ONLY the time-gated sections flip — every other
+      // byte is frozen in that snapshot (no unrelated draft edit can ride along).
+      const isRewindow = String(row.created_by || '').startsWith('scheduler:rewindow');
+      // Builder item 249: a publish set for later holds the draft as it was when it was
+      // scheduled. If a newer version went live since (a publish by hand, or another scheduled
+      // one), sending it now would put the older site back over it. The row is set aside, and
+      // whoever scheduled it is told. A scheduled revert is meant to be older, and the timed-
+      // section re-send sends the live copy on purpose, so neither is checked.
+      if (site && snap && row.kind === 'publish' && !isRewindow && await newerVersionLiveSince(String(row.site_id), String(row.created_at || ''), String(row.snapshot_id))) {
+        await svc(`presence_scheduled_publishes?id=eq.${row.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'canceled', last_error: SKIPPED_NEWER_LIVE }) });
+        if ((site as SiteRow).client_id) await raiseNotice({ siteId: String(row.site_id), clientId: String((site as SiteRow).client_id), kind: 'publish_failed', period: `sched:${row.id}`,
+          headline: 'A scheduled publish was set aside', body: 'A newer version of your site went live after it was scheduled, so the older copy wasn’t sent. If you still want those changes, schedule them again from the publish panel.' }).catch(() => false);
+        results.push({ site_id: String(row.site_id), ok: true, steps: { skipped: true } });
+        continue;
+      }
       if (!site || !snap) { err = 'site or snapshot gone'; }
       else {
-        // Phase EXP: a boundary-republish row (created_by sentinel) re-emits the CURRENT
-        // live snapshot but with its render clock set to the FIRE time, so the pure
-        // window filter re-evaluates and ONLY the time-gated sections flip — every other
-        // byte is frozen in that snapshot (no unrelated draft edit can ride along).
-        const isRewindow = String(row.created_by || '').startsWith('scheduler:rewindow');
         const snapshot = { content: snap.content, content_contract_version: snap.content_contract_version, template_slug: snap.template_slug, template_version: snap.template_version, created_at: isRewindow ? nowIso : snap.created_at, dev_customization: snap.dev_customization ?? null };
         const res = await runPipeline(site as SiteRow, sysPrincipal, row.kind === 'revert' ? 'restore' : 'publish', { snapshot, snapshotId: row.snapshot_id, mediaManifest: snap.media_manifest || [] }, row.summary || 'Scheduled change', {});
         ok = res.status === 200;

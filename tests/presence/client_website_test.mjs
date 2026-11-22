@@ -239,7 +239,7 @@ const page=read('client.html');
 ok('route: handleClientWebsiteStats exists with the standard client-handler signature',
   /export async function handleClientWebsiteStats\(_req: Request, site: SiteRow, _principal: Principal, cors: Record<string, string>\)/.test(cd));
 ok('route: unpublished sites short-circuit to published:false (the portal hides the card)',
-  /const published = elsewhere \|\| site\.status === 'live' \|\| !!site\.last_published_at;\s*\n\s*if \(!published\) return json\(\{ data: \{ published: false/.test(cd));   // item 258: a site hosted elsewhere counts as published
+  /const published = elsewhere \|\| publishedOnce\(site\);.*\n\s*if \(!published\) return json\(\{ data: \{ published: false/.test(cd));   // items 258 + 261: one rule, and a site hosted elsewhere counts as published
 ok('route: the visits read is scoped to the caller\'s OWN site, and counted in the database (item 207)',
   /readVisitStats\(site\.id, \{ startMs, weeks: DASH_WEEKS, nowMs \}\)/.test(cd) && !/presence_visits\?/.test(cd.slice(cd.indexOf('export async function handleClientWebsiteStats'), cd.indexOf('// search: null = genuinely not connected'))));
 ok('route: reuses the slice-8 pure helpers (dashRange · sourceShares) and the dashboard\'s own visits read',

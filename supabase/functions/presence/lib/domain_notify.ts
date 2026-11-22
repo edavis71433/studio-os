@@ -11,12 +11,11 @@
 // - The client's email records are saved when a domain is attached; if they vanish
 //   later (usually deleted while connecting the website), owner and studio are told at
 //   once, with the old values to put back.
-import { svc } from './db.ts';
 import { emailOperator } from './service_bridge.ts';
 import { studioWantsEmail } from './site_notify.ts';
+import { clientReach, studioSiteFor } from './client_reach.ts';
 import { loadEmailBrand } from './email_brand.ts';
 
-const first = (r: unknown) => ((r && Array.isArray((r as { json?: unknown }).json) ? ((r as { json: unknown[] }).json[0]) : null) || null) as Record<string, unknown> | null;
 export const escHtml = (x: unknown) => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
 
 /** Pure: who made a change, in the words the owner reads. A studio member acting inside the
@@ -91,17 +90,17 @@ export function domainChangeEmail(kind: DomainChange, o: { domain: string; old?:
 export async function tellOwnerAndStudio(site: { id: string; client_id?: string | null }, mail: { subject: string; html: string }, what: string, opts: { studioOnly?: boolean; studioNote?: string } = {}): Promise<{ client: boolean; studio: boolean }> {
   const out = { client: false, studio: false };
   try {
-    const [clQ, linkQ] = await Promise.all([
-      !opts.studioOnly && site.client_id ? svc(`clients?id=eq.${encodeURIComponent(String(site.client_id))}&select=email&limit=1`).catch(() => null) : Promise.resolve(null),
-      svc(`presence_service_links?customer_site_id=eq.${site.id}&status=eq.active&select=agency_site_id&order=created_at.desc&limit=1`).catch(() => null),
+    // items 267 and 268: the client from wherever their record keeps the address; the studio through the link or its list
+    const [reach, studioSite] = await Promise.all([
+      !opts.studioOnly && site.client_id ? clientReach(site.client_id) : Promise.resolve({ email: null, name: null }),
+      studioSiteFor(site.id),
     ]);
-    const to = String(first(clQ)?.email || '');
+    const to = String(reach.email || '');
     if (to) {
       const { sendEmail } = await import('../commerce/account.ts');
       // Sales item 74: a removed domain or lost email records is the owner's own business, so it always arrives (critical)
       out.client = await sendEmail(to, mail.subject.slice(0, 180), mail.html, await loadEmailBrand(site.id), { critical: true }).catch(() => false);
     }
-    const studioSite = first(linkQ)?.agency_site_id;
     // item 126: the studio's copy only while it still hears about this site by email
     if (studioSite && await studioWantsEmail(String(studioSite), site.id)) out.studio = await emailOperator(String(studioSite), mail.subject, mail.html + (opts.studioNote ? `<p>${opts.studioNote}</p>` : ''), what);
   } catch { /* telling is best-effort: the change itself already happened */ }

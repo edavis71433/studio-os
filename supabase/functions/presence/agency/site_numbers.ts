@@ -26,6 +26,7 @@ import { can, agencySiteIds } from './auth.ts';
 import type { AgencyMember } from './auth.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 import { readVisitDrop, lastWholeMonths, visitDrop, type VisitDrop } from '../lib/visit_drop.ts';
+import { publishedOnce } from '../lib/site_live.ts';
 
 /** The two whole months compared: last month and the one before (UTC), and the first
  *  moment of the earlier one. Pure. */
@@ -75,7 +76,7 @@ export function foldSiteNumbers(i: {
   const hBy = new Map<string, HealthRow>();
   for (const h of i.health || []) hBy.set(`${h.site_id}|${String(h.day).slice(0, 10)}`, h);
   for (const s of i.sites) {
-    const live = s.edition !== 'monitor' && (s.status === 'live' || !!s.last_published_at);
+    const live = s.edition !== 'monitor' && publishedOnce(s);   // item 261: the one rule
     const n: SiteNumbers = { visitors: null, visitors_why: null, search: null, search_why: null, health: null, health_why: null };
     // visitors
     if (s.edition === 'monitor') n.visitors_why = 'no_counter';

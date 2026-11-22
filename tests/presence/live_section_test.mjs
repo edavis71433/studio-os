@@ -71,7 +71,8 @@ const LIST = [
 }
 {
   const r = await draftSectionHtml(SITE, manifest, [{ type: 'richtext', title: 'Emptied', body: '' }, ...LIST], 0, '2026-11-08T00:00:00Z');
-  ok('a section emptied of everything draws nothing, as on the site', r.html === '');
+  // item 259: on the site it draws nothing; on the canvas it is a placeholder the owner can find and fill
+  ok('a section emptied of everything draws as a placeholder on the canvas, with its stored index', r.html.includes('class="block wrap block-empty block-empty-richtext"') && r.html.includes('data-dds-src="0"') && r.html.includes('Emptied'));
 }
 
 // ── Every section type the builder offers, on every template (deep pass, Part 7.10) ──

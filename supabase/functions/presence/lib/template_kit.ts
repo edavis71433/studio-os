@@ -13,7 +13,7 @@
 // tag filter and the Open now line. Every interpolation is escaped, markdown goes
 // through the sanitizer, links through safeHref. The site's kind of business picks
 // the words, paths and schema.org types (lib/industry_vocab.ts).
-import { esc, attr, safeHref, safeRedirectTo, renderMarkdown } from './markdown.ts';
+import { esc, attr, safeHref, renderMarkdown } from './markdown.ts';
 import { normalizeSnapshotContent } from './render_types.ts';
 import { vocabFor, type IndustryVocab } from './industry_vocab.ts';
 import { renderSiteBlocks, reviewsSchema, type RenderedBlock } from './site_blocks.ts';
@@ -656,15 +656,13 @@ export function makeRender(look: TemplateLook): RenderFn {
       files['feed.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>${esc(i.business_name)} — Updates</title><link>${esc(site.baseUrl + '/updates/')}</link><description>${esc('Latest updates from ' + i.business_name)}</description>${feedItems}</channel></rss>\n`;
     }
 
-    // real 301s on Netlify (SEO-safe — passes full ranking signal)
-    const _redir = (c.redirects || []).map((r) => `${r.from_path}  ${r.to_path}  301`).join('\n');
+    // Item 270: real 301s on Netlify, forced (the `!`), so the forward answers even where a file
+    // sits at the old address. Until Nov 22 2026 seven templates also wrote a small refresh page at
+    // the old address; Netlify serves a file over an unforced rule, so that page could answer in
+    // place of the 301. No refresh page is written any more.
+    const _redir = (c.redirects || []).map((r) => `${r.from_path}  ${r.to_path}  301!`).join('\n');
     files['_redirects'] = _redir ? _redir + '\n' : '';
     if (classic) files['_headers'] = classic.files.headers;
-    else {
-      // meta-refresh pages remain as a fallback for any host without _redirects support;
-      // a forward's target is a path on the site or an https link, else no page (publish refuses it too)
-      for (const r of c.redirects) { const to = safeRedirectTo(r.to_path); if (to) files[`${r.from_path.replace(/^\/|\/$/g, '')}/index.html`] = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${attr(to)}"><link rel="canonical" href="${attr(site.baseUrl + to)}"><title>Moved</title></head><body><p>Moved to <a href="${attr(to)}">${esc(to)}</a>.</p></body></html>`; }
-    }
 
     return files;
   };

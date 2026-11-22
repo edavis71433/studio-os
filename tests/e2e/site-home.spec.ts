@@ -259,6 +259,13 @@ test.describe('on a phone', () => {
     await page.locator('#sectionsNav .navitem[data-view="pages"]').click();
     await expect(page.locator('#view-pages')).toBeVisible();
   });
+  // builder item 272: the Account button hung off the right edge of a 402-point iPhone
+  test('the top bar fits: the Account button is fully on screen', async ({ page }) => {
+    await mount(page, '/presence.html');
+    const p = (await page.locator('#dds-profile').boundingBox())!;
+    expect(p.x + p.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    await expect(page.locator('#dds-search kbd')).toBeHidden();
+  });
   test('the site stops above the dock', async ({ page }) => {
     await mount(page, '/presence.html');
     await expect(page.frameLocator('#siteFrame').locator('h1').first()).toBeVisible();
@@ -344,6 +351,20 @@ const touchChecks = () => {
     await expect(h).toHaveAttribute('contenteditable', /true|plaintext-only/);
     await expect(frame.locator('#dds-dc-bar')).not.toHaveClass(/\bon\b/);   // the toolbar steps aside while you type
   });
+  // builder item 272: the keyboard stayed up after Return, with nothing to type into
+  test('Return saves the words and lets go of them, so an iPhone puts its keyboard away', async ({ page }) => {
+    const { writes, frame } = await touchCanvas(page);
+    const h = frame.locator('section#a h2[data-dds-field="title"]');
+    await frame.locator('section#a').tap();
+    await h.tap();
+    await expect(h).toHaveAttribute('contenteditable', /true|plaintext-only/);
+    await page.keyboard.press('End');
+    await page.keyboard.insertText(' today');
+    await page.keyboard.press('Enter');
+    // straight away, before the save redraws the canvas: nothing keeps the keyboard
+    expect(await h.evaluate((el) => el.ownerDocument.activeElement === el)).toBe(false);
+    await expect.poll(() => writes.filter((w) => w.path === '/settings' && w.body && Array.isArray(w.body.blocks)).map((w) => w.body.blocks[0].title).at(-1)).toBe('Your heading today');
+  });
   test('the editor’s tip says to tap, not double-click', async ({ page }) => {
     await showTips(page);
     await touchCanvas(page);
@@ -365,6 +386,24 @@ test.describe('editing by touch: Chrome on an Android phone', () => {
   test.use(PIXEL);
   test.beforeEach(({ browserName }) => { test.skip(browserName !== 'chromium', 'Chrome only'); });
   touchChecks();
+});
+// builder item 272: Safari scrolled the editor up for its keyboard and left it there
+test.describe('after an iPhone keyboard closes', () => {
+  test.beforeEach(({}, testInfo) => { test.skip(!testInfo.project.use.hasTouch, 'touch devices only'); });
+  test('the editor goes back to the top, so Exit and Publish are on screen', async ({ page }) => {
+    await touchCanvas(page);
+    const y = await page.evaluate(async () => {
+      const pad = document.createElement('div'); pad.style.height = '3000px'; document.body.appendChild(pad);   // room to be scrolled, as Safari does for its keyboard
+      window.scrollTo(0, 400);
+      const before = window.scrollY;
+      window.visualViewport!.dispatchEvent(new Event('resize'));   // the keyboard has gone: the viewport is full height again
+      await new Promise((r) => setTimeout(r, 50));
+      return [before, window.scrollY];
+    });
+    expect(y[0]).toBeGreaterThan(0);
+    expect(y[1]).toBe(0);
+    await expect(page.locator('#btnEditExit')).toBeInViewport();
+  });
 });
 test.describe('editing with a mouse is unchanged', () => {
   test.beforeEach(({}, testInfo) => { test.skip(!!testInfo.project.use.hasTouch, 'a mouse'); });
@@ -1140,15 +1179,16 @@ test.describe('type into the welcome section and About on the canvas', () => {
     await expect.poll(() => identityWrites(writes).at(-1)?.body).toEqual({ business_name: 'Marlow’s Kitchen' });
   });
 
-  test('Escape puts the words back and saves nothing', async ({ page }) => {
+  // builder item 255: Escape used to throw the words away; now it keeps them and leaves the box
+  test('Escape keeps the words and leaves the box, and they save', async ({ page }) => {
     const { writes, frame } = await canvas(page);
     const p = frame.locator('p[data-pr="identity.description"]');
     await p.dblclick();
     await page.keyboard.type(' and more');
     await page.keyboard.press('Escape');
-    await expect(p).toHaveText('Hello');
-    await settled(page);
-    expect(identityWrites(writes)).toHaveLength(0);
+    await expect(p).toHaveText('Hello and more');
+    await expect(p).not.toHaveAttribute('contenteditable', /.+/);
+    await expect.poll(() => identityWrites(writes).map((w) => w.body.description), { timeout: 6000 }).toContain('Hello and more');
   });
 
   test('a sample line is replaced by the first keystroke, and only real words are saved', async ({ page }) => {
@@ -1462,11 +1502,12 @@ test.describe('a save that fails says so', () => {
   const failing = (page: Page, path: string) => page.route(`**/functions/v1/presence${path}`, (route: Route) => route.request().method() === 'PUT'
     ? route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'write_failed', message: 'That didn’t save — nothing was changed. Please try again.' }) })
     : route.fallback());
-  test('a business detail that fails to save says “Not saved, try again”', async ({ page }) => {
+  test('a business detail that fails to save says “Not saved · Try again”', async ({ page }) => {   // item 250: a button now
     await mount(page, '/presence.html#business');
     await failing(page, '/identity');
     await page.locator('#f-phone').fill('555-0199');
-    await expect(page.locator('#topWhisper')).toHaveText('Not saved, try again');
+    await expect(page.locator('#topWhisper')).toHaveText('Not saved · Try again');
+    await expect(page.locator('#topWhisper')).toHaveAttribute('role', 'button');
     await expect(page.locator('#topWhisper')).toHaveClass(/\bbad\b/);
   });
   test('the closed switch goes back to what’s saved when its save fails', async ({ page }) => {
@@ -1475,7 +1516,7 @@ test.describe('a save that fails says so', () => {
     const sw = page.locator('#closedSwitch');
     await expect(sw).not.toBeChecked();
     await sw.click();
-    await expect(page.locator('#topWhisper')).toHaveText('Not saved, try again');
+    await expect(page.locator('#topWhisper')).toHaveText('Not saved · Try again');
     await expect(sw).not.toBeChecked();
     await expect(page.locator('#f-closednote')).toBeHidden();
   });

@@ -269,7 +269,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       if (!can(member.role, 'manage_clients')) return forbid(cors);
       const siteId = decodeURIComponent(nm[1]).toLowerCase();
       const change = pickFlags(await body());
-      if (!isSiteId(siteId) || !Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which site, and turn on or off its notifications, the bell or email.' }, 400, cors);
+      if (!isSiteId(siteId) || !Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which site, and turn on or off its notifications, the bell, email, or telling the client when their site is down.' }, 400, cors);
       const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
       if (!own) return json({ error: 'no_studio_site', message: 'Notifications are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
       const input = await sharedGather(member.agency_id, now);
@@ -532,7 +532,8 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     const q = new URL(req.url).searchParams;
     // batch B: ?fresh=1 when a page just changed something (never a shared run);
     // ?only=total is the bell's badge — the same list, just its number
-    const d = await computeStudioNeeds(member, principal, jwt, now, { fresh: q.get('fresh') === '1' });
+    // sales item 151: ?today= is the page's own day, so "overdue by 1 day" follows the studio's calendar
+    const d = await computeStudioNeeds(member, principal, jwt, now, { fresh: q.get('fresh') === '1', today: callerDay(q.get('today')) });
     if (q.get('only') === 'total') return json({ data: { total: Number(d.total) || 0, partial: !!d.partial } }, 200, cors);
     return json({ data: d }, 200, cors);
   }
@@ -1014,17 +1015,25 @@ export function keptStudioNeedsTotal(agencyId: string): { total: number; fresh: 
   const age = Date.now() - hit.at;
   return age > NEEDS_TOTAL_KEEP_MS ? null : { total: hit.total, fresh: age < NEEDS_TOTAL_TTL_MS };
 }
-export function computeStudioNeeds(member: AgencyMember, principal: Principal, jwt: string, now: string, opts: { fresh?: boolean } = {}) {
-  const key = `${member.agency_id}:${principal.userId || principal.email || ''}`;
+/** sales item 151: a YYYY-MM-DD the page sent, within a day or so of the clock's; else nothing. Pure. */
+export function callerDay(v: unknown, nowIso = new Date().toISOString()): string | undefined {
+  const s = String(v || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return undefined;
+  const ms = Date.parse(s + 'T00:00:00Z');
+  if (!Number.isFinite(ms) || Math.abs(ms - Date.parse(nowIso)) > 2 * 86_400_000) return undefined;   // a day either side of the clock is a time zone; further is a typo
+  return s;
+}
+export function computeStudioNeeds(member: AgencyMember, principal: Principal, jwt: string, now: string, opts: { fresh?: boolean; today?: string } = {}) {
+  const key = `${member.agency_id}:${principal.userId || principal.email || ''}:${opts.today || ''}`;   // a different day is a different list
   const hit = needsRuns.get(key);
   if (!opts.fresh && hit && Date.now() - hit.at < NEEDS_SHARE_MS) return hit.p;
   if (opts.fresh) gathers.delete(member.agency_id);
-  const p = runStudioNeeds(member, principal, jwt, now);
+  const p = runStudioNeeds(member, principal, jwt, now, opts.today);
   needsRuns.set(key, { at: Date.now(), p });
   p.catch(() => { if (needsRuns.get(key)?.p === p) needsRuns.delete(key); });
   return p;
 }
-async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: string, now: string) {
+async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: string, now: string, today?: string) {
     const [input, own] = await Promise.all([sharedGather(member.agency_id, now), ownSiteOf(jwt, principal)]);
     // item 11: the studio site's own Inbox rows (the SAME builder the Inbox and the
     // bell read), so the list, the bell and the Inbox name one set of things
@@ -1092,7 +1101,7 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
       }
     }
     const payload = needsYouPayload({
-      nowIso: now, links: input.links, clientNames: input.clientNames, namesByClient, sites: input.sites,
+      nowIso: now, today, links: input.links, clientNames: input.clientNames, namesByClient, sites: input.sites,
       invoices: (recv?.items ?? []) as never, reminders: rowsOf<{ period: string; created_at: string }>(remQ).map((r) => ({ period: r.period, at: r.created_at })),
       enquiries: input.enquiries, support: supportRows.map(({ requester: _r, ...row }) => row), serviceLinks,
       deals: deals.map((d) => ({ ...d, contact_name: d.contact_id ? contactName[d.contact_id] || null : null })),
