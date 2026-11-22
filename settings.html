@@ -1632,7 +1632,7 @@ function paintReport() {
   const waiting = d.live === false;
   $('reportLast').classList.toggle('wait', waiting);
   $('reportNext').classList.toggle('wait', waiting && !!d.enabled);
-  $('reportNext').textContent = waiting ? (d.enabled ? 'Waits for the site to go live' : '') : d.enabled && d.next_month ? 'Next one: ' + monthAfter(d.next_month) + ' 1 · to ' + n + (n === 1 ? ' person' : ' people') : '';
+  $('reportNext').textContent = waiting ? (d.enabled ? 'Waits for the site to go live' : '') : d.enabled && d.next_month ? 'Next one: ' + monthAfter(d.next_month) + ' 4 to 6 · to ' + n + (n === 1 ? ' person' : ' people') : '';
   // item 182: the monthly AI check, its cost in words, and how the last one went
   $('sw-ai').setAttribute('aria-checked', d.ai_checks ? 'true' : 'false');
   $('aiCost').textContent = d.ai_cost ? d.ai_cost + '.' : '';
@@ -1710,7 +1710,7 @@ function paintSuggest(d) {
   const next = d.propose_next || null, opts = Array.isArray(d.propose_options) ? d.propose_options : [];
   $('sugBox').hidden = mode !== 'auto';
   if (mode === 'auto') {
-    $('sugEye').textContent = (d.next_month ? monthAfter(d.next_month) + ' 1 report suggests' : 'The next report suggests');
+    $('sugEye').textContent = (d.next_month ? 'The ' + monthAfter(d.next_month) + ' report suggests' : 'The next report suggests');
     $('sugText').textContent = next ? next.text : 'Nothing to suggest yet. When their Do next list has an idea, it shows here; until then the report goes without one.';
     $('sugFrom').textContent = next ? (SUGGEST_FROM[next.source] || '') : '';
     $('sugPick').hidden = opts.length < 2;
