@@ -24,7 +24,7 @@ const HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
   + '</main></body></html>';
 // what the server would draw for one section of the list, marked with the arrangement it was asked for
 const drawn = (b: any, i: number) => {
-  const way = b.type === 'image_text' ? 'side-' + (b.side || 'left') : (b.variant || 'default');
+  const way = b.type === 'image_text' ? (b.variant || 'side-' + (b.side || 'left')) : (b.variant || 'default');
   return `<section class="block block-${b.type} v-${way}" data-dds-src="${i}" data-way="${way}"><h2>${b.title}</h2><p>${b.type === 'image_text' ? b.body : 'Jordan P.: The sourdough is the best in Burbank.'}</p></section>`;
 };
 const SITE = { id: 's1', edition: 'presence', status: 'ready', template_slug: 'business-classic', template_version: 1 };
@@ -140,9 +140,10 @@ test.describe('a section’s Layout tab draws the section itself each way (build
     await expect(page.locator('#settingsPanel').getByText('Image on the', { exact: false })).toHaveCount(0);
     await expect(page.locator('#settingsPanel').getByText('Which side the photo sits on is under Layout.', { exact: false })).toBeVisible();
     await page.locator('#inspectorSeg [data-itab="layout"]').click();
-    expect(await tiles(page).locator('.ins-live-name > span:first-child').allTextContents()).toEqual(['Photo on the left', 'Photo on the right']);
+    // builder item 329: and the two bold designs picked in Figma, which keep the side picked
+    expect(await tiles(page).locator('.ins-live-name > span:first-child').allTextContents()).toEqual(['Photo on the left', 'Photo on the right', 'Photo off the edge', 'Photo in a colour frame']);
     await expect(tile(page, 'Photo on the left')).toHaveAttribute('aria-pressed', 'true');
-    await expect.poll(async () => (await framesSay(page)).map((f) => f.way), { timeout: 10000 }).toEqual(['side-left', 'side-right']);
+    await expect.poll(async () => (await framesSay(page)).map((f) => f.way), { timeout: 10000 }).toEqual(['side-left', 'side-right', 'overlap', 'frame']);
     await item(page, 'Photo on the right').click({ position: { x: 30, y: 30 } });   // a tap on the picture itself picks it
     await expect.poll(() => blocksWrite(writes)?.[2]?.side, { timeout: 8000 }).toBe('right');
     // a Content edit afterwards keeps the side picked under Layout

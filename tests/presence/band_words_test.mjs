@@ -73,7 +73,8 @@ for (const { slug } of listTemplates()) {
     const files = await renderSnapshot(onBand(fullFixture(slug), band), SITE);
     const css = String(files[Object.keys(files).find((k) => /^assets\/.*\.css$/.test(k))]);
     const pages = pagesOf(files).map((p) => ({ path: p, ...readPage(String(files[p])) }));
-    ok(`${slug}, ${band} band: the sample draws its sections on the band, on ${pages.length} pages`, pages.length === 4 && pages.every((p) => p.sections.length));
+    // the home page, the owner's page and a page of every other look (three since item 329's designs)
+    ok(`${slug}, ${band} band: the sample draws its sections on the band, on ${pages.length} pages`, pages.length === 2 + variantPages().length && pages.every((p) => p.sections.length));
     const worst = new Map(), unread = new Set(), placeholders = new Set();
     let measured = 0;
     // the template's buttons and every set with no form style, then every form style with the
