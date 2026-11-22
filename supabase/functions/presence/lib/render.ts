@@ -2,7 +2,7 @@
 // Templates are versioned folders registered here. Shipping a template version =
 // deploying the function (deliberately boring, per blueprint §2). Old versions
 // are never deleted while any site pins them.
-import { fontFaceCss, libraryFontsIn } from './fonts.ts';
+import { fontFaceCss, fontFilePath, libraryFontsIn } from './fonts.ts';
 import type { RenderFn, Snapshot, SnapshotContent, SiteConfig, TemplateManifest, FileMap } from './render_types.ts';
 import { lazyRoutes } from './lazy.ts';
 import manifest_rc_1_0_0 from '../templates/restaurant-classic/1.0.0/manifest.json' with { type: 'json' };
@@ -161,12 +161,25 @@ export function devLayerFragments(dev: Snapshot['dev_customization']): { style: 
   const css = sanitizeDevCss(dev.custom_css || '');
   // a library font the style names loads from the site's own copy (lib/fonts.ts)
   const faces = fontFaceCss(libraryFontsIn(tokens));
+  // item 308: the heading and body fonts are asked for at once, so words don't flash and shift when they arrive
+  const preload = libraryFontsIn(tokens).flatMap((f) => f.weights.filter((w) => w === 400 || w === 700).map((w) => `<link rel="preload" as="font" type="font/woff2" href="/${fontFilePath(f, w)}" crossorigin>`)).join('');
   const style = (vars || css)
-    ? `<style id="presence-dev">${vars ? `:root{${vars}}` : ''}${faces}${css ? `\n${css}` : ''}</style>`
+    ? `<style id="presence-dev">${vars ? `:root{${vars}}` : ''}${faces}${css ? `\n${css}` : ''}</style>${preload}`
     : '';
   const safeHtml = dev.custom_html ? sanitizeDevHtml(dev.custom_html) : '';
   const block = safeHtml ? `<div class="presence-dev-block">${safeHtml}</div>` : '';
   return { style, block };
+}
+
+// Item 311: the developer's HTML block sits inside the page, above the footer, on the pages the
+// developer chose (the style setting html_pages: every page, the home page only, or the inner
+// pages only); never on the legal pages, the thanks and not-sent pages, the search page or the
+// "not found" page. Before, it went under the footer of every page.
+const NO_BLOCK_PAGES = new Set(['privacy/index.html', 'accessibility/index.html', 'thanks/index.html', 'not-sent/index.html', 'search/index.html', '404.html']);
+export function devBlockPages(path: string, choice: unknown): boolean {
+  if (!path.endsWith('.html') || NO_BLOCK_PAGES.has(path)) return false;
+  const home = path === 'index.html';
+  return choice === 'home' ? home : choice === 'inner' ? !home : true;
 }
 
 /** Apply the developer layer to a rendered file map (HTML files only). Pure.
@@ -179,7 +192,7 @@ export function injectDevLayer(fileMap: FileMap, dev: Snapshot['dev_customizatio
     if (typeof contents === 'string' && path.endsWith('.html') && !contents.includes('id="presence-dev"')) {
       let html = contents;
       if (style) html = html.includes('</head>') ? html.replace('</head>', `${style}</head>`) : `${style}${html}`;
-      if (block) html = html.includes('</body>') ? html.replace('</body>', `${block}</body>`) : `${html}${block}`;
+      if (block && devBlockPages(path, dev?.theme_tokens?.html_pages)) html = html.includes('</main>') ? html.replace('</main>', `${block}</main>`) : html.includes('</body>') ? html.replace('</body>', `${block}</body>`) : `${html}${block}`;
       out[path] = html;
     } else {
       out[path] = contents;

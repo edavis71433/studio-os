@@ -16,7 +16,7 @@ import type { SiteConfig, SnapshotContent } from './render_types.ts';
  *  share_title / share_description / share_image) — they change only the og:/
  *  twitter: tags, never the <title>/description Google reads. Absent = the exact
  *  same bytes as before. */
-export interface SeoHeadPage { title: string; description: string; path: string; ogImage?: string; ld: object[]; shareTitle?: string; shareDescription?: string; shareImage?: string }
+export interface SeoHeadPage { title: string; description: string; path: string; ogImage?: string; ld: object[]; shareTitle?: string; shareDescription?: string; shareImage?: string; ogType?: 'article'; published?: string; feed?: boolean }   // item 300: a post shares as an article; the Updates pages name the feed
 
 /** The full `<!DOCTYPE html> … </head>` for one page — byte-identical to what the
  *  templates emitted inline. `critical` is the template's above-the-fold CSS and
@@ -39,7 +39,7 @@ export function seoHead(o: SeoHeadPage, site: SiteConfig, c: SnapshotContent, x:
 <link rel="canonical" href="${attr(canonical)}">
 ${c.settings?.verification?.google ? `<meta name="google-site-verification" content="${attr(c.settings.verification.google)}">` : ''}${c.settings?.verification?.bing ? `\n<meta name="msvalidate.01" content="${attr(c.settings.verification.bing)}">` : ''}
 <link rel="icon" href="${attr(x.icon || '/favicon.svg')}"${x.icon ? '' : ' type="image/svg+xml"'}>
-<meta property="og:type" content="website">
+<meta property="og:type" content="${o.ogType === 'article' ? 'article' : 'website'}">${o.ogType === 'article' && o.published ? `\n<meta property="article:published_time" content="${attr(o.published)}">` : ''}${o.feed ? `\n<link rel="alternate" type="application/rss+xml" title="${attr(`Updates from ${i.business_name}`)}" href="/feed.xml">` : ''}
 <meta property="og:site_name" content="${attr(i.business_name)}">
 <meta property="og:title" content="${attr(ogTitle)}">
 <meta property="og:description" content="${attr(ogDesc)}">

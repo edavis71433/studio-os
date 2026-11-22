@@ -38,10 +38,25 @@ export function categoryNav(posts: Post[], current: PostCategory | null): string
   return `<nav class="post-cats" aria-label="Categories">${link('/updates/', 'All', !current)}${cats.map((c) => link(categoryPath(c), c.name, current?.id === c.id)).join('')}</nav>`;
 }
 
-/** The Updates page, or one category's page. Pure. */
-export function postListBody(c: SnapshotContent, d: PostDraw, current: PostCategory | null = null): string {
+/** Item 300: the list shows this many updates a page; older ones are on /updates/page/2/ and so on. */
+export const POSTS_PER_PAGE = 20;
+/** How many pages a list of posts needs (always at least one). Pure. */
+export const postPageCount = (n: number): number => Math.max(1, Math.ceil(n / POSTS_PER_PAGE));
+/** The path of page `n` of the Updates list, or of a category's list. Pure. */
+export const postListPath = (cat: PostCategory | null, n: number): string => `${cat ? categoryPath(cat) : '/updates/'}${n > 1 ? `page/${n}/` : ''}`;
+/** Item 300: the links between the pages of a list: Newer, Older and where you are. '' with one page. Pure. */
+export function postPager(cat: PostCategory | null, page: number, pages: number): string {
+  if (pages <= 1) return '';
+  const link = (n: number, label: string) => `<a href="${attr(postListPath(cat, n))}">${label}</a>`;
+  return `<nav class="post-pager" aria-label="More updates">${page > 1 ? link(page - 1, '← Newer') : '<span></span>'}<span class="post-pager-at">Page ${page} of ${pages}</span>${page < pages ? link(page + 1, 'Older →') : '<span></span>'}</nav>`;
+}
+
+/** The Updates page, or one category's page: page `page` of it (item 300). Pure. */
+export function postListBody(c: SnapshotContent, d: PostDraw, current: PostCategory | null = null, page = 1): string {
   const all = newestFirst(c.posts);
-  const posts = current ? all.filter((p) => p.category?.id === current.id) : all;
+  const listed = current ? all.filter((p) => p.category?.id === current.id) : all;
+  const pages = postPageCount(listed.length);
+  const posts = listed.slice((page - 1) * POSTS_PER_PAGE, page * POSTS_PER_PAGE);
   const rows = posts.map((p) => {
     const tags = normalizeTags(p.tags);
     const sum = postSummary(p);
@@ -53,7 +68,7 @@ export function postListBody(c: SnapshotContent, d: PostDraw, current: PostCateg
 ${sum ? `<p>${esc(sum)}</p>` : ''}${postTagsHtml(tags, esc)}</div></article>`;
   }).join('');
   return `<section class="block wrap"><h1>${esc(current ? current.name : 'Updates')}</h1>${categoryNav(c.posts, current)}${current ? '' : tagFilterBar(posts, esc, attr)}<div class="post-list">${rows}
-${posts.length === 0 ? '<p>No updates yet — our news will land here.</p>' : ''}</div>${current ? '' : tagFilterScript(posts)}</section>`;
+${posts.length === 0 ? '<p>No updates yet — our news will land here.</p>' : ''}</div>${postPager(current, page, pages)}${current || page > 1 ? '' : `<p class="post-feed"><a href="/feed.xml">Get these updates in a feed reader</a></p>`}${current ? '' : tagFilterScript(posts)}</section>`;
 }
 
 /** One post's page. Pure. */
@@ -115,5 +130,11 @@ export const POST_CSS = `
 .post-author-name{font-weight:700;margin:0}
 .post-author-bio{color:var(--soft);margin:2px 0 0}
 .post-more{display:flex;flex-wrap:wrap;gap:8px 24px;margin-top:28px}
+.post-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:28px}
+.post-pager a{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border:1px solid var(--line);border-radius:999px;color:var(--ink);text-decoration:none}
+.post-pager a:hover{border-color:var(--ink)}
+.post-pager-at{color:var(--soft);font-size:.92rem}
+.post-feed{margin-top:22px;font-size:.92rem}
+.post-feed a{display:inline-flex;align-items:center;min-height:44px;color:var(--soft)}
 @media (max-width:700px){.post-row{grid-template-columns:1fr;gap:12px}}
 `;

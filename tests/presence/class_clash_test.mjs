@@ -52,6 +52,14 @@ const OWNERS = {
   prose: ['template', 'written words: a post, the about story, an answer; the Text, Accordion, Tabs, Columns and Spotlight sections carry it too, and the section styles’ spacing reaches only theirs'],
   'block--bg-accent': ['sections', 'a section’s brand-colour band; the templates with light Features cards turn them see-through on it'],
   'block--bg-dark': ['sections', 'a section’s dark band; the templates with light Features cards turn them see-through on it'],
+  // items 305 and 306: the shell's rules (lib/site_shell.ts, in every template's stylesheet) size these for a thumb and set the no-script line
+  'ff-noscript': ['both', 'the no-script line in every form (item 305): the sections draw it, the shell styles the contact form’s'],
+  ghost: ['both', 'a quieter button: the template draws it, and the shell keeps it readable on a photo (item 292)'],
+  'map-dir': ['both', 'the Map section’s directions link; the shell makes it a full-height tap on a phone (item 306)'],
+  'nl-consent': ['both', 'the sign-up box’s tick; the shell makes it a full-height tap on a phone (item 306)'],
+  'nl-form': ['both', 'the sign-up box; the shell sizes its tick on a phone (item 306)'],
+  'veil-dark': ['both', 'item 292: the veil over a photo, on a section (the sections draw it) and on the welcome section (the shell draws it)'],
+  'veil-light': ['both', 'item 292: the light veil, the same two places'],
 };
 
 // ── reading markup and stylesheets ──

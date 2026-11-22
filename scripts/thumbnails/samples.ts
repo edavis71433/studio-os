@@ -41,8 +41,8 @@ export const SAMPLE_BLOCKS: Record<string, Record<string, unknown>> = {
   social: { type: 'social', title: 'Follow along', links: [
     { network: 'instagram', url: 'https://instagram.com/example' }, { network: 'facebook', url: 'https://facebook.com/example' }, { network: 'youtube', url: 'https://youtube.com/@example' }] },
   events: { type: 'events', title: 'Coming up', items: [
-    { name: 'Spring open house', date: '2026-04-12', detail: 'Tours and free coffee, 10 to 2.' },
-    { name: 'Community workshop', date: '2026-05-03', detail: 'Small fixes you can do yourself.' }] },
+    { name: 'Spring open house', date: '2027-04-12', detail: 'Tours and free coffee, 10 to 2.' },
+    { name: 'Community workshop', date: '2027-05-03', detail: 'Small fixes you can do yourself.', place: 'The community hall, 40 Elm Street' }] },
   map: { type: 'map', title: 'Find us', address: '123 Main Street, Burbank, CA', directions_url: 'https://maps.google.com/?q=123+Main+Street+Burbank', image_media_id: uuid() },
   richtext: { type: 'richtext', title: 'Our story', body: 'We started with one van and a promise: **show up on time and do it right**. Fifteen years later we still answer our own phone.\n\nEvery job gets the same care, big or small.' },
   image: { type: 'image', image_id: uuid(), caption: 'Our workshop in Burbank' },

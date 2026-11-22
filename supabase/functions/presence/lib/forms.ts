@@ -383,7 +383,7 @@ export interface FormRenderCtx { esc: (s: string) => string; attr: (s: string) =
 // stylesheet — and every golden — stays byte-stable when no form is present).
 // Item 260: the block carries its own complete field styles (label above, full-width field,
 // the page's font), since the template's form.card rules never reach it. Zero external assets.
-const FORM_CSS = `<style>.presence-form{max-width:560px}.presence-form .ff{margin:0 0 14px}.presence-form label{display:block;font-weight:600;font-size:.94rem}.presence-form input:not([type=checkbox]):not([type=radio]):not([type=file]),.presence-form select,.presence-form textarea{display:block;width:100%;margin-top:5px}.presence-form textarea{min-height:120px;resize:vertical}.presence-form .ff[hidden]{display:none}.presence-form .ff-req{color:#b42318}.presence-form .ff-help{display:block;font-size:.85rem;color:var(--soft,#666);margin-top:4px}.presence-form fieldset.ff-group{border:1px solid var(--line,#ddd);border-radius:9px;padding:12px 14px;margin-bottom:14px}.presence-form .ff-group legend{font-weight:600;font-size:.94rem;padding:0 6px}.presence-form .ff-opt{display:flex;align-items:center;gap:8px;font-weight:400;margin-top:6px}.presence-form .ff-opt input{width:auto;margin:0}.presence-form .ff-rating .ff-opt{display:inline-flex;margin-right:14px}.presence-form .ff-consent label{display:flex;align-items:flex-start;gap:8px;font-weight:400}.presence-form .ff-consent input{width:auto;margin-top:4px}.presence-form .hp{position:absolute;left:-9999px;height:1px;overflow:hidden}.presence-form .ff-step[hidden]{display:none}.presence-form .ff-step-title{font-weight:600;font-size:1.02rem;margin:0 0 10px}.presence-form .ff-progress{font-size:.85rem;color:var(--soft,#666);font-weight:600;margin:0 0 8px}.presence-form .ff-bar{display:block;height:5px;border-radius:999px;background:var(--line,#e5e5e5);overflow:hidden;margin:0 0 16px}.presence-form .ff-bar-in{display:block;height:100%;width:0;background:var(--accent,#5b3fa0);transition:width .2s ease}.presence-form .ff-nav{display:flex;gap:10px;margin-top:2px}</style>`;
+const FORM_CSS = `<style>.presence-form{max-width:560px}.presence-form .ff{margin:0 0 14px}.presence-form label{display:block;font-weight:600;font-size:.94rem}.presence-form input:not([type=checkbox]):not([type=radio]):not([type=file]),.presence-form select,.presence-form textarea{display:block;width:100%;margin-top:5px}.presence-form textarea{min-height:120px;resize:vertical}.presence-form .ff[hidden]{display:none}.presence-form .ff-req{color:#b42318}.presence-form .ff-help{display:block;font-size:.85rem;color:var(--soft,#666);margin-top:4px}.presence-form fieldset.ff-group{border:1px solid var(--line,#ddd);border-radius:9px;padding:12px 14px;margin-bottom:14px}.presence-form .ff-group legend{font-weight:600;font-size:.94rem;padding:0 6px}.presence-form .ff-opt{display:flex;align-items:center;gap:8px;font-weight:400;margin-top:6px}.presence-form .ff-opt input{width:auto;margin:0}.presence-form .ff-rating .ff-opt{display:inline-flex;margin-right:2px;position:relative;cursor:pointer;min-height:44px;align-items:center}.presence-form .ff-star input{position:absolute;opacity:0;width:1px;height:1px;margin:0}.presence-form .ff-star-g{display:inline-flex;color:var(--line,#cfcfcf)}.presence-form .ff-star:has(input:checked) .ff-star-g,.presence-form .ff-star:has(~.ff-star input:checked) .ff-star-g{color:var(--accent,#5b3fa0)}.presence-form .ff-rating:hover .ff-star .ff-star-g{color:var(--line,#cfcfcf)}.presence-form .ff-star:hover .ff-star-g,.presence-form .ff-star:has(~.ff-star:hover) .ff-star-g{color:var(--accent-dark,var(--accent,#5b3fa0))}.presence-form .ff-star:has(input:focus-visible) .ff-star-g{outline:2px solid var(--accent,#5b3fa0);outline-offset:2px;border-radius:4px}.presence-form .ff-star-n{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.presence-form select{appearance:none;-webkit-appearance:none;padding-right:40px;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;background-size:16px}.presence-form .ff-noscript{margin:10px 0 0;font-size:.92rem;color:var(--soft,#666)}.presence-form .ff-consent label{display:flex;align-items:flex-start;gap:8px;font-weight:400}.presence-form .ff-consent input{width:auto;margin-top:4px}.presence-form .hp{position:absolute;left:-9999px;height:1px;overflow:hidden}.presence-form .ff-step[hidden]{display:none}.presence-form .ff-step-title{font-weight:600;font-size:1.02rem;margin:0 0 10px}.presence-form .ff-progress{font-size:.85rem;color:var(--soft,#666);font-weight:600;margin:0 0 8px}.presence-form .ff-bar{display:block;height:5px;border-radius:999px;background:var(--line,#e5e5e5);overflow:hidden;margin:0 0 16px}.presence-form .ff-bar-in{display:block;height:100%;width:0;background:var(--accent,#5b3fa0);transition:width .2s ease}.presence-form .ff-nav{display:flex;gap:10px;margin-top:2px}</style>`;
 
 /** Builder item 57: every form a page's section list holds, in page order: its Form
  *  sections and the Form blocks inside its Blocks sections. Reads a stored, validated or
@@ -401,6 +401,12 @@ export function formsIn(list: unknown): FormDefinition[] {
   }
   return out;
 }
+
+// Item 301: a rating draws as stars (the same radios underneath; the number stays for screen readers)
+const STAR = '<svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/></svg>';
+/** Item 305: the one line a visitor with scripts off needs: their message would be filed as spam
+ *  (the check wants the page's time ticket), so the form says to call or email instead. */
+export const NOSCRIPT_LINE = '<noscript><p class="ff-noscript">Please call or email us; this form needs scripts turned on.</p></noscript>';
 
 export function renderForm(def: FormDefinition, ctx?: FormRenderCtx): string {
   const E = ctx?.esc || esc; const A = ctx?.attr || attr;
@@ -444,7 +450,7 @@ export function renderForm(def: FormDefinition, ctx?: FormRenderCtx): string {
       case 'rating': {
         const scale = typeof f.max === 'number' ? f.max : 5;
         const opts = Array.from({ length: scale }, (_, i) => i + 1).map((n, i) =>
-          `<label class="ff-opt ff-star"><input type="radio" name="${A(f.key)}" value="${n}"${i === 0 ? reqAttr : ''}> ${n}</label>`).join('');
+          `<label class="ff-opt ff-star"><input type="radio" name="${A(f.key)}" value="${n}"${i === 0 ? reqAttr : ''}><span class="ff-star-g" aria-hidden="true">${STAR}</span><span class="ff-star-n">${n}${n === 1 ? ' star' : ' stars'}</span></label>`).join('');
         return `<fieldset class="ff ff-group ff-rating" data-field="${A(f.key)}"><legend>${E(f.label)}${reqMark}</legend>${help}${opts}</fieldset>`;
       }
       case 'email':
@@ -507,7 +513,7 @@ export function renderForm(def: FormDefinition, ctx?: FormRenderCtx): string {
     `<input id="${A(dom)}-hp" name="_hp" tabindex="-1" autocomplete="off"></p>` +
     fieldsHtml +
     `<p style="font-size:.85rem;color:var(--soft)">Please don’t include sensitive personal, financial, or medical information.</p>` +
-    `<button class="btn" type="submit">${submit}</button></form>`;
+    `<button class="btn" type="submit">${submit}</button>${NOSCRIPT_LINE}</form>`;
 
   const prefillKeys = def.fields.filter((f) => f.prefill).map((f) => f.key);
   return body + ruleScript(def, dom) + stepScript(dom, multi) + prefillScript(dom, prefillKeys);

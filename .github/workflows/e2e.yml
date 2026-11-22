@@ -106,6 +106,10 @@ jobs:
               supabase/functions/presence/lib/site_buttons.ts) run=true ;;
               # new-site-gallery-198.spec.ts imports the gallery's kinds and designs from this (builder item 198).
               supabase/functions/presence/lib/design_gallery.ts) run=true ;;
+              # published-sites-nov-22.spec.ts presses the phone menu, the zoom view and the carousel drawn with these (builder items 288, 294, 298).
+              supabase/functions/presence/lib/site_shell.ts) run=true ;;
+              supabase/functions/presence/lib/site_block_scripts.ts) run=true ;;
+              supabase/functions/presence/lib/site_nav.ts) run=true ;;
               docs/*|supabase/*|runbooks/*|sql/*|templates/*) ;;
               tests/isolation/*|tests/presence/*|tests/smoke/*|tests/workflows/*) ;;
               .github/workflows/ci.yml|.github/workflows/deploy.yml|.github/workflows/rollback.yml|.github/workflows/schema-dump.yml) ;;
