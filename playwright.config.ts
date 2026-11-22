@@ -20,7 +20,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,      // a stray test.only fails the CI gate
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  // Builder item 419: GitHub's machines for a public repository have four cores, and each
+  // device now runs in parts on machines of their own (.github/workflows/e2e.yml). Two
+  // workers left half of each machine idle.
+  workers: process.env.CI ? 4 : undefined,
   // On CI the JSON results feed scripts/e2e-summary.mjs, which names each flaky and
   // failed test on the run's summary page; a retried pass is otherwise only in the log.
   reporter: process.env.CI
