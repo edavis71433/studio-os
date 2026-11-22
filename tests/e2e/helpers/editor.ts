@@ -425,6 +425,7 @@ export const OWN_MENU = [{ label: 'Home', href: '/' }, { label: 'Story', href: '
 export async function moveThenWrite(page: Page, frame: Frame, puts: Mounted['puts'], name: string, key: 'ArrowUp' | 'ArrowDown') {
   await openAbout(page, frame, 'Story');
   await writeOnAboutAndLeave(page, frame, puts, 'story');
+  await settled(page);   // that save's answer redraws the Pages list; a nudge before it could lose its focused button
   await page.evaluate(() => (window as unknown as { go: (v: string) => void }).go('pages'));
   const before = puts.length;
   await nudge(page, name, key);

@@ -2026,6 +2026,9 @@ html.dc-edit:not(.plan-watch) .scrim{z-index:96}
    Edit mode draws them as floating cards (the floating studio block above). */
 .dc-slideover{position:fixed;top:0;bottom:0;z-index:82;width:360px;max-width:88vw;background:var(--sheet,#fff);display:flex;flex-direction:column;visibility:hidden;box-shadow:0 0 44px color-mix(in srgb,var(--scrim-ink) 30%,transparent);transition:transform var(--dur,200ms) var(--ease,ease-out),visibility 0s linear var(--dur,200ms)}
 .dc-slideover.on{visibility:visible;transition:transform var(--dur,200ms) var(--ease,ease-out),visibility 0s}
+/* a card that is closing (it stays visible while it slides away) takes no presses: a tap meant for the page
+   landed on the Pages card's rows and opened another page (found by the slow-connection check on a phone) */
+.dc-slideover:not(.on){pointer-events:none}
 .dc-left{left:0;border-right:1px solid var(--hair);transform:translateX(-102%)}
 .dc-right{right:0;border-left:1px solid var(--hair);transform:translateX(102%)}
 .dc-slideover.on{transform:translateX(0)}

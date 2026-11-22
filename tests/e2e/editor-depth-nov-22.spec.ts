@@ -87,11 +87,16 @@ test.describe('318: a section moves on the page the moment it is moved, copied, 
 
   test('a save the server refuses puts the page back and says so; no step is left to undo', async ({ page }) => {
     const { frame } = await mountDepth(page);
-    await page.route('**/functions/v1/presence/settings**', (route: Route) => route.request().method() === 'PUT'
-      ? route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'nope', message: 'The server said no.' }) })
-      : route.fallback());
+    let refuse = () => {};
+    const refused = new Promise<void>((r) => { refuse = r; });   // the refusal waits until the moved page has been looked at
+    await page.route('**/functions/v1/presence/settings**', async (route: Route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      await refused;
+      return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'nope', message: 'The server said no.' }) });
+    });
     await run(page, 'dcMove(0, 2)');
     expect(await order(frame)).toEqual(['hero', 'our-story', 'your-heading', 'cta', 'why-choose-us']);
+    refuse();
     await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'The server said no. The page is back the way it was saved.' }).first()).toBeVisible();
     await expect.poll(() => order(frame)).toEqual(['hero', 'your-heading', 'our-story', 'cta', 'why-choose-us']);
     await expect(page.locator('#btnUndo')).toBeDisabled();

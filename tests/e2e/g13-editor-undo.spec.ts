@@ -57,6 +57,7 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     // words' save answers with the draft's settings, which have no menu
     await openAbout(page, frame, 'Story');
     await writeOnAboutAndLeave(page, frame, puts, 'story');
+    await settled(page);   // the words' save has answered and the lists are drawn again before the menu is set
     await page.evaluate((nav) => { (0, eval)('S.settings.nav = ' + JSON.stringify(nav)); }, OWN_MENU);
     const before = puts.length;
     await nudge(page, 'Story', 'ArrowDown');
