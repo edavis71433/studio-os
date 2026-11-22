@@ -16,14 +16,14 @@ const cents = (v: unknown) => { const x = Math.round(Number(v)); return Number.i
 /** Each counted return as money out of its month: a refund, or a dispute lost, on an
  *  invoice's own payment or a retainer charge. A refund of an extra payment or of money on
  *  a withdrawn invoice was never counted as money in, so it never comes off. Pure. */
-export function returnedPayments(rows: unknown): Array<{ amount_cents: number; paid_at: string; retainer: boolean; kind: 'refund' | 'dispute'; invoice_id: string; deal_id: string; bank: boolean }> {
-  const out: Array<{ amount_cents: number; paid_at: string; retainer: boolean; kind: 'refund' | 'dispute'; invoice_id: string; deal_id: string; bank: boolean }> = [];
+export function returnedPayments(rows: unknown): Array<{ amount_cents: number; paid_at: string; retainer: boolean; kind: 'refund' | 'dispute'; invoice_id: string; deal_id: string; bank: boolean; method: string }> {
+  const out: Array<{ amount_cents: number; paid_at: string; retainer: boolean; kind: 'refund' | 'dispute'; invoice_id: string; deal_id: string; bank: boolean; method: string }> = [];
   for (const r of (Array.isArray(rows) ? rows : []) as ReturnedRow[]) {
     if (!r || (r.applies_to !== 'invoice' && r.applies_to !== 'retainer')) continue;
     const c = cents(r.counted_cents);
     const at = String(r.counted_at || '');
     if (c <= 0 || !Number.isFinite(Date.parse(at))) continue;
-    out.push({ amount_cents: c, paid_at: at, retainer: r.applies_to === 'retainer', kind: r.kind === 'dispute' ? 'dispute' : 'refund', invoice_id: String(r.invoice_id || ''), deal_id: String(r.deal_id || ''), bank: r.method === 'bank' });
+    out.push({ amount_cents: c, paid_at: at, retainer: r.applies_to === 'retainer', kind: r.kind === 'dispute' ? 'dispute' : 'refund', invoice_id: String(r.invoice_id || ''), deal_id: String(r.deal_id || ''), bank: r.method === 'bank', method: String(r.method || '') });   // method: how money given back by hand went (sales item 165)
   }
   return out;
 }
