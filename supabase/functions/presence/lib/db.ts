@@ -7,6 +7,7 @@
 //            the database on every read/write, not re-implemented in code.
 // siteDb() picks between them for site content. See below.
 import { seesSite, type SiteRole } from './site_roles.ts';
+import { authChanged } from '../../_shared/auth.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -22,11 +23,17 @@ export const REST = `${SB_URL}/rest/v1`;
 // in this isolate can only add tables: a read more, and the same answer a read of
 // the whole draft would give.
 const WRITES = new Map<string, number>();
+/** Builder item 401: no call to the database waits longer than this. */
+export const DB_TIMEOUT_MS = 10_000;
+/** The tables a remembered "who is asking" rests on (lib/who_asks.ts): a write here
+ *  to any of them forgets every remembered answer at once. */
+const WHO_ASKS_TABLES = new Set(['memberships', 'tenants', 'contacts', 'clients', 'presence_sites', 'presence_entitlements', 'presence_site_members', 'presence_agency_members', 'presence_agencies', 'presence_agency_clients']);
 function noteWrite(path: string, init: RequestInit) {
   const method = (init.method || 'GET').toUpperCase();
   if (method === 'GET' || method === 'HEAD') return;
   const table = path.split('?')[0];
   WRITES.set(table, (WRITES.get(table) || 0) + 1);
+  if (WHO_ASKS_TABLES.has(table)) authChanged();
 }
 export type WriteMark = ReadonlyMap<string, number>;
 /** The write counts as they are now. */
@@ -38,11 +45,48 @@ export function writtenSince(mark: WriteMark): Set<string> {
   return out;
 }
 
+// ── One lookup per run (builder item 402) ────────────────────────────────────
+// The 15-minute job's 39 chores each asked the database who is due, and many asked the
+// same thing: the same site's client id, the same settings row, the same roster. While a
+// run is on (tickMemoBegin … tickMemoEnd, routes/system.ts), a plain service-role read
+// that an earlier chore already made is answered from that chore's answer, as a copy, as
+// long as nothing in this worker has written to the table since (a write clears that
+// table's remembered reads). Same chores, same order, same answers a fresh read would give
+// a moment earlier. Off outside a run, so a request never reads a stale row.
+let TICK_DEPTH = 0;
+let TICK_OFF = false;
+const TICK_READS = new Map<string, Promise<{ ok: boolean; status: number; json: any; text: string }>>();
+export function tickMemoBegin(): void { TICK_DEPTH++; }
+export function tickMemoEnd(): void { TICK_DEPTH = Math.max(0, TICK_DEPTH - 1); if (TICK_DEPTH === 0) TICK_READS.clear(); }
+/** Tests: run with the memo off, to measure what a run cost before. */
+export function tickMemoOff(off: boolean): void { TICK_OFF = off; if (off) TICK_READS.clear(); }
+const tickOn = () => TICK_DEPTH > 0 && !TICK_OFF;
+function forgetTickReads(table: string) {
+  for (const k of TICK_READS.keys()) if (k.split('?')[0] === table) TICK_READS.delete(k);
+}
+const copyOf = (r: { ok: boolean; status: number; json: any; text: string }) => ({ ...r, json: r.json === null || r.json === undefined ? r.json : structuredClone(r.json) });
+
 export async function svc(path: string, init: RequestInit = {}) {
+  const method = (init.method || 'GET').toUpperCase();
+  // a plain read during a run: the first chore's answer serves the rest
+  if (method === 'GET' && tickOn() && !path.startsWith('rpc/') && !init.headers) {
+    const had = TICK_READS.get(path);
+    if (had) return copyOf(await had);
+    const p = svcRaw(path, init);
+    TICK_READS.set(path, p);
+    const r = await p;
+    if (!r.ok) TICK_READS.delete(path);   // a failed read is tried again by the next chore
+    return copyOf(r);
+  }
+  if (method !== 'GET' && method !== 'HEAD' && tickOn()) forgetTickReads(path.split('?')[0]);
+  return svcRaw(path, init);
+}
+async function svcRaw(path: string, init: RequestInit = {}) {
   noteWrite(path, init);
   const r = await fetch(`${REST}/${path}`, {
     ...init,
     headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
+    signal: init.signal ?? AbortSignal.timeout(DB_TIMEOUT_MS),
   });
   const text = await r.text();
   let json: any = null; try { json = text ? JSON.parse(text) : null; } catch { /* */ }
@@ -58,6 +102,7 @@ export async function svcCount(path: string): Promise<number | null> {
     const r = await fetch(`${REST}/${path}${path.includes('?') ? '&' : '?'}select=id`, {
       method: 'HEAD',
       headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, Prefer: 'count=exact' },
+      signal: AbortSignal.timeout(DB_TIMEOUT_MS),
     });
     if (!r.ok) return null;
     const range = r.headers.get('content-range') || '';   // e.g. "0-24/117" or "*/0"
@@ -119,6 +164,7 @@ export async function asUser(jwt: string, path: string, init: RequestInit = {}) 
   const r = await fetch(`${REST}/${path}`, {
     ...init,
     headers: { apikey: SB_ANON, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
+    signal: init.signal ?? AbortSignal.timeout(DB_TIMEOUT_MS),
   });
   const text = await r.text();
   let json: any = null; try { json = text ? JSON.parse(text) : null; } catch { /* */ }
