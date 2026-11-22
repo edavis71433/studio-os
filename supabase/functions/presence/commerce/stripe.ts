@@ -34,9 +34,36 @@ async function stripeFetch(path: string, params: Record<string, string>, method:
   return { status: r.status, body: await r.json().catch(() => null) };
 }
 
+/** Stripe's own words for an answer that isn't a success: its error code and its message,
+ *  with anything that could be part of the key, the account or an email taken out (a 403
+ *  quotes part of the key and the account). Pure. */
+export function stripeSaid(status: number, body: any): { code: string; message: string } {
+  const e = (body && typeof body === 'object' && body.error) || {};
+  const code = String(e.code || e.type || '').replace(/[^a-z0-9_]/gi, '').slice(0, 60) || `http_${status}`;
+  const message = String(e.message || '')
+    .replace(/\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9*]+/g, '[key]')
+    .replace(/\bacct_[A-Za-z0-9]+/g, '[account]')
+    .replace(/[^\s'"@]+@[^\s'"@]+\.[A-Za-z]{2,}/g, '[email]')
+    .slice(0, 400);
+  return { code, message };
+}
+
+/** Stripe said no: its code (e.g. more_permissions_required) rides along, so a caller can
+ *  show which refusal it was without Stripe's message. */
+export class StripeError extends Error {
+  status: number;
+  code: string;
+  constructor(status: number, code: string, message: string) { super(message); this.name = 'StripeError'; this.status = status; this.code = code; }
+}
+
 async function stripeReq(path: string, params: Record<string, string>, idem?: string, method: 'POST' | 'GET' | 'DELETE' = 'POST'): Promise<any> {
   const { status, body: j } = await stripeFetch(path, params, method, idem);
-  if (status < 200 || status >= 300) throw new Error((j && j.error && j.error.message) || `stripe ${status}`);
+  if (status < 200 || status >= 300) {
+    const said = stripeSaid(status, j);
+    // the log keeps Stripe's own code and words (never the key), so the next refusal names itself
+    console.warn(`[stripe] ${method} ${path} answered ${status} ${said.code}: ${said.message}`);
+    throw new StripeError(status, said.code, said.message || `stripe ${status}`);
+  }
   if (!j) throw new Error(`stripe ${status}: an answer that couldn’t be read`);
   return j;
 }

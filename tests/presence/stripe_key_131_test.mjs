@@ -119,10 +119,11 @@ ok('131: a 400 or 404 to a made-up id means the permission is there; 403 means r
   probeVerdict(200) === 'allowed' && probeVerdict(400) === 'allowed' && probeVerdict(404) === 'allowed' && probeVerdict(403) === 'refused' && probeVerdict(401) === 'key_rejected' && probeVerdict(0) === 'unknown' && probeVerdict(500) === 'unknown' && probeVerdict(429) === 'unknown');
 
 // the check, against keys of each kind
-const restrictedStripe = (lacking = []) => async (method, rawPath) => {
+const restrictedStripe = (lacking = []) => async (method, rawPath, params) => {
   const path = String(rawPath).replace(/^\/v1\//, '');   // the check passes its own path; the route test passes Stripe's
   const must = KEY_MUST_NOT.find((k) => k.probe.path === path);
-  const need = KEY_NEEDS.find((k) => k.probe.path === path);
+  const same = (a, b) => JSON.stringify(a || {}) === JSON.stringify(b || {});   // two reads share balance_transactions; the check's params tell them apart
+  const need = KEY_NEEDS.find((k) => k.probe.path === path && (params === undefined || same(k.probe.params, params)));
   if (must || (need && lacking.includes(need.id))) return { status: 403 };
   return { status: method === 'GET' ? 200 : 404 };
 };
@@ -135,6 +136,18 @@ const restrictedStripe = (lacking = []) => async (method, rawPath) => {
   const rep = await checkStripeKey({ kind: 'restricted', live: true }, restrictedStripe(['balance_read']));
   const line = rep.needs.find((x) => x.id === 'balance_read');
   ok('131: a key missing one permission fails and names it', !rep.ok && line && !line.ok && line.verdict === 'refused' && /missing 1 permission/.test(rep.summary));
+}
+{
+  const rep = await checkStripeKey({ kind: 'restricted', live: true }, restrictedStripe(['balance_transaction_source_read']));
+  const src = rep.needs.find((x) => x.id === 'balance_transaction_source_read'), bal = rep.needs.find((x) => x.id === 'balance_read');
+  ok('Nov 22: a key with Balance but not Balance Transaction Sources fails and names it (how the bookkeeper file and the Stripe card were refused)', !rep.ok && src && src.verdict === 'refused' && bal && bal.ok && /missing 1 permission/.test(rep.summary), rep.summary);
+}
+{
+  calls.length = 0;
+  await stripe.listPaymentBalanceTransactions(1_794_000_000, 1_794_086_400, 1);
+  const q = calls.find((c) => c.path === '/v1/balance_transactions')?.query || {};
+  const need = KEY_NEEDS.find((k) => k.id === 'balance_transaction_source_read');
+  ok('Nov 22: the bookkeeper file\'s and the Stripe card\'s read asks for each payment\'s source, and the key check asks the same way', q['expand[]'] === 'data.source' && need?.resource === 'Balance Transaction Sources' && need.level === 'Read' && need.probe.path === 'balance_transactions' && need.probe.params?.['expand[]'] === 'data.source' && need.probe.params?.limit === '1', JSON.stringify(q));
 }
 {
   const rep = await checkStripeKey({ kind: 'secret', live: true }, async (m) => ({ status: m === 'GET' ? 200 : 404 }));
