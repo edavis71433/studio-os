@@ -189,6 +189,7 @@ export const OPENING_CSS: Record<OpeningKind, string> = {
 .op-fact .op-big.op-s{font-size:clamp(1.1rem,1.6vw,1.35rem);line-height:1.3}
 .op-fact .op-lb{display:block;margin-top:4px;font-size:.92rem;color:var(--soft)}
 .op-fact:has(.open-now:empty){display:none}
+.op-type .op-fact a{color:inherit}
 .op-type:not(.op-page){background:var(--accent-band,var(--accent-dark,#1c2434));color:#fff}
 .op-type:not(.op-page) h1{color:#fff}
 .op-type:not(.op-page) .op-line{color:rgba(255,255,255,.9)}

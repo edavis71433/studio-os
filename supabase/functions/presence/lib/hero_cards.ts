@@ -16,11 +16,14 @@
 // site that shows a card, so every other site's stylesheet keeps its bytes. This file imports
 // nothing.
 
-/** The card's rules: beside the words on a wide screen, under them on a narrow one. The card is
- *  the site's own card colour with its own words, whatever the photo's veil; every tap is 44px. */
+/** The card's rules: beside the words on a wide screen, under them on a narrow one, the words set
+ *  to the left of it (a design that centres its welcome too). The card is the site's own card
+ *  colour with its own words, whatever the photo's veil; every tap is 44px. */
 export const HERO_CARD_CSS = `
 .hero-photo .hc-with{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);gap:clamp(28px,4vw,64px);align-items:end}
-.hero-photo .hc-words{min-width:0}
+.hero-photo .hc-words{min-width:0;text-align:left}
+.hero-photo .hc-words .cta-row{justify-content:flex-start}
+.hero-photo .hc-words .kicker::after{margin-left:0}
 .hero-card{background:var(--card,#fff);color:var(--ink,#1c1c1c);border-radius:var(--radius,12px);padding:clamp(20px,2.4vw,28px);box-shadow:0 18px 48px rgba(0,0,0,.28);text-align:left}
 .hero-card .hc-h{margin:0 0 6px;font-size:1.45rem;line-height:1.2}
 .hero-card .hc-sub{margin:0 0 14px;color:var(--soft)}
