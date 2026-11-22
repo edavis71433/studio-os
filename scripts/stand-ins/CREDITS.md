@@ -1,6 +1,6 @@
-# The pictures in this folder
+# The stand-in photos (thumbs/stand-ins/)
 
-One photo per kind of business. A first draft made in + New site opens with its kind's photo until the owner swaps in their own (lib/stand_in.ts), and the design pictures and "See it full size" use them (lib/kind_samples.json, scripts/thumbnails).
+One photo per kind of business, in `thumbs/stand-ins/<file>`. This list lives here, not beside them, because everything under `thumbs/` is published with the app and the build refuses to publish a document. A first draft made in + New site opens with its kind's photo until the owner swaps in their own (lib/stand_in.ts), and the design pictures and "See it full size" use them (lib/kind_samples.json, scripts/thumbnails).
 
 Photos from Pexels (https://www.pexels.com), used under the Pexels License (https://www.pexels.com/license/): free for commercial use on websites and apps, credit not required, credited here anyway. Approved by the studio owner on Nov 22 2026. Each was cropped to 1600 x 1000 and saved again without its camera data.
 

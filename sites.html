@@ -542,7 +542,7 @@
           <div id="new-exact-wrap" hidden><label class="fl" for="new-exact">More exactly (optional)</label><select id="new-exact"></select></div>
           <fieldset id="new-draft-wrap" class="ndraft" hidden>
             <legend class="sr-only">A first draft</legend>
-            <label class="ndraft-on"><input type="checkbox" id="new-draft"><span><b>Write the first draft for me</b><span>Home, About, Services and Contact, written into a private draft you can change. Optional.</span></span></label>
+            <label class="ndraft-on"><input type="checkbox" id="new-draft" aria-controls="new-draft-fields"><span><b>Write the first draft for me</b><span>Home, About, Services and Contact, written into a private draft you can change. Optional.</span></span></label>
             <div id="new-draft-fields" class="ndraft-fields" hidden>
               <p class="fl" id="new-svc-l">Three things they offer</p>
               <div class="nsvcs" role="group" aria-labelledby="new-svc-l">
@@ -1938,7 +1938,9 @@ $('new-designs').addEventListener('change',(e)=>{const i=e.target.closest('input
 // an opening is a design, its layout and a look as one; it belongs to its kind, so it isn't "by hand"
 $('new-openings').addEventListener('change',(e)=>{const i=e.target.closest('input[name="newlook"]');const o=i&&openingOf(i.value.slice(3));if(!o)return;NEWS.opening=o.key;NEWS.look=o.design;NEWS.chosen=true;NEWS.byHand=false;if(NEWS.tpl){NEWS.tpl=false;NEWS.kit='';}paintStarter();paintDraft();paintNewSum();});
 $('new-tpls').addEventListener('change',(e)=>{const i=e.target.closest('input[name="newlook"]');if(!i)return;NEWS.kit=i.value.slice(4);NEWS.tpl=true;paintStarter();paintDraft();paintNewSum();});
-$('new-draft').addEventListener('change',()=>{paintDraft();if($('new-draft').checked)$('new-svc-0').focus();});
+// Ticking the box opens the three fields, already filled in for the kind, right after it; focus stays on
+// the box (Tab goes on into them), so a phone's keyboard doesn't open over fields that may need no typing.
+$('new-draft').addEventListener('change',paintDraft);
 ['new-svc-0','new-svc-1','new-svc-2'].forEach((id)=>$(id).addEventListener('input',()=>{DRAFT_TYPED=true;}));
 $('new-kit').addEventListener('change',()=>{if(!NEWS.tpl)NEWS.kit=$('new-kit').value;paintNewSum();});
 function newKitLine(k){
