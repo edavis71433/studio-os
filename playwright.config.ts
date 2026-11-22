@@ -20,10 +20,12 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,      // a stray test.only fails the CI gate
   retries: process.env.CI ? 1 : 0,
-  // Builder item 419: GitHub's machines for a public repository have four cores, and each
-  // device now runs in parts on machines of their own (.github/workflows/e2e.yml). Two
-  // workers left half of each machine idle.
-  workers: process.env.CI ? 4 : undefined,
+  // Two workers a machine, measured (builder item 419, Nov 22 2026). GitHub's machines for a
+  // public repository have four cores, but four workers ran the phone's WebKit at 1.4 times
+  // one worker's speed against 1.95 with two, and timed out a test that two never do; the
+  // desktop gained almost nothing (2.1 against 1.9). The speed comes from the parts instead:
+  // each device runs on machines of its own (.github/workflows/e2e.yml).
+  workers: process.env.CI ? 2 : undefined,
   // On CI the JSON results feed scripts/e2e-summary.mjs, which names each flaky and
   // failed test on the run's summary page; a retried pass is otherwise only in the log.
   reporter: process.env.CI

@@ -130,7 +130,8 @@ for (const p of projects) {
   ok(`${p}: each part from 1 to ${n} once, and every part agrees how many there are`, !!n && list.length === n && list.every((x) => x.shards === n) && list.map((x) => x.shard).sort((a, b) => a - b).join() === Array.from({ length: n }, (_, i) => i + 1).join(), list.map((x) => `${x.shard}/${x.shards}`).join(', '));
 }
 ok('the desktop in two parts, the phone and the tablet in three (item 419)', partsOf('desktop-chromium').length === 2 && partsOf('mobile').length === 3 && partsOf('tablet').length === 3);
-ok('each machine runs four workers, one per core of GitHub\'s machines for a public repository (item 419)', /^ {2}workers: process\.env\.CI \? 4 : undefined,$/m.test(CONFIG));
+// Four workers were measured slower than two on the phone's WebKit, and timed out a test (item 419).
+ok('each machine runs two workers, the number measured fastest', /^ {2}workers: process\.env\.CI \? 2 : undefined,$/m.test(CONFIG));
 // Two parts uploading under one name make the second upload fail, and that part with it.
 ok('each part uploads its report under a name of its own', /^ {10}name: playwright-report-\$\{\{ matrix\.project \}\}-\$\{\{ matrix\.shard \}\}-of-\$\{\{ matrix\.shards \}\}$/m.test(JOBS.devices || ''));
 ok('one device failing doesn\'t cancel the others', /^ {6}fail-fast: false$/m.test(JOBS.devices));

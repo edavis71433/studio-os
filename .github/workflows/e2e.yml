@@ -12,13 +12,14 @@ name: E2E (Playwright)
 #
 # The three devices run at the same time, split across eight machines (`devices`): the
 # desktop in two parts and the phone and the tablet in three each (Playwright's own
-# --shard), with four workers on each machine. They run inside Playwright's own image,
+# --shard), two workers on each machine. They run inside Playwright's own image,
 # which has the browsers and their system libraries in it. Until Nov 8 2026 one machine
 # ran all three on two workers and installed the browsers every time: a run took 44 to
 # 60 minutes against a 60-minute cap, and on Nov 6 the browser install alone took 40
 # minutes on a slow package mirror. Until Nov 22 2026 (builder item 419) each device had
-# one machine with two workers, though GitHub's machines for a public repository have
-# four cores: the phone took 46 to 69 minutes, and a release waited 52 to 75 for it.
+# one machine: the phone took 46 to 69 minutes, and a release waited 52 to 75 for it.
+# Four workers a machine was tried and measured slower on the phone's WebKit than two
+# (playwright.config.ts says the numbers), so the parts carry the gain.
 #
 # On pull requests and on main, the tablet runs only what a tablet adds: the tests
 # tagged @touch and @layout. The nightly run tests the tablet in full, with the desktop
