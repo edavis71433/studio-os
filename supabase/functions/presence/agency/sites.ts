@@ -73,8 +73,44 @@ import { ownerReplyTo } from '../lib/service_bridge.ts';
 import { ownerWho, openTransfersFor, transferSummary, ownerFacts, hasOwnerFacts, ownerEmailsOf } from '../lib/site_transfer.ts';
 import type { AttachOwnerError } from '../commerce/account.ts';
 import { provisionCustomerAccount, bridgeCustomerToStudio, ensureConnectContact, linkContactToCustomer, sendCustomerInvite } from '../routes/sales.ts';
+import { openingStartFor, openingSummary } from '../lib/template_openings.ts';
+import { validateThemeTokens } from '../lib/devmode.ts';
 
 const rowsOf = <T,>(q: { ok?: boolean; json?: unknown } | null | undefined): T[] => (q && q.ok !== false && Array.isArray(q.json) ? (q.json as T[]) : []);
+
+/* ── builder item 330: a new site opens the way its design does, in the design's own fonts ──
+   lib/template_openings.ts names, per design, the front-page layout and the two library fonts
+   (Eric's picks in Figma). + New site calls this once, after the site has its design (the one
+   picked, or the database's default) and any starter kit. It fills only what is still empty: a
+   site that already has a layout keeps it, one that already has fonts keeps them, and no other
+   site is ever reached. The fonts are saved the way Styles saves them, the two style tokens
+   beside the others, the developer's CSS and HTML kept as they are. Nothing here undoes the site:
+   a write that doesn't go through is left out of the answer and the site stays as it was made. */
+export interface OpeningOut { slug: string; layout: string; fonts: [string, string]; applied: { layout: boolean; fonts: boolean } }
+export async function startOpening(siteId: string, principal: Principal): Promise<OpeningOut | null> {
+  const site = rowsOf<{ template_slug?: string | null }>(await svc(`presence_sites?id=eq.${siteId}&select=template_slug&limit=1`).catch(() => null))[0];
+  const start = openingStartFor(site?.template_slug);
+  if (!start) return null;
+  const out: OpeningOut = { slug: start.slug, layout: start.hero_layout, fonts: start.fonts, applied: { layout: false, fonts: false } };
+  const [setQ, devQ] = await Promise.all([
+    svc(`presence_settings?site_id=eq.${siteId}&select=hero_layout&limit=1`).catch(() => null),
+    svc(`presence_dev_customizations?site_id=eq.${siteId}&select=theme_tokens,custom_css,custom_html&limit=1`).catch(() => null),
+  ]);
+  if (!setQ?.ok || !devQ?.ok) return out;   // what the site has couldn't be read, so nothing is written over it
+  if (!String(rowsOf<{ hero_layout?: string | null }>(setQ)[0]?.hero_layout || '')) {
+    const w = await svc('presence_settings?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, hero_layout: start.hero_layout }) }).catch(() => null);
+    out.applied.layout = !!w?.ok;
+  }
+  const dev = rowsOf<{ theme_tokens?: unknown; custom_css?: string | null; custom_html?: string | null }>(devQ)[0];
+  const tokens = dev?.theme_tokens && typeof dev.theme_tokens === 'object' && !Array.isArray(dev.theme_tokens) ? dev.theme_tokens as Record<string, unknown> : {};
+  if (!tokens.font_display && !tokens.font_body) {
+    const w = await svc('presence_dev_customizations?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, theme_tokens: validateThemeTokens({ ...tokens, ...start.tokens }).tokens, custom_css: dev?.custom_css ?? '', custom_html: dev?.custom_html ?? '' }) }).catch(() => null);
+    out.applied.fonts = !!w?.ok;
+  }
+  const summary = openingSummary(start, out.applied.layout, out.applied.fonts);
+  if (summary) await writeChangeEvent({ siteId, entityType: 'settings', entityId: null, action: 'update', summary, principal, provenance: 'human', fields: [...(out.applied.layout ? ['hero_layout'] : []), ...(out.applied.fonts ? ['theme_tokens'] : [])] }).catch(() => {});
+  return out;
+}
 
 /* ── plans, in the words a studio uses ── */
 export const PLAN_WORDS: Record<string, string> = {
@@ -765,7 +801,10 @@ export async function handleAgencySites(req: Request, route: string, method: str
       try { kitOut = { id: kitId, name: kit.name, ...(await applyKitTo(kit.payload, acct.siteId, principal, `Started from the “${kit.name}” ${tpl ? 'template' : 'starter kit'}`, tpl ? { label: `your “${kit.name}” template` } : {})) }; }
       catch { kitOut = { id: kitId, name: kit.name, failed: true }; }
     }
-    return json({ data: { site_id: acct.siteId, client_id: acct.clientId, name, kit: kitOut, look: lookOut, industry: industryOut, for_customer: !!forClient } }, 201, cors);
+    // item 330: the design's own opening and fonts, last, so a starter kit's colours still land
+    // first; a saved template brings its own look, so it gets neither
+    const opening = kit && kit.payload.layout ? null : await startOpening(acct.siteId, principal).catch(() => null);
+    return json({ data: { site_id: acct.siteId, client_id: acct.clientId, name, kit: kitOut, look: lookOut, industry: industryOut, opening, for_customer: !!forClient } }, 201, cors);
   }
 
   // ── every domain: the clients' and the studio's own ──

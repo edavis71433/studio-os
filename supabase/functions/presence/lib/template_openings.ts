@@ -111,6 +111,7 @@ export const OPENING_CSS: Record<OpeningKind, string> = {
 .op-proof{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:22px;font-size:.92rem;color:var(--ink)}
 .op-panel .op-photo{position:relative;min-height:320px;overflow:hidden}
 .op-panel .op-photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+@media (max-width:1100px){.op-panel{min-height:min(72vh,640px)}}
 @media (max-width:760px){.op-panel{grid-template-columns:1fr;min-height:0}.op-panel .op-words{padding:40px 20px 36px}.op-panel .op-photo{aspect-ratio:4/3;min-height:0}}
 @media (max-width:520px){.op-panel .op-photo{aspect-ratio:1/1}}`,
   editorial: `
@@ -141,6 +142,7 @@ export const OPENING_CSS: Record<OpeningKind, string> = {
 .op-type :focus-visible{outline-color:#fff}
 .op-facts{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;margin:44px 0 0;padding:28px 0 0;border-top:1px solid rgba(255,255,255,.24)}
 .op-fact .op-big{display:block;font-family:var(--font-display,inherit);font-size:clamp(1.4rem,2.6vw,2.1rem);font-weight:700;line-height:1.15;overflow-wrap:anywhere}
+.op-fact .op-big.op-s{font-size:clamp(1.1rem,1.6vw,1.35rem);line-height:1.3}
 .op-fact .op-lb{display:block;margin-top:4px;font-size:.92rem;color:rgba(255,255,255,.85)}
 .op-fact:has(.open-now:empty){display:none}
 @media (max-width:860px){.op-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}

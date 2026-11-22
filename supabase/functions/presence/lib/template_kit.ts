@@ -500,12 +500,12 @@ function openingWelcome(op: Opening, c: SnapshotContent, v: IndustryVocab, words
     return { welcome: `<section class="hero op op-editorial" ${core}><div class="wrap op-words">${kicker}${h1}${line}${ctas}</div><div class="wrap op-photos n${n}">${photos}</div></section>`, strip };
   }
   // 'type': the places it serves sit in the facts, so there is no line above the headline
-  const fact = (big: string, label: string, region = '') => `<li class="op-fact"${region}><span class="op-big">${big}</span><span class="op-lb">${label}</span></li>`;
+  const fact = (big: string, label: string, region = '', small = false) => `<li class="op-fact"${region}><span class="op-big${small ? ' op-s' : ''}">${big}</span><span class="op-lb">${label}</span></li>`;
   const facts = [
     rated ? fact(esc(avg), fromReviews) : '',
     hours ? fact(openNow, '<a href="/contact/">See all hours</a>') : '',
     tel ? fact(tel, 'Call us') : '',
-    area ? fact(esc(area), 'Places we serve', pr('identity.service_area')) : '',
+    area ? fact(esc(area), 'Places we serve', pr('identity.service_area'), [...area].length > 22) : '',
   ].join('');
   return {
     welcome: `<section class="hero op op-type" ${core}><div class="wrap op-words">${h1}${line}${ctas}${facts ? `<ul class="op-facts">${facts}</ul>` : ''}</div></section>`,
