@@ -13,6 +13,7 @@ import { fewAtATime } from './few_at_a_time.ts';
 import type { KnownFile } from './netlify.ts';
 import { trashPatch, trashGoesAt } from './media_trash.ts';
 import { missingColumnSignal } from './inbound_email.ts';
+import { STUDIO_KINDS, isStudioFileMime, studioCap, studioSizeWords, STUDIO_TYPE_WORDS, attachmentName } from './client_files.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -28,7 +29,25 @@ export const MAX_DOC_BYTES = 25 * 1024 * 1024;        // documents: 25MB
 export const isImageMime = (m: string) => IMAGE_MIME.has(m);
 export const isDocMime = (m: string) => DOC_MIME.has(m);
 
-const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' };
+const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf',
+  // builder item 337: the studio door's own kinds (lib/client_files.ts), stored under their own tails
+  ...Object.fromEntries(Object.entries(STUDIO_KINDS).map(([m, k]) => [m, k.ext])) };
+
+/** Which kinds a door takes, how big, and the words it refuses with. The website's door
+ *  (the editor, Files, a form's file field) is what it always was; the studio door
+ *  (builder item 337: the portal's "Send your studio a file", a project's deliverables)
+ *  takes the wider list in lib/client_files.ts, 25MB photos and 100MB videos and zips. */
+export interface UploadDoor { takes: (mime: string) => boolean; cap: (mime: string) => number; typeWords: string; sizeWords: (mime: string) => string }
+export const SITE_DOOR: UploadDoor = {
+  takes: (m) => MIME_ALLOW.has(m), cap: (m) => (isDocMime(m) ? MAX_DOC_BYTES : MAX_BYTES),
+  typeWords: 'Files must be an image (JPEG, PNG, WebP) or a PDF document.',
+  sizeWords: (m) => (isDocMime(m) ? 'Documents must be under 25MB.' : 'Images must be under 10MB.'),
+};
+export const STUDIO_DOOR: UploadDoor = {
+  takes: isStudioFileMime, cap: studioCap,
+  typeWords: `That kind of file can’t be sent here. ${STUDIO_TYPE_WORDS}`,
+  sizeWords: (m) => `That file is too big. ${studioSizeWords(m)}`,
+};
 
 /** Item 144: a site's live files and the bytes they take, counted and summed by the
  *  database (0165, presence_media_usage) instead of fetched row by row. The old read
@@ -44,11 +63,11 @@ export async function mediaUsage(siteId: string): Promise<{ files: number; bytes
 /** Issue a signed upload URL + create the media row in one call (G1 §8).
  *  Format-aware: images require alt text; documents require a name (stored in the
  *  same alt_text column, which satisfies the a11y CHECK and doubles as the title). */
-export async function createUpload(siteId: string, req: { mime: string; bytes: number; alt_text: string; width?: number; height?: number; content_hash?: string }) {
-  const isDoc = isDocMime(req.mime);
-  if (!MIME_ALLOW.has(req.mime)) return { error: 'unsupported_type', message: 'Files must be an image (JPEG, PNG, WebP) or a PDF document.' };
-  const cap = isDoc ? MAX_DOC_BYTES : MAX_BYTES;
-  if (!req.bytes || req.bytes > cap) return { error: 'too_large', message: isDoc ? 'Documents must be under 25MB.' : 'Images must be under 10MB.' };
+export async function createUpload(siteId: string, req: { mime: string; bytes: number; alt_text: string; width?: number; height?: number; content_hash?: string }, door: UploadDoor = SITE_DOOR) {
+  const isDoc = !isImageMime(req.mime);   // anything but a website photo is named, not described
+  if (!door.takes(req.mime)) return { error: 'unsupported_type', message: door.typeWords };
+  const cap = door.cap(req.mime);
+  if (!req.bytes || req.bytes > cap) return { error: 'too_large', message: door.sizeWords(req.mime) };
   if (!req.alt_text || req.alt_text.trim().length < 3) {
     return isDoc
       ? { error: 'name_required', message: 'Please give this document a name.' }
@@ -357,7 +376,11 @@ export async function signDownload(storagePath: string, filename?: string): Prom
   // the friendly filename. One signer, so the two can never drift apart.
   const url = await signOriginal(storagePath, 600);
   if (!url) return null;
-  return filename ? url + (url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(filename) : url;
+  // builder item 337: a studio-only kind (a Word file, an SVG, a zip…) always goes out as an
+  // attachment under its own name and extension (storage answers `download=` with
+  // Content-Disposition: attachment), so an SVG never opens as a page anywhere.
+  const name = attachmentName(filename, storagePath);
+  return name ? url + (url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(name) : url;
 }
 
 /** DAM-1 (Files): server-side COPY of a storage object (for "Duplicate"). Returns

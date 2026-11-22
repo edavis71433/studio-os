@@ -9,7 +9,9 @@ import { newestPerRequest, supportActivityAt, clientSupportNews, lastLine } from
 import { customerNames, loadCustomerNames } from '../lib/customer_names.ts';
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { signDownload, createUpload, BUCKET, MIME_ALLOW, MAX_BYTES, MAX_DOC_BYTES, isDocMime } from '../lib/media.ts';
+import { signDownload, createUpload, STUDIO_DOOR } from '../lib/media.ts';
+import { verifyStoredUpload, discardRejectedUpload } from '../lib/upload_check.ts';
+import { downloadName } from '../lib/client_files.ts';
 import { linksForCustomer, linkForCustomerProject, linkForCustomerVia, emailCustomerByClient, notifyStudioOfClientAction, healSupportOwners } from '../lib/service_bridge.ts';
 import { csatRatingsForProject } from '../lib/csat.ts';
 import { clientMayTick } from '../lib/project_checklist.ts';
@@ -204,7 +206,9 @@ export async function handleClientUploadUrl(req: Request, site: SiteRow, princip
   const link = await linkForCustomerProject(me, projectId);
   if (!link) return json({ error: 'not_found', message: 'That project isn’t here.' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
-  const res = await createUpload(link.agency_site_id, { mime: String(b?.mime || ''), bytes: Number(b?.bytes || 0), alt_text: clean(b?.title, 200) || 'Client upload' });
+  // builder item 337: the studio door — Word, text, SVG, Illustrator/EPS, HEIC, zips and short
+  // videos besides photos and PDFs; the bytes are checked before the file is recorded (below)
+  const res = await createUpload(link.agency_site_id, { mime: String(b?.mime || ''), bytes: Number(b?.bytes || 0), alt_text: clean(b?.title, 200) || 'Client upload' }, STUDIO_DOOR);
   if ('error' in (res as any)) return json(res, 422, cors);
   // Provenance: stamp the MEDIA row itself as a client upload — the deliverable's
   // note (handleClientUploadCreate below) never reaches the media row, and the
@@ -233,59 +237,10 @@ export async function handleClientUploadUrl(req: Request, site: SiteRow, princip
 }
 // ── Post-verification of a client upload (the declared-bytes bypass) ─────────
 // createUpload (the upload-url step) validates only what the client DECLARED
-// (mime/bytes); the bytes then travel browser→storage directly, so nothing yet
-// proves the stored object matches the declaration — a hostile client can
-// declare a 1KB PDF and PUT something else entirely. Before recording the
-// deliverable, HEAD the object through the storage API (service role) and
-// enforce the same mime allow-list + the cap the declaration was validated
-// against, this time on the object's ACTUAL metadata. A mismatch is a clean
-// 422 plus best-effort cleanup (object + media row — nothing orphaned, nothing
-// recorded). Anything short of positive metadata (network failure, non-2xx,
-// missing headers — storage API quirks / older builds) FAILS OPEN: this check
-// must never break honest uploads. Zero schema change.
-const storageEnv = () => ({
-  url: (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, ''),
-  key: Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
-});
-async function verifyStoredUpload(storagePath: string, declaredMime: string): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { url, key } = storageEnv();
-  if (!url || !key || !storagePath) return { ok: true };   // nothing to check against — fail open
-  const objectPath = storagePath.replace(`${BUCKET}/`, '');
-  let res: Response;
-  try {
-    res = await fetch(`${url}/storage/v1/object/authenticated/${BUCKET}/${objectPath}`, {
-      method: 'HEAD', headers: { Authorization: `Bearer ${key}`, apikey: key },
-    });
-  } catch { return { ok: true }; }                          // storage unreachable — fail open
-  if (!res.ok) return { ok: true };                         // no metadata (404 / older storage builds / HEAD quirks) — fail open
-  try { await res.body?.cancel(); } catch { /* HEAD carries no body */ }
-  // actual content-type: must stay inside the ONE store's allow-list. An absent
-  // or generic octet-stream type carries no information — skipped (fail open).
-  const ctype = String(res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
-  if (ctype && ctype !== 'application/octet-stream' && !MIME_ALLOW.has(ctype)) {
-    return { ok: false, message: 'Files must be an image (JPEG, PNG, WebP) or a PDF document.' };
-  }
-  // actual size vs the ENFORCED cap (the one the declared mime was validated
-  // against — declaring a PDF earns the 25MB cap, images 10MB). Content-Length
-  // is storage's own count of what landed, not the client's claim.
-  const size = Number(res.headers.get('content-length'));
-  if (Number.isFinite(size) && size > 0) {
-    const cap = isDocMime(declaredMime) ? MAX_DOC_BYTES : MAX_BYTES;
-    if (size > cap) return { ok: false, message: 'That file is bigger than we can accept — images up to 10MB, PDFs up to 25MB.' };
-  }
-  return { ok: true };
-}
-async function discardRejectedUpload(siteId: string, mediaId: string, storagePath: string): Promise<void> {
-  // best-effort, object first (frees the real bytes), then the row
-  try {
-    const { url, key } = storageEnv();
-    if (url && key && storagePath) {
-      const objectPath = storagePath.replace(`${BUCKET}/`, '');
-      await fetch(`${url}/storage/v1/object/${BUCKET}/${objectPath}`, { method: 'DELETE', headers: { Authorization: `Bearer ${key}`, apikey: key } });
-    }
-  } catch { /* best-effort */ }
-  await svc(`presence_media?id=eq.${mediaId}&site_id=eq.${siteId}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ deleted_at: nowIso() }) }).catch(() => {});
-}
+// (mime/bytes); the bytes then travel browser→storage directly. Before recording
+// the deliverable, lib/upload_check.ts reads the stored object back and decides
+// its kind from the bytes (builder item 337); a mismatch is a clean 422 plus a
+// best-effort clean-up, and anything short of a positive read fails open.
 export async function handleClientUploadCreate(req: Request, site: SiteRow, principal: Principal, projectId: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(projectId)) return json({ error: 'bad_request' }, 400, cors);
   const me = customerOf(site);
@@ -470,7 +425,9 @@ export async function handleClientDeliverableDownload(_req: Request, site: SiteR
   if (!d) return json({ error: 'not_found' }, 404, cors);
   const media = rows(await svc(`presence_media?id=eq.${d.media_id}&site_id=eq.${found.link.agency_site_id}&deleted_at=is.null&select=storage_path,mime&limit=1`))[0];
   if (!media?.storage_path) return json({ error: 'not_found' }, 404, cors);
-  const url = await signDownload(media.storage_path, (clean(d.title, 80) || 'download') + (media.mime === 'application/pdf' ? '.pdf' : ''));
+  // builder item 337: under its title and the kind's own extension; a studio-only kind
+  // always goes out as an attachment (signDownload)
+  const url = await signDownload(media.storage_path, downloadName(clean(d.title, 80), media.mime));
   return url ? json({ data: { url, title: d.title } }, 200, cors) : json({ error: 'unavailable' }, 502, cors);
 }
 

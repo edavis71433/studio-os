@@ -405,7 +405,7 @@ ok('portal: a failed projects read renders the couldn\'t-load line instead of th
 ok('portal: the projects try-again phrasing lives ONLY in the Needs-you queue (no duplicate line)',
   portal.split('We couldn’t load your projects just now — please try again in a moment.').length===2);
 ok('portal: the rolebadge derives from persona, never projects.length',
-  portal.includes("P.persona==='client'?'Your workspace':'Client view'")
+  portal.includes("P.persona==='client'?'Your client portal':'Client view'")
   && !portal.includes("projects.length?'Your workspace':'Client view'"));
 // PS1: the Needs-you queue's per-source failure lines — any failed source keeps
 // its own calm line, and ONLY all-sources-ok-and-empty earns "all caught up".

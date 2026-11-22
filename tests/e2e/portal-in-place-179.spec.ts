@@ -206,7 +206,7 @@ test.describe('Client portal part two — every to-do opens the thing itself (it
     await expect(page.getByRole('heading', { name: 'What helps most' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Sent so far · 0' })).toBeVisible();
     // a file the store can't take is refused before anything is sent
-    await page.locator('#dfiles').setInputFiles([{ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('x') }]);
+    await page.locator('#dfiles').setInputFiles([{ name: 'setup.exe', mimeType: 'application/x-msdownload', buffer: Buffer.from('x') }]);   // item 337: text files are welcome now; a program is not
     await expect(page.locator('#toast')).toContainText('That kind of file can’t be sent here');
     expect(urls).toBe(0);
     await page.locator('#dfiles').setInputFiles([

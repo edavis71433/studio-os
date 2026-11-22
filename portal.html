@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Studio OS — Client sign in</title>
+<title>Client sign in</title>
 <meta name="description" content="Sign in to see your project, approve work, and message your studio.">
 <meta name="theme-color" content="#5b3fa0">
 <link rel="manifest" href="/manifest.json">
@@ -23,7 +23,8 @@
   .side{color:#fff;padding:max(52px,calc(env(safe-area-inset-top) + 28px)) 24px 26px;display:flex;flex-direction:column;gap:12px}
   .sheet{flex:1;background:var(--cream);border-radius:28px 28px 0 0;padding:30px 24px 36px;display:flex;justify-content:center}
   .card{width:100%;max-width:400px}
-  .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px;min-height:40px;opacity:0;transition:opacity .35s ease}   /* item 341: starts blank, the studio fades in */
+  .brand.in{opacity:1}
   .mark{display:inline-flex;width:34px;height:34px;border-radius:9px;background:#5b3fa0;color:#fff;font-weight:700;
     align-items:center;justify-content:center;font-size:17px;flex:0 0 auto}
   .word{font-family:var(--serif);font-size:21px;font-weight:500;letter-spacing:-.2px;color:#fff}
@@ -100,7 +101,7 @@
 <body>
 <div class="door">
   <aside class="side" aria-label="Your client portal">
-    <div class="brand" id="brand"><span class="mark" aria-hidden="true">S</span><span class="word">Studio OS</span></div>
+    <div class="brand" id="brand" aria-live="polite"></div>
     <div class="eyebrow">Your client portal</div>
     <p class="lede">Your website, your project, one place.</p>
     <div class="glimpse" aria-hidden="true"><div class="gpic">
@@ -128,7 +129,6 @@
     <p class="muted" id="pwWay"><button class="linky" id="toPw" type="button">Use a password instead</button></p>
     <div class="rule" aria-hidden="true"></div>
     <p class="muted">First time here? Use the link in your invitation email to set things up.</p>
-    <p class="muted">Run a studio on Studio OS? <a href="/studio.html">Your sign-in is here</a>.</p>
   </div>
 
   <!-- CODE ENTRY (after a code is sent) -->
@@ -175,6 +175,7 @@
     <button id="stepGo" type="button">Confirm</button>
     <p class="muted stepl"><button class="linky" id="stepHelp" type="button" aria-expanded="false" aria-controls="stepLost">Can’t get a code?</button></p>
     <p class="steplost" id="stepLost" hidden></p>
+    <div id="stepBackup" hidden></div>
     <p class="muted stepl"><button class="linky" id="stepOut" type="button">Sign in as someone else</button></p>
   </div>
 
@@ -207,6 +208,7 @@
 </div>
 
 <script src="/fresh-code.js?v=191"></script>
+<script src="/backup-codes.js?v=347"></script>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // ── The CLIENT door. One job: sign in and land in the right place. ──────────
@@ -258,9 +260,13 @@ function applySignIn(si){
 // (/public/studio/<id>/brand) that gives away only what the studio's website shows.
 // Nothing here changes who can sign in; it only changes whose name is at the top.
 function mixHex(a, b, t){ var pa=parseInt(a.slice(1),16), pb=parseInt(b.slice(1),16); var ch=function(sh){ return Math.round(((pa>>sh)&255)*t+((pb>>sh)&255)*(1-t)); }; return '#'+((1<<24)+(ch(16)<<16)+(ch(8)<<8)+ch(0)).toString(16).slice(1); }
+// item 341: no studio known (a bare /portal, nothing remembered, nothing answered): the page
+// says "Client sign in", never the product's name
+function paintNoStudio(){ var box = $('brand'); if (!box || box.childNodes.length) return; var word = document.createElement('span'); word.className = 'word'; word.textContent = 'Client sign in'; box.appendChild(word); box.classList.add('in'); }
 function paintStudioBrand(b){
   if (!b || !b.name) return;
   var box = $('brand'); if (!box) return;
+  box.classList.add('in');
   var safe = String(b.name).slice(0, 80);
   box.textContent = '';
   if (typeof b.logo_url === 'string' && /^https:\/\//.test(b.logo_url)) {
@@ -274,19 +280,24 @@ function paintStudioBrand(b){
   if (b.accent && /^#[0-9a-f]{6}$/i.test(b.accent)) { try { document.documentElement.style.setProperty('--band', mixHex(b.accent, '#160f22', 0.3)); } catch(e){} }   // item 188: the band in a dark tint of the studio's colour
   try { document.title = safe + ' — Client sign in'; } catch(e){}
 }
+var STUDIO_ID = '';   // item 350: the studio's site id once known (from the link, or looked up from its short name)
 (function studioBrandBoot(){
-  var id = '';
+  var id = '', slug = '';
   try { id = String(new URLSearchParams(location.search).get('studio') || ''); } catch(e){}
-  if (!/^[0-9a-f-]{36}$/.test(id)) id = '';
+  // item 350: a short name in the address (app.example/portal/<name>) instead of the long id
+  if (!/^[0-9a-f-]{36}$/.test(id)) { slug = /^[a-z0-9-]{3,40}$/i.test(id) ? id.toLowerCase() : ''; id = ''; }
+  STUDIO_ID = id;
   var remembered = null;
   try { remembered = JSON.parse(localStorage.getItem('dds-studio-brand') || 'null'); } catch(e){}
   if (remembered && remembered.signin) applySignIn(remembered.signin);   // item 230
   if (!id && remembered) { paintStudioBrand(remembered); return; }
-  if (!id) return;
-  withTimeout(fetch(FN + '/presence/public/studio/' + id + '/brand', { headers: { apikey: SUPABASE_KEY, 'x-region': FN_REGION } }), 6000)
+  // item 341: a bare /portal belongs to the studio that owns this address; the server says which
+  var path = id ? '/presence/public/studio/' + id + '/brand' : slug ? '/presence/public/studio/by-slug/' + encodeURIComponent(slug) + '/brand' : '/presence/public/studio/default/brand';
+  var fallback = setTimeout(paintNoStudio, 2500);
+  withTimeout(fetch(FN + path, { headers: { apikey: SUPABASE_KEY, 'x-region': FN_REGION } }), 6000)
     .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(j){ var b = j && j.data; if (b && b.signin) applySignIn(b.signin); if (b && b.name && !b.is_default) { paintStudioBrand(b); try { localStorage.setItem('dds-studio-brand', JSON.stringify({ name: b.name, logo_url: b.logo_url || null, accent: b.accent || '', signin: b.signin || null })); } catch(e){} } })
-    .catch(function(){});
+    .then(function(j){ clearTimeout(fallback); var b = j && j.data; if (b && b.site_id && /^[0-9a-f-]{36}$/.test(b.site_id)) STUDIO_ID = b.site_id; if (b && b.signin) applySignIn(b.signin); if (b && b.name && !b.is_default) { paintStudioBrand(b); try { localStorage.setItem('dds-studio-brand', JSON.stringify({ name: b.name, logo_url: b.logo_url || null, accent: b.accent || '', signin: b.signin || null })); } catch(e){} } else paintNoStudio(); })
+    .catch(function(){ clearTimeout(fallback); paintNoStudio(); });
 })();
 if (typeof supabase !== "undefined") {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'dds-client-auth', persistSession: true, autoRefreshToken: true } });
@@ -490,7 +501,7 @@ $('forgot').addEventListener('click', async function(){
 $('gGo').addEventListener('click', async function(){
   if (!sb || this.disabled) return;
   clearErr('errEmail'); this.disabled = true;
-  var studio = ''; try { studio = String(new URLSearchParams(location.search).get('studio') || ''); } catch (e) {}
+  var studio = STUDIO_ID; try { studio = studio || String(new URLSearchParams(location.search).get('studio') || ''); } catch (e) {}
   var back = location.origin + '/portal.html' + (/^[0-9a-f-]{36}$/.test(studio) ? '?studio=' + studio : '');
   try {
     var r = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: back } });
@@ -536,7 +547,9 @@ function askStep(factor){
   STEP.box.clear(); STEP.box.fault('');
   // the studio can't turn it off itself: it checks it's them and asks us
   var who = studioWord();
-  $('stepLost').textContent = 'Ask ' + who + '. They check it’s you, then have the second step turned off so you can sign in and set it up again.';
+  // item 347: a backup code gets them in without asking anyone; the studio is still the fallback
+  $('stepLost').textContent = 'Lost your phone? Use one of your backup codes below. No codes? Ask ' + who + ': they check it’s you, then turn the second step off so you can sign in and set it up again.';
+  var bk = $('stepBackup'); bk.hidden = true; bk.textContent = '';
   show('stepPanel');
   STEP.box.focus();
 }
@@ -560,7 +573,14 @@ async function signedOutHere(){
   freshButtons(); show('emailPanel');
 }
 $('stepGo').addEventListener('click', stepConfirm);
-$('stepHelp').addEventListener('click', function(){ var l = $('stepLost'), open = l.hidden; l.hidden = !open; this.setAttribute('aria-expanded', open ? 'true' : 'false'); });
+$('stepHelp').addEventListener('click', function(){ var l = $('stepLost'), open = l.hidden; l.hidden = !open; this.setAttribute('aria-expanded', open ? 'true' : 'false');
+  var bk = $('stepBackup'); if (!bk || !window.ddsBackup) return; bk.hidden = !open;
+  if (open && !bk.childNodes.length) window.ddsBackup.useForm(bk, { fn: FN, key: SUPABASE_KEY, email: pendingEmail || '', studio: studioWord(), onDone: function () {
+    // two-step sign-in is off for them now: a sign-in starts over with the first step
+    try { sb.auth.signOut(); } catch (e) {}
+    show('emailPanel'); errIn('errEmail', 'Two-step sign-in is off for your account. Sign in again, then turn it back on from Help when you have your new phone.');
+  } });
+});
 $('stepOut').addEventListener('click', function(){ signedOutHere().then(function(){ $('em').focus(); }); });
 
 // Already signed in — or arriving from a magic LINK? This page is a door, not a
