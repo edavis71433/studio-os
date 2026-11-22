@@ -32,9 +32,13 @@ const TOKEN_RULES: Record<string, RegExp> = {
   font_scale: /^(0?\.\d+|1(\.\d+)?)$/,
   header_scroll: /^(scroll|stay|hide|fade)$/,   // builder items 50 and 123: what the header does on scroll (lib/site_header.ts)
   phone_bar: /^(off|light|dark)$/,              // builder item 122: the phone-only Call, Directions, Hours and Email bar (lib/phone_bar.ts)
-  motion: /^gentle$/,                           // builder item 158: sections fade up as they scroll into view (lib/site_motion.ts)
+  motion: /^(gentle|slide|scale|zoom)$/,        // builder items 158 and 302: how sections come in as they scroll into view (lib/site_motion.ts)
+  html_pages: /^(all|home|inner)$/,              // builder item 311: which pages carry the developer's HTML block (lib/render.ts)
   buttons: /^(filled|outline|pill|square|underline)$/,   // builder item 217: every button as one matched set (lib/site_buttons.ts)
   forms: /^(line|soft|round)$/,                 // builder item 217: every box people type into (lib/site_buttons.ts)
+  header_brand: /^(both|logo|name)$/,          // builder item 296: the header shows the logo and the name, the logo alone, or the name alone (lib/template_kit.ts)
+  logo_height: /^(2[4-9]|[3-7]\d|80)$/,         // builder item 296: the logo's height in px, 24 to 80
+  site_search: /^(on|off)$/,                    // builder item 295: the header's search box can be left out
 };
 export const ALLOWED_TOKENS = Object.keys(TOKEN_RULES);
 
