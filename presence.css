@@ -972,7 +972,7 @@ html.dc-edit:not(.plan-watch) #settingsPanel #designHost .field>label{font-size:
 .st-look-h{max-width:100%;font-family:var(--lk-display);font-weight:var(--lk-hw);font-size:var(--lk-hs);line-height:1.1;text-transform:var(--lk-hcase);color:var(--lk-ink);overflow-wrap:anywhere}
 .st-look-t{font:400 12px/1.35 var(--lk-body);color:var(--lk-soft)}
 .st-look-b{display:inline-block;margin-top:3px;padding:6px 11px;border-radius:var(--lk-br);background:var(--lk-fill);color:var(--lk-on);font:700 12px/1.1 var(--lk-body);text-transform:var(--lk-bcase);letter-spacing:var(--lk-bls);box-shadow:var(--lk-bsh);white-space:nowrap}
-.st-look-on{position:absolute;top:8px;right:8px;padding:2px 8px;border-radius:999px;background:var(--plum);color:#fff;font:600 12px/1.4 var(--sans)}
+.st-look-on{position:absolute;top:8px;right:8px;padding:2px 8px;border-radius:999px;background:var(--plum);color:var(--fill-ink);font:600 12px/1.4 var(--sans)}
 .st-look-on[hidden]{display:none}
 .st-fontrow{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--hair);background:var(--dc-raised,var(--paper));font:inherit;color:var(--ink);cursor:pointer;text-align:left;margin-top:8px}
 .st-fontrow:hover{border-color:var(--hair-2)}
