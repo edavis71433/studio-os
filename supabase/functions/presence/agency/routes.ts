@@ -5,7 +5,9 @@
 // single-site route lacks; nothing bypasses client ownership (drafts and
 // plans still wait on the client; publishing runs the one frozen pipeline).
 import { json } from '../../_shared/http.ts';
-import { svc } from '../lib/db.ts';
+import { svc, svcPages } from '../lib/db.ts';
+/** Builder item 411: every row, paged, in the shape of one svc() answer ([] when a page failed). */
+const allRows = async (path: string, order: string): Promise<{ ok: boolean; json: unknown[] }> => { const r = await svcPages(path, order).catch(() => null); return r ? { ok: true, json: r.rows } : { ok: false, json: [] }; };
 import { draftChangesOnly } from '../lib/provenance.ts';
 import { noticeTier } from '../lib/inbox_feed.ts';
 import { can, agencySiteIds, STUDIO_ROLE_WORDS } from './auth.ts';
@@ -94,9 +96,10 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
     svc(`presence_ai_reviews?${IN}&status=eq.open&select=site_id,status,open_count&limit=1000`),
     svc(`presence_brand_reports?${IN}&status=eq.open&select=site_id,status,open_count&limit=1000`),
     svc(`presence_evidence_runs?${IN}&finished_at=not.is.null&error_text=is.null&select=id,site_id,started_at&order=started_at.desc&limit=500`),
-    svc(`presence_form_submissions?${IN}&status=eq.new&spam=is.false&select=id,site_id,name,email,form_kind,created_at&limit=2000`),   // Section 3: leads waiting (+ who/when for Needs you)
-    svc(`presence_plan_notices?${IN}&status=eq.active&select=id,site_id,kind,period,headline,body,created_at&limit=2000`),   // Section 3: attention + billing; item 47: the words too, for the bell's news per site
-    svc(`presence_media?${IN}&asset_status=eq.pending&deleted_at=is.null&select=site_id,metadata&limit=2000`), // DAM-2: files awaiting approval
+    // builder item 411: every waiting lead, notice and pending file, a page at a time (limit=2000 quietly got 1,000)
+    allRows(`presence_form_submissions?${IN}&status=eq.new&spam=is.false&select=id,site_id,name,email,form_kind,created_at`, 'created_at'),   // Section 3: leads waiting (+ who/when for Needs you)
+    allRows(`presence_plan_notices?${IN}&status=eq.active&select=id,site_id,kind,period,headline,body,created_at`, 'created_at'),   // Section 3: attention + billing; item 47: the words too, for the bell's news per site
+    allRows(`presence_media?${IN}&asset_status=eq.pending&deleted_at=is.null&select=site_id,metadata`, 'id'), // DAM-2: files awaiting approval
     svc(`presence_service_links?customer_site_id=in.(${ids.join(',')})&status=eq.active&select=agency_site_id,customer_site_id,customer_client_id&limit=1000`).catch(() => ({ ok: false, json: [] as unknown[] })),   // item 49: whose customer each site is
   ]);
   const filesPending: Record<string, number> = {};
@@ -132,7 +135,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
   const sites = (sitesQ.json ?? []) as Array<PortfolioInput['sites'][0] & { client_id: string }>;
   const clientIds = [...new Set(sites.map((s) => s.client_id))];
   const [evQ, namesQ, entQ] = await Promise.all([
-    runIds.length ? svc(`presence_evidence?run_id=in.(${runIds.join(',')})&severity=in.(critical,warning)&select=run_id,type,severity,human&limit=2000`) : Promise.resolve({ json: [] as unknown[] }),
+    runIds.length ? allRows(`presence_evidence?run_id=in.(${runIds.join(',')})&severity=in.(critical,warning)&select=run_id,type,severity,human`, 'id') : Promise.resolve({ json: [] as unknown[] }),
     clientIds.length ? svc(`clients?id=in.(${clientIds.join(',')})&select=id,name&limit=1000`) : Promise.resolve({ json: [] as unknown[] }),
     // Section 3: authoritative billing status per client → mapped to each of their sites (one query, fixed cost).
     clientIds.length ? svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,status&limit=1000`) : Promise.resolve({ json: [] as unknown[] }),
