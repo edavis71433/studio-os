@@ -1783,7 +1783,7 @@ test.describe('Client portal — Documents shelf: files and documents (slice 12,
     expect(calls).toBe(0);
     // a file it can take opens the send form, which names the caps
     await page.locator('#ffile').setInputFiles(SHARE_FILE);
-    await expect(page.locator('#fsend .fshare-d')).toContainText('10MB');
+    await expect(page.locator('#fsend .fshare-d')).toContainText('25MB');   // item 337
     await expect(page.locator('#fsend .fshare-d')).toContainText('25MB');
   });
 

@@ -74,11 +74,11 @@ if (before) {
   ok('fewer calls than before', after.calls < before.calls, `${before.calls} → ${after.calls}`);
   ok('the chores run in the same order as before', JSON.stringify(afterOrder) === JSON.stringify(beforeOrder), afterOrder.join(','));
 }
-ok('39 chores, as listed', afterOrder.length === 39, String(afterOrder.length));
+ok('40 chores, as listed (39 and the client reminders of item 336)', afterOrder.length === 40, String(afterOrder.length));
 ok('the progress note is written a bounded number of times (at most 6 of the 41)', after.noteWrites <= 6 && after.noteWrites >= 1, String(after.noteWrites));
 {
   const row = db.tables.presence_scheduled_runs.find((x) => x.run_type === 'tick');
-  ok('…and the finished note carries every chore', row && row.status === 'done' && Object.keys(row.result?.progress || {}).length === 39 && row.finished_at, row ? Object.keys(row.result?.progress || {}).length : 'no row');
+  ok('…and the finished note carries every chore', row && row.status === 'done' && Object.keys(row.result?.progress || {}).length === 40 && row.finished_at, row ? Object.keys(row.result?.progress || {}).length : 'no row');
 }
 console.log(`\nCALLS per idle tick, 9 sites: before ${before ? before.calls : '?'} (${before ? before.reads : '?'} reads), after ${after.calls} (${after.reads} reads); progress notes ${before ? before.noteWrites : '?'} → ${after.noteWrites}`);
 
