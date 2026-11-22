@@ -125,9 +125,9 @@ const world = () => ({
     { id: rid('4', 3), site_id: SITE_S, deal_id: D1, title: 'Collect the logo files', due_date: null, status: 'done', completed_at: '2026-07-03T12:00:00Z', deleted_at: null, created_at: '2026-07-01T00:00:00Z' },
   ],
   presence_invoices: [
-    { id: rid('e', 1), site_id: SITE_S, deal_id: D1, customer_client_id: CUST, title: 'Balance', amount_cents: 160000, status: 'open', due_date: day(-2), purpose: 'service', deleted_at: null },
+    { id: rid('e', 1), site_id: SITE_S, deal_id: D1, customer_client_id: CUST, title: 'Balance', amount_cents: 160000, status: 'open', stripe_url: 'https://pay.example/x',  due_date: day(-2), purpose: 'service', deleted_at: null },
     { id: rid('e', 2), site_id: SITE_S, deal_id: D1, customer_client_id: CUST, title: 'Deposit', amount_cents: 160000, status: 'paid', due_date: null, purpose: 'deposit', deleted_at: null },
-    { id: rid('e', 3), site_id: SITE_S, deal_id: D1, customer_client_id: CUST, title: 'Photos', amount_cents: 40000, status: 'open', due_date: day(5), processing_since: '2026-07-04T00:00:00Z', purpose: 'service', deleted_at: null },
+    { id: rid('e', 3), site_id: SITE_S, deal_id: D1, customer_client_id: CUST, title: 'Photos', amount_cents: 40000, status: 'open', stripe_url: 'https://pay.example/x',  due_date: day(5), processing_since: '2026-07-04T00:00:00Z', purpose: 'service', deleted_at: null },
   ],
   // the customer's own website news (shown only inside their record), and the studio's own (never)
   presence_publishes: [

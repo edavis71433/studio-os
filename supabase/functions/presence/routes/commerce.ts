@@ -297,8 +297,23 @@ async function releaseReceipt(invoiceId: string, at: string): Promise<void> {
  *  reaches it through POST /commerce/invoice-paid; the daily check calls it directly for a
  *  payment whose message never came, and for a receipt that never went out. An id only:
  *  the invoice is re-read here, so no caller can assert an amount or a payee. */
+/** Sales item 147: the email the payer gave Stripe at checkout, as the webhook recorded it
+ *  (stripe_payments.email): by the payment that paid the invoice (paid_ref, APPLY-0188), else the
+ *  newest paid record for the invoice. '' when there is none. */
+export async function payerEmailFromStripe(invoiceId: string, paidRef: string): Promise<string> {
+  const ok = (v: unknown) => { const s = String(v || '').trim().toLowerCase(); return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : ''; };
+  if (paidRef && /^[A-Za-z0-9_]+$/.test(paidRef)) {
+    const r = await svc(`stripe_payments?stripe_payment_intent=eq.${encodeURIComponent(paidRef)}&select=email&order=created_at.desc&limit=1`).catch(() => ({ ok: false, json: [] }));
+    const hit = r.ok && Array.isArray(r.json) ? ok(r.json[0]?.email) : '';
+    if (hit) return hit;
+  }
+  const r = await svc(`stripe_payments?invoice_id=eq.${encodeURIComponent(invoiceId)}&select=email&order=created_at.desc&limit=1`).catch(() => ({ ok: false, json: [] }));
+  return r.ok && Array.isArray(r.json) ? ok(r.json[0]?.email) : '';
+}
+
 export async function invoicePaidEcho(invoiceId: string): Promise<Record<string, unknown>> {
-  const inv = (await svc(`presence_invoices?id=eq.${invoiceId}&status=eq.paid&select=id,site_id,deal_id,title,amount_cents,purpose&limit=1`)).json?.[0];
+  // paid_ref (APPLY-0188) names the Stripe payment, which is where the payer's email is (sales item 147)
+  const inv = (await svc(`presence_invoices?id=eq.${invoiceId}&status=eq.paid&select=id,site_id,deal_id,title,amount_cents,purpose,paid_ref&limit=1`).then((r) => r.ok ? r : svc(`presence_invoices?id=eq.${invoiceId}&status=eq.paid&select=id,site_id,deal_id,title,amount_cents,purpose&limit=1`))).json?.[0];
   if (!inv) return { ignored: true, reason: 'not_paid_or_unknown' };
   const clientId = (await svc(`presence_sites?id=eq.${encodeURIComponent(String(inv.site_id))}&select=client_id&limit=1`)).json?.[0]?.client_id;
   if (!clientId) return { ignored: true, reason: 'no_owner_client' };
@@ -317,6 +332,8 @@ export async function invoicePaidEcho(invoiceId: string): Promise<Record<string,
   let who = '';
   let payerEmail = '';
   let unconverted = false;   // true only when a deal exists and is NOT yet a customer
+  let contactId = '';
+  let contactHadEmail = true;
   try {
     if (inv.deal_id) {
       const deal = (await svc(`presence_deals?id=eq.${inv.deal_id}&site_id=eq.${inv.site_id}&select=title,contact_id,converted_client_id&limit=1`)).json?.[0];
@@ -325,10 +342,29 @@ export async function invoicePaidEcho(invoiceId: string): Promise<Record<string,
         const contact = (await svc(`presence_contacts?id=eq.${deal.contact_id}&site_id=eq.${inv.site_id}&select=name,email&limit=1`)).json?.[0];
         who = String(contact?.name || '').slice(0, 80);
         payerEmail = String(contact?.email || '').trim();
+        contactId = String(deal.contact_id);
+        contactHadEmail = !!payerEmail;
       }
       if (!who) who = String(deal?.title || '').slice(0, 80);
     }
   } catch { /* the money landed either way */ }
+  // Sales item 147 (Nov 22 2026 review): no email on the deal's contact (the studio copied the
+  // pay link and texted it) meant no receipt, though the thank-you page promised one. Stripe
+  // collected the payer's email at checkout and the webhook kept it (stripe_payments.email); it
+  // is used for the receipt, and saved on a contact that has none, so the next email reaches
+  // them too. The studio's line says so (savedEmail below).
+  let stripeEmail = '';
+  let savedEmail = false;
+  if (!payerEmail) {
+    stripeEmail = await payerEmailFromStripe(String(inv.id), String(inv.paid_ref || '')).catch(() => '');
+    if (stripeEmail) {
+      payerEmail = stripeEmail;
+      if (contactId && !contactHadEmail) {
+        const saved = await svc(`presence_contacts?id=eq.${contactId}&site_id=eq.${inv.site_id}&or=(email.is.null,email.eq.)&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ email: stripeEmail }) }).catch(() => ({ ok: false, json: [] }));
+        savedEmail = !!(saved.ok && Array.isArray(saved.json) && saved.json[0]);
+      }
+    }
+  }
 
   const headline = `${isDeposit ? 'Deposit' : 'Paid'} — ${what} (${amount})${who ? ` from ${who}` : ''}`;
   // raiseNoticeDetailed, not a raw insert: same unique (client_id, kind, period)
@@ -346,7 +382,8 @@ export async function invoicePaidEcho(invoiceId: string): Promise<Record<string,
     headline,
     // Item 115: a paid invoice is the best moment to ASK for a review — an offer in
     // words, never an automatic send (a deposit isn't: the work hasn't happened yet).
-    body: isDeposit ? 'The deposit landed. You can start the work.' : 'The payment landed — nothing else to do. A good moment to ask them for a review, from your Reviews tab.',
+    body: (isDeposit ? 'The deposit landed. You can start the work.' : 'The payment landed — nothing else to do. A good moment to ask them for a review, from your Reviews tab.')
+      + (stripeEmail ? ` There was no email on the deal’s contact, so the receipt went to ${stripeEmail}, the address they gave Stripe${savedEmail ? ', and it is now on their contact' : ''}.` : ''),
   });
   const fresh = outcome === 'created';
 

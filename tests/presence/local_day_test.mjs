@@ -55,8 +55,8 @@ const dayBefore = new Date(Date.parse(utcToday + 'T00:00:00Z') - 86400_000).toIS
 db.reset({
   presence_deals: [{ id: DEAL, site_id: SITE, title: 'Acme website', stage: 'proposal', expected_value_cents: 100000, deleted_at: null, updated_at: new Date().toISOString() }],
   presence_invoices: [
-    { id: 'i1', site_id: SITE, deal_id: DEAL, title: 'Deposit', amount_cents: 50000, status: 'open', due_date: dayBefore, deleted_at: null, created_at: new Date().toISOString() },
-    { id: 'i2', site_id: SITE, deal_id: DEAL, title: 'Balance', amount_cents: 70000, status: 'open', due_date: '2099-01-01', deleted_at: null, created_at: new Date().toISOString() },
+    { id: 'i1', site_id: SITE, deal_id: DEAL, title: 'Deposit', amount_cents: 50000, status: 'open', stripe_url: 'https://pay.example/x',  due_date: dayBefore, deleted_at: null, created_at: new Date().toISOString() },
+    { id: 'i2', site_id: SITE, deal_id: DEAL, title: 'Balance', amount_cents: 70000, status: 'open', stripe_url: 'https://pay.example/x',  due_date: '2099-01-01', deleted_at: null, created_at: new Date().toISOString() },
   ],
 });
 {

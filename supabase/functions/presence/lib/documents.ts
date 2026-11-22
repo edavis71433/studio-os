@@ -98,6 +98,29 @@ export interface DocContext {
   pdfName?: string | null;         // the file name it downloads as
   payments?: DocPayment[] | null;  // part payments recorded toward this invoice
   forWhat?: string | null;         // the deal it bills ("Website refresh")
+  returned?: Array<{ cents: number; at: string | null; kind: string }> | null;   // sales item 145: each refund or lost dispute on it, with its day
+}
+/** Sales item 145 (Nov 22 2026 review): what a paid invoice's page and PDF say when money went
+ *  back after it. The row stays `paid` and carries refunded_cents and dispute_status (APPLY-0233);
+ *  the page used to read "Paid in full. Thank you." after a full refund or a lost dispute, and
+ *  that page is what the client's Receipt button and receipt email open. The day comes from the
+ *  returns the context carries (the latest one); without it the words stand without a day. Pure. */
+export function invoiceReturnWords(v: any, ctx?: DocContext | null): { state: 'refunded' | 'part' | 'disputed' | 'lost' | null; pill: string; line: string; note: string } {
+  if (v?.status !== 'paid') return { state: null, pill: '', line: '', note: '' };
+  const currency = String(v?.currency || 'usd');
+  const tz = ctx?.tz || null;
+  const back = Math.max(0, Math.round(Number(v?.refunded_cents) || 0));
+  const dispute = String(v?.dispute_status || '');
+  const returns = (Array.isArray(ctx?.returned) ? ctx!.returned! : []).filter((r) => r && Number(r.cents) > 0);
+  const latest = returns.slice().sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')))[returns.length - 1] || null;
+  const day = latest?.at ? dayLabel(latest.at, tz) : '';
+  const on = day ? ` on ${day}` : '';
+  if (dispute === 'lost') return { state: 'lost', pill: 'Dispute lost', line: `The payment went back to you through a dispute${on}.`, note: `This payment was returned to you through a dispute${on}. This document is your record of the invoice and of that.` };
+  if (dispute === 'open') return { state: 'disputed', pill: 'Disputed', line: 'This payment is under dispute with your card company or bank.', note: 'This payment is under dispute with your card company or bank. Until that closes, this document is your record of the invoice.' };
+  const paidTotal = Math.round(Number(v?.amount_cents) || 0) + (Array.isArray(ctx?.payments) ? ctx!.payments! : []).reduce((n, p) => n + Math.max(0, Math.round(Number(p?.amount_cents) || 0)), 0);
+  if (back > 0 && back >= paidTotal) return { state: 'refunded', pill: 'Refunded', line: `Refunded in full${on}: ${money(back, currency)} went back to you.`, note: `This payment was refunded in full${on}. Keep this for your records.` };
+  if (back > 0) return { state: 'part', pill: `Paid · ${money(back, currency)} refunded`, line: `${money(back, currency)} of it was refunded${on}.`, note: `Thank you — this is your receipt of payment. ${money(back, currency)} of it was refunded${on}.` };
+  return { state: null, pill: '', line: '', note: '' };
 }
 /** "#0013" — the studio's running invoice number, or '' when there is none. Pure. */
 export function invoiceNo(n: unknown): string {
@@ -448,7 +471,8 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
   const docLabel = invoiceDocLabel(v);
   const heading = String(v?.title || (isDeposit ? 'Deposit' : 'Invoice'));
   const no = invoiceNo(v?.number);
-  const pill = paid ? '<span class="pill paid">✓ Paid in full</span>' : voided ? '<span class="pill void">Voided</span>' : v?.processing_since ? '<span class="pill due">Payment on its way</span>' : `<span class="pill due">${esc(v?.due_date ? 'Due ' + dayLabel(v.due_date, ctx?.tz || null) : 'Due on receipt')}</span>`;
+  const back = invoiceReturnWords(v, ctx);   // sales item 145: a refund or a dispute after the payment
+  const pill = paid ? (back.state ? `<span class="pill ${back.state === 'part' ? 'paid' : 'void'}">${esc(back.pill)}</span>` : '<span class="pill paid">✓ Paid in full</span>') : voided ? '<span class="pill void">Voided</span>' : v?.processing_since ? '<span class="pill due">Payment on its way</span>' : `<span class="pill due">${esc(v?.due_date ? 'Due ' + dayLabel(v.due_date, ctx?.tz || null) : 'Due on receipt')}</span>`;
   // who it's from, who it's billed to, and the details a bookkeeper files it by
   const from = partyLines(ctx?.studio ? { ...ctx.studio, name: brand.name } : null);
   const billTo = partyLines(ctx?.billTo);
@@ -460,6 +484,7 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
   const settling = !paid && !voided && !!v?.processing_since;
   if (!paid && !voided) details.push(settling ? 'Payment on its way' : v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt');
   if (paid) details.push(paidLine(v, tz));
+  if (back.state) details.push(back.line);
   if (voided) details.push('Voided — no longer payable');
   if (ctx?.forWhat) details.push('For ' + ctx.forWhat);
   const parties = `<div class="parties">${partyBox('From', from)}${partyBox(paid ? 'Paid by' : 'Billed to', billTo)}${partyBox('Details', details)}</div>`;
@@ -475,11 +500,13 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
   const totalCents = paid ? billed : amount;
   const table = `<table><thead><tr><th>Description</th><th class="qty">Qty</th><th>Amount</th></tr></thead><tbody>${rows}${payments.length && !paid ? `<tr><td style="color:var(--soft)">Total</td><td class="qty"></td><td style="color:var(--soft)">${esc(money(billed, currency))}</td></tr>` + partRows : ''}<tr class="total"><td>${esc(totalLabel)}</td><td class="qty"></td><td>${esc(money(totalCents, currency))}</td></tr></tbody></table>`;
   // a paid one opens with when and how it was paid, every part named
-  const banner = paid ? `<div class="banner"><span class="dot" aria-hidden="true">✓</span><div><b>Paid in full. Thank you.</b>${esc(paidLine(v, tz))}${payments.length ? ` · with ${payments.length} earlier part payment${payments.length === 1 ? '' : 's'}: ${esc(payments.map((p) => paidLine(p, tz)).join('; '))}` : ''}</div></div>` : '';
+  const banner = paid ? (back.state && back.state !== 'part'
+    ? `<div class="banner" style="background:#f3eef0;color:#5a3a3f"><span class="dot" aria-hidden="true" style="background:#a3423a">!</span><div><b>${esc(back.pill)}.</b> ${esc(back.line)} ${esc(paidLine(v, tz))}</div></div>`
+    : `<div class="banner"><span class="dot" aria-hidden="true">✓</span><div><b>Paid in full. Thank you.</b>${esc(paidLine(v, tz))}${payments.length ? ` · with ${payments.length} earlier part payment${payments.length === 1 ? '' : 's'}: ${esc(payments.map((p) => paidLine(p, tz)).join('; '))}` : ''}${back.state === 'part' ? ` · ${esc(back.line)}` : ''}</div></div>`) : '';
   // A live pay link is an ACTION, not part of the printed record → no-print (the side card, and the bar a phone keeps at the bottom).
   const payUrl = (!paid && !voided && !settling && v?.stripe_url) ? String(v.stripe_url) : '';   // item 118: none while a bank payment settles
   const payLink = payUrl ? `<a class="paylink" href="${esc(payUrl)}">Pay ${esc(money(v?.amount_cents, currency))} securely →</a>` : '';
-  const note = paid ? 'Thank you — this is your receipt of payment.'
+  const note = paid ? (back.state ? back.note : 'Thank you — this is your receipt of payment.')
     : voided ? 'This request was voided and is no longer payable.'
     : settling ? 'Your payment is on its way. A bank payment takes a few days to arrive, and there is nothing more to do. You’ll get a receipt when it lands.'
     : `Payment is processed securely.${no ? ` Please quote ${no} with any payment by check or transfer.` : ''} This document is your copy of the request.`;

@@ -14,6 +14,7 @@ import { insertSnapshot } from '../lib/draft_settings.ts';
 import { sendEmail, platformSenderName } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { ownerReplyTo } from '../lib/service_bridge.ts';
+import { ensureLeadContact } from '../lib/lead_contact.ts';   // sales item 142: one helper, shared with the automatic emails
 import { isStudioSide, studioDenied } from './projects.ts';
 import { buildActivityDetail } from '../crm/deal_activity.ts';
 import { decideWritePlan } from '../connected/writestore.ts';
@@ -239,7 +240,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
       if (toPage && siteOrigin) return await notSent('try_again');
       return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
     }
-    if (!spam) { notifyOwnerOfLead(siteId, { id: String(ins2.json?.[0]?.id || ''), form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, files: keptFiles.length }).catch(() => {}); acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email, message: fv.sub.message }).catch(() => {}); }
+    if (!spam) { notifyOwnerOfLead(siteId, { id: String(ins2.json?.[0]?.id || ''), form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, files: keptFiles.length }).catch(() => {}); acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message }).catch(() => {}); }
     if (toPage && siteOrigin) return redirectTo(def.redirect_url || '/thanks/');
     // the page's sender goes on to the owner's own thank-you address when the form has one
     return ok200(def.confirmation_text || FORM_THANKS, def.redirect_url ? { redirect: def.redirect_url } : {});
@@ -564,15 +565,6 @@ export function leadReplyHtml(body: string, original: string): string {
   const quoted = original ? `<p style="margin-top:18px;color:#6b6478;font-size:13px">You wrote:</p><blockquote style="margin:0;padding-left:12px;border-left:3px solid #e2dff0;color:#6b6478;font-size:13px">${esc(original).replace(/\n/g, '<br>')}</blockquote>` : '';
   return paras + quoted;
 }
-async function ensureLeadContact(siteId: string, emailIn: string, name: string, phone: string): Promise<void> {
-  // item 110 (K1): kept lower-cased and matched whatever the capitals, the way the database's
-  // one-contact-per-email rule matches — Jane@Example.com used to block every later add of her
-  const email = normEmail(emailIn);
-  const hit = await svc(`presence_contacts?site_id=eq.${siteId}&${emailMatch(email)}&deleted_at=is.null&select=id&limit=1`);
-  if (Array.isArray(hit.json) && hit.json.length) return;
-  await svc('presence_contacts', { method: 'POST', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ site_id: siteId, name: name || '', email, phone: phone || '' }) }).catch(() => {});
-}
 export async function handleFormReply(req: Request, jwt: string, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>) {
   if (!(await isStudioSide(jwt, site, principal))) return studioDenied(cors);
   let b: any = {}; try { b = await req.json(); } catch { /* */ }
@@ -696,26 +688,28 @@ export async function hashIp(req: Request): Promise<string> {
  *  Settings shows (enquiryAckCopy — pinned by test), or the owner's own words.
  *  On for a new site since 0175 (sales item 87); no email on the enquiry →
  *  nothing to send; never blocks the submit. */
-async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: string; message?: string }): Promise<boolean> {
+async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: string; phone?: string; message?: string }): Promise<boolean> {
   if (!sub.email) return false;
   const { automationSettingsFor } = await import('../commerce/lifecycle.ts');   // lazy: lifecycle pulls in the whole sweep
   const auto = await automationSettingsFor(siteId);
   if (!auto.auto_ack_enquiries) return false;
   // item 203: one acknowledgement a day to an address, and none to the do-not-send list
   if (await autoReplyVerdict('enquiry', siteId, sub.email) !== 'send') return false;
-  const [ident, brand, replyTo] = await Promise.all([
+  // Sales item 142 (Nov 22 2026 review): the person becomes a contact BEFORE this goes, the way a
+  // hand-written reply does, and the email answers to the Inbox (siteId, sendEmail's default).
+  // Item 72 had sent answers to the owner's own mailbox because a first-time writer was a stranger
+  // to the Inbox address; that put their answer where the follow-up series couldn't see it, so
+  // "yes, call me" was followed by "One last note from us".
+  await ensureLeadContact(siteId, sub.email, String(sub.name || ''), String(sub.phone || '')).catch(() => {});
+  const [ident, brand] = await Promise.all([
     svc(`presence_identity?site_id=eq.${siteId}&select=business_name&limit=1`),
     loadEmailBrand(siteId),
-    ownerReplyTo(siteId),
   ]);
   const studio = String(ident.json?.[0]?.business_name || '').trim();
   const copy = enquiryAckCopy({ name: sub.name, studio: studio || brand.name, words: auto.auto_ack_message });
-  // Item 72: an answer to this reaches the owner's own email. Someone writing in for
-  // the first time is no contact yet, so the site's inbound address (siteId, left as
-  // the fallback) dropped their answer as a stranger's.
   // they wrote in; this is the reply they are waiting for, from the business they wrote to (sales item 78)
   // item 87: a copy of what they wrote, so the email is proof it arrived (links taken out, lib/follow_ups.ts)
-  return await sendEmail(sub.email, copy.subject, `${wordsHtml(copy.sentence)}${quoteBlock(sub.message)}${copy.footer ? `<p style="color:#6b6478;font-size:13px">${esc(copy.footer)}</p>` : ''}`, brand, { critical: true, asBusiness: true, siteId, replyTo });
+  return await sendEmail(sub.email, copy.subject, `${wordsHtml(copy.sentence)}${quoteBlock(sub.message)}${copy.footer ? `<p style="color:#6b6478;font-size:13px">${esc(copy.footer)}</p>` : ''}`, brand, { critical: true, asBusiness: true, siteId });
 }
 
 async function notifyOwnerOfLead(siteId: string, sub: { id?: string; form_kind: string; name: string; email: string; phone: string; message: string; files?: number }) {

@@ -17,7 +17,7 @@
 //
 // Pure cores up top (exhaustively unit-tested); the impure webhook sync below.
 import { svc } from '../lib/db.ts';
-import { stripeMetaOf, stripeSubscriptionIdOf, subscriptionPeriodEnd, invoicePaidCents, invoicePaidAt } from './stripe_shape.ts';
+import { stripeMetaOf, stripeSubscriptionIdOf, subscriptionPeriodEnd, invoicePaidCents, invoicePaidAt, subscriptionAmount } from './stripe_shape.ts';
 import { stripeConfigured, retrieveSubscription } from './stripe.ts';
 
 export const RETAINER_PURPOSE = 'service_retainer';
@@ -171,10 +171,25 @@ export function retainerCardFixable(r: Partial<RetainerState> | null | undefined
 // Cancel stops every one of them.
 /** Is this subscription a second approval, not the retainer's own? Pure. */
 export function isExtraSubscription(prior: Partial<RetainerState> | null, subId: string): boolean {
-  const main = String(prior?.stripe_subscription_id || '');
-  if (!prior || !subId || !main || subId === main) return false;
+  if (!prior || !subId) return false;
+  const main = String(prior.stripe_subscription_id || '');
   if ((prior.extra_subscription_ids || []).map(String).includes(subId)) return true;
+  // Sales item 140 (Nov 22 2026 review): a retainer cancelled while it was still waiting holds
+  // no subscription, so an approval that landed after the cancel (Stripe lets an open pay page
+  // finish) was taken as the retainer's own: it stayed "Cancelled", nobody was told, Stripe
+  // charged every month and Cancel answered "already cancelled". It is an extra, like one that
+  // lands after a cancel of a live retainer: the studio hears it and Cancel stops it.
+  if (!main) return prior.status === 'canceled';
+  if (subId === main) return false;
   return prior.status === 'active' || prior.status === 'past_due' || prior.status === 'canceled';
+}
+/** Sales item 140: did this approval come through a link that is not the retainer's own (the
+ *  old link of a waiting retainer that was cancelled and set up again at a new price)? The
+ *  checkout session names its link; a mismatch is an extra, never the new retainer's own. Pure. */
+export function approvedThroughOldLink(prior: Partial<RetainerState> | null, session: any): boolean {
+  const ours = String(prior?.stripe_payment_link_id || '');
+  const via = String((typeof session?.payment_link === 'string' ? session.payment_link : session?.payment_link?.id) || '');
+  return !!ours && !!via && via !== ours && String(session?.object || 'checkout.session') === 'checkout.session';
 }
 /** Every Stripe subscription a Cancel must stop: the retainer's own, then the extras. Pure. */
 export function retainerSubscriptionIds(r: Partial<RetainerState> | null): string[] {
@@ -206,7 +221,7 @@ export function retainerPortalView(deal: { id: string; title?: unknown; retainer
     amount: (Number(r.amount_cents) || 0) / 100, interval: r.interval === 'year' ? 'year' : 'month', status,
     since: r.created_at || null, next_charge: status === 'active' ? (r.current_period_end || null) : null, canceled_at: r.canceled_at || null,
     approve_url: status === 'pending' ? String(r.checkout_url) : null,
-    can_cancel: status === 'active' || status === 'past_due',
+    can_cancel: status === 'active' || status === 'past_due' || (Array.isArray(r.extra_subscription_ids) && r.extra_subscription_ids.length > 0),   // sales item 140: an approval that landed after a cancel still charges, and Cancel must stop it
     can_update_card: retainerCardFixable(r),   // sales item 129: Stripe's page for a new card
     charges: charges.slice(0, 24),
   };
@@ -322,13 +337,15 @@ export function retainerApprovedPeriod(dealId: string, askedAt: unknown): string
   return `${retainerNoticePeriodPrefix(dealId)}approved:${Date.parse(String(askedAt || '')) || 0}`;
 }
 /** What the studio reads when a client approves. Pure. */
-export function retainerApprovedCopy(dealTitle: string, amountCents: number, interval: string): { headline: string; body: string } {
+export function retainerApprovedCopy(dealTitle: string, amountCents: number, interval: string, setUpAs: { amount_cents: number; interval: string } | null = null): { headline: string; body: string } {
   const name = (dealTitle || '').trim() || 'a retainer client';
   const amt = '$' + ((Number(amountCents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
   const per = interval === 'year' ? 'year' : 'month';
+  // sales item 140: when Stripe is charging something other than what was set up, the studio is told
+  const was = setUpAs ? ` Stripe is charging ${amt} a ${per}, not the $${((Number(setUpAs.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })} a ${setUpAs.interval === 'year' ? 'year' : 'month'} that was set up: the deal and their portal now show what Stripe charges. If that is wrong, cancel the retainer and set it up again.` : '';
   return {
     headline: `Retainer approved: ${name}, ${amt} a ${per}`,
-    body: `The client approved the ${amt} a ${per} retainer. Stripe charges their card each ${per} until one of you cancels, and every charge shows on the deal.`,
+    body: `The client approved the ${amt} a ${per} retainer. Stripe charges their card each ${per} until one of you cancels, and every charge shows on the deal.${was}`,
   };
 }
 
@@ -399,7 +416,9 @@ export async function applyRetainerSync(type: string, obj: any, opts: { live?: a
   if (!prior) return { synced: false, reason: 'no_retainer' };   // never invent a retainer from a webhook
 
   // A second approval never becomes the retainer (sales item 117): see isExtraSubscription.
-  if (isExtraSubscription(prior, subId)) return await syncExtraSubscription(type, obj, { dealId, siteId, title: String((deal as { title?: string }).title || ''), prior, subId, nowIso });
+  // Sales item 140: nor does an approval through an old link, or one that lands after a cancel.
+  const oldLink = type === 'checkout.session.completed' && !!subId && approvedThroughOldLink(prior, obj);
+  if (oldLink || isExtraSubscription(prior, subId)) return await syncExtraSubscription(type, obj, { dealId, siteId, title: String((deal as { title?: string }).title || ''), prior, subId, nowIso, oldLink });
 
   // Sales item 130: the subscription as Stripe has it now decides, whatever order the
   // messages came in (retainerStatusNow). The daily check hands over the one it just read.
@@ -422,6 +441,11 @@ export async function applyRetainerSync(type: string, obj: any, opts: { live?: a
   }
   const cpe = subscriptionPeriodEnd(live || (type.startsWith('customer.subscription.') ? obj : null));
   if (cpe) patch.current_period_end = new Date(cpe * 1000).toISOString();
+  // Sales item 140: what Stripe is charging is what the deal and the portal say. The amount was
+  // never read back, so an approval at another price (an old link finished late) showed the
+  // price the studio last set up while Stripe charged the other one.
+  const charging = subscriptionAmount(live || (type.startsWith('customer.subscription.') ? obj : null));
+  if (charging && (charging.amount_cents !== Number(prior.amount_cents) || charging.interval !== prior.interval)) { patch.amount_cents = charging.amount_cents; patch.interval = charging.interval; }
 
   const next = mergeRetainerState(prior, patch, nowIso);
   const up = await svc(`presence_deals?id=eq.${encodeURIComponent(dealId)}&site_id=eq.${encodeURIComponent(siteId)}`, {
@@ -438,7 +462,7 @@ export async function applyRetainerSync(type: string, obj: any, opts: { live?: a
       const { raiseNotice } = await import('../lib/notice.ts');
       const clientId = String((await svc(`presence_sites?id=eq.${encodeURIComponent(siteId)}&select=client_id&limit=1`).catch(() => ({ json: null as any }))).json?.[0]?.client_id || '');
       if (clientId) {
-        const copy = retainerApprovedCopy(String((deal as { title?: string }).title || '').slice(0, 80), Number(next.amount_cents) || 0, String(next.interval || 'month'));
+        const copy = retainerApprovedCopy(String((deal as { title?: string }).title || '').slice(0, 80), Number(next.amount_cents) || 0, String(next.interval || 'month'), charging && (charging.amount_cents !== Number(prior.amount_cents) || charging.interval !== prior.interval) ? { amount_cents: Number(prior.amount_cents) || 0, interval: String(prior.interval || 'month') } : null);
         const fresh = await raiseNotice({ siteId, clientId, kind: 'invoice_paid', period: retainerApprovedPeriod(dealId, prior.created_at), headline: copy.headline, body: copy.body });
         if (fresh) {
           const { emailOperator } = await import('../lib/service_bridge.ts');
@@ -504,7 +528,7 @@ export async function applyRetainerSync(type: string, obj: any, opts: { live?: a
 /** A subscription that is NOT the retainer's own (a second approval). It is
  *  remembered on the deal, the studio is told once, and its ending takes it off
  *  again. The retainer's own status, subscription and dates are never touched by it. */
-async function syncExtraSubscription(type: string, obj: any, x: { dealId: string; siteId: string; title: string; prior: Partial<RetainerState>; subId: string; nowIso: string }): Promise<{ synced: boolean; reason?: string; retry?: boolean }> {
+async function syncExtraSubscription(type: string, obj: any, x: { dealId: string; siteId: string; title: string; prior: Partial<RetainerState>; subId: string; nowIso: string; oldLink?: boolean }): Promise<{ synced: boolean; reason?: string; retry?: boolean }> {
   const had = (x.prior.extra_subscription_ids || []).map(String);
   const ended = type === 'customer.subscription.deleted' || (type.startsWith('customer.subscription.') && retainerStatusFromStripe(String(obj?.status || '')) === 'canceled');
   const extras = ended ? had.filter((id) => id !== x.subId) : (had.includes(x.subId) ? had : [...had, x.subId]);
@@ -519,7 +543,8 @@ async function syncExtraSubscription(type: string, obj: any, x: { dealId: string
       const { raiseNotice } = await import('../lib/notice.ts');
       const clientId = String((await svc(`presence_sites?id=eq.${encodeURIComponent(x.siteId)}&select=client_id&limit=1`).catch(() => ({ json: null as any }))).json?.[0]?.client_id || '');
       if (clientId) {
-        const copy = retainerTwiceCopy(x.title.slice(0, 80), Number(x.prior.amount_cents) || 0, String(x.prior.interval || 'month'), x.prior.status === 'canceled');
+        // sales item 140: an approval through an old link is one that landed after that link's retainer was cancelled
+        const copy = retainerTwiceCopy(x.title.slice(0, 80), Number(x.prior.amount_cents) || 0, String(x.prior.interval || 'month'), x.prior.status === 'canceled' || !!x.oldLink);
         const fresh = await raiseNotice({ siteId: x.siteId, clientId, kind: 'retainer_status', period: retainerTwicePeriod(x.dealId, x.subId), headline: copy.headline, body: copy.body });
         if (fresh) {
           const { emailOperator } = await import('../lib/service_bridge.ts');

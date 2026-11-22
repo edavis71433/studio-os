@@ -54,6 +54,17 @@ export function subscriptionPeriodEnd(sub: Obj): number | null {
   return best > 0 ? best : null;
 }
 
+/** What a subscription charges, read from Stripe itself (sales item 140): the first item's
+ *  price, in cents, and how often. null when Stripe's answer has no readable price. Pure. */
+export function subscriptionAmount(sub: Obj): { amount_cents: number; interval: 'month' | 'year' } | null {
+  const item = Array.isArray(sub?.items?.data) ? sub!.items.data[0] : null;
+  const price = item?.price || item?.plan || null;
+  const cents = Math.round(Number(price?.unit_amount));
+  if (!Number.isFinite(cents) || cents <= 0) return null;
+  const every = String(price?.recurring?.interval || price?.interval || 'month');
+  return { amount_cents: cents, interval: every === 'year' ? 'year' : 'month' };
+}
+
 /** What a paid Stripe invoice actually took, in cents. null when Stripe didn't say
  *  (a caller may fall back to the amount it expected); 0 is a real answer, a $0
  *  invoice, and is never recorded as a charge. */

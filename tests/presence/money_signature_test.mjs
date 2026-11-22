@@ -190,8 +190,11 @@ const SITE_B = { ...SITE_A, id: B, client_id: CLIENT_B };
 const HASH = 'cd'.repeat(32);
 const DAY = 86400_000;
 const today = () => new Date().toISOString().slice(0, 10);
-const dayFrom = (n) => new Date(Date.now() + n * DAY).toISOString().slice(0, 10);
-const agoIso = (n) => new Date(Date.now() - n * DAY).toISOString();
+// Sales item 152: the reminder sweep judges each leg on the studio's day and sends from 9 in its
+// morning, so it takes a clock: noon Pacific on today's UTC day, the day these fixtures count from.
+const NOW = Date.parse(`${today()}T20:00:00Z`);
+const dayFrom = (n) => new Date(NOW + n * DAY).toISOString().slice(0, 10);
+const agoIso = (n) => new Date(NOW - n * DAY).toISOString();
 const invoice = (over = {}) => ({
   id: INV_A, site_id: A, deal_id: DEAL_A, number: 13, title: 'Balance at launch', description: 'Balance', amount_cents: 200000, currency: 'usd', purpose: 'service',
   status: 'open', stripe_url: 'https://pay.example/x', stripe_payment_link_id: 'plink_13', due_date: dayFrom(-10), processing_since: null, paid_at: null, paid_method: '',
@@ -303,7 +306,7 @@ const echo = async (id, secret = 'echo-secret-for-tests') => call(null, 'POST', 
       invoice({ id: INV_B, site_id: B, deal_id: DEAL_B, title: 'Menu boards', amount_cents: 90000 }),        // B: overdue, but B's switch is off
     ],
   });
-  await runInvoiceReminders(20);
+  await runInvoiceReminders(20, NOW);
   const after = noticeAt(CLIENT_A, `invremind:${INV_A}:after`), before = noticeAt(CLIENT_A, `invremind:${INV_A2}:before`);
   ok('the sweep reminds a studio with the switch on: the after-leg is the studio’s active "Still unpaid"', !!after && after.status === 'active' && after.headline === 'Still unpaid — Balance at launch ($2,000.00)', JSON.stringify(notices().map((x) => [x.period, x.status])));
   ok('…and its client gets the gentle reminder with the pay link', mailTo('ivy@juniper.example').some((m) => m.subject === 'A gentle reminder — Balance at launch ($2,000.00)' && m.html.includes('https://pay.example/x')));
@@ -312,7 +315,7 @@ const echo = async (id, secret = 'echo-secret-for-tests') => call(null, 'POST', 
   const stray = noticeAt(CLIENT_A, `invremind:${INV_X}:after`);
   ok('an invoice that names the other studio’s deal never reaches that studio’s person', !!stray && /no client email on this deal/.test(stray.body) && mailTo('omar@harbor.example').length === 0);
   out.mail.length = 0;
-  await runInvoiceReminders(20);
+  await runInvoiceReminders(20, NOW);
   ok('run again the same day: no leg twice', out.mail.length === 0 && notices((x) => x.period === `invremind:${INV_A}:after`).length === 1);
 }
 {

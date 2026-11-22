@@ -161,7 +161,7 @@ test.describe('The Invoices page (item 85)', () => {
       await expect(rows.nth(3).locator('.st')).toHaveText('Paid by check');
       await expect(rows.nth(4).locator('.st')).toHaveText('Void');
       await expect(page.locator('tbody tr.part')).toContainText('Part paid $200 by Zelle');
-      await expect(page.locator('.foot')).toContainText('5 invoices · $4,000 billed · $2,800 unpaid');
+      await expect(page.locator('.foot')).toContainText('5 invoices · $4,200 billed · $2,800 unpaid');   // sales item 157: the whole invoice, its part payment included
       await expect(page.locator('.foot')).toContainText('the void one isn’t counted');
     } else {
       await expect(page.locator('.card')).toHaveCount(5);
@@ -205,8 +205,8 @@ test.describe('The Invoices page (item 85)', () => {
     await dlg.getByRole('button', { name: 'Record payment' }).click();
     await expect.poll(() => sent.length).toBe(1);
     expect(sent[0].path).toBe(`/sales/invoices/${I(3)}/payment?today=${day(0)}`);
-    expect(sent[0].body).toEqual({ amount_cents: 40000, paid_on: day(0), method: 'check', note: 'Check #1042', private_note: 'Paid late' });
-    await expect(page.locator('.dds-toast', { hasText: 'Recorded $400. The rest stays due.' })).toBeVisible();
+    expect(sent[0].body).toEqual({ amount_cents: 40000, paid_on: day(0), method: 'check', note: 'Check #1042', private_note: 'Paid late', email_receipt: false });   // sales item 148: no email on file, so no receipt asked for
+    await expect(page.locator('.dds-toast', { hasText: 'Recorded $400. $250 is still due on #0062.' })).toBeVisible();   // sales item 148: the same after-words as the deal page
     // a paid or processing invoice offers no payment to record
     await menuOf('#0063').click();
     await expect(page.getByRole('menuitem')).toHaveText(['Download PDF']);
@@ -223,9 +223,10 @@ test.describe('The Invoices page (item 85)', () => {
     await page.locator('.chip', { hasText: 'Overdue' }).click();
     const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('#csvBtn').click()]);
     const text = await (await dl.createReadStream())!.toArray().then((b) => Buffer.concat(b).toString('utf8'));
-    expect(text.split('\n')[0]).toBe('Number,Customer,Person,What for,Amount,Issued,Due,Status');
-    expect(text.split('\n')[1]).toContain('#0062,Harbor Yoga,Sam Ortiz,Booking page add-on,650.00');
-    expect(text.trim().split('\n')).toHaveLength(2);
+    expect(text.split('\n')[0]).toBe('Number,Customer,Person,What for,Amount,Paid so far,Issued,Due,Status');   // sales item 157
+    expect(text.split('\n')[1]).toContain('#0062,Harbor Yoga,Sam Ortiz,Booking page add-on,850.00,200.00,');   // sales item 157: the whole invoice, and what was paid toward it
+    expect(text.split('\n')[2]).toContain('Part payment toward #0062,200.00');
+    expect(text.trim().split('\n')).toHaveLength(3);
   });
 
   test('an older server says the page is on its way', async ({ page }) => {

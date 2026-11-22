@@ -40,10 +40,10 @@ eq('nothing at all reads as no filters', [F.hasListFilters(F.normalizeListFilter
   ], deals, cut);
   eq('contacted = a call, email, meeting or note by the day it happened, on one of their deals', [...got], ['c1']);
   const owing = F.owingContactIds([
-    { deal_id: 'd1', status: 'open' },
-    { deal_id: 'd2', status: 'open', processing_since: '2026-11-10T00:00:00Z' },   // a payment on its way
+    { deal_id: 'd1', status: 'open', stripe_url: 'https://pay.example/x' },
+    { deal_id: 'd2', status: 'open', stripe_url: 'https://pay.example/x', processing_since: '2026-11-10T00:00:00Z' },   // a payment on its way
     { deal_id: 'd3', status: 'paid' },
-    { customer_client_id: 'k1', status: 'open' },
+    { customer_client_id: 'k1', status: 'open', stripe_url: 'https://pay.example/x' },
   ], deals, new Map([['k1', ['c9', 'c8']]]));
   eq('owes = an open invoice on their deal or their customer, not one already being paid', [...owing].sort(), ['c1', 'c8', 'c9']);
   eq('keepIds keeps the order, takes only and drops not', F.keepIds(['a', 'b', 'c', 'd'], new Set(['a', 'c', 'd']), [new Set(['c'])]), ['a', 'd']);
@@ -100,9 +100,9 @@ const world = () => ({
     { id: 'e5', site_id: SITE, deal_id: did(9), kind: 'note', detail: { activity_kind: 'meeting', occurred_at: ago(3) }, created_at: ago(3) },   // on a deal since deleted: still a meeting
   ],
   presence_invoices: [
-    { id: 'i1', site_id: SITE, deal_id: did(1), status: 'open', amount_cents: 50000, deleted_at: null },
-    { id: 'i2', site_id: SITE, deal_id: did(2), status: 'open', amount_cents: 20000, processing_since: ago(1), deleted_at: null },
-    { id: 'i3', site_id: SITE, deal_id: null, customer_client_id: CUST, status: 'open', amount_cents: 9000, deleted_at: null },
+    { id: 'i1', site_id: SITE, deal_id: did(1), status: 'open', stripe_url: 'https://pay.example/x',  amount_cents: 50000, deleted_at: null },
+    { id: 'i2', site_id: SITE, deal_id: did(2), status: 'open', stripe_url: 'https://pay.example/x',  amount_cents: 20000, processing_since: ago(1), deleted_at: null },
+    { id: 'i3', site_id: SITE, deal_id: null, customer_client_id: CUST, status: 'open', stripe_url: 'https://pay.example/x',  amount_cents: 9000, deleted_at: null },
     { id: 'i4', site_id: SITE, deal_id: did(4), status: 'paid', amount_cents: 7000, deleted_at: null },
   ],
 });

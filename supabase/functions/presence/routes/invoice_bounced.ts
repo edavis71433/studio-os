@@ -43,11 +43,18 @@ export async function handleInvoiceBounced(req: Request, secret: string, cors: R
   try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const invoiceId = String(body?.invoice_id || '');
   if (!UUID_RE.test(invoiceId)) return json({ error: 'bad_request' }, 400, cors);
+  return json({ data: await tellBounced(invoiceId) }, 200, cors);
+}
+
+/** The three things after a bounce, for the webhook's hop above and for the daily check (sales
+ *  item 159: a lost "bounced" message is found there). The invoice is re-read, and nothing
+ *  happens unless it is open, not settling, and holds no link. */
+export async function tellBounced(invoiceId: string): Promise<Record<string, unknown>> {
   const r = await svc(`presence_invoices?id=eq.${invoiceId}&status=eq.open&deleted_at=is.null&select=id,site_id,deal_id,title,description,amount_cents,currency,purpose,stripe_url,processing_since,link_gen&limit=1`);
   const inv = r.ok && Array.isArray(r.json) ? r.json[0] : null;
-  if (!inv || inv.processing_since || inv.stripe_url || !(Number(inv.link_gen) > 0)) return json({ data: { ignored: true, reason: 'not_a_bounced_invoice' } }, 200, cors);
+  if (!inv || inv.processing_since || inv.stripe_url || !(Number(inv.link_gen) > 0)) return { ignored: true, reason: 'not_a_bounced_invoice' };
   const clientId = (await svc(`presence_sites?id=eq.${encodeURIComponent(String(inv.site_id))}&select=client_id&limit=1`)).json?.[0]?.client_id;
-  if (!clientId) return json({ data: { ignored: true, reason: 'no_owner_client' } }, 200, cors);
+  if (!clientId) return { ignored: true, reason: 'no_owner_client' };
 
   const payUrl = await mintPayLink(inv);
   const isDeposit = inv.purpose === 'deposit';
@@ -92,5 +99,5 @@ export async function handleInvoiceBounced(req: Request, secret: string, cors: R
       await emailOperator(String(inv.site_id), copy.headline, `<p>${esc(copy.body)}</p>`, 'invoice_bounced', { label: 'Open the deal', href: inv.deal_id ? `${base}/pipeline.html?deal=${inv.deal_id}` : `${base}/today.html` });
     } catch { /* the notice carries it */ }
   }
-  return json({ data: { notice: outcome === 'created', already: outcome === 'exists', linked: !!payUrl, emailed } }, 200, cors);
+  return { notice: outcome === 'created', already: outcome === 'exists', linked: !!payUrl, emailed };
 }
