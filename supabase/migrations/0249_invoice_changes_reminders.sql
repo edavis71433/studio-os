@@ -1,4 +1,4 @@
--- 0246 — An invoice can be changed, reminded and given money back by hand (sales items 162,
+-- 0249 — An invoice can be changed, reminded and given money back by hand (sales items 162,
 -- 165 and 166, Nov 22 2026 review).
 --
 -- presence_deal_events
@@ -40,7 +40,7 @@ alter table public.presence_deal_events
     'payment_undone',
     -- added by 0176:
     'client_question',
-    -- added by 0246:
+    -- added by 0249:
     'invoice_changed','invoice_reminded','money_back'
   ));
 

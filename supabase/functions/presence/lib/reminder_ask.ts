@@ -2,7 +2,7 @@
 // Invoice reminders start off for every studio, and nothing ever suggested switching
 // them on. The first time a studio sends an invoice with reminders off, the send's
 // answer carries ask_reminders: true and the page asks once; the answer, either way,
-// sets presence_settings.invoice_reminders_asked (migration 0246). Before the column
+// sets presence_settings.invoice_reminders_asked (migration 0249). Before the column
 // exists the read is refused and nothing is asked. Best-effort: never throws.
 import { svc } from './db.ts';
 

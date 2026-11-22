@@ -169,7 +169,7 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   enquiry_followup_1_days: { kind: 'int', min: 1, max: 14 }, enquiry_followup_2_days: { kind: 'int', min: 3, max: 30 },
   enquiry_followup_1_message: { max: 1200 }, enquiry_followup_2_message: { max: 1200 },
   invoice_overdue_repeat: { kind: 'bool' }, quote_expiry_reminders: { kind: 'bool' },
-  invoice_reminders_asked: { kind: 'bool' },   // sales item 166 (0246): asked once, whichever way it was answered
+  invoice_reminders_asked: { kind: 'bool' },   // sales item 166 (0249): asked once, whichever way it was answered
   // sales item 88 (0176): who signs agreements for the studio — added beside the client's signature
   signs_as_name: { max: 120 }, signs_as_title: { max: 80 },
   visit_counter: { kind: 'bool' },   // list item 61 (0139): the published site's visit counter, on unless switched off
@@ -474,7 +474,7 @@ const BLOG_SETTINGS_COLS = 'post_categories,post_authors';
 const PLACE_SETTINGS_COLS = 'second_location';
 // The 0184 column (builder list item 158's site icon).
 const ICON_SETTINGS_COLS = 'icon_media_id';
-// The 0246 column (sales item 166: the reminders question, asked once).
+// The 0249 column (sales item 166: the reminders question, asked once).
 const ASKED_SETTINGS_COLS = 'invoice_reminders_asked';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.

@@ -1,5 +1,5 @@
 -- ===========================================================================
---  APPLY PACK - migration 0246  (owner-apply, prod)
+--  APPLY PACK - migration 0249  (owner-apply, prod)
 -- ===========================================================================
 --  Run this ONCE (Supabase -> SQL Editor, or the Supabase connector), BEFORE or
 --  WITH the deploy.yml run that ships sales items 162 to 166 (invoice changes,

@@ -69,7 +69,7 @@ const SYS_LABEL: Record<string, string> = {
   invoice_sent: 'Invoice sent', invoice_paid: 'Invoice paid', converted: 'Converted to a customer',
   // item 107 (J8): these three fell through to "invoice voided" in lower case
   invoice_voided: 'Invoice voided', proposal_deleted: 'Draft proposal removed', contract_deleted: 'Draft agreement removed',
-  // sales items 162, 165, 166 (0246)
+  // sales items 162, 165, 166 (0249)
   invoice_changed: 'Invoice changed', invoice_reminded: 'Reminder sent', money_back: 'Money given back',
 };
 // Item 69: the client opened a document's page (routes/sales.ts firstOpen) — "They
