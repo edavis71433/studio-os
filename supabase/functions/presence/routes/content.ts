@@ -172,6 +172,10 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   enquiry_followup_1_days: { kind: 'int', min: 1, max: 14 }, enquiry_followup_2_days: { kind: 'int', min: 3, max: 30 },
   enquiry_followup_1_message: { max: 1200 }, enquiry_followup_2_message: { max: 1200 },
   invoice_overdue_repeat: { kind: 'bool' }, quote_expiry_reminders: { kind: 'bool' },
+  invoice_reminders_asked: { kind: 'bool' },   // sales item 166 (0249): asked once, whichever way it was answered
+  // sales items 167, 168 (0250): the "On every invoice" card: how else to pay, a tax number, the next number, the late fee
+  invoice_pay_other: { max: 600 }, invoice_tax_id: { max: 80 }, invoice_number_start: { kind: 'int', min: 1, max: 999999 },
+  late_fee_mode: { max: 8 }, late_fee_value: { kind: 'int', min: 0, max: 1000000 }, late_fee_days: { kind: 'int', min: 1, max: 90 },
   // sales item 88 (0176): who signs agreements for the studio — added beside the client's signature
   signs_as_name: { max: 120 }, signs_as_title: { max: 80 },
   visit_counter: { kind: 'bool' },   // list item 61 (0139): the published site's visit counter, on unless switched off
@@ -490,14 +494,18 @@ const BLOG_SETTINGS_COLS = 'post_categories,post_authors';
 const PLACE_SETTINGS_COLS = 'second_location';
 // The 0184 column (builder list item 158's site icon).
 const ICON_SETTINGS_COLS = 'icon_media_id';
+// The 0249 column (sales item 166: the reminders question, asked once).
+const ASKED_SETTINGS_COLS = 'invoice_reminders_asked';
+// The 0250 columns (sales items 167, 168: the "On every invoice" card and the late fee).
+const INVOICE_SETTINGS_COLS = 'invoice_pay_other,invoice_tax_id,invoice_number_start,late_fee_mode,late_fee_value,late_fee_days';
 // The 0255 column on presence_locations (builder list item 334's "We go to our customers").
 // Business details shows the switch only when a read returns it, so before the pack the
 // switch stays hidden and every other field reads and saves as before.
 const GOES_SETTINGS_COLS = 'goes_to_customers';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-// (0255's column sits after 0184's: it is only ever in the location's read, which holds no icon, so it steps down first there all the same)
-const OPTIONAL_SETTINGS_COLS = [ICON_SETTINGS_COLS, GOES_SETTINGS_COLS, PLACE_SETTINGS_COLS, BLOG_SETTINGS_COLS, SIGNER_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+// (0255's column sits right after 0184's: it is only ever in the location's read, which holds no icon or invoice column, so it steps down first there all the same)
+const OPTIONAL_SETTINGS_COLS = [ICON_SETTINGS_COLS, GOES_SETTINGS_COLS, INVOICE_SETTINGS_COLS, ASKED_SETTINGS_COLS, PLACE_SETTINGS_COLS, BLOG_SETTINGS_COLS, SIGNER_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;
@@ -511,7 +519,7 @@ function selectSteps(select: string): string[] {
 const SETTINGS_CFG = {
   table: 'presence_settings', entityType: 'settings', noun: 'site settings', fields: SETTINGS_FIELDS,
   select: 'site_id,category_order,cover_media_id,logo_media_id,og_media_id,announcement_text,announcement_url,announcement_expires_at,industry_key,google_site_verification,bing_site_verification,hero_layout,nav_style,sections_hidden,sections_order,footer_hours,footer_social,pages_noindex,page_seo,blocks,pages,nav,updated_at'
-    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + AD_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS + ',' + POPUP_SETTINGS_COLS + ',' + SEARCH_SETTINGS_COLS + ',' + RECIPE_SETTINGS_COLS + ',' + BLOG_SETTINGS_COLS + ',' + SIGNER_SETTINGS_COLS + ',' + ICON_SETTINGS_COLS,
+    + ',' + AUTOMATION_SETTINGS_COLS + ',' + REVIEW_SETTINGS_COLS + ',' + VISIT_SETTINGS_COLS + ',' + AD_SETTINGS_COLS + ',' + CRAWLER_SETTINGS_COLS + ',' + POPUP_SETTINGS_COLS + ',' + SEARCH_SETTINGS_COLS + ',' + RECIPE_SETTINGS_COLS + ',' + BLOG_SETTINGS_COLS + ',' + SIGNER_SETTINGS_COLS + ',' + ICON_SETTINGS_COLS + ',' + ASKED_SETTINGS_COLS + ',' + INVOICE_SETTINGS_COLS,
   conflict: 'site_id', summary: 'Updated site settings',
 } as const;
 

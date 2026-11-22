@@ -1900,13 +1900,13 @@ async function openBig(slug,openingKey){
   $('bigHead').textContent=o?o.name:d.name;
   $('bigSub').textContent=`A sample ${noun} ${o?'opening this way, on the '+d.name+' design':'in this design'}. The site’s own words and photos replace it.`;
   $('bigUse').textContent=o?'Use this look':'Use this design';
-  $('bigWait').hidden=false;$('bigWait').textContent='Drawing the sample…';$('bigFrame').srcdoc='';
+  $('bigWait').hidden=false;$('bigWait').textContent='Drawing the sample…';$('bigWrap').style.visibility='hidden';   // one srcdoc write per look: WebKit can stay on the first of two quick writes (item 100)
   $('bigDlg').showModal();paintBig();$('bigX').focus();
   let r=null;try{r=await api('/agency/designs/'+encodeURIComponent(slug)+'/sample?kind='+encodeURIComponent(NEWS.industry||fam)+(o?'&opening='+encodeURIComponent(o.key):''));}catch(_){r=null;}
   if(!BIG||BIG.slug!==slug||BIG.opening!==(o?o.key:'')||!$('bigDlg').open)return;
   const html=r&&r.ok&&r.body&&r.body.data&&r.body.data.html;
   if(!html){$('bigWait').textContent='We couldn’t draw this design just now. Its picture shows how it starts.';return;}
-  $('bigFrame').srcdoc=html;$('bigWait').hidden=true;paintBig();
+  $('bigFrame').srcdoc=html;$('bigWait').hidden=true;$('bigWrap').style.visibility='';paintBig();
 }
 $('new-designs').addEventListener('click',(e)=>{const b=e.target.closest('[data-full]');if(b)openBig(b.getAttribute('data-full'));});
 $('new-openings').addEventListener('click',(e)=>{const b=e.target.closest('[data-full-opening]');const o=b&&openingOf(b.getAttribute('data-full-opening'));if(o)openBig(o.design,o.key);});
@@ -1920,7 +1920,7 @@ $('bigUse').onclick=()=>{
   const slug=BIG&&BIG.slug;$('bigDlg').close();
   const i=o?document.querySelector(`#new-openings input[value="op:${CSS.escape(o.key)}"]`):slug&&document.querySelector(`#new-designs input[value="${CSS.escape(slug)}"]`);if(i)i.focus();
 };
-$('bigDlg').addEventListener('close',()=>{BIG=null;$('bigFrame').srcdoc='';});
+$('bigDlg').addEventListener('close',()=>{BIG=null;$('bigFrame').removeAttribute('srcdoc');});
 window.addEventListener('resize',()=>{if(BIG)paintBig();});
 $('new-x').onclick=()=>$('newDlg').close();
 $('new-cancel').onclick=()=>$('newDlg').close();

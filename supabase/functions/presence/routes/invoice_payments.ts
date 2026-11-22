@@ -116,6 +116,8 @@ export async function handleInvoicePayment(req: Request, site: SiteRow, principa
   let payUrl: string | null = null;
   if (p.part) { payUrl = await mintPayLink(updated); if (payUrl) updated = { ...updated, stripe_url: payUrl }; }
   if (!p.part) await clearReminders(site, id);
+  // sales item 172: the client said they paid; this confirms it, so the claim and its Needs-you line go
+  await (await import('./invoice_changes.ts')).clearSaidPaid(site, id).catch(() => {});
   if (inv.deal_id) await dealEvent(site.id, inv.deal_id, 'invoice_paid', principal, { detail: { invoice_id: id, amount_cents: p.amount_cents, purpose: String(inv.purpose || 'service'), method: p.method, recorded: true, ...(p.part ? { part: true, left_cents: p.left_cents } : {}) } });
   // a deposit paid in full does what a card deposit does: the checklist step, and a signed deal is won
   let moved = false;

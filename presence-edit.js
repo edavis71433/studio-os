@@ -67,7 +67,7 @@ function lookSwatch(slug) { return LOOK_SWATCH[slug] || { bg: "#f2f0f5", ink: "#
 async function dcOpenPreview() {
   if (IPE) ipeCommit();
   if (!(await dcSavePendingEdits())) return;
-  PV.page = DC_PAGE ? "/" + DC_PAGE + "/" : "/";
+  PV.page = dcPagePath();
   await openPreview("draft");
 }
 // Item 85: Hide or a move from the canvas also drew the page into the Preview screen,
@@ -86,9 +86,31 @@ function ddsKeyFor(bi) {
   return null;
 }
 function eeEditCore(view) {                      // open the core-section tab
-  closePreview(); go(view || "design");
-  if ((view || "design") === "design") { if (typeof openSettingsPanel === "function") openSettingsPanel("styles"); return; }
+  closePreview();
+  const v = view || "design";
+  if (v === "design") { go("design"); if (typeof openSettingsPanel === "function") openSettingsPanel("styles"); return; }
+  // Builder item 314: the tab's own form opens in a card beside the page; the editor is never left.
+  if ($("view-design").classList.contains("on") && dcHostView(v)) return;
+  go(v);
   toastAction(`You’re on the ${eeTabWord(view)} tab.`, "Back to your page", () => go("design"), 10000);
+}
+// The tab's form, moved into the settings panel while the card is open and put back where it
+// was when the card closes. Its fields keep their ids, so every save and Undo works as on its tab.
+let HOSTED_VIEW = null;
+function dcHostView(view) {
+  const node = $("view-" + view), p = $("settingsPanel"), scroll = p && p.querySelector(".dc-panel-scroll"); if (!node || !scroll) return false;
+  dcUnhostView();
+  HOSTED_VIEW = { node, parent: node.parentNode, next: node.nextSibling, view };
+  openSettingsPanel("core", eeTabWord(view));
+  node.classList.add("dc-hosted"); scroll.prepend(node); scroll.scrollTop = 0;
+  if (view === "updates" && typeof renderPosts === "function") renderPosts();
+  return true;
+}
+function dcUnhostView() {
+  const h = HOSTED_VIEW; if (!h) return; HOSTED_VIEW = null;
+  if (document.activeElement && h.node.contains(document.activeElement)) document.activeElement.blur();   // a field saves on change
+  h.node.classList.remove("dc-hosted");
+  if (h.parent) h.parent.insertBefore(h.node, h.next && h.next.parentNode === h.parent ? h.next : null);
 }
 function eeTabWord(view) {                       // the tab's own label, which follows the site's vocabulary (Menu/Services)
   const b = $("nav") && $("nav").querySelector(`[data-view="${view}"]`);
@@ -97,8 +119,10 @@ function eeTabWord(view) {                       // the tab's own label, which f
 // A double-click never leaves Edit mode by surprise. A core section's words live on
 // another tab until core sections move onto the canvas, so say where and offer the way.
 let EE_CORE_TOAST = null;
+// Item 314: on a built-in page an unstamped section's words are that page's (About's, the FAQ's).
+function dcCoreView(c) { const bp = dcBuiltinPage(); return bp && !c.key ? bp.view : c.view; }
 function eeDoubleClickTarget(secEl) {
-  const c = eeClassify(secEl);
+  const c = eeClassify(secEl); c.view = dcCoreView(c);
   if (c.kind === "block") { eeEditBlock(c.bi); return; }
   if (c.view === "design") { eeEditCore(c.view); return; }
   if (EE_CORE_TOAST) EE_CORE_TOAST.remove();
@@ -199,7 +223,7 @@ function togglePageInfoMenu() {
     propBtn.textContent = propLabel() + (grp.hidden ? "▸" : "▾");
   });
   m.appendChild(propBtn); m.appendChild(grp);
-  mi("Page settings…", () => pgOpenSettings({ href: DC_PAGE ? "/" + DC_PAGE + "/" : "/" }), { id: "piSearchShare", title: "This page’s name, address, place in the menu and how it shows on Google" });
+  mi("Page settings…", () => pgOpenSettings({ href: dcPagePath() }), { id: "piSearchShare", title: "This page’s name, address, place in the menu and how it shows on Google" });
   mi("Usable by everyone…", () => openUsable(), { id: "piUsable", title: "Check the draft for photos without a description, faint words and buttons that only say “Click here”" });
   document.body.appendChild(m);
   // ≤760px: the bottom-sheet presentation the slide-over panels already use
@@ -736,7 +760,7 @@ async function mountBrandKitCard() {
   const st = {
     // item 197: the site's logo is the one its settings hold (a saved kit can hold an older one)
     logo_media_id: S.settings && "logo_media_id" in S.settings ? (S.settings.logo_media_id || null) : ((kit && kit.logo_media_id) || null),
-    primary: normHexJs((kit && kit.primary) || T.accent) || "#5b3fa0",
+    primary: normHexJs((kit && kit.primary) || T.accent) || dcSiteColours().accent,   // item 277: the site's own colour, never the studio's purple
   };
   // Item 94: type and corners are set in one place, Colors and fonts below. This card showed
   // the same two choices again, and the two could disagree on which was ticked. The kit now
@@ -1371,7 +1395,7 @@ function renderLinkedChip(blk, idx, card) {
   row.append(edit, indep); sub.appendChild(row);
   card.appendChild(sub);
 }
-function dcPageTitle(slug) { const p = dcPageList().find((x) => x.slug === slug); return p ? p.title : "Home"; }
+function dcPageTitle(slug) { const b = dcBuiltinPage(slug); if (b) return b.title; const p = dcPageList().find((x) => x.slug === slug); return p ? p.title : "Home"; }
 // The page tabs live in the Pages card now (renderPagesCard, drawn with the Pages tab's lists).
 function renderPagesBar() {
   if (typeof renderPagesList === "function") renderPagesList();
@@ -1414,6 +1438,17 @@ function dcOpenPage(slug) {
   if (!frame || (DC_MODE === "timewarp" && DC_TW_LOADED)) return;
   if (PDRAG) pdFinish(false);   // a drag from the old rows or document can't land on this list
   frame.inert = true; dcRefreshTree();
+}
+// The page a link on the canvas points at, as the canvas names it: "" for Home, a page's slug,
+// else null (another site, a post, an anchor).
+function dcPageForHref(href) {
+  let path = String(href || "").trim(); if (!path) return null;
+  try { const u = new URL(path, "https://x.example/"); if (u.origin !== "https://x.example") return null; path = u.pathname; } catch (_) { return null; }
+  if (!/\/$/.test(path)) path += "/";
+  if (path === "/") return "";
+  const m = /^\/([a-z0-9-]+)\/$/.exec(path);
+  if (m && dcPageObj(m[1])) return m[1];
+  return typeof dcBuiltinForPath === "function" ? dcBuiltinForPath(path) : null;
 }
 // Where a switch waiting on its save is headed. Another click only changes this, so the
 // last page asked for wins however slow the save is.
@@ -2089,6 +2124,13 @@ async function dcLiveNow() {
   // The Contents list's rows find a swapped section again when clicked (dcTreeRow); a Columns
   // section's rows hold its columns too, so that one rebuilds the list.
   if (swapped) try { dcInjectCanvas(doc, main, true); if (cols) dcBuildTree(main); } catch (_) { /* chrome is best-effort */ }
+  // item 315: "+ Add a row" opens the new row's first words for typing
+  const lf = LIVE_FOCUS; LIVE_FOCUS = null;
+  if (swapped && lf && !IPE) try {
+    const sec = Array.prototype.find.call(main.children, (n) => { const c = eeClassify(n); return c.kind === "block" && c.bi === lf.bi; });
+    const f = sec && sec.querySelector('[data-dds-field="' + lf.path + '"]');
+    if (f) { f.scrollIntoView({ block: "nearest" }); ipeStart(doc, f, sec); const sel = doc.getSelection(), r = doc.createRange(); r.selectNodeContents(f); sel.removeAllRanges(); sel.addRange(r); }
+  } catch (_) {}
 }
 // ── T-STARTER: apply a pre-arranged, pre-filled starter layout. Replaces the
 //    working sections with a ready-made set the owner then EDITS (never a blank
@@ -2258,9 +2300,9 @@ function ovDarkenUntil(color, against, min) { let c = color; for (let i = 0; i <
 // Curated brand shades first, free hex behind "Custom…" (Eric, 2026-07-16):
 // client-side mix() tints/shades of the site accent + neutrals, per well.
 function ovShades(key) {
-  const T = DESIGN_TOKENS || {};
-  const acc = normHexJs(T.accent) || "#5b3fa0";
-  const ink = normHexJs(T.ink) || "#1d1c22";
+  const T = DESIGN_TOKENS || {}, site = dcSiteColours();   // item 277: a new site's palette is the template's, not the studio's purple
+  const acc = normHexJs(T.accent) || normHexJs(site.accent) || site.accent;
+  const ink = normHexJs(T.ink) || normHexJs(site.ink) || site.ink;
   let list;
   if (key === "text_color") list = [ink, ovMix(acc, "#000000", 0.55), ovMix(acc, "#000000", 0.3), acc, "#ffffff"];
   else if (key === "bg_color") list = ["#ffffff", ovMix(acc, "#ffffff", 0.92), ovMix(acc, "#ffffff", 0.8), ovMix(ink, "#ffffff", 0.94), ovMix(acc, "#000000", 0.45)];
@@ -2734,20 +2776,7 @@ function renderBlocksCard() {
       linkPick(bu);   // item 225
       sub.appendChild(el("div", "hint", "A prominent highlight band. The heading goes in the title field above."));
     } else if (def.tableSimple) {
-      const ta = el("textarea");
-      const toText = () => { const lines = []; if ((blk.headers || []).length) lines.push(blk.headers.join(" | ")); (blk.rows || []).forEach((r) => lines.push((r || []).join(" | "))); return lines.join("\n"); };
-      ta.value = toText(); ta.placeholder = "Name | Price | Notes\nBasic | $10 | Great to start\nPro | $25 | Most popular";
-      ta.rows = Math.max(4, ta.value.split("\n").length + 1);
-      ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.7;box-sizing:border-box";
-      ta.addEventListener("change", () => {
-        const lines = ta.value.split("\n").map((l) => l.replace(/\s+$/, "")).filter((l) => l.trim());
-        const cells = (l) => l.split("|").map((c) => c.trim());
-        const headers = lines.length ? cells(lines[0]) : [];
-        const rows = lines.slice(1).map(cells);
-        BLOCKS_WORK[idx] = wLook(idx, { type: "table", title: ti.value.trim(), headers, rows });
-      });
-      sub.appendChild(ta);
-      sub.appendChild(el("div", "hint", "One row per line, columns separated by “ | ”. The FIRST line is your header row. It scrolls sideways on phones."));
+      renderTableBlockBody(blk, idx, sub, ti);   // builder item 315: a grid of cells, add a row or a column
     } else if (def.structured === "columns") {
       renderColumnsBlockBody(blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));
@@ -2773,14 +2802,7 @@ function renderBlocksCard() {
       renderButtonsBlockBody(blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));
     } else if (def.field || def.areasSimple) {
-      const ta = el("textarea"); ta.value = blockText(def, blk);
-      ta.rows = Math.max(3, ta.value.split("\n").length + 1);
-      ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.5;box-sizing:border-box";
-      ta.addEventListener("change", () => { const t2 = ti.value.trim(); BLOCKS_WORK[idx] = wLook(idx, textToBlock(def, t2, ta.value)); });
-      sub.appendChild(ta);
-      sub.appendChild(aiField(ta, {}));
-      sub.appendChild(el("div", "hint", def.hint));
-      if (def.icons) sub.appendChild(iconGrid(ta));   // item 304: line icons for Why choose us
+      renderRowsBlockBody(def, blk, idx, sub, ti);   // builder item 315: one card per item, named fields (item 304's line icons are on each card)
     }
     // Wave-1 G4: the "Style" pill row — only for block types with curated variants.
     blockVariantRow(idx, blk, panes ? panes.layout : sub);
@@ -2850,7 +2872,7 @@ function renderBlocksCard() {
       b.style.cssText = "text-align:left;font:inherit;padding:9px 12px;border-radius:10px;border:1px solid var(--line,#ddd);background:var(--sheet,#fff);color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-width:0";
       b.appendChild(Object.assign(el("div", null, "+ " + d.name), { style: "font-weight:600;font-size:12.5px" }));
       if (SECTION_ALIAS[d.type]) b.appendChild(Object.assign(el("div", null, SECTION_ALIAS[d.type]), { style: "font-size:12px;color:var(--soft,#888)" }));
-      b.addEventListener("click", () => { dcCaptureScroll(); BLOCKS_WORK.push(emptyBlock(d)); const at = BLOCKS_WORK.length - 1; BLOCK_FOCUS = at; DC_FOCUS_BI = at; if (MEDIA_FILL_TYPES.has(d.type)) { renderBlocksCard(); eeEditBlock(at); } else { saveBlocks(); } });
+      b.addEventListener("click", () => { dcCaptureScroll(); const at = addBlockAt(d, BLOCKS_WORK.length); if (MEDIA_FILL_TYPES.has(d.type)) { DC_FOCUS_BI = null; eeEditBlock(at); } else { saveBlocks(); } });
       return b;
     };
     // Recommended for you — the server suggestion, folded in as the lead group.
@@ -2869,7 +2891,7 @@ function renderBlocksCard() {
       if (recTypes.length > 1) {
         const all = el("button", null, "Add all recommended"); all.type = "button";
         all.style.cssText = "font:inherit;font-size:12px;margin-top:10px;padding:6px 13px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--sheet,#fff);color:var(--plum-deep,#3a2470);cursor:pointer";
-        all.addEventListener("click", () => { dcCaptureScroll(); let firstAt = null; recTypes.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) { if (firstAt === null) firstAt = BLOCKS_WORK.length; BLOCKS_WORK.push(emptyBlock(d)); } }); if (firstAt !== null) { BLOCK_FOCUS = firstAt; DC_FOCUS_BI = firstAt; } saveBlocks(); });   /* recommended set is content blocks — safe to save + render */
+        all.addEventListener("click", () => { dcCaptureScroll(); let firstAt = null; recTypes.forEach((t) => { const d = BLOCK_DEFS.find((x) => x.type === t); if (d) { const at = addBlockAt(d, BLOCKS_WORK.length); if (firstAt === null) firstAt = at; } }); if (firstAt !== null) { BLOCK_FOCUS = firstAt; DC_FOCUS_BI = firstAt; DC_FOCUS_SOFT = false; } saveBlocks(); });   /* recommended set is content blocks — safe to save + render */
         wrap.appendChild(all);
       }
       lib.appendChild(wrap);
@@ -3084,8 +3106,15 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
     const isGallery = def.type === "gallery";
     const ids = Array.isArray(blk.image_ids) ? blk.image_ids : [];
     const grid = el("div"); grid.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px";
+    // item 317: the order is changed with the arrows under each photo, or by dragging one onto another
+    const moveTo = (from, to) => {
+      if (to < 0 || to >= ids.length || from === to) return;
+      commitTitle(); const b = cur(); const [id] = b.image_ids.splice(from, 1); b.image_ids.splice(to, 0, id);
+      if (Array.isArray(b.captions)) { const [c] = b.captions.splice(from, 1); b.captions.splice(to, 0, c); }
+      renderBlocksCard(); dcLiveFromPanel();
+    };
     ids.forEach((id, k) => {
-      const cell = el("div"); cell.style.cssText = "display:flex;flex-direction:column;gap:4px;width:96px";
+      const cell = el("div", "gal-cell"); cell.dataset.k = String(k);
       const chip = el("span"); chip.style.cssText = "position:relative;display:inline-block";
       chip.appendChild(mediaThumb(id));
       const x = icoBtn("x", "Remove this photo", null, 12);
@@ -3094,6 +3123,16 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
       // caption with it (the server re-validates the same alignment).
       x.addEventListener("click", () => { commitTitle(); cur().image_ids.splice(k, 1); if (Array.isArray(BLOCKS_WORK[idx].captions)) BLOCKS_WORK[idx].captions.splice(k, 1); renderBlocksCard(); });
       chip.appendChild(x); cell.appendChild(chip);
+      const mv = el("div", "gal-mv");
+      const left = icoBtn("up", "Move photo " + (k + 1) + " earlier", null, 14); left.disabled = k === 0; left.addEventListener("click", () => moveTo(k, k - 1));
+      const right = icoBtn("down", "Move photo " + (k + 1) + " later", null, 14); right.disabled = k === ids.length - 1; right.addEventListener("click", () => moveTo(k, k + 1));
+      mv.append(left, right); cell.appendChild(mv);
+      cell.draggable = true;
+      cell.addEventListener("dragstart", (e) => { RW_DRAG = k; cell.classList.add("rw-dragging"); try { e.dataTransfer.setData("text/plain", String(k)); } catch (_) {} });
+      cell.addEventListener("dragend", () => { RW_DRAG = null; cell.classList.remove("rw-dragging"); grid.querySelectorAll(".rw-over").forEach((n) => n.classList.remove("rw-over")); });
+      cell.addEventListener("dragover", (e) => { if (RW_DRAG == null || RW_DRAG === k) return; e.preventDefault(); cell.classList.add("rw-over"); });
+      cell.addEventListener("dragleave", () => cell.classList.remove("rw-over"));
+      cell.addEventListener("drop", (e) => { if (RW_DRAG == null || RW_DRAG === k) return; e.preventDefault(); moveTo(RW_DRAG, k); });
       if (isGallery) {
         const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.maxLength = 160;
         cap.value = (Array.isArray(blk.captions) && blk.captions[k]) || "";
@@ -3110,8 +3149,8 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
       grid.appendChild(cell);
     });
     sub.appendChild(grid);
-    const add = el("button", null, "+ Add photo"); add.type = "button"; add.style.cssText = miniBtn;
-    add.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { (BLOCKS_WORK[idx].image_ids = BLOCKS_WORK[idx].image_ids || []).push(id); renderBlocksCard(); } }); });
+    const add = el("button", null, "+ Add photos"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); openPicker((got) => { const list = Array.isArray(got) ? got : got ? [got] : []; if (list.length) { const b = BLOCKS_WORK[idx]; b.image_ids = (b.image_ids || []).concat(list); if (Array.isArray(b.captions)) list.forEach(() => b.captions.push("")); renderBlocksCard(); } }, { many: true }); });   // item 317: several at once
     sub.appendChild(add);
     if (isGallery) {
       // G18 (DM-11): the opt-in, zero-JS tap-to-zoom lightbox — a FIELD, not a
@@ -3159,6 +3198,186 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
     sub.appendChild(add);
   }
 }
+// ── Builder item 315: the list sections are edited as item cards, not lines with "|" ──
+// One card per item with named fields, a date picker for events, drag (or the arrows) to
+// reorder, Remove, and "+ Add a …". The stored shape is unchanged (the same items the lines
+// made), and "Type them as lines" keeps the old box for pasting a list in.
+const ROW_FIELDS = {
+  features: { one: "feature", fields: [["title", "Title", 80], ["text", "Short description", 240], ["icon", "Icon", 20, "icon"]], blank: { title: "A new feature", text: "Say what it is." } },
+  stats: { one: "number", fields: [["value", "Number", 24], ["label", "What it counts", 60]], blank: { value: "1", label: "A new number" } },
+  process: { one: "step", fields: [["step", "Step", 80], ["detail", "Detail", 300]], blank: { step: "A new step", detail: "What happens here." } },
+  pricing: { one: "tier", fields: [["name", "Name", 60], ["price_text", "Price", 40], ["features", "What’s included, one per line", 600, "lines"]], blank: { name: "A new tier", price_text: "$—", features: ["What’s included"] } },
+  certifications: { one: "certification", fields: [["name", "Name", 100], ["issuer", "Issued by", 120]], blank: { name: "A new certification" } },
+  service_areas: { one: "area", fields: [["name", "Area", 60]], blank: { name: "A new area" } },
+  social: { one: "link", fields: [["network", "Network: instagram, facebook, tiktok, youtube…", 40], ["url", "Link", 400, "url"]], blank: { network: "instagram", url: "https://instagram.com/yourbusiness" } },
+  events: { one: "event", fields: [["name", "Event", 100], ["date", "Date", 10, "date"], ["time", "Time (optional)", 40], ["detail", "Detail (optional)", 240], ["url", "Link (optional)", 400, "url"], ["place", "Place (optional: left empty, it is at your own address)", 160]], blank: { name: "A new event", detail: "Add the details." } },
+  link_list: { one: "link", fields: [["label", "Label", 80], ["url", "Link", 400, "url"]], blank: { label: "A new link", url: "https://example.com" } },
+};
+const rwPath = (def, k, key) => (def.areasSimple ? "areas." + k : def.field + "." + k + "." + key);
+function rowsOf(def, blk) { if (def.areasSimple) return (Array.isArray(blk.areas) ? blk.areas : []).map((a) => ({ name: a })); return Array.isArray(blk[def.field]) ? blk[def.field] : []; }
+function rowsSet(def, idx, rows) {
+  const b = BLOCKS_WORK[idx]; if (!b) return;
+  if (def.areasSimple) b.areas = rows.map((r) => String(r.name || "").trim()).filter(Boolean);
+  else b[def.field] = rows;
+}
+const RW_IN = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;box-sizing:border-box;margin:0";
+function renderRowsBlockBody(def, blk, idx, sub, ti) {
+  const spec = ROW_FIELDS[def.type]; if (!spec) return;
+  const cur = () => BLOCKS_WORK[idx];
+  const commitTitle = () => { cur().title = ti.value.trim(); };
+  const rows = rowsOf(def, cur()).map((r) => ({ ...r }));
+  const put = () => { commitTitle(); rowsSet(def, idx, rows.map((r) => ({ ...r }))); };
+  const list = el("div", "rw-list"); list.setAttribute("role", "list"); list.setAttribute("aria-label", spec.one + "s");
+  const again = () => { put(); renderBlocksCard(); dcLiveFromPanel(); };
+  const move = (k, to) => { if (to < 0 || to >= rows.length) return; const [r] = rows.splice(k, 1); rows.splice(to, 0, r); RW_FOCUS = { idx, k: to }; again(); };
+  rows.forEach((r, k) => {
+    const card = el("div", "rw-card"); card.setAttribute("role", "listitem"); card.dataset.k = String(k);
+    const head = el("div", "rw-head");
+    const grip = el("span", "rw-grip"); grip.innerHTML = typeof PG_GRIP === "string" ? PG_GRIP : "⠿"; grip.setAttribute("aria-hidden", "true"); grip.title = "Drag to reorder";
+    head.appendChild(grip);
+    head.appendChild(el("span", "rw-n", vocabCap(spec.one) + " " + (k + 1)));
+    const up = icoBtn("up", "Move " + spec.one + " " + (k + 1) + " up", "rw-b", 14); up.disabled = k === 0; up.addEventListener("click", () => move(k, k - 1));
+    const dn = icoBtn("down", "Move " + spec.one + " " + (k + 1) + " down", "rw-b", 14); dn.disabled = k === rows.length - 1; dn.addEventListener("click", () => move(k, k + 1));
+    const rm = icoBtn("x", "Remove " + spec.one + " " + (k + 1), "rw-b rw-rm", 14); rm.addEventListener("click", () => { rows.splice(k, 1); again(); });
+    head.append(up, dn, rm); card.appendChild(head);
+    spec.fields.forEach(([key, label, max, kind]) => {
+      if (kind === "icon") { card.appendChild(rwIconPick(r, k, spec.one, put, again, idx)); return; }   // item 304's line icons, on each card
+      let inp;
+      const val = r[key];
+      if (kind === "lines") { inp = el("textarea"); inp.value = Array.isArray(val) ? val.join("\n") : String(val || ""); inp.rows = Math.max(2, inp.value.split("\n").length + 1); }
+      else if (kind === "date" && (!val || /^\d{4}-\d{2}-\d{2}$/.test(String(val)))) { inp = el("input"); inp.type = "date"; inp.value = val || ""; }
+      else { inp = el("input"); inp.type = kind === "url" ? "url" : "text"; inp.value = String(val == null ? "" : val); inp.maxLength = max; inp.placeholder = label; }
+      inp.style.cssText = RW_IN; inp.setAttribute("aria-label", label + ", " + spec.one + " " + (k + 1));
+      inp.addEventListener("change", () => {
+        if (kind === "lines") r[key] = inp.value.split("\n").map((s) => s.trim()).filter(Boolean);
+        else { const v = inp.value.trim(); if (v) r[key] = v; else delete r[key]; }
+        put();
+      });
+      if (kind === "url" && typeof linkPick === "function") { card.appendChild(inp); linkPick(inp); }
+      else card.appendChild(inp);
+      if (kind === "lines" || key === "text" || key === "detail") card.appendChild(aiField(inp, { field: label, write: false }));
+    });
+    // drag to reorder with a mouse; the arrows do it for a finger and a keyboard
+    card.draggable = true;
+    card.addEventListener("dragstart", (e) => { RW_DRAG = k; card.classList.add("rw-dragging"); try { e.dataTransfer.setData("text/plain", String(k)); e.dataTransfer.effectAllowed = "move"; } catch (_) {} });
+    card.addEventListener("dragend", () => { RW_DRAG = null; card.classList.remove("rw-dragging"); list.querySelectorAll(".rw-over").forEach((x) => x.classList.remove("rw-over")); });
+    card.addEventListener("dragover", (e) => { if (RW_DRAG == null || RW_DRAG === k) return; e.preventDefault(); card.classList.add("rw-over"); });
+    card.addEventListener("dragleave", () => card.classList.remove("rw-over"));
+    card.addEventListener("drop", (e) => { if (RW_DRAG == null || RW_DRAG === k) return; e.preventDefault(); move(RW_DRAG, k); });
+    list.appendChild(card);
+  });
+  sub.appendChild(list);
+  const add = el("button", "dc-actbtn", "+ Add a " + spec.one); add.type = "button";
+  add.addEventListener("click", () => { rows.push({ ...spec.blank }); RW_FOCUS = { idx, k: rows.length - 1, first: true }; again(); });
+  sub.appendChild(add);
+  const fold = el("details", "rw-fold"); fold.appendChild(el("summary", null, "Type them as lines instead"));
+  const ta = el("textarea"); ta.value = blockText(def, cur()); ta.rows = Math.max(3, ta.value.split("\n").length + 1); ta.style.cssText = RW_IN + ";margin-top:6px";
+  ta.setAttribute("aria-label", "The " + spec.one + "s, one per line");
+  ta.addEventListener("change", () => { const t2 = ti.value.trim(); BLOCKS_WORK[idx] = wLook(idx, textToBlock(def, t2, ta.value)); renderBlocksCard(); });
+  fold.append(ta, el("div", "hint", def.hint)); if (def.icons) fold.appendChild(iconGrid(ta)); sub.appendChild(fold);   // item 304's grid works on the lines too
+  if (RW_FOCUS && RW_FOCUS.idx === idx) {
+    const f = RW_FOCUS; RW_FOCUS = null;
+    const c = list.children[f.k]; const target = c && (f.first ? c.querySelector("input,textarea") : c.querySelector(".rw-b"));
+    if (target) setTimeout(() => { try { target.focus({ preventScroll: true }); if (f.first && target.select) target.select(); c.scrollIntoView({ block: "nearest" }); } catch (_) {} }, 0);
+  }
+}
+let RW_DRAG = null, RW_FOCUS = null, RW_ICON_OPEN = null;   // RW_ICON_OPEN: "<section index>:<card index>" whose icons are showing
+// A feature's icon on its card: what it is now, and a press opens item 304's line icons (in the
+// site's accent colour), None, and a box for a typed emoji. Stored as "icon:<name>" or the emoji.
+function rwIconPick(r, k, one, put, again, idx) {
+  const wrap = el("div", "rw-icon");
+  const cur = String(r.icon || ""), line = /^icon:/.test(cur) ? cur.slice(5) : "";
+  const accent = dcSiteColours().accent;
+  const svg = (name, px) => '<svg viewBox="0 0 24 24" width="' + px + '" height="' + px + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + LINE_ICONS[name] + "</svg>";
+  const key = idx + ":" + k, open = RW_ICON_OPEN === key;   // a redraw makes new row objects, so the card is named by place
+  const btn = el("button", "rw-icon-now"); btn.type = "button"; btn.setAttribute("aria-expanded", String(open));
+  btn.setAttribute("aria-label", "Icon for " + one + " " + (k + 1) + ": " + (line ? (ICON_WORDS[line] || line) : cur ? cur : "none") + ". Press to change it");
+  wrap.style.setProperty("--rw-accent", accent);   // the line icons draw in the site's accent colour
+  if (line && LINE_ICONS[line]) { const i = el("span", "rw-icon-pic"); i.innerHTML = svg(line, 20); btn.appendChild(i); }
+  else if (cur) btn.appendChild(el("span", "rw-icon-pic", cur));
+  btn.appendChild(el("span", null, line ? (ICON_WORDS[line] || line) : cur ? "Emoji" : "Add an icon"));
+  btn.addEventListener("click", () => { RW_ICON_OPEN = open ? null : key; again(); });
+  wrap.appendChild(btn);
+  if (!open) return wrap;
+  const set = (v) => { if (v) r.icon = v; else delete r.icon; RW_ICON_OPEN = null; again(); };
+  const grid = el("div", "ins-icons"); grid.setAttribute("role", "group"); grid.setAttribute("aria-label", "Line icons, in your accent colour");
+  const none = el("button", "ins-icon rw-icon-none", "None"); none.type = "button"; none.setAttribute("aria-pressed", String(!cur)); none.addEventListener("click", () => set(""));
+  grid.appendChild(none);
+  Object.keys(LINE_ICONS).forEach((name) => {
+    const b = el("button", "ins-icon"); b.type = "button"; b.title = ICON_WORDS[name] || name; b.setAttribute("aria-label", ICON_WORDS[name] || name); b.setAttribute("aria-pressed", String(line === name));
+    b.innerHTML = svg(name, 22);
+    b.addEventListener("click", () => set("icon:" + name));
+    grid.appendChild(b);
+  });
+  wrap.appendChild(grid);
+  const emo = el("input"); emo.type = "text"; emo.maxLength = 12; emo.placeholder = "Or type an emoji"; emo.value = line ? "" : cur; emo.style.cssText = RW_IN;
+  emo.setAttribute("aria-label", "Or type an emoji, " + one + " " + (k + 1));
+  emo.addEventListener("change", () => set(emo.value.trim()));
+  wrap.appendChild(emo);
+  return wrap;
+}
+function renderTableBlockBody(blk, idx, sub, ti) {
+  const cur = () => BLOCKS_WORK[idx];
+  const headers = (Array.isArray(blk.headers) ? blk.headers : []).map(String), rows = (Array.isArray(blk.rows) ? blk.rows : []).map((r) => (Array.isArray(r) ? r.map(String) : []));
+  const cols = Math.max(headers.length, ...rows.map((r) => r.length), 1);
+  while (headers.length < cols) headers.push("");
+  rows.forEach((r) => { while (r.length < cols) r.push(""); });
+  const put = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "table", title: ti.value.trim(), headers: headers.map((h) => h.trim()), rows: rows.map((r) => r.map((c) => c.trim())) }); };
+  const again = () => { put(); renderBlocksCard(); dcLiveFromPanel(); };
+  const grid = el("div", "rw-table"); grid.style.setProperty("grid-template-columns", "repeat(" + cols + ",minmax(96px,1fr)) 36px");
+  const cell = (val, label, onChange, head) => {
+    const inp = el("input"); inp.type = "text"; inp.value = val; inp.maxLength = head ? 80 : 200; inp.setAttribute("aria-label", label); inp.style.cssText = RW_IN + (head ? ";font-weight:600" : "");
+    inp.addEventListener("change", () => { onChange(inp.value); put(); });
+    return inp;
+  };
+  headers.forEach((h, c) => grid.appendChild(cell(h, "Column " + (c + 1) + " heading", (v) => { headers[c] = v; }, true)));
+  const rmc = icoBtn("x", "Remove the last column", "rw-b rw-rm", 14); rmc.disabled = cols <= 1;
+  rmc.addEventListener("click", () => { headers.pop(); rows.forEach((r) => r.pop()); again(); });
+  grid.appendChild(rmc);
+  rows.forEach((r, k) => {
+    r.forEach((v, c) => grid.appendChild(cell(v, "Row " + (k + 1) + ", " + (headers[c] || "column " + (c + 1)), (nv) => { r[c] = nv; })));
+    const rm = icoBtn("x", "Remove row " + (k + 1), "rw-b rw-rm", 14); rm.addEventListener("click", () => { rows.splice(k, 1); again(); }); grid.appendChild(rm);
+  });
+  sub.appendChild(grid);
+  const acts = el("div", "rw-acts");
+  const addR = el("button", "dc-actbtn", "+ Add a row"); addR.type = "button"; addR.addEventListener("click", () => { rows.push(headers.map(() => "")); RW_FOCUS = { idx, k: rows.length - 1, first: true }; again(); });
+  const addC = el("button", "dc-actbtn dc-ghost", "+ Add a column"); addC.type = "button"; addC.addEventListener("click", () => { headers.push(""); rows.forEach((r) => r.push("")); again(); });
+  acts.append(addR, addC); sub.appendChild(acts);
+  if (RW_FOCUS && RW_FOCUS.idx === idx) { const f = RW_FOCUS; RW_FOCUS = null; const inputs = grid.querySelectorAll("input"); const t = inputs[(f.k + 1) * cols]; if (t) setTimeout(() => { try { t.focus({ preventScroll: true }); } catch (_) {} }, 0); }
+  const fold = el("details", "rw-fold"); fold.appendChild(el("summary", null, "Type it as lines instead"));
+  const ta = el("textarea");
+  const toText = () => { const lines = []; if (headers.some(Boolean)) lines.push(headers.join(" | ")); rows.forEach((r) => lines.push(r.join(" | "))); return lines.join("\n"); };
+  ta.value = toText(); ta.placeholder = "Name | Price | Notes\nBasic | $10 | Great to start"; ta.rows = Math.max(4, ta.value.split("\n").length + 1);
+  ta.style.cssText = RW_IN + ";margin-top:6px;font:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px";
+  ta.setAttribute("aria-label", "The table as lines, cells split by |");
+  ta.addEventListener("change", () => {
+    const lines = ta.value.split("\n").map((l) => l.replace(/\s+$/, "")).filter((l) => l.trim());
+    const cells = (l) => l.split("|").map((c) => c.trim());
+    BLOCKS_WORK[idx] = wLook(idx, { type: "table", title: ti.value.trim(), headers: lines.length ? cells(lines[0]) : [], rows: lines.slice(1).map(cells) });
+    renderBlocksCard();
+  });
+  fold.append(ta, el("div", "hint", "One row per line, cells split by “ | ”. The first line is the header row. It scrolls sideways on phones.")); sub.appendChild(fold);
+}
+// "+ Add a row" on the page: a new item with sample words goes on the end, the section is drawn
+// again at once, and the new item's first words are opened for typing (dcLiveNow).
+function dcAddRow(bi) {
+  const b = BLOCKS_WORK[bi]; if (!b || lockStop(bi)) return;
+  const def = BLOCK_DEFS.find((x) => x.type === b.type) || {};
+  if (b.type === "table") {
+    const headers = Array.isArray(b.headers) ? b.headers : [], rows = Array.isArray(b.rows) ? b.rows.slice() : [];
+    const w = Math.max(headers.length, ...(rows.map((r) => (r || []).length)), 1);
+    rows.push(Array.from({ length: w }, (_, i) => (i ? "" : "New row")));
+    b.rows = rows; LIVE_FOCUS = { bi, path: "rows." + (rows.length - 1) + ".0" };
+  } else {
+    const spec = ROW_FIELDS[b.type]; if (!spec) return;
+    const rows = rowsOf(def, b).slice(); rows.push({ ...spec.blank });
+    rowsSet(def, bi, rows);
+    LIVE_FOCUS = { bi, path: rwPath(def, rows.length - 1, spec.fields[0][0]) };
+  }
+  if ($("blocksCard") && PANEL_MODE === "section" && BLOCK_SOLO === bi) renderBlocksCard(); else blocksSaveSoon();
+  dcLiveFromPanel();
+}
+let LIVE_FOCUS = null;   // after the live redraw: the field to open for typing
 // FD-T18 structured team editor — name/role/bio + an optional photo per person.
 function renderTeamBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
@@ -3274,12 +3493,16 @@ function renderCarouselBlockBody(blk, idx, sub, ti) {
     ch.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { cur().slides[k].image_id = id; renderBlocksCard(); } }); });
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
     rm.addEventListener("click", () => { commitTitle(); cur().slides.splice(k, 1); renderBlocksCard(); });
-    acts.append(ch, rm);
+    // item 317: slides reorder with the arrows (44px on a touch screen)
+    const mv = (to) => { if (to < 0 || to >= slides.length) return; commitTitle(); const s2 = cur().slides; const [x] = s2.splice(k, 1); s2.splice(to, 0, x); renderBlocksCard(); dcLiveFromPanel(); };
+    const up = icoBtn("up", "Move slide " + (k + 1) + " earlier", "rw-b", 14); up.disabled = k === 0; up.addEventListener("click", () => mv(k - 1));
+    const dn = icoBtn("down", "Move slide " + (k + 1) + " later", "rw-b", 14); dn.disabled = k === slides.length - 1; dn.addEventListener("click", () => mv(k + 1));
+    acts.append(ch, rm, up, dn);
     col.append(cap, acts); row.appendChild(col); sub.appendChild(row);
   });
   if (slides.length < 12) {
-    const add = el("button", null, "+ Add slide"); add.type = "button"; add.style.cssText = miniBtn;
-    add.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { (BLOCKS_WORK[idx].slides = BLOCKS_WORK[idx].slides || []).push({ image_id: id }); renderBlocksCard(); } }); });
+    const add = el("button", null, "+ Add slides"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); openPicker((got) => { const list = (Array.isArray(got) ? got : got ? [got] : []).slice(0, 12 - slides.length); if (list.length) { const b = BLOCKS_WORK[idx]; b.slides = (b.slides || []).concat(list.map((id) => ({ image_id: id }))); renderBlocksCard(); } }, { many: true }); });   // item 317
     sub.appendChild(add);
   }
   sub.appendChild(el("div", "hint", "Up to 12 slides. Visitors swipe on phones or scroll with the keyboard — no plugins, and every image keeps its alt text."));
@@ -4037,7 +4260,7 @@ async function dcTimewarpGo() {
     if (seq !== DC_TW_SEQ || DC_MODE !== "timewarp") return;   // superseded while fetching
     const frame = $("designPreview");
     if (frame) {
-      const path = DC_PAGE ? `/${DC_PAGE}/` : "/";   // the page open on the canvas
+      const path = dcPagePath();   // the page open on the canvas
       const html = await apiHtml(`/preview?publish_id=${encodeURIComponent(d.publish_id)}&page=${encodeURIComponent(path)}`);
       if (seq !== DC_TW_SEQ || DC_MODE !== "timewarp") return;
       DP_PAINT_OPEN = DC_PAGE_OPENS;
@@ -4126,6 +4349,8 @@ function toggleTray(tab) {
 function closeSettingsPanel() {
   const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
   p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
+  if (typeof dcUnhostView === "function") dcUnhostView();   // item 314
+  if (PANEL_MODE === "core") { PANEL_MODE = "styles"; p.dataset.mode = "styles"; }
   dcHFMark(null);
   dcColourAids();
   if (sc) { sc.classList.remove("on"); sc.hidden = true; }
@@ -4308,8 +4533,9 @@ const PANEL_TITLES = { styles: "Styles", sections: "All sections", forms: "Forms
 const PANEL_SUBS = { styles: "Changes show as you pick", sections: "Ready-made layouts and saved sections", forms: "Forms on this page", header: "On every page", footer: "On every page" };
 function openSettingsPanel(mode, title) {
   const p = $("settingsPanel"), sc = $("dcScrim"); if (!p) return;
-  const m = PANEL_TITLES[mode] || mode === "section" ? mode : "styles";
+  const m = PANEL_TITLES[mode] || mode === "section" || mode === "core" ? mode : "styles";
   if (PANEL_MODE === "section" && m !== "section") BLOCK_SOLO = null;
+  if (m !== "core" && typeof dcUnhostView === "function") dcUnhostView();   // item 314: the tab's form goes back to its tab
   closeTrayPanel(); closeCommentsPanel(); closePagesCard(false);
   PANEL_LASTFOCUS = document.activeElement;
   PANEL_MODE = m; p.dataset.mode = m;
@@ -4322,7 +4548,7 @@ function openSettingsPanel(mode, title) {
   if (m === "section") { insSyncSeg(); const sc = p.querySelector(".dc-panel-scroll"); if (sc) sc.scrollTop = 0; }
   if (m === "styles") stylesTab(STYLES_TAB);
   p.setAttribute("aria-label", name);
-  const modal = ["section", "styles", "header", "footer"].indexOf(m) < 0;   // a section, a style, the header or footer: keep the page in view, undimmed
+  const modal = ["section", "styles", "header", "footer", "core"].indexOf(m) < 0;   // a section, a style, the header or footer: keep the page in view, undimmed
   p.setAttribute("aria-modal", String(modal));
   const cl = $("btnSettingsClose");
   if (cl) { if (modal) cl.innerHTML = uiIcon("x", 16); else cl.textContent = "Done"; cl.setAttribute("aria-label", modal ? "Close" : "Done"); cl.title = (modal ? "Close" : "Done") + " (Esc)"; }
@@ -4994,7 +5220,7 @@ function insFinish(panes, idx, blk, def) {
 function dcSyncPageSwitch() {
   const list = typeof dcPageList === "function" ? dcPageList() : [];
   const cur = list.find((p) => p.slug === DC_PAGE) || list[0];
-  const nm = $("dcPageName"); if (nm) nm.textContent = cur ? cur.title : "Home";
+  const nm = $("dcPageName"); if (nm) nm.textContent = dcBuiltinPage() ? dcPageTitle(DC_PAGE) : cur ? cur.title : "Home";
   const ct = $("dcPageCount"); if (ct) dcPageStatus(ct);
 }
 // Item 125: the page being edited says where it stands, beside its name, in the Pages card's
@@ -5002,7 +5228,8 @@ function dcSyncPageSwitch() {
 // site has never been published), or what its check found (Needs a look).
 function dcPageStatus(chip) {
   const ctx = pgStatusCtx(), m = typeof pgModel === "function" ? pgModel() : { menu: [], unlinked: [] };
-  const pg = [...m.menu.map((e) => e.pg), ...m.unlinked].find((p) => p && p.view === "design" && (p.slug || "") === DC_PAGE);
+  const bk = dcBuiltinKey(DC_PAGE);
+  const pg = [...m.menu.map((e) => e.pg), ...m.unlinked].find((p) => p && (bk ? p.key === bk : p.view === "design" && (p.slug || "") === DC_PAGE));
   let word = "Live", tone = "good", says = "Nothing on this page is waiting: your live site shows it as it is here";
   const tp = pg ? hbTreePage(pg) : null;
   const acc = (pg && pg.slug && (dcPageObj(pg.slug) || {}).access) || "";   // item 196: a private or password page isn't plainly "Live"
@@ -5021,7 +5248,7 @@ function pgStatusCtx() {
   const live = !!(S.health && S.health.facts && S.health.facts.website.state !== "none");
   return { live, siteLive: live || !!(typeof siteLiveUrl === "function" && siteLiveUrl()), changes: (S.changes && S.changes.changes) || [], firstPublish: !!(S.changes && S.changes.first_publish) };
 }
-function dcSyncLiveChip() { const c = $("dcLiveChip"); if (c) c.hidden = !(typeof siteLiveUrl === "function" && siteLiveUrl()); }
+function dcSyncLiveChip() { const c = $("dcLiveChip"); if (c) c.hidden = !(S.live ? S.live.is_live : (typeof siteLiveUrl === "function" && siteLiveUrl())); }   // item 261: the server's rule
 // a tablet's left card takes the dock's place while it's open (the CSS reads this class)
 // (Add, Photos and Pages; the page outline is Notes mode's own list, so it keeps the dock and its way back to Edit)
 function dcLeftSync() { const t = $("trayPanel"); document.documentElement.classList.toggle("dc-lefton", !!(PAGES_OPEN || (t && t.classList.contains("on") && DC_RAIL_TAB !== "contents"))); }
@@ -5563,37 +5790,19 @@ function mountPanelFiles() {
     body.appendChild(grid);
     // Upload a photo · Open Files
     const acts = el("div", "pf-acts");
-    const up = el("button", "dc-actbtn", "Upload a photo"); up.type = "button";
-    const file = el("input"); file.type = "file"; file.id = "pfFile"; file.accept = "image/jpeg,image/png,image/webp"; file.hidden = true; file.setAttribute("aria-label", "Choose a photo to upload");
+    const up = el("button", "dc-actbtn", "Upload photos"); up.type = "button";
+    const file = el("input"); file.type = "file"; file.id = "pfFile"; file.accept = "image/jpeg,image/png,image/webp"; file.multiple = true; file.hidden = true; file.setAttribute("aria-label", "Choose photos to upload");
     up.addEventListener("click", () => file.click());
     const link = el("button", "dc-actbtn dc-ghost", "Open Files"); link.type = "button";
     link.title = "The full Files library — versions, where-used, crops";
     link.addEventListener("click", () => { closeDesignPanels(); go("media"); });
     acts.append(up, link); body.appendChild(acts); body.appendChild(file);
-    // a few words about the photograph, then it joins the collection: the same door Files uses
-    const prep = el("div", "pf-upload"); prep.hidden = true;
-    const alt = el("input"); alt.type = "text"; alt.maxLength = 200; alt.placeholder = "Describe this photograph — e.g. Fresh pasta on a white plate"; alt.setAttribute("aria-label", "Describe this photograph");
-    const row = el("div", "row");
-    const goB = el("button", "dc-actbtn", "Add it"); goB.type = "button";
-    const nm = el("button", "dc-actbtn dc-ghost", "Never mind"); nm.type = "button";
-    row.append(goB, nm); prep.append(alt, row); body.appendChild(prep);
-    file.addEventListener("change", () => { if (!file.files[0]) return; prep.hidden = false; alt.value = ""; alt.focus(); });
-    nm.addEventListener("click", () => { prep.hidden = true; file.value = ""; });
-    goB.addEventListener("click", async () => {
-      const f = file.files[0], words = alt.value.trim(); if (!f) { prep.hidden = true; return; }
-      if (words.length < 3) { toast("A few words about the photograph first — it matters.", true); alt.focus(); return; }
-      goB.disabled = true; goB.textContent = "Bringing it in…";
-      try {
-        const dims = await new Promise((res) => { const img = new Image(); img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight }); img.onerror = () => res({}); img.src = URL.createObjectURL(f); });
-        const r = await api("POST", "/media/upload-url", { mime: f.type, bytes: f.size, alt_text: words, width: dims.w, height: dims.h });
-        const put = await fetch(r.data.upload_url, { method: "PUT", headers: { "Content-Type": f.type }, body: f });
-        if (!put.ok) throw new Error("The photograph didn’t finish arriving — nothing was lost, try once more.");
-        prep.hidden = true; file.value = "";
-        await loadMedia(); PF_S.key = null; pfRefresh(); toast("In the collection");
-      } catch (err) { toast(nice(err), true); }
-      goB.disabled = false; goB.textContent = "Add it";
-    });
-    body.appendChild(el("div", "pf-note", "Tap a photo to use it: it fills the image you’re choosing for, or becomes a new photo section. Edit crops, straightens and removes a background; saving always makes a new copy."));
+    // item 317: several at once, or dropped on the panel; big ones made smaller here; the
+    // descriptions asked for once they are in (dcUploadPhotos, the same door Files uses)
+    const after = () => { PF_S.key = null; pfRefresh(); };
+    file.addEventListener("change", async () => { const fs = Array.from(file.files || []); file.value = ""; if (!fs.length) return; up.disabled = true; try { await dcUploadPhotos(fs); } finally { up.disabled = false; } after(); });
+    dcDropPhotos(body, after);
+    body.appendChild(el("div", "pf-note", "Tap a photo to use it: it fills the image you’re choosing for, or becomes a new photo section. Drop photos here to add them. Edit crops, straightens and removes a background; saving always makes a new copy."));
     host.appendChild(body);
   }
   pfRefresh(true);
@@ -5798,9 +6007,11 @@ function spliceMove(arr, from, gap) {
   return true;
 }
 function addBlockAt(d, at) {
+  if (dcBuiltinPage()) { toast("This page is built from " + dcBuiltinFrom(dcBuiltinPage().view) + ". Add sections on Home or on a page of your own."); return -1; }   // item 314
   dcSoloEnd();
   const blk = emptyBlock(d);   // REUSE the exact block factory the click path uses
   const i = Math.max(0, Math.min(at, BLOCKS_WORK.length));
+  const slot = dcCanvasSlot(i);   // item 318: its place on the page, read before the list moves
   // G13 fix (review finding 1): THE insert splice (dcAddAt, the insert menu,
   // the drag-drop add, the rail's append all land here) — compose the shift
   // over the clamped index BEFORE the splice, so the canvas DOM's stale
@@ -5809,6 +6020,7 @@ function addBlockAt(d, at) {
   BLOCKS_WORK.splice(i, 0, blk);
   BLOCK_FOCUS = i; DC_FOCUS_BI = i;   // canvas will scroll to + flash this new section after reload
   renderBlocksCard();
+  dcCanvasAdded(i, slot);   // item 318: on the page at once
   return i;   // the index it ACTUALLY used — callers stamp the new block via this, never a re-derived clamp
 }
 function moveBlockTo(from, gap) {
@@ -6140,12 +6352,29 @@ function openInsertMenu(atIndex, anchor, rectOverride) {
 
 // ── CP-2.5: live style preview — the EXISTING /preview pipeline, nothing new ──
 let designPreviewTimer = null;
-function dpNote(title, body) {
+function dpNote(title, body, act) {
   const box = $("designPreviewEmpty"); if (!box) return;
   const t = $("dpEmptyTitle"), b = $("dpEmptyBody");
   if (t) t.textContent = title;
   if (b) b.textContent = body;
+  // builder item 314: a note can carry its own one way forward in place of the two starting links
+  const ea = box.querySelector(".ea");
+  if (ea) {
+    ea.querySelectorAll(".dp-act").forEach((n) => n.remove());
+    Array.prototype.forEach.call(ea.children, (n) => { n.hidden = !!act; });
+    if (act) { const a = el("button", "textact dp-act", act.label); a.type = "button"; a.addEventListener("click", act.run); ea.appendChild(a); }
+  }
   box.hidden = false;
+}
+// Item 314 with item 297: the FAQ and Updates pages are not drawn until they have something on
+// them, so opening one on the canvas says that and offers the card that fills it.
+function dpBuiltinEmpty() {
+  const bp = dcBuiltinPage(); if (!bp) return false;
+  const frame = $("designPreview"); if (frame) frame.srcdoc = "";
+  if (bp.key === "faq") dpNote("Your FAQ page isn’t on your site yet.", "It appears, here and on your live site, once it has a question.", { label: "Add a question →", run: () => eeEditCore("faqs") });
+  else if (bp.key === "updates") dpNote("Your Updates page isn’t on your site yet.", "It appears, here and on your live site, once an update is published.", { label: "Write an update →", run: () => eeEditCore("updates") });
+  else dpNote("This page isn’t on your site yet.", "It appears once there is something on it.", { label: "Change what’s on it →", run: () => eeEditCore(bp.view) });
+  return true;
 }
 // G13: a repaint replaces the canvas document, and the caret and every later
 // keystroke of an open in-place session would go with it — so it waits for the
@@ -6183,7 +6412,7 @@ function refreshDesignPreview() {
     // build surface, not a dead sheet. No early-return-on-empty any more.
     const opened = DC_PAGE_OPENS, read = ++DP_READS;
     try {
-      const path = DC_PAGE ? `/${DC_PAGE}/` : "/";   // multi-page: preview the CURRENT page
+      const path = dcPagePath();   // multi-page: preview the CURRENT page
       const html = await apiHtml("/preview?version=draft&page=" + encodeURIComponent(path));
       if (opened !== DC_PAGE_OPENS) return;   // the page changed while this read was out; the new page has its own
       if (read < DP_READ_PAINTED) return;
@@ -6202,6 +6431,7 @@ function refreshDesignPreview() {
         dpNote("Editing isn’t part of this plan.", "This plan watches a website that lives somewhere else. Design opens up on a plan with the website builder.");
         return;
       }
+      if (err && err.status === 404 && dpBuiltinEmpty()) { DP_PAINT_OPEN = opened; DP_READ_PAINTED = read; return; }   // item 314 with 297
       // the big proof ("See your site") still works — say so rather than staying blank,
       // or on the page just left
       if (!frame.srcdoc || frame.inert) dpNote("The preview couldn’t load just now.",
@@ -6210,6 +6440,58 @@ function refreshDesignPreview() {
   }, 350);
 }
 let DC_FOCUS_BI = null; // a just-added/dropped block index → scroll the canvas to it + flash it after reload
+// ── Builder item 318: the page moves the moment a section is added, moved, copied or deleted ──
+// Each splice below finds its section on the canvas BEFORE the list changes (the stamps and
+// DDS_SRCMAP still describe the old list), changes the list, then moves, removes or puts in
+// the drawing at once. The save goes out as before and its redraw lands over this; a save the
+// server refuses puts the list and the page back (putBlocks). A section drawn here carries a
+// stamp no server render uses, mapped in DDS_SRCMAP, so a press on it resolves until the redraw.
+let DC_FRESH_N = 0;
+let DC_FOCUS_SOFT = false;   // the redraw keeps the section in view without flashing it again
+function dcCanvasMain() { const doc = dcFrameDoc(), main = doc && doc.getElementById("main"); return main ? { doc, main } : null; }
+function dcCanvasEl(bi) { const c = dcCanvasMain(); if (!c) return null; const hit = dcBlockSections(c.main).find((s) => s.bi === bi); return hit ? hit.el : null; }
+// where a section at list index `at` goes: before the section now at `at`, else after the last one
+function dcCanvasSlot(at) {
+  const c = dcCanvasMain(); if (!c) return null;
+  const list = dcBlockSections(c.main), before = list.find((s) => s.bi === at);
+  return { doc: c.doc, main: c.main, before: before ? before.el : null, after: !before && list.length ? list[list.length - 1].el : null };
+}
+function dcStampFresh(el2, bi) {
+  const key = 100000 + (++DC_FRESH_N);
+  el2.setAttribute("data-dds-src", String(key)); el2.removeAttribute("data-dds-sid"); el2.removeAttribute("data-dds-key"); el2.removeAttribute("id");
+  el2.setAttribute("data-dc-fresh", "1");
+  if (!DDS_SRCMAP) dcComposeSrcMap((BLOCKS_WORK || []).length, (v) => v);
+  DDS_SRCMAP[key] = bi;
+}
+function dcCanvasPut(slot, el2) {
+  if (!slot) return false;
+  if (slot.before) slot.before.before(el2);
+  else if (slot.after) slot.after.after(el2);
+  else { const z = slot.main.querySelector(".dc-emptyzone"); if (z) z.before(el2); else slot.main.appendChild(el2); }
+  return true;
+}
+function dcCanvasShow(el2, flash, bi) {
+  try {
+    el2.scrollIntoView({ block: "nearest", behavior: pdReducedMotion() ? "auto" : "smooth" });
+    if (flash) { el2.classList.add("dc-justadded"); setTimeout(() => { try { el2.classList.remove("dc-justadded"); } catch (_) {} }, 1500); }
+    const doc = el2.ownerDocument; if (doc.__dcShowBar && !IPE && window.innerWidth > 760) doc.__dcShowBar(el2);
+  } catch (_) {}
+  if (bi != null) { DC_FOCUS_BI = bi; DC_FOCUS_SOFT = true; }   // the redraw keeps it in view, quietly
+  DC_SCROLL = null;
+}
+function dcCanvasDrop(el2) { try { const doc = el2.ownerDocument; if (doc.__dcHideBar) doc.__dcHideBar(); el2.remove(); } catch (_) {} dcCaptureScroll(); }
+// A section added here shows as a named placeholder until the save's redraw draws it for real.
+function dcGhostSection(doc, name) {
+  const s = doc.createElement("section"); s.className = "block wrap dc-ghost"; s.setAttribute("aria-busy", "true");
+  const inner = doc.createElement("div"); inner.className = "dc-ghost-in"; inner.textContent = "Adding " + name + "…"; s.appendChild(inner);
+  return s;
+}
+function dcCanvasAdded(bi, slot) {
+  const c = dcCanvasMain(); if (!c || !slot) return;
+  const def = BLOCK_DEFS.find((x) => x.type === (BLOCKS_WORK[bi] || {}).type) || {};
+  const ghost = dcGhostSection(c.doc, (def.name || "section").toLowerCase());
+  dcStampFresh(ghost, bi); dcCanvasPut(slot, ghost); dcCanvasShow(ghost, true, bi);
+}
 
 // ── canvas block ops — all REUSE the existing list model, then persist + redraw ──
 // saveBlocks() PUTs /settings then refreshDesignPreview(), which reloads the iframe;
@@ -6251,13 +6533,17 @@ function dcShiftIndex(i, at, delta) {
 // acts on the section it shows, not the neighbour now at that index.
 function panelSwap(idx, to) {
   const o = BLOCKS_WORK;
+  const a = dcCanvasEl(idx), b = dcCanvasEl(to);   // item 318: the two on the page swap too
   [o[to], o[idx]] = [o[idx], o[to]];
+  if (a && b) { const mark = a.ownerDocument.createComment("swap"); a.replaceWith(mark); b.replaceWith(a); mark.replaceWith(b); dcCanvasShow(a, false, to); }
   if (DDS_SIDMAP) Object.keys(DDS_SIDMAP).forEach((sid) => { DDS_SIDMAP[sid] = dcPermuteIndex(DDS_SIDMAP[sid], idx, to); });
   dcComposeSrcMap(o.length, (v) => dcPermuteIndex(v, idx, to));
 }
 function panelRemove(idx) {
+  const el2 = dcCanvasEl(idx);
   dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, idx, -1));   // before the splice, like dcDelete
   BLOCKS_WORK.splice(idx, 1);
+  if (el2) dcCanvasDrop(el2);   // item 318: off the page at once
 }
 function dcComposeSrcMap(n, fn) {
   const prev = DDS_SRCMAP, next = {};
@@ -6268,7 +6554,9 @@ function dcComposeSrcMap(n, fn) {
 function dcMove(from, gap) {
   dcSoloEnd();
   dcCaptureScroll();
+  const el2 = dcCanvasEl(from), slot = dcCanvasSlot(gap);   // item 318: read before the list moves
   if (!moveBlockTo(from, gap)) return false;   // dropped back onto its own slot → no save, no reload
+  if (el2 && slot && slot.before !== el2 && slot.after !== el2) { dcCanvasPut(slot, el2); dcCanvasShow(el2, false, dndDropIndex(from, gap)); }
   // BLOCKS_WORK just changed under the tree's feet: shift the sid→index map by
   // the same permutation, then rebuild the tree NOW — its data-bi stamps and
   // pointerdown closures must match BLOCKS_WORK even if the save/reload never
@@ -6331,7 +6619,10 @@ function dcDuplicate(bi) {
   const copy = JSON.parse(JSON.stringify(b)); delete copy._clEdit; delete copy.lock;
   if (def && def.multi) copy.id = uniqueBlockId(b.type);   // multi-instance blocks get a fresh render key
   // G13 fix (review finding 1): compose the insertion shift BEFORE the splice.
-  dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi + 1, 1)); BLOCKS_WORK.splice(bi + 1, 0, copy); BLOCK_FOCUS = bi + 1; DC_FOCUS_BI = bi + 1; renderBlocksCard(); saveBlocks();
+  const src = dcCanvasEl(bi);   // item 318: the copy is drawn from the original at once
+  dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi + 1, 1)); BLOCKS_WORK.splice(bi + 1, 0, copy); BLOCK_FOCUS = bi + 1; DC_FOCUS_BI = bi + 1; renderBlocksCard();
+  if (src) { const nu = src.cloneNode(true); nu.classList.remove("dc-hot"); nu.removeAttribute("data-dc"); dcStampFresh(nu, bi + 1); src.after(nu); try { dcInjectCanvas(src.ownerDocument, src.parentElement, true); } catch (_) {} dcCanvasShow(nu, true, bi + 1); }
+  saveBlocks();
 }
 async function dcDelete(bi) {
   dcSoloEnd();
@@ -6339,9 +6630,12 @@ async function dcDelete(bi) {
   const def = BLOCK_DEFS.find((x) => x.type === b.type);
   if (!(await askYes("Delete this " + (((def && def.name) || "section").toLowerCase()) + "? Your live site is unchanged until you publish.", { ok: "Delete", danger: true }))) return;
   bi = BLOCKS_WORK.indexOf(b); if (bi < 0) return;   // read again: the list can move while the question is up
+  const el2 = dcCanvasEl(bi);
   // G13 fix (review finding 1): compose the removal shift BEFORE the splice
   // (pre-splice length = the DOM's stamp domain) so stale stamps keep resolving.
-  dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi, -1)); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
+  dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi, -1)); BLOCKS_WORK.splice(bi, 1); renderBlocksCard();
+  if (el2) dcCanvasDrop(el2);   // item 318: gone from the page at once
+  saveBlocks();
 }
 // ── Copy / Cut / Paste a section (AEM parity) — a section clipboard ─────────────
 // The clipboard holds ONE section (deep copy), persisted to sessionStorage so it
@@ -6362,8 +6656,11 @@ function dcCutBlock(bi) {
   dcSoloEnd();
   const b = BLOCKS_WORK[bi]; if (!b || lockStop(bi)) return;
   dcCopyBlock(bi);
+  const el2 = dcCanvasEl(bi);
   // G13 fix (review finding 1): same removal shift as dcDelete, pre-splice.
-  dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi, -1)); BLOCKS_WORK.splice(bi, 1); renderBlocksCard(); saveBlocks();
+  dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, bi, -1)); BLOCKS_WORK.splice(bi, 1); renderBlocksCard();
+  if (el2) dcCanvasDrop(el2);   // item 318
+  saveBlocks();
   toast("Cut — paste it anywhere with the ＋ points");
 }
 function dcPasteAt(gap) {
@@ -6372,8 +6669,11 @@ function dcPasteAt(gap) {
   const blk = JSON.parse(JSON.stringify(clip)); delete blk._clEdit; delete blk.lock;
   if (blk.id) blk.id = uniqueBlockId(blk.type + "_" + blk.id);   // MULTI blocks get a fresh render key
   const at = Math.max(0, Math.min(gap == null ? BLOCKS_WORK.length : gap, BLOCKS_WORK.length));
+  const slot = dcCanvasSlot(at);
   // G13 fix (review finding 1): compose the insertion shift BEFORE the splice.
-  dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, at, 1)); BLOCKS_WORK.splice(at, 0, blk); BLOCK_FOCUS = at; DC_FOCUS_BI = at; renderBlocksCard(); saveBlocks();
+  dcCaptureScroll(); dcComposeSrcMap(BLOCKS_WORK.length, (v) => dcShiftIndex(v, at, 1)); BLOCKS_WORK.splice(at, 0, blk); BLOCK_FOCUS = at; DC_FOCUS_BI = at; renderBlocksCard();
+  dcCanvasAdded(at, slot);   // item 318
+  saveBlocks();
 }
 const DCK_ARIA = { "⌘": "Meta", Ctrl: "Control", "⌥": "Alt", Alt: "Alt", "⇧": "Shift", Shift: "Shift", "⌫": "Backspace", Delete: "Delete", "↑": "ArrowUp", "↓": "ArrowDown" };
 const dcKeysAria = (keys) => keys.map((k) => DCK_ARIA[k] || k).join("+");
@@ -6980,7 +7280,7 @@ function ipeStart(doc, fieldEl, secEl) {
   fieldEl.addEventListener('drop', ipeDrop);
   fieldEl.addEventListener('dragover', ipeDragover);
   fieldEl.addEventListener('beforeinput', ipeBeforeInput);   // F-4: native format gestures route through the guarded wrap
-  if (md) ipeShowBar(doc, fieldEl);
+  ipeShowBar(doc, fieldEl);   // item 316: every field has its bar
   try { fieldEl.focus(); } catch (_) {}
   // keep the double-click's own selection when it landed inside; else caret at end
   try {
@@ -7124,28 +7424,161 @@ function ipeCommit() {
   ipeAnnounce(s.doc, 'Saving…');
   ipeSaveSoon();
 }
-// ── the md mini-bar: B · I · Link (the inline subset; H2/lists stay a panel capability) ──
+// ── Builder item 319: a floating bar sits clear of the words it belongs to ──
+// Above the element when the gap to whatever is above it (the thing before it in its section,
+// else the section's own top) holds the bar; else below it when that gap does; else above,
+// pushed to the element's right end, where a heading's words least often reach. Never under
+// the dock, and never off the screen's top.
+function dcFloatClear(doc, node, bar, gap) {
+  const win = doc.defaultView, r = node.getBoundingClientRect(), h = bar.offsetHeight || 36, w = bar.offsetWidth || 0, ins = dcChromeInsets(), g = gap == null ? 8 : gap;
+  const vw = doc.documentElement.clientWidth, sy = win.scrollY, sx = win.scrollX;
+  const sec = node.closest("section,nav") || node.parentElement;
+  const seen = (n) => n && n.getBoundingClientRect().height > 0;
+  let p = node.previousElementSibling; while (p && !seen(p)) p = p.previousElementSibling;
+  let n = node.nextElementSibling; while (n && !seen(n)) n = n.nextElementSibling;
+  const prevBottom = p ? p.getBoundingClientRect().bottom : sec ? sec.getBoundingClientRect().top : -Infinity;
+  const nextTop = n ? n.getBoundingClientRect().top : sec ? sec.getBoundingClientRect().bottom : Infinity;
+  let y, right = false;
+  if (r.top - prevBottom >= h + g && r.top - h - g >= 4) y = r.top - h - g;
+  else if (nextTop - r.bottom >= h + g && r.bottom + h + g <= win.innerHeight - 4) y = r.bottom + g;
+  else if (r.top - h - g >= 4) { y = r.top - h - g; right = true; }
+  else y = r.bottom + g;
+  const x = Math.max(sx + 8 + ins.left, Math.min((right ? r.right - w : r.left - 6) + sx, sx + vw - ins.right - w - 8));
+  bar.style.setProperty("left", x + "px"); bar.style.setProperty("top", (y + sy) + "px");
+}
+// ── Builder item 316: one small bar on every piece of text ──
+// Words with formatting (a text box, a card's words) get bold, italic, a link, heading, list
+// and quote, which the stored words can hold. Every field, a heading too, gets the section's
+// own words settings: left or centre, a size step and a colour from the site's palette, the
+// same ones the Style tab keeps, shown on the section at once and saved with it.
+const IPE_SIZES = ["", "l", "xl", "s"], IPE_SIZE_WORDS = { "": "Normal", s: "Smaller", l: "Larger", xl: "Extra large" };
+function ipeBlockOf() {   // the paragraph, heading, list item or quote the caret is in
+  const s = IPE; if (!s || !s.md) return null;
+  try {
+    const sel = s.doc.getSelection(); if (!sel.rangeCount) return null;
+    let n = sel.getRangeAt(0).startContainer; if (n.nodeType === 3) n = n.parentNode;
+    for (let p = n; p && p !== s.el; p = p.parentNode) { if (p.nodeType === 1 && /^(P|DIV|H2|H3|H4|LI|BLOCKQUOTE)$/.test(String(p.tagName).toUpperCase()) && s.el.contains(p)) return p; }
+  } catch (_) {}
+  return null;
+}
+function ipeRetag(node, tag) {   // the same words in another kind of block, the caret kept inside
+  const s = IPE, doc = s.doc, nu = doc.createElement(tag);
+  while (node.firstChild) nu.appendChild(node.firstChild);
+  node.replaceWith(nu);
+  s.dirty = true;
+  ipeCaretIn(nu);
+  return nu;
+}
+function ipeHeading() {   // paragraph → heading → smaller heading → paragraph
+  const b = ipeBlockOf(); if (!b) return;
+  const t = String(b.tagName).toUpperCase();
+  if (t === 'LI' || t === 'BLOCKQUOTE') { toast('Take it out of the list or quote first.'); return; }
+  ipeRetag(b, t === 'H2' ? 'h3' : t === 'H3' ? 'p' : 'h2');
+  ipeShowBar(IPE.doc, IPE.el);
+}
+function ipeList() {
+  const s = IPE, b = ipeBlockOf(); if (!b) return;
+  const doc = s.doc, t = String(b.tagName).toUpperCase();
+  if (t === 'LI') {   // out of the list: the item becomes a paragraph beside what's left of the list
+    const ul = b.parentNode, p = ipeRetag(b, 'p');
+    if (!ul || !/^(UL|OL)$/.test(String(ul.tagName).toUpperCase())) return;
+    const items = Array.prototype.filter.call(ul.children, (x) => x !== p);
+    const after = items.filter((x) => p.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING);
+    if (!items.length) ul.replaceWith(p);
+    else if (!after.length) ul.after(p);
+    else if (after.length === items.length) ul.before(p);
+    else { const rest = doc.createElement(ul.tagName.toLowerCase()); after.forEach((x) => rest.appendChild(x)); ul.after(p); p.after(rest); }
+    ipeCaretIn(p);   // moving it out dropped the caret again
+    s.dirty = true;
+  } else if (t === 'BLOCKQUOTE') { toast('Take it out of the quote first.'); return; }
+  else { const ul = doc.createElement('ul'); b.replaceWith(ul); ul.appendChild(b); ipeRetag(b, 'li'); }
+  ipeShowBar(s.doc, s.el);
+}
+function ipeCaretIn(node) {   // moving a block drops the browser's selection: put the caret back at its end, the field focused
+  try { const doc = IPE.doc, sel = doc.getSelection(), r = doc.createRange(); IPE.el.focus({ preventScroll: true }); r.selectNodeContents(node); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); } catch (_) {}
+}
+function ipeQuote() {
+  const s = IPE, b = ipeBlockOf(); if (!b) return;
+  const doc = s.doc, t = String(b.tagName).toUpperCase();
+  const q = t === 'BLOCKQUOTE' ? b : (b.parentNode && String(b.parentNode.tagName).toUpperCase() === 'BLOCKQUOTE' ? b.parentNode : null);
+  if (q) { const first = q.firstElementChild || q.firstChild; while (q.firstChild) q.before(q.firstChild); q.remove(); if (first) ipeCaretIn(first); s.dirty = true; }
+  else if (t === 'LI') { toast('Take it out of the list first.'); return; }
+  else { const nq = doc.createElement('blockquote'); b.replaceWith(nq); nq.appendChild(b); ipeCaretIn(b); s.dirty = true; }
+  ipeShowBar(s.doc, s.el);
+}
+// The section's own words settings (the Style tab's), shown on the section at once the way
+// the server draws them (lib/site_blocks.ts ov-* classes), saved with the section.
+function ipeStyle(patch) {
+  const s = IPE; if (!s) return;
+  const c = eeClassify(s.sec); if (c.kind !== 'block' || !BLOCKS_WORK[c.bi] || lockedForMe(BLOCKS_WORK[c.bi])) return;
+  const b = { ...BLOCKS_WORK[c.bi] }, st = { ...(b.style || {}) };
+  Object.keys(patch).forEach((k) => { if (patch[k]) st[k] = patch[k]; else delete st[k]; });
+  if ('text_color' in patch) delete st.contrast_ack;
+  if (Object.keys(st).length) b.style = st; else delete b.style;
+  BLOCKS_WORK[c.bi] = b;
+  const sec = s.sec;
+  ['left', 'center', 'right'].forEach((a) => sec.classList.toggle('ov-align-' + a, st.align === a));
+  ['s', 'l', 'xl'].forEach((z) => sec.classList.toggle('ov-size-' + z, st.size === z));
+  if (st.text_color) { sec.style.setProperty('--ov-ink', st.text_color); sec.classList.add('ov-ink'); } else { sec.style.removeProperty('--ov-ink'); sec.classList.remove('ov-ink'); }
+  blocksSaveSoon();
+  if ($('blocksCard') && PANEL_MODE === 'section') renderBlocksCard();
+  ipeShowBar(s.doc, s.el);
+}
 function ipeShowBar(doc, el2) {
   let bar = doc.getElementById('dds-ipe-bar');
   if (!bar) {
     bar = doc.createElement('div'); bar.id = 'dds-ipe-bar';
     bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', 'Text formatting');
-    const mk = (label, aria, fn) => {
-      const b = doc.createElement('button'); b.type = 'button'; b.textContent = label;
-      b.setAttribute('aria-label', aria); b.title = aria;
-      // mousedown (default prevented) keeps the session's focus + selection
-      b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
-      return b;
-    };
+    doc.body.appendChild(bar);
+  }
+  const s = IPE, md = !!(s && s.md), c = s ? eeClassify(s.sec) : null;
+  const blk = c && c.kind === 'block' ? BLOCKS_WORK[c.bi] : null, st = (blk && blk.style) || {};
+  const open = bar.classList.contains('colours');
+  bar.textContent = '';
+  const mk = (label, aria, fn, cls) => {
+    const b = doc.createElement('button'); b.type = 'button'; b.textContent = label; if (cls) b.className = cls;
+    b.setAttribute('aria-label', aria); b.title = aria;
+    // mousedown (default prevented) keeps the session's focus + selection
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
+    return b;
+  };
+  const sep = () => { const n = doc.createElement('span'); n.className = 'ipe-sep'; n.setAttribute('aria-hidden', 'true'); return n; };
+  if (md) {
     bar.appendChild(mk('B', 'Bold', () => ipeWrapSel('strong')));
     bar.appendChild(mk('I', 'Italic', () => ipeWrapSel('em')));
     bar.appendChild(mk('Link', 'Add a link', () => ipeLink()));
-    doc.body.appendChild(bar);
+    const b = ipeBlockOf(), t = b ? String(b.tagName).toUpperCase() : '';
+    bar.appendChild(mk('H', 'Heading: a paragraph becomes a heading, a heading a smaller one, then a paragraph again', ipeHeading, t === 'H2' || t === 'H3' ? 'ipe-on' : ''));
+    bar.appendChild(mk('List', t === 'LI' ? 'Take this out of the list' : 'Make this a list item', ipeList, t === 'LI' ? 'ipe-on' : ''));
+    const inQ = t === 'BLOCKQUOTE' || (b && b.parentNode && String(b.parentNode.tagName).toUpperCase() === 'BLOCKQUOTE');
+    bar.appendChild(mk('Quote', inQ ? 'Take this out of the quote' : 'Make this a quote', ipeQuote, inQ ? 'ipe-on' : ''));
   }
-  const win = doc.defaultView, r = el2.getBoundingClientRect();
-  bar.style.top = Math.max(2, r.top + win.scrollY - 36) + 'px';
-  bar.style.left = Math.max(2, win.scrollX + DC_CHROME_INSET, r.left + win.scrollX) + 'px';   // never under the dock
+  if (blk && !lockedForMe(blk)) {
+    if (md) bar.appendChild(sep());
+    bar.appendChild(mk('Left', 'Line up this section’s words on the left', () => ipeStyle({ align: st.align === 'left' ? '' : 'left' }), st.align === 'left' ? 'ipe-on' : ''));
+    bar.appendChild(mk('Centre', 'Line up this section’s words in the centre', () => ipeStyle({ align: st.align === 'center' ? '' : 'center' }), st.align === 'center' ? 'ipe-on' : ''));
+    const cur = IPE_SIZES.indexOf(st.size || '') < 0 ? '' : (st.size || ''), next = IPE_SIZES[(IPE_SIZES.indexOf(cur) + 1) % IPE_SIZES.length];
+    bar.appendChild(mk('Size', 'Text size for this section: ' + IPE_SIZE_WORDS[cur] + '. Press for ' + IPE_SIZE_WORDS[next].toLowerCase(), () => ipeStyle({ size: next }), cur ? 'ipe-on' : ''));
+    const col = mk('Colour', 'A colour for this section’s words, from your site’s palette', () => { bar.classList.toggle('colours'); ipeShowBar(doc, el2); }, (st.text_color ? 'ipe-on' : '') + (open ? ' ipe-open' : ''));
+    col.setAttribute('aria-expanded', String(open));
+    bar.appendChild(col);
+    if (open) {
+      const sw = (hex, aria) => {
+        const b2 = doc.createElement('button'); b2.type = 'button'; b2.className = 'ipe-sw' + ((st.text_color || '') === hex ? ' ipe-on' : '') + (hex ? '' : ' ipe-none');
+        if (hex) b2.style.setProperty("background", hex);
+        b2.setAttribute('aria-label', aria); b2.title = aria;
+        b2.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); ipeStyle({ text_color: hex }); });
+        return b2;
+      };
+      bar.appendChild(sw('', 'The site’s usual colour'));
+      ovShades('text_color').forEach((h) => bar.appendChild(sw(h, 'Words in ' + h)));
+    }
+  }
   bar.classList.add('on');
+  // item 319: clear of the heading above; on a phone the bar takes the foot of the page, over the
+  // dock, where it covers no words at all (its ten buttons would wrap to three rows up there)
+  bar.classList.toggle('ipe-foot', window.innerWidth <= 760);
+  if (window.innerWidth > 760) dcFloatClear(doc, el2, bar); else { bar.style.removeProperty("left"); bar.style.removeProperty("top"); }
 }
 function ipeHideBar(doc) { try { const b = doc.getElementById('dds-ipe-bar'); if (b) b.classList.remove('on'); } catch (_) {} }
 // Direct Range wrapping (execCommand is deprecated): wrap the selection in
@@ -7245,9 +7678,36 @@ const IDE_FIELDS = {
   "identity.description": { input: "f-description", max: 600, label: "your description" },
   "identity.short_description": { input: "f-short_description", max: 150, label: "your short description" },   // item 330: the line under a new opening's headline
 };
-function ideStart(doc, el) {
-  const path = el.getAttribute("data-pr"), spec = IDE_FIELDS[path];
-  if (!spec || DC_MODE !== "edit" || doc !== dcFrameDoc()) return false;
+// Builder item 314: the rows a built-in page or Home's built-in sections draw from the tabs' lists
+// (a menu item, a question and its answer, a review) are typed on the page too. The row's stamp
+// names its list and its id (template_kit prE); the part pressed says which field.
+const IDE_ROWS = {
+  offering: { col: "offerings", parts: [[".nm", "name", 120, "its name"], [".ds", "description", 600, "its description"], [".pr", "price_text", 40, "its price"]] },
+  faq: { col: "faqs", parts: [["self", "question", 200, "the question"], ["answer", "answer", 2000, "the answer", true]] },
+  testimonial: { col: "testimonials", parts: [["blockquote p", "quote", 600, "the review"]] },
+};
+// The row and part a press lands on: { row, el, kind, id, field, max, label, md }, or null.
+function ideRowAt(target) {
+  if (!target || !target.closest) return null;
+  let row = target.closest("[data-pr][data-pr-id]"), el2 = null, part = null;
+  if (!row) {   // a question's answer sits beside its question, not inside it
+    const dd = target.closest("dd"), dt = dd && dd.previousElementSibling;
+    if (dt && dt.getAttribute("data-pr") === "faq" && dt.hasAttribute("data-pr-id")) { row = dt; el2 = dd; part = IDE_ROWS.faq.parts[1]; }
+    else return null;
+  }
+  const kind = row.getAttribute("data-pr"), spec = IDE_ROWS[kind]; if (!spec) return null;
+  if (!part) {
+    for (const p of spec.parts) { if (p[0] === "self") { el2 = row; part = p; break; } if (p[0] === "answer") continue; const hit = target.closest(p[0]); if (hit && row.contains(hit)) { el2 = hit; part = p; break; } }
+    if (!part) { const p = spec.parts[0]; el2 = p[0] === "self" ? row : row.querySelector(p[0]); part = p; }
+  }
+  if (!el2) return null;
+  return { row, el: el2, kind, col: spec.col, id: row.getAttribute("data-pr-id"), field: part[1], max: part[2], label: part[3], md: !!part[4] };
+}
+function ideCan(w, target) { return !!(w && IDE_FIELDS[w.getAttribute("data-pr")]) || !!ideRowAt(target); }
+function ideStart(doc, el, target) {
+  const path = el && el.getAttribute("data-pr"), spec = IDE_FIELDS[path];
+  if (!spec) return ideRowStart(doc, target || el);
+  if (DC_MODE !== "edit" || doc !== dcFrameDoc()) return false;
   if (IPE) ipeCommit();
   if (IDE) ideEnd(true);
   const field = path.split(".")[1];
@@ -7278,7 +7738,7 @@ function ideStart(doc, el) {
   return true;
 }
 function ideKeydown(e) {
-  if (e.key === "Enter") { e.preventDefault(); ideEnd(true); }
+  if (e.key === "Enter") { if (IDE && IDE.row && IDE.row.md && !(e.metaKey || e.ctrlKey)) return; e.preventDefault(); ideEnd(true); }   // an answer takes paragraphs; Ctrl+Enter saves it
   else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); ideEnd(true); }   // item 255: Escape keeps the words too
   else if (IDE && e.key.length === 1 && !e.metaKey && !e.ctrlKey && IDE.el.textContent.length >= IDE.spec.max) {
     const sel = IDE.doc.getSelection();
@@ -7292,11 +7752,61 @@ function idePaste(e) {
   const t = String((e.clipboardData || e.dataTransfer || { getData: () => "" }).getData("text/plain") || "").replace(/\s+/g, " ");
   if (t) IDE.doc.execCommand("insertText", false, t.slice(0, Math.max(0, IDE.spec.max - IDE.el.textContent.length)));
 }
+// A row's words: the same session, saved with a PATCH to its list (which records the Undo step).
+function ideRowStart(doc, target) {
+  const r = ideRowAt(target); if (!r || DC_MODE !== "edit" || doc !== dcFrameDoc()) return false;
+  if (IPE) ipeCommit();
+  if (IDE) ideEnd(true);
+  const el = r.el, prev = {};
+  ["contenteditable", "role", "aria-label", "spellcheck"].forEach((a) => { prev[a] = el.getAttribute(a); });
+  const quoted = r.field === "quote" && /^“[\s\S]*”$/.test(String(el.textContent || "").trim());
+  IDE = { doc, el, row: r, spec: { max: r.max, label: r.label }, orig: el.innerHTML, origText: el.textContent, prev, sample: false, quoted };
+  if (quoted) el.textContent = String(el.textContent).trim().slice(1, -1);
+  el.setAttribute("contenteditable", r.md ? "true" : "plaintext-only");
+  if (!r.md && el.contentEditable !== "plaintext-only") el.setAttribute("contenteditable", "true");
+  el.setAttribute("role", "textbox");
+  el.setAttribute("aria-label", "Editing " + r.label + ". " + (r.md ? "Ctrl+Enter" : "Enter") + " saves, Escape cancels");
+  el.setAttribute("spellcheck", "true");
+  el.classList.add("ipe-on");
+  el.addEventListener("keydown", ideKeydown);
+  el.addEventListener("blur", ideBlur);
+  el.addEventListener("paste", idePaste);
+  el.addEventListener("drop", idePaste);
+  try { el.focus(); } catch (_) {}
+  try { const sel = doc.getSelection(), rg = doc.createRange(); rg.selectNodeContents(el); if (!(sel.rangeCount && el.contains(sel.anchorNode))) { rg.collapse(false); sel.removeAllRanges(); sel.addRange(rg); } } catch (_) {}
+  return true;
+}
+async function ideRowEnd(s, save) {
+  const el = s.el, r = s.row;
+  const text = r.md ? (() => { try { return ipeSerializeMd(el); } catch (_) { return String(el.textContent || ""); } })().trim().slice(0, r.max)
+    : String(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, r.max);
+  const was = r.md ? String(s.origText || "").trim() : String(s.origText || "").replace(/\s+/g, " ").trim().replace(/^“([\s\S]*)”$/, "$1");
+  const keep = () => { el.innerHTML = s.orig; ideRelease(); };
+  if (!save || text === was) return keep();
+  if (!text && (r.field === "name" || r.field === "question" || r.field === "quote")) { keep(); toast("It needs some words, so it stays as it was.", true); return; }
+  if (s.quoted) el.textContent = "“" + text + "”";
+  whisper("topWhisper", "saving");
+  try {
+    const res = await api("PATCH", "/" + r.col + "/" + r.id, { [r.field]: text });
+    const row = (S[r.col] || []).find((x) => x.id === r.id); if (row && res && res.data) Object.assign(row, res.data); else if (row) row[r.field] = text;
+    if (UNDO_RENDER[r.col]) UNDO_RENDER[r.col]();
+    whisper("topWhisper", "saved"); scheduleChangesRefresh();
+    DP_REPAINT_HELD = true; ideRelease();   // drawn again from what was saved
+  } catch (err) { whisper("topWhisper", "failed"); el.innerHTML = s.orig; toast(nice(err), true); ideRelease(); }
+}
 // save: hand the words to the Business details field; cancel: put back what was there
 function ideEnd(save) {
   const s = IDE; if (!s) return;
   IDE = null;
   const el = s.el;
+  if (s.row) {
+    ["keydown", "blur", "paste", "drop"].forEach((t) => el.removeEventListener(t, t === "keydown" ? ideKeydown : t === "blur" ? ideBlur : idePaste));
+    try { if (el.ownerDocument.activeElement === el) el.blur(); } catch (_) {}
+    Object.keys(s.prev).forEach((a) => { if (s.prev[a] == null) el.removeAttribute(a); else el.setAttribute(a, s.prev[a]); });
+    el.classList.remove("ipe-on");
+    ideRowEnd(s, save);
+    return;
+  }
   ["keydown", "blur", "paste", "drop"].forEach((t) => el.removeEventListener(t, t === "keydown" ? ideKeydown : t === "blur" ? ideBlur : idePaste));
   try { if (el.ownerDocument.activeElement === el) el.blur(); } catch (_) {}   // item 272: the iPhone keyboard goes when the words are let go (as in ipeEnd)
   Object.keys(s.prev).forEach((a) => { if (s.prev[a] == null) el.removeAttribute(a); else el.setAttribute(a, s.prev[a]); });
@@ -7378,7 +7888,7 @@ function dcInjectCanvas(doc, main, live) {
       // light and dark modes while the page underneath keeps its own colours.
       ".dc-hot{outline:2px solid var(--ddsdc-p)!important;outline-offset:-2px}" +
       "[data-dds-field]:hover{outline:1px dashed rgba(var(--ddsdc-p-rgb),.6);outline-offset:3px;cursor:text}" +   // says "you can type here" before anyone double-clicks
-      Object.keys(IDE_FIELDS).map((p) => '[data-pr="' + p + '"]:hover').join(",") + "{outline:1px dashed rgba(var(--ddsdc-p-rgb),.6);outline-offset:3px;cursor:text}" +
+      Object.keys(IDE_FIELDS).map((p) => '[data-pr="' + p + '"]:hover').join(",") + ',[data-pr="offering"] .nm:hover,[data-pr="offering"] .ds:hover,[data-pr="offering"] .pr:hover,dt[data-pr="faq"]:hover,dt[data-pr="faq"]+dd:hover,[data-pr="testimonial"] blockquote p:hover' + "{outline:1px dashed rgba(var(--ddsdc-p-rgb),.6);outline-offset:3px;cursor:text}" +
       // the section pill: a white card of icons inside the selected section's top-right corner
       "#dds-dc-bar .dc-grip{touch-action:none;user-select:none}" +
       "#dds-dc-bar{position:absolute;z-index:2147483000;display:none;align-items:center;gap:2px;padding:4px;background:var(--ddsdc-card);border:1px solid rgba(var(--ddsdc-p-rgb),.08);border-radius:999px;box-shadow:var(--ddsdc-shadow);font-family:var(--ddsdc-sans)}" +
@@ -7499,6 +8009,8 @@ function dcInjectCanvas(doc, main, live) {
       // a just-added section pulses so a drop is never invisible
       "@keyframes dcJustAdded{0%{box-shadow:0 0 0 3px rgba(var(--ddsdc-p-rgb),.55),0 0 0 9px rgba(var(--ddsdc-p-rgb),.22)}100%{box-shadow:0 0 0 3px rgba(var(--ddsdc-p-rgb),0),0 0 0 9px rgba(var(--ddsdc-p-rgb),0)}}" +
       ".dc-justadded{animation:dcJustAdded 1.5s ease-out;border-radius:6px}" +
+      // item 318: a section just added, until the server draws it
+      ".dc-ghost{padding:28px 24px!important}.dc-ghost .dc-ghost-in{min-height:72px;display:flex;align-items:center;justify-content:center;border:2px dashed rgba(var(--ddsdc-p-rgb),.45);border-radius:14px;background:rgba(var(--ddsdc-p-rgb),.05);font:600 14px var(--ddsdc-sans);color:var(--ddsdc-p)}" +
       "@media (prefers-reduced-motion:reduce){.dc-justadded{animation:none;outline:3px solid rgba(var(--ddsdc-p-rgb),.5);outline-offset:-3px}}" +
       // ── G13 slice 2: the in-place text session + its md mini-bar + a11y bits ──
       ".ipe-on{outline:2px solid var(--ddsdc-p)!important;outline-offset:2px;box-shadow:0 0 0 6px rgba(var(--ddsdc-p-rgb),.14);border-radius:4px;cursor:text;caret-color:var(--ddsdc-p)}" +
@@ -7508,6 +8020,15 @@ function dcInjectCanvas(doc, main, live) {
       "#dds-ipe-bar button{font:600 12px/1 var(--ddsdc-sans);color:var(--ddsdc-ink);background:transparent;border:0;border-radius:999px;padding:0 10px;height:30px;min-width:30px;cursor:pointer}" +
       "#dds-ipe-bar button:hover{background:var(--ddsdc-up)}" +
       "#dds-ipe-bar button:focus-visible{outline:2px solid var(--ddsdc-p);outline-offset:1px}" +
+      // item 316: what's on, a divider, and the palette's round swatches
+      "#dds-ipe-bar button.ipe-on{background:var(--ddsdc-p-soft);color:var(--ddsdc-p)}" +
+      "#dds-ipe-bar .ipe-sep{width:1px;height:20px;margin:0 2px;background:var(--ddsdc-line);align-self:center}" +
+      "#dds-ipe-bar .ipe-sw{width:26px;height:26px;min-width:0;padding:0;margin:2px;border-radius:50%;border:2px solid rgba(var(--ddsdc-p-rgb),.18);align-self:center}" +
+      "#dds-ipe-bar .ipe-sw.ipe-on{border-color:var(--ddsdc-p);box-shadow:0 0 0 2px var(--ddsdc-card)}" +
+      "#dds-ipe-bar .ipe-sw.ipe-none{background:linear-gradient(135deg,transparent 45%,var(--ddsdc-bad) 45%,var(--ddsdc-bad) 55%,transparent 55%)}" +
+      "#dds-ipe-bar{max-width:calc(100vw - 24px);flex-wrap:wrap}" +
+      "#dds-ipe-bar.ipe-foot{position:fixed;left:8px;right:8px;top:auto;bottom:calc(var(--ddsdc-foot,0px) + 8px);justify-content:center;border-radius:18px}" +
+      "@media (pointer:coarse){#dds-ipe-bar button{height:44px;min-width:44px}#dds-ipe-bar .ipe-sw{width:40px;height:40px}}" +
       ".ipe-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}";
     (doc.head || doc.documentElement).appendChild(st);
   }
@@ -7557,12 +8078,17 @@ function dcInjectCanvas(doc, main, live) {
     // a short section (a heading alone) would have its words under the pill: the pill
     // sits just above it instead, or just below when the top edge is off the screen
     if (r.height < h + 28) y = top - h - 6 >= sy + 4 ? top - h - 6 : top + r.height + 6;
+    // item 319: on a phone the pill is nearly as wide as the page, so inside the section it sat
+    // on the first words (a second tap to type landed on it): it sits just above the section
+    else if (window.innerWidth <= 760 && top - h - 6 >= sy + 4) y = top - h - 6;
+    const above = y < top;
     const x = Math.max(sx + 8 + ins.left, Math.min(left + r.width - w - 8, sx + vw - ins.right - w - 8));
     bar.style.left = x + "px"; bar.style.top = y + "px";
     chip.classList.toggle("compact", r.width < 560);
     const ch = chip.offsetHeight || 24, cw = chip.offsetWidth || 0, cx = Math.max(left + 8, sx + 8 + ins.left);
     chip.style.left = cx + "px";
-    chip.style.top = (cx + cw + 8 <= x ? y + (h - ch) / 2 : top - ch - 6 >= sy + 4 ? top - ch - 6 : y + h + 6) + "px";
+    // item 319: the tag sits just above the section, clear of its words, when that is on screen
+    chip.style.top = (above ? (y - ch - 4 >= sy + 4 ? y - ch - 4 : top + 8) : top - ch - 6 >= sy + 4 ? top - ch - 6 : cx + cw + 8 <= x ? y + (h - ch) / 2 : y + h + 6) + "px";
     if (more.classList.contains("on")) placeMore();
   };
   // item 158: the right-click menu. It holds the section's actions with their keys, and it keeps
@@ -7575,6 +8101,7 @@ function dcInjectCanvas(doc, main, live) {
   };
   doc.__dcCloseCtx = closeCtx;
   const hideBar = () => { closeCtx(false); bar.classList.remove("on"); chip.classList.remove("on"); more.classList.remove("on"); doc.__dcSel = null; if (ds.current) { ds.current.classList.remove("dc-hot"); ds.current = null; } };
+  doc.__dcHideBar = hideBar;   // item 318: a section taken off the page takes its tools with it
   const scheduleHide = () => { clearTimeout(ds.hideT); if (ctx.classList.contains("on")) return; ds.hideT = setTimeout(hideBar, 170); };
   // List item 31: a finger has no hover. A tap selects a section and its toolbar
   // stays until another tap selects something else or lands off every section; a
@@ -7683,6 +8210,11 @@ function dcInjectCanvas(doc, main, live) {
           if (b.type === "stack") bar.appendChild(mkBtn("Layers", "Layers: the blocks in this section", () => openTrayPanel("contents"), { icon: "layers" }));
         }
         bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi), { icon: "pencil" }));
+        if (ROW_FIELDS[b.type] || b.type === "table") {   // item 315: a new row on the page, ready to type
+          const one = b.type === "table" ? "row" : ROW_FIELDS[b.type].one;
+          const ar = mkBtn("Add a " + one, "Add a " + one + " to this section", () => dcAddRow(bi), { cls: "dc-addblk", icon: "plus" });
+          ar.lastChild.className = "dc-addblk-l"; bar.appendChild(ar);
+        }
         bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi), { icon: "copy" }));
         bar.appendChild(mkBtn("Style", "Style this section — its colours, type and layout", () => eeEditBlock(bi, "style"), { icon: "spark" }));
         bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger", icon: "x" }));
@@ -7709,8 +8241,10 @@ function dcInjectCanvas(doc, main, live) {
         bar.appendChild(mb);
       }
     } else {
-      chipName = heading || DC_CORE_NAME[c.view] || "Section"; chipType = "Built-in section";
-      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(c.view), { icon: "pencil" }));
+      const bp = dcBuiltinPage(), cv = dcCoreView(c);   // item 314: on a built-in page, its own words
+      chipName = heading || DC_CORE_NAME[cv] || "Section"; chipType = bp && !c.key ? "Built-in page" : "Built-in section";
+      bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditCore(cv), { icon: "pencil" }));
+      if (bp && !c.key) bar.appendChild(mkBtn("Page settings", "This page’s settings: its name in the menu and how it shows on Google", () => pgOpenSettings({ href: bp.path }), { icon: "cog" }));
       const keys = dcCoreKeys(main), at = c.key ? keys.indexOf(c.key) : -1;
       if (at >= 0) {
         bar.appendChild(mkBtn("Move up", "Move this section up", () => dcMoveCore(c.key, -1), { cls: at <= 0 ? "dc-off" : "", icon: "up" }));
@@ -7726,6 +8260,7 @@ function dcInjectCanvas(doc, main, live) {
     if (locked) chip.insertAdjacentHTML("afterbegin", uiIcon("lock", 12));
     bar.classList.add("on"); chip.classList.add("on"); place(el2);
   };
+  doc.__dcShowBar = showBar;   // item 318: the tools follow a section that just moved
   // G13: refresh the sid→index lookup from the server sidecar, then wire every
   // top-level section's hover toolbar (identity read straight off the stamps).
   // Drop targets are computed live from these section rects by the
@@ -7812,7 +8347,7 @@ function dcInjectCanvas(doc, main, live) {
         const f = e.target.closest ? e.target.closest("[data-dds-field]") : null;
         const w = !f && e.target.closest ? e.target.closest("[data-pr]") : null;
         if (f && el2.contains(f)) { e.preventDefault(); hideBar(); ipeStart(doc, f, el2); }
-        else if (w && el2.contains(w) && IDE_FIELDS[w.getAttribute("data-pr")]) { e.preventDefault(); hideBar(); ideStart(doc, w); }
+        else if (((w && el2.contains(w)) || !w) && ideCan(w, e.target)) { e.preventDefault(); hideBar(); ideStart(doc, w, e.target); }
       });
       // G13 slice 2 · §2.1: double-click TEXT → edit it in place (Edit mode
       // only — the same chrome also serves Comments mode, which never edits).
@@ -7827,7 +8362,7 @@ function dcInjectCanvas(doc, main, live) {
         const w = !f && e.target.closest ? e.target.closest("[data-pr]") : null;   // the welcome section's and About's own words
         e.preventDefault();
         if (f && el2.contains(f)) ipeStart(doc, f, el2);
-        else if (!(w && el2.contains(w) && ideStart(doc, w))) eeDoubleClickTarget(el2);
+        else if (!(((w && el2.contains(w)) || !w) && ideStart(doc, w, e.target))) eeDoubleClickTarget(el2);
       });
     }
     // keyboard path (a11y contract): every stamped field is Tab-reachable in
@@ -7910,7 +8445,13 @@ function dcInjectCanvas(doc, main, live) {
     if (navEl && !navEl.hasAttribute("data-navedit")) {
       navEl.setAttribute("data-navedit", "1");
       navEl.style.cursor = "pointer"; navEl.title = "Click to edit your menu (shown on every page)";
-      navEl.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); openPagesCard("dcPageSwitch"); }, true);   // the Pages card, beside the page
+      navEl.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        // item 319: a link in the menu opens that page on the canvas; the menu's own bar opens the Pages card
+        const a = e.target.closest && e.target.closest("a[href]"), slug = a ? dcPageForHref(a.getAttribute("href")) : null;
+        if (slug != null && slug !== DC_PAGE) { dcSwitchPage(slug); return; }
+        openPagesCard("dcPageSwitch");
+      }, true);   // the Pages card, beside the page
     }
   } catch (_) {}
   if (!DC_PAGE) {
@@ -7941,6 +8482,7 @@ function dcInsBar(doc, gap, label) {
 }
 function dcBuildInserts(doc, main) {
   Array.prototype.forEach.call(main.querySelectorAll(".dc-ins, .dc-emptyzone"), (n) => n.remove());
+  if (dcBuiltinPage()) return;   // item 314: a built-in page takes no sections
   const blocks = dcBlockSections(main);
   const len = (BLOCKS_WORK || []).length;
   if (!blocks.length) {
@@ -8603,11 +9145,7 @@ function stkToolbar(doc, node, bi, j) {
 }
 function stkPlace(doc, node) {
   const win = doc.defaultView, tb = doc.getElementById("dds-dc-blk"); if (!tb || !node.isConnected) return;
-  const r = node.getBoundingClientRect(), h = tb.offsetHeight || 40, w = tb.offsetWidth || 0, ins = dcChromeInsets();
-  const vw = doc.documentElement.clientWidth;
-  const y = r.top - h - 10 >= 8 ? r.top + win.scrollY - h - 10 : r.bottom + win.scrollY + 10;   // above it, or under it when the top has no room
-  const x = Math.max(win.scrollX + 8 + ins.left, Math.min(r.left + win.scrollX - 6, win.scrollX + vw - ins.right - w - 8));
-  tb.style.setProperty("left", x + "px"); tb.style.setProperty("top", y + "px");
+  dcFloatClear(doc, node, tb, 10);   // item 319: clear of the block above and below
 }
 // On a phone the picked block's tools take the dock's place, a word under each.
 function stkPhoneBar(bi, j) {
@@ -8899,18 +9437,22 @@ function dcTreeSelect(el2, row) {
     // sections, so a silent add looked like nothing happened). Falls back to the
     // preserved scroll position for edits/moves that didn't add a section.
     if (DC_FOCUS_BI != null) {
+      // Item 318: a section that moved on the page already is kept in view, without a second
+      // flash. Item 319: one the redraw can't find leaves the canvas where it was, instead of
+      // jumping to the page's end.
+      const soft = DC_FOCUS_SOFT; DC_FOCUS_SOFT = false;
       let landed = false;
       try {
         const hit = dcBlockSections(main).find((s) => s.bi === DC_FOCUS_BI);
         if (hit && hit.el) {
-          hit.el.scrollIntoView({ block: "center", behavior: pdReducedMotion() ? "auto" : "smooth" });
-          hit.el.classList.add("dc-justadded");
-          setTimeout(() => { try { hit.el.classList.remove("dc-justadded"); } catch (_) {} }, 1500);
+          hit.el.scrollIntoView({ block: soft ? "nearest" : "center", behavior: pdReducedMotion() || soft ? "auto" : "smooth" });
+          if (!soft) { hit.el.classList.add("dc-justadded"); setTimeout(() => { try { hit.el.classList.remove("dc-justadded"); } catch (_) {} }, 1500); }
           landed = true;
         }
       } catch (_) {}
-      DC_FOCUS_BI = null; DC_SCROLL = null;
-      if (!landed && doc.defaultView) { try { doc.defaultView.scrollTo({ top: doc.body.scrollHeight, behavior: "smooth" }); } catch (_) {} }
+      DC_FOCUS_BI = null;
+      if (landed || DC_SCROLL == null) DC_SCROLL = null;
+      else if (doc.defaultView) { try { doc.defaultView.scrollTo(0, DC_SCROLL); } catch (_) {} DC_SCROLL = null; }
     } else if (DC_FOCUS_CORE) {
       const f = DC_FOCUS_CORE; DC_FOCUS_CORE = null; DC_SCROLL = null;
       const hit = main.querySelector(':scope > [data-dds-core="' + f.key + '"]');
