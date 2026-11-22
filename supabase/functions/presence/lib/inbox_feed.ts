@@ -145,6 +145,7 @@ export const UPDATE_NOTICE_KINDS: ReadonlySet<string> = new Set([
 /** Money kinds — the ones a studio can least afford to scroll past. */
 export const MONEY_NOTICE_KINDS: ReadonlySet<string> = new Set([
   'payment_trouble', 'account_lapsed', 'invoice_void_paid', 'retainer_status', 'trial_ended',
+  'client_said_paid',   // sales item 172: the client says they paid another way; the studio confirms or says not received
 ]);
 export function noticeTier(kind: unknown): FeedTier {
   return UPDATE_NOTICE_KINDS.has(String(kind ?? '')) ? 'update' : 'needs_you';

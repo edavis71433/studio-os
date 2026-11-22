@@ -1,5 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
-import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar } from './helpers/app';
+import { installApp, STUDIO_NAV, ALL_FEATURES, answerAsks, setAsksAnswer, askedSoFar, settled } from './helpers/app';
 import { ABOUT_BLOCKS, ABOUT_SECTION, aboutField, aboutIn, aboutSaveOut, addGallery, ANSWER_HEADERS, API, backToCanvas, BLOCKS, blocksIn, canvasReplaced, canvasScrollY, CONTACT, draftReads, draftVersion, duplicate, editAndWaitOut, editHome, FAR_DOWN, Field, FORM, FormBlocks, formSaveOut, Frame, GALLERY, hasTheirs, hideOut, holdPuts, holdReads, homeLine, lastPut, lastTwo, markCanvas, menuRows, META, mountCanvas, Mounted, mountPages, moveThenWrite, NORM_BLOCKS, NORM_META, NORM_SECTIONS, nudge, onPill, openAbout, openBusiness, OWN_MENU, OWN_PAGES, PAGE_HTML, Paged, PAGED, pageIn, pageMenu, panelEdit, pill, pillNames, previewHtml, redo, refusal, renameContact, SECTIONS, selectInBody, SETTINGS, slugs, stored, STORY, storyIn, STRIP, THEIRS, theirSection, typeDetail, typeOver, undo, WITH_CONTACT, WITH_FORM, writeOnAboutAndLeave, openPages } from './helpers/editor';
 import { touchScreen } from './helpers/app';
 
@@ -7,13 +7,15 @@ import { touchScreen } from './helpers/app';
 // Split from g13-editor.spec.ts (builder list item 109, Nov 2026): the fixtures and
 // helpers live in helpers/editor.ts; the tests here are as they were.
 
-test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu steps keep the words typed since', () => {
-  test('Undo and Redo of Hide from menu keep the words written since', async ({ page }) => {
+// Builder item 320: a section step lives on for the visit (Undo goes back to its page), so the
+// words are written on About BEFORE each page-menu step: the step's Undo and Redo carry them.
+test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu steps keep the words typed on another page', () => {
+  test('Undo and Redo of Hide from menu keep the words written on About', async ({ page }) => {
     const { frame, puts } = await mountPages(page, '', WITH_CONTACT);
     await openAbout(page, frame);
+    await writeOnAboutAndLeave(page, frame, puts);
     await pageMenu(page, 'Contact', 'Hide from menu');
     await expect(pill(page, 'Contact')).toHaveAttribute('data-nav', 'hidden');
-    await writeOnAboutAndLeave(page, frame, puts);
     await undo(page);
     await expect(pill(page, 'Contact')).not.toHaveAttribute('data-nav', 'hidden');
     expect(aboutIn(lastPut(puts))?.blocks[0].subtitle).toBe('Written since');
@@ -51,8 +53,17 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
 
   test('Undo of a move puts a custom menu back as it was', async ({ page }) => {
     const { frame, puts } = await mountPages(page, '', OWN_PAGES);
+    // the words first (item 320: a section step lives on), then the custom menu, since the
+    // words' save answers with the draft's settings, which have no menu
+    await openAbout(page, frame, 'Story');
+    await writeOnAboutAndLeave(page, frame, puts, 'story');
+    await settled(page);   // the words' save has answered and the lists are drawn again before the menu is set
     await page.evaluate((nav) => { (0, eval)('S.settings.nav = ' + JSON.stringify(nav)); }, OWN_MENU);
-    const { moved, count } = await moveThenWrite(page, frame, puts, 'Story', 'ArrowDown');
+    const before = puts.length;
+    await nudge(page, 'Story', 'ArrowDown');
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(before + 1);
+    await settled(page);
+    const moved = lastPut(puts), count = puts.length;
     expect(moved.nav?.map((n) => n.href)).toEqual(['/', '/gallery/', '/story/']);
     await undo(page);
     await expect.poll(() => puts.length).toBe(count + 1);
@@ -106,14 +117,14 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
   test('Undo and Redo of Show in the menu, a write with no menu in it, keep the words and write no menu', async ({ page }) => {
     const { frame, puts } = await mountPages(page, '', OWN_PAGES);
     await openAbout(page, frame, 'Story');
+    await writeOnAboutAndLeave(page, frame, puts, 'story');
     await page.evaluate(() => (window as unknown as { go: (v: string) => void }).go('pages'));
     await page.getByRole('button', { name: 'Settings for Gallery' }).click();
     await page.locator('#pageSettings').getByLabel('Show in the menu').uncheck();
-    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(1);
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(2);
     expect(lastPut(puts).pages?.find((p) => p.slug === 'gallery')?.hideNav).toBe(true);
     await page.locator('#pageSettings').getByRole('button', { name: 'Done' }).click();
     await backToCanvas(page, frame);
-    await writeOnAboutAndLeave(page, frame, puts, 'story');
     const count = puts.length;
     await undo(page);
     await expect.poll(() => puts.length).toBe(count + 1);
@@ -166,9 +177,9 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
   test('Undo and Redo of Rename keep the words, and each is a rename the server can forward', async ({ page }) => {
     const { frame, puts } = await mountPages(page, '', WITH_CONTACT);
     await openAbout(page, frame);
+    await writeOnAboutAndLeave(page, frame, puts);
     await page.evaluate(() => (0, eval)('S.settings.nav = [{ label: "Contact", href: "/contact/" }]'));
     await renameContact(page);
-    await writeOnAboutAndLeave(page, frame, puts);
     await undo(page);
     await openPages(page); await expect(pill(page, 'Contact')).toBeVisible();
     const undone = lastPut(puts) as Paged & { nav?: Array<{ href: string }> };
@@ -212,9 +223,9 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     const { frame, puts } = await mountPages(page, '', [CONTACT, ...PAGED.pages]);
     await answerAsks(page);
     await openAbout(page, frame);
+    await writeOnAboutAndLeave(page, frame, puts);
     await pageMenu(page, 'Contact', 'Delete page');
     await expect(pill(page, 'Contact')).toHaveCount(0);
-    await writeOnAboutAndLeave(page, frame, puts);
     await undo(page);
     await openPages(page); await expect(pill(page, 'Contact')).toBeVisible();
     expect(lastPut(puts).pages?.map((p) => p.slug)).toEqual(['contact', 'about']);
@@ -249,8 +260,9 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     });
     await answerAsks(page, false);
     await addGallery(page);
-    await page.evaluate(() => (0, eval)('BLOCKS_WORK = [{ type: "title", title: "Gallery", subtitle: "Written on the new page" }]; saveBlocks()'));
-    await expect.poll(() => pageIn(lastPut(puts), 'gallery')?.blocks.length).toBe(1);
+    // words on the new page as the draft holds them (not a section step of this visit, which an
+    // Undo would take back first: builder item 320)
+    await page.evaluate(() => (0, eval)('S.settings.pages.find((p) => p.slug === "gallery").blocks = [{ type: "title", title: "Gallery", subtitle: "Written on the new page" }]; BLOCKS_WORK = currentBlocks(); DC_HIST_LAST = histSnap()'));
     await openPages(page); await pill(page, 'Home').locator('.pp-name').click();
     await expect(onPill(page)).toHaveText('Home');
     const count = puts.length;
@@ -330,14 +342,20 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     await typeOver(page, frame.locator('#about-us [data-dds-field="subtitle"]'), 'On its way');
     await page.keyboard.press('Enter');
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(1);
-    await openPages(page); await pill(page, 'Home').locator('.pp-name').click();          // the page change waits on that save, and takes the snapshots with it
+    await openPages(page); await pill(page, 'Home').locator('.pp-name').click();          // the page change waits on that save
     await page.waitForTimeout(200);
     release();
     await expect(onPill(page)).toHaveText('Home');
+    // builder item 320: the words are the newest step, on About: Undo goes back there and takes them back
     await undo(page);
     await expect.poll(() => sent.length, { timeout: 6000 }).toBe(2);
-    expect(aboutIn(sent[1])?.blocks[0].subtitle).toBe('On its way');
-    expect(pageIn(sent[1], 'contact')?.hideNav).toBeUndefined();
+    await expect(onPill(page)).toHaveText('About');
+    expect(aboutIn(sent[1])?.blocks[0].subtitle).toBe('The about line');
+    expect(pageIn(sent[1], 'contact')?.hideNav).toBe(true);
+    await undo(page);                                              // then the menu step
+    await expect.poll(() => sent.length, { timeout: 6000 }).toBe(3);
+    expect(pageIn(sent[2], 'contact')?.hideNav).toBeUndefined();
+    expect(aboutIn(sent[2])?.blocks[0].subtitle).toBe('The about line');
   });
 
   test('Undo while another page write is out keeps that write: its list is built when its turn comes', async ({ page }) => {
@@ -380,10 +398,11 @@ test.describe('G13 in-place canvas text editor — Undo and Redo of page-menu st
     await page.keyboard.press('Escape');
     await writeOnAboutAndLeave(page, frame, puts);
     const count = puts.length;
-    await undo(page);                                              // off the page, it's gone with the page's snapshots
-    await page.waitForTimeout(300);
-    expect(puts.length).toBe(count);
-    expect((aboutIn(lastPut(puts))?.blocks as unknown as Saved)[0].subtitle).toBe('Written since');
+    await undo(page);                                              // builder item 320: off the page, the step is kept: Undo goes back to About for it
+    await expect.poll(() => puts.length, { timeout: 6000 }).toBe(count + 1);
+    await expect(onPill(page)).toHaveText('About');
+    expect((aboutIn(lastPut(puts))?.blocks as unknown as Saved)[0].subtitle).toBe('The about line');
+    expect((aboutIn(lastPut(puts))?.blocks as unknown as Saved)[1].title).toBe('Write to us');   // the form's redo stays
   });
 });
 

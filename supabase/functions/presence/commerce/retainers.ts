@@ -112,6 +112,17 @@ export function retainerTransition(priorStatus: string | undefined, nextStatus: 
  *  Send-once inside a week even if Stripe delivers several failed-invoice
  *  events; a retainer STILL past due next week may speak again. Pure. */
 export function retainerNoticePeriodPrefix(dealId: string): string { return `retainer:${dealId}:`; }
+
+/** Every deal with a retainer, oldest first, a page at a time. The daily Stripe check (sales item
+ *  130, commerce/stripe_check.ts) reads the first page, and the week-before note for a yearly
+ *  retainer (sales item 163, commerce/lifecycle.ts runRetainerRenewalNotes) reads the same path
+ *  later in the same 15-minute run, so the run's shared reads (builder item 402, lib/db.ts
+ *  tickMemo) answer the second from the first: one database call between them, unless the
+ *  check changed a deal in between. Keep the two on this one path. */
+export const RETAINER_DEALS_PAGE = 100;
+export function retainerDealsPath(offset = 0): string {
+  return `presence_deals?retainer=not.is.null&deleted_at=is.null&select=id,site_id,title,contact_id,retainer,created_at&order=created_at.asc&limit=${RETAINER_DEALS_PAGE}${offset > 0 ? `&offset=${offset}` : ''}`;
+}
 export function retainerNoticePeriod(dealId: string, transition: 'past_due' | 'canceled', nowMs: number): string {
   const w = Number.isFinite(nowMs) ? Math.floor(nowMs / (7 * 86400_000)) : 0;
   return `${retainerNoticePeriodPrefix(dealId)}${transition}:w${w}`;
@@ -210,7 +221,7 @@ export function retainerTwiceCopy(dealTitle: string, amountCents: number, interv
 
 /** What the client's portal shows of a retainer (sales item 117): the amount, how often,
  *  where it stands, its charges, and whether they can cancel it. Never a Stripe id. Pure. */
-export interface RetainerCharge { at: string; amount: number }
+export interface RetainerCharge { at: string; amount: number; id?: string; refunded?: number; refunded_at?: string | null; receipt_url?: string | null }   // sales item 174: a refunded charge says so and links its receipt (item 163)
 export function retainerPortalView(deal: { id: string; title?: unknown; retainer?: Partial<RetainerState> | null }, charges: RetainerCharge[]): Record<string, unknown> | null {
   const r = deal?.retainer;
   if (!r || typeof r !== 'object' || !r.status) return null;
@@ -378,8 +389,63 @@ export async function recordRetainerCharge(inv: any, x: { dealId: string; siteId
     if (!seen.ok) return { ok: false, recorded: false };
     if (Array.isArray(seen.json) && seen.json.length) return { ok: true, recorded: false };
   }
-  const ins = await svc('presence_deal_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) }).catch(() => ({ ok: false }));
-  return { ok: ins.ok === true, recorded: ins.ok === true };
+  const ins = await svc('presence_deal_events', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) }).catch(() => ({ ok: false, json: null }));
+  if (ins.ok !== true) return { ok: false, recorded: false };
+  // sales item 163: the client's branded receipt, once per charge (the charge itself is recorded once)
+  const made = Array.isArray((ins as { json?: unknown }).json) ? ((ins as { json: any[] }).json[0] || null) : null;
+  if (made?.id) await emailChargeReceipt(x.siteId, x.dealId, String(made.id), row).catch(() => false);
+  return { ok: true, recorded: true };
+}
+
+/** Sales item 163: a retainer charge's receipt, drawn as a paid invoice (lib/documents.ts kind
+ *  'charge'): the deal event that recorded the charge, read back as an invoice-shaped row. null
+ *  when it isn't a charge of this site. What came back on it (a refund of the charge in Stripe,
+ *  sales item 174) reads from presence_money_returns by the Stripe invoice. */
+export async function chargeReceiptRow(eventId: string, siteId: string): Promise<any | null> {
+  const r = await svc(`presence_deal_events?id=eq.${encodeURIComponent(eventId)}&site_id=eq.${encodeURIComponent(siteId)}&kind=eq.invoice_paid&select=id,deal_id,site_id,detail,created_at&limit=1`).catch(() => ({ ok: false, json: null }));
+  const e = r.ok && Array.isArray(r.json) ? r.json[0] : null;
+  if (!e || e.detail?.retainer !== true) return null;
+  const deal = (await svc(`presence_deals?id=eq.${encodeURIComponent(String(e.deal_id))}&site_id=eq.${encodeURIComponent(siteId)}&select=title&limit=1`).catch(() => ({ json: null as any }))).json?.[0];
+  const stripeInvoice = String(e.detail?.stripe_invoice || '');
+  let refunded = 0, returned: Array<{ cents: number; at: string | null; kind: string }> = [];
+  if (stripeInvoice) {
+    const rr = await svc(`presence_money_returns?site_id=eq.${encodeURIComponent(siteId)}&applies_to=eq.retainer&stripe_invoice=eq.${encodeURIComponent(stripeInvoice)}&counted_cents=gt.0&select=counted_cents,counted_at,kind&order=counted_at.asc&limit=20`).catch(() => ({ ok: false, json: null }));
+    for (const x of (rr.ok && Array.isArray(rr.json) ? rr.json : [])) { refunded += Number(x.counted_cents) || 0; returned.push({ cents: Number(x.counted_cents) || 0, at: x.counted_at || null, kind: String(x.kind || 'refund') }); }
+  }
+  const per = e.detail?.interval === 'year' ? 'yearly' : 'monthly';
+  return { id: e.id, deal_id: e.deal_id, title: `Retainer, ${per}${deal?.title ? ': ' + String(deal.title).slice(0, 120) : ''}`, description: 'Retainer charge', amount_cents: Math.round(Number(e.detail?.amount_cents) || 0), currency: 'usd', purpose: 'service', status: 'paid', paid_at: e.created_at, paid_method: '', paid_note: '', number: null, created_at: e.created_at, refunded_cents: refunded, dispute_status: null, charge: true, returned };
+}
+
+/** The receipt email for one retainer charge: the same branded receipt an invoice gets, with the
+ *  PDF, to the deal's person. Best-effort; a failed send never fails the recording. */
+async function emailChargeReceipt(siteId: string, dealId: string, eventId: string, row: Record<string, unknown>): Promise<boolean> {
+  const deal = (await svc(`presence_deals?id=eq.${encodeURIComponent(dealId)}&site_id=eq.${encodeURIComponent(siteId)}&select=title,contact_id&limit=1`).catch(() => ({ json: null as any }))).json?.[0];
+  const contact = deal?.contact_id ? (await svc(`presence_contacts?id=eq.${encodeURIComponent(String(deal.contact_id))}&site_id=eq.${encodeURIComponent(siteId)}&select=name,email&limit=1`).catch(() => ({ json: null as any }))).json?.[0] : null;
+  const email = String(contact?.email || '').trim();
+  if (!email) return false;
+  const [{ sendEmail }, { loadEmailBrand, EMAIL_BRAND_DEFAULT, emailBand, emailFacts }, { docContextFor }, { documentPdf, pdfFileName, }, { docLinkFor }, { dayLabel }] = await Promise.all([
+    import('./account.ts'), import('../lib/email_brand.ts'), import('../lib/doc_context.ts'), import('../lib/doc_pdf.ts'), import('../routes/sales.ts'), import('../lib/documents.ts'),
+  ]);
+  const brand = await loadEmailBrand(siteId);
+  const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+  const detail = (row.detail || {}) as { amount_cents?: number; interval?: string };
+  const amount = '$' + ((Number(detail.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const per = detail.interval === 'year' ? 'yearly' : 'monthly';
+  const studio = brand.name && brand.name !== EMAIL_BRAND_DEFAULT.name ? esc(brand.name) : 'your studio';
+  const first = String(contact?.name || '').trim().split(/\s+/)[0] || '';
+  const doc = await chargeReceiptRow(eventId, siteId);
+  let pdf: Uint8Array | null = null;
+  let link: string | null = null;
+  if (doc) {
+    try { const ctx = await docContextFor(siteId, 'charge', doc, { returned: doc.returned }); const { deal_id: _d, returned: _r, charge: _c, ...data } = doc; pdf = documentPdf('charge', data, brand, ctx); } catch { pdf = null; }
+    link = await docLinkFor('charge', eventId, siteId).catch(() => null);
+  }
+  const day = dayLabel(String(row.created_at || new Date().toISOString()));
+  return await sendEmail(email, `Receipt: ${amount} ${per} retainer payment, thank you`,
+    emailBand('Receipt · Retainer', 'Payment received. Thank you.') + `<p>${first ? `Hi ${esc(first)},` : 'Hi there,'}</p><p>Your ${per} retainer payment to ${studio} went through${day ? ' on ' + esc(day) : ''}.</p>` +
+    emailFacts([['Retainer', esc(String(deal?.title || 'Retainer'))], ['Amount paid', amount]], { big: true, tone: 'good' }) +
+    `<p>Nothing else is needed from you. ${pdf ? 'Your receipt is attached as a PDF.' : ''}${link ? ` <a href="${link}" style="color:${brand.accentDark}">View it online →</a>` : ''}</p><p style="color:#666;font-size:.9rem">You can stop the retainer any time from your portal. Have a question? Just reply to this email.</p>`,
+    brand, { critical: true, asBusiness: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('charge', doc), content: pdf }] } : {}) });
 }
 
 // ── the impure webhook sync (called by commerce/billing-sync, by PURPOSE) ────

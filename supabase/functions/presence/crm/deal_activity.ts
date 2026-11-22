@@ -69,6 +69,8 @@ const SYS_LABEL: Record<string, string> = {
   invoice_sent: 'Invoice sent', invoice_paid: 'Invoice paid', converted: 'Converted to a customer',
   // item 107 (J8): these three fell through to "invoice voided" in lower case
   invoice_voided: 'Invoice voided', proposal_deleted: 'Draft proposal removed', contract_deleted: 'Draft agreement removed',
+  // sales items 162, 165, 166 (0249)
+  invoice_changed: 'Invoice changed', invoice_reminded: 'Reminder sent', money_back: 'Money given back',
 };
 // Item 69: the client opened a document's page (routes/sales.ts firstOpen) — "They
 // opened your proposal". pipeline.html mirrors these by hand, like SYS_LABEL.
@@ -119,6 +121,10 @@ export function describeSystemEvent(row: any): string {
   if (k === 'recurring_invoice') return recurringEventLine(d);
   // sales items 126, 127 (and item 118's Undo): money given back rides payment_undone; its detail says which
   if (k === 'payment_undone') return moneyBackLine(d);
+  // sales items 162, 165, 166: a changed invoice names its changes; a reminder and money back name the amount
+  if (k === 'invoice_changed') return (d.purpose === 'deposit' ? 'Deposit request changed' : 'Invoice changed') + (Array.isArray(d.words) && d.words.length ? ' — ' + d.words.join('; ') : '');
+  if (k === 'invoice_reminded') return 'Reminder sent by hand' + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '');
+  if (k === 'money_back') return 'Money given back' + (usd(d.amount_cents) ? ' — ' + usd(d.amount_cents) : '') + (d.method ? ' by ' + String(d.method).replace('_', ' ') : '') + (d.note ? ' · ' + String(d.note).slice(0, 120) : '');
   return SYS_LABEL[k] || String(k || '').replace(/_/g, ' ');
 }
 

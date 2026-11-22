@@ -33,14 +33,16 @@ export function addressText(a: unknown): string {
 
 /** The studio as it signs its documents: Business details (name, email, phone)
  *  and its location's address, plus the time zone its dates are told in. */
-export async function studioParty(siteId: string): Promise<{ party: DocParty; tz: string | null }> {
-  const [id, loc] = await Promise.all([
+export async function studioParty(siteId: string): Promise<{ party: DocParty; tz: string | null; payOther: string }> {
+  const [id, loc, set] = await Promise.all([
     first(`presence_identity?site_id=eq.${siteId}&select=business_name,email,phone&limit=1`),
     first(`presence_locations?site_id=eq.${siteId}&select=address_line1,address_line2,city,region,postal_code,timezone,phone&limit=1`),
+    first(`presence_settings?site_id=eq.${siteId}&select=invoice_pay_other,invoice_tax_id&limit=1`),   // sales item 168 (APPLY-0250; null before it)
   ]);
   return {
-    party: { name: String(id?.business_name || ''), email: String(id?.email || ''), phone: String(id?.phone || loc?.phone || ''), address: addressOf(loc) },
+    party: { name: String(id?.business_name || ''), email: String(id?.email || ''), phone: String(id?.phone || loc?.phone || ''), address: addressOf(loc), taxId: String(set?.invoice_tax_id || '').trim() },
     tz: loc?.timezone ? String(loc.timezone) : null,
+    payOther: String(set?.invoice_pay_other || '').trim(),
   };
 }
 
@@ -76,16 +78,16 @@ export async function partPayments(siteId: string, invoiceId: string): Promise<D
 
 /** Sales item 145: the refunds and lost disputes counted against an invoice (presence_money_returns,
  *  APPLY-0233), each with its day, oldest first. [] before the table exists or when nothing came back. */
-export async function invoiceReturns(siteId: string, invoiceId: string): Promise<Array<{ cents: number; at: string | null; kind: string }>> {
+export async function invoiceReturns(siteId: string, invoiceId: string): Promise<Array<{ cents: number; at: string | null; kind: string; method?: string }>> {
   if (!UUID_RE.test(invoiceId)) return [];
   try {
-    const r = await svc(`presence_money_returns?invoice_id=eq.${invoiceId}&site_id=eq.${siteId}&applies_to=eq.invoice&counted_cents=gt.0&select=counted_cents,counted_at,kind&order=counted_at.asc&limit=50`);
-    return r.ok ? rows(r).map((x) => ({ cents: Number(x.counted_cents) || 0, at: x.counted_at || null, kind: String(x.kind || 'refund') })) : [];
+    const r = await svc(`presence_money_returns?invoice_id=eq.${invoiceId}&site_id=eq.${siteId}&applies_to=eq.invoice&counted_cents=gt.0&select=counted_cents,counted_at,kind,method&order=counted_at.asc&limit=50`);
+    return r.ok ? rows(r).map((x) => ({ cents: Number(x.counted_cents) || 0, at: x.counted_at || null, kind: String(x.kind || 'refund'), method: String(x.method || '') })) : [];
   } catch { return []; }
 }
 
 /** Everything one document needs around its row, read side by side. */
-export async function docContextFor(siteId: string, kind: 'proposal' | 'contract' | 'invoice' | 'estimate', row: any, extra: Partial<DocContext> = {}): Promise<DocContext> {
+export async function docContextFor(siteId: string, kind: 'proposal' | 'contract' | 'invoice' | 'estimate' | 'charge', row: any, extra: Partial<DocContext> = {}): Promise<DocContext> {
   const dealId = row?.deal_id;
   const [studio, billTo, payments, deal, returned] = await Promise.all([
     studioParty(siteId),
@@ -93,7 +95,7 @@ export async function docContextFor(siteId: string, kind: 'proposal' | 'contract
     kind === 'invoice' && row?.id ? partPayments(siteId, String(row.id)) : Promise.resolve([] as DocPayment[]),
     UUID_RE.test(String(dealId || '')) ? first(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=title&limit=1`) : Promise.resolve(null),
     // sales item 145: only when money came back (the row says so), so a plain receipt costs no extra read
-    kind === 'invoice' && row?.id && (Number(row?.refunded_cents) > 0 || row?.dispute_status) ? invoiceReturns(siteId, String(row.id)) : Promise.resolve([] as Array<{ cents: number; at: string | null; kind: string }>),
+    kind === 'invoice' && row?.id && (Number(row?.refunded_cents) > 0 || row?.dispute_status) ? invoiceReturns(siteId, String(row.id)) : Promise.resolve([] as Array<{ cents: number; at: string | null; kind: string; method?: string }>),
   ]);
-  return { studio: studio.party, tz: studio.tz, billTo, payments, forWhat: deal?.title ? String(deal.title) : null, returned, ...extra };
+  return { studio: studio.party, tz: studio.tz, billTo, payments, forWhat: deal?.title ? String(deal.title) : null, returned, payOther: studio.payOther || null, ...extra };
 }
