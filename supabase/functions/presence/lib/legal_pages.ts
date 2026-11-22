@@ -105,12 +105,16 @@ ${adCookieParagraphs(c) ? `${adCookieParagraphs(c)}${kept ? `
 /** The Accessibility Statement body — promises the TEMPLATE actually keeps. */
 export function accessibilityBody(c: SnapshotContent): string {
   const name = esc(c.identity.business_name);
+  // Item 307: the template's own colours are checked for contrast; a section whose colours the
+  // owner kept past a contrast warning (contrast_ack) is not, so the page then leaves the promise out.
+  const blocks = [...(c.settings?.blocks || []), ...(c.settings?.pages || []).flatMap((p) => p.blocks || [])];
+  const kept = blocks.some((b) => (b as { style?: { contrast_ack?: true } }).style?.contrast_ack === true);
+  const contrast = kept ? '' : '\n<li>the site’s own colours are checked for readable contrast, and sizes adapt to your device;</li>';
   return `<section class="block wrap"><h1>Accessibility</h1>
 <p>${name} wants everyone to be able to use this website. It’s built so that:</p>
 <ul style="margin:14px 0 14px 22px">
 <li>every page has clear headings and can be navigated by keyboard;</li>
-<li>every photograph has a written description;</li>
-<li>text keeps readable contrast, and sizes adapt to your device;</li>
+<li>every photograph has a written description;</li>${contrast || '\n<li>text sizes adapt to your device;</li>'}
 <li>the site respects your system’s reduced-motion preference;</li>
 <li>links and buttons say what they do.</li>
 </ul>

@@ -784,6 +784,14 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 .rw-b svg{width:14px;height:14px}
 @media (pointer:coarse){.rw-b{width:44px;height:44px}}
 .rw-fold{margin-top:10px}.rw-fold summary{font-size:12px;font-weight:600;color:var(--ink-2);cursor:pointer}
+/* a feature's icon on its card (item 304's line icons) */
+.rw-icon{display:flex;flex-direction:column;gap:6px}
+.rw-icon-now{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 12px;border:1px solid var(--hair);border-radius:999px;background:var(--sheet);color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.rw-icon-now[aria-expanded="true"]{border-color:var(--plum);color:var(--plum)}
+.rw-icon-pic{display:inline-flex;font-size:16px;line-height:1}
+.ins-icon[aria-pressed="true"]{border-color:var(--plum);box-shadow:0 0 0 2px var(--plum-soft)}
+.rw-icon-none{font-size:12px;font-weight:600;color:var(--ink-2)}
+@media (pointer:coarse){.rw-icon-now{min-height:44px}}
 .rw-table{display:grid;gap:6px;align-items:center;overflow-x:auto;padding-bottom:4px}
 .rw-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 #settingsPanel[data-mode="section"] #blocksCard .rw-card input,#settingsPanel[data-mode="section"] #blocksCard .rw-card textarea,#settingsPanel[data-mode="section"] #blocksCard .rw-table input{margin-bottom:0 !important}
@@ -810,6 +818,38 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 .ins-theme-pic b{display:block;width:40%;height:8px;border-radius:4px}
 .ins-theme[aria-pressed=true]{color:var(--plum);font-weight:600}
 .ins-theme[aria-pressed=true] .ins-theme-pic{border:2.5px solid var(--plum);padding:8.5px 6.5px}
+.ins-themes{grid-template-columns:repeat(var(--n,5),minmax(0,1fr))}
+/* item 292: the Photo theme tile shows the chosen photo under its veil */
+.ins-theme-pic.photo{background:linear-gradient(135deg,var(--plum),var(--ink));background-size:cover;background-position:center;box-shadow:inset 0 0 0 100px rgba(12,10,16,.45)}
+.ins-theme-pic.photo i,.ins-theme-pic.photo b{background:var(--card)!important}
+/* item 302: motion tiles that move when the pointer rests on them */
+.ins-motions{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.ins-motion{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--ink-2);font:500 12px/1.2 var(--sans);cursor:pointer}
+.ins-motion-pic{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:4px;width:100%;height:60px;box-sizing:border-box;padding:8px;border:1px solid var(--hair);border-radius:12px;overflow:hidden;background:var(--card,#fff)}
+.ins-motion-pic i{display:block;height:4px;border-radius:2px;background:var(--ink-3,#8a8597);width:70%}
+.ins-motion-pic i.s{width:45%}
+.ins-motion-pic i.ph{height:18px;width:100%;border-radius:5px;background:var(--plum-soft,#e7e0f6)}
+.ins-motion[aria-pressed=true] .ins-motion-pic{border:2.5px solid var(--plum);padding:6.5px}
+@media (prefers-reduced-motion:no-preference){
+.ins-motion[data-motion=gentle] .ins-motion-pic.play i{animation:ins-rise .7s ease both}
+.ins-motion[data-motion=slide] .ins-motion-pic.play i{animation:ins-slide .7s ease both}
+.ins-motion[data-motion=scale] .ins-motion-pic.play i{animation:ins-scale .7s ease both}
+.ins-motion[data-motion=zoom] .ins-motion-pic.play i{animation:ins-rise .7s ease both}
+.ins-motion[data-motion=zoom] .ins-motion-pic.play i.ph{animation:ins-zoom 2.4s ease-out both}
+.ins-motion .ins-motion-pic.play i:nth-child(2){animation-delay:.12s}.ins-motion .ins-motion-pic.play i:nth-child(3){animation-delay:.24s}
+}
+@keyframes ins-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes ins-slide{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:none}}
+@keyframes ins-scale{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+@keyframes ins-zoom{from{transform:scale(1)}to{transform:scale(1.15)}}
+/* item 304: the line icon grid */
+.ins-icons{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.ins-icon{display:inline-flex;align-items:center;justify-content:center;min-height:44px;border:1px solid var(--hair);border-radius:10px;background:var(--card,#fff);cursor:pointer;padding:0}
+.ins-icon:hover,.ins-icon:focus-visible{border-color:var(--plum)}
+/* item 296: the logo size row */
+.hf-size{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;margin-top:10px;font-size:13px;color:var(--ink)}
+.hf-size input[type=range]{width:100%;min-height:44px;margin:0}
+.hf-size output{min-width:44px;text-align:right;color:var(--ink-2)}
 .ins-theme:focus-visible{outline:2px solid var(--plum);outline-offset:2px;border-radius:12px}
 .ins-says{margin:0;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
 /* item 225: a section's link name, its bottom edge, and Goes to beside a link box */

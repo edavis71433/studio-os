@@ -180,7 +180,7 @@ ok('every link in a section is found, at any depth', JSON.stringify(sectionLinks
     fx.content.settings = { ...fx.content.settings, blocks: home.blocks, blocks_src: home.src, nav: [{ label: 'Home', href: '/' }, { label: 'Hours', href: '/#hours' }], sections: { hidden: ['hero', 'about', 'offerings', 'testimonials', 'faqs'], order: [] } };
     const files = await renderSnapshot(fx, { baseUrl: 'https://shop.example' });
     const cssPath = Object.keys(files).find((k) => /^assets\/site-[0-9a-f]+\.css$/.test(k));
-    const html = String(files['index.html']).replace(`<link rel="stylesheet" href="/${cssPath}">`, () => `<style>${files[cssPath]}</style>`);
+    const html = String(files['index.html']).replace(`<link rel="stylesheet" href="/${cssPath}">`, () => `<style>${files[cssPath]}</style>`).replace(/<script src="\/assets\/site-[0-9a-f]+\.js" defer><\/script>\n?/, '');   // the site's script file stays out of the fixture (items 288 and 298)
     ok(`[${slug}] the browser page has the named section, its wave, the jump links and its stylesheet`, html.includes('<section id="hours" ') && html.includes('block--edge-wave') && html.includes('href="#hours"') && html.includes('href="/#hours"') && html.includes('.block--edge-wave{') && !html.includes('/assets/site-'));
     const url = new URL(`tests/e2e/fixtures/section-links-225/${slug}.html`, ROOT);
     if (Deno.args.includes('--update-fixtures')) { Deno.mkdirSync(new URL('.', url), { recursive: true }); Deno.writeTextFileSync(url, html); }

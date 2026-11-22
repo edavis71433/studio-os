@@ -223,6 +223,7 @@ export const PROVIDERS: Provider[] = [
       for (const m of all(p.html, /href="(\/[^"]*)"/gi)) {
         const href = m[1];
         if (seen.has(href)) continue; seen.add(href);
+        if (/^\/(img|files|fonts)\//.test(href)) continue;   // photos, files and fonts travel in the media manifest, not the page map (item 308 preloads the first photo)
         if (!exists(href)) emit('links.internal_broken', 'render', `${p.path}→${href}`, { page: p.path, href });
       }
     }

@@ -215,10 +215,12 @@ const quiet = async (fn) => { const e = console.error, w = console.warn; console
 // ═══ 7. wiring ═══
 {
   const idx = read('supabase/functions/presence/index.ts');
-  ok('index: the studio check is asked first, with the person\'s own businesses as its fallback', /resolveScopedSite\(jwt, scopeReq, \{[\s\S]*?\}, \(id\) => resolveHeldBusiness\(jwt, principal, id\)\);/.test(idx));
-  const heldBranch = idx.slice(idx.indexOf("if ('held' in sc) {"), idx.indexOf('} else {', idx.indexOf("if ('held' in sc) {")));
-  ok('index: a held business sets no studio scope and no client name', heldBranch.includes('seated = sc.held;') && !heldBranch.includes('principal.scope') && !heldBranch.includes('scopedName'));
-  ok('index: a seat is stamped in one place, for a client caller alone', idx.includes("if (principal.kind === 'client') principal.member = seated.member;") && idx.split('principal.member =').length === 2);
+  // builder item 401: the seat is worked out in lib/who_asks.ts (remembered a minute) and stamped by index.ts
+  const who = read('supabase/functions/presence/lib/who_asks.ts');
+  ok('who_asks: the studio check is asked first, with the person\'s own businesses as its fallback', /resolveScopedSite\(jwt, scopeReq, audit, \(id\) => resolveHeldBusiness\(jwt, principal, id\)\);/.test(who) && idx.includes('const answer = await resolveSeat(jwt, principal, req.headers.get(\'x-dds-scope-site\')'));
+  const heldBranch = who.slice(who.indexOf("if ('held' in sc) {"), who.indexOf('} else {', who.indexOf("if ('held' in sc) {")));
+  ok('who_asks: a held business sets no studio scope and no client name', heldBranch.includes('seated = sc.held;') && !heldBranch.includes('scope =') && !heldBranch.includes('scopedName'));
+  ok('index: a seat is stamped in one place, for a client caller alone', idx.includes("if (principal.kind === 'client' && seat.member) principal.member = { ...seat.member };") && idx.split('principal.member =').length === 2 && who.includes("if (principal.kind === 'client') member = seated.member;"));
   const scope = read('supabase/functions/presence/lib/scope.ts');
   ok('scope: only "not a studio", "a role that can\'t open clients" and "not your client" fall back to the person\'s own businesses', scope.includes("if (!pre.ok && held && (pre.reason === 'not_agency' || pre.reason === 'role' || pre.reason === 'unauthorized')) {"));
   ok('scope: a held answer must be the site that was asked for', scope.includes('if (own && own.site.id === requestedSiteId) return { ok: true, site: own.site, held: own };'));

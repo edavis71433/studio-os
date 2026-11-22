@@ -24,6 +24,16 @@
 /*.js
   Cache-Control: public, max-age=86400
 
+# Builder item 412: the sign-in library's file name carries its version
+# (/vendor/supabase-js-2.45.4.js), so a year, like the fingerprinted files under /v/.
+# A new version is a new name. The rule sits below /*.js so it wins for /vendor/.
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Builder item 412: the free tools' logo was two thirds of each tool page and kept an hour.
+/tools-logo.webp
+  Cache-Control: public, max-age=2592000
+
 /*.css
   Cache-Control: public, max-age=86400
 

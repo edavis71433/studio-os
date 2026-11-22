@@ -72,7 +72,9 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   // item 131: a page holding the site's form also carries the page's sender (lib/site_send.ts), and no other page does
   const sender = senderTag(SITE.formEndpoint);
   const noSender = (h) => String(h).replace(sender, '');
-  ok('zero JavaScript emitted, except the first-party search, tag filter, Open now and the form’s sender', scriptPages.length > 0 && scriptPages.every(([, h]) => !/<script(?! type="application\/ld\+json")/.test(noOpenNow(noSender(h)))));
+  // items 288 and 298: every page links the site's own script file (the phone menu, the gallery's zoom view)
+  const noSiteJs = (h) => String(h).replace(/<script src="\/assets\/site-[0-9a-f]+\.js" defer><\/script>\n/, '');
+  ok('zero JavaScript emitted, except the first-party search, tag filter, Open now, the form’s sender and the site’s own script file', scriptPages.length > 0 && scriptPages.every(([, h]) => !/<script(?! type="application\/ld\+json")/.test(noSiteJs(noOpenNow(noSender(h))))));
   ok('the form’s sender rides only on the pages that hold the form', scriptPages.some(([, h]) => h.includes(sender)) && scriptPages.every(([, h]) => h.includes(sender) === h.includes(`action="${SITE.formEndpoint}"`)));
   ok('the Open now script is on the home page only', pages.filter(([, h]) => String(h).includes("getElementById('open-now')")).map(([k]) => k).join() === 'index.html');
 }
@@ -126,7 +128,7 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   ok('not-sent: the page exists, noindex, out of the sitemap, disallowed for robots', !!ns && ns.includes('name="robots" content="noindex"') && !f['sitemap.xml'].includes('/not-sent/') && f['robots.txt'].includes('Disallow: /not-sent/'));
   ok('not-sent: says it didn’t send, with a line per reason and a general one', ns.includes('Your message didn’t send.') && NOT_SENT_REASONS.every((r) => ns.includes(`id="ns-${r}"`)) && ns.includes('ns-general'));
   ok('not-sent: it sends the visitor Back, where the browser keeps the words, and offers the contact page', ns.includes('Back button to return to the form: what you wrote is still there.') && ns.includes('href="/contact/"'));
-  ok('not-sent: no script and no click handler (CSS :target picks the reason)', !/<script(?! type="application\/ld\+json")/.test(ns) && !/<[a-z][a-z0-9]*\b[^>]*\son\w+\s*=/i.test(ns));
+  ok('not-sent: no script beyond the site’s own file, and no click handler (CSS :target picks the reason)', !/<script(?! type="application\/ld\+json")(?! src="\/assets\/site-)/.test(ns) && !/<[a-z][a-z0-9]*\b[^>]*\son\w+\s*=/i.test(ns));
   ok('reasons: a known code keeps its line, anything else gets the general one', notSentReason('bad_email') === 'bad_email' && notSentReason('need_contact') === 'need_contact' && notSentReason('weird') === 'check');
   const route = await Deno.readTextFile(new URL('supabase/functions/presence/routes/commercial.ts', ROOT));
   // six: the contact form's two, a custom form's three (item 147: its files couldn't be kept), and item 146's "Join our list" box

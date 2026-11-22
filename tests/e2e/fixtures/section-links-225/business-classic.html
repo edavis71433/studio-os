@@ -17,7 +17,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Larkspur Tax &amp; Bookkeeping — Accountants in Burbank, CA">
 <meta name="twitter:description" content="Tax returns, bookkeeping and payroll for small businesses and families in Burbank and Glendale. Flat prices and same-day callbacks.">
-<style>:root{--ink:#1c2430;--soft:#5b6572;--paper:var(--bg,#f7f7f5);--accent:#23635a;--line:#e2e4e1}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:16.5px}h1{font-size:clamp(2.1rem,5.5vw,3.4rem);line-height:1.15;letter-spacing:-.015em}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:#fff;padding:10px 18px;z-index:99}.wrap{max-width:1000px;margin:0 auto;padding:0 22px}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:14px;padding-bottom:14px;flex-wrap:wrap}nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:9px 12px;text-decoration:none;color:#5b6572;font-weight:600}.hero{padding-top:72px;padding-bottom:48px}</style>
+<style>:root{--ink:#1c2430;--soft:#5b6572;--paper:var(--bg,#f7f7f5);--accent:#23635a;--line:#e2e4e1}html{font-size:calc(100% * var(--font-scale,1))}*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:16.5px}h1{font-size:clamp(2.1rem,5.5vw,3.4rem);line-height:1.15;letter-spacing:-.015em}.skip{position:absolute;left:-9999px}.skip:focus{left:0;background:var(--ink);color:#fff;padding:10px 18px;z-index:99}.wrap{max-width:1000px;margin:0 auto;padding:0 22px}.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:14px;padding-bottom:14px;flex-wrap:wrap}nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}nav.primary a{display:inline-block;padding:9px 12px;text-decoration:none;color:#5b6572;font-weight:600}.hero{padding-top:72px;padding-bottom:48px}.menu-btn{display:none}.site-menu{display:contents}@media (max-width:720px){.site-menu{display:none}.menu-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;min-width:44px;padding:0 14px;border:1px solid var(--line,#ddd);border-radius:999px;background:transparent;color:inherit;font:inherit;font-weight:600}}</style>
 <style>:root{--ink:#1c2430;--soft:#5b6572;--paper:var(--bg,#f7f7f5);--card:#ffffff;--accent:#23635a;--accent-dark:#17453f;--line:#e2e4e1;--wash:#eef1ee}
 html{font-size:calc(100% * var(--font-scale,1))}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -179,11 +179,64 @@ main>.block--edge:last-child{margin-bottom:var(--edge-h)}
 .post-author-name{font-weight:700;margin:0}
 .post-author-bio{color:var(--soft);margin:2px 0 0}
 .post-more{display:flex;flex-wrap:wrap;gap:8px 24px;margin-top:28px}
+.post-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:28px}
+.post-pager a{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border:1px solid var(--line);border-radius:999px;color:var(--ink);text-decoration:none}
+.post-pager a:hover{border-color:var(--ink)}
+.post-pager-at{color:var(--soft);font-size:.92rem}
+.post-feed{margin-top:22px;font-size:.92rem}
+.post-feed a{display:inline-flex;align-items:center;min-height:44px;color:var(--soft)}
 @media (max-width:700px){.post-row{grid-template-columns:1fr;gap:12px}}
 
 address.place2{margin-top:14px}
 .place2-same{color:var(--soft)}
 
+html{scroll-padding-top:calc(var(--hdr-h,72px) + 12px)}
+.hero-img img{aspect-ratio:16/9;object-fit:cover}
+@media (max-width:640px){.hero-img img{aspect-ratio:4/3}}
+.hero-photo{position:relative;isolation:isolate;overflow:hidden;min-height:min(72vh,640px);display:flex;align-items:center}
+.hero-photo .hero-bg{position:absolute;inset:0;z-index:-2}
+.hero-photo .hero-bg picture,.hero-photo .hero-bg img{width:100%;height:100%;object-fit:cover;display:block}
+.hero-photo::before{content:"";position:absolute;inset:0;z-index:-1;background:rgba(12,10,16,.55)}
+.hero-photo.veil-light::before{background:rgba(255,255,255,.72)}
+.hero-photo .hero-copy{width:100%}
+.hero-photo.veil-dark,.hero-photo.veil-dark h1,.hero-photo.veil-dark .tagline{color:#fff}
+.hero-photo.veil-dark .kicker{color:#fff;background:rgba(255,255,255,.16)}
+.hero-photo.veil-dark .btn.ghost{color:#fff;border-color:rgba(255,255,255,.75);background:transparent}
+.hero-photo.veil-dark .hp-title,.hero-photo.veil-dark .hp-contact a{color:#fff}
+@media (max-width:640px){.hero-photo{min-height:min(60vh,520px)}}
+.brandlogo{width:auto}
+.brand[style] .brandlogo{height:var(--logo-h)}
+.brand-logo-only .brandlogo{margin-right:0}
+.sitesearch:focus-within{outline:2px solid var(--accent,#333);outline-offset:2px}
+.sitesearch input{font-size:max(16px,.92rem)}
+.menu-btn{display:none}
+.site-menu{display:contents}
+@media (max-width:720px){
+html{--hdr-h:64px}
+header.site .nav{position:relative;flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:12px;padding-top:8px;padding-bottom:8px}
+header.site .brand{font-size:1.15rem;min-height:44px;display:inline-flex;align-items:center;min-width:0}
+header.site .brand[style] .brandlogo{height:min(var(--logo-h),44px)}
+.menu-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;min-width:44px;padding:0 14px;border:1px solid var(--line,#ddd);border-radius:999px;background:transparent;color:inherit;font:inherit;font-weight:600;font-size:.95rem;cursor:pointer;flex:none}
+.menu-btn svg{display:block}
+.menu-btn .mb-close{display:none}
+.menu-btn[aria-expanded="true"] .mb-open{display:none}
+.menu-btn[aria-expanded="true"] .mb-close{display:block}
+.site-menu{display:none;position:absolute;left:0;right:0;top:100%;background:var(--card,var(--paper,#fff));border-bottom:1px solid var(--line,#ddd);box-shadow:0 18px 40px rgba(0,0,0,.14);padding:8px 16px 18px;max-height:calc(100vh - 72px);overflow:auto;z-index:30;text-align:left}
+.site-menu.open{display:block}
+.site-menu nav.primary ul{display:flex;flex-direction:column;gap:0;padding:0;justify-content:flex-start}
+.site-menu nav.primary li{margin:0}
+.site-menu nav.primary a{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:10px 8px;font-size:1.02rem;border-radius:10px;border-bottom:0}
+.site-menu nav.primary ul.subnav{display:none;position:static;box-shadow:none;border:0;padding:0 0 6px 18px;min-width:0;background:transparent}
+.site-menu nav.primary li.has-sub.open>ul.subnav,.site-menu nav.primary li.has-sub:focus-within>ul.subnav{display:block}
+.site-menu nav.primary li.has-sub.open>a .sub-caret{transform:rotate(180deg)}
+.site-menu .sitesearch{max-width:none;margin:10px 0 0;min-height:44px}
+}
+@media (max-width:720px){
+a[href^="tel:"],a[href^="mailto:"],.strip a,.credit a,.post-more a,footer.site .cols a,.map-dir a,.annbar a{display:inline-flex;align-items:center;min-height:44px}
+.nl-form .nl-consent label{min-height:44px;align-items:center}
+.nl-form .nl-consent input{width:22px;height:22px;margin:0 2px 0 0}
+}
+@media print{.menu-btn{display:none}.site-menu{display:block;position:static}}
 nav.primary li.has-sub{position:relative}
 nav.primary .sub-caret{font-size:.7em;margin-left:4px;opacity:.75}
 nav.primary ul.subnav{position:absolute;left:0;top:100%;min-width:190px;margin:0;padding:6px;list-style:none;background:var(--sheet,var(--card,#fff));border:1px solid var(--line,#e6e6e6);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.14);display:none;z-index:60}
@@ -193,6 +246,7 @@ nav.primary ul.subnav a{display:block;white-space:nowrap;border-radius:7px}
 @media (max-width:720px){nav.primary ul.subnav{position:static;display:block;box-shadow:none;border:none;padding:2px 0 2px 14px;min-width:0;background:transparent}}</style>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"AccountingService","name":"Larkspur Tax & Bookkeeping","description":"A small accounting office that does your taxes, keeps your books and answers the phone. Flat prices quoted before we start, and meetings in person or by video.","url":"https://shop.example","telephone":"(818) 555-0143","email":"hello@larkspurtax.example","address":{"@type":"PostalAddress","streetAddress":"411 N Glenoaks Blvd, Suite 3","addressLocality":"Burbank","addressRegion":"CA","postalCode":"91502","addressCountry":"US"},"openingHoursSpecification":[{"@type":"OpeningHoursSpecification","dayOfWeek":"Monday","opens":"09:00","closes":"17:30"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Tuesday","opens":"09:00","closes":"17:30"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Wednesday","opens":"09:00","closes":"17:30"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Thursday","opens":"09:00","closes":"17:30"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Friday","opens":"09:00","closes":"17:00"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Saturday","opens":"10:00","closes":"14:00"}],"specialOpeningHoursSpecification":[{"@type":"OpeningHoursSpecification","validFrom":"2026-11-26","validThrough":"2026-11-26","opens":"00:00","closes":"00:00"},{"@type":"OpeningHoursSpecification","validFrom":"2026-12-24","validThrough":"2026-12-24","opens":"09:00","closes":"12:00"}],"areaServed":"Burbank, Glendale and the east San Fernando Valley","sameAs":["https://linkedin.com/company/larkspurtax.example","https://facebook.com/larkspurtax.example"]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"Larkspur Tax & Bookkeeping","url":"https://shop.example"}</script>
+<noscript><style>@media (max-width:720px){.site-menu{display:block;position:static;box-shadow:none;max-height:none;padding:0 0 10px}.menu-btn{display:none}.site-menu nav.primary ul.subnav{display:block}}</style></noscript>
 </head>
 <body>
 <a class="skip" href="#main">Skip to main content</a>
@@ -200,8 +254,9 @@ nav.primary ul.subnav a{display:block;white-space:nowrap;border-radius:7px}
 
 <header class="site"><div class="wrap nav">
   <a class="brand" href="/">Larkspur Tax &amp; Bookkeeping</a>
-  <nav class="primary" aria-label="Main"><ul><li><a href="/" aria-current="page">Home</a></li><li><a href="/#hours">Hours</a></li></ul></nav>
-  <form class="sitesearch" role="search" action="/search/" method="get"><span class="ss-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg></span><input type="search" name="q" aria-label="Search this site" placeholder="Search" autocomplete="off" maxlength="120"></form>
+  <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-menu"><svg class="mb-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><svg class="mb-close" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>Menu</span></button>
+  <div class="site-menu" id="site-menu"><nav class="primary" aria-label="Main"><ul><li><a href="/" aria-current="page">Home</a></li><li><a href="/#hours">Hours</a></li></ul></nav>
+  <form class="sitesearch" role="search" action="/search/" method="get"><span class="ss-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg></span><input type="search" name="q" aria-label="Search this site" placeholder="Search" autocomplete="off" maxlength="120"></form></div>
 </div></header>
 <main id="main">
 <div class="strip"><div class="wrap">
@@ -216,7 +271,7 @@ nav.primary ul.subnav a{display:block;white-space:nowrap;border-radius:7px}
 <footer class="site"><div class="wrap">
   <div class="cols">
     <div><h2>Larkspur Tax &amp; Bookkeeping</h2><address>411 N Glenoaks Blvd, Suite 3<br>Burbank, CA 91502</address><p><a href="tel:8185550143">(818) 555-0143</a><br><a href="mailto:hello@larkspurtax.example">hello@larkspurtax.example</a></p><p><a href="https://linkedin.com/company/larkspurtax.example" rel="noopener">Linkedin</a> · <a href="https://facebook.com/larkspurtax.example" rel="noopener">Facebook</a></p></div>
-    <div><table class="hours" data-pr="location.hours"><caption>Hours</caption><tbody><tr data-day="mon"><th scope="row">Monday</th><td>9am–5:30pm</td></tr><tr data-day="tue"><th scope="row">Tuesday</th><td>9am–5:30pm</td></tr><tr data-day="wed"><th scope="row">Wednesday</th><td>9am–5:30pm</td></tr><tr data-day="thu"><th scope="row">Thursday</th><td>9am–5:30pm</td></tr><tr data-day="fri"><th scope="row">Friday</th><td>9am–5pm</td></tr><tr data-day="sat"><th scope="row">Saturday</th><td>10am–2pm</td></tr><tr data-day="sun"><th scope="row">Sunday</th><td>Closed</td></tr></tbody></table><div class="holiday"><strong>Holiday hours</strong><ul><li>Thanksgiving (2026-11-26): Closed</li><li>Christmas Eve (2026-12-24): 9am–12pm</li></ul></div></div>
+    <div><table class="hours" data-pr="location.hours"><caption>Hours</caption><tbody><tr data-day="mon"><th scope="row">Monday</th><td>9am–5:30pm</td></tr><tr data-day="tue"><th scope="row">Tuesday</th><td>9am–5:30pm</td></tr><tr data-day="wed"><th scope="row">Wednesday</th><td>9am–5:30pm</td></tr><tr data-day="thu"><th scope="row">Thursday</th><td>9am–5:30pm</td></tr><tr data-day="fri"><th scope="row">Friday</th><td>9am–5pm</td></tr><tr data-day="sat"><th scope="row">Saturday</th><td>10am–2pm</td></tr><tr data-day="sun"><th scope="row">Sunday</th><td>Closed</td></tr></tbody></table><div class="holiday"><strong>Holiday hours</strong><ul><li>Thanksgiving, <time datetime="2026-11-26">Thu Nov 26</time>: Closed</li><li>Christmas Eve, <time datetime="2026-12-24">Thu Dec 24</time>: 9am–12pm</li></ul></div></div>
   </div>
   <div class="credit"><span>© Larkspur Tax &amp; Bookkeeping</span><span><a href="/privacy/">Privacy</a> · <a href="/accessibility/">Accessibility</a></span></div>
 </div></footer>

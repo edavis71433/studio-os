@@ -90,8 +90,10 @@ ok('degrade: operator → staff (still the studio\'s hand); everything else unto
   ok('bulk: a member\'s per-site copy → operator; staff\'s → staff', publishActorKind({ ...operator, scope: null, ...{ kind: 'client' }, scope: CLIENT }) === 'operator' && publishActorKind({ kind: 'staff', scope: CLIENT }) === 'staff');
 
   const idx = read('supabase/functions/presence/index.ts');
+  // builder item 401: the scope is decided in lib/who_asks.ts (a refusal returns before it is set) and stamped by index.ts only from a granted seat
+  const who = read('supabase/functions/presence/lib/who_asks.ts');
   ok('index.ts: the principal is stamped with the scope ONLY after resolveScopedSite allowed it',
-    /if \(!sc\.ok\) return json\(\{ error: 'scope_denied'[\s\S]{0,800}principal\.scope = \{ site_id: sc\.scoped\.site_id, name: sc\.scoped\.name \}/.test(idx));
+    /if \(!sc\.ok\) return \{ ok: false, status: sc\.status, error: 'scope_denied'[\s\S]{0,800}scope = \{ site_id: sc\.scoped\.site_id, name: sc\.scoped\.name \}/.test(who) && /if \(!answer\.ok\) return json\(\{ error: answer\.error[\s\S]{0,800}if \(seat\.scope\) principal\.scope = \{ \.\.\.seat\.scope \}/.test(idx));
   const auth = read('supabase/functions/_shared/auth.ts');
   ok('auth.ts: Principal carries the optional scope flag', /scope\?: \{ site_id: string; name: string \} \| null;/.test(auth));
 
