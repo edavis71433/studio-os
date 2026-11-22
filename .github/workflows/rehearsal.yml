@@ -1,0 +1,38 @@
+name: Database changes rehearsal (scratch database)
+
+# Builder item 420: production gets each database change by hand, from an apply pack. This
+# is the free dress rehearsal, on every pull request: a throwaway database on the runner,
+# built from every migration in order the way production was, then every apply pack from
+# 0260 on run twice on top, and the change ledger checked to say what the release will ask
+# production (scripts/rehearse-changes.sh says how and why).
+#
+# Not a required check (only `browser` and `test` are), so a Docker outage on GitHub's side
+# doesn't block a merge; a red run here means a change won't apply cleanly on production.
+# No repository secret, on purpose: the scratch database's keys are its own and gone when
+# the machine is. tests/workflows/rehearsal_test.mjs holds this file's shape in place.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A pull request pushed again stops its older rehearsal.
+concurrency:
+  group: rehearsal-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  # The CLI version deploy.yml deploys with, so the scratch database is set up by the same
+  # tool as production's functions. tests/workflows/rehearsal_test.mjs keeps them equal.
+  SUPABASE_CLI_VERSION: "2.122.0"
+
+jobs:
+  rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Every migration in order, every apply pack from 0260 twice, then the ledger
+        run: bash scripts/rehearse-changes.sh

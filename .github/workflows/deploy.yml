@@ -1,7 +1,9 @@
 name: Deploy Edge Functions
 
-# Production only (item 112, Nov 9 2026: the staging jobs went; the repository
-# has never had a staging project, so they could never run). Manual only. Actions tab -> Run workflow -> type
+# Production only (item 112, Nov 9 2026: the staging jobs went; GitHub never had the
+# staging project's ref, so they could never run). The staging project itself,
+# studio-os-staging, still exists and runs only the 5-minute watchdog
+# (supabase/ops/watchdog-cron.sql); nothing deploys to it. Manual only. Actions tab -> Run workflow -> type
 # `deploy-production` into the confirmation box. Deploys from `main`, and only a
 # commit that passed the same checks as every pull request (ci.yml, run again here)
 # and the browser check (e2e.yml's `browser`, which this waits for).
@@ -109,9 +111,68 @@ jobs:
   isolation:
     uses: ./.github/workflows/isolation.yml
 
+  # Builder item 420: production's database has every change this commit needs. From 0260
+  # on, each migration and each apply pack writes its number into presence_change_ledger
+  # when it runs. This asks production, through Supabase's own API with the deploy token the
+  # functions go out with, whether the newest migration in this commit is written there,
+  # and stops the release if it isn't: apply the packs first, then release. One read-only
+  # query; its answer, two numbers, is all that reaches this public log. A rollback doesn't
+  # ask: an older version runs on a newer database by design (changes only add).
+  ledger-gate:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Database changes are in place
+        id: ledger-gate
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        run: |
+          newest=$(ls supabase/migrations/ | sed -nE 's/^([0-9]{4})_.*\.sql$/\1/p' | sort -n | tail -1)
+          [ -n "$newest" ] || { echo "::error title=Database changes::No numbered migration found in supabase/migrations."; exit 1; }
+          n=$((10#$newest))
+          if [ "$n" -lt 260 ]; then
+            echo "The newest database change in this commit is $newest, from before the ledger (0260): nothing to compare."
+            exit 0
+          fi
+          # One read-only question to production through Supabase's own API, with the deploy token
+          # the functions are deployed with: is this commit's newest change written down there?
+          # The answer is two numbers, so nothing else reaches this public log.
+          query="select coalesce(max(number), 0) as newest, coalesce(bool_or(number = $n), false) as has from public.presence_change_ledger"
+          code=$(jq -n --arg q "$query" '{query: $q}' | curl -sS -o ledger.json -w '%{http_code}' --max-time 60 -X POST \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H 'Content-Type: application/json' --data @- \
+            "${SUPABASE_MGMT_API:-https://api.supabase.com}/v1/projects/$PROJECT_REF/database/query") || code=000
+          case "$code" in
+            200|201) ;;
+            *)
+              if grep -q 'presence_change_ledger' ledger.json 2>/dev/null && grep -qi 'does not exist' ledger.json 2>/dev/null; then
+                echo "::error title=Database changes::Production has no change ledger yet, so nothing says change $newest is there. Run docs/presence/APPLY-0260-prod.sql on production first (and every pack after it, in order), then release again."
+              else
+                echo "::error title=Database changes::Couldn't read which database changes production has (Supabase's API answered HTTP $code). Nothing was released. Try again in a few minutes; if Supabase's API is down, the release couldn't deploy anyway."
+              fi
+              exit 1 ;;
+          esac
+          has=$(jq -r 'if type == "array" then (.[0].has // false) else "unreadable" end' ledger.json 2>/dev/null || echo unreadable)
+          have=$(jq -r 'if type == "array" then (.[0].newest // 0) else 0 end' ledger.json 2>/dev/null || echo 0)
+          rm -f ledger.json
+          case "$has" in
+            true)
+              echo "Production has database change $newest (its newest is $(printf '%04d' "$have")). The release can go." ;;
+            false)
+              echo "::error title=Database changes::This release needs database change $newest, and production's newest is $(printf '%04d' "$have"). Run the apply packs after $(printf '%04d' "$have") in order (docs/presence/APPLY-NNNN-prod.sql), check each one's answer, then release again. Nothing was released."
+              exit 1 ;;
+            *)
+              echo "::error title=Database changes::Production's answer couldn't be read, so nothing was released. Try again in a few minutes."
+              exit 1 ;;
+          esac
+
   deploy-production:
     if: github.event_name == 'workflow_dispatch'
-    needs: [test, browser-gate, isolation]
+    needs: [test, browser-gate, isolation, ledger-gate]
     runs-on: ubuntu-latest
     steps:
       # The typed phrase and the branch arrive as data, never pasted into the script.

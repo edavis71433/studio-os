@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp, pressButton, touchScreen } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // ── SS12 — Admin-health ops chrome ───────────────────────────────────────────
 // The operator's ONE operational read (/admin/health-center). SS12 gives it the
@@ -266,5 +267,52 @@ test.describe('Admin Health Center — theme blocks (A11, re-skinned onto --dds-
     expect(await read('--ok')).toBe('#11744a');   // = shell --dds-good (light)
     expect(await read('--attn')).toBe('#94530a'); // = shell --dds-warn (light)
     expect(await read('--off')).toBe('#7a7280');  // page-local neutral (kept)
+  });
+});
+
+// ── Builder items 416 and 420 · crashes and database changes, read where an operator looks ──
+// Every request that crashes writes one ops_errors row; the Health Center counts them
+// (lib/health_center.ts crashesArea), sends the newest ten with the payload (routes/admin.ts,
+// recent_crashes) and compares the database's change ledger with the code (changesArea).
+const HC_CRASH = { data: { overall: 'attention', areas: [
+  { key: 'cron', label: 'Scheduled operations', state: 'ok', detail: 'Running on schedule.' },
+  { key: 'crashes', label: 'Server crashes', state: 'attention', detail: '8 crashes in the last hour: something is broken for someone, and the alarm is sounding. The newest are listed below.' },
+  { key: 'changes', label: 'Database changes', state: 'attention', detail: 'The newest database change here is 0259; this code needs 0261. Run the apply packs after 0259, in order, then release.' },
+], recent_crashes: [
+  { what: 'POST /site', said: 'TypeError: Cannot read properties of undefined (reading \'sections\')', at: '2026-11-22T17:58:00Z' },
+  { what: 'GET /portal/context', said: 'RangeError: Invalid time value', at: '2026-11-21T09:15:00Z' },
+] } };
+
+test.describe('Admin Health Center — crashes and database changes (builder items 416, 420)', () => {
+  test('the crashes area sits with the jobs, the changes area with the notices, and the newest crashes follow', async ({ page }) => {
+    await pinClock(page);
+    await installApp(page, { api: { '/admin/health-center': HC_CRASH } });
+    await page.goto('/admin-health.html');
+    const jobs = page.getByRole('heading', { name: 'Jobs & delivery' });
+    await expect(jobs).toBeVisible();
+    await expect(page.locator('.card.area', { hasText: 'Server crashes' })).toContainText('the alarm is sounding');
+    await expect(page.locator('.card.area', { hasText: 'Server crashes' }).locator('.pill')).toHaveText('Needs a look');
+    await expect(page.locator('.card.area', { hasText: 'Database changes' })).toContainText('this code needs 0261');
+    const list = page.getByRole('region', { name: 'Newest crashes' });
+    await expect(list.locator('li')).toHaveCount(2);
+    await expect(list.locator('li').first()).toContainText('POST /site');
+    await expect(list.locator('li').first()).toContainText('reading \'sections\'');
+    await expect(list.locator('li').nth(1)).toContainText('Nov 21');   // another day says its date
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);   // a long error line wraps on a phone
+  });
+
+  test('no crashes on record says so', async ({ page }) => {
+    await pinClock(page);
+    await installApp(page, { api: { '/admin/health-center': { data: { ...HC_CRASH.data, recent_crashes: [] } } } });
+    await page.goto('/admin-health.html');
+    await expect(page.getByRole('region', { name: 'Newest crashes' })).toContainText('No crashes on record');
+  });
+
+  test('a payload without the list (a server from before item 416) shows no list', async ({ page }) => {
+    await installApp(page, { api: { '/admin/health-center': HC_OK } });
+    await page.goto('/admin-health.html');
+    await expect(page.getByText('Everything is running normally.')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Newest crashes' })).toHaveCount(0);
   });
 });

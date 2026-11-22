@@ -26,6 +26,13 @@
 -- false, so it could not have seen a real failure either. One real failure was
 -- there the whole time: see supabase/migrations/0141_prune_evidence_runs_grant.sql.
 --
+-- The second route (builder item 417, Nov 22 2026): .github/workflows/uptime.yml asks
+-- production's public status read every 15 minutes from GitHub, and GitHub emails a failed
+-- run. It doesn't go through Supabase or Resend, so it still works when either is down;
+-- the two routes don't depend on each other. The staging project (studio-os-staging)
+-- exists for this watchdog alone, plus a switched-off copy of the 15-minute tick; nothing
+-- deploys to it, and the walls test moved to a scratch database (tests/isolation/README.md).
+--
 -- Vault entries it reads (staging project; the values never appear here):
 --   watchdog_health_url     https://qksstlqzbhesadrrofgn.supabase.co/functions/v1/presence/system/health
 --   watchdog_target_secret  production's SCHEDULER_SECRET
@@ -135,6 +142,11 @@ begin
             parts := parts || format('%s runs failed in the last 24 hours, %s stuck',
               coalesce(report ->> 'failures_last_24h', '?'), coalesce(report ->> 'stuck_runs', '0'));
           end if;
+          -- builder item 416: more than 5 crashed requests in an hour
+          if report -> 'crash_alarm' = 'true'::jsonb then
+            parts := parts || format('the server crashed %s times in the last hour (the Health page lists the newest)',
+              coalesce(report -> 'crashes' ->> 'last_hour', '?'));
+          end if;
           if jsonb_typeof(report -> 'secrets' -> 'missing_required') = 'array'
              and jsonb_array_length(report -> 'secrets' -> 'missing_required') > 0 then
             parts := parts || ('required secrets are missing: ' || (report -> 'secrets' -> 'missing_required')::text);
@@ -169,11 +181,11 @@ begin
             'subject', '[Studio OS ops] Production health check is failing',
             'html', '<p>The staging watchdog (Ohio) could not confirm production (Oregon) is healthy.</p>'
               || '<p><strong>Why:</strong> ' || safe || '</p>'
-              || '<p>What to check: docs/presence/INCIDENT-RUNBOOK.md in the studio-os repo.</p>'
+              || '<p>What to do: docs/RUN-SHEET.md in the studio-os repo, "When something is down".</p>'
               || '<p>This alert repeats at most every 6 hours while the problem lasts.</p>',
             'text', 'The staging watchdog (Ohio) could not confirm production (Oregon) is healthy.' || chr(10) || chr(10)
               || 'Why: ' || reason || chr(10) || chr(10)
-              || 'What to check: docs/presence/INCIDENT-RUNBOOK.md in the studio-os repo.' || chr(10)
+              || 'What to do: docs/RUN-SHEET.md in the studio-os repo, "When something is down".' || chr(10)
               || 'This alert repeats at most every 6 hours while the problem lasts.'));
         update public.watchdog_state set last_alert_at = now() where id = 1;
       end if;

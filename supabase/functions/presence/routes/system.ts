@@ -36,6 +36,7 @@ import { timingSafeEqual } from '../../_shared/hmac.ts';
 import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
 import { oauthConfigured } from '../connected/auth.ts';
 import { heldKeyKind } from '../commerce/stripe.ts';
+import { CODE_NEWEST_CHANGE } from '../lib/schema_ledger.ts';
 
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
 
@@ -189,6 +190,10 @@ function authorized(req: Request, body: any): boolean {
 
 const CRON_STALE_MS = 45 * 60_000;   // 3 missed 15-min ticks = the scheduler is dead
 const FAILURE_ALARM_24H = 10;        // sustained failures = something systemic
+// Builder item 416: a request that crashes writes one ops_errors row (index.ts). More than
+// this many in an hour means something is broken for someone, so health turns not-ok and
+// the watchdog's email and the outside check (uptime.yml) carry it.
+export const CRASH_ALARM_1H = 5;
 
 // ── Builder item 403: every count the health check needs, in one trip ─────────────
 // The 5-minute alarm check made 16 or 17 reads, 6 or 7 of them one after another and
@@ -201,7 +206,25 @@ export interface HealthCounts {
   failures_24h: number; last_failure: { run_type: string; last_error: string; at: string } | null; stuck_runs: number;   // `at`: the watchdog's SQL reads last_failure->>'at'
   live_sites: number; domains_watched: number; domains_soon: number; ent_paused: number; ent_lapsed: number;
   notices: number; failed_publishes: number; ai_ops: number; paid_publishes_30d: number;
+  // builder item 416: crashes (ops_errors rows) in the last hour and day; null when they couldn't be counted
+  crashes_1h: number | null; crashes_24h: number | null;
+  // builder item 420: the newest database change this database has (presence_change_ledger, 0260); null before 0260
+  ledger_newest: number | null; ledger_rows: number | null;
 }
+type CrashesAndLedger = Pick<HealthCounts, 'crashes_1h' | 'crashes_24h' | 'ledger_newest' | 'ledger_rows'>;
+// Before migration 0261 the one trip (0247's function) doesn't carry these, so they come in
+// three small reads side by side. Before 0260 there's no ledger, and its numbers stay null.
+async function readCrashesAndLedger(now: number): Promise<CrashesAndLedger> {
+  const since1 = new Date(now - 3600_000).toISOString(), since24 = new Date(now - 24 * 3600_000).toISOString();
+  const [c1, c24, ledger] = await Promise.all([
+    svcCount(`ops_errors?created_at=gte.${encodeURIComponent(since1)}`),
+    svcCount(`ops_errors?created_at=gte.${encodeURIComponent(since24)}`),
+    svc('presence_change_ledger?select=number&order=number.desc').catch(() => null),
+  ]);
+  const rows = ledger && ledger.ok && Array.isArray(ledger.json) ? (ledger.json as Array<{ number: number }>) : null;
+  return { crashes_1h: c1, crashes_24h: c24, ledger_newest: rows && rows.length ? Number(rows[0].number) || null : null, ledger_rows: rows ? rows.length : null };
+}
+const numOrNull = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number.isFinite(Number(v)) ? Number(v) : null);
 export async function readHealthCounts(now = Date.now()): Promise<HealthCounts | null> {
   const nowIso = new Date(now).toISOString();
   const r = await svc('rpc/presence_health_counts', { method: 'POST', body: '{}' }).catch(() => null);
@@ -213,6 +236,10 @@ export async function readHealthCounts(now = Date.now()): Promise<HealthCounts |
       failures_24h: n('failures_24h'), last_failure: j.last_failure ? { run_type: String((j.last_failure as any).run_type || ''), last_error: String((j.last_failure as any).last_error || '').slice(0, 300), at: String((j.last_failure as any).created_at || '') } : null,
       stuck_runs: n('stuck_runs'), live_sites: n('live_sites'), domains_watched: n('domains_watched'), domains_soon: n('domains_soon'),
       ent_paused: n('ent_paused'), ent_lapsed: n('ent_lapsed'), notices: n('notices'), failed_publishes: n('failed_publishes'), ai_ops: n('ai_ops'), paid_publishes_30d: n('paid_publishes_30d'),
+      // with 0261 these come in the same trip; with only 0247, three small reads of their own
+      ...('crashes_1h' in j
+        ? { crashes_1h: numOrNull(j.crashes_1h), crashes_24h: numOrNull(j.crashes_24h), ledger_newest: numOrNull(j.ledger_newest), ledger_rows: numOrNull(j.ledger_rows) }
+        : await readCrashesAndLedger(now)),
     };
   }
   if (r && !r.ok && r.status !== 404) return null;
@@ -224,7 +251,7 @@ export async function readHealthCounts(now = Date.now()): Promise<HealthCounts |
   const since30 = new Date(now - 30 * 86400_000).toISOString();
   const twoHoursAgo = new Date(now - 2 * 3600_000).toISOString();
   try {
-    const [entActive, last, failures24h, lf, stuck, live, doms, domsSoon, entPaused, entLapsed, notices, failPub, aiRows, paid] = await Promise.all([
+    const [entActive, last, failures24h, lf, stuck, live, doms, domsSoon, entPaused, entLapsed, notices, failPub, aiRows, paid, extras] = await Promise.all([
       svcCount('presence_entitlements?product=eq.presence&status=eq.active'),
       // Liveness reads the last FINISHED tick, not the last STARTED one: a chain that dies
       // mid-run keeps inserting fresh 'running' rows, so finish time is the only honest signal.
@@ -243,6 +270,7 @@ export async function readHealthCounts(now = Date.now()): Promise<HealthCounts |
       svcCount(`presence_publishes?status=eq.failed&created_at=gte.${encodeURIComponent(since7)}`),
       svcAll(`presence_ai_usage?period=eq.${period}&select=client_id,generative_ops,assistive_ops`, 'client_id'),
       svcCount(`presence_publishes?netlify_deploy_id=not.is.null&created_at=gte.${encodeURIComponent(since30)}`),
+      readCrashesAndLedger(now),   // builder items 416 and 420, in the same wave
     ]);
     if (!last.ok || entActive === null) return null;
     const row = lf.json?.[0];
@@ -253,26 +281,69 @@ export async function readHealthCounts(now = Date.now()): Promise<HealthCounts |
       notices: notices ?? 0, failed_publishes: failPub ?? 0,
       ai_ops: (aiRows as Array<{ generative_ops?: number; assistive_ops?: number }>).reduce((n, r) => n + (r.generative_ops || 0) + (r.assistive_ops || 0), 0),
       paid_publishes_30d: paid ?? 0,
+      ...extras,
     };
   } catch { return null; }
+}
+
+// Top-level ok is what the watchdog and the outside check page on, so it must reflect the
+// failures a human needs to hear about, not just "the box is on": a database that doesn't
+// answer, a dead cron (no COMPLETED tick in 45 min, once one has EVER completed), sustained
+// failures or stuck runs, and (builder item 416) more than CRASH_ALARM_1H crashes in an hour.
+// Pure, and shared by /system/health and the public /status read, so the two can't disagree.
+export function judgeHealth(counts: HealthCounts | null, settingsOk: boolean, now = Date.now()) {
+  const dbOk = !!counts;
+  const lastCycle = counts?.last_cycle ?? null;
+  const lastCycleAt = lastCycle ? Date.parse(lastCycle.finished_at || lastCycle.started_at || '') : NaN;
+  const cronStale = Number.isFinite(lastCycleAt) && (now - lastCycleAt) > CRON_STALE_MS;
+  const failureAlarm = (counts?.failures_24h ?? 0) >= FAILURE_ALARM_24H || (counts?.stuck_runs ?? 0) > 0;
+  const crashAlarm = (counts?.crashes_1h ?? 0) > CRASH_ALARM_1H;
+  return { ok: settingsOk && dbOk && !cronStale && !failureAlarm && !crashAlarm, dbOk, cronStale, failureAlarm, crashAlarm };
 }
 
 async function health(): Promise<any> {
   const secrets = validateSecrets();
   // db reachability + the operational counts, in one trip (builder item 403)
   const counts = await readHealthCounts();
-  const dbOk = !!counts;
-  const activeSites = counts?.active_sites ?? 0, lastCycle = counts?.last_cycle ?? null, failures24h = counts?.failures_24h ?? 0, stuckRuns = counts?.stuck_runs ?? 0, lastFailure = counts?.last_failure ?? null;
-  // Top-level ok is what the external watchdog pages on, so it must reflect the
-  // failures a human needs to hear about — not just "the box is on". A dead cron
-  // (no COMPLETED tick in 45 min, once one has EVER completed), sustained
-  // failures, or stuck runs degrade it.
-  const lastCycleAt = lastCycle ? Date.parse(lastCycle.finished_at || lastCycle.started_at || '') : NaN;
-  const cronStale = Number.isFinite(lastCycleAt) && (Date.now() - lastCycleAt) > CRON_STALE_MS;
-  const failureAlarm = failures24h >= FAILURE_ALARM_24H || stuckRuns > 0;
-  const ok = secrets.ok && dbOk && !cronStale && !failureAlarm;
+  const v = judgeHealth(counts, secrets.ok);
   const health_center = await computeHealthCenter(counts).catch(() => null);
-  return { ok, secrets, db_ok: dbOk, cron_stale: cronStale, failure_alarm: failureAlarm, stuck_runs: stuckRuns, active_sites: activeSites, last_cycle: lastCycle, failures_last_24h: failures24h, last_failure: lastFailure, health_center, checked_at: new Date().toISOString() };
+  return {
+    ok: v.ok, secrets, db_ok: v.dbOk, cron_stale: v.cronStale, failure_alarm: v.failureAlarm, crash_alarm: v.crashAlarm,
+    stuck_runs: counts?.stuck_runs ?? 0, active_sites: counts?.active_sites ?? 0, last_cycle: counts?.last_cycle ?? null,
+    failures_last_24h: counts?.failures_24h ?? 0, last_failure: counts?.last_failure ?? null,
+    // builder item 416: crashes counted (the watchdog's email names the hour's count when it alarms)
+    crashes: { last_hour: counts?.crashes_1h ?? null, last_day: counts?.crashes_24h ?? null, alarm_above: CRASH_ALARM_1H },
+    // builder item 420: the newest database change here, and the newest the code expects
+    changes: { newest: counts?.ledger_newest ?? null, code_newest: CODE_NEWEST_CHANGE },
+    health_center, checked_at: new Date().toISOString(),
+  };
+}
+
+// ── Builder item 417: the public status read ─────────────────────────────────────
+// GET /status, no secret and no session: the outside check (.github/workflows/uptime.yml)
+// asks it every 15 minutes from GitHub, beside the watchdog that reads /system/health with
+// the secret. It answers the same verdict as /system/health, from the same one database
+// trip, as true or false per part and nothing else: no counts, no names, no settings'
+// names, and no call out to the host or the photo library. A worker answers from its
+// last read for 60 seconds, so a burst of callers costs one trip a minute.
+const STATUS_MEMO_MS = 60_000;
+let statusMemo: { at: number; body: Record<string, unknown> } | null = null;
+export async function publicStatus(now = Date.now()): Promise<Record<string, unknown>> {
+  if (statusMemo && now - statusMemo.at < STATUS_MEMO_MS) return statusMemo.body;
+  const counts = await readHealthCounts(now);
+  const settingsOk = validateSecrets().ok;
+  const v = judgeHealth(counts, settingsOk, now);
+  const body = {
+    ok: v.ok, server: true, database: v.dbOk, schedule: v.dbOk && !v.cronStale, failures: v.dbOk && !v.failureAlarm,
+    crashes: v.dbOk && !v.crashAlarm, settings: settingsOk, checked_at: new Date(now).toISOString(),
+  };
+  statusMemo = { at: now, body };
+  return body;
+}
+/** Tests: forget the last answer. */
+export function forgetStatusMemo(): void { statusMemo = null; }
+export async function handleStatus(_req: Request, cors: Record<string, string>): Promise<Response> {
+  return json({ data: await publicStatus() }, 200, { ...cors, 'Cache-Control': 'no-store' });
 }
 
 // ── PT-8: the Admin Health Center — ONE unified operational read (no new monitoring).
@@ -304,12 +375,27 @@ export async function computeHealthCenter(counts?: HealthCounts | null): Promise
     activeNotices: notices ?? 0,
     backupsVerified: envPresent('BACKUPS_VERIFIED'),
     stripeKey: heldKeyKind(),   // sales item 131: restricted or full-power, from the prefix alone
+    crashes: { lastHour: c ? c.crashes_1h : null, lastDay: c ? c.crashes_24h : null, alarmAbove: CRASH_ALARM_1H },   // builder item 416
+    changesNewest: c ? c.ledger_newest : null,   // builder item 420
     // builder item 403: the two calls out (the host's plan, the photo key) go side by side
     ...await Promise.all([
       netlifyConfigured() ? readHostPlan(nowIso, c?.paid_publishes_30d ?? 0).catch(() => null) : Promise.resolve(null),   // builder list item 269: the host's plan, as the host tells it; the paid publishes it knows of say whether "0 used" can be believed
       stockHealth().catch(() => null),   // item 263: a refused photo key shows here, not only in a failed search
     ]).then(([hosting, stock]) => ({ hosting, stock })),
   });
+}
+
+// ── Builder item 416: the newest ten crashes, for the Health page ─────────────────
+// Each row is one request that crashed: which route (kind, e.g. "presence:POST /site") and
+// the first line of what it said, cut to 300 characters. Operators only (/admin/health-center).
+export async function readRecentCrashes(limit = 10): Promise<Array<{ what: string; said: string; at: string }> | null> {
+  const r = await svc(`ops_errors?select=kind,detail,created_at&order=created_at.desc&limit=${Math.max(1, Math.min(50, limit))}`).catch(() => null);
+  if (!r || !r.ok || !Array.isArray(r.json)) return null;
+  return (r.json as Array<{ kind?: string; detail?: string; created_at?: string }>).map((x) => ({
+    what: String(x.kind || '').replace(/^presence:/, '').slice(0, 120),
+    said: String(x.detail || '').split('\n')[0].slice(0, 300),
+    at: String(x.created_at || ''),
+  }));
 }
 
 // What in this tick deserves a human's attention? ok:false, failures/errors>0,

@@ -40,6 +40,9 @@ counts = {
   last_cycle: { status: 'done', started_at: new Date(now - 300_000).toISOString(), finished_at: new Date(now - 240_000).toISOString(), site_id: null },
   failures_24h: 3, last_failure: { run_type: 'tick', last_error: 'x'.repeat(400), created_at: new Date(now - 600_000).toISOString() }, stuck_runs: 0,
   live_sites: 7, domains_watched: 2, domains_soon: 1, notices: 4, failed_publishes: 0, ai_ops: 12, paid_publishes_30d: 5,
+  // builder items 416 and 420 (migration 0261): the crashes and the ledger come in the same trip.
+  // With only 0247's keys they take three small reads of their own (crash_counts_416_test.mjs).
+  crashes_1h: 0, crashes_24h: 0, ledger_newest: 261, ledger_rows: 120,
 };
 seen.length = 0;
 const r = await get('/system/health', { headers: { 'x-system-secret': SECRET } });

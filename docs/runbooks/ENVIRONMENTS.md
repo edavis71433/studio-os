@@ -1,5 +1,5 @@
 # Environments runbook — staging, migration runner, scripted deploys
-> **Nov 9 2026 (list item 112):** there is one environment, production. The repository never had a staging project, so the staging jobs in deploy.yml and rollback.yml could never run; they are gone, and the workflows only start by hand. Where this file says staging, read it as history.
+> **Nov 9 2026 (list item 112), corrected Nov 22 (builder item 417):** there is one environment releases go to, production. The staging project (`studio-os-staging`, wjlpursnwbmlcdwbeowv) was made on Jul 5 and still exists, but GitHub never had its project ref, so the staging jobs in deploy.yml and rollback.yml could never run; they are gone. Since Nov 9 the staging project runs only the 5-minute watchdog (`supabase/ops/watchdog-cron.sql`) and a switched-off copy of the 15-minute tick. The current run sheet is `docs/RUN-SHEET.md`, and the workflows only start by hand. Where this file says staging, read it as history.
 
 
 Build Brief step 1. Nothing below touches production except where marked

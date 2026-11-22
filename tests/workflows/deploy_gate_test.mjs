@@ -24,7 +24,7 @@ const JOBS = jobsOf(DEPLOY);
 ok('the pre-deploy gate is ci.yml itself', /^ {4}uses: \.\/\.github\/workflows\/ci\.yml$/m.test(JOBS.test || '') && !/^ {4}steps:/m.test(JOBS.test || ''));
 ok('ci.yml can be called by another workflow', /^on:\n(?: {2}.*\n|(?: {4}.*\n))*? {2}workflow_call:/m.test(CI));
 ok('the deploy has no test loop or typecheck of its own to drift', !/deno check|_test\.mjs|setup-deno/.test(DEPLOY));
-ok('production waits for the gate, the browser check and the walls between studios', /^ {4}needs: \[test, browser-gate, isolation\]$/m.test(JOBS['deploy-production'] || ''));
+ok('production waits for the gate, the browser check, the walls between studios and the database changes', /^ {4}needs: \[test, browser-gate, isolation, ledger-gate\]$/m.test(JOBS['deploy-production'] || ''));
 // Builder item 212: the suites that prove one studio can't read another's data run with every
 // deploy, on a scratch database (isolation.yml; tests/workflows/isolation_scope_test.mjs holds its shape).
 ok('every deploy checks the walls between studios with isolation.yml itself', /^ {4}uses: \.\/\.github\/workflows\/isolation\.yml$/m.test(JOBS.isolation || '') && !/^ {4}(steps|if):/m.test(JOBS.isolation || ''));
@@ -34,7 +34,7 @@ ok('…and is handed no secrets', !/secrets/.test(JOBS.isolation || ''));
 // up the deploy. The rollback never waits for it: putting back what ran before is the way out.
 ok('…and holds up the deploy until it has passed', /^ {4}needs:.*\bisolation\b/m.test(JOBS['deploy-production'] || ''));
 ok('…and a rollback doesn\'t wait for it', !/isolation/.test(ROLLBACK));
-ok('there is no staging job (item 112: no staging project ever existed)', !JOBS['deploy-staging'] && !DEPLOY.includes('SUPABASE_PROJECT_REF_STAGING') && !ROLLBACK.includes('SUPABASE_PROJECT_REF_STAGING'));
+ok('there is no staging job (item 112: GitHub never had the staging project\'s ref, and it runs only the watchdog)', !JOBS['deploy-staging'] && !DEPLOY.includes('SUPABASE_PROJECT_REF_STAGING') && !ROLLBACK.includes('SUPABASE_PROJECT_REF_STAGING'));
 ok('a deploy only starts by hand', /^on:\n {2}workflow_dispatch:/m.test(DEPLOY) && !/^ {2}push:/m.test(DEPLOY.slice(0, DEPLOY.indexOf('\njobs:'))));
 ok('the browser gate runs for every production deploy', /^ {4}if: github\.event_name == 'workflow_dispatch'$/m.test(JOBS['browser-gate'] || '') && /^ {4}if: github\.event_name == 'workflow_dispatch'$/m.test(JOBS['deploy-production'] || ''));
 ok('the browser gate may read checks and nothing else', /^ {4}permissions:\n {6}checks: read\n(?! {6})/m.test(JOBS['browser-gate'] || ''));
@@ -133,6 +133,57 @@ if (hasJq && FILTER) {
   ok('a device job from another app doesn\'t count', await jq({ check_runs: [run({ name: 'browser on tablet', app: { slug: 'someone-else' } })] }) === '');
 }
 await Deno.remove(dir, { recursive: true });
+
+// ── Builder item 420: the database changes this commit needs are on production ───
+// The real step, in a folder holding made-up migrations, with a stand-in curl that answers
+// the way Supabase's API does. No network.
+ok('the database check runs for every production deploy, with the deploy token and nothing more', /^ {4}if: github\.event_name == 'workflow_dispatch'$/m.test(JOBS['ledger-gate'] || '')
+  && /^ {4}permissions:\n {6}contents: read\n(?! {6})/m.test(JOBS['ledger-gate'] || '')
+  && (JOBS['ledger-gate'] || '').includes('SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}') && !/secrets\.(?!SUPABASE_ACCESS_TOKEN|SUPABASE_PROJECT_REF_PROD)/.test(JOBS['ledger-gate'] || ''));
+ok('…and a rollback doesn\'t ask it (an older version runs on a newer database)', !/presence_change_ledger|ledger-gate/.test(ROLLBACK));
+const LEDGER = DEPLOY.match(/id: ledger-gate\n[\s\S]*?run: \|\n((?: {10}.*\n|\n)+)/)?.[1].replace(/^ {10}/gm, '');
+ok('the database check step is found', !!LEDGER);
+const ldir = await Deno.makeTempDir({ prefix: 'ledger-gate-test-' });
+await Deno.writeTextFile(`${ldir}/gate.sh`, LEDGER || 'exit 9');
+await Deno.writeTextFile(`${ldir}/curl`, `#!/bin/bash
+echo "$*" >> "${ldir}/calls"
+out=""; while [ $# -gt 0 ]; do [ "$1" = -o ] && { out="$2"; shift; }; shift; done
+cat > /dev/null
+cp "${ldir}/body" "$out"
+cat "${ldir}/code"
+`);
+await Deno.chmod(`${ldir}/curl`, 0o755);
+async function ledgerGate(newest, code, body) {
+  const work = await Deno.makeTempDir({ dir: ldir });
+  await Deno.mkdir(`${work}/supabase/migrations`, { recursive: true });
+  for (const f of ['0000_baseline.sql', '0247_health_counts.sql', `${newest}_newest.sql`, 'README.md']) await Deno.writeTextFile(`${work}/supabase/migrations/${f}`, '-- x\n');
+  await Deno.writeTextFile(`${ldir}/body`, body);
+  await Deno.writeTextFile(`${ldir}/code`, code);
+  await Deno.remove(`${ldir}/calls`).catch(() => {});
+  const { code: exit, stdout } = await new Deno.Command('bash', {
+    args: ['-e', `${ldir}/gate.sh`], cwd: work, stdout: 'piped', stderr: 'null', clearEnv: true,
+    env: { PATH: `${ldir}:${Deno.env.get('PATH')}`, SUPABASE_ACCESS_TOKEN: 'sbp_fake', PROJECT_REF: 'prodref' },
+  }).output();
+  const calls = await Deno.readTextFile(`${ldir}/calls`).catch(() => '');
+  return { exit, log: new TextDecoder().decode(stdout), calls: calls.trim().split('\n').filter(Boolean) };
+}
+let lg = await ledgerGate('0261', '201', '[{"newest":261,"has":true}]');
+ok('production has the newest change: the release goes', lg.exit === 0 && lg.log.includes('Production has database change 0261'), lg.log.trim());
+ok('…asked once, of Supabase\'s API for production, with the deploy token', lg.calls.length === 1 && lg.calls[0].includes('https://api.supabase.com/v1/projects/prodref/database/query') && lg.calls[0].includes('Authorization: Bearer sbp_fake'), lg.calls[0]);
+lg = await ledgerGate('0262', '201', '[{"newest":261,"has":false}]');
+ok('production is a change behind: no release, and it says which packs to run', lg.exit === 1 && lg.log.includes('::error title=Database changes::This release needs database change 0262, and production\'s newest is 0261. Run the apply packs after 0261 in order'), lg.log.trim());
+lg = await ledgerGate('0262', '201', '[{"newest":263,"has":false}]');
+ok('a ledger without the change, even with newer ones, stops the release', lg.exit === 1);
+lg = await ledgerGate('0261', '400', '{"message":"Failed to run sql query: ERROR:  42P01: relation \\"public.presence_change_ledger\\" does not exist"}');
+ok('no ledger on production yet: no release, and it says to run APPLY-0260 first', lg.exit === 1 && lg.log.includes('Production has no change ledger yet') && lg.log.includes('APPLY-0260-prod.sql'), lg.log.trim());
+lg = await ledgerGate('0261', '503', 'Service Unavailable');
+ok('Supabase\'s API not answering: no release, and it says so', lg.exit === 1 && lg.log.includes('Couldn\'t read which database changes production has (Supabase\'s API answered HTTP 503)'));
+lg = await ledgerGate('0261', '201', '{"unexpected":true}');
+ok('an answer it can\'t read: no release', lg.exit === 1 && lg.log.includes('couldn\'t be read'));
+lg = await ledgerGate('0259', '201', '[]');
+ok('a commit whose newest change is from before the ledger asks nothing', lg.exit === 0 && lg.calls.length === 0 && lg.log.includes('from before the ledger'));
+ok('the answer\'s body never reaches the log', !lg.log.includes('unexpected'));
+await Deno.remove(ldir, { recursive: true });
 
 // ── Every function, deployed and rolled back ─────────────────────────────────
 const FUNCTIONS = new URL('supabase/functions/', ROOT);

@@ -77,7 +77,8 @@ parts.
 ## Last run
 
 - Before Nov 2026: by hand on the staging project `wjlpursnwbmlcdwbeowv`, last on
-  2026-07-05, 22 of 22 passed. That project no longer exists.
+  2026-07-05, 22 of 22 passed. That project still exists, and since Nov 9 2026 it runs
+  only the 5-minute watchdog (`supabase/ops/watchdog-cron.sql`); nothing deploys to it.
 - First full run on a scratch database: 2026-11-12, all 204 checks passed (GitHub
   Actions run 43218372665, commit c757c85). Every later run is on the Actions tab
   under "Walls between studios (scratch database)", and each run's summary says how

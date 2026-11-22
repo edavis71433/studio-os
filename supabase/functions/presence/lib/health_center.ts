@@ -6,6 +6,7 @@
 // Pure: the /system/health route feeds it already-loaded counts.
 
 import { stockHealthWords } from './stock/health.ts';
+import { changesArea } from './schema_ledger.ts';
 
 export interface HealthCenterInputs {
   nowIso: string;
@@ -30,6 +31,21 @@ export interface HealthCenterInputs {
   /** builder list item 269: the host's plan as the host tells it (lib/netlify.ts readHostPlan).
    *  Left out, the area isn't shown. */
   hosting?: HostingRead | null;
+  /** builder list item 416: server crashes (ops_errors rows), null when they couldn't be counted.
+   *  Left out, the area isn't shown. */
+  crashes?: { lastHour: number | null; lastDay: number | null; alarmAbove: number };
+  /** builder list item 420: the newest change in the database's change ledger (null: no ledger
+   *  yet). Left out, the area isn't shown. */
+  changesNewest?: number | null;
+}
+
+/** Pure: the Server crashes area (builder list item 416). */
+export function crashesArea(c: NonNullable<HealthCenterInputs['crashes']>): { state: AreaState; detail: string } {
+  if (c.lastHour === null || c.lastDay === null) return { state: 'attention', detail: 'Crashes couldn’t be counted just now.' };
+  const n = (x: number) => `${x} crash${x === 1 ? '' : 'es'}`;
+  if (c.lastHour > c.alarmAbove) return { state: 'attention', detail: `${n(c.lastHour)} in the last hour: something is broken for someone, and the alarm is sounding. The newest are listed below.` };
+  if (c.lastDay > 0) return { state: 'attention', detail: `${n(c.lastDay)} in the last day${c.lastHour ? `, ${c.lastHour} of them in the last hour` : ''}. The newest are listed below.` };
+  return { state: 'ok', detail: 'No crashes in the last day.' };
 }
 export interface HostingRead { ok: boolean; team: string | null; plan: string | null; credits_included: number | null; credits_used: number | null; period_start: string | null; next_period_start: string | null; exceeded: boolean; read_at: string; why: string | null }
 
@@ -106,6 +122,12 @@ export function summarizeHealthCenter(i: HealthCenterInputs): { overall: AreaSta
 
   // hosting (builder list item 269): the host's plan, as the host tells it
   if (i.hosting !== undefined) { const h = hostingArea(i.hosting); add('hosting', 'Hosting', h.state, h.detail); }
+
+  // server crashes (builder list item 416): every crashed request writes one row; nothing read them before
+  if (i.crashes !== undefined) { const c = crashesArea(i.crashes); add('crashes', 'Server crashes', c.state, c.detail); }
+
+  // database changes (builder list item 420): the ledger's newest number against the code's
+  if (i.changesNewest !== undefined) { const c = changesArea(i.changesNewest); add('changes', 'Database changes', c.state, c.detail); }
 
   // errors
   const errs = i.failedPublishes + i.failedRuns;

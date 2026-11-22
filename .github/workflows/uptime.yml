@@ -1,0 +1,43 @@
+name: Uptime (from outside)
+
+# Builder item 417: the second alarm route. Every 15 minutes GitHub asks Studio OS, from
+# outside, what a visitor's browser asks plus the server's public status read
+# (scripts/uptime-check.sh says what, and why each check). No repository secret, on
+# purpose: nothing here needs more than a visitor has.
+#
+# A failed run is the alarm. GitHub emails a failed scheduled run to the person who last
+# changed this file's schedule, Eric, and the run's page says what was down and why. That
+# route doesn't go through Supabase or Resend, so it works when either of them is what's
+# down. The first route is the 5-minute watchdog on the staging project
+# (supabase/ops/watchdog-cron.sql), which emails through Resend at most every 6 hours.
+#
+# GitHub may start a scheduled run some minutes late when it is busy, and it switches a
+# public repository's schedules off after 60 days with no commits. docs/RUN-SHEET.md,
+# "When something is down", says what to do with a failed run.
+# tests/workflows/uptime_test.mjs runs the real check against a stand-in server.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/uptime.yml
+      - scripts/uptime-check.sh
+
+permissions:
+  contents: read
+
+# One at a time: a late run doesn't stack behind another.
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  outside:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ask Studio OS whether it is well, from outside
+        run: bash scripts/uptime-check.sh

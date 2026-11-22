@@ -34,7 +34,7 @@ import { writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { rdapLookupDetailed, lookupPatch, whereToGo } from '../lib/rdap.ts';
 import { rateAllow } from '../lib/ratelimit.ts';
 import { describeEngine } from '../optimization/engine.ts';
-import { computeHealthCenter } from './system.ts';
+import { computeHealthCenter, readRecentCrashes } from './system.ts';
 import { inventory as connInventory, inventorySummary as connInventorySummary } from '../connected/inventory.ts';
 import type { SiteRow } from '../lib/site.ts';
 import { hostedName, SITE_COLS as SITE_ROW_COLS } from '../lib/site.ts';
@@ -754,7 +754,11 @@ export async function handleAdmin(req: Request, route: string, method: string, p
   //    it can make. Derived live from the registry + catalog, so it can never
   //    drift from what actually runs.
   if (route === '/admin/optimization' && method === 'GET') return json({ data: describeEngine() }, 200, cors);
-  if (route === '/admin/health-center' && method === 'GET') return json({ data: await computeHealthCenter() }, 200, cors); // PT-2C: operator-authed Health Center
+  if (route === '/admin/health-center' && method === 'GET') {   // PT-2C: operator-authed Health Center
+    // builder item 416: the newest ten crashes ride along, read beside the counts
+    const [hc, recent] = await Promise.all([computeHealthCenter(), readRecentCrashes(10)]);
+    return json({ data: { ...hc, recent_crashes: recent } }, 200, cors);
+  }
   // sales item 131: ask Stripe about each permission the key holds, changing nothing (commerce/stripe_key.ts)
   if (route === '/admin/stripe-key' && method === 'GET') {
     if (!(await rateAllow(`stripekey:${principal.userId || 'staff'}`, 6, 600))) return json({ error: 'rate_limited', message: 'That was checked a moment ago. Try again in a few minutes.' }, 429, cors);

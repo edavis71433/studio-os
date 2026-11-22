@@ -101,7 +101,7 @@ import { resolveAgencyMember } from './agency/auth.ts';
 import { handleAgency } from './agency/routes.ts';
 import { handleCommerce, isPublicCommerceRoute } from './routes/commerce.ts';
 import { handleScopedCommerce } from './routes/commerce_scoped.ts';
-const { handleSystem } = lazyRoutes(() => import('./routes/system.ts'));
+const { handleSystem, handleStatus } = lazyRoutes(() => import('./routes/system.ts'));
 const { handleVisibility, handleVisibilityCheck } = lazyRoutes(() => import('./routes/visibility.ts'));
 const { handleFollowGet, handleFollowPut, handleLlmsDraft, handlePhrasesGet, handlePhrasesPut } = lazyRoutes(() => import('./routes/search_tab.ts'));
 const { handleUsableGet, handleUsablePut } = lazyRoutes(() => import('./routes/usable.ts'));
@@ -155,6 +155,10 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/system' || route.startsWith('/system/')) {
     return handleSystem(req, route, method, cors);
   }
+
+  // ── Builder item 417: the public status read. The outside check (uptime.yml) asks it
+  //    every 15 minutes: true or false per part, nothing else, no secret, no session.
+  if (route === '/status' && method === 'GET') return handleStatus(req, cors);
 
   // 2. authentication (shared resolver; never throws)
   const principal = await resolvePrincipal(req, null);
