@@ -10,8 +10,10 @@
 
 /** The most a published page may weigh, in kB. */
 export const PAGE_WEIGHT_LIMIT_KB = 100;
-/** What a typical site's pages weigh, in kB, at most (the test keeps it true). */
-export const TYPICAL_PAGE_KB = 30;
+/** What a typical site's pages weigh, in kB, at most (the test keeps it true). Nov 22 2026: 30 became
+ *  40 when every page took on the phone menu, the shell's rules and the site's one script file
+ *  (items 288, 292, 298, 306): about 6 kB more before compression, 2 kB after. */
+export const TYPICAL_PAGE_KB = 40;
 
 const enc = new TextEncoder();
 const bytesOf = (v: string | Uint8Array): number => (typeof v === 'string' ? enc.encode(v).length : v.byteLength);

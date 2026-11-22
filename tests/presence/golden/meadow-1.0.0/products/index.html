@@ -30,6 +30,11 @@ h1{font-size:clamp(2.3rem,5.6vw,3.7rem);line-height:1.14;letter-spacing:-.015em;
 nav.primary ul{display:flex;gap:4px;list-style:none;flex-wrap:wrap}
 nav.primary a{display:inline-block;padding:9px 16px;text-decoration:none;color:#55624f;font-weight:600}
 .hero{padding-top:100px;padding-bottom:64px}
+.menu-btn{display:none}
+.site-menu{display:contents}
+@media (max-width:720px){.site-menu{display:none}
+.menu-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;min-width:44px;padding:0 14px;border:1px solid var(--line,#ddd);border-radius:999px;background:transparent;color:inherit;font:inherit;font-weight:600}
+}
 </style>
 <link rel="stylesheet" href="/assets/site.css">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"ItemList","name":"Fernwood Flower Co. Products","url":"https://vermilionandvine.example/products/","itemListElement":[{"@type":"ListItem","position":1,"item":{"@type":"Product","name":"Market bouquet","description":"The best of the morning's flowers, wrapped in paper.","offers":{"@type":"Offer","price":"$45","priceCurrency":"USD"}
@@ -52,6 +57,14 @@ nav.primary a{display:inline-block;padding:9px 16px;text-decoration:none;color:#
 }
 ]}
 </script>
+<noscript>
+<style>@media (max-width:720px){.site-menu{display:block;position:static;box-shadow:none;max-height:none;padding:0 0 10px}
+.menu-btn{display:none}
+.site-menu nav.primary ul.subnav{display:block}
+}
+</style>
+</noscript>
+<link rel="preload" as="image" href="/img/market-bouquet-800.webp" imagesrcset="/img/market-bouquet-400.webp 400w, /img/market-bouquet-800.webp 800w, /img/market-bouquet-1600.webp 1600w" imagesizes="(max-width:640px) 100vw, 320px" fetchpriority="high">
 </head>
 <body>
 <a class="skip" href="#main">Skip to main content</a>
@@ -60,7 +73,17 @@ nav.primary a{display:inline-block;padding:9px 16px;text-decoration:none;color:#
 <header class="site">
 <div class="wrap nav">
   <a class="brand" href="/">Fernwood Flower Co.</a>
-  <nav class="primary" aria-label="Main">
+  <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-menu">
+<svg class="mb-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+<path d="M4 7h16M4 12h16M4 17h16"/>
+</svg>
+<svg class="mb-close" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+<path d="M6 6l12 12M18 6L6 18"/>
+</svg>
+<span>Menu</span>
+</button>
+  <div class="site-menu" id="site-menu">
+<nav class="primary" aria-label="Main">
 <ul>
 <li>
 <a href="/">Home</a>
@@ -97,6 +120,7 @@ nav.primary a{display:inline-block;padding:9px 16px;text-decoration:none;color:#
 </span>
 <input type="search" name="q" aria-label="Search this site" placeholder="Search" autocomplete="off" maxlength="120">
 </form>
+</div>
 </div>
 </header>
 <main id="main">
@@ -211,8 +235,8 @@ nav.primary a{display:inline-block;padding:9px 16px;text-decoration:none;color:#
 <div class="holiday">
 <strong>Holiday hours</strong>
 <ul>
-<li>Thanksgiving (2026-11-26): Closed</li>
-<li>Christmas Eve (2026-12-24): 9am–2pm</li>
+<li>Thanksgiving, <time datetime="2026-11-26">Thu Nov 26</time>: Closed</li>
+<li>Christmas Eve, <time datetime="2026-12-24">Thu Dec 24</time>: 9am–2pm</li>
 </ul>
 </div>
 </div>
@@ -226,5 +250,7 @@ nav.primary a{display:inline-block;padding:9px 16px;text-decoration:none;color:#
 </div>
 </div>
 </footer>
+<script src="/assets/site-118ea87df9388d20.js" defer>
+</script>
 </body>
 </html>

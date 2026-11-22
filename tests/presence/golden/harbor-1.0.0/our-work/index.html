@@ -35,18 +35,33 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 .hero-panel{background:var(--wash);border:1px solid var(--line);border-bottom:2px solid var(--accent);border-radius:var(--radius,10px);padding:26px 28px}
 @media (max-width:860px){.hero-grid{grid-template-columns:1fr;gap:28px}
 }
+.menu-btn{display:none}
+.site-menu{display:contents}
+@media (max-width:720px){.site-menu{display:none}
+.menu-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;min-width:44px;padding:0 14px;border:1px solid var(--line,#ddd);border-radius:999px;background:transparent;color:inherit;font:inherit;font-weight:600}
+}
 </style>
 <link rel="stylesheet" href="/assets/site.css">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Copper Line Plumbing","item":"https://vermilionandvine.example/"}
 ,{"@type":"ListItem","position":2,"name":"Our work","item":"https://vermilionandvine.example/our-work/"}
 ]}
 </script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"ItemList","name":"Coming up","itemListElement":[{"@type":"ListItem","position":1,"item":{"@type":"Event","name":"Spring open house","startDate":"2026-04-12","description":"Tours and free coffee, 10 to 2."}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"ItemList","name":"Coming up","itemListElement":[{"@type":"ListItem","position":1,"item":{"@type":"Event","name":"Spring open house","startDate":"2027-04-12","location":{"@type":"Place","name":"Copper Line Plumbing","address":"1420 S Central Ave, Glendale, CA 91204"}
+,"description":"Tours and free coffee, 10 to 2."}
 }
-,{"@type":"ListItem","position":2,"item":{"@type":"Event","name":"Community workshop","startDate":"2026-05-03","description":"Small fixes you can do yourself."}
+,{"@type":"ListItem","position":2,"item":{"@type":"Event","name":"Community workshop","startDate":"2027-05-03","location":{"@type":"Place","name":"The community hall, 40 Elm Street","address":"The community hall, 40 Elm Street"}
+,"description":"Small fixes you can do yourself."}
 }
 ]}
 </script>
+<noscript>
+<style>@media (max-width:720px){.site-menu{display:block;position:static;box-shadow:none;max-height:none;padding:0 0 10px}
+.menu-btn{display:none}
+.site-menu nav.primary ul.subnav{display:block}
+}
+</style>
+</noscript>
+<link rel="preload" as="image" href="/img/s0012-800.webp" imagesrcset="/img/s0012-400.webp 400w, /img/s0012-800.webp 800w, /img/s0012-1600.webp 1600w" imagesizes="(max-width:900px) 100vw, 820px" fetchpriority="high">
 </head>
 <body>
 <a class="skip" href="#main">Skip to main content</a>
@@ -55,7 +70,17 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 <header class="site">
 <div class="wrap nav">
   <a class="brand" href="/">Copper Line Plumbing</a>
-  <nav class="primary" aria-label="Main">
+  <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-menu">
+<svg class="mb-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+<path d="M4 7h16M4 12h16M4 17h16"/>
+</svg>
+<svg class="mb-close" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+<path d="M6 6l12 12M18 6L6 18"/>
+</svg>
+<span>Menu</span>
+</button>
+  <div class="site-menu" id="site-menu">
+<nav class="primary" aria-label="Main">
 <ul>
 <li>
 <a href="/">Home</a>
@@ -92,6 +117,7 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 </span>
 <input type="search" name="q" aria-label="Search this site" placeholder="Search" autocomplete="off" maxlength="120">
 </form>
+</div>
 </div>
 </header>
 <main id="main">
@@ -164,20 +190,22 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 <ul class="events">
 <li class="ev">
 <span class="ev-when">
-<time datetime="2026-04-12">Apr 12</time>
+<time datetime="2027-04-12">Apr 12</time>
 </span>
 <span class="ev-body">
 <span class="ev-name" data-dds-field="items.0.name">Spring open house</span>
 <span class="ev-detail" data-dds-field="items.0.detail">Tours and free coffee, 10 to 2.</span>
+<span class="ev-place">1420 S Central Ave, Glendale, CA 91204</span>
 </span>
 </li>
 <li class="ev">
 <span class="ev-when">
-<time datetime="2026-05-03">May 3</time>
+<time datetime="2027-05-03">May 3</time>
 </span>
 <span class="ev-body">
 <span class="ev-name" data-dds-field="items.1.name">Community workshop</span>
 <span class="ev-detail" data-dds-field="items.1.detail">Small fixes you can do yourself.</span>
+<span class="ev-place" data-dds-field="items.1.place">The community hall, 40 Elm Street</span>
 </span>
 </li>
 </ul>
@@ -247,7 +275,7 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 <input type="radio" name="site-tabs" id="site-tabs-0" class="tab-radio" checked>
 <input type="radio" name="site-tabs" id="site-tabs-1" class="tab-radio">
 <input type="radio" name="site-tabs" id="site-tabs-2" class="tab-radio">
-<div class="tab-strip" role="tablist">
+<div class="tab-strip">
 <label class="tab-label" for="site-tabs-0" data-dds-field="tabs.0.label">Repairs</label>
 <label class="tab-label" for="site-tabs-1" data-dds-field="tabs.1.label">Installs</label>
 <label class="tab-label" for="site-tabs-2" data-dds-field="tabs.2.label">Upkeep</label>
@@ -569,7 +597,16 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 .presence-form .ff-group legend{font-weight:600;font-size:.94rem;padding:0 6px}
 .presence-form .ff-opt{display:flex;align-items:center;gap:8px;font-weight:400;margin-top:6px}
 .presence-form .ff-opt input{width:auto;margin:0}
-.presence-form .ff-rating .ff-opt{display:inline-flex;margin-right:14px}
+.presence-form .ff-rating .ff-opt{display:inline-flex;margin-right:2px;position:relative;cursor:pointer;min-height:44px;align-items:center}
+.presence-form .ff-star input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.presence-form .ff-star-g{display:inline-flex;color:var(--line,#cfcfcf)}
+.presence-form .ff-star:has(input:checked) .ff-star-g,.presence-form .ff-star:has(~.ff-star input:checked) .ff-star-g{color:var(--accent,#5b3fa0)}
+.presence-form .ff-rating:hover .ff-star .ff-star-g{color:var(--line,#cfcfcf)}
+.presence-form .ff-star:hover .ff-star-g,.presence-form .ff-star:has(~.ff-star:hover) .ff-star-g{color:var(--accent-dark,var(--accent,#5b3fa0))}
+.presence-form .ff-star:has(input:focus-visible) .ff-star-g{outline:2px solid var(--accent,#5b3fa0);outline-offset:2px;border-radius:4px}
+.presence-form .ff-star-n{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.presence-form select{appearance:none;-webkit-appearance:none;padding-right:40px;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;background-size:16px}
+.presence-form .ff-noscript{margin:10px 0 0;font-size:.92rem;color:var(--soft,#666)}
 .presence-form .ff-consent label{display:flex;align-items:flex-start;gap:8px;font-weight:400}
 .presence-form .ff-consent input{width:auto;margin-top:4px}
 .presence-form .hp{position:absolute;left:-9999px;height:1px;overflow:hidden}
@@ -618,6 +655,9 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 </div>
 <p style="font-size:.85rem;color:var(--soft)">Please don’t include sensitive personal, financial, or medical information.</p>
 <button class="btn" type="submit">Send message</button>
+<noscript>
+<p class="ff-noscript">Please call or email us; this form needs scripts turned on.</p>
+</noscript>
 </form>
 </section>
 <section id="placed-by-hand" data-dds-sid="freeform:free_layout" data-dds-key="block_freeform_free_layout" data-dds-src="21" class="block wrap block-freeform">
@@ -682,7 +722,16 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 .presence-form .ff-group legend{font-weight:600;font-size:.94rem;padding:0 6px}
 .presence-form .ff-opt{display:flex;align-items:center;gap:8px;font-weight:400;margin-top:6px}
 .presence-form .ff-opt input{width:auto;margin:0}
-.presence-form .ff-rating .ff-opt{display:inline-flex;margin-right:14px}
+.presence-form .ff-rating .ff-opt{display:inline-flex;margin-right:2px;position:relative;cursor:pointer;min-height:44px;align-items:center}
+.presence-form .ff-star input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.presence-form .ff-star-g{display:inline-flex;color:var(--line,#cfcfcf)}
+.presence-form .ff-star:has(input:checked) .ff-star-g,.presence-form .ff-star:has(~.ff-star input:checked) .ff-star-g{color:var(--accent,#5b3fa0)}
+.presence-form .ff-rating:hover .ff-star .ff-star-g{color:var(--line,#cfcfcf)}
+.presence-form .ff-star:hover .ff-star-g,.presence-form .ff-star:has(~.ff-star:hover) .ff-star-g{color:var(--accent-dark,var(--accent,#5b3fa0))}
+.presence-form .ff-star:has(input:focus-visible) .ff-star-g{outline:2px solid var(--accent,#5b3fa0);outline-offset:2px;border-radius:4px}
+.presence-form .ff-star-n{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.presence-form select{appearance:none;-webkit-appearance:none;padding-right:40px;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;background-size:16px}
+.presence-form .ff-noscript{margin:10px 0 0;font-size:.92rem;color:var(--soft,#666)}
 .presence-form .ff-consent label{display:flex;align-items:flex-start;gap:8px;font-weight:400}
 .presence-form .ff-consent input{width:auto;margin-top:4px}
 .presence-form .hp{position:absolute;left:-9999px;height:1px;overflow:hidden}
@@ -731,6 +780,9 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 </div>
 <p style="font-size:.85rem;color:var(--soft)">Please don’t include sensitive personal, financial, or medical information.</p>
 <button class="btn" type="submit">Send message</button>
+<noscript>
+<p class="ff-noscript">Please call or email us; this form needs scripts turned on.</p>
+</noscript>
 </form>
 </div>
 <div class="stk-b stk-map" data-dds-item="9">
@@ -806,8 +858,8 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 <div class="holiday">
 <strong>Holiday hours</strong>
 <ul>
-<li>Thanksgiving (2026-11-26): Closed</li>
-<li>Christmas Eve (2026-12-24): 7am–12pm</li>
+<li>Thanksgiving, <time datetime="2026-11-26">Thu Nov 26</time>: Closed</li>
+<li>Christmas Eve, <time datetime="2026-12-24">Thu Dec 24</time>: 7am–12pm</li>
 </ul>
 </div>
 </div>
@@ -821,5 +873,7 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 </div>
 </div>
 </footer>
+<script src="/assets/site-118ea87df9388d20.js" defer>
+</script>
 </body>
 </html>

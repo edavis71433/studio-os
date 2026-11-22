@@ -45,9 +45,12 @@ ok('starring a version is edit, like naming one', memberWriteNeeds('/publishes/s
   ok('on, each page gets the style in its head and the script before its end', on['index.html'].includes('<style id="dds-motion">') && /<script id="dds-motion-js">[\s\S]*<\/script><\/body>/.test(on['index.html']) && on['about/index.html'].includes('dds-motion'));
   ok('files that aren’t pages are left alone', on['robots.txt'] === 'x' && on['menu.pdf'] === map['menu.pdf']);
   ok('a page with no <main> is left alone, and a page is never done twice', applyMotion({ 'x.html': '<body>no main</body>' }, 'gentle')['x.html'] === '<body>no main</body>' && applyMotion(on, 'gentle')['index.html'] === on['index.html']);
-  ok('only visitors whose device allows motion see it', MOTION_CSS.startsWith('@media screen and (prefers-reduced-motion:no-preference)') && /prefers-reduced-motion: reduce/.test(MOTION_JS));
-  ok('a section fades only as it rises, never out first', /section\.dds-rise\{opacity:0;transform:translateY\(18px\)\}/.test(MOTION_CSS) && /\.dds-up\{opacity:1;transform:none;transition:opacity/.test(MOTION_CSS));
-  ok('nothing hides until the script runs, the first section never waits, and what’s on screen shows at once', !/main>section\{opacity:0/.test(MOTION_CSS) && /\.slice\(1\)/.test(MOTION_JS) && /getBoundingClientRect\(\)\.top<h\)return/.test(MOTION_JS));
+  // item 302: four choices now; every one is kind the same way
+  ok('only visitors whose device allows motion see it', Object.values(MOTION_CSS).every((css) => css.startsWith('@media screen and (prefers-reduced-motion:no-preference)')) && /prefers-reduced-motion: reduce/.test(MOTION_JS));
+  ok('a section fades only as it rises, never out first', /section\.dds-rise\{opacity:0;transform:translateY\(18px\)\}/.test(MOTION_CSS.gentle) && Object.values(MOTION_CSS).every((css) => /\.dds-up\{opacity:1;transform:none;transition:opacity/.test(css)));
+  ok('nothing hides until the script runs, the first section never waits, and what’s on screen shows at once', Object.values(MOTION_CSS).every((css) => !/main>section\{opacity:0/.test(css)) && /\.slice\(1\)/.test(MOTION_JS) && /getBoundingClientRect\(\)\.top<h\)return/.test(MOTION_JS));
+  ok('slide, scale and zoom: sections slide in from a side, grow from a touch smaller, or the welcome photo zooms slowly', /translateX\(-40px\)/.test(MOTION_CSS.slide) && /dds-alt\{transform:translateX\(40px\)/.test(MOTION_CSS.slide) && /scale\(\.94\)/.test(MOTION_CSS.scale) && /@keyframes dds-zoom/.test(MOTION_CSS.zoom) && Object.values(MOTION_CSS).every((css) => /\.btn:hover/.test(css)));
+  ok('every choice is a setting; anything else is none', ['gentle', 'slide', 'scale', 'zoom'].every((m) => motionOf(m) === m) && motionOf('bounce') === null && motionOf('') === null);
   let parses = true; try { new Function(MOTION_JS); } catch (e) { parses = String(e); }
   ok('the script parses, and has no inline handlers', parses === true && !/\bon[a-z]+=/.test(MOTION_JS), String(parses));
   ok('the style setting takes "gentle" and nothing else', validateThemeTokens({ motion: 'gentle' }).tokens.motion === 'gentle' && validateThemeTokens({ motion: 'wild' }).rejected.includes('motion'));
@@ -90,7 +93,8 @@ ok('starring a version is edit, like naming one', memberWriteNeeds('/publishes/s
 {
   const page = editorSource(), files = read('files.html');
   ok('Versions: a star on every kept version, and All, Published or Starred', /function verStar\(p\)/.test(page) && /api\("PUT", "\/publishes\/stars", \{ id: p\.id, starred: next \}\)/.test(page) && /\["all", "All"\], \["published", "Published"\], \["starred", "Starred \(" \+ starredN \+ "\)"\]/.test(page));
-  ok('Styles › Looks: Still or Gentle motion, with what it does said', /pillRow\(card, "Motion", \[\["Still", ""\], \["Gentle motion", "gentle"\]\]/.test(page) && /saveTokens\(\{ motion: o\[1\] \}/.test(page));
+  // item 302: the row became five tiles that move (motionRow), each with what it does said
+ok('Styles › Looks: Still, Gentle, Slide, Scale or Zoom, with what each does said', /stab\(motionRow\(card, T\), "looks"\)/.test(page) && /\["gentle", "Gentle", "Each section fades up/.test(page) && /\["zoom", "Zoom", /.test(page) && /saveTokens\(\{ motion: v \}/.test(page));
   ok('Styles › Looks: the site icon, shown as a browser tab shows it, with the letter one press away', /function siteIconRow\(\)/.test(page) && /tab\.setAttribute\("role", "img"\)/.test(page) && /"How your site shows in a browser tab: "/.test(page) && /settingsPut\(\{ icon_media_id: id \}\)/.test(page));
   ok('Photos: one press to use a picture as the site icon', /mkAssign\("icon_media_id", "Site icon", "Use as site icon"\)/.test(page));
   ok('Pages: one place for everything on every page, each saying On or Off', /id="pcEvery"/.test(page) && /function pcEvery\(\)/.test(page) && ['Announcement bar', 'Pop-up', 'Phone bar', 'Header and footer', 'Not found page'].every((t) => page.includes(`"${t}"`)));

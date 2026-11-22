@@ -16,13 +16,18 @@
 import { esc, attr, safeHref, renderMarkdown } from './markdown.ts';
 import { normalizeSnapshotContent } from './render_types.ts';
 import { vocabFor, type IndustryVocab } from './industry_vocab.ts';
-import { renderSiteBlocks, reviewsSchema, type RenderedBlock } from './site_blocks.ts';
+import { renderSiteBlocks, reviewsSchema, BLOCK_JS, type RenderedBlock } from './site_blocks.ts';
 import { renderNavList, NAV_DROPDOWN_CSS } from './site_nav.ts';
 import { seoHead } from './seo_emit.ts';
 import { privacyBody, accessibilityBody, legalFooterLinks, notSentInner } from './legal_pages.ts';
 import { searchBoxHtml, searchPageBody, searchClientScript, searchIndexJson, normalizeTags } from './search_index.ts';
-import { postListBody, postPageBody, postLd, postCategories, categoryPath, POST_CSS, type PostDraw } from './post_render.ts';
+import { postListBody, postPageBody, postLd, postCategories, categoryPath, postPageCount, postListPath, POST_CSS, type PostDraw } from './post_render.ts';
 import { contactPlace, footerPlace, ldPlaces, PLACE_CSS } from './place_render.ts';
+import { SHELL_CSS, SHELL_CRITICAL, SHELL_NOSCRIPT, MENU_JS, menuButtonHtml } from './site_shell.ts';
+
+/** The site's script file: the phone menu (lib/site_shell.ts) and the gallery and carousel (lib/site_blocks.ts). */
+export const SITE_JS = `${MENU_JS}\n${BLOCK_JS}`;
+export const SITE_JS_PATH = `/assets/site-${fnv(SITE_JS)}.js`;
 import type { PostCategory } from './blog.ts';
 import type { FileMap, HolidayException, HoursDay, LocationContent, MediaRef, RenderFn, Snapshot, SnapshotContent, SiteConfig } from './render_types.ts';
 
@@ -135,15 +140,18 @@ function fmtTime(t: string): string {
 // AVIF variants sit beside WebP at the same widths (self-hosted; the path differs
 // only by extension — see serializer.variantPath), so derive the AVIF srcset here.
 const avifOf = (webpPath: string): string => webpPath.replace(/\.webp$/, '.avif');
-function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = ''): string {
+function img(m: MediaRef | null | undefined, sizes: string, lazy = true, cls = '', focal = false): string {
   if (!m || !m.variants) return '';
+  // item 293: the welcome photo is cropped to a shape, so the focal point the owner set keeps its place
+  const fx = Number(m.focal?.x), fy = Number(m.focal?.y);
+  const pos = focal && m.focal && Number.isFinite(fx) && Number.isFinite(fy) ? ` style="object-position:${Math.min(100, Math.max(0, fx))}% ${Math.min(100, Math.max(0, fy))}%"` : '';
   const v = m.variants;
   const order = ['w400', 'w800', 'w1600'].filter((k) => v[k]);
   const srcset = order.map((k) => `${attr(v[k])} ${k.slice(1)}w`).join(', ');
   const src = v.w800 || v.w400 || Object.values(v)[0];
   if (!src) return '';
   const dims = m.width && m.height ? ` width="${m.width}" height="${m.height}"` : '';
-  const imgTag = `<img src="${attr(src)}"${srcset ? ` srcset="${srcset}" sizes="${attr(sizes)}"` : ''} alt="${attr(m.alt)}"${dims}${lazy ? ' loading="lazy" decoding="async"' : ' fetchpriority="high"'}${cls ? ` class="${cls}"` : ''}>`;
+  const imgTag = `<img src="${attr(src)}"${srcset ? ` srcset="${srcset}" sizes="${attr(sizes)}"` : ''} alt="${attr(m.alt)}"${dims}${lazy ? ' loading="lazy" decoding="async"' : ' fetchpriority="high"'}${cls ? ` class="${cls}"` : ''}${pos}>`;
   if (!srcset) return imgTag;   // single variant: nothing to choose between formats
   // <picture>: AVIF first (browser picks the first it supports), WebP next, the
   // <img> is the ultimate fallback. Self-hosted variants only — zero external origins.
@@ -166,6 +174,17 @@ function hoursData(c: SnapshotContent): string {
   return JSON.stringify({ tz: loc.timezone, days, ex });
 }
 
+// Item 303: a holiday's date in words, the way posts and events print theirs: "Thu Nov 26".
+const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export function dayDate(ymd: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
+  if (!m) return String(ymd || '');
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (Number.isNaN(d.getTime()) || d.getUTCMonth() !== Number(m[2]) - 1) return String(ymd);
+  return `${DAYS_SHORT[d.getUTCDay()]} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
 function hoursTable(c: SnapshotContent, caption: string): string {
   const loc = loc0(c)!;
   const byDay = new Map(loc.hours.map((d) => [d.day, d]));
@@ -177,7 +196,7 @@ function hoursTable(c: SnapshotContent, caption: string): string {
   }).join('');
   const holidays = (loc.holiday_exceptions || []).map((e: HolidayException) => {
     const val = e.closed ? 'Closed' : (e.intervals || []).map((i) => `${fmtTime(i.open)}–${fmtTime(i.close)}`).join(', ');
-    return `<li>${esc(e.label)} (${esc(e.date)}): ${esc(val)}</li>`;
+    return `<li>${esc(e.label)}, <time datetime="${attr(e.date)}">${esc(dayDate(e.date))}</time>: ${esc(val)}</li>`;
   }).join('');
   return `<table class="hours"${pr('location.hours')}><caption>${esc(caption)}</caption><tbody>${rows}</tbody></table>` +
     (holidays ? `<div class="holiday"><strong>Holiday hours</strong><ul>${holidays}</ul></div>` : '');
@@ -251,10 +270,10 @@ const ldSite = (c: SnapshotContent, site: SiteConfig) => ({ '@context': 'https:/
 
 // ═════════ the page shell ═════════
 
-interface PageOpts { path: string; title: string; description: string; ld: object[]; ogImage?: string; shareTitle?: string; shareDescription?: string; shareImage?: string; active: string; body: string }
-interface Extras { announce: string; icon: string; nav: Array<[string, string, string]> }
+interface PageOpts { path: string; title: string; description: string; ld: object[]; ogImage?: string; shareTitle?: string; shareDescription?: string; shareImage?: string; active: string; body: string; ogType?: 'article'; published?: string; feed?: boolean }
+interface Extras { announce: string; icon: string; nav: Array<[string, string, string]>; tokens: Record<string, string> }
 
-function shell(look: TemplateLook, c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpts, x: Extras): string {
+function shell(look: TemplateLook, c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpts, x: Extras, jsPath = SITE_JS_PATH): string {
   const i = c.identity;
   const logo = c.settings?.logo || null;   // the logo sits in the brand slot
   const { addr, tel, mail } = contactBits(c);
@@ -266,20 +285,29 @@ function shell(look: TemplateLook, c: SnapshotContent, site: SiteConfig, cssPath
   const closedNotice = loc0(c)?.temporarily_closed
     ? `<div class="notice" role="status">${esc(loc0(c)!.temporarily_closed_note || 'We are temporarily closed. See you soon.')}</div>` : '';
   const credit = site.brand?.credit ? `<span>${esc(site.brand.credit)}</span>` : '';
+  // Item 296: the header shows the logo and the name, the logo alone (the name stays as its alt text,
+  // so a screen reader still hears it), or the name alone; the logo's height is the owner's choice.
+  const hasLogo = !!logo?.variants?.w400;
+  const brandMode = hasLogo && x.tokens.header_brand === 'logo' ? 'logo' : x.tokens.header_brand === 'name' ? 'name' : 'both';
+  const logoH = /^\d{2}$/.test(x.tokens.logo_height || '') ? Number(x.tokens.logo_height) : 0;
+  const logoImg = hasLogo && brandMode !== 'name'
+    ? `<img src="${attr(logo!.variants!.w400)}" alt="${brandMode === 'logo' ? attr(i.business_name) : ''}" class="brandlogo"${logo!.width && logo!.height ? ` width="${logo!.width}" height="${logo!.height}"` : ''}>` : '';
+  const brand = `<a class="brand${brandMode === 'logo' ? ' brand-logo-only' : ''}" href="/"${logoH ? ` style="--logo-h:${logoH}px"` : ''}>${logoImg}${brandMode === 'logo' ? '' : esc(i.business_name)}</a>`;
 
-  return `${seoHead(o, site, c, x, look.critical, cssPath)}
+  return `${seoHead(o, site, c, x, look.critical + SHELL_CRITICAL, cssPath).replace('</head>', `${SHELL_NOSCRIPT}\n</head>`)}
 <body>
 <a class="skip" href="#main">Skip to main content</a>
 ${x.announce}
 ${closedNotice}
 <header class="site"><div class="wrap nav${c.settings?.nav_style === 'centered' ? ' centered' : ''}">
-  <a class="brand" href="/">${logo?.variants?.w400 ? `<img src="${attr(logo.variants.w400)}" alt="" class="brandlogo">` : ''}${esc(i.business_name)}</a>
-  <nav class="primary" aria-label="Main"><ul>${
+  ${brand}
+  ${menuButtonHtml()}
+  <div class="site-menu" id="site-menu"><nav class="primary" aria-label="Main"><ul>${
     c.settings?.nav?.length
       ? renderNavList(c.settings.nav, o.path, esc, attr)
       : x.nav.map(([p, label, key]) => `<li><a href="${attr(p)}"${o.active === key ? ' aria-current="page"' : ''}>${esc(label)}</a></li>`).join('')
   }</ul></nav>
-  ${searchBoxHtml()}
+  ${x.tokens.site_search === 'off' ? '' : searchBoxHtml()}</div>
 </div></header>
 <main id="main">
 ${o.body}
@@ -293,8 +321,17 @@ ${o.body}
 </div></footer>
 ${o.body.includes('id="open-now"') ? `<script id="hours-data" type="application/json">${loc0(c) ? hoursData(c).replaceAll('<', '\\u003c') : '{}'}</script>
 <script>${OPEN_NOW_JS}</script>
-` : ''}</body>
+` : ''}<script src="${attr(jsPath)}" defer></script>
+</body>
 </html>`;
+}
+
+/** Item 308: a preload for the first photo on a page that has no eager one, from its own srcset. Pure. */
+export function firstPhotoPreload(body: string): string {
+  if (body.includes('fetchpriority="high"')) return '';
+  const m = /<img src="([^"]+)"(?: srcset="([^"]*)" sizes="([^"]*)")?[^>]*\sloading="lazy"/.exec(body);
+  if (!m) return '';
+  return `<link rel="preload" as="image" href="${m[1]}"${m[2] ? ` imagesrcset="${m[2]}" imagesizes="${m[3]}"` : ''} fetchpriority="high">`;
 }
 
 /** A simple page's heading band: the thanks, not-sent, 404 and owner's pages. */
@@ -405,6 +442,9 @@ function homeBody(look: TemplateLook, c: SnapshotContent, v: IndustryVocab, word
   </div>`;
   // DS-6 split layout — the first CROPPING presentation, so the focal point (DS-5) drives it
   const useSplit = c.settings?.hero_layout === 'split' && !!hero;
+  // Item 292: words over the photo, under a dark veil (hero_layout "photo") or a light one ("photo-light")
+  const usePhoto = !useSplit && (c.settings?.hero_layout === 'photo' || c.settings?.hero_layout === 'photo-light') && !!hero?.variants;
+  const photoVeil = c.settings?.hero_layout === 'photo-light' ? 'veil-light' : 'veil-dark';
   const focalStyle = hero?.focal ? ` style="object-position:${hero.focal.x}% ${hero.focal.y}%"` : '';
   const splitImg = useSplit && hero?.variants
     ? `<div class="split-img"><img src="${attr(hero.variants.w800 || hero.variants.w400 || '')}"${hero.variants.w400 && hero.variants.w1600 ? ` srcset="${attr(hero.variants.w400)} 400w, ${attr(hero.variants.w800 || hero.variants.w1600)} 800w, ${attr(hero.variants.w1600)} 1600w" sizes="${panel ? '(max-width:860px) 100vw, 42vw' : '(max-width:760px) 100vw, 45vw'}"` : ''} alt="${attr(hero.alt)}" fetchpriority="high"${focalStyle}></div>`
@@ -422,14 +462,17 @@ function homeBody(look: TemplateLook, c: SnapshotContent, v: IndustryVocab, word
 </div></div>` : '';
   const photoSizes = look.classic?.heroPhotoSizes || '(max-width: 1000px) 100vw, 960px';
   let welcome: string;
-  if (panel) {
+  if (usePhoto) {
+    welcome = `<section class="hero hero-photo ${photoVeil}" data-dds-core="hero" data-dds-movable><div class="hero-bg" aria-hidden="true">${img(hero, '100vw', false, '', true)}</div><div class="wrap hero-copy">${heroText}</div>
+</section>`;
+  } else if (panel) {
     const right = useSplit ? splitImg : heroPanel(c, v);
     welcome = `<section class="hero" data-dds-core="hero" data-dds-movable><div class="wrap hero-grid${right ? '' : ' solo'}"><div class="hero-copy">${heroText}</div>${right}</div>
-${hero && !useSplit ? `<div class="wrap"><div class="hero-img">${img(hero, photoSizes, false)}</div></div>` : ''}
+${hero && !useSplit ? `<div class="wrap"><div class="hero-img">${img(hero, photoSizes, false, '', true)}</div></div>` : ''}
 </section>`;
   } else {
     welcome = `<section class="hero wrap" data-dds-core="hero" data-dds-movable>${useSplit ? `<div class="hero-split"><div>${heroText}</div>${splitImg}</div>` : `${heroText}
-  ${hero ? `<div class="hero-img">${img(hero, photoSizes, false)}</div>` : ''}`}
+  ${hero ? `<div class="hero-img">${img(hero, photoSizes, false, '', true)}</div>` : ''}`}
 </section>`;
   }
   return `${heroOff ? strip : ''}
@@ -482,10 +525,12 @@ function contactBody(look: TemplateLook, c: SnapshotContent, site: SiteConfig, w
 <input type="hidden" name="source_page" value="/contact/">
 <p class="hp" aria-hidden="true"><label for="f-hp">Leave this field empty</label><input id="f-hp" name="_hp" tabindex="-1" autocomplete="off"></p>
 <p><label for="f-name">Your name</label>${br}<input id="f-name" name="name" required maxlength="120"${fs}></p>
-<p><label for="f-email">Email or phone</label>${br}<input id="f-email" name="contact" required maxlength="254"${fs}></p>
+<p><label for="f-email">Email</label>${br}<input id="f-email" type="email" name="email" required maxlength="254" autocomplete="email" inputmode="email"${fs}></p>
+<p><label for="f-phone">Phone <span class="f-opt">(optional)</span></label>${br}<input id="f-phone" type="tel" name="phone" maxlength="40" autocomplete="tel" inputmode="tel"${fs}></p>
 <p><label for="f-msg">Message</label>${br}<textarea id="f-msg" name="message" required maxlength="2000" rows="5"${fs}></textarea></p>
 <p style="font-size:.85rem;color:var(--soft)">Please don’t include sensitive personal, financial, or medical information.</p>
-<button class="btn" type="submit">Send</button></form>`
+<button class="btn" type="submit">Send</button>
+<noscript><p class="ff-noscript">Please call or email us; this form needs scripts turned on.</p></noscript></form>`
     : (mail ? `<p style="margin-top:18px"><a class="btn" href="mailto:${attr(i.email)}">Email us</a></p>` : '');
   return `<section class="block wrap"><h1>Contact &amp; hours</h1>
 <div class="cards"${inline ? '' : ' style="margin-top:8px"'}>
@@ -517,9 +562,12 @@ export function makeRender(look: TemplateLook): RenderFn {
 
     // Append the dropdown-nav CSS only when the owner set a custom nav → sites without
     // one keep the exact same stylesheet + hash (byte-identical).
-    const effCss = look.css + POST_CSS + PLACE_CSS + (c.settings?.nav?.length ? '\n' + NAV_DROPDOWN_CSS : '');
+    const effCss = look.css + POST_CSS + PLACE_CSS + SHELL_CSS + (c.settings?.nav?.length ? '\n' + NAV_DROPDOWN_CSS : '');
     const cssPath = `/assets/site-${fnv(effCss)}.css`;
     files[`assets/site-${fnv(effCss)}.css`] = effCss;
+    // Items 288 and 298: the site's one script file (the phone menu and the header's height, the
+    // gallery's zoom view and the carousel's arrows), named by its hash like the stylesheet
+    files[SITE_JS_PATH.slice(1)] = SITE_JS;
 
     const siteTitle = i.seo_title || i.business_name;
     const siteDesc = i.seo_description || i.short_description || i.description;   // item 127
@@ -537,13 +585,24 @@ export function makeRender(look: TemplateLook): RenderFn {
     const announce = annLive
       ? `<div class="annbar" role="status">${annHref ? `<a href="${attr(annHref)}">${esc(ann!.text)}</a>` : esc(ann!.text)}</div>` : '';
     const icon = c.settings?.logo?.variants?.w400 || '';   // the logo becomes the favicon when present
+    // Item 297: the FAQ page and the Updates page exist only once they have something on them;
+    // until then they are out of the menu (the owner's own menu too), the sitemap and the site.
+    const hasFaq = c.faqs.length > 0, hasUpdates = c.posts.length > 0;
+    const emptyPaths = new Set([...(hasFaq ? [] : ['/faq/']), ...(hasUpdates ? [] : ['/updates/'])]);
     const nav: Array<[string, string, string]> = [
       ['/', 'Home', 'home'], [v.offeringPath, v.offeringLabel, 'offerings'], ['/about/', 'About', 'about'],
-      ['/faq/', 'FAQ', 'faq'], ['/updates/', 'Updates', 'updates'], ['/contact/', 'Contact', 'contact'],
+      ...(hasFaq ? [['/faq/', 'FAQ', 'faq'] as [string, string, string]] : []), ...(hasUpdates ? [['/updates/', 'Updates', 'updates'] as [string, string, string]] : []), ['/contact/', 'Contact', 'contact'],
     ];
+    if (emptyPaths.size && c.settings?.nav?.length) {
+      const kept = c.settings.nav.map((it) => ({ ...it, ...(Array.isArray(it.children) ? { children: it.children.filter((k) => !emptyPaths.has(k.href)) } : {}) }))
+        .filter((it) => !emptyPaths.has(it.href) && !(it.folder && !(it.children || []).length));
+      c.settings.nav = kept.length ? kept : undefined;
+    }
     // Multi-page: the owner's own pages join the main nav (after Contact), unless hidden.
     for (const cp of (c.settings?.pages || [])) { if (!cp.hideNav) nav.push([`/${cp.slug}/`, cp.title, `page:${cp.slug}`]); }
-    const extras: Extras = { announce, icon, nav };
+    // Items 295 and 296: the header's own choices live with the style settings (lib/devmode.ts)
+    const tokens: Record<string, string> = { ...((snapshot.dev_customization?.theme_tokens as Record<string, string> | undefined) || {}) };
+    const extras: Extras = { announce, icon, nav, tokens };
 
     // Phase SD: "Show this page on Google?" — noindex + sitemap exclusion per page,
     // and per-page search headline/description overrides. Plain choices, our plumbing.
@@ -561,13 +620,18 @@ export function makeRender(look: TemplateLook): RenderFn {
     const markNoindex = (file: string) => { files[file] = (files[file] as string).replace('</title>', '</title>\n<meta name="robots" content="noindex">'); };
 
     const page = (path: string, opts: Omit<PageOpts, 'path'>) => {
-      const html = shell(look, c, site, cssPath, { path, ...opts }, extras);
+      // Item 308: the first photo on a page is the main thing it paints, so the page asks for it at
+      // once (a preload in the head; the welcome photo already loads first and needs none).
+      const html = shell(look, c, site, cssPath, { path, ...opts }, extras).replace('</head>', `${firstPhotoPreload(opts.body)}</head>`);
       const file = path === '/' ? 'index.html' : `${path.replace(/^\/|\/$/g, '')}/index.html`;
       files[file] = html;
     };
     const postIndexBody = (cat: PostCategory | null = null) => postListBody(c, postDraw(look), cat);
 
-    const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at, src: c.settings?.blocks_src });   // Phase T-BLOCKS (+ FB form blocks + BK booking + EXP window)
+    // Item 299: an event happens at the business's address unless it names its own place
+    const l0 = loc0(c);
+    const place = l0 && l0.address_line1 ? { name: i.business_name, address: [l0.address_line1, l0.address_line2, l0.city, [l0.region, l0.postal_code].filter(Boolean).join(' ')].map((x) => String(x || '').trim()).filter(Boolean).join(', ') } : undefined;
+    const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at, src: c.settings?.blocks_src, place });   // Phase T-BLOCKS (+ FB form blocks + BK booking + EXP window)
     const ldBiz = ldBusiness(c, site, v, !!classic?.reservations);
     // Phase RV: fold the HONEST reviews schema (AggregateRating + Review, approved rows
     // only) onto the ONE business node — home only, where the reviews_wall is visible.
@@ -578,8 +642,10 @@ export function makeRender(look: TemplateLook): RenderFn {
     if (noidx.has('offerings')) markNoindex(`${v.offeringPath.replace(/^\/|\/$/g, '')}/index.html`);
     page('/about/', { ...seoOv('about', `About — ${i.business_name}`, siteDesc), ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c, words) });
     if (noidx.has('about')) markNoindex('about/index.html');
-    page('/faq/', { ...seoOv('faq', `FAQ — ${i.business_name}`, `Answers to common questions about ${i.business_name}.`), ld: c.faqs.length ? [ldFaq(c)] : [], active: 'faq', body: faqBody(c) });
-    if (noidx.has('faq')) markNoindex('faq/index.html');
+    if (hasFaq) {
+      page('/faq/', { ...seoOv('faq', `FAQ — ${i.business_name}`, `Answers to common questions about ${i.business_name}.`), ld: [ldFaq(c)], active: 'faq', body: faqBody(c) });
+      if (noidx.has('faq')) markNoindex('faq/index.html');
+    }
     page('/contact/', { ...seoOv('contact', `Contact & Hours — ${i.business_name}`, words.contactDescription(i.business_name)), ld: [ldBiz, ...ldPlaces(c, site, v.schemaType)], active: 'contact', body: contactBody(look, c, site, words) });
     if (noidx.has('contact')) markNoindex('contact/index.html');
     page('/thanks/', { title: `Thank you — ${i.business_name}`, description: `Your message to ${i.business_name} was sent.`, ld: [], active: 'contact', body: band(look, `<h1>Thank you — your message was sent.</h1><p class="tagline">${esc(i.business_name)} will get back to you soon.</p><div class="cta-row"><a class="btn" href="/">Back to the site</a></div>`) });
@@ -590,27 +656,41 @@ export function makeRender(look: TemplateLook): RenderFn {
     // Phase Q (FD-M3): the generated legal foundation — facts-true, the owner never writes legal HTML
     page('/privacy/', { title: `Privacy — ${i.business_name}`, description: `How ${i.business_name} handles your information.`, ld: [], active: '', body: privacyBody(c, snapshot.created_at.slice(0, 10), site) });
     page('/accessibility/', { title: `Accessibility — ${i.business_name}`, description: `${i.business_name}’s accessibility commitment.`, ld: [], active: '', body: accessibilityBody(c) });
-    page('/updates/', { ...seoOv('updates', `Updates — ${i.business_name}`, `News and updates from ${i.business_name}.`), ld: [], active: 'updates', body: postIndexBody() });
-    if (noidx.has('updates')) markNoindex('updates/index.html');
-    for (const p of c.posts) {
-      page(`/updates/${p.slug}/`, {
-        title: `${p.title} — ${i.business_name}`, description: p.excerpt || siteDesc,
-        ld: [ldCrumbs(site, [[i.business_name, '/'], ['Updates', '/updates/'], [p.title, `/updates/${p.slug}/`]]), postLd(site, i.business_name, p)],
-        ogImage: p.hero?.variants?.w1600, active: 'updates', body: postPageBody(c, p, postDraw(look)),
-      });
-      if (p.noindex) markNoindex(`updates/${p.slug}/index.html`);
-    }
-    // Builder list item 40: a page per category, listed like the Updates page
-    for (const cat of postCategories(c)) {
-      page(categoryPath(cat), { title: `${cat.name} — ${i.business_name}`, description: `${cat.name}: news and updates from ${i.business_name}.`, ld: [ldCrumbs(site, [[i.business_name, '/'], ['Updates', '/updates/'], [cat.name, categoryPath(cat)]])], active: 'updates', body: postIndexBody(cat) });
-      if (noidx.has('updates')) markNoindex(`${categoryPath(cat).slice(1)}index.html`);
+    // Item 300: the list pages at 20 (/updates/page/2/ …), every list page names the feed, and a
+    // post shares as an article. Item 297: no Updates pages at all until there is a post.
+    const listPages: string[] = [];
+    const listPage = (cat: PostCategory | null, n: number, total: number) => {
+      const path = postListPath(cat, n);
+      const suffix = n > 1 ? ` (page ${n} of ${total})` : '';
+      page(path, cat
+        ? { title: `${cat.name}${suffix} — ${i.business_name}`, description: `${cat.name}: news and updates from ${i.business_name}.`, ld: [ldCrumbs(site, [[i.business_name, '/'], ['Updates', '/updates/'], [cat.name, categoryPath(cat)]])], active: 'updates', feed: true, body: postListBody(c, postDraw(look), cat, n) }
+        : { ...seoOv('updates', `Updates${suffix} — ${i.business_name}`, `News and updates from ${i.business_name}.`), ld: [], active: 'updates', feed: true, body: postListBody(c, postDraw(look), null, n) });
+      if (noidx.has('updates')) markNoindex(`${path.slice(1)}index.html`);
+      listPages.push(path);
+    };
+    if (hasUpdates) {
+      const total = postPageCount(c.posts.length);
+      for (let n = 1; n <= total; n++) listPage(null, n, total);
+      for (const p of c.posts) {
+        page(`/updates/${p.slug}/`, {
+          title: `${p.title} — ${i.business_name}`, description: p.excerpt || siteDesc,
+          ld: [ldCrumbs(site, [[i.business_name, '/'], ['Updates', '/updates/'], [p.title, `/updates/${p.slug}/`]]), postLd(site, i.business_name, p)],
+          ogImage: p.hero?.variants?.w1600, active: 'updates', ogType: 'article', published: p.published_at, feed: true, body: postPageBody(c, p, postDraw(look)),
+        });
+        if (p.noindex) markNoindex(`updates/${p.slug}/index.html`);
+      }
+      // Builder list item 40: a page per category, listed like the Updates page
+      for (const cat of postCategories(c)) {
+        const total = postPageCount(c.posts.filter((p) => p.category?.id === cat.id).length);
+        for (let n = 1; n <= total; n++) listPage(cat, n, total);
+      }
     }
 
     // Multi-page: the owner's own pages, each rendered with the SAME shell/nav/footer
     // and the shared block engine — so a custom page is a first-class page of the site.
     // (Their slugs never take a built-in page's: lib/page_ops.ts RESERVED_PAGE_SLUGS.)
     for (const cp of (c.settings?.pages || [])) {
-      const cblocks = renderSiteBlocks(cp.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at, src: cp.blocks_src });
+      const cblocks = renderSiteBlocks(cp.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at, src: cp.blocks_src, place });
       page(`/${cp.slug}/`, {
         ...seoOv(`page:${cp.slug}`, `${cp.title} — ${i.business_name}`, siteDesc),
         ld: [ldCrumbs(site, [[i.business_name, '/'], [cp.title, `/${cp.slug}/`]]), ...cblocks.flatMap((b) => (b.ld ? [b.ld] : []))],
@@ -625,7 +705,7 @@ export function makeRender(look: TemplateLook): RenderFn {
     // first-party inline script filters it client-side. Kept out of the sitemap +
     // noindexed (a thin utility page).
     files['search-index.json'] = searchIndexJson(c, { offeringPath: v.offeringPath, offeringLabel: v.offeringLabel });
-    page('/search/', { title: `Search — ${i.business_name}`, description: `Search ${i.business_name}.`, ld: [], active: '', body: searchPageBody(esc, { offeringPath: v.offeringPath, offeringLabel: v.offeringLabel }) + searchClientScript() });
+    page('/search/', { title: `Search — ${i.business_name}`, description: `Search ${i.business_name}.`, ld: [], active: '', body: searchPageBody(esc, { offeringPath: v.offeringPath, offeringLabel: v.offeringLabel, faqPage: hasFaq, updatesPage: hasUpdates }) + searchClientScript() });
     markNoindex('search/index.html');
 
     files['404.html'] = shell(look, c, site, cssPath, {
@@ -639,8 +719,8 @@ export function makeRender(look: TemplateLook): RenderFn {
 
     // item 99: no page records when it last changed, so only a post (its own date) carries one
     const lastmod = '';
-    const KEY_PATHS: Array<[string, string]> = [['offerings', v.offeringPath], ['about', '/about/'], ['faq', '/faq/'], ['contact', '/contact/'], ['updates', '/updates/']];
-    const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) })), ...(noidx.has('updates') ? [] : postCategories(c).map((cat) => ({ loc: categoryPath(cat), lastmod }))), ...(c.settings?.pages || []).filter((cp) => !noidx.has(`page:${cp.slug}`)).map((cp) => ({ loc: `/${cp.slug}/`, lastmod }))];
+    const KEY_PATHS: Array<[string, string]> = [['offerings', v.offeringPath], ['about', '/about/'], ...(hasFaq ? [['faq', '/faq/'] as [string, string]] : []), ['contact', '/contact/']];
+    const urls: Array<{ loc: string; lastmod: string }> = [{ loc: '/', lastmod }, ...KEY_PATHS.filter(([k]) => !noidx.has(k)).map(([, p]) => ({ loc: p, lastmod })), ...(noidx.has('updates') ? [] : listPages.map((p) => ({ loc: p, lastmod }))), { loc: '/privacy/', lastmod }, { loc: '/accessibility/', lastmod }, ...c.posts.filter((p) => !p.noindex).map((p) => ({ loc: `/updates/${p.slug}/`, lastmod: String(p.published_at || snapshot.created_at).slice(0, 10) })), ...(c.settings?.pages || []).filter((cp) => !noidx.has(`page:${cp.slug}`)).map((cp) => ({ loc: `/${cp.slug}/`, lastmod }))];
     const indent = classic ? '  ' : '';
     files['sitemap.xml'] = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `${indent}<url><loc>${esc(site.baseUrl + u.loc)}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}</url>`).join('\n')}\n</urlset>\n`;
     files['robots.txt'] = classic ? `User-agent: *\nAllow: /\n\nSitemap: ${site.baseUrl}/sitemap.xml\n` : `User-agent: *\nAllow: /\nDisallow: /thanks/\nDisallow: /not-sent/\n\nSitemap: ${site.baseUrl}/sitemap.xml\n`;

@@ -30,6 +30,11 @@ h1{font-size:clamp(2rem,5.5vw,3.2rem)}
 nav.primary ul{display:flex;gap:6px;list-style:none;flex-wrap:wrap}
 nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:var(--ink)}
 .hero{padding-top:64px;padding-bottom:40px;text-align:center}
+.menu-btn{display:none}
+.site-menu{display:contents}
+@media (max-width:720px){.site-menu{display:none}
+.menu-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;min-width:44px;padding:0 14px;border:1px solid var(--line,#ddd);border-radius:999px;background:transparent;color:inherit;font:inherit;font-weight:600}
+}
 </style>
 <link rel="stylesheet" href="/assets/site.css">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Restaurant","name":"Vermilion & Vine","description":"What we do, where we do it, and what we are known for, in one line.","url":"https://vermilionandvine.example","telephone":"(323) 555-0142","email":"hello@vermilionandvine.example","address":{"@type":"PostalAddress","streetAddress":"5119 York Boulevard","addressLocality":"Los Angeles","addressRegion":"CA","postalCode":"90042","addressCountry":"US"}
@@ -87,6 +92,13 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 }
 ]}
 </script>
+<noscript>
+<style>@media (max-width:720px){.site-menu{display:block;position:static;box-shadow:none;max-height:none;padding:0 0 10px}
+.menu-btn{display:none}
+.site-menu nav.primary ul.subnav{display:block}
+}
+</style>
+</noscript>
 </head>
 <body>
 <a class="skip" href="#main">Skip to main content</a>
@@ -95,7 +107,17 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 <header class="site">
 <div class="wrap nav">
   <a class="brand" href="/">Vermilion &amp; Vine</a>
-  <nav class="primary" aria-label="Main">
+  <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-menu">
+<svg class="mb-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+<path d="M4 7h16M4 12h16M4 17h16"/>
+</svg>
+<svg class="mb-close" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+<path d="M6 6l12 12M18 6L6 18"/>
+</svg>
+<span>Menu</span>
+</button>
+  <div class="site-menu" id="site-menu">
+<nav class="primary" aria-label="Main">
 <ul>
 <li>
 <a href="/" aria-current="page">Home</a>
@@ -132,6 +154,7 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 </span>
 <input type="search" name="q" aria-label="Search this site" placeholder="Search" autocomplete="off" maxlength="120">
 </form>
+</div>
 </div>
 </header>
 <main id="main">
@@ -437,7 +460,6 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 <source type="image/webp" srcset="/img/s0004-400.webp 400w, /img/s0004-800.webp 800w, /img/s0004-1600.webp 1600w" sizes="(max-width:640px) 50vw, 320px">
 <img src="/img/s0004-800.webp" srcset="/img/s0004-400.webp 400w, /img/s0004-800.webp 800w, /img/s0004-1600.webp 1600w" sizes="(max-width:640px) 50vw, 320px" alt="A sample photo" width="1600" height="1067" loading="lazy" decoding="async">
 </picture>
-<figcaption data-dds-field="captions.0">A sample photo</figcaption>
 </figure>
 <figure class="ga">
 <picture>
@@ -445,7 +467,6 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 <source type="image/webp" srcset="/img/s0005-400.webp 400w, /img/s0005-800.webp 800w, /img/s0005-1600.webp 1600w" sizes="(max-width:640px) 50vw, 320px">
 <img src="/img/s0005-800.webp" srcset="/img/s0005-400.webp 400w, /img/s0005-800.webp 800w, /img/s0005-1600.webp 1600w" sizes="(max-width:640px) 50vw, 320px" alt="A sample photo" width="1600" height="1067" loading="lazy" decoding="async">
 </picture>
-<figcaption data-dds-field="captions.1">A sample photo</figcaption>
 </figure>
 <figure class="ga">
 <picture>
@@ -453,7 +474,6 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 <source type="image/webp" srcset="/img/s0006-400.webp 400w, /img/s0006-800.webp 800w, /img/s0006-1600.webp 1600w" sizes="(max-width:640px) 50vw, 320px">
 <img src="/img/s0006-800.webp" srcset="/img/s0006-400.webp 400w, /img/s0006-800.webp 800w, /img/s0006-1600.webp 1600w" sizes="(max-width:640px) 50vw, 320px" alt="A sample photo" width="1600" height="1067" loading="lazy" decoding="async">
 </picture>
-<figcaption data-dds-field="captions.2">A sample photo</figcaption>
 </figure>
 <figure class="ga">
 <picture>
@@ -461,7 +481,6 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 <source type="image/webp" srcset="/img/s0007-400.webp 400w, /img/s0007-800.webp 800w, /img/s0007-1600.webp 1600w" sizes="(max-width:640px) 50vw, 320px">
 <img src="/img/s0007-800.webp" srcset="/img/s0007-400.webp 400w, /img/s0007-800.webp 800w, /img/s0007-1600.webp 1600w" sizes="(max-width:640px) 50vw, 320px" alt="A sample photo" width="1600" height="1067" loading="lazy" decoding="async">
 </picture>
-<figcaption data-dds-field="captions.3">A sample photo</figcaption>
 </figure>
 <figure class="ga">
 <picture>
@@ -469,7 +488,6 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 <source type="image/webp" srcset="/img/s0008-400.webp 400w, /img/s0008-800.webp 800w, /img/s0008-1600.webp 1600w" sizes="(max-width:640px) 50vw, 320px">
 <img src="/img/s0008-800.webp" srcset="/img/s0008-400.webp 400w, /img/s0008-800.webp 800w, /img/s0008-1600.webp 1600w" sizes="(max-width:640px) 50vw, 320px" alt="A sample photo" width="1600" height="1067" loading="lazy" decoding="async">
 </picture>
-<figcaption data-dds-field="captions.4">A sample photo</figcaption>
 </figure>
 <figure class="ga">
 <picture>
@@ -477,7 +495,6 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 <source type="image/webp" srcset="/img/s0009-400.webp 400w, /img/s0009-800.webp 800w, /img/s0009-1600.webp 1600w" sizes="(max-width:640px) 50vw, 320px">
 <img src="/img/s0009-800.webp" srcset="/img/s0009-400.webp 400w, /img/s0009-800.webp 800w, /img/s0009-1600.webp 1600w" sizes="(max-width:640px) 50vw, 320px" alt="A sample photo" width="1600" height="1067" loading="lazy" decoding="async">
 </picture>
-<figcaption data-dds-field="captions.5">A sample photo</figcaption>
 </figure>
 </div>
 </section>
@@ -526,7 +543,7 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 <blockquote class="rw-body">
 <p>On time, tidy, and fairly priced.</p>
 </blockquote>
-<figcaption class="rw-author">Jordan P.<time class="rw-date" datetime="2026-05-02">2026-05-02</time>
+<figcaption class="rw-author">Jordan P.<time class="rw-date" datetime="2026-05-02">May 2, 2026</time>
 </figcaption>
 </figure>
 <figure class="rw-card">
@@ -534,7 +551,7 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 <blockquote class="rw-body">
 <p>They explained everything before starting.</p>
 </blockquote>
-<figcaption class="rw-author">Priya S.<time class="rw-date" datetime="2026-04-11">2026-04-11</time>
+<figcaption class="rw-author">Priya S.<time class="rw-date" datetime="2026-04-11">Apr 11, 2026</time>
 </figcaption>
 <div class="rw-reply">
 <p class="rw-reply-lbl">Response from the owner</p>
@@ -570,6 +587,9 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 <label>
 <input type="checkbox" name="consent" value="yes" required> Yes, send me updates by email. I can unsubscribe at any time.</label>
 </p>
+<noscript>
+<p class="ff-noscript">Please call or email us; this form needs scripts turned on.</p>
+</noscript>
 </form>
 </section>
 <section id="follow-along" data-dds-sid="social" data-dds-key="block_social" data-dds-src="14" class="block wrap block-social">
@@ -691,8 +711,8 @@ nav.primary a{display:inline-block;padding:10px 12px;text-decoration:none;color:
 <div class="holiday">
 <strong>Holiday hours</strong>
 <ul>
-<li>Thanksgiving (2026-11-26): Closed</li>
-<li>Christmas Eve (2026-12-24): 12pm–8pm</li>
+<li>Thanksgiving, <time datetime="2026-11-26">Thu Nov 26</time>: Closed</li>
+<li>Christmas Eve, <time datetime="2026-12-24">Thu Dec 24</time>: 12pm–8pm</li>
 </ul>
 </div>
 </div>
@@ -725,5 +745,7 @@ var tr=document.querySelector('table.hours tr[data-day="'+ds[now.getDay()]+'"]')
 catch(e){el.textContent=''}
 }
 )();</script>
+<script src="/assets/site-118ea87df9388d20.js" defer>
+</script>
 </body>
 </html>

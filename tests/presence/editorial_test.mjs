@@ -72,7 +72,8 @@ const cssOf = (f) => f[Object.keys(f).find((k) => k.startsWith('assets/site-') &
   const noOpenNow = (h) => String(h).replace(/<script id="hours-data" type="application\/json">[\s\S]*?<\/script>\n<script>\(function\(\)\{var el=document\.getElementById\('open-now'\)[\s\S]*?<\/script>/, '');
   // item 131: the page holding the site's form also carries the page's sender (lib/site_send.ts)
   const noSender = (h) => String(h).replace(senderTag(SITE.formEndpoint), '');
-  ok('editorial keeps ZERO client JavaScript (except first-party search, tag filter, Open now and the form’s sender)', !Object.entries(f).some(([k, v]) => k.endsWith('.html') && k !== 'search/index.html' && k !== 'updates/index.html' && /<script(?![^>]*application\/ld\+json)/.test(noOpenNow(noSender(v)))));
+  const noSiteJs = (h) => String(h).replace(/<script src="\/assets\/site-[0-9a-f]+\.js" defer><\/script>\n/, '');   // items 288 and 298: the site's own script file
+  ok('editorial keeps ZERO client JavaScript (except first-party search, tag filter, Open now, the form’s sender and the site’s own script file)', !Object.entries(f).some(([k, v]) => k.endsWith('.html') && k !== 'search/index.html' && k !== 'updates/index.html' && /<script(?![^>]*application\/ld\+json)/.test(noSiteJs(noOpenNow(noSender(v))))));
   ok('editorial: the Open now script is on the home page only', Object.entries(f).filter(([k, v]) => k.endsWith('.html') && String(v).includes("getElementById('open-now')")).map(([k]) => k).join() === 'index.html');
   ok('provenance markers preserved (data-pr on the hero identity)', home.includes('data-pr="identity.business_name"'));
 }
