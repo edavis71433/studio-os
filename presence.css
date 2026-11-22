@@ -586,7 +586,12 @@ html.dc-edit:not(.plan-watch) #pcBody{padding:0 20px 20px}
 .pc-open .pp-name{max-width:100%;font-size:14px;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pc-sub{max-width:100%;font-size:12px;line-height:1.3;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pc-row.on .pc-sub{color:var(--plum)}
-.pc-row .hb-chip{flex:none;gap:5px;margin-right:2px;padding:2px 8px;font-size:12px;font-weight:600}
+.pc-row .hb-chip{flex:0 1 auto;min-width:0;gap:5px;margin-right:2px;padding:2px 8px;font-size:12px;font-weight:600}
+/* item 285: the name comes first; a long pill gives way, never the name */
+.pc-row .hb-chip .t{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.pc-row .pc-open{min-width:96px}
+.dc-switch-name{flex:1 1 auto;min-width:3ch}
+.dc-switch .dc-chip{flex:0 1 auto;min-width:0;overflow:hidden}
 .pc-ico{flex:none;display:grid;place-items:center;width:28px;height:30px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--ink-2);font:700 15px/1 var(--sans);cursor:pointer}
 .pc-ico:hover{background:var(--dc-raised,var(--paper));color:var(--ink)}
 .pc-row.on .pc-ico:hover{background:var(--sheet)}
@@ -1068,6 +1073,19 @@ html.dc-edit:not(.plan-watch) .ritualwrap.as-card .ritual{max-width:none;margin:
 }
 /* the tip sits above the message area, so neither ever covers the other */
 html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important;z-index:80 !important}
+/* item 286: on a computer or a tablet the dock stands at the left, so the hints and the Looks
+   note start to its right instead of under it (the phone's dock is along the bottom) */
+@media(min-width:761px){
+  html.dc-edit:not(.plan-watch) .dds-hint{left:calc(16px + var(--dc-dock-w) + 16px);right:16px;width:max-content;max-width:min(560px,calc(100vw - var(--dc-dock-w) - 48px));margin:0 auto;transform:translateY(8px)}
+  html.dc-edit:not(.plan-watch) .dds-hint.show{transform:none}
+  html.dc-edit:not(.plan-watch) #dcZoomNote{left:calc(16px + var(--dc-dock-w) + 16px)}
+}
+/* item 284: the Notes card's list */
+.cm-list{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.cm-row{display:flex;align-items:center;gap:8px;min-height:40px;padding:2px 2px 2px 8px;border-radius:10px}
+.cm-row:hover{background:var(--wash,#f4f0fb)}
+.cm-row-n{flex:1 1 auto;min-width:0;text-align:left;font:inherit;font-size:13.5px;font-weight:600;color:var(--ink);background:none;border:0;padding:8px 0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-row-n:focus-visible{outline:2px solid var(--plum);outline-offset:2px;border-radius:6px}
 @media(max-width:760px){
   .topbar #btnEditSite,.topbar #btnUndoTop,.topbar #btnRedoTop{display:inline-flex}
   html.dc-edit:not(.plan-watch) .dds-toast{bottom:92px}   /* the shell's toast, clear of the dock */

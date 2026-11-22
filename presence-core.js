@@ -3869,14 +3869,18 @@ function pcChangeOn(ch, pg) {
   const t = String(pg.title || ""), q = "“" + (t.length > 48 ? t.slice(0, 47) + "…" : t) + "”";
   return s.slice(-(q.length + 5)) === " on " + q + ".";
 }
+// Builder item 285: a status pill with many words pushed the page's name out of its row ("Home"
+// showed only "Needs something before publishing"). The pill is a dot and two words, the whole
+// sentence in its title, and the name comes first (presence.css gives it a floor).
+function shortStatus(s) { s = String(s == null ? "" : s).trim(); return s.length <= 16 ? s : s.split(/\s+/).slice(0, 2).join(" "); }
 function pcChip(pg, ctx) {
   const chip = el("span", "hb-chip"); chip.appendChild(el("i", "d"));
   const tp = hbTreePage(pg);
-  if (tp && HB_TREE_FLAG[tp.status]) { chip.classList.add(HB_TREE_FLAG[tp.status]); chip.appendChild(document.createTextNode(tp.status_label)); return chip; }
-  if (!ctx.siteLive || ctx.firstPublish) { chip.appendChild(document.createTextNode("Not live yet")); chip.title = "Your site goes live the first time you publish"; return chip; }
+  if (tp && HB_TREE_FLAG[tp.status]) { chip.classList.add(HB_TREE_FLAG[tp.status]); chip.appendChild(el("span", "t", shortStatus(tp.status_label))); chip.title = tp.status_label; return chip; }
+  if (!ctx.siteLive || ctx.firstPublish) { chip.appendChild(el("span", "t", "Not live yet")); chip.title = "Your site goes live the first time you publish"; return chip; }
   const n = ctx.changes.filter((ch) => pcChangeOn(ch, pg)).length;
   if (!n) return null;   // live and nothing waiting: nothing to say
-  chip.classList.add("warn"); chip.appendChild(document.createTextNode(n + (n === 1 ? " change" : " changes")));
+  chip.classList.add("warn"); chip.appendChild(el("span", "t", n + (n === 1 ? " change" : " changes")));
   chip.title = n + (n === 1 ? " change is" : " changes are") + " waiting to go live";
   return chip;
 }
