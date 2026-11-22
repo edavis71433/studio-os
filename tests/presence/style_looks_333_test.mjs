@@ -11,7 +11,7 @@
 // tests/e2e/style-looks-333.spec.ts draws the tiles in the editor.
 import { validateThemeTokens } from '../../supabase/functions/presence/lib/devmode.ts';
 import { renderSnapshot, renderForBuilder, listTemplates, FIXED_COLOR_TEMPLATES } from '../../supabase/functions/presence/lib/render.ts';
-import { lookStyle, lookSettings, applyLookLayer, leaveDarkLook, LOOK_COLOUR_TOKENS, DARK_LOOK_TOKENS } from '../../supabase/functions/presence/lib/site_looks.ts';
+import { lookStyle, lookSettings, applyLookLayer, leaveDarkLook, ownButtonWords, LOOK_COLOUR_TOKENS, DARK_LOOK_TOKENS } from '../../supabase/functions/presence/lib/site_looks.ts';
 import { siteColours, buttonChoice, contrast } from '../../supabase/functions/presence/lib/site_buttons.ts';
 import { FONT_LIBRARY, libraryFontsIn, fontStack } from '../../supabase/functions/presence/lib/fonts.ts';
 import { fixture, fullFixture } from './full_fixture.mjs';
@@ -180,6 +180,40 @@ for (const { slug } of listTemplates()) {
     ok(`${slug}, ${where}: every colour, selector and rule is one the cascade reads`, unread.size === 0, [...unread].slice(0, 4).join(' | '));
     ok(`${slug}, ${where}: words were measured under all twelve looks (${measured})`, measured > 12 * 2000);
     ok(`${slug}, ${where}: every word reads at 4.5:1 or better under every look (worst ${worst.r.toFixed(2)}:1)`, under.length === 0, `${under.length} under: ${under.slice(0, 6).join(' | ')}`);
+  }
+}
+
+// ── "Your template's" buttons picked over a look ──
+// Styles' Buttons can go back to the template's own after a look (it clears the set, its corners and
+// its shadow). Five templates fill their main button with the accent under white words; a look whose
+// accent is too light for them gives those buttons words that read on it (lib/site_looks.ts).
+{
+  ok('a light look keeps the template\'s white button words', LOOKS.filter((l) => !l.tokens.scheme).every((l) => ownButtonWords(l.tokens) === ''));
+  ok('the two dark looks\' bright accents take dark words that read on the accent and its darker shade', ['night_shift', 'black_gold'].every((k) => { const t = look(k), w = ownButtonWords(t); return w === '#111111' && contrast(w, t.accent) >= 4.5 && contrast(w, t.accent_dark) >= 4.5; }));
+  ok('no accent, or one the style layer refuses, names no words', ownButtonWords({}) === '' && ownButtonWords(null) === '' && ownButtonWords({ accent: 'red' }) === '' && ownButtonWords({ accent: '#c9a45c80' }) === '');
+  const own = (k) => { const { buttons: _b, button_radius: _r, button_shadow: _s, ...t } = look(k); return t; };
+  ok('the words are written only with the template\'s own buttons, only on the five that fill them with the accent', css(own('black_gold'), { template: 'harbor' }).includes(':root .btn:not(:where(.ghost,.btn-outline)){color:#111111}')
+    && !css(look('black_gold'), { template: 'harbor' }).includes(':where(.ghost') && ['atelier', 'editorial'].every((t) => !css(own('black_gold'), { template: t }).includes(':where(.ghost'))
+    && !css(own('black_gold'), { fixed: true, template: 'slate' }).includes(':where(.ghost') && !css(own('garden'), { template: 'harbor' }).includes(':where(.ghost'));
+  for (const { slug } of listTemplates()) {
+    if (FIXED_COLOR_TEMPLATES.has(slug)) continue;
+    let measured = 0;
+    const under = [], unread = new Set();
+    for (const l of LOOKS) {
+      const files = await renderSnapshot(withTokens(fullFixture(slug), own(l.key)), SITE);
+      for (const path of Object.keys(files).filter((k) => k.endsWith('.html'))) {
+        const doc = parseHtml(String(files[path])), all = [...elementsIn(doc)];
+        const head = all.find((e) => e.tag === 'head'), body = all.find((e) => e.tag === 'body');
+        if (!head || !body) continue;
+        const c = cascade(doc, [...sheetsOf(head, files), ...sheetsOf(body, files)], { width: 1280, height: 900, later: true });
+        c.unread.forEach((x) => unread.add(x));
+        for (const el of elementsIn(body)) for (const w of c.words(el)) {
+          measured++;
+          if (!w.image && w.ratio < 4.5) under.push(`${w.ratio.toFixed(2)} ${l.name}, ${path}: ${el.tag}${el.classes.size ? '.' + [...el.classes].join('.') : ''} "${w.what.slice(0, 30)}" ${hexOf(w.fg)} on ${hexOf(w.bg)}`);
+        }
+      }
+    }
+    ok(`${slug}, the template's own buttons under every look: every word reads at 4.5:1 or better (${measured} words)`, under.length === 0 && unread.size === 0 && measured > 12 * 1000, `${under.length} under: ${under.slice(0, 4).join(' | ')} ${[...unread].slice(0, 2).join(' | ')}`);
   }
 }
 

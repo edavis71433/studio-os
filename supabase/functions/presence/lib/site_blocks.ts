@@ -2870,7 +2870,8 @@ export const DESIGN_CSS = `/* IW-A 'overlap': the photo runs off the page's edge
 .block-features.v-numbered .fn-t{margin:0 0 8px;font-size:1.3rem;line-height:1.25}
 .block-features.v-numbered .fn-num{display:block;margin-bottom:12px;font-size:2.3rem;line-height:1;color:var(--accent-dark,var(--accent))}
 .block-features.v-numbered .fn-d{margin:0;color:var(--soft);line-height:1.55}
-/* F-B 'tiles': line icons in tiles; the design's own colour theme is the dark band */
+/* F-B 'tiles': line icons in tiles; the design's own colour theme is the dark band, where each icon is a light
+   tint of the accent: at 30% accent it reads on its disc whatever the accent (black reads 5.3:1; 40% read 4.25:1) */
 .block-features.v-tiles .ft-grid{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
 .block-features.v-tiles .ft-tile{margin:0;padding:26px 24px;border:1px solid var(--line,rgba(0,0,0,.1));border-radius:var(--radius,12px);background:var(--card,#fff)}
 .block-features.v-tiles .ft-ic{display:flex;align-items:center;justify-content:center;width:56px;height:56px;margin:0 0 16px;border-radius:50%;background:var(--wash,rgba(0,0,0,.05));color:var(--accent-dark,var(--accent));font-size:1.5rem;line-height:1}
@@ -2879,7 +2880,7 @@ export const DESIGN_CSS = `/* IW-A 'overlap': the photo runs off the page's edge
 .block-features.v-tiles .ft-d{margin:0;color:var(--soft);font-size:.95rem;line-height:1.55}
 .block.block-features.v-tiles.block--bg-dark .ft-tile{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)}
 .block.block-features.v-tiles.block--bg-dark .ft-ic{background:rgba(255,255,255,.1);color:#fff}
-@supports (color:color-mix(in srgb,red,#fff)){.block.block-features.v-tiles.block--bg-dark .ft-ic{color:color-mix(in srgb,var(--accent) 40%,#fff)}}
+@supports (color:color-mix(in srgb,red,#fff)){.block.block-features.v-tiles.block--bg-dark .ft-ic{color:color-mix(in srgb,var(--accent) 30%,#fff)}}
 .block.block-features.v-tiles.block--bg-accent .ft-tile{background:var(--band-box,rgba(0,0,0,.08));border-color:rgba(255,255,255,.22)}
 .block.block-features.v-tiles.block--bg-accent .ft-ic{background:rgba(255,255,255,.14);color:inherit}
 /* PR-A 'menu' and PR-B 'plans' centre their heading, and the little rule some templates draw by it */

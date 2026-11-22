@@ -71,6 +71,40 @@ const TEMPLATE_DARK_LAYER: Record<string, string> = {
   meadow: `${R} nav.primary a[aria-current="page"]{background:var(--accent-band)}`,
 };
 
+// A look with no button set ("Your template's" in Styles, picked after the look) keeps each
+// template's own buttons. Five templates fill their main button with the accent under white words;
+// where a look's accent is too light for white words (the two dark looks: Night shift's orange and
+// Black & gold's gold, 3.12 and 2.35:1) the words take the darkest that reads on the accent and on
+// its darker shade (the button when pressed), as a button set picks them (lib/site_buttons.ts
+// buttonChoice). The rule stays at (0,2,0): over the template's .btn and .btn:hover (by coming
+// later), under the bands' own (0,3,0), so a button on a band keeps the band's colours. The second
+// buttons (.ghost, .btn-outline) are drawn in words, not on the accent, and keep their own.
+const ACCENT_BUTTON_TEMPLATES = new Set(['business-classic', 'harbor', 'restaurant-classic', 'aurora', 'meadow']);
+const BUTTON_SET = /^(filled|outline|pill|square|underline)$/;
+const hex6 = (v: unknown): string | null => {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(v ?? '').trim());
+  return m ? '#' + (m[1].length === 3 ? m[1].split('').map((c) => c + c).join('') : m[1]).toLowerCase() : null;
+};
+const lum = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+  .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)).reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0);
+const contrast = (a: string, b: string) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+/** The words a template's own accent-filled button takes under a look, or '' when white reads on
+ *  the look's accent and its darker shade (or the look names no accent). Pure. */
+export function ownButtonWords(tokens: Record<string, unknown> | null | undefined): string {
+  const t = tokens || {};
+  const accent = hex6(t.accent);
+  if (!accent) return '';
+  const dark = hex6(t.accent_dark) || accent;
+  const reads = (x: string) => contrast(x, accent) >= 4.5 && contrast(x, dark) >= 4.5;
+  if (reads('#ffffff')) return '';
+  return [hex6(t.ink), '#111111', '#000000'].find((x): x is string => !!x && reads(x)) || '#000000';
+}
+const ownButtons = (tokens: Record<string, unknown> | null | undefined, template = ''): string => {
+  if (!ACCENT_BUTTON_TEMPLATES.has(template) || BUTTON_SET.test(String((tokens || {}).buttons ?? ''))) return '';
+  const words = ownButtonWords(tokens);
+  return words ? `${R} .btn:not(:where(.ghost,.btn-outline)){color:${words}}` : '';
+};
+
 /** The settings, as stored, that this layer reads. Anything else (or a value the style layer
  *  refuses) draws nothing. Pure. */
 export function lookSettings(tokens: Record<string, unknown> | null | undefined) {
@@ -93,7 +127,7 @@ export interface LookPlace { fixed?: boolean; template?: string }
 export function lookStyle(tokens: Record<string, unknown> | null | undefined, place: LookPlace = {}): string {
   const s = lookSettings(tokens), colours = !place.fixed;
   const css = (s.upper ? HEADINGS_UPPER : '') + (s.regular ? HEADINGS_REGULAR : '') + (s.corners ? BUTTON_CORNERS : '') + (s.offset ? BUTTON_OFFSET : '')
-    + (s.look && colours ? LOOK_LAYER + (TEMPLATE_LAYER[place.template || ''] || '') : '') + (s.dark && colours ? DARK_LAYER + (TEMPLATE_DARK_LAYER[place.template || ''] || '') : '');
+    + (s.look && colours ? LOOK_LAYER + (TEMPLATE_LAYER[place.template || ''] || '') + ownButtons(tokens, place.template) : '') + (s.dark && colours ? DARK_LAYER + (TEMPLATE_DARK_LAYER[place.template || ''] || '') : '');
   return css ? `<style id="dds-look">${css}</style>` : '';
 }
 

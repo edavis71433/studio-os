@@ -16,6 +16,8 @@
 // where they're used (and whole on the builder's canvas), and every word in them reading. It
 // also writes the pages tests/e2e/section-designs-329.spec.ts measures in a browser.
 import { renderSnapshot, renderForBuilder, devLayerFragments, FIXED_COLOR_TEMPLATES } from '../../supabase/functions/presence/lib/render.ts';
+import { buttonStyle, siteColours } from '../../supabase/functions/presence/lib/site_buttons.ts';
+import { lookStyle } from '../../supabase/functions/presence/lib/site_looks.ts';
 import { validateBlocks, resolveBlockMedia, unresolveBlockMedia, renderSiteBlocks, BLOCK_VARIANTS, BLOCK_CSS, DESIGN_CSS, sectionStyles } from '../../supabase/functions/presence/lib/site_blocks.ts';
 import { esc, attr, safeHref } from '../../supabase/functions/presence/lib/markdown.ts';
 import { composeBlocks } from '../../supabase/functions/presence/lib/serializer.ts';
@@ -224,34 +226,46 @@ for (const slug of TEMPLATES) {
 // Each design as it first comes (its own colour theme: the tiles' dark band, the numbered
 // questions' tinted one), under the template's own colours and every palette and look the
 // editor offers a template that takes them (band_words_test.mjs reads them all on the accent and
-// dark bands). Words that show later count too: a closed answer.
+// dark bands). A look is read as a site draws it: its colours, its own layer (lib/site_looks.ts,
+// which turns a dark look's page dark) and its own button set, then the template's own buttons, as
+// "Your template's" in Styles leaves them after a look. Words that show later count too: a closed answer.
 {
   const SRC = editorSource();
   const pageArray = (name) => new Function(`return ${SRC.match(new RegExp(`\\nconst ${name} = (\\[[\\s\\S]*?\\n\\]);`))[1]};`)();
   const TOKENS = ['accent', 'accent_dark', 'ink', 'soft', 'bg'];
   const CHOICES = [{ name: 'its own colours', tokens: {} }, ...[...pageArray('PALETTES'), ...pageArray('STYLE_LOOKS')].filter((p) => p.tokens && Object.keys(p.tokens).length)]
     .filter((c, i, all) => all.findIndex((d) => TOKENS.every((k) => d.tokens[k] === c.tokens[k])) === i);
-  // a palette's :root variables, as the site's style layer sets them
-  const rootOf = (tokens) => { const css = devLayerFragments({ theme_tokens: tokens, custom_css: '', custom_html: '' }).style.replace(/^<style[^>]*>|<\/style>$/g, ''); const m = /^:root\{([^{}]*)\}/.exec(css); return Object.fromEntries((m ? m[1] : '').split(';').filter(Boolean).map((d) => [d.slice(0, d.indexOf(':')).trim(), d.slice(d.indexOf(':') + 1).trim()])); };
+  // a style element's :root variables and its other rules (the palette's style layer, a button set's colours)
+  const splitStyle = (style) => { const css = style.replace(/^<style[^>]*>|<\/style>$/g, ''); const m = /^:root\{([^{}]*)\}/.exec(css); return { root: Object.fromEntries((m ? m[1] : '').split(';').filter(Boolean).map((d) => [d.slice(0, d.indexOf(':')).trim(), d.slice(d.indexOf(':') + 1).trim()])), rules: m ? css.slice(m[0].length) : css }; };
+  const rootOf = (tokens) => splitStyle(devLayerFragments({ theme_tokens: tokens, custom_css: '', custom_html: '' }).style).root;
   const VIEWS = [{ width: 1280, height: 900 }, { width: 390, height: 844 }];
   ok(`the editor offers palettes and looks to read under (${CHOICES.length - 1})`, CHOICES.length > 8);
   for (const slug of TEMPLATES) {
-    const files = drawn[slug];
+    const files = drawn[slug], fixed = FIXED_COLOR_TEMPLATES.has(slug);
     const doc = parseHtml(String(files['designs/index.html'])), all = [...elementsIn(doc)];
     const head = all.find((e) => e.tag === 'head'), body = all.find((e) => e.tag === 'body');
-    const sheets = [...sheetsOf(head, files), ...sheetsOf(body, files)];
+    const headSheets = sheetsOf(head, files), bodySheets = sheetsOf(body, files);
+    const css = cssOf(files).css;
     const sections = all.filter((e) => e.classes.has('block') && [...e.classes].some((c) => /^v-(overlap|frame|numbered|tiles|menu|plans|side)$/.test(c)));
     let worst = { ratio: Infinity, why: '' }, words = 0;
     const unread = new Set();
-    for (const choice of FIXED_COLOR_TEMPLATES.has(slug) ? CHOICES.slice(0, 1) : CHOICES) {
+    for (const choice of fixed ? CHOICES.slice(0, 1) : CHOICES) {
       const root = rootOf(choice.tokens);
-      for (const view of VIEWS) {
-        if (view.width < 600 && choice !== CHOICES[0]) continue;   // a phone: the template's own colours
-        const c = cascade(doc, sheets, { ...view, later: true, root });
-        c.unread.forEach((u) => unread.add(u));
-        for (const sec of sections) for (const el of [sec, ...elementsIn(sec)]) for (const w of c.words(el)) {
-          words++;
-          if (w.ratio < worst.ratio) worst = { ratio: w.ratio, why: `${[...sec.classes].join('.')} ${el.tag}.${[...el.classes].join('.')} "${w.what.slice(0, 30)}" ${hexOf(w.fg)} on ${hexOf(w.bg)}, ${choice.name}, ${view.width}px` };
+      for (const set of [null, ...(choice.tokens.buttons ? [choice.tokens.buttons] : [])]) {
+        // the set and the look's layer go at the end of the head, as a site carries them; "Your
+        // template's" buttons clear the set with its corners and shadow (presence-edit.js buttonSetRows)
+        const { buttons: _b, button_radius: _r, button_shadow: _s, ...own } = choice.tokens;
+        const lookCss = splitStyle(lookStyle(set ? choice.tokens : own, { fixed, template: slug })).rules;
+        const style = set ? splitStyle(buttonStyle(set, null, siteColours(css, choice.tokens))) : { root: {}, rules: '' };
+        const sheets = [...headSheets, ...(style.rules + lookCss ? [style.rules + lookCss] : []), ...bodySheets];
+        for (const view of VIEWS) {
+          if (view.width < 600 && (choice !== CHOICES[0] || set)) continue;   // a phone: the template's own colours
+          const c = cascade(doc, sheets, { ...view, later: true, root: { ...style.root, ...root } });
+          c.unread.forEach((u) => unread.add(u));
+          for (const sec of sections) for (const el of [sec, ...elementsIn(sec)]) for (const w of c.words(el)) {
+            words++;
+            if (w.ratio < worst.ratio) worst = { ratio: w.ratio, why: `${[...sec.classes].join('.')} ${el.tag}.${[...el.classes].join('.')} "${w.what.slice(0, 30)}" ${hexOf(w.fg)} on ${hexOf(w.bg)}, ${choice.name}, ${set || 'the template’s'} buttons, ${view.width}px` };
+          }
         }
       }
     }
