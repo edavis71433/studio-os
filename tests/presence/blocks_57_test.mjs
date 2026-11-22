@@ -137,7 +137,8 @@ const draw = (list) => renderSiteBlocks(resolveBlockMedia(validateBlocks(list), 
   ok('its first heading names the section: its anchor and its place in On this page', toc.includes('<a href="#our-story">Our story</a>') && toc.includes('id="stack"'));
   ok('the same blocks always draw the same bytes', draw([STORY]) === draw([STORY]));
   const look = draw([{ ...STORY, look: { background: 'dark' } }]);
-  ok('the section’s colour theme lands on its root like any section', look.startsWith('<section id="our-story" data-dds-sid="stack" data-dds-key="block_stack" class="block block--bg-dark wrap block-stack">'));
+  // item 276: the colour is on the full-width band, the width limit on an inner box
+  ok('the section’s colour theme lands on its root like any section, with the width limit inside', look.startsWith('<section id="our-story" data-dds-sid="stack" data-dds-key="block_stack" class="block block--bg-dark block-stack"><div class="wrap">') && look.endsWith('</div></section>'));
   const map = validateBlocksWithMap([{ type: 'richtext', body: '' }, STORY]);
   ok('the editor’s join still points at the stored section', map.map[0].sid === 'stack' && map.map[0].src_index === 1);
 }

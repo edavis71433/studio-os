@@ -34,6 +34,7 @@ import type {
 import { renderMarkdown } from './markdown.ts';
 import { normalizeFormDefinition, renderForm, type FormDefinition } from './forms.ts';
 import { brandTint } from './palettes.ts';
+import { hasSampleWords } from './sample_words_check.ts';
 import { parseWindow, isVisibleNow } from './content_window.ts';
 import { normHex, darken, contrastRatio } from './brand_kit.ts';
 import { UUID_RE } from './uuid.ts';
@@ -1332,6 +1333,36 @@ function lookClasses(look?: BlockLook): string {
   if (look.edge) c.push('block--edge', `block--edge-${look.edge}`);   // item 225
   return c.join(' ');
 }
+// Item 259: what the builder's placeholder says for each kind of empty section: its plain
+// name, then what fills it. Only the canvas ever shows these (lib/serializer.ts keepEmpty).
+const EMPTY_WORDS: Record<string, [string, string]> = {
+  gallery: ['Photo gallery', 'Add photos to this gallery from its panel.'],
+  video: ['Video', 'Paste a link to your video in this section’s panel.'],
+  map: ['Map and directions', 'Add your address, or a picture of your map, in this section’s panel.'],
+  team: ['Team', 'Add the people on your team in this section’s panel.'],
+  reviews_wall: ['Reviews wall', 'Your approved reviews show here. Approve some under Reviews and they appear.'],
+  image: ['Image', 'Choose a photo for this section from its panel.'],
+  before_after: ['Before and after', 'Add a before photo and an after photo in this section’s panel.'],
+  partners: ['Partners', 'Add the logos in this section’s panel.'],
+  carousel: ['Carousel', 'Add slides to this carousel from its panel.'],
+};
+// ── Item 276: a section's colour theme (tint, accent, dark) or its own background colour
+// painted a box in the middle of the page when the section's root also carried `wrap`, the
+// width limit: the colour and the limit were on one element, with the page colour either
+// side. The colour now goes on the full-width band and the limit on an inner box, the way the
+// `alt` sections are built. A section with no colour of its own is untouched. ──
+const BAND_CLASS_RE = /(?:^| )(?:block--bg-(?:tint|accent|dark)|ov-bg)(?: |$)/;
+function fullBand(html: string): string {
+  const m = /^<(section|nav|div)((?:\s+[a-z-]+="[^"]*")*?)\s+class="([^"]*)"([^>]*)>/.exec(html);
+  if (!m) return html;
+  const classes = m[3];
+  if (!/(?:^| )wrap(?: |$)/.test(classes) || !BAND_CLASS_RE.test(classes)) return html;
+  const tag = m[1], close = `</${tag}>`;
+  if (!html.endsWith(close)) return html;
+  const kept = classes.split(' ').filter((c) => c && c !== 'wrap').join(' ');
+  const open = `<${tag}${m[2]} class="${kept}"${m[4]}>`;
+  return `${open}<div class="wrap">${html.slice(m[0].length, html.length - close.length)}</div>${close}`;
+}
 /** Inject the look classes into a section's `class="block …"` (first occurrence).
  *  No-op when no non-default look is set — the default render is untouched. */
 function applyLook(html: string, look?: BlockLook): string {
@@ -1533,12 +1564,13 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       case 'team':
         html = `<section class="block wrap block-team">${h2(b.title, 'Meet the team', 'title')}<div class="cards">${b.members.map((m, i) =>
           `<div class="card team-card">${m.media ? `<div class="team-photo">${blockImg(m.media, esc, attr, '(max-width:640px) 100vw, 220px')}</div>` : ''}<div class="nm"${dds(`members.${i}.name`)}>${esc(m.name)}</div>${m.role ? `<div class="pr"${dds(`members.${i}.role`)}>${esc(m.role)}</div>` : ''}${m.bio ? `<p class="ds"${dds(`members.${i}.bio`)}>${esc(m.bio)}</p>` : ''}</div>`).join('')}</div></section>`;
-        ld = { '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: b.members.map((m, i) => ({ '@type': 'ListItem', position: i + 1, item: { '@type': 'Person', name: m.name, jobTitle: m.role || undefined } })) };
+        if (!hasSampleWords(b.members)) ld = { '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: b.members.map((m, i) => ({ '@type': 'ListItem', position: i + 1, item: { '@type': 'Person', name: m.name, jobTitle: m.role || undefined } })) };   // item 275
         break;
       case 'process':
         html = `<section class="block alt block-process"><div class="wrap">${h2(b.title, 'How it works', 'title')}<ol class="process">${b.steps.map((st, i) =>
           `<li><span class="step-t"${dds(`steps.${i}.step`)}>${esc(st.step)}</span>${st.detail ? `<span class="step-d"${dds(`steps.${i}.detail`)}>${esc(st.detail)}</span>` : ''}</li>`).join('')}</ol></div></section>`;
-        ld = { '@context': 'https://schema.org', '@type': 'HowTo', name: b.title || 'How it works', step: b.steps.map((st, i) => ({ '@type': 'HowToStep', position: i + 1, name: st.step, text: st.detail || st.step })) };
+        // item 275: a section still on its sample words is left out of what Google reads
+        if (!hasSampleWords(b.steps)) ld = { '@context': 'https://schema.org', '@type': 'HowTo', name: b.title || 'How it works', step: b.steps.map((st, i) => ({ '@type': 'HowToStep', position: i + 1, name: st.step, text: st.detail || st.step })) };
         break;
       case 'pricing':
         if (b.variant === 'list') {
@@ -1550,7 +1582,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           html = `<section class="block wrap block-pricing">${h2(b.title, 'Pricing', 'title')}<div class="cards">${b.tiers.map((tr, i) =>
             `<div class="card price-tier"><div class="nm"${dds(`tiers.${i}.name`)}>${esc(tr.name)}</div>${tr.price_text ? `<div class="pr"${dds(`tiers.${i}.price_text`)}>${esc(tr.price_text)}</div>` : ''}${tr.features.length ? `<ul class="tier-feats">${tr.features.map((f, k) => `<li${dds(`tiers.${i}.features.${k}`)}>${esc(f)}</li>`).join('')}</ul>` : ''}</div>`).join('')}</div></section>`;
         }
-        ld = { '@context': 'https://schema.org', '@type': 'ItemList', name: b.title || 'Pricing', itemListElement: b.tiers.map((tr, i) => {
+        if (!hasSampleWords(b.tiers)) ld = { '@context': 'https://schema.org', '@type': 'ItemList', name: b.title || 'Pricing', itemListElement: b.tiers.map((tr, i) => {   // item 275
           const price = numericPrice(tr.price_text);
           return { '@type': 'ListItem', position: i + 1, item: { '@type': 'Offer', name: tr.name, ...(price ? { price, priceCurrency: 'USD' } : {}), ...(tr.features.length ? { description: tr.features.join('; ') } : {}) } };
         }) };
@@ -1769,6 +1801,12 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           : `<div class="block wrap block-divider div-line div-${b.size}"><hr></div>`;
         break;
       }
+      case 'empty': {   // item 259: the builder's placeholder for a section with nothing to show yet
+        const name = EMPTY_WORDS[b.of]?.[0] || 'This section';
+        const note = EMPTY_WORDS[b.of]?.[1] || 'It is empty so far. Open its panel to fill it in.';
+        html = `<section class="block wrap block-empty block-empty-${attr(b.of)}" aria-label="${attr(`${name}, not filled in yet`)}"><div class="empty-box"><p class="empty-name">${esc(b.title || name)}</p><p class="empty-note">${esc(note)}</p></div></section>`;
+        break;
+      }
       case 'form': {   // custom form builder — typed fields → accessible, XSS-safe form
         const inner = renderForm(b, { esc, attr, safeHref, formEndpoint: ctx.formEndpoint });
         html = `<section class="block wrap block-form">${b.title ? h2(b.title, '', 'title') : ''}${inner}</section>`;
@@ -1788,7 +1826,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           : `${intro}<p class="bk-msg">Your booking widget will appear here once your site is published.</p>`;
         html = `<section class="block wrap block-booking">${h2(b.title, 'Book an appointment', 'title')}${inner}</section>`;
         if (endpoint) html += bookingScript();
-        ld = { '@context': 'https://schema.org', '@type': 'ReserveAction', name: b.title || 'Book an appointment' };
+        if (endpoint) ld = { '@context': 'https://schema.org', '@type': 'ReserveAction', name: b.title || 'Book an appointment' };   // item 275: only a booking that can be made is told to Google
         break;
       }
       case 'reviews_wall': {   // NATIVE reviews wall — real, owner-approved customer
@@ -1974,7 +2012,7 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       const href = safeHref(b.url);
       html = href ? `<section class="block wrap block-appt">${h2(b.title, 'Book an appointment', 'title')}${b.text ? `<p class="appt-text"${dds('text')}>${esc(b.text)}</p>` : ''}<p class="appt-cta"><a class="btn" href="${attr(href)}" rel="noopener"${dds('button')}>${esc(b.button || 'Book now')}</a></p></section>` : '';
     }
-    built.push({ b, bi, html: applyStyle(applyLook(html, (b as { look?: BlockLook }).look), (b as { style?: BlockStyle }).style), ld });
+    built.push({ b, bi, html: fullBand(applyStyle(applyLook(html, (b as { look?: BlockLook }).look), (b as { style?: BlockStyle }).style)), ld });
   }
 
   // Second pass: stamp a stable, de-duped anchor id onto every rendered <section>,
@@ -1997,8 +2035,8 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
     if (e.b.type !== 'toc') continue;
     if (!tocEntries.length) { e.html = ''; continue; }
     const title = (e.b as SiteBlockToc).title || 'On this page';
-    e.html = applyStyle(applyLook(`<nav class="block wrap block-toc" aria-label="${attr(title)}"><h2${dds('title')}>${esc(title)}</h2><ol class="toc">${
-      tocEntries.map((x) => `<li><a href="#${attr(x.id)}">${esc(x.text)}</a></li>`).join('')}</ol></nav>`, (e.b as { look?: BlockLook }).look), (e.b as { style?: BlockStyle }).style);
+    e.html = fullBand(applyStyle(applyLook(`<nav class="block wrap block-toc" aria-label="${attr(title)}"><h2${dds('title')}>${esc(title)}</h2><ol class="toc">${
+      tocEntries.map((x) => `<li><a href="#${attr(x.id)}">${esc(x.text)}</a></li>`).join('')}</ol></nav>`, (e.b as { look?: BlockLook }).look), (e.b as { style?: BlockStyle }).style));
   }
 
   const out: RenderedBlock[] = [];
@@ -2100,7 +2138,7 @@ ul.areas li{background:var(--wash);color:var(--ink);padding:5px 12px;border-radi
 .block-cta .cta-inner{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
 .block-cta .cta-text{font-size:1.2rem;font-weight:700;margin:0}
 .team-card .team-photo{margin:-2px 0 10px}
-.team-card .team-photo img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;display:block}
+.team-card .team-photo img{width:100%;height:auto;aspect-ratio:1/1;object-fit:cover;border-radius:10px;display:block}
 .partners{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:26px;align-items:center}
 .partners li{margin:0}
 .partners img{height:44px;width:auto;max-width:150px;object-fit:contain;display:block}
@@ -2127,18 +2165,18 @@ ul.areas li{background:var(--wash);color:var(--ink);padding:5px 12px;border-radi
 .appt-cta{margin-top:14px}
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
 .gallery .ga{margin:0}
-.gallery .ga img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;display:block}
+.gallery .ga img{width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;border-radius:10px;display:block}
 .gallery .ga figcaption{font-size:.85rem;color:var(--soft);margin-top:5px}
 .ba-pair{margin-top:12px}
 .ba-pair .ba-fig{position:relative;margin:0 0 10px}
 /* the Before and After labels sit on the photos: a near-black of their own, as the theme's ink is light on Slate */
 .ba-pair .ba-lab{position:absolute;top:8px;left:8px;background:#111;color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:999px}
-.ba-pair .ba-fig img{width:100%;border-radius:10px;display:block}
+.ba-pair .ba-fig img{width:100%;height:auto;border-radius:10px;display:block}
 .ba-cap{color:var(--soft);font-size:.95rem;margin-top:4px}
 @media(min-width:620px){.ba-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}.ba-pair .ba-cap{grid-column:1/-1}}
 .v-link{display:block;text-decoration:none;color:inherit;margin-top:6px}
 .v-poster{position:relative;display:block}
-.v-poster img{width:100%;border-radius:12px;display:block}
+.v-poster img{width:100%;height:auto;border-radius:12px;display:block}
 .v-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px}
 .v-textlink{display:inline-block;font-weight:700;color:var(--accent-dark,var(--accent));border:2px solid var(--accent);border-radius:999px;padding:10px 20px}
 .v-cap{color:var(--soft);font-size:.95rem;margin-top:8px}
@@ -2161,7 +2199,7 @@ ul.events .ev{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(-
 .ev-time{display:block;font-weight:400;color:var(--soft);font-size:.9rem}
 .ev-name{display:block;font-weight:700}
 .ev-detail{display:block;color:var(--soft);font-size:.95rem;margin-top:2px}
-.block-map .map-img img{width:100%;border-radius:12px;display:block}
+.block-map .map-img img{width:100%;height:auto;border-radius:12px;display:block}
 .map-addr{margin:10px 0 0;font-size:1.05rem}
 .map-dir{margin-top:6px}
 .map-dir a{font-weight:700;color:var(--accent-dark,var(--accent))}
@@ -2172,11 +2210,11 @@ ${SP} ul,${SP} ol{margin:0 0 .8em;padding-left:1.3em}${SP} li{margin:.2em 0}
 ${SP} blockquote{margin:0 0 .8em;padding-left:14px;border-left:3px solid var(--accent);color:var(--soft)}
 ${SP} a{color:var(--accent-dark,var(--accent))}
 .block-image .img-fig{margin:0}
-.block-image .img-fig img{width:100%;border-radius:12px;display:block}
+.block-image .img-fig img{width:100%;height:auto;border-radius:12px;display:block}
 .block-image figcaption{font-size:.9rem;color:var(--soft);margin-top:6px}
 .block-image .img-link{display:block;text-decoration:none;color:inherit}
 .it-row{display:flex;flex-direction:column;gap:20px;margin-top:6px}
-.it-row .it-media img{width:100%;border-radius:12px;display:block}
+.it-row .it-media img{width:100%;height:auto;border-radius:12px;display:block}
 .it-text{align-self:center}
 .it-cta{margin:14px 0 0}
 @media(min-width:620px){.it-row{flex-direction:row;align-items:center;gap:32px}.it-row .it-media,.it-row .it-text{flex:1 1 0;min-width:0}.it-row.it-right{flex-direction:row-reverse}}
@@ -2196,7 +2234,7 @@ ${SP} a{color:var(--accent-dark,var(--accent))}
 .block-divider.div-line{margin-top:var(--div-gap,36px);margin-bottom:var(--div-gap,36px)}
 .div-space{height:var(--div-gap,36px)}
 .block-columns .cols{display:grid;gap:24px;grid-template-columns:1fr;margin-top:6px}
-.block-columns .col-media img{width:100%;border-radius:10px;display:block;margin-bottom:10px}
+.block-columns .col-media img{width:100%;height:auto;border-radius:10px;display:block;margin-bottom:10px}
 .block-columns .col .prose{max-width:none}
 .block-columns .col-block>.block{padding-top:0;padding-bottom:0}
 .block-columns .col-block .wrap{padding-left:0;padding-right:0;max-width:none;margin:0}
@@ -2217,7 +2255,7 @@ ${SP} a{color:var(--accent-dark,var(--accent))}
 .block-tabs .tab-label{padding:10px 16px;cursor:pointer;font-weight:600;color:var(--soft);border-bottom:2px solid transparent;margin-bottom:-2px;border-radius:8px 8px 0 0}
 .block-tabs .tab-label:hover{color:var(--ink,inherit)}
 .block-tabs .tab-panel{display:none;padding:18px 2px}
-.block-tabs .tab-panel .col-media img{border-radius:10px;display:block;max-width:100%;margin-bottom:12px}
+.block-tabs .tab-panel .col-media img{border-radius:10px;display:block;max-width:100%;height:auto;margin-bottom:12px}
 .block-tabs .tab-panel .prose{max-width:none}
 .block-tabs .tab-radio:nth-of-type(1):checked~.tab-strip .tab-label:nth-of-type(1),.block-tabs .tab-radio:nth-of-type(2):checked~.tab-strip .tab-label:nth-of-type(2),.block-tabs .tab-radio:nth-of-type(3):checked~.tab-strip .tab-label:nth-of-type(3),.block-tabs .tab-radio:nth-of-type(4):checked~.tab-strip .tab-label:nth-of-type(4),.block-tabs .tab-radio:nth-of-type(5):checked~.tab-strip .tab-label:nth-of-type(5),.block-tabs .tab-radio:nth-of-type(6):checked~.tab-strip .tab-label:nth-of-type(6){color:var(--accent);border-bottom-color:var(--accent)}
 .block-tabs .tab-radio:nth-of-type(1):checked~.tab-panels .tab-panel:nth-of-type(1),.block-tabs .tab-radio:nth-of-type(2):checked~.tab-panels .tab-panel:nth-of-type(2),.block-tabs .tab-radio:nth-of-type(3):checked~.tab-panels .tab-panel:nth-of-type(3),.block-tabs .tab-radio:nth-of-type(4):checked~.tab-panels .tab-panel:nth-of-type(4),.block-tabs .tab-radio:nth-of-type(5):checked~.tab-panels .tab-panel:nth-of-type(5),.block-tabs .tab-radio:nth-of-type(6):checked~.tab-panels .tab-panel:nth-of-type(6){display:block}
@@ -2243,7 +2281,7 @@ ${SP} a{color:var(--accent-dark,var(--accent))}
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:8px}
 .teaser-card{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card,#fff)}
 a.teaser-card{text-decoration:none;color:inherit}
-.teaser-card .tc-media img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block}
+.teaser-card .tc-media img{width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;display:block}
 .teaser-card .tc-body{padding:14px 16px}
 .teaser-card .tc-title{font-weight:700;margin:0 0 4px}
 .teaser-card .tc-text{color:var(--soft);font-size:.95rem;margin:0}
@@ -2256,6 +2294,18 @@ ol.toc a{color:var(--accent-dark,var(--accent))}
 .block-download .dl{display:inline-flex;align-items:center;gap:10px;border:2px solid var(--accent);border-radius:12px;padding:12px 18px;text-decoration:none;color:var(--accent-dark,var(--accent));font-weight:700}
 .block-download .dl:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .block-download .dl svg{flex:0 0 auto}
+/* ── Item 259: an empty section's placeholder on the builder's canvas (never published) ── */
+.block-empty .empty-box{border:2px dashed var(--line,#ccc);border-radius:14px;padding:28px 20px;text-align:center;color:var(--soft)}
+.block-empty .empty-name{font-weight:700;color:var(--ink);margin:0 0 6px}
+.block-empty .empty-note{margin:0;font-size:.95rem}
+/* ── Item 260: real buttons and fields take the page's font and lose the browser's own border. A
+   template's own .btn or form.card rule still wins (a class beats a tag), so a template that gives
+   its buttons a border keeps it. Text fields stay 16px or more, so an iPhone never zooms on a tap. ── */
+button,input,select,textarea{font:inherit;color:inherit}
+button{border:0;background:none;cursor:pointer}
+input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{font-size:max(16px,1em)}
+.nl-form .nl-row input,.presence-form input:not([type=checkbox]):not([type=radio]):not([type=file]),.presence-form select,.presence-form textarea,.bk-date{padding:12px;border:1px solid var(--line,#ddd);border-radius:var(--radius,10px);background:var(--paper,#fff);color:var(--ink,inherit)}
+.nl-form .nl-row input:focus-visible,.presence-form input:focus-visible,.presence-form select:focus-visible,.presence-form textarea:focus-visible,.bk-date:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 /* ── Phase BK · native booking widget (first-party stepper) ── */
 .booking-widget{max-width:560px;margin-top:8px}
 .bk-intro{color:var(--soft);margin:0 0 12px}

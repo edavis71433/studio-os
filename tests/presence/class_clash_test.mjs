@@ -22,6 +22,10 @@ import { TEMPLATES, fixture, fullFixture } from './full_fixture.mjs';
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
 
+// Item 260: the one shared rule for real buttons and fields reaches both sides' markup on purpose,
+// by tag name: the page's font, no browser border, 16px text. A template's own .btn or form.card
+// rule still wins, a class beating a tag. No other bare tag may be reached from the section styles.
+const TAGS_BOTH = new Set(['button', 'input', 'select', 'textarea']);
 const OWNERS = {
   wrap: ['template', 'the page width'],
   block: ['template', 'a band of the page'],
@@ -127,6 +131,7 @@ function reachProblems(t, owners) {
   for (const sel of sectionSelectors) {
     if (!reaches(sel, els)) continue;
     if ([...named(sel)].some((c) => owners[c]?.[0] === 'both')) continue;
+    if (TAGS_BOTH.has(sel.replace(/:[^ ,]+/g, '').trim())) continue;   // item 260
     out.push(sel);
   }
   return out;

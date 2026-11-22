@@ -30,6 +30,7 @@ import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
 import { runStripeCheck } from '../commerce/stripe_check.ts';   // sales item 130: the daily check against Stripe
 import { summarizeHealthCenter } from '../lib/health_center.ts';
+import { stockHealth } from '../lib/stock/health.ts';
 import { timingSafeEqual } from '../../_shared/hmac.ts';
 import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
 import { oauthConfigured } from '../connected/auth.ts';
@@ -276,6 +277,7 @@ export async function computeHealthCenter(): Promise<any> {
     activeNotices: notices ?? 0,
     backupsVerified: envPresent('BACKUPS_VERIFIED'),
     stripeKey: heldKeyKind(),   // sales item 131: restricted or full-power, from the prefix alone
+    stock: await stockHealth().catch(() => null),   // item 263: a refused photo key shows here, not only in a failed search
   });
 }
 

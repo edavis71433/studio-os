@@ -1,6 +1,7 @@
 // ── /px/:siteId — the ONE first-party analytics collector (AN-2) ─────────────
 // PUBLIC, pre-auth (a visitor on the customer's published site beacons here).
-// Privacy-first: honors Do-Not-Track, drops bots, stores NO raw IP (daily hash),
+// Privacy-first: honors Do-Not-Track and Global Privacy Control, drops bots, stores NO raw IP (daily hash;
+// item 279: the limiter in front scrambles it too, lib/ratelimit.ts),
 // NO cookies, NO full referrer. Extremely lightweight — one tiny insert, always
 // returns 204, never blocks the visitor. Reuses the public-insert + rate-limit +
 // salted-hash pattern from the lead form; adds no new infrastructure.
@@ -15,7 +16,8 @@ const noContent = (cors: Record<string, string>) => new Response(null, { status:
 export async function handleCollect(req: Request, siteId: string, cors: Record<string, string>) {
   // always succeed silently — analytics must never affect the visitor's experience
   if (!/^[0-9a-f-]{36}$/.test(siteId)) return noContent(cors);
-  if ((req.headers.get('dnt') || '') === '1') return noContent(cors);         // respect Do-Not-Track server-side too
+  // item 279: Do Not Track and the newer Global Privacy Control signal, both honoured server-side too
+  if ((req.headers.get('dnt') || '') === '1' || (req.headers.get('sec-gpc') || '') === '1') return noContent(cors);
 
   const ip = clientIp(req);
   // generous caps for real traffic; a runaway source is still bounded (item 209: both in one call)
