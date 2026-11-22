@@ -183,19 +183,19 @@ async function openBig(slug){
   BIG={slug,phone:window.innerWidth<761};
   $('bigHead').textContent=d.name;
   $('bigSub').textContent=`A sample ${SAMPLE_NOUNS[fam]||'business'} in this design. A site’s own words and photos replace it.`;
-  $('bigWait').hidden=false;$('bigWait').textContent='Drawing the sample…';$('bigFrame').srcdoc='';
+  $('bigWait').hidden=false;$('bigWait').textContent='Drawing the sample…';$('bigWrap').style.visibility='hidden';   // one srcdoc write per look: WebKit can stay on the first of two quick writes (item 100)
   $('bigDlg').showModal();paintBig();$('bigX').focus();
   let r=null;try{r=await api('GET','/agency/designs/'+encodeURIComponent(slug)+'/sample?kind='+encodeURIComponent(fam));}catch(_){r=null;}
   if(!BIG||BIG.slug!==slug||!$('bigDlg').open)return;
   const html=r&&r.ok&&r.body&&r.body.data&&r.body.data.html;
   if(!html){$('bigWait').textContent='We couldn’t draw this design just now. Its picture shows how it starts.';return;}
-  $('bigFrame').srcdoc=html;$('bigWait').hidden=true;paintBig();
+  $('bigFrame').srcdoc=html;$('bigWait').hidden=true;$('bigWrap').style.visibility='';paintBig();
 }
 $('main').addEventListener('click',(e)=>{const b=e.target.closest('[data-full]');if(b)openBig(b.getAttribute('data-full'));});
 $('bigDesk').onclick=()=>{if(BIG){BIG.phone=false;paintBig();}};
 $('bigPhone').onclick=()=>{if(BIG){BIG.phone=true;paintBig();}};
 $('bigX').onclick=()=>$('bigDlg').close();
-$('bigDlg').addEventListener('close',()=>{const slug=BIG&&BIG.slug;BIG=null;$('bigFrame').srcdoc='';const b=slug&&document.querySelector(`[data-full="${CSS.escape(slug)}"]`);if(b)b.focus();});
+$('bigDlg').addEventListener('close',()=>{const slug=BIG&&BIG.slug;BIG=null;$('bigFrame').removeAttribute('srcdoc');const b=slug&&document.querySelector(`[data-full="${CSS.escape(slug)}"]`);if(b)b.focus();});
 window.addEventListener('resize',()=>{if(BIG)paintBig();});
 function wire(){
   const list=$('klist');if(!list)return;
