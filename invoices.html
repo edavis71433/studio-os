@@ -371,7 +371,8 @@ $('payForm').addEventListener('submit',async(e)=>{
   $('payDlg').close();
   // sales item 148: the same after-messages the deal page gives: the receipt, a card link that may still be live, a fresh link that couldn't be made
   const x=(r.body&&r.body.data)||{};const live=x.link_deactivated===false;
-  let m=x.part?`Recorded ${money(cents)}. ${money(x.left_cents)} is still due on ${i.number_label||'the invoice'}.`:`Recorded: ${i.number_label||'the invoice'} is paid.`;
+  const part=x.part!==undefined?!!x.part:cents<(Number(i.amount_cents)||0), left=x.left_cents!==undefined?x.left_cents:(Number(i.amount_cents)||0)-cents;   // an older server's answer says neither
+  let m=part?`Recorded ${money(cents)}. ${money(left)} is still due on ${i.number_label||'the invoice'}.`:`Recorded: ${i.number_label||'the invoice'} is paid.`;
   if(x.receipt_emailed)m+=` Receipt emailed to ${i.first||'them'}.`;else if(wantReceipt)m+=' The receipt email didn’t go out.';
   if(live)m+=' Its card link may still be live, so switch it off in Stripe.';
   if(x.part&&x.fresh_link===false)m+=' A new payment link couldn’t be made just now: press Send on the invoice to make one.';

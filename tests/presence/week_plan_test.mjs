@@ -93,7 +93,7 @@ globalThis.fetch = async (url) => {
   const table = u.pathname.replace(/^.*\/rest\/v1\//, '');
   reads.push(table);
   const reply = (b) => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } });
-  if (table === 'presence_invoices') return reply(u.searchParams.get('status') === 'eq.open' ? [{ id: 'inv1', title: 'Website', amount_cents: 160000, due_date: DUE, deal_id: null }] : []);
+  if (table === 'presence_invoices') return reply(u.searchParams.get('status') === 'eq.open' ? [{ id: 'inv1', title: 'Website', amount_cents: 160000, due_date: DUE, deal_id: null, stripe_url: 'https://pay.example/x' }] : []);
   if (table === 'presence_estimates') return reply([{ id: 'e1', deal_id: DEAL, title: '', subtotal_cents: 240000, expires_at: RUNS_OUT + 'T17:00:00Z', status: 'sent' }]);
   if (table === 'presence_deals') return reply(u.searchParams.get('id') ? [{ id: DEAL, title: 'Harbor refresh', converted_client_id: null, converted_site_id: C }] : []);
   if (table === 'presence_sites') return reply([{ id: A, client_id: null }, { id: C, client_id: null }]);

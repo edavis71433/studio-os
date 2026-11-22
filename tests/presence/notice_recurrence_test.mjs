@@ -91,6 +91,7 @@ const TERMINAL_OK = [
   { kind: 'domain_expiry', marker: 'domainExpiryPeriod(', why: 'exp:<domain>:<expiry date>:<rung> (builder list item 133) — each rung of ONE expiry is said once; a renewal moves the date, so the next expiry gets new keys and the ladder starts again' },
   { kind: 'deal_followup', marker: 'invoiceReminderPeriod(', why: 'invremind:<id>:<leg> — an invoice settles exactly once (paid or voided); each of the three legs (−7 · due · +N) sends once by design (Oct 2026 studio audit, change 10)' },
   // sales items 116 to 118 (Nov 12 2026 review)
+  { kind: 'deal_followup', marker: 'draftNudgePeriod(', why: 'invremind:<id>:draft:<date> — one ask per unsent invoice per due date (sales item 141); sending or voiding the invoice takes the invremind prefix down, and a re-dated draft gets a fresh key' },
   { kind: 'deal_followup', marker: 'invoiceReminderFailedPeriod(', why: 'invremind:<id>:<leg>:failed — one row per reminder leg whose email did not leave; the leg sending (or the invoice being paid or voided) takes it down, and a leg sends once' },
   { kind: 'retainer_status', marker: 'retainerTwicePeriod(', why: 'retainer:<deal>:twice:<subscription> — one row per extra Stripe subscription; another second approval is another subscription id' },
   { kind: 'retainer_status', marker: 'clientcancel:', why: 'retainer:<deal>:clientcancel:<day> — a client cancels a retainer once; one set up again and cancelled later is on a later day' },
