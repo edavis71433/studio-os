@@ -20,7 +20,7 @@ import { withAiCrawlerChoice } from './ai_crawlers.ts';
 import { withSearchChoices } from './search_tools.ts';
 import { injectAdTags } from './ad_tags.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
-import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
+import { BLOCK_CSS, DESIGN_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
 import { applyPageChrome, applyNotFoundPage } from './page_access.ts';
 import { applyHeaderScroll } from './site_header.ts';
 import { applyPhoneBar } from './phone_bar.ts';
@@ -240,7 +240,7 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   const content = snapshot.content as SnapshotContent;
   const dressed = injectSender(injectPopup(injectDevLayer(found, snapshot.dev_customization), content, site), content, site);
   // List item 152: the Google tag and the Meta Pixel, behind a cookie notice, on a site that has them.
-  const tagged = injectAdTags(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
+  const tagged = injectAdTags(opts.allSectionStyles ? keepAllSectionStyles(dressed) : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
   return injectCsp(injectAnalytics(tagged, counting ? site.siteId : undefined));
 }
 
@@ -272,16 +272,29 @@ function fnv(s: string): string {
 // own name and every page links to that: a site that adds a gallery can never be served a
 // cached stylesheet without the gallery's rules.
 export function trimSectionStyles(fileMap: FileMap): FileMap {
+  return swapSectionStyles(fileMap, () => {
+    const classes = new Set<string>();
+    for (const [k, v] of Object.entries(fileMap)) if (k.endsWith('.html') && typeof v === 'string') pageClasses(v, classes);
+    return sectionStyles(classes);
+  });
+}
+/** Item 329: the builder's canvas keeps every section style, the bold designs' (DESIGN_CSS) too,
+ *  right after BLOCK_CSS: a section the canvas swaps in may take a design nothing on the page has
+ *  yet, and the Layout tab draws each design with the canvas's own styles. */
+export function keepAllSectionStyles(fileMap: FileMap): FileMap {
+  return swapSectionStyles(fileMap, () => `${BLOCK_CSS}\n${DESIGN_CSS}`);
+}
+/** The site's stylesheet with its section styles (BLOCK_CSS, whole in every template's) swapped for
+ *  `styles()`, under a new name of its own, and every page pointed at it. */
+function swapSectionStyles(fileMap: FileMap, styles: () => string): FileMap {
   const cssKey = Object.keys(fileMap).find((k) => /^assets\/site-[0-9a-f]+\.css$/.test(k));
   const css = cssKey ? fileMap[cssKey] : undefined;
   if (typeof css !== 'string' || !css.includes(BLOCK_CSS)) return fileMap;
-  const classes = new Set<string>();
-  for (const [k, v] of Object.entries(fileMap)) if (k.endsWith('.html') && typeof v === 'string') pageClasses(v, classes);
-  const trimmed = css.replace(BLOCK_CSS, () => sectionStyles(classes));
-  const key = `assets/site-${fnv(trimmed)}.css`;
+  const swapped = css.replace(BLOCK_CSS, styles);
+  const key = `assets/site-${fnv(swapped)}.css`;
   const out: FileMap = {};
   for (const [k, v] of Object.entries(fileMap)) {
-    if (k === cssKey) out[key] = trimmed;
+    if (k === cssKey) out[key] = swapped;
     else out[k] = typeof v === 'string' && k.endsWith('.html') ? v.split(`/${cssKey}`).join(`/${key}`) : v;
   }
   return out;

@@ -59,7 +59,8 @@ export const REALIZED_BLOCK_TYPES: readonly SiteBlockType[] = [
 // Most types are one-instance-per-site; the MULTI set (form/columns/cards) may repeat,
 // so the total cap is generous headroom rather than the realized-type count.
 const MAX_BLOCKS = 32;
-const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, tabs: 6, carousel: 12, progress: 8, buttons: 3, columns: 6, cards: 8, linkList: 16, tableCols: 6, tableRows: 24, freeformElements: 12, freeformSections: 4, stackItems: 20, stackForms: 2 };
+// Item 329: a printed price list (pricing 'menu') holds more rows than the four tier cards do.
+const CAP = { features: 8, stats: 6, team: 12, process: 10, pricing: 4, menuRows: 16, certifications: 12, service_areas: 40, tierFeatures: 8, gallery: 16, beforeAfter: 8, partners: 12, social: 8, events: 12, accordion: 10, tabs: 6, carousel: 12, progress: 8, buttons: 3, columns: 6, cards: 8, linkList: 16, tableCols: 6, tableRows: 24, freeformElements: 12, freeformSections: 4, stackItems: 20, stackForms: 2 };
 // Layout Container: a column's optional width on a 12-unit responsive grid (AEM's
 // snap-to-grid column span). Absent = equal widths (the original 2–3 col behavior).
 const clampSpan = (v: unknown): number | undefined => {
@@ -195,10 +196,14 @@ function parseLook(raw: unknown, type = ''): BlockLook | undefined {
 // matching rules live in BLOCK_CSS, namespaced .v-<variant>. ──
 export const BLOCK_VARIANTS: Record<string, readonly string[]> = {
   reviews_wall: ['quotes', 'strip'],   // testimonials: card grid (default) | big pull-quotes | compact band
-  accordion: ['two-column'],           // faq-style: accordion (default) | open Q&A grid
+  // faq-style: accordion (default) | open Q&A grid | item 329: questions beside the heading | numbered, answers showing
+  accordion: ['two-column', 'side', 'numbered'],
   cta: ['card'],                       // banner (default) | boxed, centered card
-  pricing: ['list'],                   // tier cards (default) | atelier-style name—rule—price rows
+  // tier cards (default) | atelier-style name—rule—price rows | item 329: a printed price list | three plans
+  pricing: ['list', 'menu', 'plans'],
   gallery: ['masonry', 'filmstrip'],   // grid (default) | CSS-columns masonry | horizontal filmstrip
+  features: ['numbered', 'tiles'],     // item 329: grid (default) | numbered under thick rules | icon tiles on a dark band
+  image_text: ['overlap', 'frame'],    // item 329: photo beside the words (default) | photo off the edge | photo in a colour frame
 };
 function parseVariant(type: string, raw: unknown): string | undefined {
   const v = (raw && typeof raw === 'object') ? (raw as { variant?: unknown }).variant : undefined;
@@ -266,7 +271,9 @@ interface StoredReviewsWall { type: 'reviews_wall'; title?: string; max: number 
 // Text & layout staples: image/image_text carry media by ID (resolved by resolveBlockMedia);
 // richtext/accordion/buttons/divider carry no media (pass straight through).
 interface StoredImage { type: 'image'; title?: string; image_id?: string; caption?: string; alt?: string; link?: string; decorative?: boolean }
-interface StoredImageText { type: 'image_text'; title?: string; image_id?: string; body: string; side: 'left' | 'right'; button?: { label: string; url: string } }
+// Item 329: `number` + `number_label`, a big number with a short line beside it ("15" / "years
+// planting gardens"), drawn by the 'frame' design when both are filled.
+interface StoredImageText { type: 'image_text'; title?: string; image_id?: string; body: string; side: 'left' | 'right'; button?: { label: string; url: string }; number?: string; number_label?: string }
 // Layout & utility staples (T-BLOCKS r4). Columns/cards carry media by ID (resolved
 // by resolveBlockMedia) + a stable id (multi-instance). Download carries one file id.
 // Toc carries no media/id — its list is derived at render from sibling headings.
@@ -441,11 +448,18 @@ function validateBlocksTracked(raw: unknown): { blocks: StoredBlock[]; src: numb
         break;
       }
       case 'pricing': {
+        // item 329: a printed price list keeps up to 16 rows; every other design keeps four, as before
         const tiers = arr((b as any).tiers).map((tr) => ({
           name: s(tr?.name, 60), price_text: s(tr?.price_text, 40) || undefined,
           features: arr(tr?.features).map((f) => s(f, 100)).filter(Boolean).slice(0, CAP.tierFeatures),
-        })).filter((tr) => tr.name).slice(0, CAP.pricing);
-        if (tiers.length) block = { type: 'pricing', title, tiers } as SiteBlockPricing;
+        })).filter((tr) => tr.name).slice(0, parseVariant('pricing', b) === 'menu' ? CAP.menuRows : CAP.pricing);
+        if (tiers.length) {
+          block = { type: 'pricing', title, tiers } as SiteBlockPricing;
+          // item 329: which plan the 'plans' design raises, counted from 1 (0 = none). A whole
+          // number naming a plan that's there, or nothing (the middle one of three is the default).
+          const f = (b as any).featured;
+          if (typeof f === 'number' && Number.isInteger(f) && f >= 0 && f <= tiers.length) (block as SiteBlockPricing).featured = f;
+        }
         break;
       }
       case 'certifications': {
@@ -589,6 +603,10 @@ function validateBlocksTracked(raw: unknown): { blocks: StoredBlock[]; src: numb
           const bl = s((b as any).button?.label, 40);
           const bu = s((b as any).button?.url, 300);
           if (bl && bu) st.button = { label: bl, url: bu };   // url validated by safeHref at render
+          // item 329: the big number and its line, each kept on its own (the 'frame' design shows both)
+          const num = s((b as any).number, 12), numLabel = s((b as any).number_label, 60);
+          if (num) st.number = num;
+          if (numLabel) st.number_label = numLabel;
           block = st;
         }
         break;
@@ -596,7 +614,11 @@ function validateBlocksTracked(raw: unknown): { blocks: StoredBlock[]; src: numb
       case 'accordion': {   // general expandable content (distinct from FAQ's Q&A + schema)
         const items = arr((b as any).items).map((it) => ({ summary: s(it?.summary, 120), body: ml(it?.body, 1500) }))
           .filter((it) => it.summary).slice(0, CAP.accordion);
-        if (items.length) block = { type: 'accordion', title, items } as SiteBlockAccordion;
+        if (items.length) {
+          block = { type: 'accordion', title, items } as SiteBlockAccordion;
+          const intro = s((b as any).intro, 200);   // item 329: the short line under the heading ('side' design)
+          if (intro) (block as SiteBlockAccordion).intro = intro;
+        }
         break;
       }
       case 'tabs': {   // tabbed panels — each tab: a label + rich body + optional image
@@ -870,6 +892,11 @@ const lk = (b: StoredBlock) => ({
   ...(b.variant ? { variant: b.variant } : {}),   // Wave-1 G4: the style variant rides the rebuild too
   ...(isAnchor(b.anchor) ? { anchor: b.anchor } : {}),   // item 225: so does the section's link name
 });
+// Item 329: an image + text section's big number and its line ride the rebuilds both ways; absent, nothing.
+const bigNumber = (b: { number?: unknown; number_label?: unknown }) => ({
+  ...(typeof b.number === 'string' && b.number ? { number: b.number } : {}),
+  ...(typeof b.number_label === 'string' && b.number_label ? { number_label: b.number_label } : {}),
+});
 // Item 292: the photo behind a section rides the look. Resolved here like any other photo
 // (through the one ref(), so it lands in the media manifest); gone from the library, the
 // section falls back to its template's own band.
@@ -974,7 +1001,7 @@ export function resolveBlockMedia(blocks: StoredBlock[], ref: (id: string) => Me
       }
       case 'image_text': {   // prose keeps the block valuable even if the image can't resolve
         const image = b.image_id ? ref(b.image_id) : null;
-        if (image || b.body) out.push({ type: 'image_text', title: b.title, image, body: b.body, side: b.side, button: b.button, ...lk(b) });
+        if (image || b.body) out.push({ type: 'image_text', title: b.title, image, body: b.body, side: b.side, button: b.button, ...bigNumber(b), ...lk(b) });
         break;
       }
       case 'freeform': {   // G25: each image element resolves through the SAME ref()
@@ -1100,7 +1127,7 @@ export function unresolveBlockMedia(blocks: unknown, idOf: (m: MediaRef) => stri
         out.push({ type: 'download', title: b.title, ...put('file_id', b.file), label: b.label, ...lk(b) });
         break;
       case 'image_text':
-        out.push({ type: 'image_text', title: b.title, ...put('image_id', b.image), body: b.body, side: b.side, button: b.button, ...lk(b) } as StoredBlock);
+        out.push({ type: 'image_text', title: b.title, ...put('image_id', b.image), body: b.body, side: b.side, button: b.button, ...bigNumber(b), ...lk(b) } as StoredBlock);
         break;
       case 'freeform': {   // a photo element is its photo
         const elements: StoredFreeformElement[] = [];
@@ -1261,6 +1288,14 @@ const numericPrice = (p?: string): string | undefined => {
   if (!p) return undefined;
   const m = p.replace(/,/g, '').match(/\d+(\.\d+)?/);
   return m ? m[0] : undefined;
+};
+// Item 329: a plan's price in the 'plans' design, big up to its first number ("$129", "From $95")
+// and the rest small (" a month"). The words are only split, never changed, so the element still
+// reads as the owner typed it; a price with no number in it is drawn at one size.
+const planPrice = (p: string, esc: (s: string) => string): string => {
+  const m = /^(\D{0,12}?\d[\d.,]*)([\s\S]*)$/.exec(p);
+  if (!m) return `<span class="pp-word">${esc(p)}</span>`;
+  return `<span class="pp-big">${esc(m[1])}</span>${m[2] ? `<span class="pp-per">${esc(m[2])}</span>` : ''}`;
 };
 
 // ── Events: dates stay honest — ISO in storage renders human, pure string math
@@ -1643,6 +1678,25 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
     let html = '', ld: object | undefined;
     switch (b.type) {
       case 'features':
+        if (b.variant === 'numbered') {
+          // Item 329, design F-A: columns numbered 01, 02, 03 under thick rules, each item's title and
+          // words under its number. The number rides in the item's heading, so it wears the site's
+          // heading face; a screen reader hears the list's own numbering instead.
+          html = `<section class="block wrap block-features v-numbered">${h2(b.title, 'Why choose us', 'title')}<ol class="fn-list">${b.items.map((it, i) =>
+            `<li class="fn-item"><h3 class="fn-t"><span class="fn-num" aria-hidden="true">${String(i + 1).padStart(2, '0')}</span><span${dds(`items.${i}.title`)}>${esc(it.title)}</span></h3>${it.text ? `<p class="fn-d"${dds(`items.${i}.text`)}>${esc(it.text)}</p>` : ''}</li>`).join('')}</ol></section>`;
+          break;
+        }
+        if (b.variant === 'tiles') {
+          // Item 329, design F-B: each item a tile with its line icon (item 304) in a ring, on a dark
+          // band. The band is the design's own colour theme: a theme or colour the owner picks wins.
+          const band = !(b as { look?: BlockLook }).look?.background && !(b as { style?: BlockStyle }).style?.bg_color ? ' block--bg-dark' : '';
+          html = `<section class="block wrap block-features v-tiles${band}">${h2(b.title, 'Why choose us', 'title')}<ul class="ft-grid">${b.items.map((it, i) => {
+            const line = !!it.icon && it.icon.startsWith('icon:') && !!LINE_ICONS[it.icon.slice(5)];
+            const ic = it.icon ? `<span class="ft-ic" aria-hidden="true">${line ? lineIcon(it.icon.slice(5)) : esc(it.icon)}</span>` : '';
+            return `<li class="ft-tile">${ic}<h3 class="ft-t"${dds(`items.${i}.title`)}>${esc(it.title)}</h3>${it.text ? `<p class="ft-d"${dds(`items.${i}.text`)}>${esc(it.text)}</p>` : ''}</li>`;
+          }).join('')}</ul></section>`;
+          break;
+        }
         html = `<section class="block wrap block-features">${h2(b.title, 'Why choose us', 'title')}<div class="svc-grid">${b.items.map((it, i) =>
           `<div class="svc">${it.icon ? (LINE_ICONS[it.icon.replace(/^icon:/, '')] && it.icon.startsWith('icon:') ? `<div class="svc-ic svc-ic-line" aria-hidden="true">${lineIcon(it.icon.slice(5))}</div>` : `<div class="svc-ic" aria-hidden="true">${esc(it.icon)}</div>`) : ''}<div class="nm"${dds(`items.${i}.title`)}>${esc(it.title)}</div>${it.text ? `<div class="ds"${dds(`items.${i}.text`)}>${esc(it.text)}</div>` : ''}</div>`).join('')}</div></section>`;
         break;
@@ -1667,6 +1721,20 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           // rule, price; features as a muted line beneath. Same data, same schema.
           html = `<section class="block wrap block-pricing v-list">${h2(b.title, 'Pricing', 'title')}<div class="price-list">${b.tiers.map((tr, i) =>
             `<div class="pl-row"><div class="pl-head"><span class="pl-name"${dds(`tiers.${i}.name`)}>${esc(tr.name)}</span><span class="pl-rule" aria-hidden="true"></span>${tr.price_text ? `<span class="pl-price"${dds(`tiers.${i}.price_text`)}>${esc(tr.price_text)}</span>` : ''}</div>${tr.features.length ? `<p class="pl-feats">${tr.features.map((f) => esc(f)).join(' · ')}</p>` : ''}</div>`).join('')}</div></section>`;
+        } else if (b.variant === 'menu') {
+          // Item 329, design PR-A: a printed price list, a dotted line between each name and its price,
+          // in two columns past four rows. Each column is its own list, so a phone reads them in order.
+          const half = b.tiers.length > 4 ? Math.ceil(b.tiers.length / 2) : b.tiers.length;
+          const row = (tr: SiteBlockPricing['tiers'][number], i: number) => `<li class="pm-row"><span class="pm-line"><span class="pm-name"${dds(`tiers.${i}.name`)}>${esc(tr.name)}</span><span class="pm-dots" aria-hidden="true"></span>${tr.price_text ? `<span class="pm-price"${dds(`tiers.${i}.price_text`)}>${esc(tr.price_text)}</span>` : ''}</span>${tr.features.length ? `<span class="pm-note">${tr.features.map((f, k) => `<span${dds(`tiers.${i}.features.${k}`)}>${esc(f)}</span>`).join(' · ')}</span>` : ''}</li>`;
+          const cols = [b.tiers.slice(0, half), b.tiers.slice(half)].filter((c) => c.length);
+          html = `<section class="block wrap block-pricing v-menu">${h2(b.title, 'Pricing', 'title')}<div class="pm-cols${cols.length > 1 ? ' pm-two' : ''}">${cols.map((c, ci) => `<ul class="pm-col">${c.map((tr, k) => row(tr, ci * half + k)).join('')}</ul>`).join('')}</div></section>`;
+        } else if (b.variant === 'plans') {
+          // Item 329, design PR-B: plan cards, one raised in the accent colour with a "Most popular"
+          // badge (words, so the colour is never the only sign): the plan the owner marked, counted
+          // from 1 (0 marks none), else the middle one of three.
+          const raised = typeof b.featured === 'number' ? b.featured - 1 : (b.tiers.length === 3 ? 1 : -1);
+          html = `<section class="block wrap block-pricing v-plans">${h2(b.title, 'Pricing', 'title')}<ul class="pp-grid">${b.tiers.map((tr, i) =>
+            `<li class="pp-card${i === raised ? ' pp-on' : ''}">${i === raised ? '<p class="pp-badge">Most popular</p>' : ''}<h3 class="pp-name"${dds(`tiers.${i}.name`)}>${esc(tr.name)}</h3>${tr.price_text ? `<p class="pp-price"${dds(`tiers.${i}.price_text`)}>${planPrice(tr.price_text, esc)}</p>` : ''}${tr.features.length ? `<ul class="pp-feats">${tr.features.map((f, k) => `<li${dds(`tiers.${i}.features.${k}`)}>${esc(f)}</li>`).join('')}</ul>` : ''}</li>`).join('')}</ul></section>`;
         } else {
           html = `<section class="block wrap block-pricing">${h2(b.title, 'Pricing', 'title')}<div class="cards">${b.tiers.map((tr, i) =>
             `<div class="card price-tier"><div class="nm"${dds(`tiers.${i}.name`)}>${esc(tr.name)}</div>${tr.price_text ? `<div class="pr"${dds(`tiers.${i}.price_text`)}>${esc(tr.price_text)}</div>` : ''}${tr.features.length ? `<ul class="tier-feats">${tr.features.map((f, k) => `<li${dds(`tiers.${i}.features.${k}`)}>${esc(f)}</li>`).join('')}</ul>` : ''}</div>`).join('')}</div></section>`;
@@ -1837,6 +1905,28 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
       }
       case 'image_text': {   // image beside prose; flex row STACKS < 620px (see BLOCK_CSS)
         const prose = b.body ? renderMarkdown(b.body) : '';
+        if (b.variant === 'overlap' || b.variant === 'frame') {
+          // Item 329, designs IW-A and IW-C. 'overlap': the photo runs off the page's edge on its side
+          // and a card with the words sits over it; the section spans the page so the photo can reach
+          // the edge, and a box inside keeps the words to the page's width. 'frame': the photo on an
+          // offset block of the accent colour, the words beside it, led by a big number and its line
+          // when both are filled. Either stacks on a phone, the photo first.
+          const over = b.variant === 'overlap';
+          const side = b.side === 'right' ? ' it-right' : ' it-left';
+          const pic = b.image ? `<div class="iw-media"><div class="iw-pic">${blockImg(b.image, esc, attr, over ? '(max-width:760px) 100vw, 60vw' : '(max-width:760px) 100vw, 520px')}</div></div>` : '';
+          const href = b.button ? safeHref(b.button.url) : null;
+          const go = !href ? '' : over
+            ? `<p class="iw-cta"><a class="btn" href="${attr(href)}" rel="noopener"${dds('button.label')}>${esc(b.button!.label)}</a></p>`
+            : `<p class="iw-cta"><a class="iw-link" href="${attr(href)}" rel="noopener"><span${dds('button.label')}>${esc(b.button!.label)}</span><span aria-hidden="true">→</span></a></p>`;
+          const num = !over && b.number && b.number_label ? `<p class="iw-num"><span class="iw-big"${dds('number')}>${esc(b.number)}</span><span class="iw-lbl"${dds('number_label')}>${esc(b.number_label)}</span></p>` : '';
+          const words = num + (b.title ? h2(b.title, '', 'title') : '') + (prose ? `<div class="iw-body"${dds('body', true)}>${prose}</div>` : '') + go;
+          const box = words ? `<div class="${over ? 'iw-card' : 'iw-words'}">${words}</div>` : '';
+          const row = `<div class="${over ? 'iw-over' : 'iw-frame'}${side}${pic ? '' : ' iw-solo'}">${pic}${box}</div>`;
+          if (pic || prose) html = over
+            ? `<section class="block block-imgtext v-overlap"><div class="wrap">${row}</div></section>`
+            : `<section class="block wrap block-imgtext v-frame">${row}</section>`;
+          break;
+        }
         const img = b.image ? `<div class="it-media">${blockImg(b.image, esc, attr, '(max-width:620px) 100vw, 460px')}</div>` : '';
         const href = b.button ? safeHref(b.button.url) : null;
         const btn = href ? `<p class="it-cta"><a class="btn" href="${attr(href)}" rel="noopener"${dds('button.label')}>${esc(b.button!.label)}</a></p>` : '';
@@ -1853,6 +1943,18 @@ export function renderSiteBlocks(blocks: SiteBlock[] | undefined, ctx: BlockRend
           // phones) — every answer visible, real headings, still zero JS.
           const rows = b.items.map((it, i) => `<div class="qa-item"><h3 class="qa-q"${dds(`items.${i}.summary`)}>${esc(it.summary)}</h3>${it.body ? `<div class="prose"${dds(`items.${i}.body`, true)}>${renderMarkdown(it.body)}</div>` : ''}</div>`).join('');
           html = `<section class="block wrap block-accordion v-two-column">${h2(b.title, 'More information', 'title')}<div class="qa-grid">${rows}</div></section>`;
+        } else if (b.variant === 'side') {
+          // Item 329, design Q-A: the heading and a short line on the left, the questions on the right,
+          // each opening with a plus sign; the first stands open, as drawn. Still <details>, no script.
+          const rows = b.items.map((it, i) => `<details class="qs-item"${i === 0 ? ' open' : ''}><summary${dds(`items.${i}.summary`)}>${esc(it.summary)}</summary>${it.body ? `<div class="prose"${dds(`items.${i}.body`, true)}>${renderMarkdown(it.body)}</div>` : ''}</details>`).join('');
+          html = `<section class="block wrap block-accordion v-side"><div class="qs-grid"><div class="qs-head">${h2(b.title, 'More information', 'title')}${b.intro ? `<p class="qs-intro"${dds('intro')}>${esc(b.intro)}</p>` : ''}</div><div class="qs-list">${rows}</div></div></section>`;
+        } else if (b.variant === 'numbered') {
+          // Item 329, design Q-B: numbered questions with the answers showing, in two columns, on a
+          // tinted band (the design's own colour theme: a theme or colour the owner picks wins). The
+          // number rides in the question's heading, so it wears the site's heading face.
+          const band = !(b as { look?: BlockLook }).look?.background && !(b as { style?: BlockStyle }).style?.bg_color ? ' block--bg-tint' : '';
+          const rows = b.items.map((it, i) => `<li class="qn-item"><h3 class="qn-q"><span class="qn-num" aria-hidden="true">${String(i + 1).padStart(2, '0')}</span><span${dds(`items.${i}.summary`)}>${esc(it.summary)}</span></h3>${it.body ? `<div class="prose"${dds(`items.${i}.body`, true)}>${renderMarkdown(it.body)}</div>` : ''}</li>`).join('');
+          html = `<section class="block wrap block-accordion v-numbered${band}">${h2(b.title, 'More information', 'title')}<ol class="qn-grid">${rows}</ol></section>`;
         } else {
           const rows = b.items.map((it, i) => `<details class="acc-item"><summary${dds(`items.${i}.summary`)}>${esc(it.summary)}</summary>${it.body ? `<div class="prose"${dds(`items.${i}.body`, true)}>${renderMarkdown(it.body)}</div>` : ''}</details>`).join('');
           html = `<section class="block wrap block-accordion">${h2(b.title, 'More information', 'title')}<div class="accordion">${rows}</div></section>`;
@@ -2721,6 +2823,129 @@ a.ff-el.btn{display:inline-flex;align-items:center;justify-content:center;text-a
 .block-stack.block--align-center .stk-form .presence-form,.stk .stk-form.stk-ac .presence-form{margin-left:auto;margin-right:auto;text-align:left}
 @media(max-width:620px){.stk-hide-m{display:none!important}}`;
 
+// ── Item 329 · the bold section designs Eric picked in Figma (section C) ──
+// Their rules live apart from BLOCK_CSS, so no stylesheet drawn before them changes by a byte: a
+// published site gets them through sectionStyles (only the rules its pages' classes can use, and
+// every rule here needs a class only these designs draw), and the builder's canvas gets them all
+// (lib/render.ts renderSnapshot, allSectionStyles), as it keeps every section style. The site's own
+// fonts and colours throughout (--accent, --ink, --soft, --line, --card, --wash, --font-display);
+// each stacks on a phone (760px and up draws the wide layout). On the accent and dark bands every
+// word follows the band (BLOCK_CSS's forced inheritance), and what these rules colour is named
+// below so it follows too (tests/presence/band_words_test.mjs reads them on every template).
+const DS_PLUS = 'linear-gradient(currentColor,currentColor) center/100% 2px no-repeat';
+export const DESIGN_CSS = `/* IW-A 'overlap': the photo runs off the page's edge, a card with the words over it. The section
+   spans the page (its box of words is the .wrap inside), so the photo can reach the edge; overflow-x
+   clips the half a scrollbar the 50vw sum can overshoot by, and leaves a shaped edge below alone. */
+.block.block-imgtext.v-overlap{overflow-x:clip}
+.block-imgtext.v-overlap .iw-over{display:flex;flex-direction:column;margin-top:6px}
+.block-imgtext.v-overlap .iw-media{margin:0 calc(50% - 50vw)}
+.block-imgtext.v-overlap .iw-pic img{display:block;width:100%;height:auto;aspect-ratio:4/3;object-fit:cover}
+.block-imgtext.v-overlap .iw-card{position:relative;z-index:1;margin:-56px 8px 0;padding:28px 24px;border-radius:var(--radius,14px);background:var(--card,#fff);color:var(--ink);box-shadow:0 18px 48px rgba(16,12,8,.16)}
+.block-imgtext.v-overlap .iw-solo .iw-card{margin:0 auto;max-width:640px}
+.block-imgtext.v-overlap .iw-card h2{margin:0 0 14px;font-size:clamp(1.5rem,2.6vw,2.3rem);line-height:1.12}
+.block-imgtext.v-overlap .iw-cta{margin:20px 0 0}
+@media(min-width:760px){.block-imgtext.v-overlap .iw-over{flex-direction:row;align-items:center}.block-imgtext.v-overlap .iw-over.it-right{flex-direction:row-reverse}.block-imgtext.v-overlap .iw-media{flex:0 0 auto;width:calc(8% + 50vw);margin:0 0 0 calc(50% - 50vw)}.block-imgtext.v-overlap .it-right .iw-media{margin:0 calc(50% - 50vw) 0 0}.block-imgtext.v-overlap .iw-pic img{aspect-ratio:auto;height:clamp(340px,42vw,620px)}.block-imgtext.v-overlap .iw-card{flex:0 0 50%;margin:0 0 0 -8%;padding:clamp(28px,4vw,56px)}.block-imgtext.v-overlap .it-right .iw-card{margin:0 -8% 0 0}.block-imgtext.v-overlap .iw-solo .iw-card{flex:0 1 640px;margin:0 auto}}
+/* IW-C 'frame': the photo on an offset block of the accent colour, the words beside it, led by a big number */
+.block-imgtext.v-frame .iw-frame{display:grid;gap:36px;align-items:center;margin-top:6px}
+.block-imgtext.v-frame .iw-media{position:relative;padding:0 20px 20px 0}
+.block-imgtext.v-frame .iw-media::before{content:"";position:absolute;left:20px;top:20px;right:0;bottom:0;border-radius:var(--radius,6px);background:var(--accent)}
+.block-imgtext.v-frame .it-right .iw-media{padding:0 0 20px 20px}
+.block-imgtext.v-frame .it-right .iw-media::before{left:0;right:20px}
+.block-imgtext.v-frame .iw-pic{position:relative}
+.block-imgtext.v-frame .iw-pic img{display:block;width:100%;height:auto;aspect-ratio:7/8;object-fit:cover;border-radius:var(--radius,6px)}
+.block-imgtext.v-frame .iw-num{display:flex;align-items:center;gap:16px;margin:0 0 18px}
+.block-imgtext.v-frame .iw-big{flex:0 0 auto;font-family:var(--font-display,inherit);font-size:clamp(3.2rem,7vw,5.5rem);font-weight:700;line-height:.9;letter-spacing:-.02em;color:var(--accent-dark,var(--accent))}
+.block-imgtext.v-frame .iw-lbl{max-width:14em;line-height:1.35}
+.block-imgtext.v-frame .iw-words h2{margin:0 0 14px;font-size:clamp(1.5rem,2.6vw,2.3rem);line-height:1.12}
+.block-imgtext.v-frame .iw-body{color:var(--soft)}
+.block-imgtext.v-frame .iw-cta{margin:14px 0 0}
+.block-imgtext.v-frame .iw-link{display:inline-flex;align-items:center;gap:.4em;min-height:44px;font-weight:700;color:var(--accent-dark,var(--accent));text-decoration:none}
+.block-imgtext.v-frame .iw-link:hover{text-decoration:underline}
+@media(min-width:760px){.block-imgtext.v-frame .iw-frame{grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:40px 72px}.block-imgtext.v-frame .iw-frame.it-right{grid-template-columns:minmax(0,6fr) minmax(0,5fr)}.block-imgtext.v-frame .it-right .iw-media{order:2}.block-imgtext.v-frame .iw-media{padding:0 40px 40px 0}.block-imgtext.v-frame .iw-media::before{left:40px;top:40px}.block-imgtext.v-frame .it-right .iw-media{padding:0 0 40px 40px}.block-imgtext.v-frame .it-right .iw-media::before{left:0;right:40px}.block-imgtext.v-frame .iw-frame.iw-solo{grid-template-columns:minmax(0,1fr)}}
+.block-imgtext:is(.v-overlap,.v-frame) .iw-body>*{margin:0 0 .8em}
+.block-imgtext:is(.v-overlap,.v-frame) .iw-body>:last-child{margin-bottom:0}
+/* F-A 'numbered': columns numbered 01, 02, 03 under thick rules */
+.block-features.v-numbered .fn-list{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:36px 48px}
+.block-features.v-numbered .fn-item{margin:0;padding-top:22px;border-top:4px solid}
+.block-features.v-numbered .fn-t{margin:0 0 8px;font-size:1.3rem;line-height:1.25}
+.block-features.v-numbered .fn-num{display:block;margin-bottom:12px;font-size:2.3rem;line-height:1;color:var(--accent-dark,var(--accent))}
+.block-features.v-numbered .fn-d{margin:0;color:var(--soft);line-height:1.55}
+/* F-B 'tiles': line icons in tiles; the design's own colour theme is the dark band */
+.block-features.v-tiles .ft-grid{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+.block-features.v-tiles .ft-tile{margin:0;padding:26px 24px;border:1px solid var(--line,rgba(0,0,0,.1));border-radius:var(--radius,12px);background:var(--card,#fff)}
+.block-features.v-tiles .ft-ic{display:flex;align-items:center;justify-content:center;width:56px;height:56px;margin:0 0 16px;border-radius:50%;background:var(--wash,rgba(0,0,0,.05));color:var(--accent-dark,var(--accent));font-size:1.5rem;line-height:1}
+.block-features.v-tiles .ft-ic svg{display:block;width:28px;height:28px}
+.block-features.v-tiles .ft-t{margin:0 0 6px;font-size:1.15rem;line-height:1.3}
+.block-features.v-tiles .ft-d{margin:0;color:var(--soft);font-size:.95rem;line-height:1.55}
+.block.block-features.v-tiles.block--bg-dark .ft-tile{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)}
+.block.block-features.v-tiles.block--bg-dark .ft-ic{background:rgba(255,255,255,.1);color:#fff}
+@supports (color:color-mix(in srgb,red,#fff)){.block.block-features.v-tiles.block--bg-dark .ft-ic{color:color-mix(in srgb,var(--accent) 40%,#fff)}}
+.block.block-features.v-tiles.block--bg-accent .ft-tile{background:var(--band-box,rgba(0,0,0,.08));border-color:rgba(255,255,255,.22)}
+.block.block-features.v-tiles.block--bg-accent .ft-ic{background:rgba(255,255,255,.14);color:inherit}
+/* PR-A 'menu' and PR-B 'plans' centre their heading, and the little rule some templates draw by it */
+.block-pricing:is(.v-menu,.v-plans) h2{text-align:center}
+.block-pricing:is(.v-menu,.v-plans) h2::before,.block-pricing:is(.v-menu,.v-plans) h2::after{margin-left:auto;margin-right:auto}
+/* PR-A 'menu': a printed price list, dotted lines between each name and its price */
+.block-pricing.v-menu .pm-cols{display:grid;gap:0 64px;max-width:560px;margin:14px auto 0}
+.block-pricing.v-menu .pm-cols.pm-two{max-width:none}
+.block-pricing.v-menu .pm-col{list-style:none;margin:0;padding:6px 0 0;border-top:2px solid}
+.block-pricing.v-menu .pm-row{margin:0;padding:10px 0}
+.block-pricing.v-menu .pm-line{display:flex;align-items:baseline;gap:10px}
+.block-pricing.v-menu .pm-name{min-width:0;font-size:1.05rem;overflow-wrap:anywhere}
+.block-pricing.v-menu .pm-dots{flex:1 1 24px;min-width:24px;border-bottom:2px dotted var(--line,rgba(0,0,0,.25));transform:translateY(-.3em)}
+.block-pricing.v-menu .pm-price{flex:0 0 auto;font-family:var(--font-display,inherit);font-size:1.15rem;font-weight:700;white-space:nowrap}
+.block-pricing.v-menu .pm-note{display:block;margin-top:2px;color:var(--soft);font-size:.9rem}
+@media(min-width:760px){.block-pricing.v-menu .pm-two{grid-template-columns:1fr 1fr}}
+@media(max-width:759px){.block-pricing.v-menu .pm-two .pm-col+.pm-col{border-top:0;padding-top:0}}
+/* PR-B 'plans': plan cards, one raised in the accent colour with a "Most popular" badge */
+.block-pricing.v-plans .pp-grid{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:20px}
+.block-pricing.v-plans .pp-card{margin:0;padding:30px 28px;border-radius:calc(var(--radius,12px) + 6px);background:var(--wash,rgba(0,0,0,.04));color:var(--ink)}
+.block-pricing.v-plans .pp-on{background:${BAND};color:#fff;box-shadow:0 22px 48px rgba(0,0,0,.18)}
+.block-pricing.v-plans .pp-on :is(h3,p,li,span){color:inherit}
+.block-pricing.v-plans .pp-badge{display:inline-block;margin:0 0 14px;padding:5px 12px;border-radius:999px;background:#fff;color:${BAND};font-size:.75rem;font-weight:700;letter-spacing:.08em;line-height:1.4;text-transform:uppercase}
+.block-pricing.v-plans .pp-on .pp-badge{color:${BAND}}
+.block-pricing.v-plans .pp-name{margin:0;font-size:1.3rem;line-height:1.25}
+.block-pricing.v-plans .pp-price{margin:10px 0 0;line-height:1.1}
+.block-pricing.v-plans .pp-big{font-family:var(--font-display,inherit);font-size:clamp(2.2rem,4vw,3.2rem);font-weight:800;letter-spacing:-.02em}
+.block-pricing.v-plans .pp-per{font-size:.95rem}
+.block-pricing.v-plans .pp-word{font-size:1.3rem;font-weight:700}
+.block-pricing.v-plans .pp-feats{list-style:none;margin:18px 0 0;padding:0}
+.block-pricing.v-plans .pp-feats li{position:relative;margin:8px 0 0;padding-left:26px;line-height:1.45}
+.block-pricing.v-plans .pp-feats li::before{content:"";position:absolute;left:3px;top:.4em;width:10px;height:5px;border:solid var(--accent-dark,var(--accent));border-width:0 0 2px 2px;transform:rotate(-45deg)}
+.block-pricing.v-plans .pp-on .pp-feats li::before{border-color:currentColor}
+@media(min-width:760px){.block-pricing.v-plans .pp-grid{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:24px;margin-top:48px}.block-pricing.v-plans .pp-on{margin:-24px 0;padding-top:40px;padding-bottom:40px}}
+/* Q-A 'side': the heading and a short line on the left, the questions on the right */
+.block-accordion.v-side .qs-grid{display:grid;gap:20px 64px}
+.block-accordion.v-side .qs-head h2{margin:0;font-size:clamp(1.5rem,2.6vw,2.2rem);line-height:1.15}
+.block-accordion.v-side .qs-intro{margin:14px 0 0;max-width:40ch;color:var(--soft)}
+.block-accordion.v-side .qs-list{border-top:1px solid var(--line,rgba(0,0,0,.12))}
+.block-accordion.v-side .qs-item{border-bottom:1px solid var(--line,rgba(0,0,0,.12))}
+.block-accordion.v-side .qs-item summary{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:44px;padding:14px 0;cursor:pointer;list-style:none;font-family:var(--font-display,inherit);font-weight:700;font-size:1.08rem;line-height:1.35}
+.block-accordion.v-side .qs-item summary::-webkit-details-marker{display:none}
+.block-accordion.v-side .qs-item summary::after{content:"";flex:0 0 14px;height:14px;background:${DS_PLUS},linear-gradient(currentColor,currentColor) center/2px 100% no-repeat;color:var(--accent-dark,var(--accent))}
+.block-accordion.v-side .qs-item[open] summary::after{background:${DS_PLUS}}
+.block-accordion.v-side .qs-item summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.block-accordion.v-side .qs-item .prose{padding:0 0 18px;color:var(--soft)}
+@media(min-width:760px){.block-accordion.v-side .qs-grid{grid-template-columns:minmax(0,5fr) minmax(0,7fr);align-items:start}}
+/* Q-B 'numbered': numbered questions, the answers showing, in two columns; its own theme is the tinted band */
+.block-accordion.v-numbered .qn-grid{list-style:none;margin:24px 0 0;padding:0}
+.block-accordion.v-numbered .qn-item{position:relative;margin:0 0 30px;padding-left:3.4rem;break-inside:avoid}
+.block-accordion.v-numbered .qn-item:last-child{margin-bottom:0}
+.block-accordion.v-numbered .qn-q{margin:0 0 6px;font-size:1.2rem;line-height:1.3}
+.block-accordion.v-numbered .qn-num{position:absolute;left:0;top:-.08em;font-size:1.8rem;line-height:1;color:var(--accent-dark,var(--accent))}
+.block-accordion.v-numbered .qn-item .prose{color:var(--soft);max-width:none}
+@media(min-width:760px){.block-accordion.v-numbered .qn-grid{columns:2;column-gap:64px}.block-accordion.v-numbered .qn-item:last-child{margin-bottom:30px}}
+/* on the accent and dark bands: the colours above follow the band's words */
+${onBands('.iw-card', '.v-overlap')}{background:var(--band-box,rgba(0,0,0,.08));color:inherit;box-shadow:none;outline:1px solid rgba(255,255,255,.22)}
+${onBands('.iw-media::before', '.v-frame')}{background:rgba(255,255,255,.22)}
+${onBands('.iw-big', '.v-frame')},${onBands('.fn-num', '.v-numbered')},${onBands('.qn-num', '.v-numbered')},${onBands('.qs-item summary::after', '.v-side')}{color:inherit}
+${onBands('.pp-card', '.v-plans')}{background:var(--band-box,rgba(0,0,0,.08));color:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)}
+${onBands('.pp-feats li::before', '.v-plans')}{border-color:currentColor}
+.block.block-pricing.v-plans.block--bg-dark .pp-card{background:rgba(255,255,255,.06)}
+.block.block-pricing.v-plans.block--bg-dark .pp-card.pp-on,.block.block-pricing.v-plans.block--bg-photo.veil-dark .pp-card.pp-on{background:${BAND};color:#fff;box-shadow:0 22px 48px rgba(0,0,0,.3)}
+.block.block-pricing.v-plans.block--bg-accent .pp-card.pp-on{background:#fff;color:${BAND};box-shadow:0 22px 48px rgba(0,0,0,.2)}
+.block.block-pricing.v-plans.block--bg-accent .pp-on .pp-badge{background:${BAND};color:#fff}`;
+
 // Item 298: the gallery's zoom view and the carousel script live in lib/site_block_scripts.ts (a file that
 // imports nothing, so the browser spec that presses them reaches only it); the shell appends it.
 export { BLOCK_JS } from './site_block_scripts.ts';
@@ -2779,6 +3004,9 @@ function selectorNeeds(sel: string): { all: string[]; any: string[][] } {
   return { all, any };
 }
 const BLOCK_NODES = cssNodes(BLOCK_CSS);
+// Item 329: the designs' rules come after BLOCK_CSS's, chosen the same way. Every one needs a class
+// only those designs draw, so a site without them keeps exactly the stylesheet it had.
+const SECTION_NODES = [...BLOCK_NODES, ...cssNodes(DESIGN_CSS)];
 const NEEDS = new Map<string, { all: string[]; any: string[][] }>();
 const canMatch = (sel: string, classes: ReadonlySet<string>): boolean => {
   let n = NEEDS.get(sel);
@@ -2786,16 +3014,16 @@ const canMatch = (sel: string, classes: ReadonlySet<string>): boolean => {
   return n.all.every((c) => classes.has(c)) && n.any.every((g) => g.some((c) => classes.has(c)));
 };
 
-/** The section styles a site with these classes can use: BLOCK_CSS's rules, in order, less
- *  every selector that can't match and every group left empty. Pure and deterministic. */
+/** The section styles a site with these classes can use: BLOCK_CSS's rules then DESIGN_CSS's, in
+ *  order, less every selector that can't match and every group left empty. Pure and deterministic. */
 export function sectionStyles(classes: ReadonlySet<string>): string {
   const draw = (n: CssNode, named: string | null): string => {
     if ('sel' in n) { const s = n.sel.filter((x) => canMatch(x, classes)); return s.length ? `${s.join(',')}{${n.body}}` : ''; }
     if ('at' in n) { const k = n.kids.map((x) => draw(x, named)).join(''); return k ? `${n.at}{${k}}` : ''; }
     return named !== null && named.includes(n.frames) ? n.text : '';
   };
-  const named = BLOCK_NODES.map((n) => draw(n, null)).join('');   // the rules alone, to see which @keyframes they name
-  return BLOCK_NODES.map((n) => draw(n, named)).filter(Boolean).join('\n');
+  const named = SECTION_NODES.map((n) => draw(n, null)).join('');   // the rules alone, to see which @keyframes they name
+  return SECTION_NODES.map((n) => draw(n, named)).filter(Boolean).join('\n');
 }
 
 /** Every class a page carries: its class attributes, and the words of its scripts (a script
