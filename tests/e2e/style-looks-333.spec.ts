@@ -3,6 +3,7 @@ import { installApp, STUDIO_NAV, ALL_FEATURES, pressButton, touchScreen } from '
 import { FONT_LIBRARY } from '../../supabase/functions/presence/lib/fonts';
 import { applyLookLayer } from '../../supabase/functions/presence/lib/site_looks';
 import { applyButtonStyles } from '../../supabase/functions/presence/lib/site_buttons';
+import { STYLE_LOOKS, LOOK_CLEAR } from '../../supabase/functions/presence/lib/style_looks';
 
 // Builder list item 333 (Nov 2026): Styles › Looks. The twelve ready-made looks Eric picked in Figma
 // (section D), grouped by mood, each drawn small in its own fonts, colours and button. A tap tries
@@ -23,7 +24,8 @@ const API = {
   '/preview/status': { data: { draft: { unpublished_changes: 0 }, preview: { exists: false }, live: { published: true, last_published_at: '2026-11-10T15:00:00Z' } } },
   '/portal/context': CTX,
 };
-// the library the server sends with the site's style (routes/dev.ts), so each tile can load its faces
+// the library the server sends with the site's style (routes/dev.ts), so each tile can load its faces,
+// and the looks with what picking one clears: the server's one list (lib/style_looks.ts)
 const FONTS = FONT_LIBRARY.map(({ id, family, css, kind, weights, fallback }) => ({ id, family, css, kind, weights, fallback }));
 // Figma section D, in order: name, mood, the heading's face
 const LOOKS: Array<[string, string, string]> = [
@@ -43,7 +45,7 @@ async function editor(page: Page, tokens: Record<string, string> = {}) {
   let saved: Record<string, string> = { ...tokens };
   await installApp(page, { api: { ...API,
     '/settings': { data: { blocks: BLOCKS, section_meta: META } },
-    '/dev/customization': { data: { theme_tokens: saved, custom_css: '', custom_html: '', allowed_tokens: [], can_edit_css: false, font_library: FONTS } },
+    '/dev/customization': { data: { theme_tokens: saved, custom_css: '', custom_html: '', allowed_tokens: [], can_edit_css: false, font_library: FONTS, looks: STYLE_LOOKS, look_clear: LOOK_CLEAR } },
   } });
   const writes: Write[] = [];
   await page.route('**/functions/v1/presence/**', (route: Route) => {

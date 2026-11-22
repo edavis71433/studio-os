@@ -6,6 +6,7 @@
 // This renders each template's own sample and measures that colour on its page colour.
 import { renderSnapshot, listTemplates } from '../../supabase/functions/presence/lib/render.ts';
 import { lookStyle } from '../../supabase/functions/presence/lib/site_looks.ts';
+import { STYLE_LOOKS } from '../../supabase/functions/presence/lib/style_looks.ts';   // the ready-made looks: the server's one list
 import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
@@ -38,7 +39,7 @@ const FIXED = new Set(JSON.parse(/const FIXED_COLOR_TEMPLATES = new Set\((\[[^\]
 // Item 333: a ready-made look also names its cards' colour (the two dark ones), and brings its own
 // small layer of rules (lib/site_looks.ts), read here after the template's own: each of its rules
 // starts at :root only to outrank the template's, so the last rule with the selector is the one drawn.
-const CHOICES = [...pageArray('PALETTES'), ...pageArray('STYLE_LOOKS')].filter((p) => p.tokens && p.tokens.ink)
+const CHOICES = [...pageArray('PALETTES'), ...STYLE_LOOKS].filter((p) => p.tokens && p.tokens.ink)
   .map((p) => ({ name: p.name, tokens: p.tokens, vars: Object.fromEntries(['accent', 'accent_dark', 'ink', 'soft', 'bg', 'card', 'accent_band'].filter((k) => p.tokens[k]).map((k) => [k.replace('_', '-'), p.tokens[k]])) }));
 const lookRules = (tokens, slug) => screenRules(lookStyle(tokens, { template: slug }).replace(/<\/?style[^>]*>/g, '').replace(/:root /g, ''));
 /** Rules outside @media blocks: print and narrow-screen rules don't recolour the table on screen. */

@@ -50,6 +50,10 @@ const TOKEN_RULES: Record<string, RegExp> = {
   heading_weight: /^400$/,                      // headings at regular weight, for a face drawn in one weight
   button_radius: /^([0-9]|[1-3][0-9]|40)px$/,   // every button's corners, over its set's
   button_shadow: /^offset$/,                    // a solid shadow beside the main button
+  // the openings made for a kind of business (lib/kind_openings.ts). Each draws only when set (lib/template_kit.ts).
+  hero_card: /^(estimate|today)$/,              // a card on the welcome photo: a form asking for an estimate, or today's hours and the booking button
+  hero_photo: /^left$/,                         // the colour panel opening with its photo on the left
+  hero_band: /^off$/,                           // the Type only opening on the page itself, not on a band of colour
 };
 export const ALLOWED_TOKENS = Object.keys(TOKEN_RULES);
 

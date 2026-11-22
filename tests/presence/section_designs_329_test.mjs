@@ -18,6 +18,7 @@
 import { renderSnapshot, renderForBuilder, devLayerFragments, FIXED_COLOR_TEMPLATES } from '../../supabase/functions/presence/lib/render.ts';
 import { buttonStyle, siteColours } from '../../supabase/functions/presence/lib/site_buttons.ts';
 import { lookStyle } from '../../supabase/functions/presence/lib/site_looks.ts';
+import { STYLE_LOOKS } from '../../supabase/functions/presence/lib/style_looks.ts';   // the ready-made looks: the server's one list
 import { validateBlocks, resolveBlockMedia, unresolveBlockMedia, renderSiteBlocks, BLOCK_VARIANTS, BLOCK_CSS, DESIGN_CSS, sectionStyles } from '../../supabase/functions/presence/lib/site_blocks.ts';
 import { esc, attr, safeHref } from '../../supabase/functions/presence/lib/markdown.ts';
 import { composeBlocks } from '../../supabase/functions/presence/lib/serializer.ts';
@@ -233,7 +234,7 @@ for (const slug of TEMPLATES) {
   const SRC = editorSource();
   const pageArray = (name) => new Function(`return ${SRC.match(new RegExp(`\\nconst ${name} = (\\[[\\s\\S]*?\\n\\]);`))[1]};`)();
   const TOKENS = ['accent', 'accent_dark', 'ink', 'soft', 'bg'];
-  const CHOICES = [{ name: 'its own colours', tokens: {} }, ...[...pageArray('PALETTES'), ...pageArray('STYLE_LOOKS')].filter((p) => p.tokens && Object.keys(p.tokens).length)]
+  const CHOICES = [{ name: 'its own colours', tokens: {} }, ...[...pageArray('PALETTES'), ...STYLE_LOOKS].filter((p) => p.tokens && Object.keys(p.tokens).length)]
     .filter((c, i, all) => all.findIndex((d) => TOKENS.every((k) => d.tokens[k] === c.tokens[k])) === i);
   // a style element's :root variables and its other rules (the palette's style layer, a button set's colours)
   const splitStyle = (style) => { const css = style.replace(/^<style[^>]*>|<\/style>$/g, ''); const m = /^:root\{([^{}]*)\}/.exec(css); return { root: Object.fromEntries((m ? m[1] : '').split(';').filter(Boolean).map((d) => [d.slice(0, d.indexOf(':')).trim(), d.slice(d.indexOf(':') + 1).trim()])), rules: m ? css.slice(m[0].length) : css }; };

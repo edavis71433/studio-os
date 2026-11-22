@@ -11,6 +11,7 @@
 //   GET  /dev/customization      — the site's theme tokens + custom CSS/HTML
 //   PUT  /dev/customization      — save (validated + sanitized); reports rejected tokens
 import { FONT_LIBRARY } from '../lib/fonts.ts';
+import { STYLE_LOOKS, LOOK_CLEAR } from '../lib/style_looks.ts';
 import { json } from '../../_shared/http.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -73,6 +74,10 @@ export async function handleDevCustomizationGet(jwt: string, site: SiteRow, prin
     allowed_tokens: ALLOWED_TOKENS,
     // the curated library the Styles panel offers (lib/fonts.ts); the files are in the app at /fonts/library/
     font_library: FONT_LIBRARY.map(({ id, family, css, kind, weights, fallback }) => ({ id, family, css, kind, weights, fallback })),
+    // the ready-made looks Styles offers, Original first, and what picking one clears (lib/style_looks.ts):
+    // the one list + New site's openings start a site in too
+    looks: STYLE_LOOKS,
+    look_clear: LOOK_CLEAR,
     // Whether THIS caller may author custom CSS/HTML (full Developer Mode) vs. only
     // read it (an owner sees the palette but not the advanced CSS editor). The UI
     // gates the "Custom CSS (advanced)" area on this so non-technical owners never

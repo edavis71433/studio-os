@@ -16,6 +16,9 @@
 // The fonts are library families (lib/fonts.ts), regular and bold only, saved as the same
 // two style tokens Styles saves, so a publish carries their files like any other pick.
 import { FONT_LIBRARY, fontStack, type LibraryFont } from './fonts.ts';
+import { kindOpening } from './kind_openings.ts';
+import { lookByKey } from './style_looks.ts';
+import type { Snapshot } from './render_types.ts';
 
 /** Every front-page layout, in the editor's order, with the name it shows. '' is Classic. */
 export const HERO_LAYOUTS = [
@@ -83,6 +86,50 @@ export function openingSummary(start: OpeningStart, layout: boolean, fonts: bool
   return fonts ? `Fonts: ${type}` : '';
 }
 
+// ═════════ the openings made for a kind of business (lib/kind_openings.ts) ═════════
+// An opening gives a new site its design, its layout, the name centred at the top or not, and
+// one style: a ready-made look whole (its colours, fonts and buttons), or for an opening with no
+// look the design's own new-site fonts; with the card on the photo, the panel's photo side and
+// Type only on the page as three more style settings. agency/sites.ts applies it to the new site only.
+export interface KindOpeningStart {
+  key: string;
+  /** Its name, as + New site shows it. */
+  name: string;
+  /** The design it is made with. */
+  slug: string;
+  /** presence_settings.hero_layout and .nav_style. */
+  hero_layout: HeroLayout;
+  nav_style: '' | 'centered';
+  /** The style settings it brings, as Styles saves them. */
+  tokens: Record<string, string>;
+}
+/** What an opening gives a new site, or null for a key that isn't one (or names a design or a
+ *  look that isn't there). Pure. */
+export function kindOpeningStart(key: unknown): KindOpeningStart | null {
+  const o = kindOpening(key);
+  const start = o ? openingStartFor(o.design) : null;
+  if (!o || !start || !isHeroLayout(o.layout)) return null;
+  const look = o.look ? lookByKey(o.look) : null;
+  if (o.look && !look) return null;
+  const tokens: Record<string, string> = { ...(look ? look.tokens : start.tokens), ...(o.card ? { hero_card: o.card } : {}), ...(o.photo ? { hero_photo: o.photo } : {}), ...(o.band ? { hero_band: o.band } : {}) };
+  return { key: o.key, name: o.name, slug: o.design, hero_layout: o.layout, nav_style: o.header, tokens };
+}
+
+/** A sample snapshot as a new site on its design opens: the design's own layout and fonts
+ *  (TEMPLATE_OPENINGS), or with an opening its layout, header and style. The design pictures,
+ *  the opening pictures and "See it full size" draw this. A copy; the one given is untouched.
+ *  Unknown designs and openings for another design are left as they are. Pure. */
+export function startedSnapshot(snapshot: Snapshot, openingKey = ''): Snapshot {
+  const opening = openingKey ? kindOpeningStart(openingKey) : null;
+  const start = openingStartFor(snapshot.template_slug);
+  if (!start || (openingKey && (!opening || opening.slug !== snapshot.template_slug))) return snapshot;
+  const out = structuredClone(snapshot);
+  out.content = { ...out.content, settings: { ...(out.content.settings || {}), hero_layout: opening ? opening.hero_layout : start.hero_layout, ...(opening?.nav_style ? { nav_style: opening.nav_style } : {}) } };
+  const dev = out.dev_customization || { theme_tokens: {}, custom_css: '', custom_html: '' };
+  out.dev_customization = { ...dev, theme_tokens: { ...(dev.theme_tokens || {}), ...(opening ? opening.tokens : start.tokens) } };
+  return out;
+}
+
 // ═════════ the stylesheet, for a site drawn with a new layout ═════════
 // Shared by the three (OPENING_BASE), then each one's own. The layouts keep each design's
 // own voice: its kicker, its buttons, its heading font and weight; these rules only lay
@@ -128,26 +175,42 @@ export const OPENING_CSS: Record<OpeningKind, string> = {
 .op-photos.n1 .op-ph img{aspect-ratio:16/9}
 .op-photos.n2 .op-ph img{aspect-ratio:4/5}
 @media (max-width:640px){.op-photos.n3{grid-template-columns:1fr 1fr}.op-photos.n3 .op-ph:first-child{grid-column:1/-1}.op-photos .op-ph img{aspect-ratio:1/1}.op-photos.n1 .op-ph img{aspect-ratio:4/3}}`,
+  // The band's colours are scoped to a band: the openings made for a kind of business can draw the
+  // same words on the page itself (the style setting hero_band: off, class op-page), where the
+  // site's own button set and colours carry on. On the band its buttons are white, over any button
+  // set (0,4,0), so a set's colours, picked for the page, are never drawn on the band's.
   type: `
-.op-type{background:var(--accent-band,var(--accent-dark,#1c2434));color:#fff;padding-top:clamp(56px,9vw,112px);padding-bottom:clamp(44px,6vw,80px)}
-.op-type h1{color:#fff;font-size:clamp(2.6rem,7vw,6rem);line-height:1.02;letter-spacing:-.02em;max-width:15ch;margin:0 0 20px}
+.op-type{padding-top:clamp(56px,9vw,112px);padding-bottom:clamp(44px,6vw,80px)}
+.op-type h1{font-size:clamp(2.6rem,7vw,6rem);line-height:1.02;letter-spacing:-.02em;max-width:15ch;margin:0 0 20px}
 .op-type h1.op-long{font-size:clamp(2.1rem,4.6vw,3.9rem);max-width:22ch}
-.op-type .op-line{color:rgba(255,255,255,.9)}
 .op-type .cta-row{justify-content:flex-start}
-.op-type .btn{background:#fff;color:var(--accent-band,var(--accent-dark,#1c2434));border-color:#fff;box-shadow:none}
-.op-type .btn:hover{background:rgba(255,255,255,.88);color:var(--accent-band,var(--accent-dark,#1c2434));border-color:#fff}
-.op-type .btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.75)}
-.op-type .btn.ghost:hover{background:rgba(255,255,255,.12);color:#fff;border-color:#fff}
-.op-type a{color:#fff}
-.op-type :focus-visible{outline-color:#fff}
-.op-facts{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;margin:44px 0 0;padding:28px 0 0;border-top:1px solid rgba(255,255,255,.24)}
+.op-facts{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;margin:44px 0 0;padding:28px 0 0;border-top:1px solid var(--ink,currentColor)}
 .op-fact .op-big{display:block;font-family:var(--font-display,inherit);font-size:clamp(1.4rem,2.6vw,2.1rem);font-weight:700;line-height:1.15;overflow-wrap:anywhere}
 .op-fact .op-big.op-s{font-size:clamp(1.1rem,1.6vw,1.35rem);line-height:1.3}
-.op-fact .op-lb{display:block;margin-top:4px;font-size:.92rem;color:rgba(255,255,255,.85)}
+.op-fact .op-lb{display:block;margin-top:4px;font-size:.92rem;color:var(--soft)}
 .op-fact:has(.open-now:empty){display:none}
+.op-type:not(.op-page){background:var(--accent-band,var(--accent-dark,#1c2434));color:#fff}
+.op-type:not(.op-page) h1{color:#fff}
+.op-type:not(.op-page) .op-line{color:rgba(255,255,255,.9)}
+.op.op-type:not(.op-page) .btn{background:#fff;color:var(--accent-band,var(--accent-dark,#1c2434));border-color:#fff;box-shadow:none}
+.op.op-type:not(.op-page) .btn:hover{background:rgba(255,255,255,.88);color:var(--accent-band,var(--accent-dark,#1c2434));border-color:#fff}
+.op.op-type:not(.op-page) .btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.75)}
+.op.op-type:not(.op-page) .btn.ghost:hover{background:rgba(255,255,255,.12);color:#fff;border-color:#fff}
+.op-type:not(.op-page) a{color:#fff}
+.op-type:not(.op-page) :focus-visible{outline-color:#fff}
+.op-type:not(.op-page) .op-facts{border-top-color:rgba(255,255,255,.24)}
+.op-type:not(.op-page) .op-fact .op-lb{color:rgba(255,255,255,.85)}
 @media (max-width:860px){.op-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){.op-type .cta-row .btn{flex:1 1 100%;text-align:center}}`,
 };
 
 /** The rules a site drawn with this layout carries, after its design's own. Pure. */
 export const openingCss = (kind: OpeningKind): string => OPENING_BASE + OPENING_CSS[kind];
+
+/** The colour panel with its photo on the left (the style setting hero_photo: left, Figma C3): the
+ *  words' wide side moves to the right, so they line up with the page's edge there. A phone still
+ *  shows the words first. Carried only by a site drawn that way. */
+export const PANEL_LEFT_CSS = `
+.op-panel.op-left .op-photo{order:-1}
+.op-panel.op-left .op-words{padding-left:clamp(24px,5vw,72px);padding-right:max(24px,calc(50vw - 516px))}
+@media (max-width:760px){.op-panel.op-left .op-photo{order:0}.op-panel.op-left .op-words{padding:40px 20px 36px}}`;

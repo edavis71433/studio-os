@@ -12,6 +12,7 @@
 import { validateThemeTokens } from '../../supabase/functions/presence/lib/devmode.ts';
 import { renderSnapshot, renderForBuilder, listTemplates, FIXED_COLOR_TEMPLATES } from '../../supabase/functions/presence/lib/render.ts';
 import { lookStyle, lookSettings, applyLookLayer, leaveDarkLook, ownButtonWords, LOOK_COLOUR_TOKENS, DARK_LOOK_TOKENS } from '../../supabase/functions/presence/lib/site_looks.ts';
+import { STYLE_LOOKS, LOOK_CLEAR, LOOK_KEYS, lookByKey } from '../../supabase/functions/presence/lib/style_looks.ts';
 import { siteColours, buttonChoice, contrast } from '../../supabase/functions/presence/lib/site_buttons.ts';
 import { FONT_LIBRARY, libraryFontsIn, fontStack } from '../../supabase/functions/presence/lib/fonts.ts';
 import { fixture, fullFixture } from './full_fixture.mjs';
@@ -22,10 +23,10 @@ const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); if (!p) console.log(`FAIL  ${n}${note ? ' — ' + note : ''}`); };
 const SITE = { baseUrl: 'https://example.com' };
 
-// ── the looks, as the editor offers them ──
+// ── the looks, as the editor is sent them (lib/style_looks.ts), and what it clears when a colour is picked over a dark one ──
 const PAGE = editorSource();
 const pageValue = (name, open, close) => new Function(`return ${PAGE.match(new RegExp(`\\nconst ${name} = (\\${open}[\\s\\S]*?\\${close});`))[1]};`)();
-const ALL = pageValue('STYLE_LOOKS', '[', '\n]'), CLEAR = pageValue('LOOK_CLEAR', '{', '}'), DARK_CLEAR = pageValue('DARK_LOOK_CLEAR', '{', '}');
+const ALL = STYLE_LOOKS, CLEAR = LOOK_CLEAR, DARK_CLEAR = pageValue('DARK_LOOK_CLEAR', '{', '}');
 const LOOKS = ALL.filter((l) => l.key);
 const FIGMA = [['Golden hour', 'Warm'], ['Hand-lettered', 'Warm'], ['Hard hat', 'Bold'], ['Night shift', 'Bold'], ['Big & bright', 'Bold'], ['Clinic calm', 'Calm'], ['Garden', 'Calm'],
   ['Blush', 'Elegant'], ['Black & gold', 'Elegant'], ['Newsprint', 'Classic'], ['Steady navy', 'Classic'], ['Playground', 'Friendly']];

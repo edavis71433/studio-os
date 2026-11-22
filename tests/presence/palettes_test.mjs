@@ -6,7 +6,8 @@
 // dev layer must emit the dash-cased vars the templates actually consume.
 // Item 105: the server's second copy of the palettes (lib/palettes.ts PALETTES)
 // had no caller, so it went. These checks now read the lists owners actually pick
-// from: presence.html's PALETTES and the colours of its STYLE_LOOKS.
+// from: the editor's PALETTES and the colours of the ready-made looks (lib/style_looks.ts, the list the
+// editor is sent).
 // Item 333: the twelve ready-made looks each bring their own page colour (two of them dark) and
 // a button set, so a look is measured on its own page and with the button words the site draws
 // (lib/site_buttons.ts buttonChoice). tests/presence/style_looks_333_test.mjs reads every word
@@ -15,6 +16,7 @@
 import { validateThemeTokens } from '../../supabase/functions/presence/lib/devmode.ts';
 import { devLayerFragments } from '../../supabase/functions/presence/lib/render.ts';
 import { buttonChoice } from '../../supabase/functions/presence/lib/site_buttons.ts';
+import { STYLE_LOOKS } from '../../supabase/functions/presence/lib/style_looks.ts';   // the ready-made looks: the server's one list
 import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const PAGE = editorSource();
@@ -25,7 +27,7 @@ function pageArray(name) {
   return new Function(`return ${m[1]};`)();
 }
 const PALETTES = pageArray('PALETTES').filter((p) => p.tokens);   // "Original" has none
-const LOOKS = pageArray('STYLE_LOOKS').filter((l) => l.tokens && l.tokens.accent).map((l) => ({ key: `look "${l.name}"`, tokens: l.tokens }));
+const LOOKS = STYLE_LOOKS.filter((l) => l.tokens && l.tokens.accent).map((l) => ({ key: `look "${l.name}"`, tokens: l.tokens }));
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };

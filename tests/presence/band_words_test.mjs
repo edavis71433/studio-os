@@ -14,6 +14,7 @@
 import { renderSnapshot, devLayerFragments, listTemplates, FIXED_COLOR_TEMPLATES } from '../../supabase/functions/presence/lib/render.ts';
 import { BUTTON_SETS, FORM_STYLES, buttonStyle, siteColours } from '../../supabase/functions/presence/lib/site_buttons.ts';
 import { lookStyle, LOOK_COLOUR_TOKENS } from '../../supabase/functions/presence/lib/site_looks.ts';
+import { STYLE_LOOKS } from '../../supabase/functions/presence/lib/style_looks.ts';   // the ready-made looks: the server's one list
 import { fixture, fullFixture, variantPages } from './full_fixture.mjs';
 import { parseHtml, elementsIn, sheetsOf, cascade, hexOf } from './style_cascade.mjs';
 import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
@@ -25,7 +26,7 @@ const PAGE = editorSource();
 const pageArray = (name) => new Function(`return ${PAGE.match(new RegExp(`\\nconst ${name} = (\\[[\\s\\S]*?\\n\\]);`))[1]};`)();
 // every palette and look the editor offers; a look with a palette's very colours is read once
 const COLOUR_TOKENS = ['accent', 'accent_dark', 'ink', 'soft', 'bg'];
-const CHOICES = [{ name: 'its own colours', tokens: {} }, ...[...pageArray('PALETTES'), ...pageArray('STYLE_LOOKS')].filter((p) => p.tokens && Object.keys(p.tokens).length)]
+const CHOICES = [{ name: 'its own colours', tokens: {} }, ...[...pageArray('PALETTES'), ...STYLE_LOOKS].filter((p) => p.tokens && Object.keys(p.tokens).length)]
   .filter((c, i, all) => all.findIndex((d) => COLOUR_TOKENS.every((k) => d.tokens[k] === c.tokens[k])) === i);
 const VIEWS = [{ name: 'desktop', width: 1280, height: 900 }, { name: 'phone', width: 390, height: 844 }];
 const UA_PLACEHOLDER = '#757575';
