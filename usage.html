@@ -215,12 +215,12 @@ const hostOf=(u)=>String(u||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'');
 function daysShown(){
   const days=(U&&Array.isArray(U.days))?U.days:[];
   if(WHICH!=='this')return days;
-  const today=new Date().toISOString().slice(0,10);
+  const today=(window.ddsDate&&window.ddsDate.ymd)?window.ddsDate.ymd():new Date().toISOString().slice(0,10);   // item 282: the studio's own day, not world time
   return days.filter(d=>d.day<=today);
 }
 function bandHtml(){
   const t=U.totals||{publishes:0,restores:0,skipped:0,cost_cents:0,bytes:0,files:0,visits:0};
-  const plan=U.plan||{publishes:330,cost_cents:10};
+  const plan=U.plan||{cost_cents:10,host:null};
   const days=daysShown();
   const last=days.length?days[days.length-1].day:'';
   const label=String(U.month_label||'');
@@ -233,8 +233,23 @@ function bandHtml(){
     return `<i${top?' class="peak"':''} style="height:${d.publishes?h:3}%">${top?`<b>${esc(n1(max))} on ${esc(dayName(d.day))}</b>`:''}</i>`;
   }).join('');
   const chartWords=days.length?(peak?`Publishes each day: most on ${dayName(peak.day)}, with ${max}.`:'Publishes each day: none yet.'):'';
-  const pct=Math.min(100,Math.round(t.publishes/(plan.publishes||330)*100));
   const saved=t.skipped*(plan.cost_cents||10);
+  // item 269: the host's own answer about the plan, or "not known"; never a typed-in number
+  const h=plan.host||null;
+  const dayOf=(iso)=>iso?new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'}):'';
+  let gaugeHtml='';
+  if(h&&h.ok&&h.credits_included!==null&&h.credits_used!==null){
+    const pct=Math.min(100,Math.round(h.credits_used/h.credits_included*100));
+    gaugeHtml=`<div class="gl"><span>${esc(n1(h.credits_used))} of ${esc(n1(h.credits_included))} credits used on the host’s plan${h.next_period_start?`, renews ${esc(dayOf(h.next_period_start))}`:''}</span><span>${pct}%</span></div>
+        <div class="track" role="img" aria-label="${pct}% of the plan’s credits used"><div class="fill" style="width:${pct}%"></div></div>
+        <div class="gc">${h.exceeded?'The plan is used up: publishes are paused until it renews.':'Read from the host today. Your app’s own updates count here too; each publish is about 15 credits.'}</div>`;
+  }else if(h&&h.ok&&h.exceeded){
+    gaugeHtml=`<div class="gl"><span>The host’s plan is used up${h.next_period_start?`: publishes are paused until ${esc(dayOf(h.next_period_start))}`:''}</span></div><div class="gc">Buy credits at the host, or wait for the plan to renew.</div>`;
+  }else{
+    const why=!h||h.why==='no_token'?'No hosting key is set.':h.why==='refused'?'The hosting key can’t read the team’s plan.':h&&h.ok?'The host reports 0 credits used, which it does even when credits were spent, so the real figure isn’t shown.':'The host’s plan couldn’t be read just now.';
+    const plan2=h&&h.ok?[h.plan,h.credits_included!==null?`${n1(h.credits_included)} credits a period`:'',h.next_period_start?`renews ${dayOf(h.next_period_start)}`:''].filter(Boolean).join(' · '):'';
+    gaugeHtml=`<div class="gl"><span>How much of the host’s plan is used: not known</span></div><div class="gc">${esc(why)}${plan2?' Plan: '+esc(plan2)+'.':''} Each publish is about 15 credits, your app’s own updates included.</div>`;
+  }
   return `<section class="uband" aria-label="${esc(label)} in numbers">
     <div>
       <div class="top">
@@ -242,9 +257,7 @@ function bandHtml(){
         ${days.length?`<div class="chart" role="img" aria-label="${esc(chartWords)}"><div class="ct" aria-hidden="true">Publishes each day</div><div class="bars" aria-hidden="true">${bars}</div><div class="axis" aria-hidden="true"><span>${esc(dayName(days[0].day))}</span><span>${esc(dayName(last))}${WHICH==='this'?' (today)':''}</span></div></div>`:''}
       </div>
       <div class="gauge">
-        <div class="gl"><span>${esc(n1(t.publishes))} of about ${esc(n1(plan.publishes))} publishes Netlify’s plan covers a month</span><span>${pct}%</span></div>
-        <div class="track" role="img" aria-label="${pct}% of the plan’s publishes"><div class="fill" style="width:${pct}%"></div></div>
-        <div class="gc">Your app’s own updates use the same plan.</div>
+        ${gaugeHtml}
       </div>
     </div>
     <div class="facts">

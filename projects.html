@@ -697,8 +697,14 @@ function cardHtml(p){
     ${when}
   </div>`;
 }
-function boardHtml(list){
-  if(VIEW==='done'||VIEW==='archived')return `<div class="pgrid">${list.map(cardHtml).join('')}</div>`;
+// sales item 150: a project with nothing in it yet (Add a customer makes one so the customer has a
+// place; no step, no milestone, no approval, no deal) stays off the board until something is in it.
+// The Table view lists it, and the customer's profile opens it.
+const nothingYet=(p)=>isRunning(p)&&!p.deal_id&&!!(REPORTS[p.id]&&REPORTS[p.id].nothing_yet);
+function boardHtml(all){
+  if(VIEW==='done'||VIEW==='archived')return `<div class="pgrid">${all.map(cardHtml).join('')}</div>`;
+  const list=all.filter(p=>!nothingYet(p)),waiting=all.length-list.length;
+  const note=waiting?`<p class="muted" id="boardWaiting" style="margin:10px 0 0;font-size:13px">${waiting} project${waiting===1?'':'s'} with nothing in ${waiting===1?'it':'them'} yet ${waiting===1?'is':'are'} in the Table view. Add a first step and ${waiting===1?'it joins':'they join'} the board.</p>`:'';
   const staged=STAGED();
   const cols=[];
   const none=list.filter(p=>stageOf(p)==='none');
@@ -708,7 +714,7 @@ function boardHtml(list){
   return `<div class="pboard">${cols.map(c=>`<section class="pcol${c.items.length?'':' empty'}" aria-labelledby="pcol-${c.k}">
     <h2 class="pcol-h" id="pcol-${c.k}">${esc(c.l)} <span class="n">${c.items.length}</span></h2>
     ${c.items.length?`<div class="pcol-b">${c.items.map(cardHtml).join('')}</div>`:`<p class="pcol-empty">Nothing in ${esc(c.l.toLowerCase())}</p>`}
-  </section>`).join('')}</div>`;
+  </section>`).join('')}</div>${note}`;
 }
 
 // ── Bold redesign — the calendar: each project on its target date, a month at a

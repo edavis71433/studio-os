@@ -141,6 +141,20 @@ test.describe('the client sees a locked section (builder item 155)', () => {
     expect(lastBlocks()![0].lock).toEqual(LOCK(true));
   });
 
+  // Builder item 253: every card field but the Heading rebuilt the section without its lock, so the
+  // client's save was refused (and the words lost) and the studio's quietly unlocked it
+  test('words open: a body field (the subtitle) saves too, and the lock rides along', async ({ page }) => {
+    const { frame, lastBlocks } = await mount(page, { studio: false, lock: LOCK(true) });
+    await pick(page, frame, '#a');
+    await frame.locator('#dds-dc-bar .dc-b', { hasText: 'Edit words' }).click();
+    const sub = page.locator('#blocksCard input[placeholder="Subtitle (optional)"]');
+    await expect(sub).toBeEditable();
+    await sub.fill('Baked before dawn'); await sub.blur();
+    await expect.poll(() => lastBlocks()?.[0]?.subtitle).toBe('Baked before dawn');
+    expect(lastBlocks()![0].lock).toEqual(LOCK(true));
+    await expect(page.locator('#dcWhisper')).not.toHaveText(/Not saved/);
+  });
+
   test('words shut: only the padlock; the card says to ask, and nothing in it can change', async ({ page }) => {
     const { frame, puts } = await mount(page, { studio: false, lock: LOCK(false) });
     await pick(page, frame, '#a');

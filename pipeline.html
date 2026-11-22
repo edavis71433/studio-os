@@ -293,7 +293,12 @@ html.dds-embed #detailWrap{padding-top:0}
   .stage.bad{background:transparent;border:1px solid var(--bad);color:var(--bad)}
   .stage.void{background:var(--bg);color:var(--faint)}
   .val{font-variant-numeric:tabular-nums;color:var(--soft);font-size:13px}
-  dialog{border:none;border-radius:var(--dds-r-lg,10px);padding:0;max-width:560px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  /* sales item 153: margin:auto centres a dialog; the page's *{margin:0} above took that away, so
+     New deal opened at the window's top-left corner, over the menu */
+  dialog{border:none;border-radius:var(--dds-r-lg,10px);padding:0;margin:auto;max-width:560px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  #dealForm .f2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  #dealForm select{width:100%;min-height:40px;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:var(--dds-r-md,8px);background:var(--card);color:var(--ink)}
+  @media (max-width:560px){#dealForm .f2{grid-template-columns:1fr}}
   dialog::backdrop{background:rgba(27,21,37,.4)}
   .dhead{padding:var(--dds-s5,20px) var(--dds-s5,20px);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:start}
   .dbody{padding:var(--dds-s5,20px) var(--dds-s5,20px);max-height:64vh;overflow:auto}
@@ -593,7 +598,18 @@ html.dds-embed #detailWrap{padding-top:0}
     <div style="font-family:var(--serif);font-size:20px;margin-bottom:12px">New deal</div>
     <label for="f-title">Deal title</label>
     <input id="f-title" required maxlength="200" placeholder="e.g. Acme website" autocomplete="off">
-    <label for="f-email" style="margin-top:10px">Client email <span class="mut">(optional — enables their login on convert)</span></label>
+    <!-- sales item 153: value, stage, expected close and how they found you, as Agiled and Salesforce ask here -->
+    <div class="f2">
+      <div><label for="f-value" style="margin-top:10px">Value <span class="mut">(optional)</span></label>
+      <input id="f-value" type="text" inputmode="decimal" maxlength="12" placeholder="$ 2,500" autocomplete="off"></div>
+      <div><label for="f-stage" style="margin-top:10px">Stage</label>
+      <select id="f-stage"></select></div>
+      <div><label for="f-close" style="margin-top:10px">Expected close <span class="mut">(optional)</span></label>
+      <input id="f-close" type="date" autocomplete="off"></div>
+      <div><label for="f-via" style="margin-top:10px">How they found you</label>
+      <select id="f-via"></select></div>
+    </div>
+    <label for="f-email" style="margin-top:10px">Client email <span class="mut">(optional — so they can sign in later)</span></label>
     <input id="f-email" type="email" maxlength="160" placeholder="name@business.com" autocomplete="off">
     <label for="f-name" style="margin-top:10px">Client name <span class="mut">(optional)</span></label>
     <input id="f-name" maxlength="120" placeholder="Jane Doe" autocomplete="off">
@@ -3113,7 +3129,13 @@ function wireBoard(){
 let ND_CONTACT=null;
 // sales item 105: an empty board's one button is the header's + New deal
 document.addEventListener('click',(e)=>{const x=e.target&&e.target.closest?e.target.closest('[data-first-deal]'):null;if(x){const nd=document.getElementById('newDeal');if(nd)nd.click();}});
-function openNewDeal(){ ND_CONTACT=null; $('f-title').value=''; $('f-email').value=''; $('f-name').value=''; $('f-phone').value=''; $('formDlg').showModal(); setTimeout(()=>$('f-title').focus(),20); }
+// sales item 153: the stage list (your own stage names) and the How-they-found-you list, drawn when the box opens
+// reset() rather than value='' on each field: iPhone Safari keeps a cleared date field invalid after value='', which
+// silently blocks the next submit (the form just focuses the date). A form reset clears that state.
+function clearNewDeal(){ $('dealForm').reset(); $('f-stage').innerHTML=OPEN_STAGES_LIST.map(s=>`<option value="${s}">${esc(stageLabel(s))}</option>`).join(''); $('f-via').innerHTML=foundOpts(''); }
+// "$ 2,500" or "2500.50" → cents; anything unreadable is no value
+const centsOf=(s)=>{const n=Number(String(s||'').replace(/[^0-9.]/g,''));return Number.isFinite(n)&&n>0?Math.round(n*100):0;};
+function openNewDeal(){ ND_CONTACT=null; clearNewDeal(); $('formDlg').showModal(); setTimeout(()=>$('f-title').focus(),20); }
 // Scoped into a client, POST /sales/deals writes site_id = the CLIENT's site —
 // but deals only ever live on the studio's own site, so the deal would vanish
 // from the pipeline the moment you left the client. Hide the action.
@@ -3153,10 +3175,16 @@ $('dealForm').onsubmit=async(e)=>{
       if(c&&c.deduped)cnote=dedupeNote(c.data,cname,email);   // an existing contact was linked, not a new one — say so
       if(contactId)ND_CONTACT={who,id:contactId,note:cnote};
       CONTACT_NAME=null;CONTACT_TEXT=null;CONTACT_FAILED=false; }   // BOTH contact caches are stale now — the Table's name join AND the search index (visibleDeals gates its refetch on !CONTACT_TEXT); refetch on the next render
-    const created=await api('/sales/deals','POST',{title,contact_id:contactId});
+    // sales item 153: the value, stage, close date and source go with the deal (each only when given)
+    const body={title,contact_id:contactId};
+    const cents=centsOf($('f-value').value); if(cents)body.expected_value_cents=cents;
+    const stage=$('f-stage').value; if(stage&&stage!=='lead')body.stage=stage;
+    const close=$('f-close').value; if(close)body.expected_close=close;
+    const via=$('f-via').value; if(via)body.found_via=via;
+    const created=await api('/sales/deals','POST',body);
     ND_CONTACT=null;
     if(again){
-      $('f-title').value=''; $('f-email').value=''; $('f-name').value=''; $('f-phone').value='';
+      clearNewDeal();
       toast((cnote?'Deal added. '+cnote:`“${title}” added`)+' — ready for the next one.'); load();
       setTimeout(()=>$('f-title').focus(),20);
       return;

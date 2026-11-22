@@ -64,7 +64,7 @@ test.describe('Settings › Monthly report: who gets it (builder list item 160)'
   test('their email on the record; up to four more people, each taken off with ×; one that unsubscribed is said so', async ({ page }) => {
     const puts = await openCard(page);
     const sec = page.locator('#report');
-    await expect(sec.locator('#reportNext')).toHaveText('Next one: December 1 · to 1 person');
+    await expect(sec.locator('#reportNext')).toHaveText('Next one: December 4 to 6 · to 1 person');
     await expect(sec.locator('#reportTo li.main')).toContainText('Sam Ortiz');
     await expect(sec.locator('#reportTo li.main')).toContainText('sam@maple.example · on their record');
     await sec.getByRole('button', { name: 'Add someone' }).click();
@@ -78,7 +78,7 @@ test.describe('Settings › Monthly report: who gets it (builder list item 160)'
     await expect(toast(page)).toContainText('Added. office@maple.example gets the next report.');
     expect(puts).toEqual([{ cc: ['office@maple.example'] }]);
     await expect(sec.locator('#reportTo')).toContainText('office@maple.example');
-    await expect(sec.locator('#reportNext')).toHaveText('Next one: December 1 · to 2 people');
+    await expect(sec.locator('#reportNext')).toHaveText('Next one: December 4 to 6 · to 2 people');
     await expect(sec.getByRole('button', { name: 'Add someone' })).toBeFocused();   // ready for the next one
     // the client’s own address isn’t added twice
     await sec.getByRole('button', { name: 'Add someone' }).click();
@@ -88,7 +88,7 @@ test.describe('Settings › Monthly report: who gets it (builder list item 160)'
     await sec.locator('#ccIn').fill('gone@maple.example');
     await sec.getByRole('button', { name: 'Add', exact: true }).click();
     await expect(sec.locator('#ccWarn')).toHaveText('gone@maple.example is left out: unsubscribed.');
-    await expect(sec.locator('#reportNext')).toHaveText('Next one: December 1 · to 2 people');   // the one who unsubscribed doesn’t count
+    await expect(sec.locator('#reportNext')).toHaveText('Next one: December 4 to 6 · to 2 people');   // the one who unsubscribed doesn’t count
     await sec.getByRole('button', { name: 'Take gone@maple.example off' }).click();
     await expect(toast(page)).toContainText('Taken off.');
     expect(puts[puts.length - 1]).toEqual({ cc: ['office@maple.example'] });
@@ -102,7 +102,7 @@ test.describe('Settings › Monthly report: who gets it (builder list item 160)'
     await sec.locator('#sw-copy').click();
     await expect(sec.locator('#sw-copy')).toHaveAttribute('aria-checked', 'true');
     await expect(toast(page)).toContainText('On. You’ll get a copy of each report.');
-    await expect(sec.locator('#reportNext')).toHaveText('Next one: December 1 · to 2 people');
+    await expect(sec.locator('#reportNext')).toHaveText('Next one: December 4 to 6 · to 2 people');
     await sec.locator('#sw-quiet').click();
     await expect(sec.locator('#sw-quiet')).toHaveAttribute('aria-checked', 'true');
     await expect(toast(page)).toContainText('On. A month under 30 visits is skipped.');
@@ -151,7 +151,7 @@ test.describe('Settings › Monthly report: what to suggest next (builder list i
     await sec.getByRole('radio', { name: 'Pick for me each month' }).click();
     await expect(toast(page)).toContainText('On. Each report suggests one thing from their Do next list.');
     await expect(sec.locator('#sugBox')).toBeVisible();
-    await expect(sec.locator('#sugEye')).toHaveText('December 1 report suggests');
+    await expect(sec.locator('#sugEye')).toHaveText('The December report suggests');
     await expect(sec.locator('#sugText')).toHaveText(IDEA.text);
     await expect(sec.locator('#sugFrom')).toHaveText('From their Do next list: a Growth Coach idea');
     await sec.getByRole('button', { name: 'Pick another ▾' }).click();
@@ -256,7 +256,7 @@ test.describe('Settings › Monthly reports, every client (builder list item 160
     const blue = sec.locator(`[data-report="${OTHER}"]`);
     await blue.getByRole('switch').click();
     await expect(blue.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
-    await expect(toast(page)).toContainText('On. Bluebird Bakery gets a report in the first days of next month.');
+    await expect(toast(page)).toContainText('On. Bluebird Bakery gets a report on the 4th to 6th of next month.');
     expect(puts).toEqual([{ scope: OTHER, body: { enabled: true } }]);   // the client's own switch, with that client in scope
     await expect(sec.getByRole('button', { name: 'Switch on everyone who can get it' })).toBeHidden();   // nobody left who can
   });

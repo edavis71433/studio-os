@@ -235,6 +235,35 @@ for (const s of db.tables.presence_snapshots) s.created_at = new Date().toISOStr
   ok('refused, and logged: customer, contact and deal lines (no change to a website)', refused.length === 3 && logged.filter((l) => l.includes('change_event_refused')).length === 3);
 }
 
+// ═══ 8. builder item 249: a publish set for later never puts an older site back ═══
+{
+  const { SKIPPED_NEWER_LIVE } = await import('../../supabase/functions/presence/ops/scheduler.ts');
+  db.tables.presence_identity[0].tagline = 'Holiday hours from the 20th';   // frozen into the scheduled copy
+  const made = await schedule({ kind: 'publish', scheduled_for: soon(), note: 'Holiday hours' });
+  const row = made.body?.data?.id ? due(made.body.data.id) : null;
+  ok('249: scheduled, with the draft frozen as it stood', made.status === 200 && !!row && row.status === 'pending', JSON.stringify(made.body).slice(0, 160));
+  row.created_at = pubs().at(-1).created_at;   // made after the last publish, on the database's own clock
+  // then a newer change goes live by hand, before the date
+  db.tables.presence_identity[0].tagline = 'Open late on Fridays';
+  const hand = await quiet(async () => { const r = await PUB.handlePublish(null, site(), OWNER, {}); return { status: r.status, body: await r.json() }; });
+  ok('249: a publish by hand goes live in the meantime', hand.status === 200 && hand.body.data.status === 'live', JSON.stringify(hand.body).slice(0, 160));
+  const deploys = nf.deploys.length, n = pubs().length;
+  const cyc = await quiet(() => runDuePublishes());
+  ok('249: at the set time the older copy is NOT sent: no deploy, no publish record', cyc.ok === true && cyc.failures === 0 && nf.deploys.length === deploys && pubs().length === n, JSON.stringify(cyc.results));
+  ok('249: the row is set aside and says why', row.status === 'canceled' && row.last_error === SKIPPED_NEWER_LIVE, JSON.stringify(row));
+  const notice = db.tables.presence_plan_notices.find((x) => x.period === `sched:${row.id}`);
+  ok('249: whoever scheduled it is told, once', !!notice && notice.kind === 'publish_failed' && notice.headline === 'A scheduled publish was set aside' && /newer version of your site went live/.test(notice.body), JSON.stringify(notice));
+  // a second tick finds nothing to do with it
+  const again = await quiet(() => runDuePublishes());
+  ok('249: …and it isn’t looked at again', again.ran === 0 && row.status === 'canceled');
+  // a scheduled revert is meant to bring an older version back: it still goes
+  const rv = await schedule({ kind: 'revert', scheduled_for: soon(), publish_id: firstPub.id });
+  const rrow = rv.body?.data?.id ? due(rv.body.data.id) : null;
+  if (rrow) rrow.created_at = pubs().at(-1).created_at;
+  const rc = await quiet(() => runDuePublishes());
+  ok('249: a scheduled return to an earlier version still goes (it is older on purpose)', !!rrow && rc.ran === 1 && rc.failures === 0 && rrow.status === 'done', JSON.stringify(rc.results));
+}
+
 const failed = results.filter((r) => !r.p);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);
 if (failed.length) Deno.exit(1);

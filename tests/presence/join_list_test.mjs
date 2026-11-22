@@ -169,15 +169,16 @@ const yes = async (email) => {
   ok('migration 0157: two columns and an index, safe to run twice', [mig, pack].every((s) => s.includes('add column if not exists subscribed_at timestamptz') && s.includes("add column if not exists subscribed_note text not null default ''") && s.includes('create index if not exists presence_contacts_subscribed_idx')) && pack.includes('-- Check:'));
   ok('0157 is the only migration with that number', [...Deno.readDirSync(new URL('supabase/migrations/', ROOT))].filter((e) => e.name.startsWith('0157_')).length === 1);
   ok('forwards: a site path or an https link, nothing else', safeRedirectTo('/menu/') === '/menu/' && safeRedirectTo('https://resy.example/x') === 'https://resy.example/x' && safeRedirectTo('data:text/html,x') === null && safeRedirectTo('javascript:alert(1)') === null && safeRedirectTo('//evil.example') === null && safeRedirectTo('') === null);
-  // Every template that draws a forward page (Restaurant Classic leaves forwards to _redirects)
+  // Item 270 (Nov 22 2026): no template writes a forward page any more; every forward is a forced
+  // rule in _redirects, so the old address answers with a real 301 on every template.
   const careless = [];
-  for (const t of ['atelier', 'aurora', 'business-classic', 'editorial', 'harbor', 'meadow', 'slate']) {
+  for (const t of ['atelier', 'aurora', 'business-classic', 'editorial', 'harbor', 'meadow', 'slate', 'restaurant-classic']) {
     const fx = fullFixture(t);
     fx.content.redirects = [{ from_path: '/old/', to_path: 'data:text/html,<b>x</b>' }, { from_path: '/menu-old/', to_path: '/menu/' }];
     const out = await renderSnapshot(fx, { baseUrl: 'https://shop.example' });
-    if ('old/index.html' in out || !String(out['menu-old/index.html']).includes('content="0;url=/menu/"')) careless.push(t);
+    if ('old/index.html' in out || 'menu-old/index.html' in out || !String(out['_redirects']).includes('/menu-old/  /menu/  301!')) careless.push(t);
   }
-  ok('…every template that draws a forward page asks first: a bad one draws no page, a good one still forwards', careless.length === 0, careless.join(','));
+  ok('…no template writes a forward page; the good forward is a forced 301 rule on every template', careless.length === 0, careless.join(','));
 }
 
 // ═══ E · the privacy page says what joining keeps (after list item 138's rewrite) ═══

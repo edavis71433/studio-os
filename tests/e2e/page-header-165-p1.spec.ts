@@ -27,7 +27,8 @@ const HOME_API = {
   '/agency/portfolio': { data: [row({ site_id: 'a1', name: 'Fern Street Bakery' }), row({ site_id: 'a2', name: 'Lumen Dental' }), row({ site_id: 'a3', name: 'Ridge Garage' })] },
   '/agency/needs-you': { data: { rows: [NEED], more: 0, rest: [], total: 1, empty_line: '', partial: false, own_site: true, next_by_site: { a1: { what: NEED.what, verb: NEED.verb, href: NEED.href, kind: NEED.kind } }, next_by_client: {} } },
   '/agency/kits': { data: [] },
-  '/studio/customers': { data: [] },
+  // sales item 158: Home's "N customers you look after" counts the Customers page's own list
+  '/studio/customers': { data: [{ client_id: 'c1', customer_site_id: 'a1', project_id: null, name: 'Fern Street Bakery' }, { client_id: 'c2', customer_site_id: 'a2', project_id: null, name: 'Lumen Dental' }, { client_id: 'c3', customer_site_id: 'a3', project_id: null, name: 'Ridge Garage' }] },
 };
 
 // ── Domains: studio-sites.spec's /agency/domains shape ──
@@ -73,7 +74,12 @@ const PROJ_API = {
     { id: 'p2', name: 'Birch brand refresh', status: 'complete', client_visible: true, client_id: 'c2', deal_id: null, start_date: null, target_date: null, updated_at: '2026-07-01T00:00:00Z' },
     { id: 'p3', name: 'Internal ops', status: 'active', client_visible: false, client_id: null, deal_id: null, start_date: null, target_date: null, updated_at: '2026-06-20T00:00:00Z' },
   ], is_studio_view: true },
-  '/studio/customers': { data: [{ client_id: 'c1', name: 'Cove Cafe', email: 'a@cove.example', status: 'active', customer_site_id: 'site-c1', open_support: 0, project_count: 1 }] },
+  // sales item 158: Home's "N customers you look after" counts the Customers page's own list
+  '/studio/customers': { data: [
+    { client_id: 'c1', name: 'Cove Cafe', email: 'a@cove.example', status: 'active', customer_site_id: 'site-c1', open_support: 0, project_count: 1 },
+    { client_id: 'c2', name: 'Lumen Dental', email: 'b@lumen.example', status: 'active', customer_site_id: 'a2', open_support: 0, project_count: 0 },
+    { client_id: 'c3', name: 'Ridge Garage', email: 'c@ridge.example', status: 'active', customer_site_id: 'a3', open_support: 0, project_count: 0 },
+  ] },
 };
 
 // ── Prospects: prospects.spec's kept rows ──

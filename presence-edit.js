@@ -260,7 +260,8 @@ function cmToggle() {
   CM_PENDING = (async () => {
     try {
       await cmLoad(); CM_ON = true;
-      if (DC_MODE === "comments") openTrayPanel("contents");   // …unless the user already moved on mid-load
+      dcRefreshTree();   // item 99: the Contents list drops its move, settings and remove buttons while Notes is on (the off path redraws it too)
+      if (DC_MODE === "comments") cmRenderList();   // builder item 284: the Notes card …unless the user already moved on mid-load
     } catch (err) { toast(nice(err), true); }
     CM_BUSY = false; CM_PENDING = null; cmSyncButton();
   })();
@@ -286,10 +287,48 @@ function closeCommentsPanel() {
   const p = $("commentsPanel"); if (!p) return;
   p.classList.remove("on"); p.setAttribute("aria-hidden", "true");
 }
+// Builder item 284: the Notes button lit up and opened nothing you could see (the Layers list
+// grew badges, and the button stayed lit after Escape). Now it opens a Notes card: the whole
+// page and every section, each with its open count or "Leave a note", and the words "No notes
+// yet. Click a section to leave one" while there are none. A section's row, or the section on
+// the page, opens its thread; the thread's Close comes back to this list; the card's Close
+// and Escape leave Notes mode (closeDesignPanels).
+let CM_VIEW = "list";   // what the comments card shows: the list, or one thread
+function dcBlockName(bi) {
+  const b = (BLOCKS_WORK || [])[bi]; if (!b) return "Section";
+  const def = (typeof BLOCK_DEFS !== "undefined" ? BLOCK_DEFS : []).find((x) => x.type === b.type);
+  return (def && def.name) || b.type || "Section";
+}
+function cmRenderList() {
+  const p = $("commentsPanel"), host = $("cmPanelBody"); if (!p || !host) return;
+  closeSettingsPanel(); closePagesCard(false); closeTrayPanel();
+  if (!p.classList.contains("on")) PANEL_LASTFOCUS = document.activeElement;
+  CM_VIEW = "list";
+  const tt = $("cmPanelTitle"); if (tt) tt.textContent = "Notes";
+  host.textContent = "";
+  const wrap = el("div"); wrap.style.cssText = "padding:12px 14px 22px";
+  const rows = [[DC_PAGE, "", "Whole page — " + dcPageTitle(DC_PAGE)]];
+  const doc = dcFrameDoc(), main = doc && doc.getElementById("main");
+  if (main) dcBlockSections(main).forEach(({ el: sec, bi }) => { const sid = (sec.getAttribute && sec.getAttribute("data-dds-sid")) || ddsSidFor(bi); if (sid) rows.push([DC_PAGE, sid, dcBlockName(bi)]); });
+  const open = cmTotalOpen();
+  wrap.appendChild(el("div", "cm-empty", open ? (open === 1 ? "1 open note on this draft." : open + " open notes on this draft.") + " Click a section to read or add to its notes." : "No notes yet. Click a section to leave one."));
+  const list = el("div", "cm-list"); list.setAttribute("role", "list");
+  rows.forEach(([slug, bid, name]) => {
+    const r = el("div", "cm-row"); r.setAttribute("role", "listitem");
+    const b = el("button", "cm-row-n", name); b.type = "button"; b.addEventListener("click", () => openCommentsThread(slug, bid, name));
+    r.appendChild(b); r.appendChild(cmBadge(slug, bid, name));
+    list.appendChild(r);
+  });
+  wrap.appendChild(list);
+  host.appendChild(wrap);
+  p.classList.add("on"); p.setAttribute("aria-hidden", "false");
+  setTimeout(() => { try { $("btnCommentsClose").focus(); } catch (_) {} }, 40);
+}
 function openCommentsThread(slug, bid, name) {
   const p = $("commentsPanel"); if (!p) return;
   closeSettingsPanel(); closePagesCard(false);
-  PANEL_LASTFOCUS = document.activeElement;
+  CM_VIEW = "thread";
+  if (!p.classList.contains("on")) PANEL_LASTFOCUS = document.activeElement;
   const tt = $("cmPanelTitle"); if (tt) tt.textContent = name;
   cmRenderThread(slug, bid, name);
   p.classList.add("on"); p.setAttribute("aria-hidden", "false");
@@ -1965,7 +2004,9 @@ function mountBlocksCard() {
 // Phase T-STYLE: a section's "look" (background / width / spacing / alignment) is
 // orthogonal to its content. The per-type editors below rebuild their block object
 // from their own fields, so carry the chosen look across every rebuild.
-function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.style) o.style = p.style; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p.anchor) o.anchor = p.anchor; if (p && p._clEdit) o._clEdit = p._clEdit; return o; }
+// Builder item 253: the lock rides along too, so a change to any field of a locked section keeps
+// it locked (the client's save was refused and their words lost; the studio's quietly unlocked it).
+function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.style) o.style = p.style; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p.anchor) o.anchor = p.anchor; if (p && p._clEdit) o._clEdit = p._clEdit; if (p && p.lock) o.lock = p.lock; return o; }
 // Wave-1 G4: per-block STYLE VARIANTS — 2–3 curated looks per section type, rendered
 // by the shared block engine (mirrors site_blocks.ts BLOCK_VARIANTS; the server
 // re-validates, unknown values fall back to the default). The default is stored as
@@ -3374,6 +3415,9 @@ async function putForms() {
 }
 // Forms follow the same rule as sections: a difference from the last save is saved.
 let FORMS_SAVE_T = null;
+// Builder item 251: a form edit in its 0.7 s wait, on its way, or failed (the close-tab warning asks)
+function formsPending() { return FORMS_SAVE_T != null || !!FORMS_SAVING || !!(FORMS_WORK && JSON.stringify(FORMS_WORK) !== FORMS_BASE); }
+if (typeof SAVE_PARTS !== "undefined") SAVE_PARTS.push({ pending: formsPending, retry: formsSaveNow });   // the core's close-tab warning and retry (items 250, 251)
 function formsSaveSoon(ms) { clearTimeout(FORMS_SAVE_T); FORMS_SAVE_T = setTimeout(formsSaveNow, ms === undefined ? 700 : ms); }
 async function formsSaveNow() {
   clearTimeout(FORMS_SAVE_T); FORMS_SAVE_T = null;
@@ -4624,7 +4668,7 @@ function dcPageStatus(chip) {
   let word = "Live", tone = "good", says = "Nothing on this page is waiting: your live site shows it as it is here";
   const tp = pg ? hbTreePage(pg) : null;
   const acc = (pg && pg.slug && (dcPageObj(pg.slug) || {}).access) || "";   // item 196: a private or password page isn't plainly "Live"
-  if (tp && HB_TREE_FLAG[tp.status]) { word = tp.status_label; tone = HB_TREE_FLAG[tp.status]; says = tp.status_label; }
+  if (tp && HB_TREE_FLAG[tp.status]) { word = shortStatus(tp.status_label); tone = HB_TREE_FLAG[tp.status]; says = tp.status_label; }   // item 285: two words; the whole in the title
   else if (acc === "private") { word = "Private"; tone = ""; says = "Kept in your draft: it isn’t on your live site or in its menu"; }
   else if (!ctx.siteLive || ctx.firstPublish) { word = "Not live yet"; tone = ""; says = "Your site goes live the first time you publish"; }
   else {
@@ -4818,7 +4862,11 @@ function exitEditMode(to) {   // to: the tab to land on (the Pages card's "Chang
   if (DC_MODE !== "edit") dcSetMode("edit");
   go(to || EDIT_RETURN);
 }
-function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTrayPanel(); closeSettingsPanel(); closeCommentsPanel(); if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; } }
+function closeDesignPanels() {
+  closePagesCard(false); dcDockMore(false); closeTrayPanel(); closeSettingsPanel(); closeCommentsPanel();
+  if (DC_MODE === "comments" && !CM_BUSY) dcSetMode("edit");   // item 284: closing the Notes card leaves Notes mode, so the button isn't left lit
+  if (PANEL_LASTFOCUS && PANEL_LASTFOCUS.focus) { try { PANEL_LASTFOCUS.focus(); } catch (_) {} PANEL_LASTFOCUS = null; }
+}
 // Item 38: the rest are Edit mode's own buttons, wired as its part (presence-edit.js) loads.
 (function initDesignPanels() {
   const on = (id, fn) => { const b = $(id); if (b) b.addEventListener("click", fn); };
@@ -4868,7 +4916,7 @@ function closeDesignPanels() { closePagesCard(false); dcDockMore(false); closeTr
     twd.max = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;   // History's Timewarp caps at today too
     twd.addEventListener("change", dcTimewarpGo);
   }
-  on("btnCommentsClose", closeDesignPanels);   // G11
+  on("btnCommentsClose", () => { if (CM_VIEW === "thread" && DC_MODE === "comments") cmRenderList(); else closeDesignPanels(); });   // G11; item 284: a thread's Close goes back to the Notes list
   const sc = $("dcScrim"); if (sc) sc.addEventListener("click", closeDesignPanels);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
@@ -6604,11 +6652,13 @@ function ipeStart(doc, fieldEl, secEl) {
       sel.removeAllRanges(); sel.addRange(r);
     }
   } catch (_) {}
-  ipeAnnounce(doc, 'Editing ' + ipeFieldLabel(path) + '. ' + (md ? 'Control Enter saves' : 'Enter saves') + ', Escape cancels.');
+  ipeAnnounce(doc, 'Editing ' + ipeFieldLabel(path) + '. ' + (md ? 'Control Enter' : 'Enter') + ' or Escape saves and leaves the box; Undo takes it back.');
 }
 function ipeKeydown(e) {
   if (!IPE) return;
-  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ipeCancel(); return; }
+  // Builder item 255: Escape keeps what was typed and leaves the box (Undo takes it back). It used
+  // to throw the words away with no message and nothing to redo.
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ipeCommit(); return; }
   if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
     const k2 = String(e.key || '').toLowerCase();
     // the browser's NATIVE bold/italic would inject DOM shapes the markdown
@@ -6688,6 +6738,9 @@ function ipeEnd() {   // restore the element's pre-session attributes + chrome
     s.el.removeEventListener('drop', ipeDrop);
     s.el.removeEventListener('dragover', ipeDragover);
     s.el.removeEventListener('beforeinput', ipeBeforeInput);
+    // Builder item 272: let go of the words, so an iPhone puts its keyboard away. Left focused,
+    // the keyboard stayed up over the page after Return with nothing to type into.
+    if (s.doc.activeElement === s.el) s.el.blur();
     Object.keys(s.prev).forEach((a) => { if (s.prev[a] == null) s.el.removeAttribute(a); else s.el.setAttribute(a, s.prev[a]); });
     ipeHideBar(s.doc);
   } catch (_) { /* the canvas may have reloaded under us — nothing to restore */ }
@@ -6887,7 +6940,7 @@ function ideStart(doc, el) {
 }
 function ideKeydown(e) {
   if (e.key === "Enter") { e.preventDefault(); ideEnd(true); }
-  else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); ideEnd(false); }
+  else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); ideEnd(true); }   // item 255: Escape keeps the words too
   else if (IDE && e.key.length === 1 && !e.metaKey && !e.ctrlKey && IDE.el.textContent.length >= IDE.spec.max) {
     const sel = IDE.doc.getSelection();
     if (!sel || sel.isCollapsed) e.preventDefault();   // full: typing over a selection still works
@@ -6906,6 +6959,7 @@ function ideEnd(save) {
   IDE = null;
   const el = s.el;
   ["keydown", "blur", "paste", "drop"].forEach((t) => el.removeEventListener(t, t === "keydown" ? ideKeydown : t === "blur" ? ideBlur : idePaste));
+  try { if (el.ownerDocument.activeElement === el) el.blur(); } catch (_) {}   // item 272: the iPhone keyboard goes when the words are let go (as in ipeEnd)
   Object.keys(s.prev).forEach((a) => { if (s.prev[a] == null) el.removeAttribute(a); else el.setAttribute(a, s.prev[a]); });
   el.classList.remove("ipe-on");
   const text = String(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, s.spec.max);
@@ -6921,6 +6975,15 @@ function ideEnd(save) {
   // beat it. A redraw before it lands would paint the old words back.
   const saving = IDE_SAVING = debounceFlush("identity:" + s.field).finally(() => { if (IDE_SAVING === saving) IDE_SAVING = null; ideRelease(); });
 }
+// Builder item 272: iPhone Safari scrolls the whole editor up to make room for its keyboard and
+// doesn't always scroll it back, which left the top bar (Exit, Preview, Publish) off the top of
+// the screen with a grey gap at the bottom. The editor is a fixed full-screen layout that never
+// scrolls as a page, so once the keyboard has gone it goes back to the top.
+if (window.visualViewport) window.visualViewport.addEventListener("resize", () => {
+  if (!document.documentElement.classList.contains("dc-edit") || IPE || IDE) return;
+  if (window.visualViewport.height < window.innerHeight * 0.85) return;   // the keyboard is still up
+  if (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) { window.scrollTo(0, 0); document.body.scrollTop = 0; }
+});
 function ideRelease() {   // the redraw a session or its save held off
   if (!DP_REPAINT_HELD || IPE || IDE || IDE_SAVING) return;
   DP_REPAINT_HELD = false; dcCaptureScroll(); refreshDesignPreview();
@@ -7390,6 +7453,14 @@ function dcInjectCanvas(doc, main, live) {
         openCtx(el2, x, y);
       });
       el2.addEventListener("click", (e) => {
+        // item 284: in Notes mode a press on a section opens its notes
+        if (DC_MODE === "comments") {
+          if (e.target.closest && e.target.closest(".dc-ins,#dds-dc-bar,#dds-dc-more,#dds-ipe-bar,.dc-colh,.dc-emptyzone")) return;
+          const c = eeClassify(el2); if (c.kind !== "block") return;
+          const sid = el2.getAttribute("data-dds-sid") || ddsSidFor(c.bi); if (!sid) return;
+          e.preventDefault(); openCommentsThread(DC_PAGE, sid, dcBlockName(c.bi));
+          return;
+        }
         if (!byTouch()) return;   // a mouse click keeps its meaning: hover shows the bar, a double-click edits
         if (e.target.closest && e.target.closest(".dc-ins,#dds-dc-bar,#dds-dc-more,#dds-ipe-bar,.dc-colh,.dc-emptyzone")) return;
         if (IPE && IPE.el && IPE.el.contains(e.target)) return;   // typing in it already

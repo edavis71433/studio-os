@@ -560,6 +560,7 @@ const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 // the shell's one toast (shell-kit.js); bad→error styling
 const toast=(m,bad,action)=>ddsToast(m,bad?'err':'ok',action);
 let TOKEN="",ME=null,CLIENTS=[],PROJECT_BY_SITE={},CUST_FAILED=false,LOADED_ONCE=false,LOADED_AT=0;
+let CUST_LIST=null;   // sales item 158: the Customers page's own list (/studio/customers), so Home counts the same customers it does
 const money=(c)=>ddsMoney(c||0);   // the shell's one money format (shell-kit.js): whole dollars, or with cents
 let REQ_SEQ=0;   // request-generation guard: a slow response that resolves after a newer request started is DISCARDED
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;}); // keep token fresh (auto-refresh)
@@ -568,6 +569,10 @@ sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_tok
 // call for that same path, and whatever is left is dropped when boot ends.
 const EARLY=new Map();
 function early(paths){for(const p of paths){const pr=apiNow(p);pr.catch(()=>{});EARLY.set(p,pr);}}
+// sales item 151: Home's own day and clock go with every read the server dates (Won this month, the goal
+// bar, overdue invoices, late next steps), as Pipeline's do; the server used London's day without them
+const dayQ=()=>'today='+encodeURIComponent(ddsDate.ymd())+'&tzo='+new Date().getTimezoneOffset();
+const SUMMARY_PATH=()=>'/sales/summary?'+dayQ(),RECV_PATH=()=>'/sales/receivables?'+dayQ(),NEEDS_PATH=(fresh)=>'/agency/needs-you?'+dayQ()+(fresh?'&fresh=1':'');
 // the shell's one API helper (shell-kit.js): Home reads at studio level, so no client goes with a read
 const apiNow=(path)=>ddsApi(path,{scope:''});
 function api(path){const e=EARLY.get(path);if(e){EARLY.delete(path);return e;}return apiNow(path);}
@@ -683,9 +688,17 @@ function lheadHtml(shown){
     <div class="lmeta" id="lmeta">${shown} customer${shown===1?'':'s'} · ${esc(updatedLabel())}${DISPLAY==='table'?` · Sorted by ${esc(sortCol[1])} — ${SORT.dir>0?'ascending':'descending'}`:''}</div>`;
 }
 // the header's line: the customers the studio looks after and how many of them need you (the list's own rows)
+// sales item 158: the number is the Customers page's (its All view: every customer on the studio's books, the
+// same /studio/customers rows), not the count of sites Home looks after; the two differed on the live account
+// ("6 customers you look after" against "5 customers"). Without that list (an older server, a failed read),
+// the sites as before.
+function customerCount(){
+  if(Array.isArray(CUST_LIST)){const seen=new Set();for(const c of CUST_LIST)if(c&&c.client_id)seen.add(String(c.client_id));return seen.size;}
+  return CLIENTS.filter(c=>!c.archived).length;
+}
 function headLine(){
   if(!LOADED_ONCE)return'';
-  const live=CLIENTS.filter(c=>!c.archived),n=live.length,needs=live.filter(c=>!!nextFor(c)).length;
+  const live=CLIENTS.filter(c=>!c.archived),n=customerCount(),needs=live.filter(c=>!!nextFor(c)).length;
   return n?`${n} customer${n===1?'':'s'} you look after${needs?` · ${needs} need${needs===1?'s':''} you`:''}`:'No customers yet';
 }
 function paintHeadLine(){const l=$('phLine');if(l)l.textContent=headLine();}
@@ -978,7 +991,7 @@ async function load(soft){
   let ar=null,arch=null;
   // ↻ refreshes the Archived list too once it has been read (it used to stay cached all session)
   const wantArch=ARCH_STATE==='ok'||VIEWNAME==='archived';
-  try{[pf,cust,ar,arch]=await Promise.all([api('/agency/portfolio'),api('/studio/customers').catch(()=>({ok:false})),api('/sales/receivables').catch(()=>null),wantArch?api('/agency/portfolio?archived=true').catch(()=>null):null]);}
+  try{[pf,cust,ar,arch]=await Promise.all([api('/agency/portfolio'),api('/studio/customers').catch(()=>({ok:false})),api(RECV_PATH()).catch(()=>null),wantArch?api('/agency/portfolio?archived=true').catch(()=>null):null]);}
   catch(_){pf={ok:false,status:0,body:{}};cust={ok:false};}
   if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
   if(!pf.ok){
@@ -998,6 +1011,7 @@ async function load(soft){
   CUST_FAILED=!(cust&&cust.ok);
   if(!CUST_FAILED){
     const clist=Array.isArray(cust.body.data)?cust.body.data:[];
+    CUST_LIST=clist;
     PROJECT_BY_SITE={};clist.forEach(c=>{if(c.customer_site_id&&c.project_id)PROJECT_BY_SITE[c.customer_site_id]=c.project_id;});
     // ONE roster (Oct 2026 studio audit, change 3): the bridge roster customers.html
     // used to show (email · support waiting · projects · status) folds into the
@@ -1281,7 +1295,7 @@ async function mountStudio(){
   const host=$('studio');if(!host)return;
   const gen=++SSEQ;
   const get=async(p)=>{try{const r=await api(p);return r.ok?r.body.data:null;}catch(_){return null;}};
-  const [summary,deals,mine]=await Promise.all([get('/sales/summary'),get('/sales/deals?limit=100'),get('/sales/my-tasks')]);
+  const [summary,deals,mine]=await Promise.all([get(SUMMARY_PATH()),get('/sales/deals?limit=100'),get('/sales/my-tasks')]);
   if(gen!==SSEQ)return;
   MYTASKS=(mine&&Array.isArray(mine.items))?{items:mine.items,total:Number(mine.total)||mine.items.length,partial:!!mine.partial}:null;
   DEALS=Array.isArray(deals)?deals:null;DEALS_CUT=Array.isArray(deals)&&deals.length>=100;STUDIO_DONE=true;
@@ -1329,7 +1343,7 @@ window.addEventListener('hashchange',openFromHash);
 async function boot(){
   try{const{data}=await sb.auth.getSession();TOKEN=(data&&data.session&&data.session.access_token)||"";
     if(!TOKEN){signedOut();return;}
-    early(['/agency/needs-you','/sales/summary','/sales/deals?limit=100','/sales/my-tasks','/agency/portfolio','/studio/customers','/sales/receivables']);
+    early([NEEDS_PATH(false),SUMMARY_PATH(),'/sales/deals?limit=100','/sales/my-tasks','/agency/portfolio','/studio/customers',RECV_PATH()]);
     const me=await api('/agency/me');
     if(!me.ok)EARLY.clear();
     if(me.status===401){signedOut();return;}   // stale session ≠ "not an agency" — send them to the door
@@ -1705,7 +1719,7 @@ function applyNext(){NEXT={bySite:(NEEDS&&NEEDS.next_by_site)||{},byClient:(NEED
 async function mountNeeds(fresh){
   const host=$('needs');if(!host)return;
   const gen=++NSEQ;
-  let r;try{r=await api('/agency/needs-you'+(fresh?'?fresh=1':''));}catch(_){r={ok:false,status:0,body:{}};}   // fresh: just after a change here, never a shared run
+  let r;try{r=await api(NEEDS_PATH(fresh));}catch(_){r={ok:false,status:0,body:{}};}   // fresh: just after a change here, never a shared run
   if(gen!==NSEQ)return;   // a newer read started — drop this one
   if(!r.ok||!r.body.data||typeof r.body.data!=='object'){
     if(!NEEDS){NEEDS_FAILED=true;paintNeeds();}   // a failed re-read keeps the last good list

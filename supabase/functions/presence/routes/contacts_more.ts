@@ -258,15 +258,23 @@ export async function handleContactMerge(req: Request, site: SiteRow, principal:
   for (const k of MERGE_PICKS) if (b.pick && (b.pick[k] === 'other' || b.pick[k] === 'keep')) pick[k] = b.pick[k];
   const { values, conflict, notesCut } = mergeValues(keep, other, pick);
   if (conflict === 'different_customers') return json({ error: 'different_customers', message: 'These two records belong to two different customers, so they can’t be merged.' }, 409, cors);
-  const [dealsR, apptR, revR] = await Promise.all([
+  // sales item 143: their logged calls, emails, meetings and notes (presence_person_events) and
+  // their own to-dos (presence_deal_tasks with no deal) move too. Both are read by the kept
+  // record's id, so a line left on the merged-away record vanished from the record, To-dos,
+  // Home and the reminder emails without a word. Before APPLY-0173 neither table exists: the
+  // read fails, nothing is counted, and nothing is moved.
+  const [dealsR, apptR, revR, evR, tkR] = await Promise.all([
     svc(`presence_deals?site_id=eq.${site.id}&contact_id=eq.${otherId}&deleted_at=is.null&select=id&limit=500`),
     svc(`presence_appointments?site_id=eq.${site.id}&contact_id=eq.${otherId}&select=id&limit=500`),
     svc(`presence_reviews?site_id=eq.${site.id}&contact_id=eq.${otherId}&select=id&limit=500`),
+    svc(`presence_person_events?site_id=eq.${site.id}&contact_id=eq.${otherId}&deleted_at=is.null&select=id&limit=500`).catch(() => ({ ok: false, json: [] })),
+    svc(`presence_deal_tasks?site_id=eq.${site.id}&contact_id=eq.${otherId}&deleted_at=is.null&select=id&limit=500`).catch(() => ({ ok: false, json: [] })),
   ]);
-  const moved = { deals: rows(dealsR).map((x: any) => x.id), appointments: rows(apptR).map((x: any) => x.id), reviews: rows(revR).map((x: any) => x.id) };
+  const moved = { deals: rows(dealsR).map((x: any) => x.id), appointments: rows(apptR).map((x: any) => x.id), reviews: rows(revR).map((x: any) => x.id), history: rows(evR).map((x: any) => x.id), todos: rows(tkR).map((x: any) => x.id) };
+  const moves = { deals: moved.deals.length, bookings: moved.appointments.length, reviews: moved.reviews.length, history: moved.history.length, todos: moved.todos.length };
   if (b.confirm !== true) {
     return json({ data: { dry_run: true, keep: { id: keep.id, ...mergeShow(keep), tags: keep.tags || [] }, other: { id: other.id, ...mergeShow(other), tags: other.tags || [] },
-      result: { ...mergeShow(values), tags: values.tags }, moves: { deals: moved.deals.length, bookings: moved.appointments.length, reviews: moved.reviews.length }, partial: !dealsR.ok || !apptR.ok || !revR.ok,
+      result: { ...mergeShow(values), tags: values.tags }, moves, partial: !dealsR.ok || !apptR.ok || !revR.ok,
       notes_cut: notesCut } }, 200, cors);   // item 121: said before the merge, not found out after
   }
   if (!dealsR.ok) return json({ error: 'read_failed', message: 'We couldn’t check their deals just now, so nothing was merged.' }, 502, cors);
@@ -279,7 +287,7 @@ export async function handleContactMerge(req: Request, site: SiteRow, principal:
   if (!away.ok || !rows(away)[0]) return json({ error: 'write_failed', message: 'Nothing was merged — the change didn’t reach the database. Please try again.' }, 502, cors);
   // 2) their deals, bookings and reviews move to the record you keep
   const move = async (table: string, ids: string[]) => ids.length ? (await svc(`${table}?site_id=eq.${site.id}&contact_id=eq.${otherId}&id=in.(${ids.join(',')})`, { method: 'PATCH', body: JSON.stringify({ contact_id: keepId }) })).ok : true;
-  const mv = await Promise.all([move('presence_deals', moved.deals), move('presence_appointments', moved.appointments), move('presence_reviews', moved.reviews)]);
+  const mv = await Promise.all([move('presence_deals', moved.deals), move('presence_appointments', moved.appointments), move('presence_reviews', moved.reviews), move('presence_person_events', moved.history), move('presence_deal_tasks', moved.todos)]);
   // 3) the kept record takes the picked values, both sets of tags and the notes
   const patch: Record<string, unknown> = { ...values };
   const up = await svc(`presence_contacts?id=eq.${keepId}&site_id=eq.${site.id}&select=id,name,email`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
@@ -288,7 +296,7 @@ export async function handleContactMerge(req: Request, site: SiteRow, principal:
     await unmergeRecord(site.id, otherId, record).catch(() => null);
     return json({ error: 'write_failed', message: 'Nothing was merged — part of it didn’t save, so everything was put back. Please try again.' }, 502, cors);
   }
-  return json({ data: { merged: true, keep: rows(up)[0], merged_away: { id: otherId, name: String(other.name || other.email || 'Contact') }, moved: { deals: moved.deals.length, bookings: moved.appointments.length, reviews: moved.reviews.length }, notes_cut: notesCut } }, 200, cors);
+  return json({ data: { merged: true, keep: rows(up)[0], merged_away: { id: otherId, name: String(other.name || other.email || 'Contact') }, moved: moves, notes_cut: notesCut } }, 200, cors);
 }
 
 /** Undo a merge from its record: the kept record's fields go back where nobody changed
@@ -311,7 +319,8 @@ async function unmergeRecord(siteId: string, awayId: string, record: any): Promi
     const list = Array.isArray(ids) ? ids.map(String).filter((x) => UUID_RE.test(x)) : [];
     return list.length ? svc(`${table}?site_id=eq.${siteId}&contact_id=eq.${keepId}&id=in.(${list.join(',')})`, { method: 'PATCH', body: JSON.stringify({ contact_id: awayId }) }) : Promise.resolve(null);
   };
-  await Promise.all([back('presence_deals', record?.moved?.deals), back('presence_appointments', record?.moved?.appointments), back('presence_reviews', record?.moved?.reviews)]);
+  await Promise.all([back('presence_deals', record?.moved?.deals), back('presence_appointments', record?.moved?.appointments), back('presence_reviews', record?.moved?.reviews),
+    back('presence_person_events', record?.moved?.history), back('presence_deal_tasks', record?.moved?.todos)]);   // sales item 143: the history and to-dos go back too
   return true;
 }
 

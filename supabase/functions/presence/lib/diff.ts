@@ -24,7 +24,19 @@ function fmtT(t: string): string {
 const dayText = (d: HoursDay | undefined): string =>
   !d || d.closed || !d.intervals?.length ? 'Closed' : d.intervals.map((i) => `${fmtT(i.open)}–${fmtT(i.close)}`).join(', ');
 const q = (s: string, max = 48): string => `“${s.length > max ? s.slice(0, max - 1) + '…' : s}”`;
-const jeq = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+// Item 262: the live version comes back from the database with its keys in another order
+// (Postgres stores JSON that way), so plain JSON text called every section, page and forward
+// "changed" the moment it was published: "Publish 6 changes" seconds after a publish of 6.
+// Compared with the keys in one fixed order, the same words are the same words.
+export function canon(v: unknown): string {
+  const walk = (x: unknown): unknown => {
+    if (Array.isArray(x)) return x.map(walk);
+    if (x && typeof x === 'object') return Object.fromEntries(Object.keys(x as Record<string, unknown>).sort().map((k) => [k, walk((x as Record<string, unknown>)[k])]));
+    return x;
+  };
+  return JSON.stringify(walk(v ?? null));
+}
+const jeq = (a: unknown, b: unknown): boolean => canon(a) === canon(b);
 // a map whose keys were saved in another order is the same map
 const sortedKeys = (o: Record<string, unknown>): Array<[string, string]> => Object.keys(o).sort().map((k) => [k, JSON.stringify(o[k] && typeof o[k] === 'object' ? Object.fromEntries(Object.entries(o[k] as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))) : o[k])]);
 
@@ -45,7 +57,7 @@ function stackChange(a: any, b: any, where: string): string {
   for (const [k, n] of tb) if (n > (ta.get(k) || 0)) bits.push(`${word(k, n - (ta.get(k) || 0))} added`);
   for (const [k, n] of ta) if (n > (tb.get(k) || 0)) bits.push(`${word(k, n - (tb.get(k) || 0))} removed`);
   if (!bits.length) {
-    const ja = items(a).map((x) => JSON.stringify(x)), jb = items(b).map((x) => JSON.stringify(x));
+    const ja = items(a).map((x) => canon(x)), jb = items(b).map((x) => canon(x));
     const edited = ja.filter((x, i) => x !== jb[i]).length;
     if (!edited) bits.push('its look changed');
     else if ([...ja].sort().join('\n') === [...jb].sort().join('\n')) bits.push('blocks moved');
@@ -173,9 +185,6 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
   }
   for (const p of l.posts) if (!dP.has(p.id)) out.push({ section: 'updates', sentence: `The blog post ${q(p.title)} comes off your site.`, entity_id: p.id });
 
-  // ── redirects (rare; keep honest) ──
-  if (!jeq(d.redirects, l.redirects)) out.push({ section: 'site', sentence: 'Link redirects are updated.' });
-
   // ── the pop-up (item 148) ──
   if (!jeq(d.settings?.popup ?? null, l.settings?.popup ?? null)) {
     out.push({ section: 'site', sentence: !d.settings?.popup ? 'The pop-up comes off your site.' : !l.settings?.popup ? 'Your site gets its pop-up.' : 'The pop-up is changed.' });
@@ -203,7 +212,7 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
     out.push({ section: 'site', sentence: d.settings?.llms_txt ? 'Your llms.txt for AI tools is updated.' : 'Your llms.txt is taken down.' });
   }
   // ── ad tags (item 152): the cookie notice and the privacy page change with them ──
-  if (JSON.stringify(d.settings?.ad_tags || null) !== JSON.stringify(l.settings?.ad_tags || null)) {
+  if (!jeq(d.settings?.ad_tags || null, l.settings?.ad_tags || null)) {
     const t = d.settings?.ad_tags || {};
     const names = [t.google ? 'the Google tag' : '', t.meta ? 'Meta’s pixel' : ''].filter(Boolean).join(' and ');
     out.push({ section: 'site', sentence: names
@@ -244,13 +253,30 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
   type OwnPage = NonNullable<Settings['pages']>[number];
   const lPages = new Map<string, OwnPage>((ls.pages || []).map((p) => [p.slug, p]));
   const dPages = new Map<string, OwnPage>((ds.pages || []).map((p) => [p.slug, p]));
+  // item 262: a page whose address changed used to read as a new page plus a removed page.
+  // The editor writes a forward from the old address to the new one, so that forward pairs
+  // them; failing that, a gone page and a new page with the same sections are the same page.
+  const moved = new Map<string, OwnPage>();          // new slug → the page as it was live
+  const movedFrom = new Set<string>();               // the old slugs, left out of "removed"
+  const renameForwards = new Set<string>();          // the forwards that only explain a rename
+  const slugOf = (path: unknown): string => { const m = /^\/([a-z0-9-]+)\/?$/.exec(String(path || '')); return m ? m[1] : ''; };
+  for (const r of d.redirects || []) {
+    const from = slugOf(r.from_path), to = slugOf(r.to_path);
+    if (from && to && lPages.has(from) && !dPages.has(from) && dPages.has(to) && !lPages.has(to) && !moved.has(to)) { moved.set(to, lPages.get(from)!); movedFrom.add(from); renameForwards.add(r.from_path); }
+  }
   for (const p of ds.pages || []) {
-    const prev = lPages.get(p.slug);
+    if (lPages.has(p.slug) || moved.has(p.slug)) continue;
+    const twin = (ls.pages || []).find((lp) => !dPages.has(lp.slug) && !movedFrom.has(lp.slug) && jeq(lp.blocks || [], p.blocks || []) && (lp.blocks || []).length > 0);
+    if (twin) { moved.set(p.slug, twin); movedFrom.add(twin.slug); }
+  }
+  for (const p of ds.pages || []) {
+    const prev = lPages.get(p.slug) || moved.get(p.slug);
     if (!prev) {
       out.push({ section: 'site', sentence: p.access === 'private' ? `New page ${q(p.title)}, kept private.` : `New page: ${q(p.title)}.` });
       continue;
     }
-    if (prev.title !== p.title) out.push({ section: 'site', sentence: `The page ${q(prev.title)} is renamed ${q(p.title)}.` });
+    if (moved.has(p.slug)) out.push({ section: 'site', sentence: prev.title !== p.title ? `Renamed ${q(prev.title)} to ${q(p.title)}; its old address forwards to the new one.` : `${q(p.title)} moves to a new address; the old one forwards to it.` });
+    else if (prev.title !== p.title) out.push({ section: 'site', sentence: `The page ${q(prev.title)} is renamed ${q(p.title)}.` });
     blockDelta(prev.blocks || [], p.blocks || [], ` on ${q(p.title)}`);
     const was = prev.access || 'everyone', now = p.access || 'everyone';
     if (was !== now) {
@@ -265,7 +291,11 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
       if (ftr) out.push({ section: 'site', sentence: p.noFooter ? `${q(p.title)} leaves out the footer.` : `${q(p.title)} shows the footer again.` });
     }
   }
-  for (const p of ls.pages || []) if (!dPages.has(p.slug)) out.push({ section: 'site', sentence: `The page ${q(p.title)} is removed.` });
+  for (const p of ls.pages || []) if (!dPages.has(p.slug) && !movedFrom.has(p.slug)) out.push({ section: 'site', sentence: `The page ${q(p.title)} is removed.` });
+
+  // ── redirects (rare; keep honest) ──
+  // item 262: a forward that only explains a rename above is not a second change
+  if (!jeq((d.redirects || []).filter((r) => !renameForwards.has(r.from_path)), l.redirects)) out.push({ section: 'site', sentence: 'Link redirects are updated.' });
 
   // ── the menu and how pages show on Google ──
   if (!jeq(ds.nav || [], ls.nav || [])) out.push({ section: 'site', sentence: 'Your menu changes.' });

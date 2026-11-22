@@ -1192,7 +1192,7 @@ $('editForm').onsubmit=async(e)=>{
 // ── MERGE two records for one person (sales items 86 + 105) ─────────────────
 // The server's dry run says what each record holds and what would move; you pick,
 // field by field, what the record you keep says (its own value by default). Merge
-// moves their deals, bookings and reviews, keeps both sets of tags and notes, and
+// moves their deals, bookings, reviews, logged history and to-dos (sales item 143), keeps both sets of tags and notes, and
 // sets the other record aside for 30 days; Undo in the message after puts it back.
 const MERGE_FIELDS=[['name','Name'],['email','Email'],['phone','Phone'],['phone2','Second phone'],['job_title','Job title'],['company','Company'],['address','Address'],['found_via','How they found you']];
 let MERGE=null;
@@ -1223,6 +1223,8 @@ function paintMerge(){
   if(mv.deals)parts.push(mv.deals+' deal'+(mv.deals===1?'':'s')+' (with their proposals, invoices and projects)');
   if(mv.bookings)parts.push(mv.bookings+' booking'+(mv.bookings===1?'':'s'));
   if(mv.reviews)parts.push(mv.reviews+' review'+(mv.reviews===1?'':'s'));
+  if(mv.history)parts.push(mv.history+' logged '+(mv.history===1?'call, email or note':'calls, emails and notes'));   // sales item 143
+  if(mv.todos)parts.push(mv.todos+' to-do'+(mv.todos===1?'':'s'));
   parts.push('notes');
   $('mergeBody').innerHTML=`<h3 id="merge-h">Merge two records for one person</h3>
     <div class="mgrid" role="group" aria-labelledby="merge-h"><span class="mhl"></span>${head(a,'')}${head(b,'')}${rows}

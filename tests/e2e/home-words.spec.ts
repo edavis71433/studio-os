@@ -63,7 +63,7 @@ test.describe('item 96 — Home', () => {
     await installApp(page, { api: HOME });
     const writes = await recordWrites(page);
     const fresh: string[] = [];
-    page.on('request', (r) => { if (r.url().includes('/agency/needs-you?fresh=1')) fresh.push(r.url()); });
+    page.on('request', (r) => { const u = new URL(r.url()); if (u.pathname.endsWith('/agency/needs-you') && u.searchParams.get('fresh') === '1') fresh.push(r.url()); });   // sales item 151: the read also carries Home's day
     await page.goto('/agency.html');
     const line = page.locator('#needsOld');
     await expect(line).toHaveText('2 of these have waited over a month. Clear them');

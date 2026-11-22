@@ -21,6 +21,7 @@
 //                emails go out only when the notice row is newly inserted.
 // Pure decision logic + copy up top (tested); the impure runner below.
 import { svc, svcCount } from '../lib/db.ts';
+import { isOpenDealStage, OPEN_DEAL_STAGES_FILTER } from '../lib/deal_stages.ts';   // sales item 146: the one list of open stages (the first is `lead`, never `new`)
 import { rateAllow } from '../lib/ratelimit.ts';
 import { deleteSite } from '../lib/netlify.ts';
 import { getSite } from '../lib/netlify.ts';
@@ -28,6 +29,7 @@ import { rdapLookupDetailed, daysUntil, expiryRung, expiryWords, lookupPatch } f
 import { domainHealth, padlockAfterCheck, domainTruth, dnsRecordsSure } from '../lib/domain_health.ts';
 import { mailWatch, domainChangeEmail, tellOwnerAndStudio, announceLiveOnce } from '../lib/domain_notify.ts';
 import { studioWantsEmail } from '../lib/site_notify.ts';
+import { clientReach, studioSiteFor } from '../lib/client_reach.ts';
 import type { DomainMail } from '../lib/domain_notify.ts';
 import { whereToGo } from '../lib/rdap.ts';
 import { provisionSsl } from '../lib/netlify.ts';
@@ -451,16 +453,16 @@ export async function checkOneDomain(site: DomainCheckSite, nowIso = new Date().
   await svc(`presence_plan_notices?client_id=eq.${encodeURIComponent(site.client_id)}&kind=eq.domain_expiry&status=eq.active&period=not.like.${encodeURIComponent('exp:%')}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => null);
   const esc = (x: unknown) => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
   const html = `<p><strong>${esc(site.custom_domain)}</strong> ${esc(words.when)}${info.registrar ? ` at <strong>${esc(info.registrar)}</strong>` : ''}.</p><p>${esc(words.after)}</p>`;
-  const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email,name&limit=1`).catch(() => ({ json: [] as unknown[] }));
-  const clientEmail = (Array.isArray(cl.json) && (cl.json[0] as { email?: string } | undefined)?.email) || '';
+  // item 268: the client's address from wherever their record keeps it
+  const clientEmail = (await clientReach(site.client_id).catch(() => ({ email: null }))).email || '';
   if (clientEmail) {
     const brand = await loadEmailBrand(site.id);   // BR-1: the customer's domain notice, on their brand
     // Sales item 74: a lapsing domain takes the website down, so the warning always arrives (critical)
     await sendEmail(clientEmail, `Your domain ${site.custom_domain} ${words.when}`, html, brand, { critical: true }).catch(() => false);
   }
   // the studio that looks after this client gets a copy of every rung (it used to be told only inside 7 days, and only the platform)
-  const link = await svc(`presence_service_links?customer_site_id=eq.${site.id}&status=eq.active&select=agency_site_id&order=created_at.desc&limit=1`).catch(() => ({ json: [] as unknown[] }));
-  const studioSite = Array.isArray(link.json) && (link.json[0] as { agency_site_id?: string } | undefined)?.agency_site_id;
+  // item 267: the studio through its service link, else its list of sites (a site made with "+ New site" has no link yet)
+  const studioSite = await studioSiteFor(site.id);
   if (studioSite && await studioWantsEmail(String(studioSite), site.id)) await emailOperator(String(studioSite), `${site.custom_domain} ${words.when}`, `${html}<p>${clientEmail ? 'Your client has been sent the same reminder.' : 'Your client has no email on their record, so they haven’t been told.'}</p>`, 'domain-expiry');
   if (rung === '7' || rung === '1' || rung === 'expired') {
     // OPERATIONAL, to the platform operator (critical:true — an opt-out must not silence it; a bounce/complaint still does).
@@ -876,7 +878,7 @@ export function dealTaskDue(t: { status?: string; due_date?: string | null }, to
  *  pipeline stages — a won/lost/converted deal's old date is history. Pure. */
 export function nextStepOverdue(d: { stage?: string; next_step_at?: string | null; converted_client_id?: string | null }, todayIso: string): boolean {
   if (!d.next_step_at || d.converted_client_id) return false;
-  if (!['new', 'qualified', 'proposal', 'contract'].includes(String(d.stage || ''))) return false;
+  if (!isOpenDealStage(d.stage)) return false;   // sales item 146: this said `new`, a stage no deal has, so a first-stage deal never got the reminder
   return String(d.next_step_at).slice(0, 10) < todayIso.slice(0, 10);
 }
 
@@ -946,7 +948,7 @@ export async function runDealTaskReminders(limit = 20): Promise<{ nudged: number
   }
 
   // ── passed next-step dates (presence_deals.next_step_at, 0089) ──
-  const dq = await svc(`presence_deals?deleted_at=is.null&converted_client_id=is.null&stage=in.(new,qualified,proposal,contract)&next_step_at=not.is.null&next_step_at=lt.${today}&select=id,site_id,title,stage,next_step_at,next_step&order=next_step_at.asc&limit=${limit}`).catch(() => ({ ok: false, json: null as any }));
+  const dq = await svc(`presence_deals?deleted_at=is.null&converted_client_id=is.null&${OPEN_DEAL_STAGES_FILTER}&next_step_at=not.is.null&next_step_at=lt.${today}&select=id,site_id,title,stage,next_step_at,next_step&order=next_step_at.asc&limit=${limit}`).catch(() => ({ ok: false, json: null as any }));
   for (const d of (dq.ok && Array.isArray(dq.json) ? dq.json : []) as Array<{ id: string; site_id: string; title?: string; stage: string; next_step_at: string; next_step?: string }>) {
     if (!nextStepOverdue({ stage: d.stage, next_step_at: d.next_step_at, converted_client_id: null }, nowIso)) continue;
     const clientId = await clientFor(d.site_id);

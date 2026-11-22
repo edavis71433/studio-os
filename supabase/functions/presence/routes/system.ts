@@ -11,6 +11,7 @@ import { svc, svcAll, svcCount } from '../lib/db.ts';
 import { runOperationsCycle, retryFailedRuns, runDuePublishes, runReconcileStuckPublishes, reapStaleRuns, runWindowExpiries } from '../ops/scheduler.ts';
 import { runUptimeHeartbeat } from '../monitor/heartbeat.ts';
 import { runGscSync } from '../ops/gsc_sync.ts';
+import { readHostPlan, netlifyConfigured } from '../lib/netlify.ts';
 import { runGa4Sync } from '../ops/ga4_sync.ts';
 import { runRetentionSweep } from '../ops/retention.ts';
 import { reapMedia } from '../lib/media_gc.ts';
@@ -30,6 +31,7 @@ import { runDeletionSweep } from '../commerce/deletion.ts';
 import { runBillingReconcile } from '../commerce/entitlement_sync.ts';
 import { runStripeCheck } from '../commerce/stripe_check.ts';   // sales item 130: the daily check against Stripe
 import { summarizeHealthCenter } from '../lib/health_center.ts';
+import { stockHealth } from '../lib/stock/health.ts';
 import { timingSafeEqual } from '../../_shared/hmac.ts';
 import { CONNECTED_PROVIDERS } from '../connected/providers.ts';
 import { oauthConfigured } from '../connected/auth.ts';
@@ -248,7 +250,7 @@ export async function computeHealthCenter(): Promise<any> {
   // PostgREST max-rows cap, silently under-reporting at scale.
   const [failedRuns, live, doms, domsSoon, entActive, entPaused, entLapsed, notices, failPub, aiUseQ] = await Promise.all([
     svcCount(`presence_scheduled_runs?status=eq.failed&created_at=gte.${encodeURIComponent(since24)}`),
-    svcCount('presence_sites?status=eq.live'),
+    svcCount('presence_sites?edition=eq.presence&offline_at=is.null&or=(status.eq.live,last_published_at.not.is.null)'),   // item 261: the one rule (lib/site_live.ts), as a count
     svcCount('presence_sites?custom_domain=not.is.null'),
     svcCount(`presence_sites?custom_domain=not.is.null&domain_expires_at=lte.${encodeURIComponent(soon)}&domain_expires_at=gte.${encodeURIComponent(nowIso)}`),
     svcCount('presence_entitlements?product=eq.presence&status=eq.active'),
@@ -276,6 +278,8 @@ export async function computeHealthCenter(): Promise<any> {
     activeNotices: notices ?? 0,
     backupsVerified: envPresent('BACKUPS_VERIFIED'),
     stripeKey: heldKeyKind(),   // sales item 131: restricted or full-power, from the prefix alone
+    hosting: netlifyConfigured() ? await readHostPlan(nowIso, (await svcCount(`presence_publishes?netlify_deploy_id=not.is.null&created_at=gte.${encodeURIComponent(new Date(Date.now() - 30 * 86400_000).toISOString())}`).catch(() => null)) ?? 0).catch(() => null) : null,   // builder list item 269: the host's plan, as the host tells it; the paid publishes it knows of say whether "0 used" can be believed
+    stock: await stockHealth().catch(() => null),   // item 263: a refused photo key shows here, not only in a failed search
   });
 }
 
@@ -404,7 +408,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['digest', () => runWeeklyDigest()],
             ['domains', () => runDomainWatch(10)],
             ['traffic_spikes', () => runTrafficSpikes(200)],   // builder list item 47: a busy day of visitors, said once per site per day
-            ['monthly_reports', () => runMonthlyReports(20)],   // builder list item 58: last month's report to each switched-on client, in the first days of a month
+            ['monthly_reports', () => runMonthlyReports(20)],   // builder list item 58: last month's report to each switched-on client, on the 4th to 6th of a month
             ['rank_grids', () => runRankGridScans(1)],   // builder list item 185: one switched-on client's monthly map rank grid at most (a few seconds a search)
             ['site_trash', () => runSiteTrashPurge(10)],   // builder list item 154: a site 90 days in a studio's trash is deleted for good
             ['file_trash', () => runFileTrashPurge(100)],   // builder list item 218: a file 30 days in a site's Trash is deleted for good, unless the live site still shows it

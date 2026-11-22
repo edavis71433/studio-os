@@ -213,5 +213,39 @@ const mergeWorld = () => ({
   ok('merge: a part that fails puts everything back and says so', r.status === 502 && !live(C2).deleted_at && live(C1).email === 'jordan@ellis.example' && db.tables.presence_appointments[0].contact_id === C2, JSON.stringify(r.body));
 }
 
+// ═══ sales item 143: the merged-away person's logged history and own to-dos move too, and back on Undo ═══
+{
+  const E1 = 'ffffffff-0000-4000-8000-000000000001', E2 = 'ffffffff-0000-4000-8000-000000000002', EK = 'ffffffff-0000-4000-8000-000000000003', T1 = 'ffffffff-0000-4000-8000-000000000011', TD = 'ffffffff-0000-4000-8000-000000000012';
+  db.reset({ ...mergeWorld(),
+    presence_person_events: [
+      { id: E1, site_id: SITE, contact_id: C2, client_id: null, kind: 'call', body: 'Called about the quote', occurred_at: '2026-11-01T10:00:00Z', deleted_at: null },
+      { id: E2, site_id: SITE, contact_id: C2, client_id: null, kind: 'email', body: 'Sent the brochure', occurred_at: '2026-11-02T10:00:00Z', deleted_at: '2026-11-03T00:00:00Z' },   // a removed line stays removed
+      { id: EK, site_id: SITE, contact_id: C1, client_id: null, kind: 'note', body: 'Already on the kept record', occurred_at: '2026-11-04T10:00:00Z', deleted_at: null },
+    ],
+    presence_deal_tasks: [
+      { id: T1, site_id: SITE, deal_id: null, contact_id: C2, client_id: null, title: 'Call back Tuesday', due_date: '2026-11-24', status: 'open', deleted_at: null },
+      { id: TD, site_id: SITE, deal_id: D1, contact_id: null, client_id: null, title: 'On the deal, not the person', due_date: null, status: 'open', deleted_at: null },
+    ],
+  });
+  const dry = await res(await M.handleContactMerge(req('POST', `/sales/contacts/${C1}/merge`, { from: C2 }), site, owner, C1, cors));
+  ok('item 143: the preview counts the logged history and the to-dos that would move (not a removed line, not a deal’s to-do)', dry.status === 200 && dry.body?.data?.moves?.history === 1 && dry.body.data.moves.todos === 1 && dry.body.data.moves.deals === 1, JSON.stringify(dry.body?.data?.moves));
+  const go = await res(await M.handleContactMerge(req('POST', `/sales/contacts/${C1}/merge`, { from: C2, confirm: true }), site, owner, C1, cors));
+  const ev = (id) => db.tables.presence_person_events.find((x) => x.id === id), tk = (id) => db.tables.presence_deal_tasks.find((x) => x.id === id);
+  ok('item 143: the merge moves the logged call and the to-do to the kept record and says so', go.status === 200 && go.body?.data?.moved?.history === 1 && go.body.data.moved.todos === 1 && ev(E1).contact_id === C1 && tk(T1).contact_id === C1, JSON.stringify(go.body));
+  ok('item 143: the removed line, the kept record’s own line and the deal’s to-do are left alone', ev(E2).contact_id === C2 && ev(EK).contact_id === C1 && tk(TD).contact_id === null && tk(TD).deal_id === D1);
+  ok('item 143: the merge record remembers what moved, so Undo can bring it back', live(C2).merge_record?.moved?.history?.includes(E1) && live(C2).merge_record?.moved?.todos?.includes(T1));
+  const un = await res(await M.handleContactUnmerge(req('POST', `/sales/contacts/${C2}/unmerge`), site, owner, C2, cors));
+  ok('item 143: Undo puts the logged call and the to-do back on the record that returns', un.status === 200 && ev(E1).contact_id === C2 && tk(T1).contact_id === C2 && ev(EK).contact_id === C1, JSON.stringify(un.body));
+}
+{
+  // before APPLY-0173 neither table exists: the merge still works, counts nothing there and moves nothing there
+  db.reset(mergeWorld());
+  db.fail.add('presence_person_events'); db.fail.add('presence_deal_tasks');
+  const dry = await res(await M.handleContactMerge(req('POST', `/sales/contacts/${C1}/merge`, { from: C2 }), site, owner, C1, cors));
+  const go = await res(await M.handleContactMerge(req('POST', `/sales/contacts/${C1}/merge`, { from: C2, confirm: true }), site, owner, C1, cors));
+  db.fail.delete('presence_person_events'); db.fail.delete('presence_deal_tasks');
+  ok('item 143: without the history and to-do tables the merge still goes through, with nothing counted or moved there', dry.status === 200 && dry.body?.data?.moves?.history === 0 && dry.body.data.moves.todos === 0 && go.status === 200 && go.body?.data?.merged === true, JSON.stringify([dry.body, go.body]));
+}
+
 console.log(`\n════ IMPORT UNDO + MERGE (items 86, 105): ${pass}/${pass + fail} PASSED ════`);
 if (fail) { console.log('Failed:\n  ' + failed.join('\n  ')); Deno.exit(1); }

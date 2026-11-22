@@ -25,10 +25,14 @@ import { raiseNotice, clearNotice, clearNoticePrefix, siteDownPeriod, siteDownPe
 import { sendEmail } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { siteOrigin } from '../lib/site.ts';
+import { clientReach, studioSiteFor } from '../lib/client_reach.ts';
+import { tellsClientDown } from '../lib/site_notify.ts';
+import { emailOperator } from '../lib/service_bridge.ts';
 
 /** Consecutive failed probes required before we call a site confirmed-down.
  *  Two = one blip is forgiven; a real outage still alerts within ~2 ticks. */
-export const DOWN_THRESHOLD = 2;
+export { DOWN_THRESHOLD } from '../lib/site_live.ts';
+import { DOWN_THRESHOLD } from '../lib/site_live.ts';
 
 const timed = (ms: number) => AbortSignal.timeout(ms);
 
@@ -97,6 +101,22 @@ const DOWN_HEADLINE = 'Your website didn’t respond just now';
 const DOWN_BODY = 'We checked your website twice and it didn’t answer — visitors may be seeing an error right now. We’re watching closely and will tell you the moment it’s back. Often this clears on its own within minutes; if it doesn’t, it’s usually the domain or hosting, and we’ll reach out.';
 const UP_SUBJECT = 'Good news — your website is back online';
 const UP_BODY = '<p>Your website is answering again — visitors can reach it. Nothing more you need to do.</p><p>We’ll keep watching around the clock, as always.</p>';
+
+/** Item 267: the studio's own words about a client's outage, sent before the client's. Pure. */
+export function studioDownEmail(url: string, clientTold: boolean, clientName: string | null): { subject: string; html: string } {
+  const esc = (x: unknown) => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  const who = clientName ? `${esc(clientName)}’s website` : 'A client’s website';
+  return {
+    subject: `${who.replace(/’s website$/, '')}: ${url.replace(/^https?:\/\//, '')} isn’t answering`,
+    html: `<p><strong>${who}</strong> at <a href="${esc(url)}">${esc(url)}</a> didn’t answer two checks in a row, so visitors may be seeing an error.</p>`
+      + `<p>${clientTold ? 'Your client has been emailed the same news, in calm words, and will be told when it’s back.' : 'Your client has NOT been emailed: you chose to tell them yourself for this site (Settings, Notifications).'}</p>`
+      + '<p>Often this clears on its own within minutes. If it doesn’t, it’s usually the domain or the hosting: open the site’s Domains sheet to check.</p>',
+  };
+}
+export function studioUpEmail(url: string, clientName: string | null): { subject: string; html: string } {
+  const esc = (x: unknown) => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  return { subject: `${clientName ? esc(clientName) : 'A client'}: ${url.replace(/^https?:\/\//, '')} is answering again`, html: `<p><a href="${esc(url)}">${esc(url)}</a> is back. Nothing more to do.</p>` };
+}
 
 // ── The sweep — one bounded, best-effort tick over live hosted sites ─────────
 export interface HeartbeatResult { ok: true; run_type: 'heartbeat'; checked: number; confirmed_down: number; recovered: number; skipped_unmigrated?: boolean }
@@ -178,9 +198,13 @@ export async function runUptimeHeartbeat(limit = 25): Promise<HeartbeatResult> {
 export async function notifyConfirmedDown(site: HeartbeatSite & { client_id: string }, url: string, nowMs: number = Date.now()): Promise<void> {
   const fresh = await raiseNotice({ siteId: site.id, clientId: site.client_id, kind: 'site_down', period: siteDownPeriod(site.id, nowMs), headline: DOWN_HEADLINE, body: DOWN_BODY });
   if (!fresh) return;   // already raised for this outage — don't re-email/re-push
+  // item 267: the studio that looks after the site hears FIRST, in its own words, and chooses per
+  // client whether the client is emailed too; item 268: the client's address from wherever their record keeps it
+  const [studioSite, reach] = await Promise.all([studioSiteFor(site.id), clientReach(site.client_id)]);
+  const tellClient = await tellsClientDown(studioSite, site.id);
+  if (studioSite) { const m = studioDownEmail(url, tellClient && !!reach.email, reach.name); await emailOperator(studioSite, m.subject, m.html, 'site-down').catch(() => false); }
   // customer email, on their brand (reuses the ONE branded send path)
-  const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email&limit=1`).catch(() => ({ json: null as any }));
-  const email = cl.json?.[0]?.email;
+  const email = tellClient ? reach.email : null;
   if (email) {
     const brand = await loadEmailBrand(site.id).catch(() => undefined);
     await sendEmail(email, DOWN_HEADLINE, `<p>${DOWN_BODY}</p>`, brand, { critical: true }).catch(() => {});
@@ -191,7 +215,7 @@ export async function notifyConfirmedDown(site: HeartbeatSite & { client_id: str
   // marketing opt-out must not be able to silence "a site is down". (A
   // bounce/complaint still suppresses it — account.ts:112-116.)
   const ops = Deno.env.get('OPS_ALERT_EMAIL') || '';
-  if (ops) sendEmail(ops, `[Studio OS ops] Site down: ${url}`, `<p>${url} failed ${DOWN_THRESHOLD} consecutive uptime probes. The owner has been notified; we clear it automatically on recovery.</p>`, undefined, { critical: true }).catch(() => {});
+  if (ops) sendEmail(ops, `[Studio OS ops] Site down: ${url}`, `<p>${url} failed ${DOWN_THRESHOLD} consecutive uptime probes. The studio has been told${tellClient ? ', and the owner' : '; the owner was not, by the studio’s choice'}; we clear it automatically on recovery.</p>`, undefined, { critical: true }).catch(() => {});
 }
 
 // Recovery → clear the down notice (idempotent) + one calm "back online" email.
@@ -203,8 +227,11 @@ export async function notifyConfirmedDown(site: HeartbeatSite & { client_id: str
 export async function notifySiteRecovered(site: HeartbeatSite & { client_id: string }): Promise<void> {
   await clearNoticePrefix(site.client_id, 'site_down', siteDownPeriodPrefix(site.id));
   await clearNotice(site.client_id, 'site_down', siteDownLegacyPeriod(site.id));
-  const cl = await svc(`clients?id=eq.${encodeURIComponent(site.client_id)}&select=email&limit=1`).catch(() => ({ json: null as any }));
-  const email = cl.json?.[0]?.email;
+  // items 267 and 268: the studio first; the client only if the studio tells them about outages
+  const [studioSite, reach] = await Promise.all([studioSiteFor(site.id), clientReach(site.client_id)]);
+  const tellClient = await tellsClientDown(studioSite, site.id);
+  if (studioSite) { const url = pickLiveUrl(site) || ''; const m = studioUpEmail(url, reach.name); await emailOperator(studioSite, m.subject, m.html, 'site-up').catch(() => false); }
+  const email = tellClient ? reach.email : null;
   if (email) {
     const brand = await loadEmailBrand(site.id).catch(() => undefined);
     await sendEmail(email, UP_SUBJECT, UP_BODY, brand, { critical: true }).catch(() => {});
