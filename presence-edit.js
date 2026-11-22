@@ -2041,17 +2041,20 @@ function mountBlocksCard() {
 // from their own fields, so carry the chosen look across every rebuild.
 // Builder item 253: the lock rides along too, so a change to any field of a locked section keeps
 // it locked (the client's save was refused and their words lost; the studio's quietly unlocked it).
-function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.style) o.style = p.style; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p.anchor) o.anchor = p.anchor; if (p && p._clEdit) o._clEdit = p._clEdit; if (p && p.lock) o.lock = p.lock; return o; }
+function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.style) o.style = p.style; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p.anchor) o.anchor = p.anchor; if (p && p._clEdit) o._clEdit = p._clEdit; if (p && p.lock) o.lock = p.lock; if (p && typeof p.featured === "number") o.featured = p.featured; return o; }   // item 329: and the raised plan
 // Wave-1 G4: per-block STYLE VARIANTS — 2–3 curated looks per section type, rendered
 // by the shared block engine (mirrors site_blocks.ts BLOCK_VARIANTS; the server
 // re-validates, unknown values fall back to the default). The default is stored as
 // NO `variant` key, so untouched sections stay byte-identical.
 const BLOCK_VARIANT_OPTS = {
   reviews_wall: [["Cards", ""], ["Big quotes", "quotes"], ["Compact strip", "strip"]],
-  accordion: [["Accordion", ""], ["Open, in two columns", "two-column"]],
+  accordion: [["Accordion", ""], ["Open, in two columns", "two-column"], ["Questions beside the heading", "side"], ["Numbered questions", "numbered"]],
   cta: [["Banner", ""], ["Card", "card"]],
-  pricing: [["Cards", ""], ["Price list", "list"]],
+  pricing: [["Cards", ""], ["Price list", "list"], ["Printed price list", "menu"], ["Three plans", "plans"]],
   gallery: [["Grid", ""], ["Mosaic", "masonry"], ["Filmstrip", "filmstrip"]],
+  // item 329: the bold designs picked in Figma (the Layout tab draws each one live)
+  features: [["Grid", ""], ["Numbered", "numbered"], ["Icon tiles on a dark band", "tiles"]],
+  image_text: [["Photo beside the words", ""], ["Photo off the edge", "overlap"], ["Photo in a colour frame", "frame"]],
 };
 // A "Style" pill row inside the block editor (reuses the Design Studio pillRow).
 // Writes block.variant into the working copy — saved by the existing "Save sections".
@@ -2061,6 +2064,34 @@ function blockVariantRow(idx, blk, sub) {
   const isOn = (o) => String((BLOCKS_WORK[idx] && BLOCKS_WORK[idx].variant) || "") === o[1];
   const pick = (o) => { const b = { ...BLOCKS_WORK[idx] }; if (o[1]) b.variant = o[1]; else delete b.variant; BLOCKS_WORK[idx] = b; renderBlocksCard(); dcLiveFromPanel(); };
   pillRow(sub, "Style", opts, isOn, pick);
+  designExtras(sub, idx, blk, false);
+}
+// Item 329: what a bold design adds under its section's layout choice: which side the photo sits on
+// (Photo off the edge, Photo in a colour frame), which plan is raised (Three plans), and a word on a
+// printed price list holding more prices than the other designs show. `inPane`: the inspector's
+// Layout tab (the classic panel keeps its own "Image on the" choice).
+function designExtras(host, idx, blk, inPane) {
+  if (!blk) return;
+  const set = (patch) => { BLOCKS_WORK[idx] = { ...BLOCKS_WORK[idx], ...patch }; renderBlocksCard(); dcLiveFromPanel(); };
+  if (inPane && blk.type === "image_text" && (blk.variant === "overlap" || blk.variant === "frame")) {
+    insTiles(host, "Photo side", [["On the left", "left"], ["On the right", "right"]], (o) => (blk.side === "right" ? "right" : "left") === o[1], (o) => set({ side: o[1] }), (o) => "image_text:" + o[1]).parentNode.dataset.group = "photo-side";
+  }
+  const tiers = blk.type === "pricing" && Array.isArray(blk.tiers) ? blk.tiers : null;
+  if (tiers && blk.variant === "plans") {
+    const f = el("div", "ins-field"); f.dataset.group = "featured";
+    const id = "dsFeatured" + idx, lab = el("label", "ins-lbl", "Most popular plan"); lab.htmlFor = id;
+    const sel = el("select"); sel.id = id;
+    const now = typeof blk.featured === "number" ? blk.featured : (tiers.length === 3 ? 2 : 0);   // the server's default: the middle one of three
+    [[0, "None"]].concat(tiers.map((t, i) => [i + 1, (t && t.name) || "Plan " + (i + 1)])).forEach(([v, l]) => { const o = el("option", null, l); o.value = String(v); if (v === now) o.selected = true; sel.appendChild(o); });
+    sel.addEventListener("change", () => set({ featured: Number(sel.value) }));
+    f.append(lab, sel, el("p", "ins-says", "It stands taller, in your accent colour, with a “Most popular” badge."));
+    host.appendChild(f);
+  }
+  if (tiers && blk.variant === "menu" && tiers.length > 4) {
+    const n = el("p", "ins-says"); n.dataset.group = "menu-note";
+    n.textContent = "The printed price list shows up to 16 prices, in two columns. Cards, Price list and Three plans show the first four, so switching to one of them leaves the rest out.";
+    host.appendChild(n);
+  }
 }
 // A calm, collapsed "Look of this section" control row — plain words, smart defaults,
 // no CSS. Lives INSIDE the block you're already editing (no separate panel). The
@@ -2539,13 +2570,26 @@ function renderBlocksCard() {
       bl.placeholder = "Button label (optional)"; bl.value = (blk.button && blk.button.label) || "";
       bu.placeholder = "Button link (optional)"; bu.value = (blk.button && blk.button.url) || "";
       [bl, bu].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-      const commit = () => { const o = { type: "image_text", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, body: ta.value.trim(), side: side.value === "right" ? "right" : "left" }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; BLOCKS_WORK[idx] = wLook(idx, o); };
-      [ta, side, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
+      // item 329: Photo in a colour frame leads its words with a big number and a short line, shown
+      // when both are filled; the two labelled fields appear while that design is in use
+      const numField = (label, key, max, ph) => {
+        const f = el("div", "ins-field"), id = "itNum-" + key + "-" + idx, l = el("label", "ins-lbl", label); l.htmlFor = id;
+        const i = el("input"); i.type = "text"; i.id = id; i.maxLength = max; i.placeholder = ph; i.value = blk[key] || ""; i.style.cssText = inputCss;
+        f.append(l, i); f.input = i; return f;
+      };
+      const nums = blk.variant === "frame" ? [numField("Big number (optional)", "number", 12, "15"), numField("What the number counts (optional)", "number_label", 60, "years planting gardens")] : [];
+      const commit = () => {
+        const o = { type: "image_text", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, body: ta.value.trim(), side: side.value === "right" ? "right" : "left" }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U };
+        const was = BLOCKS_WORK[idx] || {};
+        ["number", "number_label"].forEach((k, n) => { const v = nums.length ? nums[n].input.value.trim() : String(was[k] || ""); if (v) o[k] = v; });
+        BLOCKS_WORK[idx] = wLook(idx, o);
+      };
+      [ta, side, bl, bu, ...nums.map((f) => f.input)].forEach((inp) => inp.addEventListener("change", commit));
       pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].image_id = id || undefined; renderBlocksCard(); }); });
       // item 224: in the inspector the photo's side is an arrangement on the Layout tab; the
       // select stays behind the scenes so a Content edit keeps the side that was picked there
       const inPane = sub.classList && sub.classList.contains("ins-pane");
-      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(ta, aiField(ta, {}), ...(inPane ? [] : [sideWrap]), bl, bu); linkPick(bu);
+      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(...nums, ta, aiField(ta, {}), ...(inPane ? [] : [sideWrap]), bl, bu); linkPick(bu);
       sub.appendChild(el("div", "hint", inPane ? "Which side the photo sits on is under Layout. On phones the image and text stack automatically." : "On phones the image and text stack automatically."));
     } else if (def.dividerSimple) {
       const styWrap = el("label", "hint", "Style "); const sty = el("select");
@@ -3050,6 +3094,12 @@ function renderAccordionBlockBody(blk, idx, sub, ti) {
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
   const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
+  if (blk.variant === "side") {   // item 329: Questions beside the heading has a short line under its heading
+    const f = el("div", "ins-field"), id = "accIntro-" + idx, l = el("label", "ins-lbl", "A short line under the heading (optional)"); l.htmlFor = id;
+    const i = el("input"); i.type = "text"; i.id = id; i.maxLength = 200; i.placeholder = "Still not sure? Ask us anything."; i.value = blk.intro || ""; i.style.cssText = inputCss;
+    i.addEventListener("change", () => { const v = i.value.trim(); if (v) cur().intro = v; else delete cur().intro; });
+    f.append(l, i); sub.appendChild(f);
+  }
   const items = Array.isArray(blk.items) ? blk.items : [];
   items.forEach((it, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
@@ -4404,6 +4454,11 @@ const INS_PIC_PARTS = {
   "cta:default": ["", "k"], "cta:card": ["", "", "k"],
   "pricing:default": 3, "pricing:list": 3,
   "image_text:left": ["p", "h", "", ""], "image_text:right": ["p", "h", "", ""],
+  // item 329: the bold designs
+  "image_text:overlap": ["p", "k", "h", ""], "image_text:frame": ["b", "p", "h", "", ""],
+  "features:default": 3, "features:numbered": ["h", "h", "h", "", "", ""], "features:tiles": 4,
+  "pricing:menu": 6, "pricing:plans": ["", "k", ""],
+  "accordion:side": ["h", "", "", "", ""], "accordion:numbered": ["k", "", "k", "", "k", "", "k", ""],
   "width:normal": 1, "width:full": 1,
 };
 function insPic(key) {
@@ -4421,18 +4476,29 @@ function insPic(key) {
 // (offline, a server from before the route), the tile keeps its sketch. Pictures are kept by what
 // they show, so the card's next redraw or a tab switch finds them at once.
 const IMAGE_TEXT_SIDES = [["Photo on the left", "left"], ["Photo on the right", "right"]];
+// item 329: and the two bold designs, which keep the side picked (Photo side, under them)
+const IMAGE_TEXT_WAYS = IMAGE_TEXT_SIDES.concat([["Photo off the edge", "overlap"], ["Photo in a colour frame", "frame"]]);
 const LIVE_PIC_W = 800;              // each arrangement is drawn this wide, then shrunk to its tile
 const LIVE_PIC_AGE = 10 * 60e3;      // a drawing's photos have signed addresses: draw it again after a while
 const LIVE_PICS = new Map();         // what a picture shows → { html, at }, or the promise of one on its way
 let LIVE_PIC_RUNNING = 0;
 const LIVE_PIC_QUEUE = [];           // a few asks at a time; the rest wait their turn
 const LIVE_PIC_RO = typeof ResizeObserver === "function" ? new ResizeObserver((es) => es.forEach((e) => livePicFit(e.target))) : null;
-const LIVE_PIC_WHAT = { reviews_wall: "reviews", gallery: "photos", pricing: "prices", accordion: "questions", cta: "words", image_text: "photo and words" };
+const LIVE_PIC_WHAT = { reviews_wall: "reviews", gallery: "photos", pricing: "prices", accordion: "questions", cta: "words", image_text: "photo and words", features: "highlights" };
 // the same JSON whatever order a block's keys were written in, so one picture has one name
 const stableJson = (v) => JSON.stringify(v, (k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, kk) => { o[kk] = x[kk]; return o; }, {}) : x));
 // the ways one section can be arranged: the choices, which one it has, and the section each way
 function insArrangements(blk) {
-  if (blk && blk.type === "image_text") return { opts: IMAGE_TEXT_SIDES, isOn: (o) => (blk.side === "right" ? "right" : "left") === o[1], with: (o) => ({ ...blk, side: o[1] }), pic: (o) => "image_text:" + o[1] };
+  if (blk && blk.type === "image_text") {
+    const isSide = (o) => o[1] === "left" || o[1] === "right";
+    const design = blk.variant === "overlap" || blk.variant === "frame" ? blk.variant : "";
+    return {
+      opts: IMAGE_TEXT_WAYS,
+      isOn: (o) => (isSide(o) ? !design && (blk.side === "right" ? "right" : "left") === o[1] : design === o[1]),
+      with: (o) => { const b = { ...blk }; if (isSide(o)) { b.side = o[1]; delete b.variant; } else b.variant = o[1]; return b; },
+      pic: (o) => "image_text:" + o[1],
+    };
+  }
   const opts = blk && BLOCK_VARIANT_OPTS[blk.type]; if (!opts) return null;
   return { opts, isOn: (o) => String(blk.variant || "") === o[1], with: (o) => { const b = { ...blk }; if (o[1]) b.variant = o[1]; else delete b.variant; return b; }, pic: (o) => blk.type + ":" + (o[1] || "default") };
 }
@@ -4531,6 +4597,7 @@ function insLiveLayouts(host, idx, blk) {
     item.append(win, b);
     list.appendChild(item);
   });
+  designExtras(wrap, idx, blk, true);   // item 329
   host.insertBefore(wrap, host.firstChild);   // the arrangement leads the tab, as drawn
   if (INS_TAB === "layout") insLiveStart(list);
 }
@@ -6472,8 +6539,8 @@ const IPE_CAPS = {
   map: { address: 200 },
   richtext: { body: 4000 },
   image: { caption: 200 },
-  image_text: { body: 2000, 'button.label': 40 },
-  accordion: { 'items.N.summary': 120, 'items.N.body': 1500 },
+  image_text: { body: 2000, 'button.label': 40, number: 12, number_label: 60 },   // item 329: the frame design's big number
+  accordion: { 'items.N.summary': 120, 'items.N.body': 1500, intro: 200 },        // item 329: the side design's short line
   tabs: { 'tabs.N.label': 40, 'tabs.N.body': 1500 },
   carousel: { 'slides.N.caption': 160 },
   progress: { 'items.N.label': 60 },
