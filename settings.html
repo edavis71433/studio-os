@@ -2470,15 +2470,11 @@ async function saveReply() {
 function wirePortal() {
   const ta = $('portalWelcome');
   if (ta.dataset.wired) return; ta.dataset.wired = '1';
-<<<<<<< HEAD
   $('portalCoverPick').addEventListener('click', openCoverPicker);   // items 247/335
   $('portalCoverClear').addEventListener('click', () => saveLook({ cover_media_id: null }));
   $('portalCoverClose').addEventListener('click', () => { const d = $('portalCoverDlg'); if (d.close) d.close(); else d.removeAttribute('open'); });
   $('portalFont').addEventListener('change', () => saveLook({ heading_font: $('portalFont').value }));
-  $('portalSlugSave').addEventListener('click', saveSlug);   // item 350
-=======
   $('portalSlug').addEventListener('change', saveSlug);   // item 350; item 165: saves when you leave the box, no Save button
->>>>>>> claude/portal-nov-22
   $('portalSlug').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveSlug(); } });
   $('portalReplyWithin').addEventListener('change', saveReply);   // item 353
   $('portalReplyHours').addEventListener('change', saveReply);
