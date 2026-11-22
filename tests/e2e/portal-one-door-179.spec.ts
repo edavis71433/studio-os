@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Builder list item 179, part three: one Messages door. Requests and Support fold
 // into Messages, six tabs become five, a conversation reads like a chat, and Book
@@ -93,7 +94,7 @@ test.describe('Client portal part three — one Messages door (item 179)', () =>
 
   test('a project conversation reads like a chat: the studio on the left, you on the right, the days marked, what happened as a quiet line', async ({ page }) => {
     // the hour that split Nov 9 in two: 15:00Z was more than six days back, 16:00Z less (the labels are calendar days now)
-    await page.clock.setFixedTime(new Date('2026-11-15T15:30:00Z'));
+    await pinClock(page, '2026-11-15T15:30:00Z');
     await start(page);
     await page.goto('/client.html');
     await openMessages(page);

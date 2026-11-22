@@ -2,6 +2,7 @@ import { test, expect, type Page, type Locator } from '@playwright/test';
 import { installApp } from './helpers/app';
 import { installIosFocusSemantics } from './helpers/ios-focus';
 import { settled } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Nov 10 bug hunt, Pipeline (B7 · B8 · B13 · B14 · B19 · B20 and the small ones):
 //   B20 "5k" is $5,000 (it was saved as $5)
@@ -246,7 +247,7 @@ test.describe('item 98 — the proposal editor (B8, B7)', () => {
 test.describe('item 104 — "Won this month" is your month (B14)', () => {
   test.use({ timezoneId: 'America/Los_Angeles' });
   test('5:30pm on Oct 31 in Los Angeles: October’s wins still count, and the summary is asked with your clock', async ({ page }) => {
-    await page.clock.install({ time: new Date('2026-11-01T00:30:00Z') });   // 5:30pm Oct 31, Pacific
+    await pinClock(page, '2026-11-01T00:30:00Z', { ticking: true });   // 5:30pm Oct 31, Pacific
     const won = (id: string, at: string) => ({ id, title: 'Won ' + at, stage: 'won', contact_id: null, expected_value_cents: 120000, converted_client_id: 'cl-' + id, converted_at: at, updated_at: at, created_at: '2026-10-01T00:00:00Z' });
     // mid-October, and 5:10pm Oct 31 (already Nov 1 in UTC): both October's here
     await installApp(page, { api: { ...API, '/sales/deals': { data: [DEALS[0], DEALS[1], won(D3, '2026-10-15T18:00:00Z'), won('44444444-4444-4444-8444-4444444444d4', '2026-11-01T00:10:00Z')] } } });

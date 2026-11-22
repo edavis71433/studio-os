@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, OWNER_SESSION, spyRequestBodies, sentBodies, pressButton } from './helpers/app';
 import { settled } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // The client portal (client.html) — a reviewer's calm world: mirror of "needs
 // you" (Phase PP Section 4), then approve what's theirs to approve.
@@ -1514,7 +1515,7 @@ const SHARE_FILE = { name: 'Team photos.png', mimeType: 'image/png', buffer: Buf
 
 test.describe('Client portal — Documents shelf: files and documents (slice 12, item 179 part four)', () => {
   test('proposals and agreements sit on the shelf newest first, each with its state and the one thing to do', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
+    await pinClock(page, '2026-11-15T18:00:00Z');   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
     await installApp(page, { api: { ...FILES_API, '/client/billing': { data: { invoices: [] } } } });
     await page.goto('/client.html');
     await openFilesTab(page);
@@ -1551,7 +1552,7 @@ test.describe('Client portal — Documents shelf: files and documents (slice 12,
   });
 
   test('project files are shelf rows: type icon, honest meta, You-shared chip on client uploads, Save round-trip', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
+    await pinClock(page, '2026-11-15T18:00:00Z');   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
     await installApp(page, { api: FILES_API });
     await page.addInitScript(() => { (window as any).open = (u: string) => { (window as any).__opened = u; return null; }; });
     await page.route('**/functions/v1/presence/client/deliverables/d1/download', (route) =>

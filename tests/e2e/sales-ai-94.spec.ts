@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { installApp, ALL_FEATURES, STUDIO_LEVEL_NAV } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Sales item 94 (Nov 2026): AI help on the sales side and the month's goal, drawn in Figma
 // first (page "Sales 94 · 105 · 93 · 120", parts 1 to 3) and approved by Eric. Draft it for
@@ -223,7 +224,7 @@ test.describe('sales item 94 — AI help and the month’s goal', () => {
     // yesterday for the first hour after midnight, every day. So the clock stops at midday, and the
     // last use is an hour before that.
     const NOON = Date.parse('2026-11-15T12:00:00Z');
-    await page.clock.setFixedTime(new Date(NOON));
+    await pinClock(page, NOON);
     const puts: Array<Record<string, unknown>> = [];
     await installApp(page, { api: {
       '/portal/context': STUDIO_CTX,

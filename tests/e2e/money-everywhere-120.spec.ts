@@ -1,10 +1,11 @@
 import { test, expect, Page } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // The fixtures' dates are fixed in 2026, and the relative ones count from the same moment, so the
 // clock is pinned there: from January a page adds the year, and the checks say "Nov 6" (builder item 108).
 const PINNED = Date.parse('2026-11-15T18:00:00Z');
-test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date(PINNED)); });
+test.beforeEach(async ({ page }) => { await pinClock(page, PINNED); });
 
 // Sales item 120: the money shows everywhere. The client's portal names each invoice by
 // its number and draws a part payment under the invoice it paid toward, with its own

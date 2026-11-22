@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp, settled } from './helpers/app';
+import { pinClock } from './helpers/clock';
 import { mountCanvas, API, PAGED } from './helpers/editor';
 import { smallTargets, say } from './helpers/tap-walk';
 
@@ -48,7 +49,7 @@ test.describe('every editor control is a finger-sized target on a touch screen (
   // the editor's other tabs: the help buttons, checklist links, text toolbars, chips and switches
   for (const [name, hash, ready] of [['Today', 'today', '#view-today.on'], ['Pages', 'pages', '#view-pages.on'], ['Business', 'business', '#view-business.on']] as const) {
     test(`the ${name} tab`, async ({ page }) => {
-      await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'));
+      await pinClock(page, '2026-11-16T18:00:00Z');
       await installApp(page, { api: { ...API, '/settings': { data: PAGED } } as never });
       await page.goto(`/presence.html#${hash}`);
       await expect(page.locator(ready)).toBeVisible();

@@ -20,6 +20,7 @@
 // PART C drives the real code through a fetch fake: the second outage notifies,
 // the second token expiry notifies, the re-stalled deal re-nudges, and every
 // teardown clears by prefix + the pre-bucket legacy key.
+import { pinClock } from './clock.mjs';
 const ROOT = new URL('../../', import.meta.url);
 const results = [];
 const ok = (n, p, note = '') => { results.push(p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
@@ -292,34 +293,33 @@ const restore = () => { globalThis.fetch = realFetch; };
   const { calls } = installFake();
   const week1 = Date.parse('2026-07-02T09:00:00Z');
   const week2 = week1 + 8 * 86400_000;
-  const realNow = Date.now;
 
-  Date.now = () => week1;
+  let unpin = pinClock(week1);
   await markStatus(SITE, 'google_search_console', 'expired', 'down', 'token revoked');
   const raisesOf = () => calls.filter((c) => c.method === 'POST' && c.url.includes('presence_plan_notices') && c.body?.kind === 'connection_expired');
   ok('C2: expiry #1 raises connection_expired on a week-bucketed per-provider key',
     raisesOf().length === 1 && raisesOf()[0].body.period.startsWith('conn:google_search_console:w'));
 
-  Date.now = () => week1 + 3600_000;
+  unpin(); unpin = pinClock(week1 + 3600_000);
   await markStatus(SITE, 'google_search_console', 'expired', 'down', 'token revoked');
   ok('C2: a re-fire within the week re-raises NOTHING (send-once inside the bucket)',
     raisesOf().length === 2 && calls.filter((c) => c.method === 'POST' && c.body?.kind === 'connection_expired').length === 2,
     'markStatus fires per sync attempt; the second insert must hit the held key');
   // (two POST attempts, but the fake's unique memory returned a row only once)
 
-  Date.now = () => week1 + 2 * 3600_000;
+  unpin(); unpin = pinClock(week1 + 2 * 3600_000);
   await markStatus(SITE, 'google_search_console', 'connected', 'ok');
   const clears = calls.filter((c) => c.method === 'PATCH' && c.url.includes('kind=eq.connection_expired'));
   ok('C2: reconnect clears by prefix AND the legacy exact key',
     clears.some((c) => /period=like\./.test(c.url)) && clears.some((c) => c.url.includes(`period=eq.${encodeURIComponent('conn:google_search_console')}`)),
     clears.map((c) => c.url).join('\n'));
 
-  Date.now = () => week2;
+  unpin(); unpin = pinClock(week2);
   await markStatus(SITE, 'google_search_console', 'expired', 'down', 'token revoked again');
   const periods = raisesOf().map((c) => c.body.period);
   ok('C2: EXPIRY #2 (a later week) NOTIFIES — new bucket, new row (the fix)',
     new Set(periods).size === 2, periods.join(', '));
-  Date.now = realNow;
+  unpin();
   restore();
 }
 
@@ -327,7 +327,6 @@ const restore = () => { globalThis.fetch = realFetch; };
 {
   const { runDealFollowups } = await import('../../supabase/functions/presence/commerce/lifecycle.ts');
   const DEAL = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
-  const realNow = Date.now;
   const { calls, held } = installFake();
   // quiet since mid-June (dealNudgeDue reads updated_at); the site has the Oct 2026
   // "nudge me" switch ON (benchmark item 6 — default off, so the fixture opts in)
@@ -343,7 +342,7 @@ const restore = () => { globalThis.fetch = realFetch; };
   };
 
   const week1 = Date.parse('2026-07-02T09:00:00Z');
-  Date.now = () => week1;
+  let unpin = pinClock(week1);
   await runDealFollowups(5);
   const nudges = () => calls.filter((c) => c.method === 'POST' && c.url.includes('presence_plan_notices') && c.body?.kind === 'deal_followup' && c.body?.period?.startsWith(`deal:${DEAL}:`));
   ok('C3: stall #1 nudges on the week-bucketed key', nudges().length === 1 && /w\d+$/.test(nudges()[0].body.period));
@@ -353,11 +352,11 @@ const restore = () => { globalThis.fetch = realFetch; };
 
   // …the deal wakes (sales.ts clears by prefix — proven structurally in A4) and
   // stalls again a few weeks later:
-  Date.now = () => week1 + 3 * 7 * 86400_000;
+  unpin(); unpin = pinClock(week1 + 3 * 7 * 86400_000);
   await runDealFollowups(5);
   const uniquePeriods = new Set(nudges().map((c) => c.body.period));
   ok('C3: STALL #2 (a later week) RE-NUDGES — a new bucket, a new row (the fix)', uniquePeriods.size === 2, [...uniquePeriods].join(', '));
-  Date.now = realNow;
+  unpin();
   restore();
 }
 

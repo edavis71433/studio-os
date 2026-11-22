@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Builder list item 210 (Nov 2026; review file 03, findings 1, 6 and 11): the Usage tab on
 // Sites, as drawn in Figma (page 310:2, option A) and approved. The month in one band: the
@@ -49,7 +50,7 @@ async function openUsage(page: Page, o: { usage?: unknown; status?: number } = {
   const ctl = { status: o.status ?? 200, usage: o.usage ?? (USAGE as unknown) };   // a test may change the answer later
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.clock.setFixedTime(new Date(NOW));
+  await pinClock(page, NOW);
   await installApp(page, { api: { '/portal/context': studioContext, '/agency/sites': { data: SITES, partial: false, can_open: true, can_create: true, trash: [], trash_days: 90 } } as never });
   await page.route(/\/functions\/v1\/presence\/agency\/usage(\?.*)?$/, (route: Route) => {
     const m = new URL(route.request().url()).searchParams.get('month') || '';

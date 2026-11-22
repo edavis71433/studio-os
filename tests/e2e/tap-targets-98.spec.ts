@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp, settled } from './helpers/app';
+import { pinClock } from './helpers/clock';
 import { smallTargets, type Miss } from './helpers/tap-walk';
 import { CONTACTS_API, PROJECTS_API, AGENCY_API, BROADCASTS_API, CUSTOMERS_API } from './tap-targets-98.fixtures';
 import { SETTINGS_98 } from './tap-targets-98.settings';
@@ -39,7 +40,7 @@ test.describe('every control is a finger-sized target on a touch screen (builder
   for (const pg of PAGES) {
     test(`${pg.name}`, async ({ page }) => {
       test.skip(!test.info().project.use.hasTouch, 'touch screens only: a mouse keeps the compact desktop sizes');
-      await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'));
+      await pinClock(page, '2026-11-16T18:00:00Z');
       await installApp(page, { api: pg.api as never });
       await page.goto(pg.path);
       await expect(page.locator(pg.ready)).toBeVisible();
@@ -51,7 +52,7 @@ test.describe('every control is a finger-sized target on a touch screen (builder
 
   test('the Add a customer box', async ({ page }) => {
     test.skip(!test.info().project.use.hasTouch, 'touch screens only');
-    await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'));
+    await pinClock(page, '2026-11-16T18:00:00Z');
     await installApp(page, { api: CUSTOMERS_API as never });
     await page.goto('/customers.html');
     await page.locator('#addCust').click();
@@ -68,7 +69,7 @@ test.describe('every control is a finger-sized target on a touch screen (builder
   const say = (small: Miss[]) => small.map((m) => `${m.el} "${m.text}" ${m.w}x${m.h} misses ${m.side}`).join('\n');
   test('a customer’s steps card, its Invite form and its other-host field', async ({ page }) => {
     test.skip(!test.info().project.use.hasTouch, 'touch screens only');
-    await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'));
+    await pinClock(page, '2026-11-16T18:00:00Z');
     await installApp(page, { api: PROFILE_241() as never });
     await page.goto(`/crm.html?client_id=${CID}`);
     await expect(page.locator('#custsteps .cs-row')).toBeVisible();
@@ -89,7 +90,7 @@ test.describe('every control is a finger-sized target on a touch screen (builder
 
   test('the Delete customer box', async ({ page }) => {
     test.skip(!test.info().project.use.hasTouch, 'touch screens only');
-    await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'));
+    await pinClock(page, '2026-11-16T18:00:00Z');
     await installApp(page, { api: PROFILE_241({ [`/sales/customers/${CID}`]: WITH_SITE }) as never });
     await page.goto(`/crm.html?client_id=${CID}`);
     await expect(page.locator('#custsteps .cs-row')).toBeVisible();
@@ -103,7 +104,7 @@ test.describe('every control is a finger-sized target on a touch screen (builder
 
   test('Delete customer… in Customers’ preview', async ({ page }) => {
     test.skip(!test.info().project.use.hasTouch, 'touch screens only');
-    await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'));
+    await pinClock(page, '2026-11-16T18:00:00Z');
     await installApp(page, { api: CUSTOMERS_241 as never });
     await page.addInitScript(() => { try { localStorage.setItem('dds-display:customers', 'table'); } catch (_) { /* */ } });
     await page.goto('/customers.html');

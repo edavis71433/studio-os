@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { deflateSync } from 'zlib';
 import { installApp, spyRequestBodies, sentBodies } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Items 39 + 117 (Nov 2026): the photo editor on the Files page. Crop to a shape,
 // rotate and flip, sliders and named filters, and "Remove background" for a
@@ -191,14 +192,14 @@ test.describe('Photo editor — saving', () => {
   });
 
   test('a panel left open past the hour its links last reads the file again first', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-08T12:00:00Z'));
+    await pinClock(page, '2026-11-08T12:00:00Z');
     await setup(page);
     let reads = 0;
     await page.route(new RegExp('/functions/v1/presence/assets/' + PHOTO.id + '$'), (route) => { if (route.request().method() === 'GET') reads++; return route.fallback(); });
     await page.locator(`tr[data-open="${PHOTO.id}"]`).click();
     await expect(page.locator('#panel #f-name')).toHaveValue('Storefront');
     expect(reads).toBe(1);
-    await page.clock.setFixedTime(new Date('2026-11-08T12:51:00Z'));
+    await pinClock(page, '2026-11-08T12:51:00Z');
     await page.locator('#panel').getByRole('button', { name: 'Edit photo' }).click();
     await expect(page.locator('dialog.dds-ie #ie-msg')).toBeHidden();
     expect(reads).toBe(2);

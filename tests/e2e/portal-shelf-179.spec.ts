@@ -1,10 +1,11 @@
 import { test, expect, Page } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // The fixtures' dates are fixed in 2026, and the relative ones count from the same moment, so the
 // clock is pinned there: from January a page adds the year, and the checks say "Nov 6" (builder item 108).
 const PINNED = Date.parse('2026-11-15T18:00:00Z');
-test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date(PINNED)); });
+test.beforeEach(async ({ page }) => { await pinClock(page, PINNED); });
 
 // Builder list item 179, part four: the papers shelf. Files and Invoices fold into
 // Documents: invoices, proposals and estimates, agreements and files on one shelf,
