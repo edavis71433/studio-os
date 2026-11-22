@@ -3216,7 +3216,7 @@ function renderMediaGrid(grid, manage, onPick, onEdit) {
   grid.innerHTML = "";
   if (!S.media.length) {
     if (manage) grid.innerHTML = `<div class="estate" style="grid-column:1/-1;padding:30px 0"><div class="eq">No photos yet.</div><div class="eh">Add a few of your best. They’ll be ready to place anywhere on your site.</div></div>`;
-    else grid.innerHTML = `<p style="color:var(--ink-2);font-size:13px">No files in this collection yet.</p>`;
+    else grid.innerHTML = `<p style="color:var(--ink-2);font-size:13px">No photos yet. Upload some, or pick from Stock photos.</p>`;   // item 317: the chooser says what to do next
     return;
   }
   S.media.forEach((m) => {
@@ -3227,7 +3227,7 @@ function renderMediaGrid(grid, manage, onPick, onEdit) {
 // One photograph cell + its manage actions — used by the classic grid above AND by
 // FL_render (#180), so images keep every behavior inside the Files library view.
 function mediaCell(grid, m, manage, onPick) {
-  const cell = el(onPick ? "button" : "div", "mcell");
+  const cell = el(onPick ? "button" : "div", "mcell"); cell.__mediaId = m.id;
   if (m.thumb) { const img = el("img"); img.src = m.thumb; img.alt = m.alt_text || ""; img.loading = "lazy"; cell.appendChild(img); }
   if (m.used_by && m.used_by.length) { const b = el("span", "badge", "On your site"); b.title = "At work: " + m.used_by.join(", "); cell.appendChild(b); }
   const alt = el("span", "alt", m.alt_text || "");
@@ -3379,12 +3379,107 @@ function showSuggest(cell, m, grid, p) {
   cell.appendChild(panel);
   altI.focus(); altI.select();
 }
+// ── Builder item 317: photos go in by the batch, descriptions asked after, big ones made smaller ──
+// A phone photo is often 12 MB and 4,000 px across; the site never shows more than about
+// 2,400 px, so anything past that, or past 3 MB, is redrawn at 2,400 px on its long side here
+// in the browser (a PNG stays a PNG, so it keeps its transparency). The server's 10 MB rule is
+// then never the thing that turns a photo away.
+const PHOTO_MAX_PX = 2400, PHOTO_SHRINK_FROM = 3 * 1024 * 1024, PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+async function dcShrinkPhoto(file) {
+  const asIs = { blob: file, mime: file.type, width: undefined, height: undefined, shrunk: false };
+  let src = null;
+  try { if (window.createImageBitmap) src = await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (_) { src = null; }
+  if (!src) src = await new Promise((res) => { const img = new Image(); img.onload = () => res(img); img.onerror = () => res(null); img.src = URL.createObjectURL(file); });
+  if (!src) return asIs;
+  const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight, big = Math.max(w, h);
+  if (!big || (big <= PHOTO_MAX_PX && file.size <= PHOTO_SHRINK_FROM)) return { ...asIs, width: w, height: h };
+  try {
+    const k = Math.min(1, PHOTO_MAX_PX / big), nw = Math.max(1, Math.round(w * k)), nh = Math.max(1, Math.round(h * k));
+    const c = document.createElement("canvas"); c.width = nw; c.height = nh;
+    c.getContext("2d").drawImage(src, 0, 0, nw, nh);
+    const png = file.type === "image/png";
+    let blob = await new Promise((res) => c.toBlob(res, png ? "image/png" : "image/jpeg", 0.86)), mime = png ? "image/png" : "image/jpeg";
+    if (blob && png && blob.size > PHOTO_MAX_BYTES) { const j = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.86)); if (j) { blob = j; mime = "image/jpeg"; } }
+    if (!blob) return { ...asIs, width: w, height: h };
+    return { blob, mime, width: nw, height: nh, shrunk: true };
+  } catch (_) { return { ...asIs, width: w, height: h }; }
+}
+// A first description from the file's name: "fresh-pasta_basil.jpg" → "Fresh pasta basil";
+// a camera's name ("IMG_4021.HEIC") gives nothing, so it is "Photo" until they say.
+function photoWords(name) {
+  const words = String(name || "").replace(/\.[a-z0-9]+$/i, "").split(/[-_\s.]+/).filter((t) => t && !/^\d+$/.test(t) && !/^(img|dsc|dcim|pxl|mvimg|image|photo|screenshot|screen shot|jpeg|jpg|png|copy)$/i.test(t));
+  const s = words.join(" ").trim();
+  return s.length >= 3 ? s.charAt(0).toUpperCase() + s.slice(1) : "Photo";
+}
+// Every file in the list goes up, one after another, with its first description; then the
+// descriptions are asked for in one sheet (dcDescribePhotos). Resolves the photos that landed.
+async function dcUploadPhotos(files, opts) {
+  const list = Array.from(files || []).filter((f) => /^image\/(jpeg|png|webp)$/.test(f.type));
+  const skipped = Array.from(files || []).length - list.length;
+  if (skipped) toast(skipped === 1 ? "One file isn’t a JPEG, PNG or WebP photo, so it was left out." : skipped + " files aren’t JPEG, PNG or WebP photos, so they were left out.", true);
+  if (!list.length) return [];
+  const wid = (opts && opts.whisper) || "topWhisper", done = [];
+  let shrunk = 0;
+  for (let i = 0; i < list.length; i++) {
+    const f = list[i];
+    whisper(wid, list.length === 1 ? "Bringing it in…" : "Bringing in " + (i + 1) + " of " + list.length + "…");
+    try {
+      const out = await dcShrinkPhoto(f); if (out.shrunk) shrunk++;
+      const words = photoWords(f.name);
+      const r = await api("POST", "/media/upload-url", { mime: out.mime, bytes: out.blob.size, alt_text: words, width: out.width, height: out.height });
+      const put = await fetch(r.data.upload_url, { method: "PUT", headers: { "Content-Type": out.mime }, body: out.blob });
+      if (!put.ok) throw new Error("“" + f.name + "” didn’t finish arriving — nothing was lost, try it once more.");
+      done.push({ id: r.data.media_id, name: f.name, words });
+    } catch (err) { toast(nice(err), true); }
+  }
+  whisper(wid, done.length ? "saved" : "");
+  if (done.length) await loadMedia();
+  if (done.length) toast((done.length === 1 ? "1 photo" : done.length + " photos") + " in your collection" + (shrunk ? (shrunk === 1 ? ", one made smaller for the web" : ", " + shrunk + " made smaller for the web") : ""));
+  if (done.length && !(opts && opts.quiet)) dcDescribePhotos(done);
+  return done;
+}
+// One sheet for the descriptions, after the photos are in: each with the words guessed from its
+// file name, saved only where they were changed. "Later" keeps the guesses.
+function dcDescribePhotos(items) {
+  const d = svDialog(items.length === 1 ? "Describe this photo" : "Describe these photos", "A few words each: read aloud for people who can’t see them, and read by Google. The first guess comes from each file’s name.");
+  const rows = [];
+  items.forEach((it) => {
+    const m = (S.media || []).find((x) => x.id === it.id) || {};
+    const row = el("div", "ph-desc-row");
+    const img = el("img"); img.alt = ""; if (m.thumb) img.src = m.thumb; row.appendChild(img);
+    const inp = el("input"); inp.type = "text"; inp.maxLength = 200; inp.value = m.alt_text || it.words; inp.setAttribute("aria-label", "Description for " + it.name); row.appendChild(inp);
+    rows.push({ it, inp, was: inp.value }); d.body.appendChild(row);
+  });
+  const acts = el("div", "acts");
+  const save = el("button", "pillbtn sm inked", "Save descriptions"); save.type = "button";
+  const later = el("button", "pillbtn sm", "Later"); later.type = "button";
+  acts.append(save, later); d.body.appendChild(acts);
+  later.addEventListener("click", () => d.close());
+  save.addEventListener("click", async () => {
+    save.disabled = true;
+    const changed = rows.filter((r) => r.inp.value.trim().length >= 3 && r.inp.value.trim() !== r.was);
+    try {
+      for (const r of changed) { await api("PUT", `/media/${r.it.id}`, { alt_text: r.inp.value.trim() }); const m = (S.media || []).find((x) => x.id === r.it.id); if (m) m.alt_text = r.inp.value.trim(); }
+      d.close(); if (changed.length) { toast("Descriptions saved"); if ($("mediaGrid")) renderMediaGrid($("mediaGrid"), true); if (typeof pfRefresh === "function" && $("panelFilesGrid")) pfRefresh(); }
+    } catch (err) { save.disabled = false; toast(nice(err), true); }
+  });
+  setTimeout(() => { try { rows[0].inp.focus(); rows[0].inp.select(); } catch (_) {} }, 30);
+}
+// Files dropped anywhere on a host go in the same way.
+function dcDropPhotos(host, onDone) {
+  if (!host || host.__dcDrop) return; host.__dcDrop = true;
+  host.addEventListener("dragover", (e) => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files")) { e.preventDefault(); host.classList.add("ph-over"); } });
+  host.addEventListener("dragleave", () => host.classList.remove("ph-over"));
+  host.addEventListener("drop", async (e) => { host.classList.remove("ph-over"); const fs = e.dataTransfer && e.dataTransfer.files; if (!fs || !fs.length) return; e.preventDefault(); const got = await dcUploadPhotos(fs); if (onDone) onDone(got); });
+}
 $("btnUpload").addEventListener("click", () => $("fileInput").click());
-$("fileInput").addEventListener("change", () => {
-  const f = $("fileInput").files[0]; if (!f) return;
-  S.pendingFile = f;
-  $("uploadPrep").hidden = false; $("upload-alt").value = ""; $("upload-alt").focus();
+$("fileInput").setAttribute("multiple", "");
+$("fileInput").addEventListener("change", async () => {
+  const fs = Array.from($("fileInput").files || []); if (!fs.length) return;
+  await dcUploadPhotos(fs, { whisper: "save-media" });
+  $("fileInput").value = "";
 });
+dcDropPhotos($("mediaGrid"));
 $("btnUploadCancel").addEventListener("click", () => { S.pendingFile = null; $("uploadPrep").hidden = true; $("fileInput").value = ""; });
 $("btnUploadGo").addEventListener("click", async () => {
   const f = S.pendingFile, alt = $("upload-alt").value.trim();
@@ -3401,14 +3496,49 @@ $("btnUploadGo").addEventListener("click", async () => {
     await loadMedia(); toast("In the collection");
   } catch (err) { whisper("save-media", ""); toast(nice(err), true); }
 });
-let pickerCb = null;
-function openPicker(onPick) {
-  pickerCb = onPick;
-  renderMediaGrid($("pickerGrid"), false, (id) => { closeSheet("pickerScrim"); onPick(id); }, editInPicker);
-  pickerShowTab("mine");   // "Your photos" is always the default when the picker opens
+let pickerCb = null, PICK_MANY = null;   // item 317: many: the ids picked so far
+function pickerPaintGrid() {
+  const onPick = pickerCb; if (!onPick) return;
+  if (!PICK_MANY) { renderMediaGrid($("pickerGrid"), false, (id) => { closeSheet("pickerScrim"); onPick(id); }, editInPicker); return; }
+  renderMediaGrid($("pickerGrid"), false, (id) => {
+    const at = PICK_MANY.indexOf(id); if (at >= 0) PICK_MANY.splice(at, 1); else PICK_MANY.push(id);
+    $("pickerGrid").querySelectorAll(".mcell").forEach((c) => { const on = PICK_MANY.includes(c.__mediaId); c.classList.toggle("picked", on); c.setAttribute("aria-pressed", String(on)); });
+    pickerManyBtn();
+  });
+  $("pickerGrid").querySelectorAll(".mcell").forEach((c) => { c.setAttribute("aria-pressed", "false"); });
+  pickerManyBtn();
+}
+function pickerManyBtn() {
+  const b = $("btnPickMany"); if (!b) return;
+  b.hidden = !PICK_MANY; b.disabled = !(PICK_MANY && PICK_MANY.length);
+  b.textContent = PICK_MANY && PICK_MANY.length ? "Add " + (PICK_MANY.length === 1 ? "this photo" : PICK_MANY.length + " photos") : "Add the photos you pick";
+}
+// opts.many: several at once (a gallery); the callback gets the ids in the order they were picked.
+function openPicker(onPick, opts) {
+  pickerCb = onPick; PICK_MANY = opts && opts.many ? [] : null;
+  const t = $("pickTitle"); if (t) t.textContent = PICK_MANY ? "Choose photographs" : "Choose a photograph";
+  const none = $("btnPickNone"); if (none) none.hidden = !!PICK_MANY;
+  pickerPaintGrid();
+  // item 317: a library with nothing in it opens on Stock, searched for the kind of business
+  pickerShowTab((S.media || []).length ? "mine" : "stock");
   openSheet("pickerScrim");
 }
 $("btnPickNone").addEventListener("click", () => { const cb = pickerCb; closeSheet("pickerScrim"); if (cb) cb(null); });
+$("btnPickMany").addEventListener("click", () => { const cb = pickerCb, ids = (PICK_MANY || []).slice(); if (!ids.length) return; closeSheet("pickerScrim"); if (cb) cb(ids); });
+// Upload from inside the chooser: the photos land in the library and, one, in the slot.
+$("pickUploadBtn").addEventListener("click", () => $("pickUploadIn").click());
+$("pickUploadIn").addEventListener("change", async () => {
+  const fs = Array.from($("pickUploadIn").files || []); $("pickUploadIn").value = ""; if (!fs.length) return;
+  const got = await dcUploadPhotos(fs);
+  pickerAfterUpload(got);
+});
+function pickerAfterUpload(got) {
+  if (!got.length || !pickerCb) return;
+  if (PICK_MANY) { got.forEach((g) => { if (!PICK_MANY.includes(g.id)) PICK_MANY.push(g.id); }); pickerPaintGrid(); pickerShowTab("mine"); return; }
+  if (got.length === 1) { const cb = pickerCb; closeSheet("pickerScrim"); cb(got[0].id); return; }
+  pickerPaintGrid(); pickerShowTab("mine");
+}
+dcDropPhotos($("pickerMinePane"), pickerAfterUpload);
 
 /* ── Items 39 + 117 in the picker: Edit on a photo opens the same editor as Files
  *    (image-editor.js, loaded on first use). Saving makes a NEW file beside the
@@ -3521,8 +3651,14 @@ function pickerShowTab(which) {
   $("pickTabMine").classList.toggle("on", mine); $("pickTabMine").setAttribute("aria-selected", String(mine));
   $("pickTabStock").classList.toggle("on", !mine); $("pickTabStock").setAttribute("aria-selected", String(!mine));
   $("pickerMinePane").hidden = !mine; $("pickerStockPane").hidden = mine;
-  if (!mine) { renderPickerStock(); const q = $("pickStockQ"); if (q) q.focus(); }
+  if (!mine) {
+    // item 317: Stock opens on photos for the kind of business until something else is searched for
+    if (!PICK_STOCK.q && PICK_STOCK.state !== "off") { PICK_STOCK.q = stockWordsFor(); const q = $("pickStockQ"); if (q) q.value = PICK_STOCK.q; loadPickerStock(); return; }
+    renderPickerStock(); const q = $("pickStockQ"); if (q) q.focus();
+  }
 }
+const STOCK_WORDS = { restaurant: "restaurant food", coffee_shop: "coffee cafe", cafe: "cafe", bar: "bar cocktails", food_truck: "street food", retail: "shop products", fitness: "fitness gym", gym: "gym workout", yoga: "yoga studio", nonprofit: "community volunteers", church: "church community", salon: "hair salon", spa: "spa wellness", dentist: "dental clinic", plumber: "plumber tools", contractor: "home renovation", landscaper: "garden landscaping", cleaning: "clean home", photographer: "camera photography", lawyer: "law office", accountant: "office desk", realtor: "house exterior", auto: "car repair", pet: "dog grooming", generic: "small business" };
+function stockWordsFor() { const k = (S.settings && S.settings.industry_key) || "generic"; return STOCK_WORDS[k] || String(k).replace(/_/g, " "); }
 $("pickTabMine").addEventListener("click", () => pickerShowTab("mine"));
 $("pickTabStock").addEventListener("click", () => pickerShowTab("stock"));
 $("pickStockGo").addEventListener("click", () => { PICK_STOCK.q = $("pickStockQ").value.trim(); loadPickerStock(); });
@@ -3643,8 +3779,12 @@ const HB_ICON = {
 };
 const hbCap = (s) => { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); };
 // the public address of the live site (custom domain, else the hosting subdomain)
+// Builder item 261: ONE rule for "is it live", made on the server (lib/site_live.ts, sent as
+// GET /site's `live`): an address alone never made a site live. The address is still the site's
+// once it has been published; before that there is nothing to see.
 function siteLiveUrl() {
   const s = S.site; if (!s) return null;
+  if (S.live && S.live.published === false) return null;
   if (s.custom_domain) return `https://${s.custom_domain}`;
   if (s.netlify_site_id) return `https://presence-${String(s.id).replace(/-/g, "").slice(0, 12)}.netlify.app`;
   return null;
@@ -5043,8 +5183,11 @@ function renderStageStatus() {
   const st = $("ssStatus"); if (!st) return;
   const live = siteLiveUrl(); const c = S.changes || {};
   const n = c.count || 0;
-  st.textContent = live ? (n ? `Live · ${n} change${n === 1 ? "" : "s"} waiting` : "Live") : "Not live yet";
-  st.classList.toggle("live", !!live);
+  // item 261: the server's word (Live, Offline, Not answering, Paused, Not live yet), then the count
+  const word = S.live && S.live.words ? S.live.words : live ? "Live" : "Not live yet";
+  const isLive = S.live ? !!S.live.is_live : !!live;
+  st.textContent = isLive && n ? `Live · ${n} change${n === 1 ? "" : "s"} waiting` : word;
+  st.classList.toggle("live", isLive);
   dcSyncLiveChip();
 }
 // One line for what's left before the site can go live. Nothing to finish, no line.
@@ -6767,6 +6910,7 @@ async function refreshAll() {
   const ctxP = SHELL_LOADED.then(() => (window.ddsContext ? window.ddsContext().then((d) => ({ data: d })) : Promise.reject())).catch(() => api("GET", "/portal/context").catch(() => null));
   const [[siteR, off, faq, tes, pos, med, set], ctxR] = await Promise.all([openReads(soft, tagged), ctxP]);
   S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
+  S.live = siteR.data.live || null;   // item 261: the one live rule, from the server
   S.offerings = off.data || []; S.faqs = faq.data || []; S.testimonials = tes.data || []; S.posts = pos.data || [];
   S.media = med.data || []; S.settings = set.data || {};
   // Phase SKU: the FEATURE edition — so the standalone CMS workspace shows only
@@ -8830,7 +8974,7 @@ async function undoSync(rec, vals, r) {
   else if (rec.route === "/location") { S.location = { ...(S.location || {}), ...vals }; fillSingles(); }
   else if (rec.route === "/bookings/settings") { BK.settings = { ...BK.settings, ...vals }; if ($("view-bookings").classList.contains("on")) loadBookings(); }
   else if (rec.route === "/dev/customization") { DESIGN_TOKENS = vals.theme_tokens || {}; if (EDIT_CARDS) remountInPlace("designCard", () => mountDesignCard(false), true); }   // item 85: the tokens are in hand
-  else if (rec.route === "/site/template") { const s = await api("GET", "/site"); S.site = s.data.site; LOOKS = null; applyVocab(); if ($("designGallery")) mountTemplateGallery(); const c = $("designCard"); if (c) c.remove(); mountDesignCard(); }
+  else if (rec.route === "/site/template") { const s = await api("GET", "/site"); S.site = s.data.site; S.live = s.data.live || S.live; LOOKS = null; applyVocab(); if ($("designGallery")) mountTemplateGallery(); const c = $("designCard"); if (c) c.remove(); mountDesignCard(); }
   else if (rec.route === "/settings") {
     S.settings = (r && r.data) || { ...S.settings, ...vals };
     const moved = rec.kind === "pages" && DC_PAGE && vals.pages.find((p) => p.prev_slug === DC_PAGE);

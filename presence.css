@@ -772,6 +772,21 @@ html.dc-edit:not(.plan-watch) .dc-close{height:36px;padding:0 14px;font-size:13p
 #settingsPanel[data-mode="section"] #blocksCard .ins-field input{margin-bottom:0 !important}
 #settingsPanel[data-mode="section"] #blocksCard input:focus-visible,#settingsPanel[data-mode="section"] #blocksCard textarea:focus-visible,#settingsPanel[data-mode="section"] #blocksCard select:focus-visible{outline:2px solid var(--plum);outline-offset:0}
 #settingsPanel[data-mode="section"] #blocksCard .hint{font-size:12px;color:var(--ink-3)}
+/* builder item 315: the list sections' item cards */
+.rw-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.rw-card{padding:8px 10px 10px;border:1px solid var(--hair);border-radius:12px;background:var(--sheet);display:flex;flex-direction:column;gap:6px}
+.rw-card.rw-dragging{opacity:.5}.rw-card.rw-over{outline:2px solid var(--plum);outline-offset:2px}
+.rw-head{display:flex;align-items:center;gap:4px;margin-bottom:2px}
+.rw-grip{display:inline-flex;color:var(--ink-3);cursor:grab;width:18px;justify-content:center}.rw-grip svg{width:14px;height:14px}
+.rw-n{flex:1;font-size:12px;font-weight:600;color:var(--ink-2)}
+.rw-b{width:32px;height:32px;display:grid;place-items:center;padding:0;border:0;border-radius:999px;background:transparent;color:var(--ink-2);cursor:pointer}
+.rw-b:hover{background:var(--dc-raised,var(--paper));color:var(--ink)}.rw-b:disabled{opacity:.35;cursor:default}.rw-b.rw-rm:hover{color:var(--clay,#a3423a)}
+.rw-b svg{width:14px;height:14px}
+@media (pointer:coarse){.rw-b{width:44px;height:44px}}
+.rw-fold{margin-top:10px}.rw-fold summary{font-size:12px;font-weight:600;color:var(--ink-2);cursor:pointer}
+.rw-table{display:grid;gap:6px;align-items:center;overflow-x:auto;padding-bottom:4px}
+.rw-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+#settingsPanel[data-mode="section"] #blocksCard .rw-card input,#settingsPanel[data-mode="section"] #blocksCard .rw-card textarea,#settingsPanel[data-mode="section"] #blocksCard .rw-table input{margin-bottom:0 !important}
 .ai-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .ai-chip{font:600 12px/18px var(--sans);padding:3px 10px;border-radius:999px;border:0;background:var(--dc-raised,var(--paper));color:var(--ink-2);cursor:pointer}
 .ai-chip:hover{color:var(--ink)}
@@ -1605,6 +1620,22 @@ html.plan-watch #svWords{display:none}
 .mcell .fldot.on{background:#8fd0a5}
 /* in-picker source switch: Your photos / Stock photos (FD-T10 in-builder stock) */
 .pickerTabs{display:flex;gap:6px;margin:var(--dds-s4,16px) 0 var(--dds-s1,4px);border-bottom:1px solid var(--hair)}
+/* builder item 317: upload from the chooser, pick several, drop photos on the panel, describe them after */
+.pickUpload{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 12px}
+.pickUploadHint{font-size:12.5px;color:var(--ink-2)}
+.ph-over{outline:2px dashed var(--plum);outline-offset:4px;border-radius:12px}
+.mcell.picked{outline:3px solid var(--plum);outline-offset:2px}
+.mcell.picked::after{content:"✓";position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:var(--plum);color:#fff;font:700 13px/22px var(--sans);text-align:center}
+.ph-desc-row{display:flex;align-items:center;gap:12px;margin:8px 0}
+.ph-desc-row img{width:56px;height:56px;object-fit:cover;border-radius:8px;background:var(--paper);flex:none}
+.ph-desc-row input{flex:1;padding:9px 11px;font:inherit;font-size:13.5px;border:1px solid var(--hair-2);border-radius:10px;background:var(--sheet);color:var(--ink)}
+.gal-cell{display:flex;flex-direction:column;gap:4px;width:96px}
+.gal-cell .gal-mv{display:flex;gap:2px;justify-content:center}
+.gal-cell .gal-mv button{width:32px;height:32px;display:grid;place-items:center;padding:0;border:0;border-radius:999px;background:transparent;color:var(--ink-2);cursor:pointer}
+.gal-cell .gal-mv button:hover{background:var(--dc-raised,var(--paper));color:var(--ink)}.gal-cell .gal-mv button:disabled{opacity:.35;cursor:default}
+.gal-cell .gal-mv button svg{width:14px;height:14px}
+@media (pointer:coarse){.gal-cell{width:120px}.gal-cell .gal-mv button{width:44px;height:44px}}
+.gal-cell.rw-dragging{opacity:.5}.gal-cell.rw-over{outline:2px solid var(--plum);outline-offset:2px;border-radius:8px}
 .pickerTab{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--ink-2);background:transparent;border:0;border-bottom:2px solid transparent;padding:var(--dds-s2,8px) var(--dds-s1,4px);margin-bottom:-1px;cursor:pointer;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease)}
 .pickerTab.on{color:var(--ink);border-bottom-color:var(--plum)}
 .pickerStockBar{display:flex;gap:var(--dds-s2,8px);align-items:center;margin:var(--dds-s4,16px) 0 10px}

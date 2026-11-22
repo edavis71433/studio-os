@@ -678,7 +678,7 @@ async function mountBrandKitCard() {
   const st = {
     // item 197: the site's logo is the one its settings hold (a saved kit can hold an older one)
     logo_media_id: S.settings && "logo_media_id" in S.settings ? (S.settings.logo_media_id || null) : ((kit && kit.logo_media_id) || null),
-    primary: normHexJs((kit && kit.primary) || T.accent) || "#5b3fa0",
+    primary: normHexJs((kit && kit.primary) || T.accent) || dcSiteColours().accent,   // item 277: the site's own colour, never the studio's purple
   };
   // Item 94: type and corners are set in one place, Colors and fonts below. This card showed
   // the same two choices again, and the two could disagree on which was ticked. The kit now
@@ -1989,6 +1989,13 @@ async function dcLiveNow() {
   // The Contents list's rows find a swapped section again when clicked (dcTreeRow); a Columns
   // section's rows hold its columns too, so that one rebuilds the list.
   if (swapped) try { dcInjectCanvas(doc, main, true); if (cols) dcBuildTree(main); } catch (_) { /* chrome is best-effort */ }
+  // item 315: "+ Add a row" opens the new row's first words for typing
+  const lf = LIVE_FOCUS; LIVE_FOCUS = null;
+  if (swapped && lf && !IPE) try {
+    const sec = Array.prototype.find.call(main.children, (n) => { const c = eeClassify(n); return c.kind === "block" && c.bi === lf.bi; });
+    const f = sec && sec.querySelector('[data-dds-field="' + lf.path + '"]');
+    if (f) { f.scrollIntoView({ block: "nearest" }); ipeStart(doc, f, sec); const sel = doc.getSelection(), r = doc.createRange(); r.selectNodeContents(f); sel.removeAllRanges(); sel.addRange(r); }
+  } catch (_) {}
 }
 // ── T-STARTER: apply a pre-arranged, pre-filled starter layout. Replaces the
 //    working sections with a ready-made set the owner then EDITS (never a blank
@@ -2127,9 +2134,9 @@ function ovDarkenUntil(color, against, min) { let c = color; for (let i = 0; i <
 // Curated brand shades first, free hex behind "Custom…" (Eric, 2026-07-16):
 // client-side mix() tints/shades of the site accent + neutrals, per well.
 function ovShades(key) {
-  const T = DESIGN_TOKENS || {};
-  const acc = normHexJs(T.accent) || "#5b3fa0";
-  const ink = normHexJs(T.ink) || "#1d1c22";
+  const T = DESIGN_TOKENS || {}, site = dcSiteColours();   // item 277: a new site's palette is the template's, not the studio's purple
+  const acc = normHexJs(T.accent) || normHexJs(site.accent) || "#23635a";
+  const ink = normHexJs(T.ink) || normHexJs(site.ink) || "#1d1c22";
   let list;
   if (key === "text_color") list = [ink, ovMix(acc, "#000000", 0.55), ovMix(acc, "#000000", 0.3), acc, "#ffffff"];
   else if (key === "bg_color") list = ["#ffffff", ovMix(acc, "#ffffff", 0.92), ovMix(acc, "#ffffff", 0.8), ovMix(ink, "#ffffff", 0.94), ovMix(acc, "#000000", 0.45)];
@@ -2590,20 +2597,7 @@ function renderBlocksCard() {
       linkPick(bu);   // item 225
       sub.appendChild(el("div", "hint", "A prominent highlight band. The heading goes in the title field above."));
     } else if (def.tableSimple) {
-      const ta = el("textarea");
-      const toText = () => { const lines = []; if ((blk.headers || []).length) lines.push(blk.headers.join(" | ")); (blk.rows || []).forEach((r) => lines.push((r || []).join(" | "))); return lines.join("\n"); };
-      ta.value = toText(); ta.placeholder = "Name | Price | Notes\nBasic | $10 | Great to start\nPro | $25 | Most popular";
-      ta.rows = Math.max(4, ta.value.split("\n").length + 1);
-      ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.7;box-sizing:border-box";
-      ta.addEventListener("change", () => {
-        const lines = ta.value.split("\n").map((l) => l.replace(/\s+$/, "")).filter((l) => l.trim());
-        const cells = (l) => l.split("|").map((c) => c.trim());
-        const headers = lines.length ? cells(lines[0]) : [];
-        const rows = lines.slice(1).map(cells);
-        BLOCKS_WORK[idx] = wLook(idx, { type: "table", title: ti.value.trim(), headers, rows });
-      });
-      sub.appendChild(ta);
-      sub.appendChild(el("div", "hint", "One row per line, columns separated by “ | ”. The FIRST line is your header row. It scrolls sideways on phones."));
+      renderTableBlockBody(blk, idx, sub, ti);   // builder item 315: a grid of cells, add a row or a column
     } else if (def.structured === "columns") {
       renderColumnsBlockBody(blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));
@@ -2629,13 +2623,7 @@ function renderBlocksCard() {
       renderButtonsBlockBody(blk, idx, sub, ti);
       sub.appendChild(el("div", "hint", def.hint));
     } else if (def.field || def.areasSimple) {
-      const ta = el("textarea"); ta.value = blockText(def, blk);
-      ta.rows = Math.max(3, ta.value.split("\n").length + 1);
-      ta.style.cssText = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;line-height:1.5;box-sizing:border-box";
-      ta.addEventListener("change", () => { const t2 = ti.value.trim(); BLOCKS_WORK[idx] = wLook(idx, textToBlock(def, t2, ta.value)); });
-      sub.appendChild(ta);
-      sub.appendChild(aiField(ta, {}));
-      sub.appendChild(el("div", "hint", def.hint));
+      renderRowsBlockBody(def, blk, idx, sub, ti);   // builder item 315: one card per item, named fields
     }
     // Wave-1 G4: the "Style" pill row — only for block types with curated variants.
     blockVariantRow(idx, blk, panes ? panes.layout : sub);
@@ -2939,8 +2927,15 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
     const isGallery = def.type === "gallery";
     const ids = Array.isArray(blk.image_ids) ? blk.image_ids : [];
     const grid = el("div"); grid.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px";
+    // item 317: the order is changed with the arrows under each photo, or by dragging one onto another
+    const moveTo = (from, to) => {
+      if (to < 0 || to >= ids.length || from === to) return;
+      commitTitle(); const b = cur(); const [id] = b.image_ids.splice(from, 1); b.image_ids.splice(to, 0, id);
+      if (Array.isArray(b.captions)) { const [c] = b.captions.splice(from, 1); b.captions.splice(to, 0, c); }
+      renderBlocksCard(); dcLiveFromPanel();
+    };
     ids.forEach((id, k) => {
-      const cell = el("div"); cell.style.cssText = "display:flex;flex-direction:column;gap:4px;width:96px";
+      const cell = el("div", "gal-cell"); cell.dataset.k = String(k);
       const chip = el("span"); chip.style.cssText = "position:relative;display:inline-block";
       chip.appendChild(mediaThumb(id));
       const x = icoBtn("x", "Remove this photo", null, 12);
@@ -2949,6 +2944,16 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
       // caption with it (the server re-validates the same alignment).
       x.addEventListener("click", () => { commitTitle(); cur().image_ids.splice(k, 1); if (Array.isArray(BLOCKS_WORK[idx].captions)) BLOCKS_WORK[idx].captions.splice(k, 1); renderBlocksCard(); });
       chip.appendChild(x); cell.appendChild(chip);
+      const mv = el("div", "gal-mv");
+      const left = icoBtn("up", "Move photo " + (k + 1) + " earlier", null, 14); left.disabled = k === 0; left.addEventListener("click", () => moveTo(k, k - 1));
+      const right = icoBtn("down", "Move photo " + (k + 1) + " later", null, 14); right.disabled = k === ids.length - 1; right.addEventListener("click", () => moveTo(k, k + 1));
+      mv.append(left, right); cell.appendChild(mv);
+      cell.draggable = true;
+      cell.addEventListener("dragstart", (e) => { RW_DRAG = k; cell.classList.add("rw-dragging"); try { e.dataTransfer.setData("text/plain", String(k)); } catch (_) {} });
+      cell.addEventListener("dragend", () => { RW_DRAG = null; cell.classList.remove("rw-dragging"); grid.querySelectorAll(".rw-over").forEach((n) => n.classList.remove("rw-over")); });
+      cell.addEventListener("dragover", (e) => { if (RW_DRAG == null || RW_DRAG === k) return; e.preventDefault(); cell.classList.add("rw-over"); });
+      cell.addEventListener("dragleave", () => cell.classList.remove("rw-over"));
+      cell.addEventListener("drop", (e) => { if (RW_DRAG == null || RW_DRAG === k) return; e.preventDefault(); moveTo(RW_DRAG, k); });
       if (isGallery) {
         const cap = el("input"); cap.type = "text"; cap.placeholder = "Caption (optional)"; cap.maxLength = 160;
         cap.value = (Array.isArray(blk.captions) && blk.captions[k]) || "";
@@ -2965,8 +2970,8 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
       grid.appendChild(cell);
     });
     sub.appendChild(grid);
-    const add = el("button", null, "+ Add photo"); add.type = "button"; add.style.cssText = miniBtn;
-    add.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { (BLOCKS_WORK[idx].image_ids = BLOCKS_WORK[idx].image_ids || []).push(id); renderBlocksCard(); } }); });
+    const add = el("button", null, "+ Add photos"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); openPicker((got) => { const list = Array.isArray(got) ? got : got ? [got] : []; if (list.length) { const b = BLOCKS_WORK[idx]; b.image_ids = (b.image_ids || []).concat(list); if (Array.isArray(b.captions)) list.forEach(() => b.captions.push("")); renderBlocksCard(); } }, { many: true }); });   // item 317: several at once
     sub.appendChild(add);
     if (isGallery) {
       // G18 (DM-11): the opt-in, zero-JS tap-to-zoom lightbox — a FIELD, not a
@@ -3014,6 +3019,151 @@ function renderMediaBlockBody(def, blk, idx, sub, ti) {
     sub.appendChild(add);
   }
 }
+// ── Builder item 315: the list sections are edited as item cards, not lines with "|" ──
+// One card per item with named fields, a date picker for events, drag (or the arrows) to
+// reorder, Remove, and "+ Add a …". The stored shape is unchanged (the same items the lines
+// made), and "Type them as lines" keeps the old box for pasting a list in.
+const ROW_FIELDS = {
+  features: { one: "feature", fields: [["title", "Title", 80], ["text", "Short description", 240], ["icon", "Icon: an emoji (optional)", 8]], blank: { title: "A new feature", text: "Say what it is." } },
+  stats: { one: "number", fields: [["value", "Number", 24], ["label", "What it counts", 60]], blank: { value: "1", label: "A new number" } },
+  process: { one: "step", fields: [["step", "Step", 80], ["detail", "Detail", 300]], blank: { step: "A new step", detail: "What happens here." } },
+  pricing: { one: "tier", fields: [["name", "Name", 60], ["price_text", "Price", 40], ["features", "What’s included, one per line", 600, "lines"]], blank: { name: "A new tier", price_text: "$—", features: ["What’s included"] } },
+  certifications: { one: "certification", fields: [["name", "Name", 100], ["issuer", "Issued by", 120]], blank: { name: "A new certification" } },
+  service_areas: { one: "area", fields: [["name", "Area", 60]], blank: { name: "A new area" } },
+  social: { one: "link", fields: [["network", "Network: instagram, facebook, tiktok, youtube…", 40], ["url", "Link", 400, "url"]], blank: { network: "instagram", url: "https://instagram.com/yourbusiness" } },
+  events: { one: "event", fields: [["name", "Event", 100], ["date", "Date", 10, "date"], ["time", "Time (optional)", 40], ["detail", "Detail (optional)", 240], ["url", "Link (optional)", 400, "url"]], blank: { name: "A new event", detail: "Add the details." } },
+  link_list: { one: "link", fields: [["label", "Label", 80], ["url", "Link", 400, "url"]], blank: { label: "A new link", url: "https://example.com" } },
+};
+const rwPath = (def, k, key) => (def.areasSimple ? "areas." + k : def.field + "." + k + "." + key);
+function rowsOf(def, blk) { if (def.areasSimple) return (Array.isArray(blk.areas) ? blk.areas : []).map((a) => ({ name: a })); return Array.isArray(blk[def.field]) ? blk[def.field] : []; }
+function rowsSet(def, idx, rows) {
+  const b = BLOCKS_WORK[idx]; if (!b) return;
+  if (def.areasSimple) b.areas = rows.map((r) => String(r.name || "").trim()).filter(Boolean);
+  else b[def.field] = rows;
+}
+const RW_IN = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;box-sizing:border-box;margin:0";
+function renderRowsBlockBody(def, blk, idx, sub, ti) {
+  const spec = ROW_FIELDS[def.type]; if (!spec) return;
+  const cur = () => BLOCKS_WORK[idx];
+  const commitTitle = () => { cur().title = ti.value.trim(); };
+  const rows = rowsOf(def, cur()).map((r) => ({ ...r }));
+  const put = () => { commitTitle(); rowsSet(def, idx, rows.map((r) => ({ ...r }))); };
+  const list = el("div", "rw-list"); list.setAttribute("role", "list"); list.setAttribute("aria-label", spec.one + "s");
+  const again = () => { put(); renderBlocksCard(); dcLiveFromPanel(); };
+  const move = (k, to) => { if (to < 0 || to >= rows.length) return; const [r] = rows.splice(k, 1); rows.splice(to, 0, r); RW_FOCUS = { idx, k: to }; again(); };
+  rows.forEach((r, k) => {
+    const card = el("div", "rw-card"); card.setAttribute("role", "listitem"); card.dataset.k = String(k);
+    const head = el("div", "rw-head");
+    const grip = el("span", "rw-grip"); grip.innerHTML = typeof PG_GRIP === "string" ? PG_GRIP : "⠿"; grip.setAttribute("aria-hidden", "true"); grip.title = "Drag to reorder";
+    head.appendChild(grip);
+    head.appendChild(el("span", "rw-n", vocabCap(spec.one) + " " + (k + 1)));
+    const up = icoBtn("up", "Move " + spec.one + " " + (k + 1) + " up", "rw-b", 14); up.disabled = k === 0; up.addEventListener("click", () => move(k, k - 1));
+    const dn = icoBtn("down", "Move " + spec.one + " " + (k + 1) + " down", "rw-b", 14); dn.disabled = k === rows.length - 1; dn.addEventListener("click", () => move(k, k + 1));
+    const rm = icoBtn("x", "Remove " + spec.one + " " + (k + 1), "rw-b rw-rm", 14); rm.addEventListener("click", () => { rows.splice(k, 1); again(); });
+    head.append(up, dn, rm); card.appendChild(head);
+    spec.fields.forEach(([key, label, max, kind]) => {
+      let inp;
+      const val = r[key];
+      if (kind === "lines") { inp = el("textarea"); inp.value = Array.isArray(val) ? val.join("\n") : String(val || ""); inp.rows = Math.max(2, inp.value.split("\n").length + 1); }
+      else if (kind === "date" && (!val || /^\d{4}-\d{2}-\d{2}$/.test(String(val)))) { inp = el("input"); inp.type = "date"; inp.value = val || ""; }
+      else { inp = el("input"); inp.type = kind === "url" ? "url" : "text"; inp.value = String(val == null ? "" : val); inp.maxLength = max; inp.placeholder = label; }
+      inp.style.cssText = RW_IN; inp.setAttribute("aria-label", label + ", " + spec.one + " " + (k + 1));
+      inp.addEventListener("change", () => {
+        if (kind === "lines") r[key] = inp.value.split("\n").map((s) => s.trim()).filter(Boolean);
+        else { const v = inp.value.trim(); if (v) r[key] = v; else delete r[key]; }
+        put();
+      });
+      if (kind === "url" && typeof linkPick === "function") { card.appendChild(inp); linkPick(inp); }
+      else card.appendChild(inp);
+      if (kind === "lines" || key === "text" || key === "detail") card.appendChild(aiField(inp, { field: label, write: false }));
+    });
+    // drag to reorder with a mouse; the arrows do it for a finger and a keyboard
+    card.draggable = true;
+    card.addEventListener("dragstart", (e) => { RW_DRAG = k; card.classList.add("rw-dragging"); try { e.dataTransfer.setData("text/plain", String(k)); e.dataTransfer.effectAllowed = "move"; } catch (_) {} });
+    card.addEventListener("dragend", () => { RW_DRAG = null; card.classList.remove("rw-dragging"); list.querySelectorAll(".rw-over").forEach((x) => x.classList.remove("rw-over")); });
+    card.addEventListener("dragover", (e) => { if (RW_DRAG == null || RW_DRAG === k) return; e.preventDefault(); card.classList.add("rw-over"); });
+    card.addEventListener("dragleave", () => card.classList.remove("rw-over"));
+    card.addEventListener("drop", (e) => { if (RW_DRAG == null || RW_DRAG === k) return; e.preventDefault(); move(RW_DRAG, k); });
+    list.appendChild(card);
+  });
+  sub.appendChild(list);
+  const add = el("button", "dc-actbtn", "+ Add a " + spec.one); add.type = "button";
+  add.addEventListener("click", () => { rows.push({ ...spec.blank }); RW_FOCUS = { idx, k: rows.length - 1, first: true }; again(); });
+  sub.appendChild(add);
+  const fold = el("details", "rw-fold"); fold.appendChild(el("summary", null, "Type them as lines instead"));
+  const ta = el("textarea"); ta.value = blockText(def, cur()); ta.rows = Math.max(3, ta.value.split("\n").length + 1); ta.style.cssText = RW_IN + ";margin-top:6px";
+  ta.setAttribute("aria-label", "The " + spec.one + "s, one per line");
+  ta.addEventListener("change", () => { const t2 = ti.value.trim(); BLOCKS_WORK[idx] = wLook(idx, textToBlock(def, t2, ta.value)); renderBlocksCard(); });
+  fold.append(ta, el("div", "hint", def.hint)); sub.appendChild(fold);
+  if (RW_FOCUS && RW_FOCUS.idx === idx) {
+    const f = RW_FOCUS; RW_FOCUS = null;
+    const c = list.children[f.k]; const target = c && (f.first ? c.querySelector("input,textarea") : c.querySelector(".rw-b"));
+    if (target) setTimeout(() => { try { target.focus({ preventScroll: true }); if (f.first && target.select) target.select(); c.scrollIntoView({ block: "nearest" }); } catch (_) {} }, 0);
+  }
+}
+let RW_DRAG = null, RW_FOCUS = null;
+function renderTableBlockBody(blk, idx, sub, ti) {
+  const cur = () => BLOCKS_WORK[idx];
+  const headers = (Array.isArray(blk.headers) ? blk.headers : []).map(String), rows = (Array.isArray(blk.rows) ? blk.rows : []).map((r) => (Array.isArray(r) ? r.map(String) : []));
+  const cols = Math.max(headers.length, ...rows.map((r) => r.length), 1);
+  while (headers.length < cols) headers.push("");
+  rows.forEach((r) => { while (r.length < cols) r.push(""); });
+  const put = () => { BLOCKS_WORK[idx] = wLook(idx, { type: "table", title: ti.value.trim(), headers: headers.map((h) => h.trim()), rows: rows.map((r) => r.map((c) => c.trim())) }); };
+  const again = () => { put(); renderBlocksCard(); dcLiveFromPanel(); };
+  const grid = el("div", "rw-table"); grid.style.gridTemplateColumns = "repeat(" + cols + ",minmax(96px,1fr)) 36px";
+  const cell = (val, label, onChange, head) => {
+    const inp = el("input"); inp.type = "text"; inp.value = val; inp.maxLength = head ? 80 : 200; inp.setAttribute("aria-label", label); inp.style.cssText = RW_IN + (head ? ";font-weight:600" : "");
+    inp.addEventListener("change", () => { onChange(inp.value); put(); });
+    return inp;
+  };
+  headers.forEach((h, c) => grid.appendChild(cell(h, "Column " + (c + 1) + " heading", (v) => { headers[c] = v; }, true)));
+  const rmc = icoBtn("x", "Remove the last column", "rw-b rw-rm", 14); rmc.disabled = cols <= 1;
+  rmc.addEventListener("click", () => { headers.pop(); rows.forEach((r) => r.pop()); again(); });
+  grid.appendChild(rmc);
+  rows.forEach((r, k) => {
+    r.forEach((v, c) => grid.appendChild(cell(v, "Row " + (k + 1) + ", " + (headers[c] || "column " + (c + 1)), (nv) => { r[c] = nv; })));
+    const rm = icoBtn("x", "Remove row " + (k + 1), "rw-b rw-rm", 14); rm.addEventListener("click", () => { rows.splice(k, 1); again(); }); grid.appendChild(rm);
+  });
+  sub.appendChild(grid);
+  const acts = el("div", "rw-acts");
+  const addR = el("button", "dc-actbtn", "+ Add a row"); addR.type = "button"; addR.addEventListener("click", () => { rows.push(headers.map(() => "")); RW_FOCUS = { idx, k: rows.length - 1, first: true }; again(); });
+  const addC = el("button", "dc-actbtn dc-ghost", "+ Add a column"); addC.type = "button"; addC.addEventListener("click", () => { headers.push(""); rows.forEach((r) => r.push("")); again(); });
+  acts.append(addR, addC); sub.appendChild(acts);
+  if (RW_FOCUS && RW_FOCUS.idx === idx) { const f = RW_FOCUS; RW_FOCUS = null; const inputs = grid.querySelectorAll("input"); const t = inputs[(f.k + 1) * cols]; if (t) setTimeout(() => { try { t.focus({ preventScroll: true }); } catch (_) {} }, 0); }
+  const fold = el("details", "rw-fold"); fold.appendChild(el("summary", null, "Type it as lines instead"));
+  const ta = el("textarea");
+  const toText = () => { const lines = []; if (headers.some(Boolean)) lines.push(headers.join(" | ")); rows.forEach((r) => lines.push(r.join(" | "))); return lines.join("\n"); };
+  ta.value = toText(); ta.placeholder = "Name | Price | Notes\nBasic | $10 | Great to start"; ta.rows = Math.max(4, ta.value.split("\n").length + 1);
+  ta.style.cssText = RW_IN + ";margin-top:6px;font:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px";
+  ta.setAttribute("aria-label", "The table as lines, cells split by |");
+  ta.addEventListener("change", () => {
+    const lines = ta.value.split("\n").map((l) => l.replace(/\s+$/, "")).filter((l) => l.trim());
+    const cells = (l) => l.split("|").map((c) => c.trim());
+    BLOCKS_WORK[idx] = wLook(idx, { type: "table", title: ti.value.trim(), headers: lines.length ? cells(lines[0]) : [], rows: lines.slice(1).map(cells) });
+    renderBlocksCard();
+  });
+  fold.append(ta, el("div", "hint", "One row per line, cells split by “ | ”. The first line is the header row. It scrolls sideways on phones.")); sub.appendChild(fold);
+}
+// "+ Add a row" on the page: a new item with sample words goes on the end, the section is drawn
+// again at once, and the new item's first words are opened for typing (dcLiveNow).
+function dcAddRow(bi) {
+  const b = BLOCKS_WORK[bi]; if (!b || lockStop(bi)) return;
+  const def = BLOCK_DEFS.find((x) => x.type === b.type) || {};
+  if (b.type === "table") {
+    const headers = Array.isArray(b.headers) ? b.headers : [], rows = Array.isArray(b.rows) ? b.rows.slice() : [];
+    const w = Math.max(headers.length, ...(rows.map((r) => (r || []).length)), 1);
+    rows.push(Array.from({ length: w }, (_, i) => (i ? "" : "New row")));
+    b.rows = rows; LIVE_FOCUS = { bi, path: "rows." + (rows.length - 1) + ".0" };
+  } else {
+    const spec = ROW_FIELDS[b.type]; if (!spec) return;
+    const rows = rowsOf(def, b).slice(); rows.push({ ...spec.blank });
+    rowsSet(def, bi, rows);
+    LIVE_FOCUS = { bi, path: rwPath(def, rows.length - 1, spec.fields[0][0]) };
+  }
+  if ($("blocksCard") && PANEL_MODE === "section" && BLOCK_SOLO === bi) renderBlocksCard(); else blocksSaveSoon();
+  dcLiveFromPanel();
+}
+let LIVE_FOCUS = null;   // after the live redraw: the field to open for typing
 // FD-T18 structured team editor — name/role/bio + an optional photo per person.
 function renderTeamBlockBody(blk, idx, sub, ti) {
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
@@ -3123,12 +3273,16 @@ function renderCarouselBlockBody(blk, idx, sub, ti) {
     ch.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { cur().slides[k].image_id = id; renderBlocksCard(); } }); });
     const rm = el("button", null, "Remove"); rm.type = "button"; rm.style.cssText = miniBtn;
     rm.addEventListener("click", () => { commitTitle(); cur().slides.splice(k, 1); renderBlocksCard(); });
-    acts.append(ch, rm);
+    // item 317: slides reorder with the arrows (44px on a touch screen)
+    const mv = (to) => { if (to < 0 || to >= slides.length) return; commitTitle(); const s2 = cur().slides; const [x] = s2.splice(k, 1); s2.splice(to, 0, x); renderBlocksCard(); dcLiveFromPanel(); };
+    const up = icoBtn("up", "Move slide " + (k + 1) + " earlier", "rw-b", 14); up.disabled = k === 0; up.addEventListener("click", () => mv(k - 1));
+    const dn = icoBtn("down", "Move slide " + (k + 1) + " later", "rw-b", 14); dn.disabled = k === slides.length - 1; dn.addEventListener("click", () => mv(k + 1));
+    acts.append(ch, rm, up, dn);
     col.append(cap, acts); row.appendChild(col); sub.appendChild(row);
   });
   if (slides.length < 12) {
-    const add = el("button", null, "+ Add slide"); add.type = "button"; add.style.cssText = miniBtn;
-    add.addEventListener("click", () => { commitTitle(); openPicker((id) => { if (id) { (BLOCKS_WORK[idx].slides = BLOCKS_WORK[idx].slides || []).push({ image_id: id }); renderBlocksCard(); } }); });
+    const add = el("button", null, "+ Add slides"); add.type = "button"; add.style.cssText = miniBtn;
+    add.addEventListener("click", () => { commitTitle(); openPicker((got) => { const list = (Array.isArray(got) ? got : got ? [got] : []).slice(0, 12 - slides.length); if (list.length) { const b = BLOCKS_WORK[idx]; b.slides = (b.slides || []).concat(list.map((id) => ({ image_id: id }))); renderBlocksCard(); } }, { many: true }); });   // item 317
     sub.appendChild(add);
   }
   sub.appendChild(el("div", "hint", "Up to 12 slides. Visitors swipe on phones or scroll with the keyboard — no plugins, and every image keeps its alt text."));
@@ -4722,7 +4876,7 @@ function pgStatusCtx() {
   const live = !!(S.health && S.health.facts && S.health.facts.website.state !== "none");
   return { live, siteLive: live || !!(typeof siteLiveUrl === "function" && siteLiveUrl()), changes: (S.changes && S.changes.changes) || [], firstPublish: !!(S.changes && S.changes.first_publish) };
 }
-function dcSyncLiveChip() { const c = $("dcLiveChip"); if (c) c.hidden = !(typeof siteLiveUrl === "function" && siteLiveUrl()); }
+function dcSyncLiveChip() { const c = $("dcLiveChip"); if (c) c.hidden = !(S.live ? S.live.is_live : (typeof siteLiveUrl === "function" && siteLiveUrl())); }   // item 261: the server's rule
 // a tablet's left card takes the dock's place while it's open (the CSS reads this class)
 // (Add, Photos and Pages; the page outline is Notes mode's own list, so it keeps the dock and its way back to Edit)
 function dcLeftSync() { const t = $("trayPanel"); document.documentElement.classList.toggle("dc-lefton", !!(PAGES_OPEN || (t && t.classList.contains("on") && DC_RAIL_TAB !== "contents"))); }
@@ -5264,37 +5418,19 @@ function mountPanelFiles() {
     body.appendChild(grid);
     // Upload a photo · Open Files
     const acts = el("div", "pf-acts");
-    const up = el("button", "dc-actbtn", "Upload a photo"); up.type = "button";
-    const file = el("input"); file.type = "file"; file.id = "pfFile"; file.accept = "image/jpeg,image/png,image/webp"; file.hidden = true; file.setAttribute("aria-label", "Choose a photo to upload");
+    const up = el("button", "dc-actbtn", "Upload photos"); up.type = "button";
+    const file = el("input"); file.type = "file"; file.id = "pfFile"; file.accept = "image/jpeg,image/png,image/webp"; file.multiple = true; file.hidden = true; file.setAttribute("aria-label", "Choose photos to upload");
     up.addEventListener("click", () => file.click());
     const link = el("button", "dc-actbtn dc-ghost", "Open Files"); link.type = "button";
     link.title = "The full Files library — versions, where-used, crops";
     link.addEventListener("click", () => { closeDesignPanels(); go("media"); });
     acts.append(up, link); body.appendChild(acts); body.appendChild(file);
-    // a few words about the photograph, then it joins the collection: the same door Files uses
-    const prep = el("div", "pf-upload"); prep.hidden = true;
-    const alt = el("input"); alt.type = "text"; alt.maxLength = 200; alt.placeholder = "Describe this photograph — e.g. Fresh pasta on a white plate"; alt.setAttribute("aria-label", "Describe this photograph");
-    const row = el("div", "row");
-    const goB = el("button", "dc-actbtn", "Add it"); goB.type = "button";
-    const nm = el("button", "dc-actbtn dc-ghost", "Never mind"); nm.type = "button";
-    row.append(goB, nm); prep.append(alt, row); body.appendChild(prep);
-    file.addEventListener("change", () => { if (!file.files[0]) return; prep.hidden = false; alt.value = ""; alt.focus(); });
-    nm.addEventListener("click", () => { prep.hidden = true; file.value = ""; });
-    goB.addEventListener("click", async () => {
-      const f = file.files[0], words = alt.value.trim(); if (!f) { prep.hidden = true; return; }
-      if (words.length < 3) { toast("A few words about the photograph first — it matters.", true); alt.focus(); return; }
-      goB.disabled = true; goB.textContent = "Bringing it in…";
-      try {
-        const dims = await new Promise((res) => { const img = new Image(); img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight }); img.onerror = () => res({}); img.src = URL.createObjectURL(f); });
-        const r = await api("POST", "/media/upload-url", { mime: f.type, bytes: f.size, alt_text: words, width: dims.w, height: dims.h });
-        const put = await fetch(r.data.upload_url, { method: "PUT", headers: { "Content-Type": f.type }, body: f });
-        if (!put.ok) throw new Error("The photograph didn’t finish arriving — nothing was lost, try once more.");
-        prep.hidden = true; file.value = "";
-        await loadMedia(); PF_S.key = null; pfRefresh(); toast("In the collection");
-      } catch (err) { toast(nice(err), true); }
-      goB.disabled = false; goB.textContent = "Add it";
-    });
-    body.appendChild(el("div", "pf-note", "Tap a photo to use it: it fills the image you’re choosing for, or becomes a new photo section. Edit crops, straightens and removes a background; saving always makes a new copy."));
+    // item 317: several at once, or dropped on the panel; big ones made smaller here; the
+    // descriptions asked for once they are in (dcUploadPhotos, the same door Files uses)
+    const after = () => { PF_S.key = null; pfRefresh(); };
+    file.addEventListener("change", async () => { const fs = Array.from(file.files || []); file.value = ""; if (!fs.length) return; up.disabled = true; try { await dcUploadPhotos(fs); } finally { up.disabled = false; } after(); });
+    dcDropPhotos(body, after);
+    body.appendChild(el("div", "pf-note", "Tap a photo to use it: it fills the image you’re choosing for, or becomes a new photo section. Drop photos here to add them. Edit crops, straightens and removes a background; saving always makes a new copy."));
     host.appendChild(body);
   }
   pfRefresh(true);
@@ -7671,6 +7807,11 @@ function dcInjectCanvas(doc, main, live) {
           if (b.type === "stack") bar.appendChild(mkBtn("Layers", "Layers: the blocks in this section", () => openTrayPanel("contents"), { icon: "layers" }));
         }
         bar.appendChild(mkBtn("Edit", "Edit this section", () => eeEditBlock(bi), { icon: "pencil" }));
+        if (ROW_FIELDS[b.type] || b.type === "table") {   // item 315: a new row on the page, ready to type
+          const one = b.type === "table" ? "row" : ROW_FIELDS[b.type].one;
+          const ar = mkBtn("Add a " + one, "Add a " + one + " to this section", () => dcAddRow(bi), { cls: "dc-addblk", icon: "plus" });
+          ar.lastChild.className = "dc-addblk-l"; bar.appendChild(ar);
+        }
         bar.appendChild(mkBtn("Duplicate", "Duplicate this section", () => dcDuplicate(bi), { icon: "copy" }));
         bar.appendChild(mkBtn("Style", "Style this section — its colours, type and layout", () => eeEditBlock(bi, "style"), { icon: "spark" }));
         bar.appendChild(mkBtn("Delete", "Delete this section", () => dcDelete(bi), { cls: "dc-danger", icon: "x" }));
