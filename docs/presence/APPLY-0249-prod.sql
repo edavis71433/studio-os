@@ -15,7 +15,7 @@
 --    delete from public.presence_deal_events where kind in ('invoice_changed','invoice_reminded','money_back');
 --    then re-add 0176's kind list; alter table public.presence_settings drop column if exists invoice_reminders_asked;
 --
---  Covers: supabase/migrations/0246_invoice_changes_reminders.sql
+--  Covers: supabase/migrations/0249_invoice_changes_reminders.sql
 -- ===========================================================================
 
 alter table public.presence_settings
