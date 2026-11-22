@@ -17,9 +17,15 @@
 // The studio's visit inside a client is still recorded for every request, allowed or not
 // (SC-2): the first lookup records its own, and every request that shares it records one
 // of its own with its own route and request id.
+//
+// What is remembered is who may sit where: the person, the scope, the seat, the role and
+// the plan. The site row itself (its status, template, last publish, domain) is read fresh
+// on every request that learns its seat from memory, by its id: one trip, so a publish or
+// a template switch made by another worker shows at once, as it did before.
 import type { Principal } from '../../_shared/auth.ts';
 import { authEpoch, WHO_ASKS_TTL_MS } from '../../_shared/auth.ts';
-import { resolveSite, type SiteRow } from './site.ts';
+import { resolveSite, SITE_COLS, type SiteRow } from './site.ts';
+import { svc } from './db.ts';
 import { resolveScopedSite, recordScopedVisit, type AuditCtx } from './scope.ts';
 import { resolveMemberSite, resolveHeldBusiness, resolveSiteRole } from './workspace.ts';
 import type { SiteRole } from './site_roles.ts';
@@ -38,7 +44,7 @@ export type SeatAnswer =
   | { ok: true; seat: Seat }
   | { ok: false; status: number; error: string; message: string; scoped: boolean; reason: string };
 
-const kept = new Map<string, { at: number; epoch: number; p: Promise<SeatAnswer> }>();
+const kept = new Map<string, { at: number; epoch: number; p: Promise<SeatAnswer>; done: boolean }>();
 const MAX_KEPT = 500;
 
 /** Forget every remembered seat (tests). */
@@ -95,6 +101,15 @@ async function lookupSeat(jwt: string, principal: Principal, scopeReq: string | 
   return { ok: true, seat: { site, scopedName, scope, agencyId, member, siteRole, ent } };
 }
 
+/** The remembered seat with its site row as it is now; a seat whose site row is gone
+ *  (deleted since) is no seat. */
+async function withSiteNow(answer: SeatAnswer & { ok: true }): Promise<SeatAnswer> {
+  const r = await svc(`presence_sites?id=eq.${answer.seat.site.id}&select=${SITE_COLS}&limit=1`).catch(() => null);
+  const row = r && r.ok && Array.isArray(r.json) ? (r.json[0] as SiteRow | undefined) : undefined;
+  if (!row) return { ok: false, status: 404, error: 'no_site', message: 'No Presence site is set up for this account yet.', scoped: false, reason: 'no_site' };
+  return { ok: true, seat: { ...answer.seat, site: row } };
+}
+
 /** The seat for this request: worked out, or remembered. `shared` says it was remembered
  *  or shared with a request already looking it up, in which case the studio's visit inside
  *  a client has not yet been recorded for THIS request. */
@@ -104,13 +119,21 @@ export async function resolveSeat(jwt: string, principal: Principal, scopeReq: s
   const epoch = authEpoch();
   const hit = kept.get(key);
   if (hit && hit.epoch === epoch && now - hit.at < WHO_ASKS_TTL_MS) {
-    const answer = await hit.p;
-    if (scopeReq) recordScopedVisit(audit, answer.ok ? answer.seat.agencyId : null, scopeReq, answer.ok ? answer.seat.scopedName || '' : '', answer.ok ? 'ok' : answer.reason);
-    return answer;
+    // a lookup still in flight hands over its own fresh row; a remembered one reads the row now
+    const inFlight = !hit.done;
+    const kept_ = await hit.p;
+    const answer: SeatAnswer = kept_.ok && !inFlight ? await withSiteNow(kept_) : kept_;
+    if (answer.ok || kept_.ok === answer.ok) {
+      if (scopeReq) recordScopedVisit(audit, answer.ok ? answer.seat.agencyId : null, scopeReq, answer.ok ? answer.seat.scopedName || '' : '', answer.ok ? 'ok' : answer.reason);
+      return answer;
+    }
+    kept.delete(key);   // the site is gone since: work the seat out again, as a fresh request would
   }
   const p = lookupSeat(jwt, principal, scopeReq, audit);
-  kept.set(key, { at: now, epoch, p });
+  const entry = { at: now, epoch, p, done: false };
+  kept.set(key, entry);
   const answer = await p;
+  entry.done = true;
   if (!answer.ok) { if (kept.get(key)?.p === p) kept.delete(key); return answer; }
   if (kept.size > MAX_KEPT) {
     for (const [k, v] of kept) { if (now - v.at >= WHO_ASKS_TTL_MS) kept.delete(k); }

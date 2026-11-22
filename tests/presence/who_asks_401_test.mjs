@@ -86,10 +86,10 @@ ok('studio in a client: the first call answers', a1.status === 200 && a1.body?.d
 db.log = [];
 const a2 = await call('jwt-studio', '/identity', CLIENT_SITE); await settle();
 const studioSecond = trips();
-ok('studio in a client: the second call learns who is asking from memory: 1 read, the route\'s own', a2.status === 200 && studioSecond === 1, `first ${studioFirst} trips, second ${studioSecond}: ${db.log.map((c) => c.url.split('?')[0]).join(' ')}`);
+ok('studio in a client: the second call learns who is asking from memory: 2 reads, the site row as it is now and the route\'s own', a2.status === 200 && studioSecond === 2 && db.reads('presence_sites?id=eq.').length === 1, `first ${studioFirst} trips, second ${studioSecond}: ${db.log.map((c) => c.url.split('?')[0]).join(' ')}`);
 db.log = [];
 const seven = await Promise.all(Array.from({ length: 7 }, () => call('jwt-studio', '/identity', CLIENT_SITE))); await settle();
-ok('…and seven calls at once make seven reads, one each', seven.every((r) => r.status === 200) && trips() === 7, `${trips()} trips`);
+ok('…and seven calls at once make fourteen reads, two each', seven.every((r) => r.status === 200) && trips() === 14, `${trips()} trips`);
 ok('…the studio\'s visit inside the client is still recorded each time', db.tables.presence_scoped_access_events.length === 9 && db.tables.presence_scoped_access_events.every((e) => e.outcome === 'allowed' && e.client_name === 'Maple Bakery'), String(db.tables.presence_scoped_access_events.length));
 
 // ═══ 2. the business owner on their own site, and a Designer's seat ═══
@@ -97,12 +97,22 @@ db.reset(world());
 const b1 = await call('jwt-owner', '/identity'); await settle();
 const ownerFirst = trips(); db.log = [];
 const b2 = await call('jwt-owner', '/identity'); await settle();
-ok('owner on their own site: first call answers, second makes 1 read', b1.status === 200 && b2.status === 200 && trips() === 1, `first ${ownerFirst}, second ${trips()}`);
+ok('owner on their own site: first call answers, second makes 2 reads', b1.status === 200 && b2.status === 200 && trips() === 2, `first ${ownerFirst}, second ${trips()}`);
 db.log = [];
 const d1 = await call('jwt-designer', '/identity', CLIENT_SITE); await settle();
 const designerFirst = trips(); db.log = [];
 const d2 = await call('jwt-designer', '/identity', CLIENT_SITE); await settle();
-ok('a Designer\'s seat: first call answers, second makes 1 read', d1.status === 200 && d2.status === 200 && trips() === 1, `first ${designerFirst}, second ${trips()}`);
+ok('a Designer\'s seat: first call answers, second makes 2 reads', d1.status === 200 && d2.status === 200 && trips() === 2, `first ${designerFirst}, second ${trips()}`);
+// the site row is read fresh each time: a template switched or a site deleted by another worker shows at once
+{
+  db.tables.presence_sites.find((s) => s.id === CLIENT_SITE).template_slug = 'harbor';
+  const t = await call('jwt-studio', '/site', CLIENT_SITE);
+  ok('a template switched elsewhere shows on the very next call', t.status === 200 && JSON.stringify(t.body).includes('harbor'), `${t.status} ${t.text.slice(0, 120)}`);
+  db.tables.presence_sites = db.tables.presence_sites.filter((s) => s.id !== CLIENT_SITE);
+  const g = await call('jwt-studio', '/identity', CLIENT_SITE);
+  ok('a site deleted elsewhere is refused on the very next call', g.status === 404 || g.status === 403, `${g.status} ${g.text.slice(0, 80)}`);
+  db.reset(world());
+}
 
 // ═══ 3. the same refusals ═══
 const r1 = await call('jwt-designer', '/crm/record?client_id=' + OWNER_CLIENT, CLIENT_SITE);
