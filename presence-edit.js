@@ -507,15 +507,35 @@ const TYPE_PRESETS = [
 // FD-T3: complete "looks" — one tap sets a coordinated palette + type + shape
 // (all through the SAME token layer; every palette is contrast-checked). A look is
 // a variant of the one engine, not a new template (constitution Part 4).
+// Item 333: the twelve Eric picked in Figma (section D), grouped by mood. Each sets its colours,
+// its two library fonts (lib/fonts.ts, a family's css name then its fallback), its button set and
+// corners, and names itself (look), which brings its own small layer of rules so every word reads
+// on every template (lib/site_looks.ts). Hard hat's headings are in capitals, Blush's at regular
+// weight (its face has one), Playground's main button has a solid shadow, Big & bright is the
+// Larger text size, and the two dark looks bring the colours a template's cards, rules, shaded
+// bands and accent sections take on a dark page. tests/presence/style_looks_333_test.mjs reads
+// every word of every template under each; tests/e2e/style-looks-333.spec.ts draws the tiles.
 const STYLE_LOOKS = [
-  { key: "", name: "Original", tokens: {} },
-  { name: "Warm & inviting", tokens: { accent: "#8c3b2e", accent_dark: "#6f2e24", ink: "#241d1a", soft: "#6b5f58", font_display: "Georgia, 'Iowan Old Style', serif", font_body: "system-ui, -apple-system, 'Segoe UI', sans-serif", radius: "18px", bg: "#faf6ee" } },
-  { name: "Clean & modern", tokens: { accent: "#2f5d8a", accent_dark: "#224566", ink: "#1b2530", soft: "#5a6570", font_display: "system-ui, -apple-system, 'Segoe UI', sans-serif", font_body: "system-ui, -apple-system, 'Segoe UI', sans-serif", radius: "2px", bg: "#f3f5f7" } },
-  { name: "Bold & confident", tokens: { accent: "#37474f", accent_dark: "#263238", ink: "#1e262a", soft: "#5c686e", font_display: "Georgia, 'Times New Roman', serif", font_body: "system-ui, sans-serif", spacing_scale: "1.18" } },
-  { name: "Fresh & natural", tokens: { accent: "#23635a", accent_dark: "#17453f", ink: "#1c2430", soft: "#5b6572", font_display: "Georgia, 'Iowan Old Style', serif", font_body: "system-ui, -apple-system, sans-serif", bg: "#faf6ee" } },
-  { name: "Refined & elegant", tokens: { accent: "#5b3fa0", accent_dark: "#463079", ink: "#221e2c", soft: "#635d70", font_display: "Georgia, 'Iowan Old Style', serif", font_body: "system-ui, -apple-system, 'Segoe UI', sans-serif", radius: "18px" } },
+  { key: "", name: "Original", mood: "Template", tokens: {} },
+  { key: "golden_hour", name: "Golden hour", mood: "Warm", tokens: { look: "golden_hour", accent: "#b4532a", accent_dark: "#904222", ink: "#3b2416", soft: "#6f5a4b", bg: "#fbf3e6", font_display: "Fraunces, Georgia, serif", font_body: "Nunito Sans, system-ui, sans-serif", buttons: "pill" } },
+  { key: "hand_lettered", name: "Hand-lettered", mood: "Warm", tokens: { look: "hand_lettered", accent: "#a8561a", accent_dark: "#8f4916", ink: "#2e2a26", soft: "#5f574f", bg: "#fdf6ec", font_display: "Caveat, cursive", font_body: "Poppins, system-ui, sans-serif", buttons: "filled", button_radius: "14px", radius: "14px" } },
+  { key: "hard_hat", name: "Hard hat", mood: "Bold", tokens: { look: "hard_hat", accent: "#111111", accent_dark: "#000000", ink: "#111111", soft: "#2b2b2b", bg: "#f2c230", font_display: "Roboto Slab, Georgia, serif", font_body: "Work Sans, system-ui, sans-serif", heading_case: "upper", buttons: "square", radius: "2px" } },
+  { key: "night_shift", name: "Night shift", mood: "Bold", tokens: { look: "night_shift", scheme: "dark", accent: "#ff5a1f", accent_dark: "#ff6e3a", accent_band: "#a63b14", ink: "#f5f5f5", soft: "#b6bcc6", bg: "#0e1116", card: "#1c1f23", line: "#33353a", wash: "#16191e", font_display: "Space Grotesk, system-ui, sans-serif", font_body: "Inter, system-ui, sans-serif", buttons: "filled", button_radius: "4px", radius: "4px" } },
+  { key: "big_bright", name: "Big & bright", mood: "Bold", tokens: { look: "big_bright", accent: "#d62839", accent_dark: "#ab202e", ink: "#101828", soft: "#475467", bg: "#ffffff", font_display: "Outfit, system-ui, sans-serif", font_body: "Figtree, system-ui, sans-serif", buttons: "pill", font_scale: "1.08" } },
+  { key: "clinic_calm", name: "Clinic calm", mood: "Calm", tokens: { look: "clinic_calm", accent: "#0e7c86", accent_dark: "#0b636b", ink: "#0e2f3a", soft: "#466069", bg: "#eef6f7", font_display: "Plus Jakarta Sans, system-ui, sans-serif", font_body: "Plus Jakarta Sans, system-ui, sans-serif", buttons: "pill" } },
+  { key: "garden", name: "Garden", mood: "Calm", tokens: { look: "garden", accent: "#2f5d3a", accent_dark: "#264a2e", ink: "#1f2a22", soft: "#55604f", bg: "#f1efe6", font_display: "Lora, Georgia, serif", font_body: "Manrope, system-ui, sans-serif", buttons: "filled", button_radius: "10px", radius: "10px" } },
+  { key: "blush", name: "Blush", mood: "Elegant", tokens: { look: "blush", accent: "#7a3b55", accent_dark: "#622f44", ink: "#2d1e24", soft: "#6e5a61", bg: "#f6e4df", font_display: "DM Serif Display, Georgia, serif", font_body: "DM Sans, system-ui, sans-serif", heading_weight: "400", buttons: "pill" } },
+  { key: "black_gold", name: "Black & gold", mood: "Elegant", tokens: { look: "black_gold", scheme: "dark", accent: "#c9a45c", accent_dark: "#bf9c57", accent_band: "#6f5a33", ink: "#f5f0e6", soft: "#cfc6b8", bg: "#121212", card: "#201f1f", line: "#363634", wash: "#1a1a19", font_display: "Playfair Display, Georgia, serif", font_body: "Manrope, system-ui, sans-serif", buttons: "filled", button_radius: "0px", radius: "2px" } },
+  { key: "newsprint", name: "Newsprint", mood: "Classic", tokens: { look: "newsprint", accent: "#1a1a1a", accent_dark: "#000000", ink: "#1a1a1a", soft: "#4d4d4d", bg: "#f4f1ea", font_display: "Libre Baskerville, Georgia, serif", font_body: "Source Sans Three, system-ui, sans-serif", buttons: "square", radius: "2px" } },
+  { key: "steady_navy", name: "Steady navy", mood: "Classic", tokens: { look: "steady_navy", accent: "#13315c", accent_dark: "#0f274a", ink: "#0b2545", soft: "#4a5a70", bg: "#ffffff", font_display: "Merriweather, Georgia, serif", font_body: "Inter, system-ui, sans-serif", buttons: "filled", button_radius: "2px", radius: "2px" } },
+  { key: "playground", name: "Playground", mood: "Friendly", tokens: { look: "playground", accent: "#cc2a5a", accent_dark: "#a32248", ink: "#2b2d42", soft: "#5c5e70", bg: "#fff8e7", font_display: "Quicksand, system-ui, sans-serif", font_body: "Nunito, system-ui, sans-serif", buttons: "pill", button_shadow: "offset" } },
 ];
-const LOOK_CLEAR = { accent: "", accent_dark: "", ink: "", soft: "", font_display: "", font_body: "", radius: "", bg: "", spacing_scale: "" };
+// A look sets all of these, so the next one (or Original) leaves nothing of the last behind.
+const LOOK_CLEAR = { accent: "", accent_dark: "", ink: "", soft: "", font_display: "", font_body: "", radius: "", bg: "", spacing_scale: "",
+  font_scale: "", buttons: "", look: "", scheme: "", card: "", line: "", wash: "", accent_band: "", heading_case: "", heading_weight: "", button_radius: "", button_shadow: "" };
+// A dark look's colours only read together: a colour, background or brand colour picked over one
+// starts again from the template's own, on a light page (routes/dev.ts does the same for the kit).
+const DARK_LOOK_CLEAR = { scheme: "", bg: "", ink: "", soft: "", accent: "", accent_dark: "", card: "", line: "", wash: "", accent_band: "", look: "" };
 const SIZE_OPTS = [ ["Cozy","0.95"], ["Standard",""], ["Larger","1.08"] ];
 const CORNER_OPTS = [ ["Sharp","2px"], ["Soft",""], ["Round","18px"] ];
 const BG_OPTS = [ ["Bright",""], ["Warm","#faf6ee"], ["Cool","#f3f5f7"] ];
@@ -561,24 +581,44 @@ function dcPatchTokens(tokens) {
 // A pick shows at once and saves behind. The next pick builds on it before it has saved,
 // so two quick picks keep both; a failed save puts the page back if nothing came after.
 let TOKENS_SEQ = 0;
+// Item 333: what a ready-made look sets that the server draws (lib/site_looks.ts), so the canvas is drawn again.
+const LOOK_DRAWN = ["look", "scheme", "heading_case", "heading_weight", "button_radius", "button_shadow"];
 async function saveTokens(change, msg) {
+  if (DESIGN_TOKENS && DESIGN_TOKENS.scheme && !("scheme" in change) && ["accent", "accent_dark", "ink", "soft", "bg"].some((k) => k in change)) change = { ...DARK_LOOK_CLEAR, ...change };   // item 333
   const before = DESIGN_TOKENS, next = { ...DESIGN_TOKENS };
   const redraw = "buttons" in change || "forms" in change;   // item 217: the server draws a set's own style (lib/site_buttons.ts)
+  const lookDrawn = LOOK_DRAWN.some((k) => k in change);
   for (const [k, v] of Object.entries(change)) { if (v === "" || v == null) delete next[k]; else next[k] = v; }
   const seq = ++TOKENS_SEQ;
   const put = api("PUT", "/dev/customization", { theme_tokens: next });   // Undo reads the tokens from before, here
   DESIGN_TOKENS = next;
-  const shown = dcPatchTokens(next);
-  const remount = () => { const card = $("designCard"); if (card) card.remove(); mountDesignCard(false); };
+  // a page going dark or light waits for the server's drawing: its cards and bands change with it
+  const shown = String((before && before.scheme) || "") === String(next.scheme || "") && dcPatchTokens(next);
   try {
     await put;
-    if (seq === TOKENS_SEQ) remount();
-    toast(msg + " — publish to see it live"); scheduleChangesRefresh(); stageStale();
-    if (!shown || redraw) refreshDesignPreview();
+    if (seq === TOKENS_SEQ) designCardRedraw();
+    toast(msg + ". Publish to see it live."); scheduleChangesRefresh(); stageStale();
+    if (!shown || redraw || lookDrawn) refreshDesignPreview();
   } catch (err) {
-    if (seq === TOKENS_SEQ) { DESIGN_TOKENS = before; if (shown) dcPatchTokens(before); remount(); }
+    if (seq === TOKENS_SEQ) { DESIGN_TOKENS = before; if (shown) dcPatchTokens(before); designCardRedraw(); }
     toast(nice(err), true);
   }
+}
+// Item 333: the card is drawn again where it stands, so a pick never moves the panel. The panel
+// keeps its scroll, and the choice that had the keyboard keeps it: a look's tile by its look, any
+// other control by its place among the card's controls.
+function designCardRedraw() {
+  const old = $("designCard"); if (!old) return mountDesignCard(false);
+  const sc = old.closest(".dc-panel-scroll"), top = sc ? sc.scrollTop : 0;
+  const controls = (root) => [...root.querySelectorAll("button, input, select, textarea, summary, a[href]")];
+  const ae = document.activeElement, had = ae && ae !== old && old.contains(ae);
+  const look = had && ae.classList.contains("st-look") ? ae.dataset.look : null, at = had ? controls(old).indexOf(ae) : -1;
+  return remountInPlace("designCard", () => mountDesignCard(false), true).then(() => {
+    if (sc) sc.scrollTop = top;
+    const nu = $("designCard"); if (!nu || !had) return;
+    const t = look !== null ? [...nu.querySelectorAll(".st-look")].find((x) => x.dataset.look === look) : controls(nu)[at];
+    if (t) t.focus({ preventScroll: true });
+  });
 }
 // the tab a Styles row belongs to (the floating studio's Styles card hides the others)
 function stab(rowEl, tab) { const w = rowEl && (rowEl.classList && rowEl.classList.contains("ins-field") ? rowEl : rowEl.parentNode); if (w && w.dataset) w.dataset.stab = tab; return rowEl; }
@@ -850,28 +890,65 @@ function lookIsOn(l) {
   if (!Object.keys(t).length) return keys.every((k) => !T[k]);
   return keys.every((k) => String(T[k] || "") === String(t[k] || ""));
 }
-// Ready-made looks as small pictures of themselves: the page colour, a heading, two lines, a button.
+// Item 333: each ready-made look drawn small in its own fonts, colours and button, two across:
+// its mood, its name as a heading, a line of words and a button. The one in use is ringed and says
+// On. A tap marks it at once and saves behind; the card is then drawn again where it stands
+// (designCardRedraw), so the panel keeps its place and the tile keeps the keyboard.
 function lookTiles(host, label, looks, isOn, onPick) {
   const wrap = el("div", "ins-field"); wrap.dataset.stab = "looks"; wrap.style.marginTop = "4px";
   wrap.appendChild(el("div", "ins-lbl", label));
-  const grid = el("div", "st-looks");
+  wrap.appendChild(el("p", "ins-says", "Tap one to try it on the page. The panel stays where it is."));
+  lookFaces(looks);
+  const grid = el("div", "st-looks"); grid.setAttribute("role", "group"); grid.setAttribute("aria-label", label);
+  const mark = (b, on) => { b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); b.querySelector(".st-look-on").hidden = !on; };
   looks.forEach((l) => {
-    const t = l.tokens || {}; const on = isOn(l);
-    const b = el("button", "st-look" + (on ? " on" : "")); b.type = "button"; b.setAttribute("aria-pressed", String(on));
-    const pic = el("div", "st-look-pic"); pic.style.background = t.bg || "#ffffff";
-    const ink = t.ink || "#1d1b22", acc = t.accent || ink;
-    const h = el("i", "h"); h.style.background = ink;
-    const l1 = el("i"); l1.style.background = ink; l1.style.opacity = ".45";
-    const l2 = el("i"); l2.style.background = ink; l2.style.opacity = ".45"; l2.style.width = "60%";
-    const bt = el("i", "b"); bt.style.background = acc; bt.style.borderRadius = t.radius === "2px" ? "1px" : "4px";
-    pic.append(h, l1, l2, bt); b.appendChild(pic);
-    b.appendChild(el("span", "st-look-l", (on ? "✓ " : "") + (l.name || "Original")));
-    b.title = (l.name || "Original") + (on ? " — in use" : "");
-    b.addEventListener("click", () => onPick(l));
+    const b = el("button", "st-look"); b.type = "button"; b.dataset.look = l.key || "";
+    b.setAttribute("aria-label", l.name); b.title = l.name + " · " + l.mood;
+    Object.entries(lookDrawing(l)).forEach(([k, v]) => b.style.setProperty(k, v));
+    const pic = el("span", "st-look-pic"); pic.setAttribute("aria-hidden", "true");
+    pic.append(el("span", "st-look-mood", l.mood), el("span", "st-look-h", l.name), el("span", "st-look-t", "Open until six."), el("span", "st-look-b", "Book now"), el("span", "st-look-on", "On"));
+    b.appendChild(pic);
+    mark(b, isOn(l));
+    b.addEventListener("click", () => {
+      if (b.classList.contains("on")) return;   // already this look: nothing to save
+      grid.querySelectorAll(".st-look").forEach((x) => mark(x, x === b));
+      onPick(l);
+    });
     grid.appendChild(b);
   });
   wrap.appendChild(grid); host.appendChild(wrap);
   return wrap;
+}
+// A look's tile colours, faces and button, as CSS variables (presence.css .st-look). The button is
+// filled the way the site fills it (lib/site_buttons.ts buttonChoice): white words on the accent,
+// or on its darker shade, or else the darkest words that read on the accent.
+function lookDrawing(l) {
+  const t = l.tokens || {}, sans = "system-ui, -apple-system, 'Segoe UI', sans-serif";
+  const ink = t.ink || "#1d1b22", acc = t.accent || ink, dark = t.accent_dark || acc;
+  let fill = acc, on = "#ffffff";
+  if (ovContrast("#ffffff", acc) < 4.5) {
+    if (ovContrast("#ffffff", dark) >= 4.5) fill = dark;
+    else on = [ink, "#111111", "#000000"].find((x) => ovContrast(x, acc) >= 4.5) || "#000000";
+  }
+  const display = t.font_display || sans, set = t.buttons || "";
+  const size = 17 * (t.font_scale ? 1.18 : 1) * (/^Caveat\b/.test(display) ? 1.35 : 1);
+  return {
+    "--lk-bg": t.bg || "#ffffff", "--lk-ink": ink, "--lk-soft": t.soft || "#5b5866", "--lk-mood": t.accent_dark || ink,
+    "--lk-fill": fill, "--lk-on": on, "--lk-display": display, "--lk-body": t.font_body || sans,
+    "--lk-hw": t.heading_weight === "400" ? "400" : "700", "--lk-hs": size.toFixed(1) + "px", "--lk-hcase": t.heading_case === "upper" ? "uppercase" : "none",
+    "--lk-br": set === "pill" ? "999px" : set === "square" ? "0" : t.button_radius ? Math.round(parseInt(t.button_radius, 10) / 2) + "px" : "6px",
+    "--lk-bcase": set === "square" ? "uppercase" : "none", "--lk-bls": set === "square" ? ".08em" : "0",
+    "--lk-bsh": t.button_shadow === "offset" ? "2px 2px 0 " + ink : "none",
+  };
+}
+// The looks' faces, so each tile shows its real type: dcFontFaces' rules for every library family
+// a look names, once for the page. A face loads when a tile first draws words in it.
+function lookFaces(looks) {
+  if ($("lookFaces") || !DESIGN_FONTS.length) return;
+  const rules = new Set(looks.flatMap((l) => dcFontFaces(l.tokens).match(/@font-face\{[^}]*\}/g) || []));
+  if (!rules.size) return;
+  const st = document.createElement("style"); st.id = "lookFaces"; st.textContent = [...rules].join("");
+  document.head.appendChild(st);
 }
 // ── Item 217: Styles › Buttons. One set restyles every button on the site, the main one and the
 // second beside it, and one form style every box people type into (lib/site_buttons.ts draws
@@ -909,7 +986,7 @@ function buttonSetRows(card, T) {
     wrap.appendChild(grid); card.appendChild(wrap);
   };
   tiles("Button set", "Every button on the site at once: the main one and the second one beside it, on every page and section.",
-    BUTTON_SET_OPTS, "bs", String(T.buttons || ""), (o) => saveTokens({ buttons: o[1] }, o[1] ? "Buttons: " + o[0] : "Buttons: your template’s own"),
+    BUTTON_SET_OPTS, "bs", String(T.buttons || ""), (o) => saveTokens({ buttons: o[1], button_radius: "", button_shadow: "" }, o[1] ? "Buttons: " + o[0] : "Buttons: your template’s own"),   // item 333: the set's own corners, no look's shadow
     (pic) => pic.append(el("i", "bs-main", "Book"), el("i", "bs-second", "See menu")));
   tiles("Forms", "The boxes people type into, on every form, sign-up and booking.",
     FORM_STYLE_OPTS, "fs", String(T.forms || ""), (o) => saveTokens({ forms: o[1] }, o[1] ? "Forms: " + o[0] : "Forms: your template’s own"),
@@ -992,9 +1069,10 @@ async function mountDesignCard(fresh = true) {
   // explains itself (a look restyles the whole site; publishing stays approval-first).
   // The floating studio: each look is a small picture of itself, the one in use ticked.
   const looksWrap = lookTiles(card, "Ready-made looks", STYLE_LOOKS, lookIsOn, (l) => saveTokens({ ...LOOK_CLEAR, ...(l.tokens || {}) }, (l.name || "Original") + " style"));
-  looksWrap.appendChild(el("div", "hint", "One tap restyles your whole site — colors, type and corners together, always readable. Nothing reaches your live site until you publish."));
+  looksWrap.appendChild(el("div", "hint", "One tap restyles your whole site: colours, fonts and buttons together, always readable. Nothing reaches your live site until you publish."));
   const fixedColors = FIXED_COLOR_TEMPLATES.has((S.site && S.site.template_slug) || "");
   if (fixedColors) card.appendChild(el("div", "hint", "This template keeps its own dark colors, so the color and background choices don't change it. Fonts, text size, corners and spacing do.")).dataset.stab = "colours";
+  else if (T.scheme) card.appendChild(el("div", "hint", "This look has a dark page. A colour or background picked here goes back to a light page.")).dataset.stab = "colours";   // item 333 (saveTokens)
   // item 118: which colour themes this page's sections wear (the canvas tags each one while this tab is open)
   const nowRow = el("div", "ins-field"); nowRow.id = "stThemesNow"; nowRow.dataset.stab = "colours";
   nowRow.append(el("div", "ins-lbl", "Colour themes on this page"), el("p", "ins-says"));
@@ -1040,7 +1118,7 @@ async function mountDesignCard(fresh = true) {
       card.appendChild(rowEl);
     }
   }
-  card.appendChild(el("div", "hint", "Designed, readable combinations — contrast is checked so your site always stays easy to read. You can restore any earlier version.")).dataset.stab = "looks";
+  card.appendChild(el("div", "hint", "Designed, readable combinations: contrast is checked so your site always stays easy to read. You can restore any earlier version.")).dataset.stab = "looks";
   if (DESIGN_TOKENS && Object.keys(DESIGN_TOKENS).length && !PALETTES.some((p) => p.accent && String(DESIGN_TOKENS.accent || "").toLowerCase() === p.accent) && DESIGN_TOKENS.accent) {
     card.appendChild(el("div", "hint", "A developer set custom colors — picking a palette replaces them.")).dataset.stab = "colours";
   }

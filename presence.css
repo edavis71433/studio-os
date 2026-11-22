@@ -931,7 +931,6 @@ html.dc-edit:not(.plan-watch) #settingsPanel #designGallery{padding:0 20px 14px}
 html.dc-edit:not(.plan-watch) #settingsPanel #designHost .field{border:0;box-shadow:none;border-radius:0;padding:0;margin:0 0 18px;background:transparent}
 html.dc-edit:not(.plan-watch) #settingsPanel #designCard>label{display:none}
 html.dc-edit:not(.plan-watch) #settingsPanel #designHost .field>label{font-size:12.5px;font-weight:500;color:var(--ink-2)}
-.st-looks{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 /* item 217: the Buttons tab. Each set and form style is a small drawing in the site's own
    colours (--bs-*, set from the canvas); lib/site_buttons.ts draws the real ones on the site. */
 .st-group{margin-top:14px}
@@ -960,15 +959,21 @@ html.dc-edit:not(.plan-watch) #settingsPanel #designHost .field>label{font-size:
 .fs-line .fs-f{border-width:0 0 1.5px;border-color:var(--bs-ink);border-radius:0;background:transparent}
 .fs-soft .fs-f{border-color:transparent;border-radius:7px;background:color-mix(in srgb,var(--bs-ink) 8%,var(--bs-paper))}
 .fs-round .fs-f{border-color:color-mix(in srgb,var(--bs-ink) 40%,var(--bs-paper));border-radius:999px}
-.st-look{padding:0;border:0;background:transparent;text-align:left;cursor:pointer;font:inherit;color:var(--ink);min-width:0}
-.st-look-pic{height:78px;padding:8px;border-radius:10px;border:1px solid var(--hair);display:flex;flex-direction:column;gap:4px;align-items:flex-start;justify-content:center}
-.st-look.on .st-look-pic{border:2px solid var(--plum);padding:7px}
-.st-look i{display:block;height:3px;border-radius:1px;width:80%}
-.st-look i.h{height:7px;border-radius:2px;width:50%}
-.st-look i.b{height:8px;width:26px;margin-top:2px}
-.st-look-l{display:block;margin-top:6px;font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.st-look.on .st-look-l{color:var(--plum);font-weight:600}
-.st-look:focus-visible .st-look-pic{outline:2px solid var(--plum);outline-offset:2px}
+/* item 333: the ready-made looks, each drawn small in its own fonts, colours and button (presence-edit.js
+   lookDrawing sets the --lk-* variables): its mood, its name as a heading, a line of words, a button.
+   No words under 12px (item 34). */
+.st-looks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}
+.st-look{position:relative;display:block;min-width:0;min-height:44px;padding:0;border:1px solid var(--hair);border-radius:12px;background:var(--lk-bg);color:var(--lk-ink);font:inherit;text-align:left;cursor:pointer;overflow:hidden}
+.st-look:hover{border-color:var(--ink-3)}
+.st-look.on{border-color:var(--plum);box-shadow:0 0 0 2px var(--plum)}
+.st-look:focus-visible{outline:2px solid var(--plum);outline-offset:4px}
+.st-look-pic{display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:11px 12px 12px}
+.st-look-mood{max-width:calc(100% - 44px);font:700 12px/1.25 var(--lk-body);letter-spacing:.08em;text-transform:uppercase;color:var(--lk-mood);white-space:nowrap;overflow:hidden}
+.st-look-h{max-width:100%;font-family:var(--lk-display);font-weight:var(--lk-hw);font-size:var(--lk-hs);line-height:1.1;text-transform:var(--lk-hcase);color:var(--lk-ink);overflow-wrap:anywhere}
+.st-look-t{font:400 12px/1.35 var(--lk-body);color:var(--lk-soft)}
+.st-look-b{display:inline-block;margin-top:3px;padding:6px 11px;border-radius:var(--lk-br);background:var(--lk-fill);color:var(--lk-on);font:700 12px/1.1 var(--lk-body);text-transform:var(--lk-bcase);letter-spacing:var(--lk-bls);box-shadow:var(--lk-bsh);white-space:nowrap}
+.st-look-on{position:absolute;top:8px;right:8px;padding:2px 8px;border-radius:999px;background:var(--plum);color:#fff;font:600 12px/1.4 var(--sans)}
+.st-look-on[hidden]{display:none}
 .st-fontrow{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--hair);background:var(--dc-raised,var(--paper));font:inherit;color:var(--ink);cursor:pointer;text-align:left;margin-top:8px}
 .st-fontrow:hover{border-color:var(--hair-2)}
 .st-fontrow .k{font-size:12.5px;color:var(--ink-2);font-weight:500;margin-right:8px}
