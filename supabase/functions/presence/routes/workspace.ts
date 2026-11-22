@@ -213,7 +213,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     studioSiteId ? import('./studio_brand.ts').then((m) => m.studioBrandOf(studioSiteId)).catch(() => null) : Promise.resolve(null),
     studioSiteId && site.client_id ? clientGreetingName(studioSiteId, String(site.client_id), site.id).catch(() => '') : Promise.resolve(''),
     // builder list items 229 and 233: what this client's studio shows them (a failed read hides nothing)
-    studioSiteId ? import('../lib/portal_settings.ts').then((m) => m.readPortalSettings(studioSiteId).then((s) => ({ off: m.resolveOff(s, site.id), welcome: s.welcome, home_off: s.home_off, signin: s.signin }))).catch(() => null) : Promise.resolve(null),
+    studioSiteId ? import('../lib/portal_settings.ts').then((m) => m.readPortalSettings(studioSiteId).then((s) => ({ off: m.resolveOff(s, site.id), welcome: s.welcome, home_off: s.home_off, signin: s.signin, reply: s.reply }))).catch(() => null) : Promise.resolve(null),
   ]);
 
   // Phase D: resolve the FEATURE edition from the licensed plan (falls back to
@@ -314,7 +314,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
   return json({ data: {
     site_role: role,
     capabilities: caps,
-    studio,                              // builder list item 59: { name, logo_url, accent } for a managed client, else null
+    studio: studio ? { ...studio, site_id: studioSiteId } : studio,   // builder list item 59: { name, logo_url, accent } for a managed client, else null; item 340: and the studio's site, for the portal's app details
     client_first_name: clientFirstName || null,   // builder list item 179: the name on the studio's record of this client
     portal: portalSettings,              // builder list items 229 and 233: { off, welcome, home_off } for a managed client, else null
     edition: site.edition,               // 'monitor' | 'presence' (site hosting dimension)
@@ -365,7 +365,7 @@ export async function handlePortalPreviewContext(site: SiteRow, scope: { site_id
   return json({ data: {
     site_role: 'business_owner', capabilities: capabilitiesOf('business_owner'),
     studio, client_first_name: clientFirstName || null,
-    portal: { off: resolveOff(ps, site.id), welcome: ps.welcome, home_off: ps.home_off, signin: ps.signin },
+    portal: { off: resolveOff(ps, site.id), welcome: ps.welcome, home_off: ps.home_off, signin: ps.signin, reply: ps.reply },
     edition: site.edition, site_live: publishedOnce(site),
     is_agency: false, is_operator: false, is_managed_client: true, sees_full_workspace: siteCan('business_owner', 'view_all'), is_client_portal: false,
     landing: '/client.html', scope: null, attention_count: 0, attention_stale: false, studio_requests: [], businesses: [], business: null, nav: [],

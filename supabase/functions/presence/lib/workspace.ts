@@ -174,7 +174,7 @@ export async function sendInviteLink(email: string, opts: { subject: string; int
   const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
   const roleBox = opts.role ? `<div style="background:#efeafc;border-radius:12px;padding:12px 16px;margin:14px 0 4px"><p style="margin:0 0 4px;font-weight:600;color:#40297f">${esc(opts.role.title)}</p>${opts.role.lines.filter(Boolean).map((l, i) => `<p style="margin:${i ? '4px' : '0'} 0 0;color:${i ? '#55526a' : '#40297f'}">${esc(l)}</p>`).join('')}</div>` : '';
   const sent = await sendEmail(email, opts.subject,
-    `<p>${opts.intro}</p>${roleBox}<p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${opts.brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type — this button signs you straight in. It works once, for a short while. After that, go to <a href="${door}" style="color:#938ba3">${door.replace(/^https:\/\//, '')}</a>, enter this email address, and we’ll email you a code. Want a password for next time? Use “Forgot your password?” on the sign-in page any time.</p>`, opts.brand, { critical: true }).catch(() => false);   // an invited member’s ONLY door in = transactional
+    `<p>${opts.intro}</p>${roleBox}<p class="cta"><a href="${link}" style="display:inline-block;margin-top:6px;background:${opts.brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Sign in to get started →</a></p><p style="color:#938ba3;font-size:13px;margin-top:10px">No code to type — this button signs you straight in. It works once, for a short while. After that, go to <a href="${door}" style="color:#938ba3">${door.replace(/^https:\/\//, '')}</a>, enter this email address, and tap “Email me a code”: we’ll email you a code to type in. You can sign in that way any time, with no password.</p>`, opts.brand, { critical: true }).catch(() => false);   // an invited member’s ONLY door in = transactional
   return sent !== false;
 }
 
@@ -198,8 +198,27 @@ async function sendSiteInvite(email: string, siteId: string, role: SiteRole, can
       ? { subject: `You’re invited to work on ${name}’s website`, intro: `You’ve been invited to work on <strong>${safe}</strong>’s website as a Designer.` }
       : { subject: `You’ve been invited to help run ${name}`, intro: `You’ve been invited to help run <strong>${safe}</strong> as ${named}.` };
   const box = SEAT_WORDS[role] ? { title: `What ${role === 'client_reviewer' ? 'you' : 'a ' + named} can see`, lines: [SEAT_WORDS[role].you, publishWords({ role, can_publish: canPublish })] } : undefined;
+  // builder item 339: a client's own account (a site a studio looks after) adds its people as
+  // Co-owners, and they sign in where the client does: the portal door, with the studio named
+  if (role === 'business_owner') {
+    const studio = await studioOfManagedSite(siteId);
+    if (studio) {
+      const w = { subject: `You’ve been added to ${name}’s client portal`, intro: `You’ve been added to <strong>${safe}</strong>’s client portal, where ${safe} and its studio work together: the website, the project, messages and papers.` };
+      return sendInviteLink(email, { ...w, role: { title: 'What you can see', lines: ['Everything on the account: the website, messages, documents and invoices.', 'You can approve work and write to the studio, the same as the owner.'] }, brand, next: `/portal.html?studio=${studio}` });
+    }
+  }
   // a seat that sees the website (the full workspace, or a Designer's) signs in at the studio door
   return sendInviteLink(email, { ...words, role: box, brand, next: seesSite(role) ? '/studio.html' : '/portal.html' });
+}
+
+/** Builder item 339: the studio that looks after this site, when it is a client's own site
+ *  (an active service link names it as the customer side); '' otherwise or when unsure. */
+export async function studioOfManagedSite(siteId: string): Promise<string> {
+  try {
+    const r = await svc(`presence_service_links?customer_site_id=eq.${siteId}&status=eq.active&select=agency_site_id&limit=1`);
+    const id = r.ok && Array.isArray(r.json) ? String(r.json[0]?.agency_site_id || '') : '';
+    return /^[0-9a-f-]{36}$/i.test(id) ? id : '';
+  } catch { return ''; }
 }
 
 /** Nov 2026 review (client portal finding 5): is this a studio's own site, the one

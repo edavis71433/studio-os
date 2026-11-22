@@ -45,7 +45,7 @@ ok('unsubscribable: only mail an unsubscribe stops', unsubscribable() === true &
   ok('footer (business without an address, optional mail): the platform’s postal line stands in', noAddr.includes(`Sent through ${PLATFORM_POSTAL}`) && /Unsubscribe/.test(noAddr));
   ok('footer (business without an address, always-arrives mail): just the name', emailFooterHtml({ ...SALON, address: '' }, { asBusiness: true }) === '<strong style="color:#6b6478;font-weight:600">Bella’s Salon</strong>');
   const plat = emailFooterHtml(SALON, {});
-  ok('footer (platform mail, e.g. an owner’s alert): sent by the business on Studio OS, the platform’s postal line, no Unsubscribe', plat === `Sent by Bella’s Salon on Studio OS.<br>${PLATFORM_POSTAL}`);
+  ok('footer (platform mail, e.g. an owner’s alert): sent by the business (item 348: never “on Studio OS” to a client), the platform’s postal line, no Unsubscribe', plat === `Sent by Bella’s Salon.<br>${PLATFORM_POSTAL}`);
   ok('footer: the default brand reads "Sent by Studio OS."', emailFooterHtml(EMAIL_BRAND_DEFAULT, {}).startsWith('Sent by Studio OS.'));
   ok('footer: asBusiness with the default brand is platform mail', emailFooterHtml(EMAIL_BRAND_DEFAULT, { asBusiness: true }).startsWith('Sent by Studio OS.'));
   ok('footer: a link that is not https is never drawn', !/Unsubscribe/.test(emailFooterHtml(SALON, { unsubscribeUrl: 'javascript:alert(1)' })));
@@ -92,7 +92,7 @@ const last = () => sent[sent.length - 1];
   await sendEmail('owner@salon.example', 'New booking — Haircut', '<p>New</p>', SALON, { critical: true });
   const m = last();
   ok('an owner’s alert keeps the platform as the sender (it is not the business writing to itself)', m.from === 'Example Studio <hello@example.com>');
-  ok('…and the platform footer', m.html.includes('Sent by Bella’s Salon on Studio OS.') && m.html.includes(PLATFORM_POSTAL));
+  ok('…and the platform footer', m.html.includes('Sent by Bella’s Salon.') && m.html.includes(PLATFORM_POSTAL));
 }
 {
   await sendEmail('pat@customer.example', 'x', '<p>x</p>', undefined, { asBusiness: true });

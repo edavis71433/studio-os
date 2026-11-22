@@ -3342,8 +3342,9 @@ async function linkAgencyPortfolio(principal: Principal, siteId: string | undefi
  *  emailSalesDoc documents ("never the platform name"). `siteId` is the
  *  STUDIO's site (every caller holds it), so loadEmailBrand resolves the same
  *  name + accent the proposal/contract/invoice emails already wear. */
-export async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: boolean): Promise<boolean> {
+export async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: boolean, opts: { firstName?: string } = {}): Promise<boolean> {
   if (!email) return false;
+  const first = firstNameOf(opts.firstName || '');   // builder item 348: greeted by name when we know it
   // App pages (set-password/get-started/portal) ARE served on the primary site —
   // build-public.sh copies every root .html into dist/ and _redirects blocks only
   // source/doc dirs, not these pages. So the link MUST use the same origin as the
@@ -3373,8 +3374,11 @@ export async function sendCustomerInvite(siteId: string, email: string, _isNewLo
     : link
     ? `<p class="cta"><a href="${link}" style="${btnStyle}">Create your password &amp; sign in →</a></p>`
     : `<p class="cta"><a href="${base}/portal.html?studio=${siteId}" style="${btnStyle}">Sign in at your portal →</a></p><p style="font-size:13px;color:#6b6478">No password needed — we’ll email you a one-time code.</p>`;
+  const { emailBand, emailPreheader } = await import('../lib/email_brand.ts');
   const left = await sendEmail(email, `Your client portal is ready${studioName ? ` — ${studioName}` : ''}`,
-    `<p>Welcome — your client portal is ready. It’s the one place where we work together from here:</p>` +
+    emailPreheader('One place for your website, your project and your papers. Press the button to come in.') +
+    emailBand(studioName ? 'Your client portal' : '', studioName ? `${studioName} invited you` : 'Your client portal') +   // item 348: the band has a title, never a bare "Welcome"
+    `<p>${first ? `Hi ${first.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string))},` : 'Welcome,'} your client portal is ready. It’s the one place where we work together from here:</p>` +
     `<ul style="margin:8px 0;padding-left:20px">` +
     `<li>watch your project’s progress as it happens</li>` +
     `<li>send messages straight to ${studioName ? studioName.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string)) : 'us'}</li>` +
