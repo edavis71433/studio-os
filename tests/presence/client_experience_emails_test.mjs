@@ -74,7 +74,7 @@ const sr = intake.slice(srStart, srEnd);
 // sales item 92: the subject names the studio ("A reply from <studio>") on both branches
 ok('support-reply: the literal-email branch is kept (email-native requesters unchanged)', /if \(EMAIL_RE\.test\(requester\)\)/.test(sr) && /sendEmail\(requester, subject, replyHtml, brand, \{ critical: true, asBusiness: true, siteId: site\.id \}\)/.test(sr) && /`A reply from \$\{brand\.name\}`/.test(sr));
 ok('support-reply: an auth-uid requester is RESOLVED, not skipped — F3 stamp first, else clientIdForRequester', /reqRow\?\.client_id && UUID_RE\.test\(String\(reqRow\.client_id\)\)/.test(sr) && /clientIdForRequester\(site\.id, \{ userId: requester \}\)/.test(sr));
-ok('support-reply: the resolved client is emailed via the ONE bridge channel', /emailCustomerByClient\(site\.id, clientId, subject, replyHtml\)/.test(sr));
+ok('support-reply: the resolved client is emailed via the ONE bridge channel', /emailCustomerByClient\(site\.id, clientId, subject, replyHtml, \{ support: String\(reqRow\.id\) \}\)/.test(sr));
 ok('support-reply: the 15-minute throttle guards BOTH branches (probe precedes them)', (() => {
   const throttle = sr.indexOf('15 * 60 * 1000');
   const emailBranch = sr.indexOf('EMAIL_RE.test(requester))');

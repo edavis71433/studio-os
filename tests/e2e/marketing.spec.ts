@@ -35,6 +35,9 @@ const read = (f: string) => readFileSync(join(ROOT, f), 'utf8');
 
 // The marketing estate (buy-audit.html deliberately excluded: it ships
 // chromeless today; MS3 owns its slim payment-moment chrome per the plan).
+// Builder item 349: 404.html, terms.html and privacy.html left it; a client lands on
+// those from a studio's emails and portal, so they wear the one public frame
+// (public-frame.js, tests/e2e/public-frame-349.spec.ts) and no marketing chrome.
 const PAGES = [
   'index.html', 'services.html', 'web-design.html', 'seo-strategy.html',
   'monthly-retainer.html', 'pricing.html', 'how-we-work.html',
@@ -45,8 +48,8 @@ const PAGES = [
   'pasadena-web-design.html',
   'tools.html', 'audit.html', 'ai-critique.html', 'report-card.html',
   'roi-calculator.html', 'pricing-estimator.html', 'local-visibility.html',
-  'about.html', 'work.html', 'contact.html', 'privacy.html', 'terms.html',
-  'accessibility.html', 'ai-disclaimer.html', '404.html',
+  'about.html', 'work.html', 'contact.html',
+  'accessibility.html', 'ai-disclaimer.html',
 ];
 
 const region = (html: string, name: string, file: string): string => {
@@ -164,8 +167,6 @@ test.describe('marketing chrome (static pins)', () => {
     // landers mark the Industries section; tool pages + audit mark Free tools
     expect(navOf('salon-web-design.html')).toMatch(/data-nav="industries" aria-current="true"/);
     expect(navOf('audit.html')).toMatch(/data-nav="tools" aria-current="true"/);
-    // 404 claims nothing
-    expect(navOf('404.html')).not.toContain('aria-current');
   });
 
   test('every marketing page loads nav.js exactly once (the accessible submenu/burger behavior)', () => {
@@ -315,10 +316,9 @@ test.describe('marketing chrome (static pins)', () => {
     for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
       expect(m[1], `404.html link ${m[1]}`).toMatch(/^(https?:|\/|#|mailto:)/);
     }
-    // money-path rescues per the plan
-    for (const rescue of ['/contact', '/pricing', '/audit']) {
-      expect(html.includes(`href="${rescue}"`), `404 rescue ${rescue}`).toBe(true);
-    }
+    // item 349: a client's page, so its one door is the client sign-in, never a sales page
+    expect(html).toContain('href="/portal.html"');
+    expect(html).not.toContain('dds-marketing-nav');
   });
 
   test('label honesty: "See what your site needs" always means /audit', () => {
@@ -788,8 +788,10 @@ test.describe('MS5 about.html leftovers (static pins)', () => {
 const MS6_CAPTURE_PAGES = [
   'services.html', 'web-design.html', 'pricing.html', 'seo-strategy.html', 'monthly-retainer.html',
 ];
-const LEGAL_PAGES = ['privacy.html', 'terms.html', 'accessibility.html', 'ai-disclaimer.html'];
-const MS6_FAMILY = [...MS6_CAPTURE_PAGES, ...LEGAL_PAGES, '404.html'];
+// builder item 349: privacy.html, terms.html and 404.html left the legal template for the one
+// public frame a client sees (public-frame.js; tests/e2e/public-frame-349.spec.ts)
+const LEGAL_PAGES = ['accessibility.html', 'ai-disclaimer.html'];
+const MS6_FAMILY = [...MS6_CAPTURE_PAGES, ...LEGAL_PAGES];
 const INTERNAL_PAGES = ['email-signature.html', 'styleguide.html', 'a11y.html', 'provision.html'];   // provision: studio audit change 12
 // List item 139: tools retired in the Free Tools rebuild, and the paid-audit checkout nothing links to
 const RETIRED_PAGES = ['audit.html', 'ai-critique.html', 'report-card.html', 'roi-calculator.html', 'pricing-estimator.html', 'local-visibility.html', 'tools.html', 'buy-audit.html'];
@@ -1614,12 +1616,14 @@ test.describe('dark scheme (chrome + closer fine print)', () => {
     expect(await contrastOf(page, 'main h2'), 'legal section headings').toBeGreaterThanOrEqual(3);
     expect(await contrastOf(page, 'main .lead-muted'), 'legal body copy').toBeGreaterThanOrEqual(4.5);
     expect(await contrastOf(page, 'main .lead-muted a'), 'legal in-body links').toBeGreaterThanOrEqual(4.5);
+    // item 349: privacy and 404 wear the public frame; its card, words and links read in dark too
     await page.goto('/privacy.html');
-    expect(await contrastOf(page, 'main .lead-muted'), 'privacy body copy').toBeGreaterThanOrEqual(4.5);
-    expect(await contrastOf(page, 'main .lead-muted a'), 'privacy in-body links').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, 'main .pf-card p'), 'privacy body copy').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, 'main .pf-card p a'), 'privacy in-body links').toBeGreaterThanOrEqual(4.5);
     await page.goto('/404.html');
     expect(await contrastOf(page, 'main h1'), '404 headline').toBeGreaterThanOrEqual(3);
-    expect(await contrastOf(page, 'main p a'), '404 rescue links').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, 'main .pf-card p'), '404 words').toBeGreaterThanOrEqual(4.5);
+    expect(await contrastOf(page, 'main a.pf-ghost'), '404 sign-in door').toBeGreaterThanOrEqual(4.5);
     // one capture page proves the tokenized band (byte-identical markup on both)
     await page.goto('/services.html');
     expect(await contrastOf(page, '.soft-capture h2'), 'capture heading (large)').toBeGreaterThanOrEqual(3);

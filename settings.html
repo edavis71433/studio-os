@@ -85,6 +85,20 @@
   .form2 .how{font-size:12.5px;color:var(--faint);margin-top:-4px}   /* sales item 88: under who signs */
   .form2 [data-signer][hidden]{display:none}
   .form2 .note{grid-column:1/-1;font-size:12.5px;color:var(--faint)}
+  /* sales items 167, 168: On every invoice. Its hints sit under their box (the signer's -4px would
+     lay them over the bottom of the box above, inside its 44px finger box); the late fee's three
+     controls sit in a row, and stack, each the full width, on a phone */
+  .invform .how{margin-top:6px}
+  .invform textarea{width:100%;min-height:72px;border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:8px 10px;font:inherit;font-size:13.5px;line-height:1.45;background:var(--card);color:var(--ink);resize:vertical}
+  .invform textarea:focus{outline:2px solid var(--p);outline-offset:1px;border-color:var(--p)}
+  .invform .latefee{border-top:1px solid var(--line);padding-top:12px}
+  .lfrow{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto;gap:10px;align-items:center}
+  .lfval{min-width:0}
+  .lfdays{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--soft);white-space:nowrap}
+  .form2 .lfdays label{display:inline;margin:0;font-size:13.5px;color:var(--soft)}
+  .lfdays input{width:72px;flex:0 0 72px}
+  @media (max-width:640px){.lfrow{grid-template-columns:minmax(0,1fr)}.lfdays input{width:96px;flex-basis:96px}}
+  @media (max-width:767px){.invform input,.invform select{height:44px;font-size:16px}.invform textarea{font-size:16px}}
   .btn{display:inline-flex;align-items:center;gap:var(--dds-s2,8px);height:32px;padding:0 var(--dds-s3,12px);border-radius:var(--dds-r,8px);border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
   .btn:hover{border-color:var(--dds-line-strong,#d2d2db)} .btn:disabled{opacity:.55;cursor:default}
   .btn.primary{background:var(--p);border-color:var(--p);color:#fff} .btn.primary:hover{background:var(--p-deep)}
@@ -629,7 +643,8 @@
     <div class="card-h"><h2 id="portalPartsHead" tabindex="-1">What your clients see</h2><span class="hint" id="portalPartsHint">Turn a part off to hide it from every client. To change it for one client, open them and choose their portal in Settings.</span></div>
     <div class="pwho" id="portalWho" hidden>
       <p class="how" id="portalWhoLine"></p>
-      <div class="row"><a class="btn sm primary" id="portalSee" href="#">See their portal</a><button type="button" class="btn sm" id="portalLink" hidden>Send a sign-in link</button></div>
+      <div class="row"><a class="btn sm primary" id="portalSee" href="#">See their portal</a><button type="button" class="btn sm" id="portalLink" hidden>Send a sign-in link</button><button type="button" class="btn sm" id="portalTwoOff" hidden>Turn off their two-step sign-in</button></div>
+      <p class="how" id="portalTwoNote" hidden>For a client who lost their phone and has no backup codes. Asks you for a fresh code first, then emails them.</p>
     </div>
     <div id="portalPartsRows"></div>
     <div class="row" id="portalResetRow" hidden style="margin-top:10px"><button type="button" class="btn sm" id="portalReset">Back to your studio’s choices</button></div>
@@ -641,6 +656,25 @@
       <div class="t"><b><label for="portalWelcome">Welcome note</label><span id="portalWelcomeSaved"></span></b><div class="how">At the top of every client’s Home, signed with your studio’s name. Leave it empty for none.</div>
         <textarea id="portalWelcome" maxlength="500" rows="4" placeholder="e.g. Thanks for working with us! Everything for your website is here. Anything you need, write to us in Messages." style="width:100%;margin-top:8px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;resize:vertical"></textarea>
         <div class="how" id="portalWelcomeCount" aria-live="polite">0 / 500</div></div>
+    </div>
+    <!-- builder item 350 (Nov 22 review): a short name in the portal's address, saved on its own
+         (PUT /agency/portal { slug }); the long address keeps working. -->
+    <div class="swrow pw-note" id="portalSlugRow">
+      <div class="t"><b><label for="portalSlug">Your portal’s address</label><span id="portalSlugSaved"></span></b><div class="how" id="portalSlugHow">A short name clients can read out or type, like your studio’s name. Letters, numbers and hyphens. Changes save as you go.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px"><span class="how" id="portalSlugBase" style="margin:0"></span><input id="portalSlug" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="your-studio" aria-label="Short name" style="flex:1 1 180px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;min-height:44px"></div>
+        <div class="how" id="portalSlugAddr" style="margin-top:6px"></div></div>
+    </div>
+    <!-- builder item 353 (Nov 22 review): the reply time and working hours in the studio's own words.
+         The portal used to promise "they usually reply within a day" in four places; now it says
+         what the studio chose here, or nothing. Saved with the portal's other choices (PUT /agency/portal { reply }). -->
+    <div class="swrow pw-note" id="portalReplyRow">
+      <div class="t"><b><label for="portalReplyWithin">When you reply</label><span id="portalReplySaved"></span></b><div class="how">What your clients read next to Messages. Leave it unsaid and the portal promises nothing.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <select id="portalReplyWithin" aria-label="Reply time" style="flex:1 1 220px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;min-height:44px">
+            <option value="">Don’t say</option><option value="within a few hours">Within a few hours</option><option value="within one business day">Within one business day</option><option value="within two business days">Within two business days</option><option value="within a week">Within a week</option>
+          </select>
+          <input id="portalReplyHours" type="text" maxlength="60" placeholder="Working hours, e.g. Mon to Fri, 9 to 5" aria-label="Working hours" style="flex:2 1 260px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;min-height:44px">
+        </div></div>
     </div>
     <div class="plabel">Cards on Home</div>
     <div id="portalCardRows"></div>
@@ -748,12 +782,33 @@
   </section>
   <!-- builder list item 191: two-step sign-in (Figma B1 off, B3 on; the set-up sheet B2 and the code before
        Turn off are fresh-code.js). It is the signed-in person's own, so it lives at studio level only. -->
+  <!-- sales items 168 and 167 (Nov 22 2026 review): what goes on every invoice. How else to pay (check,
+       Zelle), the studio's tax or licence number, the next invoice number (a studio moving from another
+       tool carries on from 1042), and an optional late fee, off to start. The studio's own, never a
+       client's; each box saves when it is left (saveAutomation, the same path as the switches). -->
+  <section class="card" id="invoiceCard" aria-labelledby="invoiceHead" hidden data-needs="configure">
+    <div class="card-h"><h2 id="invoiceHead" tabindex="-1">On every invoice</h2><span class="hint">Printed on each invoice, its PDF and its email. Changes save as you go.</span></div>
+    <form class="form2 invform" id="invoiceForm">
+      <div class="full"><div class="flab"><label for="f-payother">Other ways to pay <span class="muted">(optional)</span></label><span class="fs" id="fs-f-payother" role="status"></span></div><textarea id="f-payother" maxlength="600" rows="2" placeholder="e.g. Zelle: pay@yourstudio.com · Checks to Your Studio, 12 Main St" aria-describedby="fs-f-payother"></textarea>
+        <div class="how">Clients see this under the card button, with the invoice number to quote. One way per line, or separate them with a dot.</div></div>
+      <div><div class="flab"><label for="f-taxid">Tax or licence number <span class="muted">(optional)</span></label><span class="fs" id="fs-f-taxid" role="status"></span></div><input id="f-taxid" maxlength="80" placeholder="e.g. EIN 12-3456789" aria-describedby="fs-f-taxid"></div>
+      <div><div class="flab"><label for="f-nextno">Next invoice number</label><span class="fs" id="fs-f-nextno" role="status"></span></div><input id="f-nextno" type="number" min="1" max="999999" step="1" placeholder="e.g. 1043" aria-describedby="fs-f-nextno"></div>
+      <div class="full how">Set this once when moving from another tool: the next invoice takes this number, and the count carries on from it. Numbers already given never change.</div>
+      <div class="full latefee"><div class="flab"><label for="f-latemode">Late fee</label><span class="fs" id="fs-f-latemode" role="status"></span></div>
+        <div class="lfrow">
+          <select id="f-latemode" aria-describedby="fs-f-latemode"><option value="off">None</option><option value="flat">A flat amount</option><option value="percent">A percent of the invoice</option></select>
+          <div class="lfval"><label for="f-latevalue" class="sr-only">How much</label><input id="f-latevalue" inputmode="decimal" placeholder="25" aria-describedby="fs-f-latevalue"><span class="fs" id="fs-f-latevalue" role="status"></span></div>
+          <div class="lfdays"><label for="f-latedays">after</label><input id="f-latedays" type="number" min="1" max="90" step="1" value="7" aria-describedby="fs-f-latedays"><span>days late</span><span class="fs" id="fs-f-latedays" role="status"></span></div>
+        </div>
+        <div class="how" id="lateHow">Off to start. Added once, as a line on the invoice with a fresh pay link, and said plainly in the next reminder. Only fair if your agreement says so.</div></div>
+    </form>
+  </section>
   <section class="card" id="security" aria-labelledby="securityHead" hidden>
     <div class="card-h"><h2 id="securityHead" tabindex="-1">Sign-in and security</h2><span class="hint">How you get in, and who hears about the big changes.</span></div>
     <div class="tsrow" aria-live="polite">
       <div class="tshead"><b>Two-step sign-in</b><span class="tspill" id="tsPill">Checking…</span></div>
       <p class="tsline" id="tsLine"></p>
-      <div class="tsacts"><button class="btn primary" type="button" id="tsOn" hidden>Turn on two-step sign-in</button><button class="btn" type="button" id="tsOff" hidden>Turn off</button><span class="tsnote" id="tsOffNote" hidden>Asks for a code from the app first.</span><button class="btn" type="button" id="tsRetry" hidden>Try again</button></div>
+      <div class="tsacts"><button class="btn primary" type="button" id="tsOn" hidden>Turn on two-step sign-in</button><button class="btn" type="button" id="tsCodes" hidden>Backup codes</button><button class="btn" type="button" id="tsOff" hidden>Turn off</button><span class="tsnote" id="tsOffNote" hidden>Asks for a code from the app first.</span><button class="btn" type="button" id="tsRetry" hidden>Try again</button></div>
     </div>
     <div class="tsalerts" data-needs="owner">
       <p class="tsto"><b>Alerts go to</b><span>the email on this account</span></p>
@@ -790,6 +845,7 @@
   </div>
 </div>
 <script src="/fresh-code.js?v=191"></script>
+<script src="/backup-codes.js?v=347"></script>
 <script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 const SUPABASE_URL = "https://qksstlqzbhesadrrofgn.supabase.co";
@@ -902,6 +958,7 @@ const CARDS = [
   // Bold redesign (Nov 2026): the deal stages are a section of their own (the studio's book, like Automations)
   { key: 'stages', href: '#stages', title: 'Deal stages', desc: 'Your names for the four open stages, the chance each one closes, and when a deal counts as stalled.', words: 'pipeline deals stalled chance close', studioOnly: true, needs: 'configure' },
   // sales item 94: the month's goal and the AI help switch (the studio's own, like the stages)
+  { key: 'invoiceCard', href: '#invoiceCard', title: 'On every invoice', desc: 'Other ways to pay, your tax number, the next invoice number, and an optional late fee.', words: 'invoice check zelle tax ein licence number late fee pay', studioOnly: true, needs: 'configure' },
   { key: 'goal', href: '#goal', title: 'Goal and AI help', desc: 'A monthly sales goal for Home and Pipeline, and AI help that drafts a reply or sums a customer up.', words: 'goal target monthly sales number ai help draft reply summary claude assistant cost', studioOnly: true, needs: 'configure' },
   { key: 'auto', href: '#automations', title: 'Automations', desc: 'Ready-made recipes: answer and follow up enquiries, remind unpaid invoices and quotes about to run out, nudge quiet deals, ask for a review. Each shows what it sends.', words: 'automatic reminders emails nudge review request unpaid recipes follow up quote expires auto reply', studioOnly: true, needs: 'configure' },
   // sales item 87: inside a client, the replies THEIR website sends: the acknowledgement and the follow-ups
@@ -1298,8 +1355,8 @@ async function loadSecurity() {
   paintSecurity();
 }
 function paintSecurity() {
-  const pill = $('tsPill'), line = $('tsLine'), on = $('tsOn'), off = $('tsOff'), note = $('tsOffNote'), retry = $('tsRetry');
-  on.hidden = off.hidden = note.hidden = retry.hidden = true;
+  const pill = $('tsPill'), line = $('tsLine'), on = $('tsOn'), off = $('tsOff'), note = $('tsOffNote'), retry = $('tsRetry'), codes = $('tsCodes');
+  on.hidden = off.hidden = note.hidden = retry.hidden = true; if (codes) codes.hidden = true;
   if (!TWO || !TWO.read) {
     // C4: a read that failed is not "off"
     pill.className = 'tspill'; pill.textContent = 'Couldn’t check';
@@ -1312,6 +1369,8 @@ function paintSecurity() {
     pill.className = 'tspill on'; pill.textContent = since ? 'On since ' + since : 'On';
     line.textContent = 'Codes come from the authenticator app you set up' + (TWO.since && longDate(TWO.since) ? ' on ' + longDate(TWO.since) : '') + '. Signing in on a new device, or after signing out, asks for one.';
     off.hidden = note.hidden = false;
+    // item 347: ten one-use backup codes, made on this page and shown once
+    if (codes && window.ddsBackup) { codes.hidden = false; window.ddsBackup.remaining(api).then((d) => { if (d && typeof d.remaining === 'number' && !TWO.codesSaid) { TWO.codesSaid = true; line.textContent += d.total ? ` ${d.remaining} of ${d.total} backup codes left.` : ' No backup codes yet: make some in case you lose your phone.'; } }); }
     setStatus('security', { text: 'Two-step sign-in is on', cls: '' });
   } else {
     pill.className = 'tspill off'; pill.textContent = 'Off';
@@ -1336,6 +1395,16 @@ function wireSecurity() {
     TWO = await window.ddsFresh.status(sb); paintSecurity();
   });
   retry.addEventListener('click', () => { loadSecurity().catch(() => {}); });
+  const codes = $('tsCodes');
+  if (codes && window.ddsBackup) codes.addEventListener('click', async () => {
+    codes.disabled = true;
+    try {
+      const { r, codes: list } = await window.ddsBackup.save(api);
+      if (!r || !r.ok) { toast(nice(r && r.body, 'Couldn’t make backup codes just now.'), true); return; }
+      await window.ddsBackup.show(list, { studio: 'Studio OS' });
+      TWO = await window.ddsFresh.status(sb); paintSecurity();
+    } finally { codes.disabled = false; }
+  });
 }
 async function loadPlan() {
   if (inClient()) return;
@@ -1589,6 +1658,7 @@ function paintAutomations() {
   $('automations').hidden = false;
   if (inClient()) return;   // the studio's own sections stay out of a client's settings
   $('stages').hidden = false;
+  paintInvoiceCard();   // sales items 167, 168
   loadStageNames();
   loadMenu();
 }
@@ -2204,7 +2274,7 @@ function loadPortalSettings() {
     paintPortalParts(); wirePortal();
     $('portalParts').hidden = false;
     if (SCOPE) loadPortalWho();   // item 232: when they were invited and last in, and their portal
-    if (!SCOPE) { paintPortalHome(); $('portalHome').hidden = false; paintSignIn(); $('portalSignIn').hidden = false; }   // the note, Home's cards and the sign-in ways are every client's: kept at studio level
+    if (!SCOPE) { paintPortalHome(); paintReply(); paintSlug(); $('portalHome').hidden = false; paintSignIn(); $('portalSignIn').hidden = false; }   // the note, Home's cards, the reply words and the sign-in ways are every client's: kept at studio level
   }).catch(() => { PORTAL_ASKED = null; });
   return PORTAL_ASKED;
 }
@@ -2230,6 +2300,20 @@ function paintPortalParts() {
   }).join('');
   $('portalPartsRows').querySelectorAll('[data-pp]').forEach((b) => b.addEventListener('click', () => { if (b.getAttribute('aria-disabled') === 'true') return; const k = b.getAttribute('data-pp'); savePortalPart(k, b.getAttribute('aria-checked') !== 'true'); }));
   $('portalResetRow').hidden = !(c && Object.keys(c.choices || {}).length) || locked;
+  // builder item 336: whether this client gets the gentle reminders about to-dos and questionnaires
+  if (c) {
+    const on = c.reminders !== false, busy = PORTAL_BUSY.has('reminders');
+    $('portalPartsRows').insertAdjacentHTML('beforeend', `<div class="swrow" data-portal-part="reminders"><button type="button" class="sw" role="switch" id="sw-pp-reminders" aria-checked="${on ? 'true' : 'false'}" aria-labelledby="sw-pp-reminders-l"${locked || busy ? ' aria-disabled="true"' : ''}></button><div class="t"><b id="sw-pp-reminders-l">Reminders${PORTAL_SAVED === 'reminders' ? '<span class="nsaved" role="status">Saved</span>' : ''}</b><div class="how">One email when you put a to-do or a questionnaire to ${esc(who)}, then a gentle reminder after 3 and 7 days while it waits. Off, they get nothing about it by email.</div></div></div>`);
+    $('sw-pp-reminders').addEventListener('click', async (e) => {
+      const b = e.currentTarget; if (b.getAttribute('aria-disabled') === 'true') return;
+      const want = b.getAttribute('aria-checked') !== 'true';
+      PORTAL_BUSY.add('reminders'); b.setAttribute('aria-disabled', 'true');
+      const r = await api('/agency/portal/clients/' + encodeURIComponent(c.site_id), 'PUT', { reminders: want });
+      PORTAL_BUSY.delete('reminders');
+      if (!r.ok || !r.body || !r.body.data) { toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); paintPortalParts(); return; }
+      c.reminders = r.body.data.reminders !== false; PORTAL_SAVED = 'reminders'; paintPortalParts();
+    });
+  }
   if (had) { const n = $(had); if (n) n.focus(); }   // the redraw keeps your place
   $('portalPartsNote').textContent = locked ? 'Your role can see these but not change them. Your studio’s owner, an admin or an account manager can.' : 'Needs you is always on your clients’ Home. A part that’s off is refused by the server too, not only hidden.';
 }
@@ -2286,6 +2370,19 @@ async function loadPortalWho() {
   link.hidden = !p || p.state === 'none' || p.can_edit === false;
   link.textContent = p && p.state === 'expired' ? 'Send a new invite' : 'Send a sign-in link';
   if (!link.dataset.wired) { link.dataset.wired = '1'; link.addEventListener('click', () => sendPortalLink(c, link)); }
+  // item 347: the owner can turn a client's two-step sign-in off (a fresh code first; the client is emailed)
+  const two = $('portalTwoOff'), twoNote = $('portalTwoNote');
+  const owner = !!((TEAM_ME && TEAM_ME.role === 'owner') || (CTX && CTX.site_role === 'business_owner' && !(CTX.is_agency && TEAM_ME && TEAM_ME.role !== 'owner'))) && !(p && p.can_edit === false);
+  two.hidden = twoNote.hidden = !(owner && p && p.state === 'joined');
+  if (!two.dataset.wired) { two.dataset.wired = '1'; two.addEventListener('click', async () => {
+    if (two.disabled) return; two.disabled = true;
+    const send = (extra) => api('/agency/clients/' + encodeURIComponent(c.site_id) + '/two-step/off', 'POST', extra || {}).catch(() => null);
+    const r = window.ddsFresh ? await window.ddsFresh.run(send, { sb }) : await send({});
+    two.disabled = false;
+    if (!r || r.cancelled) return;
+    if (!r.ok) { toast(nice(r.body, 'That didn’t go through. Nothing changed.'), true); return; }
+    toast(`Two-step sign-in is off for ${c.name}. We emailed them.`);
+  }); }
   $('portalWho').hidden = false;
 }
 async function sendPortalLink(c, btn) {
@@ -2321,9 +2418,53 @@ function paintPortalHome() {
   $('portalCardRows').querySelectorAll('[data-pc]').forEach((b) => b.addEventListener('click', () => { if (b.getAttribute('aria-disabled') === 'true') return; savePortalCard(b.getAttribute('data-pc'), b.getAttribute('aria-checked') !== 'true'); }));
   if (had) { const n = $(had); if (n) n.focus(); }
 }
+async function paintSlug() {   // item 350
+  const r = await api('/agency/portal/overview', 'GET').catch(() => null);
+  const d = r && r.ok && r.body && r.body.data;
+  const inp = $('portalSlug'); if (!inp) return;
+  const base = (location.origin || '') + '/portal/';
+  $('portalSlugBase').textContent = base;
+  if (d) { if (document.activeElement !== inp) { inp.value = d.slug || ''; inp.dataset.kept = inp.value; } $('portalSlugAddr').textContent = 'Today: ' + (d.address || ''); }
+  inp.disabled = portalLocked();
+}
+async function saveSlug() {
+  const inp = $('portalSlug'); if (!inp || portalLocked() || inp.dataset.saving) return;
+  const want = inp.value.trim();
+  if (want === (inp.dataset.kept || '')) return;   // item 165: nothing changed, nothing sent
+  inp.dataset.saving = '1';
+  const r = await api('/agency/portal', 'PUT', { slug: want });
+  delete inp.dataset.saving;
+  if (!r.ok || !r.body || !r.body.data) { toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); return; }
+  inp.value = r.body.data.slug || ''; inp.dataset.kept = inp.value; $('portalSlugAddr').textContent = 'Today: ' + (r.body.data.address || '');
+  $('portalSlugSaved').innerHTML = '<span class="nsaved" role="status">Saved</span>';
+  toast(r.body.data.slug ? 'Your portal’s address is ' + r.body.data.address : 'Back to the long address.');
+}
+function paintReply() {   // item 353
+  const r = (PORTALSET && PORTALSET.reply) || { within: '', hours: '' }, locked = portalLocked();
+  const sel = $('portalReplyWithin'), hrs = $('portalReplyHours');
+  if (document.activeElement !== sel) sel.value = r.within || '';
+  if (document.activeElement !== hrs) hrs.value = r.hours || '';
+  sel.disabled = locked; hrs.disabled = locked;
+}
+async function saveReply() {
+  if (!PORTALSET || portalLocked()) return;
+  const want = { within: $('portalReplyWithin').value || '', hours: ($('portalReplyHours').value || '').trim() };
+  const cur = PORTALSET.reply || { within: '', hours: '' };
+  if (want.within === (cur.within || '') && want.hours === (cur.hours || '')) return;
+  const r = await api('/agency/portal', 'PUT', { reply: want });
+  if (!r.ok || !r.body || !r.body.data) { toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); paintReply(); return; }
+  PORTALSET.reply = r.body.data.reply || { within: '', hours: '' };
+  paintReply();
+  $('portalReplySaved').innerHTML = '<span class="nsaved" role="status">Saved</span>';
+}
 function wirePortal() {
   const ta = $('portalWelcome');
   if (ta.dataset.wired) return; ta.dataset.wired = '1';
+  $('portalSlug').addEventListener('change', saveSlug);   // item 350; item 165: saves when you leave the box, no Save button
+  $('portalSlug').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveSlug(); } });
+  $('portalReplyWithin').addEventListener('change', saveReply);   // item 353
+  $('portalReplyHours').addEventListener('change', saveReply);
+  $('portalReplyHours').addEventListener('input', () => { $('portalReplySaved').innerHTML = ''; });
   ta.addEventListener('input', () => { $('portalWelcomeCount').textContent = `${ta.value.length} / ${PORTALSET.welcome_max || 500}`; $('portalWelcomeSaved').innerHTML = ''; });
   ta.addEventListener('change', savePortalWelcome);   // when you leave the box
   $('portalReset').addEventListener('click', resetPortalClient);
@@ -2737,7 +2878,44 @@ function saveStageNames(k) {
     paintStageNames(r.body && r.body.data); stagesStatus(r.body && r.body.data);
   });
 }
+// ── sales items 168 and 167: the "On every invoice" card ──
+const LATE_WORDS = { off: 'Off. Nothing is added to a late invoice.', flat: 'Added once, as a line on the invoice with a fresh pay link, and said plainly in the next reminder.', percent: 'A percent of the invoice’s amount, added once, as a line with a fresh pay link, and said in the next reminder.' };
+function paintInvoiceCard() {
+  const st = SETTINGS || {}; const typing = document.activeElement;
+  const set = (id, v, key) => { const el = $(id); if (el && el !== typing && !AUTO_FLIGHT[key] && !AUTO_KEEP[key]) { el.value = v; markBad(el, false); } };
+  set('f-payother', String(st.invoice_pay_other || ''), 'invoice_pay_other');
+  set('f-taxid', String(st.invoice_tax_id || ''), 'invoice_tax_id');
+  set('f-nextno', st.invoice_number_start ? String(st.invoice_number_start) : '', 'invoice_number_start');
+  const mode = ['flat', 'percent'].includes(st.late_fee_mode) ? st.late_fee_mode : 'off';
+  set('f-latemode', mode, 'late_fee_mode');
+  set('f-latevalue', mode === 'flat' ? (Number(st.late_fee_value) ? (Number(st.late_fee_value) / 100).toFixed(2) : '') : mode === 'percent' ? String(Number(st.late_fee_value) || '') : '', 'late_fee_value');
+  set('f-latedays', String(Number(st.late_fee_days) >= 1 ? Math.trunc(Number(st.late_fee_days)) : 7), 'late_fee_days');
+  $('f-latevalue').placeholder = mode === 'percent' ? '5' : '25.00';
+  $('f-latevalue').disabled = mode === 'off'; $('f-latedays').disabled = mode === 'off';
+  $('lateHow').textContent = LATE_WORDS[mode] + (mode === 'off' ? '' : ' Only fair if your agreement says so.');
+  $('invoiceCard').hidden = false;
+}
+function wireInvoiceCard() {
+  const text = (id, key, max) => { const el = $(id); el.addEventListener('change', () => { const v = el.value.trim().slice(0, max); markBad(el, false); saveAutomation({ [key]: v }, null, fsSlot(id), key).then((ok) => { if (!ok) markBad(el, true); }); }); };
+  text('f-payother', 'invoice_pay_other', 600); text('f-taxid', 'invoice_tax_id', 80);
+  $('f-nextno').addEventListener('change', () => { const el = $('f-nextno'); const n = Math.trunc(Number(el.value)); if (!el.value.trim()) { saveAutomation({ invoice_number_start: null }, null, fsSlot('f-nextno'), 'invoice_number_start'); return; } if (!Number.isFinite(n) || n < 1 || n > 999999) { markBad(el, true); saidFailed(fsSlot('f-nextno'), null, 'Enter a whole number from 1 to 999999.'); return; } markBad(el, false); saveAutomation({ invoice_number_start: n }, null, fsSlot('f-nextno'), 'invoice_number_start').then((ok) => { if (!ok) markBad(el, true); }); });
+  const fee = () => {
+    const mode = $('f-latemode').value; const raw = String($('f-latevalue').value || '').replace(/[^0-9.]/g, ''); const days = Math.trunc(Number($('f-latedays').value));
+    const patch = { late_fee_mode: mode };
+    if (mode !== 'off') {
+      const v = mode === 'flat' ? Math.round(parseFloat(raw || '0') * 100) : Math.trunc(Number(raw || '0'));
+      if (!(v > 0) || (mode === 'percent' && v > 100)) { markBad($('f-latevalue'), true); saidFailed(fsSlot('f-latevalue'), null, mode === 'percent' ? 'Enter a percent from 1 to 100.' : 'Enter the fee amount.'); return; }
+      patch.late_fee_value = v;
+      patch.late_fee_days = Number.isFinite(days) && days >= 1 && days <= 90 ? days : 7;
+    }
+    markBad($('f-latevalue'), false);
+    saveAutomation(patch, null, [fsSlot('f-latemode'), fsSlot('f-latevalue'), fsSlot('f-latedays')], ['late_fee_mode', 'late_fee_value', 'late_fee_days']).then(() => paintInvoiceCard());
+  };
+  $('f-latemode').addEventListener('change', () => { const m = $('f-latemode').value; $('f-latevalue').disabled = m === 'off'; $('f-latedays').disabled = m === 'off'; $('lateHow').textContent = LATE_WORDS[m]; if (m === 'off') fee(); else $('f-latevalue').focus(); });
+  $('f-latevalue').addEventListener('change', fee); $('f-latedays').addEventListener('change', fee);
+}
 function wireAutomations() {
+  wireInvoiceCard();   // sales items 167, 168
   for (const k of STAGE_KEYS) {   // item 165: the stage boxes save when they're left
     $('sn-' + k).addEventListener('change', () => saveStageNames(k));
     $('sc-' + k).addEventListener('change', () => saveStageChances(k));   // item 69
@@ -2904,6 +3082,7 @@ const SHELL_READY = document.readyState === 'loading' ? new Promise((r) => docum
     if (location.hash === '#studio') { const n = $('f-name'); if (n) n.focus(); }
     if (location.hash === '#billing' && !inClient()) holdAnchor($('billing'));   // I7: billing is the studio's own, never a client's (a client's "Update payment" link lands at the top)
     if (location.hash === '#automations' && automationsHere()) holdAnchor($('automations'));
+    if (location.hash === '#invoiceCard' && !inClient()) holdAnchor($('invoiceCard'));   // sales item 168
     if (location.hash === '#stages' && !inClient()) holdAnchor($('stages'));   // item 83: a second business is not a client
     if (location.hash === '#goal' && !inClient()) holdAnchor($('goal'));   // sales item 94: Home's goal card and AI help's Open Settings land here
     if (location.hash === '#security' && !inClient()) holdAnchor($('security'));   // item 191: the studio home's nudge lands here

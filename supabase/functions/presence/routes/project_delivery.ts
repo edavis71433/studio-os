@@ -6,7 +6,9 @@
 // reviews. No parallel systems.
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
-import { signDownload, createUpload } from '../lib/media.ts';
+import { signDownload, createUpload, STUDIO_DOOR } from '../lib/media.ts';
+import { verifyStoredUpload } from '../lib/upload_check.ts';
+import { downloadName } from '../lib/client_files.ts';
 import { isStudioSide, studioDenied, loadProject, projectEvent, clearApprovalOverdue } from './projects.ts';
 import { isDecision, isSubjectType, canDecideApproval, approvalHash, cleanDueDate, dueDateText } from '../lib/approvals.ts';
 import { emailBridgedCustomer } from '../lib/service_bridge.ts';
@@ -31,7 +33,9 @@ export async function handleDeliverableUploadUrl(req: Request, jwt: string, site
   const project = await loadProject(site.id, projectId);
   if (!project) return json({ error: 'not_found' }, 404, cors);
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
-  const res = await createUpload(site.id, { mime: String(b?.mime || ''), bytes: Number(b?.bytes || 0), alt_text: clean(b?.alt_text, 200) || clean(b?.title, 200) || 'Deliverable file', width: b?.width, height: b?.height });
+  // builder item 337: the studio door (lib/client_files.ts): Word, text, SVG, Illustrator/EPS,
+  // HEIC, zips and short videos besides photos and PDFs; checked by their bytes when recorded
+  const res = await createUpload(site.id, { mime: String(b?.mime || ''), bytes: Number(b?.bytes || 0), alt_text: clean(b?.alt_text, 200) || clean(b?.title, 200) || 'Deliverable file', width: b?.width, height: b?.height }, STUDIO_DOOR);
   if ('error' in res) return json(res, 422, cors);
   return json({ data: res }, 200, cors); // { media_id, upload_url, storage_path }
 }
@@ -44,8 +48,16 @@ export async function handleDeliverablesCreate(req: Request, jwt: string, site: 
   let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const mediaId = UUID_RE.test(b.media_id || '') ? b.media_id : null;
   if (!mediaId) return json({ error: 'validation', message: 'A deliverable needs a file (media_id).' }, 422, cors);
-  const media = rows(await svc(`presence_media?id=eq.${mediaId}&site_id=eq.${site.id}&deleted_at=is.null&select=id,alt_text,mime&limit=1`))[0];
+  const media = rows(await svc(`presence_media?id=eq.${mediaId}&site_id=eq.${site.id}&deleted_at=is.null&select=id,alt_text,mime,storage_path&limit=1`))[0];
   if (!media) return json({ error: 'bad_media', message: 'That file isn’t in this workspace.' }, 422, cors);
+  // builder item 337: a file not yet shared on any project is checked by its stored bytes
+  // first. It is the studio's own file in Files, so a mismatch refuses the share and
+  // keeps the file (never thrown away under the studio: it may be in use elsewhere).
+  const shared = rows(await svc(`presence_deliverables?site_id=eq.${site.id}&media_id=eq.${mediaId}&deleted_at=is.null&select=id&limit=1`))[0];
+  if (!shared) {
+    const verdict = await verifyStoredUpload(String(media.storage_path || ''), String(media.mime || ''));
+    if (!verdict.ok) return json({ error: 'upload_mismatch', message: verdict.message }, 422, cors);
+  }
   const status = b.status === 'draft' ? 'draft' : 'shared';
   const clientVisible = b.client_visible === false ? false : true;
   const ins = await svc('presence_deliverables', { method: 'POST', headers: { Prefer: 'return=representation' },
@@ -98,8 +110,9 @@ export async function handleDeliverableDownload(req: Request, jwt: string, site:
   }
   const media = rows(await svc(`presence_media?id=eq.${d.media_id}&site_id=eq.${site.id}&deleted_at=is.null&select=storage_path,mime,alt_text&limit=1`))[0];
   if (!media?.storage_path) return json({ error: 'not_found', message: 'That file is no longer available.' }, 404, cors);
-  const ext = (media.mime === 'application/pdf') ? '.pdf' : '';
-  const url = await signDownload(media.storage_path, (clean(d.title, 80) || 'download') + ext);
+  // builder item 337: under its title and the kind's own extension; a studio-only kind
+  // always goes out as an attachment (signDownload)
+  const url = await signDownload(media.storage_path, downloadName(clean(d.title, 80), media.mime));
   if (!url) return json({ error: 'unavailable', message: 'We couldn’t prepare that download — please try again.' }, 502, cors);
   return json({ data: { url, title: d.title } }, 200, cors);
 }

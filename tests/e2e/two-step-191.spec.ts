@@ -205,7 +205,8 @@ test.describe('Two-step sign-in (builder item 191)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'One more step.' })).toBeVisible();
     await expect(page.locator('#stepHow')).toHaveText('Type the 6-digit code from your authenticator app.');
     await page.getByRole('button', { name: 'Can’t get a code?' }).click();
-    await expect(page.locator('#stepLost')).toHaveText('Ask Harbor Studio. They check it’s you, then have the second step turned off so you can sign in and set it up again.');
+    // builder item 347: a backup code comes first, the studio second
+    await expect(page.locator('#stepLost')).toHaveText('Lost your phone? Use one of your backup codes below. No codes? Ask Harbor Studio: they check it’s you, then turn the second step off so you can sign in and set it up again.');
     await noSidewaysScroll(page);
     await typeCode(page, '#stepPanel', GOOD);
     await page.waitForURL(/\/client\.html$/);

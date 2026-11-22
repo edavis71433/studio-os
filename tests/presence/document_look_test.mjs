@@ -144,18 +144,21 @@ for (const [name, html] of Object.entries(every)) {
   ok('emailFacts: escaped; the green tone for paid and signed', emailFacts([['<i>', '<b>']]).includes('&lt;i&gt;') && emailFacts([['Paid', 'Nov 11']], { tone: 'good' }).includes('background:#e7f1ea'));
   ok('email with a logo: on a white chip in the band, the name as its alt text', /<img src="https:\/\/store\.example\/l\.png" alt="Brightline Studio" style="[^"]*background:#ffffff/.test(brandEmailShell('<p>x</p>', { ...b, logoUrl: 'https://store.example/l.png' })));
   const sales = read('supabase/functions/presence/routes/sales.ts'), com = read('supabase/functions/presence/routes/commerce.ts');
-  ok('the document emails set their band: proposal, agreement, the one link, invoice, signed copy, receipt', count(sales, /emailBand\(/g) === 4 && /emailBand\(`\$\{isDeposit \? 'Deposit request' : 'Invoice'\}\$\{no \? ' ' \+ no : ''\}`, title\)/.test(sales) && /emailBand\('Signed agreement', 'Your signed copy'\)/.test(sales) && /emailBand\(`Receipt\$\{no \?/.test(com));
+  ok('the document emails set their band: proposal, agreement, the one link, invoice, signed copy, receipt', count(sales, /emailBand\(/g) === 5 /* item 348: the invitation has a band title too */ && /emailBand\(`\$\{isDeposit \? 'Deposit request' : 'Invoice'\}\$\{no \? ' ' \+ no : ''\}`, title\)/.test(sales) && /emailBand\('Signed agreement', 'Your signed copy'\)/.test(sales) && /emailBand\(`Receipt\$\{no \?/.test(com));
   ok('the invoice email and the receipt carry their facts box', /emailFacts\(\[\['Due', row\?\.due_date \? dayLabel\(row\.due_date, ctx\?\.tz\) : 'On receipt'\], \['Amount due', amount\]\], \{ big: true \}\)/.test(sales) && /emailFacts\(\[\[isDeposit \? 'Deposit' : 'Invoice', `\$\{what\}\$\{no \? ` \$\{no\}` : ''\}`\], \['Amount paid', amount\]\], \{ big: true, tone: 'good' \}\)/.test(com));
 }
 
 // ═══ 9. the two pay pages ═══
+// Builder item 349: the band, the card and the studio's name come from the one public frame
+// (public-frame.js, tests/presence/public_frame_349_test.mjs); the pages keep the round seal.
+const frame = read('public-frame.js'), look = read('public-frame.css');
 for (const [file, seal] of [['payment-success.html', '#2f6a4a'], ['payment-canceled.html', '#775d31']]) {
   const html = read(file);
-  ok(`${file}: a band, then the card with its round seal`, html.includes('<div class="band"><div class="studio" id="studio"></div></div>') && html.includes('<div class="wrap"><div class="card">') && html.includes(`--seal:${seal}`) && /\.mark \{[^}]*border-radius:50%/.test(html));
-  ok(`${file}: the band takes the studio’s name and colour from this browser, a colour only when it is a plain hex`, html.includes("localStorage.getItem('dds-studio-brand')") && html.includes("/^#[0-9a-f]{6}$/i.test(b.accent || '')") && html.includes("root.setProperty('--band-b', hex)") && /t\.textContent = name;/.test(html) && !/innerHTML = name|innerHTML=name/.test(html));
-  ok(`${file}: its ids and the product’s fonts are as they were`, html.includes('id="cta"') && html.includes('<link rel="stylesheet" href="/fonts/brand.css">') && html.includes("'Fraunces'") && html.includes('prefers-color-scheme:dark'));
+  ok(`${file}: the frame's band, then the card with its round seal`, html.includes('<script src="/public-frame.js" defer></script>') && html.includes('<link rel="stylesheet" href="/public-frame.css">') && /<header class="pf-band" data-pf-band>.*<div class="pf-studio" id="pf-studio" data-pf-studio/.test(html) && html.includes('<div class="pf-card pf-center" data-pf-card>') && html.includes(`--pf-seal:${seal}`) && html.includes('<div class="pf-seal" aria-hidden="true">'));
+  ok(`${file}: its ids and the product’s fonts are as they were`, html.includes('id="cta"') && html.includes('<link rel="stylesheet" href="/fonts/brand.css">') && look.includes('"Fraunces"') && look.includes('prefers-color-scheme:dark'));
   ok(`${file}: tags balance`, count(html, /<div\b/g) === count(html, /<\/div>/g));
 }
+ok('the frame draws the seal round, takes a colour only when it is a plain hex, and a name only ever as text', /\.pf-seal\{[^}]*border-radius:50%/.test(look) && frame.includes("localStorage.getItem('dds-studio-brand')") && frame.includes("HEX.test(b.accent || '')") && frame.includes("root.setProperty('--pf-band-b', current.accent)") && /word\.textContent = name;/.test(frame) && !/innerHTML/.test(frame));
 
 // ═══ 10. the pages the browser check opens are the renderer's own ═══
 // tests/e2e/document-look.spec.ts opens these three in a real browser (phone and desktop,

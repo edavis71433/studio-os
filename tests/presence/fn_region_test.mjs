@@ -78,6 +78,10 @@ const LEFT = [
   // service's own fixed answer, not one of our functions, so it never carries the header
   ['portal.html', '{ apikey: SUPABASE_KEY }'],
   ['settings.html', '{ apikey: SUPABASE_KEY }'],
+  // builder item 340: the portal asks for the push key the way the shell does (an env value)
+  ['client.html', "{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}"],
+  // builder item 347: a backup code is used before any sign-in, by someone who lost their phone (routes/backup_codes.ts, one fixed route)
+  ['backup-codes.js', "{ 'Content-Type': 'application/json', apikey: o.key, Authorization: 'Bearer ' + o.key }"],
 ];
 
 // ── 1. every signed-in call asks for Oregon; the others where they read enough ─
@@ -109,7 +113,7 @@ const LEFT = [
   ok('the pages on the shell\'s helpers make no signed-in call of their own', kitPages.length >= 25 && ownCalls.length === 0, ownCalls.join(', '));
   ok('with no sign-in: an approval, a signature and the sign-in page\'s studio name ask',
     keyedLiterals(src['approve.html']).every(asks) && keyedLiterals(src['sign.html']).every(asks)
-    && src['portal.html'].includes("fetch(FN + '/presence/public/studio/' + id + '/brand', { headers: { apikey: SUPABASE_KEY, 'x-region': FN_REGION } })"));
+    && src['portal.html'].includes("fetch(FN + path, { headers: { apikey: SUPABASE_KEY, 'x-region': FN_REGION } })"));   // item 341: the path is the studio's id, its short name, or the default studio
   ok('the push key is asked for as before', src['shell.js'].includes("fetch(FN + '/push/key', { headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY } })"));
   ok('the marketing lead forms and the closing sign-up pages are left as they were', [...MARKETING, ...CLOSING].every((f) => !src[f] || !src[f].includes('x-region')));
 }

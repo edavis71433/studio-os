@@ -43,7 +43,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TEMPLATE = join(ROOT, 'scripts', 'marketing-chrome.template.html');
 
 // [file, cleanUrl, sectionDataNav?]
-// cleanUrl null (404.html) = never a current page, no stamping.
+// cleanUrl null = never a current page, no stamping (no page uses it since 404.html left, item 349).
 export const PAGES = [
   ['index.html', '/'],
   ['services.html', '/services'],
@@ -74,11 +74,11 @@ export const PAGES = [
   ['about.html', '/about'],
   ['work.html', '/work'], // footer-demoted per P3; keeps full chrome
   ['contact.html', '/contact'],
-  ['privacy.html', '/privacy'],
-  ['terms.html', '/terms'],
+  // builder item 349: privacy.html, terms.html and 404.html wear the one public frame
+  // (public-frame.js), not the marketing chrome: a client lands on them from a studio's
+  // emails and portal
   ['accessibility.html', '/accessibility'],
   ['ai-disclaimer.html', '/ai-disclaimer'],
-  ['404.html', null],
 ];
 
 const REGIONS = ['dds-marketing-nav', 'dds-marketing-footer'];

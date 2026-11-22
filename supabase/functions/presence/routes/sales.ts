@@ -20,6 +20,8 @@ import { applyPlaceholders, buildPlaceholderValues, depositSplit } from '../lib/
 import { raiseNotice, clearNotice, clearNoticePrefix, dealFollowupPeriodPrefix, dealFollowupLegacyPeriod } from '../lib/notice.ts';
 import { stripeConfigured, createServicePaymentLink, createServiceRetainerLink, deactivatePaymentLink, cancelSubscription } from '../commerce/stripe.ts';
 import { stampFirstSent } from '../lib/pay_link.ts';
+import { shouldAskReminders } from '../lib/reminder_ask.ts';   // sales item 166
+import { cleanLines } from '../lib/invoice_changes.ts';   // sales item 170
 import { moneyState, moneyBuckets, invoiceNotSent, SENT_INVOICE_FILTER } from '../lib/money_state.ts';
 import { studioZone } from '../lib/studio_clock.ts';   // sales item 152
 import { ownStripeRefused, OWN_STRIPE_MESSAGE } from '../commerce/own_stripe.ts';   // sales item 149
@@ -95,7 +97,7 @@ export const CONNECT_INTENT_TAG = '[[connect-on-signup]]';
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const actorOf = (p: Principal) => ({ actor: p.email || p.userId || 'system', actor_kind: p.kind });
 const siteUrl = () => (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
-const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
+export const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
 /** Where a Document of Record OPENS: the doc.html viewer on OUR origin — never
  *  the raw edge-function URL. Supabase's default *.supabase.co domain rewrites
  *  GET text/html responses to text/plain, so a direct link to the server-
@@ -1314,7 +1316,7 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       // as the proposals read above) so the record's Billing tab never blanks.
       // item 107: recurring_id rides along (0145) so the record can tell what's left of the proposal
       // sales items 77 and 81: the invoice's number and how a recorded payment came in (APPLY-0167)
-      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note,refunded_cents,dispute_status,first_sent_at,link_gen&order=due_date.asc.nullsfirst,created_at.asc`); /* sales item 141: first_sent_at and link_gen say whether it ever went out */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note,refunded_cents,dispute_status&order=due_date.asc.nullsfirst,created_at.asc`); /* sales items 126, 127: before APPLY-0233, without what came back */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note&order=due_date.asc.nullsfirst,created_at.asc`); /* before APPLY-0188: without the private note */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
+      (async () => { let r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,description,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note,refunded_cents,dispute_status,first_sent_at,link_gen,lines,client_says_paid,late_fee_cents&order=due_date.asc.nullsfirst,created_at.asc`); /* sales items 172, 167 (APPLY-0250) */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,description,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note,refunded_cents,dispute_status,first_sent_at,link_gen,lines&order=due_date.asc.nullsfirst,created_at.asc`); /* sales item 162: description and lines, for Change */ /* sales item 141: first_sent_at and link_gen say whether it ever went out */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note,refunded_cents,dispute_status&order=due_date.asc.nullsfirst,created_at.asc`); /* sales items 126, 127: before APPLY-0233, without what came back */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for,paid_private_note&order=due_date.asc.nullsfirst,created_at.asc`); /* before APPLY-0188: without the private note */ if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id,number,paid_method,paid_note,payment_for&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since,recurring_id&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at,processing_since&order=due_date.asc.nullsfirst,created_at.asc`); if (!r.ok) r = await svc(`presence_invoices?deal_id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id,title,amount_cents,purpose,status,stripe_url,due_date,paid_at,created_at&order=due_date.asc.nullsfirst,created_at.asc`); return r; })(),
       // item 47: the deal's estimates and recurring invoices — both [] before APPLY-0145
       import('./estimates.ts').then((m) => m.estimatesForDeal(site.id, id)).catch(() => []),
       import('./recurring_invoices.ts').then((m) => m.recurringForDeal(site.id, id)).catch(() => []),
@@ -1795,9 +1797,13 @@ export async function emailInvoice(siteId: string, dealId: string, title: string
     const doc = invoiceId ? await docLink('invoice', invoiceId, siteId) : null;
     const docLine = doc ? `<p style="margin-top:6px">The ${isDeposit ? 'request' : 'invoice'} is attached as a PDF. <a href="${doc}" style="color:${brand.accentDark}">View it online →</a></p>` : '';
     const noteLine = note ? `<p>${escH(note)}</p>` : '';
+    // sales item 168: how else to pay, under the button
+    const { payOtherLines } = await import('../lib/documents.ts');
+    const other = payOtherLines(ctx?.payOther);
+    const otherLine = other.length ? `<p style="color:#6b6478;font-size:14px;margin-top:10px"><b style="color:#1b1525">Other ways to pay:</b> ${other.map(escH).join(' · ')}${no ? `. Please quote ${no}.` : ''}</p>` : '';
     const pdf = row ? (() => { try { const { deal_id: _d, ...data } = row; return documentPdf('invoice', data, brand, ctx); } catch { return null; } })() : null;
     return await sendEmail(String(email), `${title}${no ? ' ' + no : ''} — ${amount}`,
-      `${emailBand(`${isDeposit ? 'Deposit request' : 'Invoice'}${no ? ' ' + no : ''}`, title)}<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p><p>${who ? `${who} has sent you` : 'Here is'} ${what} for <strong>${amount}</strong>, ${due}. You can pay securely here — nothing else needed.</p>${noteLine}${emailFacts([['Due', row?.due_date ? dayLabel(row.due_date, ctx?.tz) : 'On receipt'], ['Amount due', amount]], { big: true })}<p class="cta">${btn}</p>${docLine}`,
+      `${emailBand(`${isDeposit ? 'Deposit request' : 'Invoice'}${no ? ' ' + no : ''}`, title)}<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p><p>${who ? `${who} has sent you` : 'Here is'} ${what} for <strong>${amount}</strong>, ${due}. You can pay securely here — nothing else needed.</p>${noteLine}${emailFacts([['Due', row?.due_date ? dayLabel(row.due_date, ctx?.tz) : 'On receipt'], ['Amount due', amount]], { big: true })}<p class="cta">${btn}</p>${otherLine}${docLine}`,
       brand, { critical: true, asBusiness: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // a payment link = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
@@ -1852,7 +1858,24 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
       if (lines.reduce((n, l) => n + l.amount_cents, 0) !== amountCents) lines = null;   // never lines that disagree with the amount
     }
   }
+  // sales item 170: lines typed on the form ("+ another line") go with the invoice when they add up to its amount
+  if (!lines && Array.isArray(b.lines) && b.lines.length > 1) {
+    const c = cleanLines(b.lines);
+    if (!c.ok) return json({ error: 'validation', message: c.message }, 422, cors);
+    const sum = c.lines.reduce((n, l) => n + l.amount_cents, 0);
+    if (amountCents === null) amountCents = sum;
+    if (sum !== amountCents) return json({ error: 'validation', message: 'The lines don’t add up to the amount. Fix one or the other.' }, 422, cors);
+    lines = c.lines;
+  }
   if (!amountCents || amountCents < 50) return json({ error: 'validation', message: 'Enter an amount to invoice (or accept a proposal first).' }, 422, cors);
+  // sales item 176: costs paid for this customer that are waiting for the next invoice ride on it as lines
+  const { unbilledCosts, costLines } = await import('./costs.ts');
+  const costs = b.add_costs === false ? [] : await unbilledCosts(site.id, dealId);
+  if (costs.length) {
+    const base = lines && lines.length ? lines : [{ label: clean(b.title, 200) || (b.purpose === 'deposit' ? 'Deposit' : 'Invoice'), qty: 1, amount_cents: amountCents }];
+    lines = [...base, ...costLines(costs)];
+    amountCents += costs.reduce((n, c) => n + c.amount_cents, 0);
+  }
   if (amountCents > 100000000) return json({ error: 'validation', message: 'That amount is over $1,000,000 — double-check it and try again.' }, 422, cors);
   const purpose = b.purpose === 'deposit' ? 'deposit' : 'service';
   // what's left after a deposit reads as the balance it is
@@ -1893,6 +1916,10 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
     }
     inv = rows(ins)[0];
     if (!inv) return json({ error: 'write_failed', message: 'That invoice didn’t save — please try again.' }, 502, cors);
+    if (costs.length) await (await import('./costs.ts')).markCostsBilled(site.id, costs.map((c) => c.id), String(inv.id));   // sales item 176
+    // sales item 164: "Save without sending" keeps it as a draft (sales item 141's "Not sent yet"):
+    // numbered, no pay link, no email, no history line until Send
+    if (b.send === false) return json({ data: inv, url: null, emailed: false, reused: false, saved: true, amount_cents: Number(inv.amount_cents) }, 201, cors);
   }
   let payUrl: string | null = inv.stripe_url || null;
   let repaired = false;
@@ -1918,7 +1945,9 @@ export async function handleSalesInvoice(req: Request, site: SiteRow, principal:
   // recorded — the retry that completes it must write the history line.
   if (!reused || repaired) await dealEvent(site.id, dealId, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose } });
   // double_tap: the server held the email back (sent under two minutes ago), so the page can say so (item 107)
-  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, reused, double_tap: doubleTap, amount_cents: Number(inv.amount_cents) }, reused ? 200 : 201, cors);
+  // sales item 166: the first send with reminders off asks "Remind them if it isn't paid?" once
+  const askReminders = emailed ? await shouldAskReminders(site.id) : false;
+  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, reused, double_tap: doubleTap, amount_cents: Number(inv.amount_cents), ask_reminders: askReminders }, reused ? 200 : 201, cors);
 }
 
 /** PAYMENT SCHEDULE — turn a deal total into an ordered set of STAGED invoices
@@ -2029,7 +2058,8 @@ export async function handleSalesInvoiceSend(req: Request, site: SiteRow, princi
   await stampFirstSent(inv.id, site.id, nowIso());   // a plan stage sent weeks after the plan was made counts from today (sales item 118)
   // First real send (or a link repair) writes the history line; a plain resend doesn't spam it.
   if ((!hadLink || repaired) && inv.deal_id) await dealEvent(site.id, inv.deal_id, 'invoice_sent', principal, { detail: { invoice_id: inv.id, amount_cents: Number(inv.amount_cents), purpose: inv.purpose } });
-  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, resent: hadLink && !repaired, double_tap: doubleTap }, 200, cors);
+  const askReminders = emailed ? await shouldAskReminders(site.id) : false;   // sales item 166
+  return json({ data: { ...inv, stripe_url: payUrl }, url: payUrl, emailed, resent: hadLink && !repaired, double_tap: doubleTap, ask_reminders: askReminders }, 200, cors);
 }
 
 /** WITHDRAW an invoice that should never have been raised.
@@ -2982,7 +3012,9 @@ export async function handleSalesDocument(req: Request, token: string, cors: Rec
   // it; the drawer's own Open/print link never does, nor does fetching its PDF.
   if (tok.k === 'invoice' && tok.e === 1 && !asPdf) await firstOpen('presence_invoices', tok.id, tok.site_id, row.deal_id, row.purpose === 'deposit' ? 'deposit' : 'invoice');
   const pdfName = pdfFileName(tok.k, row);
-  const ctx = await docContextFor(tok.site_id, tok.k, row, { pdfUrl: `${fnBase()}/functions/v1/presence/sales/doc/${encodeURIComponent(token)}?format=pdf`, pdfName });
+  // sales item 172: an unpaid invoice's page can say "Paid another way? Tell us", posted under its own token
+  const said = tok.k === 'invoice' && row.status === 'open' && !row.processing_since && row.stripe_url ? { saidPaidUrl: `${fnBase()}/functions/v1/presence/sales/doc/${encodeURIComponent(token)}/said-paid`, saidPaid: row.client_says_paid && typeof row.client_says_paid === 'object' ? row.client_says_paid : null } : {};
+  const ctx = await docContextFor(tok.site_id, tok.k, row, { pdfUrl: `${fnBase()}/functions/v1/presence/sales/doc/${encodeURIComponent(token)}?format=pdf`, pdfName, ...said });
   const { deal_id: _deal, ...data } = row;
   if (asPdf) {
     return new Response(documentPdf(tok.k, data, brand, ctx), { status: 200, headers: { ...cors, 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${pdfName}"`, 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' } });
@@ -2997,10 +3029,15 @@ export async function docRow(kind: DocKind, id: string, siteId: string): Promise
   const one = async (path: string) => { const r = await svc(path); return r.ok ? (rows(r)[0] || null) : undefined; };
   if (kind === 'proposal') return (await one(`presence_proposals?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status,sent_at,decided_at&limit=1`)) || null;
   if (kind === 'estimate') return (await one(`presence_estimates?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=id,deal_id,title,line_items,subtotal_cents,currency,terms,status,sent_at,expires_at,decided_at&limit=1`)) || null;
+  // sales item 163: a retainer charge's receipt is the deal event that recorded the charge, drawn as a paid invoice
+  if (kind === 'charge') return (await import('../commerce/retainers.ts')).chargeReceiptRow(id, siteId);
   if (kind === 'invoice') {
     const base = 'id,deal_id,title,description,amount_cents,currency,purpose,status,stripe_url,due_date,paid_at,created_at';
     // processing_since (0132): the page says "Payment on its way" while a bank payment settles (sales item 118)
     // sales item 145: what came back after the payment (APPLY-0233), so the page and PDF never say "Paid in full" after a refund
+    // sales item 172: what the client told us (APPLY-0250), so the page says so instead of asking again
+    const withSaid = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines,processing_since,refunded_cents,dispute_status,client_says_paid,late_fee_cents&limit=1`);
+    if (withSaid !== undefined) return withSaid;
     const withBack = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines,processing_since,refunded_cents,dispute_status&limit=1`);
     if (withBack !== undefined) return withBack;
     const full = await one(`presence_invoices?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=${base},number,paid_method,paid_note,payment_for,lines,processing_since&limit=1`);
@@ -3017,12 +3054,12 @@ export async function docRow(kind: DocKind, id: string, siteId: string): Promise
 // artifact belongs to THIS site (tenant-safe), then mints a 30-day `doc` token and
 // returns the URL to the server-rendered page above. Studio-gated like every
 // authed /sales/* route.
-const DOC_TABLE: Record<DocKind, string> = { proposal: 'presence_proposals', contract: 'presence_contracts', invoice: 'presence_invoices', estimate: 'presence_estimates' };
+const DOC_TABLE: Record<DocKind, string> = { proposal: 'presence_proposals', contract: 'presence_contracts', invoice: 'presence_invoices', estimate: 'presence_estimates', charge: 'presence_deal_events' };
 export async function handleSalesDocumentLink(site: SiteRow, kind: DocKind, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const secret = linkSecret();
   if (!secret) return json({ error: 'unavailable', message: 'Document links aren’t available in this environment.' }, 503, cors);
-  const exists = rows(await svc(`${DOC_TABLE[kind]}?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=id&limit=1`))[0];
+  const exists = rows(await svc(`${DOC_TABLE[kind]}?id=eq.${id}&site_id=eq.${site.id}${kind === 'charge' ? '&kind=eq.invoice_paid' : '&deleted_at=is.null'}&select=id&limit=1`))[0];   // a charge is a deal event (no deleted_at)
   if (!exists) return json({ error: 'not_found', message: 'That document isn’t here.' }, 404, cors);
   const token = await signDocToken({ t: 'doc', k: kind, id, site_id: site.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);
   // sales item 82: the same document as a PDF (the record's PDF button downloads it)
@@ -3347,8 +3384,9 @@ async function linkAgencyPortfolio(principal: Principal, siteId: string | undefi
  *  emailSalesDoc documents ("never the platform name"). `siteId` is the
  *  STUDIO's site (every caller holds it), so loadEmailBrand resolves the same
  *  name + accent the proposal/contract/invoice emails already wear. */
-export async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: boolean): Promise<boolean> {
+export async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: boolean, opts: { firstName?: string } = {}): Promise<boolean> {
   if (!email) return false;
+  const first = firstNameOf(opts.firstName || '');   // builder item 348: greeted by name when we know it
   // App pages (set-password/get-started/portal) ARE served on the primary site —
   // build-public.sh copies every root .html into dist/ and _redirects blocks only
   // source/doc dirs, not these pages. So the link MUST use the same origin as the
@@ -3378,8 +3416,11 @@ export async function sendCustomerInvite(siteId: string, email: string, _isNewLo
     : link
     ? `<p class="cta"><a href="${link}" style="${btnStyle}">Create your password &amp; sign in →</a></p>`
     : `<p class="cta"><a href="${base}/portal.html?studio=${siteId}" style="${btnStyle}">Sign in at your portal →</a></p><p style="font-size:13px;color:#6b6478">No password needed — we’ll email you a one-time code.</p>`;
+  const { emailBand, emailPreheader } = await import('../lib/email_brand.ts');
   const left = await sendEmail(email, `Your client portal is ready${studioName ? ` — ${studioName}` : ''}`,
-    `<p>Welcome — your client portal is ready. It’s the one place where we work together from here:</p>` +
+    emailPreheader('One place for your website, your project and your papers. Press the button to come in.') +
+    emailBand(studioName ? 'Your client portal' : '', studioName ? `${studioName} invited you` : 'Your client portal') +   // item 348: the band has a title, never a bare "Welcome"
+    `<p>${first ? `Hi ${first.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string))},` : 'Welcome,'} your client portal is ready. It’s the one place where we work together from here:</p>` +
     `<ul style="margin:8px 0;padding-left:20px">` +
     `<li>watch your project’s progress as it happens</li>` +
     `<li>send messages straight to ${studioName ? studioName.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string)) : 'us'}</li>` +
