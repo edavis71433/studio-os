@@ -10,6 +10,7 @@
 // the deterministic answer. polish() never throws and never blocks.
 import { verifyPolish } from './verify.ts';
 import { recordUsage, checkAiCeiling, type MeterCtx } from '../commerce/metering.ts';
+import { SMALL_MODEL, SMALL_OUTPUT_CONFIG } from '../../_shared/ai_model.ts';   // builder item 409
 
 const POLISH_SYSTEM = `You edit a short note from a business concierge to a small-business owner.
 Rules, absolute:
@@ -27,13 +28,13 @@ export async function polish(text: string, groundingText: string, meter?: MeterC
   // deterministic answer — a tenant over the hard AI ceiling simply gets the
   // unpolished answer (no spend, no error).
   if (meter && !(await checkAiCeiling(meter.clientId)).allowed) return { text, polished: false };
-  const MODEL = 'claude-haiku-4-5-20251001';
+  const MODEL = SMALL_MODEL;
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: MODEL, max_tokens: 400,
+        model: MODEL, max_tokens: 400, output_config: SMALL_OUTPUT_CONFIG,
         system: POLISH_SYSTEM,
         messages: [{ role: 'user', content: `<<<NOTE\n${text.slice(0, 2000)}\nNOTE>>>` }],
       }),
