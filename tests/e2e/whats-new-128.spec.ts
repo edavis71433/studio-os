@@ -120,7 +120,9 @@ test.describe('What’s new', () => {
 });
 
 test.describe('New in your portal', () => {
-  test('it tops the portal’s Help tab, in words written for clients, and never shows a studio’s entry', async ({ page }) => {
+  // builder item 352 (Nov 22 review): product news stays with the studio. The portal's Help tab
+  // used to open on a "New in your portal" card; a client never sees it now.
+  test('item 352: the portal’s Help tab shows no product news, and no “hasn’t added” line', async ({ page }) => {
     await entries(page);
     const PID = '11111111-1111-4111-8111-111111111111';
     await installApp(page, { api: {
@@ -136,21 +138,12 @@ test.describe('New in your portal', () => {
     } as never });
     await page.goto('/client.html');
     await page.locator('#tabnav [data-tab="help"]').click();
-    const door = page.locator('#helpWhatsNew');
-    await expect(door).toBeVisible();
-    await expect(door).toContainText('New in your portal');
-    await expect(door.locator('.wn-new')).toHaveText('New');
-    const box = await door.boundingBox(), head = await page.locator('#main header h1').boundingBox();
-    expect(box!.y).toBeGreaterThan(head!.y);   // under the Help heading, first thing on the tab
-    await door.click();
-    const p = panel(page);
-    await expect(p.locator('h2')).toHaveText('New in your portal');
-    await expect(p.locator('.wn-card h4')).toHaveText(['Every conversation with your studio is now in Messages']);
-    await expect(p.getByRole('link', { name: /Show me/ })).toHaveAttribute('href', '/client.html');
-    await expect(p).not.toContainText('Studio OS');
-    await p.locator('.wn-x').click();
-    await expect(door.locator('.wn-new')).toHaveCount(0);
-    await expect(door).toBeFocused();
+    await expect(page.locator('#main header h1')).toBeVisible();
+    await settled(page);
+    await expect(page.locator('#helpWhatsNew')).toHaveCount(0);
+    await expect(page.locator('#main')).not.toContainText('New in your portal');
+    await expect(page.locator('#main')).not.toContainText('hasn’t added');
+    await expect(panel(page)).toHaveCount(0);
   });
 });
 
