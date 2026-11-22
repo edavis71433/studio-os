@@ -764,6 +764,13 @@ export async function handleAdmin(req: Request, route: string, method: string, p
     return json({ data: await checkStripeKey(heldKeyKind(), stripeProbe) }, 200, cors);
   }
 
+  // builder item 398: the outside accounts Studio OS depends on, and the owner's tick each quarter
+  if (route === '/admin/accounts' && method === 'GET') return (await import('./accounts_check.ts')).handleAccountsList(principal, cors);
+  {
+    const acc = route.match(/^\/admin\/accounts\/([a-z][a-z0-9_]{1,30})\/checked$/);
+    if (acc && method === 'POST') return (await import('./accounts_check.ts')).handleAccountChecked(acc[1], principal, cors);
+  }
+
   // ── L4.0: Connected Platform inventory — the living, generated-from-registry
   //    profile of every provider (operator introspection; verifies one shared
   //    architecture, no drift).

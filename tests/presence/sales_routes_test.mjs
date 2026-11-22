@@ -126,8 +126,9 @@ const ago = (d) => new Date(Date.now() - d * DAY).toISOString();
 const ahead = (d) => new Date(Date.now() + d * DAY).toISOString();
 const minutesAgo = (m) => new Date(Date.now() - m * 60_000).toISOString();
 const nowSec = () => Math.floor(Date.now() / 1000);
-const sign = (o) => S.signSalesToken({ exp: nowSec() + 3600, ...o }, SECRET);
-const verify = (t) => S.verifySalesToken(t, SECRET, nowSec());
+// builder item 394: links are signed and read with the server's own key (made from APPROVAL_SECRET), never the raw secret
+const sign = (o) => S.signSalesToken({ exp: nowSec() + 3600, ...o }, S.linkSecret());
+const verify = (t) => S.verifySalesToken(t, S.linkSecret(), nowSec());
 const row = (table, rid) => (db.tables[table] || []).find((r) => r.id === rid);
 const writes = () => db.log.filter((c) => c.method !== 'GET' && c.method !== 'HEAD');
 const wrote = (table, method) => writes().filter((c) => c.url.split('?')[0] === `/rest/v1/${table}` && (!method || c.method === method));
@@ -309,7 +310,7 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   const odd = await Promise.all([
     sign({ t: 'doc', id: PROP_A, site_id: SITE_A }), sign({ t: 'admin', id: PROP_A, site_id: SITE_A }),
     sign({ t: 'proposal', id: 'not-a-uuid', site_id: SITE_A }), sign({ t: 'proposal', id: PROP_A, site_id: 'nobody' }),
-    S.signSalesToken({ t: 'proposal', id: PROP_A, site_id: SITE_A, exp: String(nowSec() + 600) }, SECRET),
+    S.signSalesToken({ t: 'proposal', id: PROP_A, site_id: SITE_A, exp: String(nowSec() + 600) }, S.linkSecret()),
   ]);
   ok('a signed link of an unknown kind, with a broken id or studio, or an expiry that is not a number, does not open', (await Promise.all(odd.map(verify))).every((x) => x === null));
   const kinds = await Promise.all(['proposal', 'contract', 'flow', 'estimate'].map(async (k) => (await verify(await sign({ t: k, id: PROP_A, site_id: SITE_A })))?.t));
@@ -402,10 +403,11 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   ok('every link in those emails is the deal\'s one flow link, never a link to a single document', linksSent.length >= 3 && kindsSent.every((k) => k === 'flow:true'), JSON.stringify(kindsSent));
   // no signing secret: nothing to hand out
   world();
-  const saved = Deno.env.get('APPROVAL_SECRET');
-  Deno.env.delete('APPROVAL_SECRET');
+  // item 394: "no signing secret" now means no link root at all: no APPROVAL_SECRET and no database key
+  const saved = Deno.env.get('APPROVAL_SECRET'), dbk = Deno.env.get('SERVICE_ROLE_KEY'), dbk2 = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  Deno.env.delete('APPROVAL_SECRET'); Deno.env.delete('SERVICE_ROLE_KEY'); Deno.env.delete('SUPABASE_SERVICE_ROLE_KEY');
   const bare = await res(await S.handleSalesProposalSend(req('POST', `/sales/proposals/${PROP_A}/send`, {}), siteA, studioA, PROP_A, cors));
-  Deno.env.set('APPROVAL_SECRET', saved);
+  Deno.env.set('APPROVAL_SECRET', saved); if (dbk) Deno.env.set('SERVICE_ROLE_KEY', dbk); if (dbk2) Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', dbk2);
   ok('with no signing secret configured the send still happens, with no link and no email (never an unsigned link)', bare.status === 200 && bare.body.url === null && bare.body.emailed === false && row('presence_proposals', PROP_A).status === 'sent' && mailTo('riley@example.org').length === 0, bare.text.slice(0, 200));
   // the reminder a few days later
   world((t) => { t.presence_contracts = [agreement(CON_A, SITE_A, DEAL_A, 'sent', { sent_at: ago(4) })]; t.presence_proposals = []; });
@@ -582,7 +584,7 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   world((t) => { t.presence_proposals = []; t.presence_contracts = [agreement(CON_A, SITE_A, DEAL_A, 'sent')]; });
   await S.handleSalesContractSign(req('POST', `/sales/contracts/${CON_A}/sign`, { token: await sign({ t: 'contract', id: CON_A, site_id: SITE_A }), presented_hash: HASH, signer_name: 'Riley Park', signer_email: 'riley@example.org' }, { 'x-forwarded-for': '203.0.113.50' }), CON_A, cors);
   const ev = row('presence_contracts', CON_A).signed_evidence || {};
-  ok('the signature evidence records the fingerprint signed and a keyed hash of the signer\'s IP, not the IP itself', ev.hash === HASH && ev.ip_hash === await hmacHex(SECRET, '203.0.113.50') && !JSON.stringify(ev).includes('203.0.113.50') && typeof ev.token_exp === 'number', JSON.stringify(ev));
+  ok('the signature evidence records the fingerprint signed and a keyed hash of the signer\'s IP, not the IP itself', ev.hash === HASH && ev.ip_hash === await hmacHex(S.linkSecret(), '203.0.113.50') && !JSON.stringify(ev).includes('203.0.113.50') && typeof ev.token_exp === 'number', JSON.stringify(ev));
 
   // the deal's contact can be set, changed and cleared after the deal is made
   world((t) => { t.presence_deals.find((d) => d.id === DEAL_A2).contact_id = null; });

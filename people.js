@@ -135,7 +135,27 @@
     return me.req('/portal/members').then(function (r) {
       if (r.status === 403) { me.d = null; me.host.innerHTML = '<div class="pp">' + me.headHtml() + '<p class="pp-faint">' + esc((r.body && r.body.message) || 'Only the owner can manage who can get in.') + '</p></div>'; me.wire(); return; }
       if (!r.ok || !r.body || !Array.isArray(r.body.data)) { me.host.innerHTML = '<div class="pp">' + me.headHtml() + '<p class="pp-faint">The people wouldn’t load just now.</p><div class="pp-foot"><button type="button" class="pp-btn" data-pp="retry">Try again</button></div></div>'; me.wire(); return; }
-      me.d = r.body; me.draw();
+      me.d = r.body;
+      // builder item 387: what the client may do on their own site, the studio's switch
+      if (!me.o.siteId) { me.runs = null; me.draw(); return; }
+      return me.req('/agency/sites/' + encodeURIComponent(me.o.siteId) + '/runs').then(function (rr) {
+        me.runs = rr.ok && rr.body && rr.body.data && typeof rr.body.data.on === 'boolean' ? rr.body.data : null; me.draw();   // nothing drawn until the server answers it
+      }, function () { me.runs = null; me.draw(); });
+    });
+  };
+  // builder item 387: the switch's words, for the owner as a person
+  Sheet.prototype.runsWords = function (on) {
+    var who = this.ownerWho(), they = who === 'the owner' ? 'The owner' : who.charAt(0).toUpperCase() + who.slice(1);
+    return on
+      ? 'On: ' + they + ' can publish, take the site offline, and change its template, domain and people themselves.'
+      : 'Off: your studio publishes, takes the site offline, and changes its template, domain and people. ' + they + ' can still edit the draft.';
+  };
+  Sheet.prototype.setRuns = function (on, box) {
+    var me = this; box.disabled = true;
+    return me.req('/agency/sites/' + encodeURIComponent(me.o.siteId) + '/runs', 'PUT', { on: on }).then(function (r) {
+      box.disabled = false;
+      if (r.ok && r.body && r.body.data) { me.runs = r.body.data; var w = me.host.querySelector('[data-runs-words]'); if (w) w.textContent = me.runsWords(me.runs.on); me.say(me.runs.on ? 'Switched on. They can publish and run the site now.' : 'Switched off. Your studio publishes this site.'); me.changed(); return; }
+      box.checked = !on; me.say((r.body && r.body.message) || 'That didn’t save. Try again.', true);
     });
   };
   Sheet.prototype.headHtml = function (title, sub) {
@@ -181,6 +201,10 @@
       var t = d.transfer, wait = t.status === 'asked_owner' ? 'Waiting for ' + (ow && !ow.me ? first(ow.name) : 'the owner') + ' to agree' : 'Waiting for ' + t.to_email + ' to accept';
       if (ow && ow.me && t.status === 'asked_owner') wait = 'Waiting for you to agree. Check your email';
       h += '<div class="pp-wait" data-wait><span class="t">Handing over to ' + esc(t.to_email) + '. ' + esc(wait) + ', sent ' + esc(day(t.created_at) || 'today') + '. Lapses ' + esc(day(t.expires_at)) + '.</span>' + (me.side() ? '<button type="button" class="pp-btn bad" data-pp="stop">Stop the handover</button>' : '') + '</div>';
+    }
+    if (studioView && ow && me.runs) {   // builder item 387: what the client may do on their own site
+      h += '<label class="pp-pub" data-runs><span class="t"><b>They can publish and run their website</b><span class="w" data-runs-words>' + esc(me.runsWords(me.runs.on)) + '</span></span><input type="checkbox" class="pp-switch" role="switch" data-pp="runs" aria-label="They can publish and run their website"' + (me.runs.on ? ' checked' : '') + (me.runs.can_change ? '' : ' disabled') + '></label>';
+      if (!me.runs.can_change) h += '<p class="pp-faint">Only your studio’s owners, admins and account managers can change this.</p>';
     }
     if (st) {
       h += '<div class="pp-rule"></div><div class="pp-lab">' + esc((studioView ? 'Your studio' : st.name) + ' · ' + st.role) + '</div>';
@@ -248,6 +272,7 @@
       var what = b.getAttribute('data-pp');
       if (what === 'role') { b.addEventListener('change', function () { me.setRole(b.getAttribute('data-id'), b.value, b); }); return; }
       if (what === 'publish') { b.addEventListener('change', function () { me.setPublish(b.getAttribute('data-id'), b.checked, b); }); return; }
+      if (what === 'runs') { b.addEventListener('change', function () { me.setRuns(b.checked, b); }); return; }
       b.addEventListener('click', function (e) {
         e.preventDefault();
         if (what === 'close') return me.o.close && me.o.close();

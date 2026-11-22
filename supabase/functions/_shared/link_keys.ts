@@ -13,14 +13,16 @@
 // The keys are derived one way (HMAC-SHA256 of the root over the kind's name), so one kind's
 // key can't sign another kind's links and none of them gives the root away.
 //
-// Nothing already sent breaks. A link signed the old way still opens until
-// LEGACY_LINKS_UNTIL, 90 days after this went live (the longest a link lives is 90 days),
-// because the old key may have been the scheduler's secret. An emailed unsubscribe link,
-// open counter or photo was signed with the database key itself: those old signatures stay
-// good for as long as that key is the same, since accepting them costs nothing (whoever
-// holds the database key holds everything anyway) and an unsubscribe link must keep
-// working. A link signed from any root this server still holds keeps opening, so setting
-// LINK_SECRET later breaks nothing either.
+// Nothing already sent breaks. A link that always expires within 90 days (a form ticket,
+// a draft link, a one-tap approval, the card link, a spam or Join our list link) and was
+// signed the old way still opens until LEGACY_LINKS_UNTIL, 90 days after this went live: its
+// old key may have been the scheduler's secret. A link that never expires keeps opening with
+// its old key for as long as that key is the same: a receipt's or a signed agreement's
+// (sales item 79 keeps those for good), a booking's change-or-cancel link, and every emailed
+// unsubscribe link, open counter and photo (signed with the database key itself). Breaking
+// those would break what people were promised; changing the old secret retires them.
+// A link signed from any root this server still holds keeps opening, so setting LINK_SECRET
+// later breaks nothing either.
 //
 // Sync on purpose: half the callers pick their key outside an async step, so the derivation
 // is a small SHA-256 written out here (tests/presence/link_keys_394_test.mjs checks it
@@ -50,8 +52,8 @@ export function linkRoots(): string[] {
   return [...new Set([linkSecretEnv(), approvalEnv(), dbKey()].filter(Boolean))];
 }
 
-/** The emailed links, signed with the database key itself before this change. */
-const EMAIL_KINDS: ReadonlySet<LinkKind> = new Set(['email_unsubscribe', 'email_open', 'email_image']);
+/** Links that never expire: their old signatures stay good while the old key is the same. */
+const LASTING_KINDS: ReadonlySet<LinkKind> = new Set(['sales', 'booking', 'email_unsubscribe', 'email_open', 'email_image']);
 
 /** What each kind was signed with before this change. */
 function legacyKeys(kind: LinkKind): string[] {
@@ -86,7 +88,7 @@ export function linkKey(kind: LinkKind): string {
  *  kind from the other roots, then (until LEGACY_LINKS_UNTIL) what it was signed with before. */
 export function linkKeysAccepted(kind: LinkKind, nowMs: number = Date.now()): string[] {
   const out = [linkKey(kind), ...linkRoots().map((r) => deriveLinkKey(r, kind))];
-  if (EMAIL_KINDS.has(kind) || nowMs < Date.parse(LEGACY_LINKS_UNTIL)) out.push(...legacyKeys(kind));
+  if (LASTING_KINDS.has(kind) || nowMs < Date.parse(LEGACY_LINKS_UNTIL)) out.push(...legacyKeys(kind));
   return [...new Set(out.filter(Boolean))];
 }
 

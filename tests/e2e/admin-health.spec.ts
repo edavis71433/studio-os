@@ -268,3 +268,46 @@ test.describe('Admin Health Center — theme blocks (A11, re-skinned onto --dds-
     expect(await read('--off')).toBe('#7a7280');  // page-local neutral (kept)
   });
 });
+
+// ── Builder item 398 · the accounts Studio OS depends on, ticked each quarter ──
+// The card lists what to check at each outside account and where; the platform's owner
+// ticks one after looking (POST /admin/accounts/<key>/checked) and it reads as checked.
+const ACCT = (supabaseChecked: string | null, canTick = true) => ({ data: {
+  accounts: [
+    { key: 'supabase', name: 'Supabase', why: 'The database, sign-in and the server.', checks: ['New sign-ups are off.', 'Confirm email is on.'], where: 'https://supabase.example/settings',
+      checked_at: supabaseChecked, checked_by: supabaseChecked ? 'owner@platform.example' : null, due: !supabaseChecked },
+    { key: 'github', name: 'GitHub', why: 'The code and every release.', checks: ['Two-step sign-in is on for your account.'], where: 'https://github.example/settings',
+      checked_at: '2026-08-01T10:00:00Z', checked_by: 'owner@platform.example', due: true },
+  ],
+  due: supabaseChecked ? 1 : 2, every_days: 92, can_tick: canTick, ready: true,
+} });
+test.describe('Accounts Studio OS depends on (builder item 398)', () => {
+  test('each account says what to check and where; the owner ticks one and it reads as checked', async ({ page }) => {
+    let ticked = '';
+    await installApp(page, { api: {
+      '/admin/health-center': HC_OK, '/admin/accounts': ACCT(null),
+      'POST /admin/accounts/supabase/checked': () => { ticked = 'supabase'; return ACCT('2026-11-22T18:00:00Z'); },
+    } });
+    await page.goto('/admin-health.html');
+    const card = page.locator('#acctCard');
+    await expect(page.getByRole('heading', { name: 'Accounts Studio OS depends on' })).toBeVisible();
+    await expect(card).toContainText('2 of 2 due for a look');
+    await expect(card).toContainText('New sign-ups are off.');
+    await expect(card).toContainText('Not checked yet');
+    await expect(card).toContainText('Due again. Last checked Aug 1, 2026 by owner@platform.example');
+    await expect(card.getByRole('link', { name: 'Open Supabase →' })).toHaveAttribute('href', 'https://supabase.example/settings');
+    await pressButton(card.getByRole('button', { name: 'I checked Supabase today' }));
+    await expect.poll(() => ticked).toBe('supabase');
+    await expect(card).toContainText('1 of 2 due for a look');
+    await expect(card).toContainText('Checked Nov 22, 2026 by owner@platform.example');
+  });
+
+  test('anyone else on the platform\'s staff reads the list but can\'t tick', async ({ page }) => {
+    await installApp(page, { api: { '/admin/health-center': HC_OK, '/admin/accounts': ACCT(null, false) } });
+    await page.goto('/admin-health.html');
+    const card = page.locator('#acctCard');
+    await expect(card).toContainText('Supabase');
+    await expect(card.getByRole('button', { name: /I checked/ })).toHaveCount(0);
+    await expect(card).toContainText('Only the platform’s owner ticks these.');
+  });
+});

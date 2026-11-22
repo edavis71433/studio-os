@@ -66,8 +66,9 @@ const L = await import('../../supabase/functions/_shared/link_keys.ts');
 // ═══ 4. old links ═══
 {
   clear(); Deno.env.set('SCHEDULER_SECRET', 'sched'); Deno.env.set('SERVICE_ROLE_KEY', 'db-key');
-  ok('a proposal link signed the old way (the scheduler\'s secret, when nothing else was set) opens before Feb 21 2027', L.linkKeysAccepted('sales', BEFORE).includes('sched'));
-  ok('…and not after', !L.linkKeysAccepted('sales', AFTER).includes('sched') && L.linkKeysAccepted('sales', AFTER).length > 0);
+  ok('a card link signed the old way (the scheduler\'s secret, when nothing else was set) opens before Feb 21 2027', L.linkKeysAccepted('retainer_card', BEFORE).includes('sched'));
+  ok('…and not after (every such link has expired by then anyway)', !L.linkKeysAccepted('retainer_card', AFTER).includes('sched') && L.linkKeysAccepted('retainer_card', AFTER).length > 0);
+  ok('a link that never expires (a receipt or a signed agreement, a booking\'s change-or-cancel) keeps its old key after Feb 21 2027', L.linkKeysAccepted('sales', AFTER).includes('sched') && L.linkKeysAccepted('booking', AFTER).includes('sched'));
   const check = (key) => async (k) => k === key;
   ok('signedWithAny follows the same dates', (await L.signedWithAny('form_ticket', L.linkKey('form_ticket'), check('sched'), BEFORE)) && !(await L.signedWithAny('form_ticket', L.linkKey('form_ticket'), check('sched'), AFTER)));
   ok('a key the caller brings (a test\'s own) is tried alone, never widened', !(await L.signedWithAny('form_ticket', 'some-other-key', check('sched'), BEFORE)) && await L.signedWithAny('form_ticket', 'some-other-key', check('some-other-key'), BEFORE));
@@ -92,7 +93,7 @@ const L = await import('../../supabase/functions/_shared/link_keys.ts');
   const body = tok.split('.')[0];
   const old = `${body}.${await hmacHex('sched', body)}`;
   const oldSig = old.split('.')[1];
-  ok('sales: a link signed with the scheduler\'s secret before this change still opens until Feb 21 2027, and not after', (await L.signedWithAny('sales', S.linkSecret(), async (k) => (await hmacHex(k, body)) === oldSig, BEFORE)) && !(await L.signedWithAny('sales', S.linkSecret(), async (k) => (await hmacHex(k, body)) === oldSig, AFTER)));
+  ok('sales: a link signed with the scheduler\'s secret before this change still opens, before and after Feb 21 2027 (receipts are kept for good)', (await L.signedWithAny('sales', S.linkSecret(), async (k) => (await hmacHex(k, body)) === oldSig, BEFORE)) && (await L.signedWithAny('sales', S.linkSecret(), async (k) => (await hmacHex(k, body)) === oldSig, AFTER)));
   const F = await import('../../supabase/functions/presence/lib/form_check.ts');
   const site = '33333333-3333-4333-8333-333333333333';
   const ticket = await F.issueTicket(site, NOW);

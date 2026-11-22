@@ -841,7 +841,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     }
   }
 
-  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied|invite|trash|restore)$/);
+  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied|invite|trash|restore|runs)$/);
   if (!m) return null;
   const siteId = m[1], what = m[2];
 
@@ -864,6 +864,31 @@ export async function handleAgencySites(req: Request, route: string, method: str
   }
 
   // ── pin a site to the top of YOUR Sites page (item 45) ──
+  // ── Builder item 387: "They can publish and run their website", one switch per client. Off
+  //    (the default), the studio keeps Publish, Take offline, the template, the domain and who
+  //    works on the site; on, the client may do those too (lib/studio_holds.ts). Reading it is
+  //    any seat's; changing it is a manager's, as the client's other settings are. ──
+  if (what === 'runs' && (method === 'GET' || method === 'PUT')) {
+    if (!can(member.role, 'read')) return forbid(cors);
+    if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notYours(cors);
+    const linkAt = `presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`;
+    const answer = (row: { client_runs_site?: unknown; client_runs_site_at?: unknown; client_runs_site_by?: unknown } | null) => json({ data: {
+      site_id: siteId, on: row?.client_runs_site === true, at: typeof row?.client_runs_site_at === 'string' ? row.client_runs_site_at : null,
+      by: typeof row?.client_runs_site_by === 'string' && row.client_runs_site_by ? row.client_runs_site_by : null, can_change: can(member.role, 'manage_clients'),
+    } }, 200, { ...cors, 'Cache-Control': 'no-store' });
+    if (method === 'GET') {
+      const r = await svc(`${linkAt}&select=client_runs_site,client_runs_site_at,client_runs_site_by&limit=1`);
+      return answer(r.ok && Array.isArray(r.json) ? r.json[0] || null : null);   // before migration 0265: off
+    }
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    let b: { on?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+    if (typeof b.on !== 'boolean') return json({ error: 'bad_request', message: 'Say on true or false.' }, 400, cors);
+    const w = await svc(linkAt, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ client_runs_site: b.on, client_runs_site_at: new Date().toISOString(), client_runs_site_by: member.email || '' }) });
+    const row = w.ok && Array.isArray(w.json) ? w.json[0] || null : null;
+    if (!row) return json({ error: 'write_failed', message: 'That didn’t save just now. Try again in a moment.' }, 502, cors);
+    return answer(row);
+  }
+
   if (what === 'pin' && method === 'PUT') {
     if (!can(member.role, 'read')) return forbid(cors);
     let b: { pinned?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
