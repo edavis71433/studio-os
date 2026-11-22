@@ -489,7 +489,8 @@ const ICON_SETTINGS_COLS = 'icon_media_id';
 const GOES_SETTINGS_COLS = 'goes_to_customers';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-const OPTIONAL_SETTINGS_COLS = [GOES_SETTINGS_COLS, ICON_SETTINGS_COLS, PLACE_SETTINGS_COLS, BLOG_SETTINGS_COLS, SIGNER_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+// (0255's column sits after 0184's: it is only ever in the location's read, which holds no icon, so it steps down first there all the same)
+const OPTIONAL_SETTINGS_COLS = [ICON_SETTINGS_COLS, GOES_SETTINGS_COLS, PLACE_SETTINGS_COLS, BLOG_SETTINGS_COLS, SIGNER_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;
