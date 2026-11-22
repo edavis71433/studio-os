@@ -8,6 +8,7 @@ The one page for running Studio OS: how a release goes out, how to undo one, how
 - **The server**: the Supabase function `presence` (plus `clever-api`, `stripe-webhook` and the five Free Tools functions) on the production project `davis-digital-studio` (qksstlqzbhesadrrofgn, Oregon).
 - **The database and the uploaded files**: the same production project.
 - **Published client sites**: Netlify, one site each. They don't read the database when a visitor comes, so they stay up when Supabase is down; their forms and bookings don't.
+- **Scheduled jobs** on production (Integrations, Cron; `supabase/ops/schedule-presence-cron.sql` is their source): `presence-cycle` every 15 minutes (the 15-minute job), `presence-keep-awake` every minute (builder item 404: a ping that touches nothing, so the next person meets a warm worker; the same worker answers 3 to 5 pings running; about 43,000 calls a month against the 2,000,000 the plan includes), and the daily Search Console and GA4 syncs.
 - **The staging project** `studio-os-staging` (wjlpursnwbmlcdwbeowv, Ohio): runs only the 5-minute watchdog. Nothing deploys to it.
 
 ## Release

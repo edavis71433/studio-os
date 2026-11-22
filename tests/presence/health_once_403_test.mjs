@@ -7,7 +7,7 @@
 //     key) go side by side;
 //   · before 0247 the same counts go out as one wave, none twice (system_health_test.mjs);
 //   · the watchdog's probe asks for Oregon (x-region), and a 'ping' task touches nothing,
-//     for the keep-awake job every 4 minutes.
+//     for the keep-awake job every minute.
 //   deno run --allow-read --allow-env --allow-net tests/presence/health_once_403_test.mjs
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -89,7 +89,7 @@ ok('readHealthCounts answers null then, not a throw', (await readHealthCounts())
   ok('the watchdog\'s probe asks for Oregon', /'x-region', 'us-west-2'\)/.test(watchdog) && watchdog.indexOf("'x-region'") > watchdog.indexOf("'x-system-secret'"));
   ok('…and still reads the top-level ok only, with the last failure\'s at', /\(report -> 'ok'\) = 'true'::jsonb/.test(watchdog) && /report -> 'last_failure' ->> 'at'/.test(watchdog));
   const keep = read('docs/presence/APPLY-keep-awake-prod.sql');
-  ok('the keep-awake pack: every 4 minutes, task ping, asking for Oregon, the secret from Vault, production\'s address', /cron\.schedule\('presence-keep-awake', '\*\/4 \* \* \* \*'/.test(keep) && /'task', 'ping'/.test(keep) && /"x-region":"us-west-2"/.test(keep) && /vault\.decrypted_secrets where name = 'presence_scheduler_secret'/.test(keep) && /qksstlqzbhesadrrofgn\.supabase\.co\/functions\/v1\/presence\/system\/run'/.test(keep) && !/secret=/.test((keep.match(/do \$pack\$[\s\S]*?\$pack\$;/) || [''])[0]));
+  ok('the keep-awake pack: every minute, task ping, asking for Oregon, the secret from Vault, production\'s address', /cron\.schedule\('presence-keep-awake', '\* \* \* \* \*'/.test(keep) && /'task', 'ping'/.test(keep) && /"x-region":"us-west-2"/.test(keep) && /vault\.decrypted_secrets where name = 'presence_scheduler_secret'/.test(keep) && /qksstlqzbhesadrrofgn\.supabase\.co\/functions\/v1\/presence\/system\/run'/.test(keep) && !/secret=/.test((keep.match(/do \$pack\$[\s\S]*?\$pack\$;/) || [''])[0]));
   ok('…inside one do block that refuses to run anywhere but production', /do \$pack\$[\s\S]*raise exception[\s\S]*\$pack\$;/.test(keep));
 }
 
