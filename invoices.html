@@ -390,7 +390,7 @@ function openMenu(btn){
   if(i.deal_id)items.push(['deal','Open the deal']);
   items.push(['pdf','Download PDF']);
   if(waits)items.push(['void','Void']);
-  m.innerHTML=items.map(([k,l])=>`<button type="button" role="menuitem" data-act="${k}"${k==='void'||k==='undo'?' style="color:var(--bad)"':''}>${l}</button>`).join('');
+  m.innerHTML=items.map(([k,l])=>`<button type="button" role="menuitem" data-act="${k}"${k==='void'||k==='undo'||k==='back'?' data-needs="delete"':''}${k==='void'||k==='undo'?' style="color:var(--bad)"':''}>${l}</button>`).join('');
   btn.parentNode.appendChild(m);btn.setAttribute('aria-expanded','true');
   if(window.ddsListKit&&window.ddsListKit.fit)window.ddsListKit.fit(m);
   m.querySelector('button').focus();

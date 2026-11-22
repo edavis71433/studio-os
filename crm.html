@@ -1574,7 +1574,7 @@ function renderBillingTab(host){
       sub=(sub?sub+' · ':'')+esc(PAY_WORDS[v.paid_method]||'Paid online')+(v.paid_note?' · '+esc(v.paid_note):'')+(v.paid_private_note?' · <span title="Only you see this. It is not on their receipt.">Private: '+esc(v.paid_private_note)+'</span>':'');
       if(v.refunded_cents>0)sub+=' · '+esc(fmtC(v.refunded_cents))+' refunded';
       // sales item 165: money given back by hand on an invoice paid by hand; item 77: Undo
-      if(v.paid_method&&!v.payment_for)acts+=act(`data-back-inv="${esc(v.id)}"`,'Give money back','A part refund, a credit: amount, day, how. It reads Paid with that much refunded.');
+      if(v.paid_method&&!v.payment_for)acts+=act(`data-back-inv="${esc(v.id)}" data-needs="delete"`,'Give money back','A part refund, a credit: amount, day, how. It reads Paid with that much refunded.');
       if(v.paid_method)acts+=act(`data-undo-pay="${esc(v.id)}" data-needs="delete"`,'Undo','Recorded by mistake? The invoice goes back to unpaid');}
     else if(st==='refunded'||st==='disputed'||st==='lost'){
       const dsp=((DEAL&&DEAL.returns)||[]).find(r=>r.kind==='dispute'&&r.invoice_id===v.id&&r.status===(st==='lost'?'lost':'open'));
