@@ -66,7 +66,8 @@ function handlePlans(cors: Record<string, string>) {
   // Phase P: every plan ships its SERVICE tier (onboarding/support/AI/implementation/
   // training/maintenance) so software and service packages can never drift apart.
   const plans = planPayload(grantFounder()).map((p: any) => ({ ...p, support: supportFor(p.key) }));
-  return json({ data: { founders_open: FOUNDERS_OPEN, trial_days: TRIAL_DAYS, plans } }, 200, cors);
+  // builder item 412: public and the same for everyone, so a browser keeps it five minutes
+  return json({ data: { founders_open: FOUNDERS_OPEN, trial_days: TRIAL_DAYS, plans } }, 200, { ...cors, 'Cache-Control': 'public, max-age=300' });
 }
 
 // ── PUBLIC: self-serve sign-up is closed (builder item 199, Nov 15 2026) ──────

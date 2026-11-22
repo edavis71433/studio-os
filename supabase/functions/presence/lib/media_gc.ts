@@ -63,8 +63,17 @@ export interface MediaGcResult {
 
 /** Run one bounded GC pass across BOTH classes. Global (all sites), oldest-first,
  *  per-row isolated (one failure never stops the rest). */
-export async function reapMedia(limit = 100): Promise<MediaGcResult> {
+/** Builder item 412: is `nowMs` inside the one 15-minute window a day (03:00 to 03:15 UTC)
+ *  when the never-uploaded check runs? It asked storage about the same uploaded files every
+ *  run (48 times an hour in the logs); once a day is enough for rows two days old. Pure. */
+export function orphanWindow(nowMs: number): boolean {
+  const d = new Date(nowMs);
+  return d.getUTCHours() === 3 && d.getUTCMinutes() < 15;
+}
+
+export async function reapMedia(limit = 100, opts: { orphans?: boolean } = {}): Promise<MediaGcResult> {
   const now = Date.now();
+  const orphans = opts.orphans ?? orphanWindow(now);
   const lim = Math.max(1, Math.min(500, limit));
   const res: MediaGcResult = { ok: true, run_type: 'media_gc', soft_scanned: 0, soft_reaped: 0, orphan_scanned: 0, orphan_reaped: 0 };
 
@@ -84,7 +93,7 @@ export async function reapMedia(limit = 100): Promise<MediaGcResult> {
 
   // ── Class 2: never-uploaded orphans (row present, object absent, aged out) ──
   const orphanBefore = new Date(now - gcOrphanMs()).toISOString();
-  const cand = await svc(`presence_media?deleted_at=is.null&created_at=lte.${encodeURIComponent(orphanBefore)}&select=id,site_id,storage_path,deleted_at,created_at&order=created_at.asc&limit=${lim}`);
+  const cand = orphans ? await svc(`presence_media?deleted_at=is.null&created_at=lte.${encodeURIComponent(orphanBefore)}&select=id,site_id,storage_path,deleted_at,created_at&order=created_at.asc&limit=${lim}`) : { json: [] as MediaRow[] };
   const candRows: MediaRow[] = Array.isArray(cand.json) ? cand.json : [];
   for (const m of candRows) {
     if (!agedPast(m.created_at, now, gcOrphanMs())) continue;

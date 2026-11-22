@@ -17,6 +17,12 @@ const EVIDENCE_DAYS = 180;      // presence_evidence_runs, before migration 0193
 const HEALTH_HISTORY_DAYS = 30; // item 206: findings, judgments and recommendations — readers use the latest per site
 const HEALTH_PRUNE_RUNS = 500;  // item 206: runs cleared per tick at most, so one call stays well inside the API's 8 seconds
 const HEALTH_DAYS = 400;        // presence_health_days — one small row per site per day; a year of trend lines
+// Builder item 408: history nobody reads. Each site keeps its newest MOMENTS_KEEP moments (every
+// reader takes 300 at most) and every dismissed one; audit_log keeps AUDIT_DAYS. Bites of
+// HISTORY_BITE rows a table a tick, so the 130,000-row backlog goes over a day, never in one statement.
+export const MOMENTS_KEEP = 500;
+export const AUDIT_DAYS = 90;
+export const HISTORY_BITE = 2000;
 
 export async function runRetentionSweep(now: Date = new Date()): Promise<Record<string, boolean | number | null>> {
   const out: Record<string, boolean | number | null> = {};
@@ -74,6 +80,16 @@ export async function runRetentionSweep(now: Date = new Date()): Promise<Record<
 
   // Health by day (0170): a pre-0170 environment 404s → recorded false, never throws.
   await prune('health_days', `presence_health_days?day=lt.${daysAgo(HEALTH_DAYS).slice(0, 10)}`);
+
+  // Builder item 408: moments past each site's newest 500 and audit rows past 90 days, in
+  // bites, through presence_prune_history (0246). Before 0246 the function isn't there
+  // (404): that is a skip, not a failure. A refused or failed call is a failed sweep.
+  try {
+    const r = await svc('rpc/presence_prune_history', { method: 'POST', body: JSON.stringify({ keep_moments: MOMENTS_KEEP, keep_audit_days: AUDIT_DAYS, max_rows: HISTORY_BITE }) });
+    if (r.ok) { out.moments = Number(r.json?.moments ?? 0); out.audit_log = Number(r.json?.audit ?? 0); }
+    else if (r.status === 404) out.skipped_history = true;
+    else out.history = false;
+  } catch { out.history = false; }
 
   // Evidence: needs "all but each site's latest run" — SQL, not REST.
   // Item 206: presence_prune_health (0193) clears health-check history older than 30

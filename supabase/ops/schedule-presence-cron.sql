@@ -27,6 +27,9 @@
 --     the Google app; each site without a connection is skipped)
 --   presence_ga4_sync   30 7 * * *     GA4, daily, offset from the Search
 --     Console job; owner-gated the same way
+--   presence-keep-awake */4 * * * *    builder item 404: a tiny call that touches
+--     nothing (task 'ping'), asking for Oregon, so the worker the next person meets
+--     is awake. About 10,800 calls a month against the 2 million the plan includes.
 -- Not scheduled (Eric, Nov 8 2026): the hourly failure retry (task 'retry')
 -- and the weekly coach sweep (task 'coach'). /system/run still accepts both,
 -- and the next 15-minute tick runs a failed site again anyway.
@@ -74,6 +77,16 @@ begin
                    'task', 'gsc_sync'))
   $job$);
 
+  -- builder item 404: keep a worker awake beside the database; the call touches nothing
+  perform cron.schedule('presence-keep-awake', '*/4 * * * *', $job$
+    select net.http_post(
+      url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/presence/system/run',
+      headers := '{"Content-Type":"application/json","x-region":"us-west-2"}'::jsonb,
+      body    := jsonb_build_object(
+                   'secret', (select decrypted_secret from vault.decrypted_secrets where name = 'presence_scheduler_secret'),
+                   'task', 'ping'))
+  $job$);
+
   -- monthly signal totals; 30 minutes after the GSC job so the two Google reads never share an invocation window
   perform cron.schedule('presence_ga4_sync', '30 7 * * *', $job$
     select net.http_post(
@@ -86,7 +99,7 @@ begin
 end
 $setup$;
 
--- Verify (expect the three jobs, every check true; shows no secret values):
+-- Verify (expect the four jobs, every check true; shows no secret values):
 select j.jobname,
        j.schedule,
        j.active,
@@ -96,7 +109,7 @@ select j.jobname,
   from cron.job j
   cross join vault.decrypted_secrets v
  where v.name = 'presence_scheduler_secret'
-   and j.jobname in ('presence-cycle', 'presence_gsc_sync', 'presence_ga4_sync')
+   and j.jobname in ('presence-cycle', 'presence_gsc_sync', 'presence_ga4_sync', 'presence-keep-awake')
  order by j.jobname;
 
 -- == SPLIT MODE (when the fleet outgrows the single tick, ~30-50 sites) ======

@@ -510,12 +510,15 @@ for (const w of WRITES) {
   const idx = read('supabase/functions/presence/index.ts');
   const at = (s) => idx.indexOf(s);
   const SCOPE_READ = "req.headers.get('x-dds-scope-site')";
-  const DENY = "if (!sc.ok) return json({ error: 'scope_denied'";
-  const STAMP = 'principal.scope = { site_id: sc.scoped.site_id, name: sc.scoped.name };';
+  // builder item 401: the scope is worked out in lib/who_asks.ts (remembered a minute, never a refusal) and stamped by index.ts
+  const who = read('supabase/functions/presence/lib/who_asks.ts');
+  const wat = (s) => who.indexOf(s);
+  const DENY = "if (!sc.ok) return { ok: false, status: sc.status, error: 'scope_denied'";
+  const STAMP = 'scope = { site_id: sc.scoped.site_id, name: sc.scoped.name };';
   const BUILD = 'const db = siteDb(jwt, site, principal);';
-  ok('index: a denied scope returns before anything is stamped', at(SCOPE_READ) > 0 && at(SCOPE_READ) < at(DENY) && at(DENY) < at(STAMP));
-  ok('index: principal.scope is stamped in one place', idx.split('principal.scope =').length === 2);
-  ok('index: only the un-scoped branch can reach resolveSite', at(STAMP) < at('site = await resolveSite(jwt);') && /\} else \{\s*site = await resolveSite\(jwt\);/.test(idx));
+  ok('index: a denied scope returns before anything is stamped', at(SCOPE_READ) > 0 && at(SCOPE_READ) < at('if (!answer.ok) return json({ error: answer.error') && at('if (!answer.ok) return json({ error: answer.error') < at('principal.scope = {') && wat(DENY) > 0 && wat(DENY) < wat(STAMP));
+  ok('index: principal.scope is stamped in one place', idx.split('principal.scope =').length === 2 && who.split('scope = {').length === 2);
+  ok('who_asks: only the un-scoped branch can reach resolveSite', wat(STAMP) < wat('site = await resolveSite(jwt);') && /\} else \{\s*site = await resolveSite\(jwt\);/.test(who) && !idx.includes('resolveSite('));
   ok('index: the data path is built once, after the entitlement, reviewer, edition and feature gates',
     idx.split('siteDb(').length === 2 && [
       'const ent = await checkEntitlement(principal, site.client_id);',

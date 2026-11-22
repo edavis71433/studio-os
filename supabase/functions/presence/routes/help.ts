@@ -9,6 +9,7 @@
 import { json } from '../../_shared/http.ts';
 import { matchHelp, helpCorpus } from '../lib/help_assistant.ts';
 import { verifyPolish } from '../concierge/verify.ts';
+import { SMALL_MODEL, SMALL_OUTPUT_CONFIG } from '../../_shared/ai_model.ts';   // builder item 409
 
 const HELP_POLISH_SYSTEM = `You edit a short product-help note for a small-business owner using website software.
 Rules, absolute:
@@ -30,7 +31,7 @@ async function polishHelp(text: string, grounding: string): Promise<string> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 400,
+        model: SMALL_MODEL, max_tokens: 400, output_config: SMALL_OUTPUT_CONFIG,
         system: HELP_POLISH_SYSTEM,
         messages: [{ role: 'user', content: `<<<NOTE\n${text.slice(0, 1500)}\nNOTE>>>` }],
       }),
