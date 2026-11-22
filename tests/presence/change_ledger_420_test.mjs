@@ -21,17 +21,26 @@ const migrations = [...Deno.readDirSync(new URL('supabase/migrations/', ROOT))].
 const packs = [...Deno.readDirSync(new URL('docs/presence/', ROOT))].map((e) => e.name).filter((f) => /^APPLY-\d{4}-prod\.sql$/.test(f)).sort();
 const num = (f) => Number(f.match(/(\d{4})/)[1]);
 const newest = Math.max(...migrations.map(num));
-ok('the code\'s newest change is the newest migration (raise CODE_NEWEST_CHANGE with each new one)', CODE_NEWEST_CHANGE === newest, `code ${CODE_NEWEST_CHANGE}, newest migration ${newest}`);
+// The changes production had before the ledger existed, as APPLY-0260 writes them down. They
+// predate the ledger, so they don't write themselves; some arrive in files from other pull
+// requests after this one (0265 to 0267 ran on Nov 22 from a pull request still open).
+const p260 = read('docs/presence/APPLY-0260-prod.sql');
+const backfill = p260.slice(p260.indexOf('-- BACKFILL-LIST-START'), p260.indexOf('-- BACKFILL-LIST-END'));
+const listed = [...backfill.matchAll(/\((\d+), '([a-z0-9_-]*)', 'backfill'\)/g)].map((m) => Number(m[1]));
+const backfilled = new Set(listed);
+const files = new Set(migrations.map(num));
+ok('the code\'s newest change is at least the newest migration (raise CODE_NEWEST_CHANGE with each new one)', CODE_NEWEST_CHANGE >= newest, `code ${CODE_NEWEST_CHANGE}, newest migration ${newest}`);
+ok('…and names a change that is a file here or already on production (backfilled)', files.has(CODE_NEWEST_CHANGE) || backfilled.has(CODE_NEWEST_CHANGE), String(CODE_NEWEST_CHANGE));
 
 // A statement outside comments: the line, with -- comments dropped.
 const statements = (sql) => sql.split('\n').map((l) => l.replace(/--.*$/, '').trim()).filter(Boolean);
 const note = (n) => new RegExp(`^select public\\.presence_ledger_note\\(${n}, '[a-z0-9_]+'\\);$`);
-for (const f of migrations.filter((m) => num(m) >= FIRST)) {
+for (const f of migrations.filter((m) => num(m) >= FIRST && !backfilled.has(num(m)))) {
   const s = statements(read(`supabase/migrations/${f}`));
   ok(`${f} ends by writing its own number down`, note(num(f)).test(s[s.length - 1] || ''), s[s.length - 1]);
   ok(`${f} has an apply pack`, packs.includes(`APPLY-${f.slice(0, 4)}-prod.sql`));
 }
-for (const f of packs.filter((p) => num(p) >= FIRST)) {
+for (const f of packs.filter((p) => num(p) >= FIRST && !backfilled.has(num(p)))) {
   const s = statements(read(`docs/presence/${f}`));
   ok(`${f} writes its own number down, outside a comment`, s.some((l) => note(num(f)).test(l)));
   ok(`${f} names its migration`, migrations.some((m) => m.startsWith(`${f.slice(6, 10)}_`)) && read(`docs/presence/${f}`).includes(`Covers: supabase/migrations/${f.slice(6, 10)}_`));
@@ -39,7 +48,7 @@ for (const f of packs.filter((p) => num(p) >= FIRST)) {
 
 // ═══ 2. The ledger, the same in its migration and its pack ═══
 const def = (sql, start, end) => { const i = sql.indexOf(start); return i < 0 ? '' : sql.slice(i, sql.indexOf(end, i) + end.length); };
-const m260 = read('supabase/migrations/0260_change_ledger.sql'), p260 = read('docs/presence/APPLY-0260-prod.sql');
+const m260 = read('supabase/migrations/0260_change_ledger.sql');
 const table = (s) => def(s, 'create table if not exists public.presence_change_ledger', ');');
 const fn = (s) => def(s, 'create or replace function public.presence_ledger_note', '$$;');
 ok('the ledger table is the same in 0260 and its pack', !!table(m260) && table(m260) === table(p260));
@@ -50,9 +59,8 @@ for (const s of [m260, p260]) {
 ok('a second run counts the run and keeps the first time (on conflict)', /on conflict \(number\) do update\s+set last_at = now\(\), runs = l\.runs \+ 1/.test(fn(m260)));
 
 // The backfill: what production had before the ledger, written once as "backfill".
-const backfill = p260.slice(p260.indexOf('-- BACKFILL-LIST-START'), p260.indexOf('-- BACKFILL-LIST-END'));
-const listed = [...backfill.matchAll(/\((\d+), '([a-z0-9_-]*)', 'backfill'\)/g)].map((m) => Number(m[1]));
-ok('the pack backfills what production already had, each number once, all before 0260, never the fenced 0003 to 0005', listed.length >= 100 && new Set(listed).size === listed.length && listed.every((n) => n >= 0 && n < FIRST) && !listed.some((n) => n >= 3 && n <= 5), `${listed.length} numbers`);
+ok('the pack backfills what production already had, each number once, never the fenced 0003 to 0005, never the ledger\'s own 0260 and 0261', listed.length >= 100 && new Set(listed).size === listed.length && listed.every((n) => n >= 0) && !listed.some((n) => (n >= 3 && n <= 5) || n === 260 || n === 261), `${listed.length} numbers`);
+ok('…as read on production on Nov 22: through 0247, 0249 to 0255 and 0265 to 0267, never 0248', [0, 72, 73, 245, 246, 247, 249, 255, 265, 267].every((n) => backfilled.has(n)) && !backfilled.has(248) && !backfilled.has(256));
 ok('…and a re-run adds nothing (on conflict do nothing)', /'backfill'\)[\s\S]*?on conflict \(number\) do nothing;/.test(backfill));
 
 // ═══ 3. 0261: 0247's counts, plus the four new ones, in one trip ═══

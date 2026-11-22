@@ -15,8 +15,10 @@
 #      makes that easy;
 #   3. checks the ledger (presence_change_ledger, migration 0260): every migration from
 #      0260 on wrote its number, every pack wrote its number on each run, and the newest
-#      number is the newest file in supabase/migrations, the same question the release
-#      asks production before it goes out (deploy.yml, "Database changes are in place").
+#      file in supabase/migrations is in the ledger, the same question the release asks
+#      production before it goes out (deploy.yml, "Database changes are in place").
+#      Changes that predate the ledger (APPLY-0260's backfill list, 0265 to 0267 among
+#      them) don't write themselves, so they are only run, not checked for their row.
 #
 # Nothing here reads a repository secret or reaches production. Needs docker, node (npx).
 # Local use, with Docker running:
@@ -93,6 +95,9 @@ done
 
 # ── 3. The ledger says what the release will ask ─────────────────────────────────
 say "The ledger"
+# The numbers APPLY-0260 backfills: on production before the ledger, so they don't write themselves.
+backfilled=" $(sed -nE "s/^  \(([0-9]+), '[a-z0-9_-]*', 'backfill'\),?$/\1/p" "$REPO/docs/presence/APPLY-0260-prod.sql" | tr '\n' ' ')"
+is_backfilled() { case "$backfilled" in *" $1 "*) return 0 ;; esac; return 1; }
 ledger=$(psql_ -At -F ' ' -c "select number, runs from public.presence_change_ledger order by number" 2>&1) \
   || fail "The ledger (presence_change_ledger, migration 0260) isn't on the scratch database."
 echo "$ledger" | sed 's/^/  /'
@@ -100,18 +105,20 @@ bad=""
 for f in "$REPO"/supabase/migrations/[0-9]*.sql; do
   n=$((10#$(basename "$f" | sed -E 's/^([0-9]{4})_.*/\1/')))
   [ "$n" -ge "$FIRST_LEDGER" ] || continue
+  is_backfilled "$n" && continue
   printf '%s\n' "$ledger" | grep -qE "^$n " || bad="$bad migration $(basename "$f") wrote no ledger row;"
 done
 for f in ${packs[@]+"${packs[@]}"}; do
   n=$((10#$(basename "$f" | sed -E 's/^APPLY-([0-9]{4})-prod\.sql$/\1/')))
+  is_backfilled "$n" && continue
   runs=$(printf '%s\n' "$ledger" | awk -v n="$n" '$1 == n {print $2}')
   [ "${runs:-0}" -ge 2 ] || bad="$bad $(basename "$f") didn't write its number on each run (runs: ${runs:-none});"
 done
 top=$(printf '%s\n' "$ledger" | awk 'END {print $1}')
-[ "$top" = "$((10#$newest))" ] || bad="$bad the ledger's newest number is ${top:-none}, and the newest migration is $newest;"
+[ "${top:-0}" -ge "$((10#$newest))" ] || bad="$bad the ledger's newest number is ${top:-none}, below the newest migration $newest;"
 # The release's own question, asked here first (deploy.yml sends the same query to production).
 gate=$(psql_ -At -c "select coalesce(max(number), 0) || ' ' || coalesce(bool_or(number = $((10#$newest))), false) from public.presence_change_ledger")
-[ "$gate" = "$((10#$newest)) true" ] || bad="$bad the release's question answered \"$gate\";"
+[ "${gate#* }" = true ] || bad="$bad the release's question (is $newest in the ledger?) answered \"$gate\";"
 [ -z "$bad" ] || fail "${bad# }"
 
 line="Database changes rehearsal: $applied migrations applied in order on a fresh database, ${#packs[@]} apply pack(s) from $FIRST_LEDGER on run twice each, and the ledger's newest change is $newest, on $(date -u '+%Y-%m-%d at %H:%M UTC')."

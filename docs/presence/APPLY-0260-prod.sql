@@ -15,7 +15,7 @@
 --  What it does:
 --    1. creates presence_change_ledger and presence_ledger_note() (service role only);
 --    2. writes down, as "backfill", the changes production already had before the
---       ledger existed (the list below: CONFIRM it before running, see its note);
+--       ledger existed (the list below, read on production on Nov 22; see its note);
 --    3. writes down 0260 itself.
 --
 --  Check first that the editor's top bar says davis-digital-studio (production).
@@ -60,10 +60,13 @@ grant execute on function public.presence_ledger_note(int, text) to service_role
 
 -- 2. What production already had before the ledger (backfill; a re-run adds nothing).
 -- BACKFILL-LIST-START
--- CONFIRM BEFORE RUNNING. This is the default proposed to the coordinating session on
--- Nov 22 2026: every numbered migration in the repository below 0260, except 0003 to 0005
--- (fenced: production never applied them). If a number here is known NOT to be on
--- production, delete its line first, so the ledger never claims a change that isn't there.
+-- Read on production by the coordinating session on Nov 22 2026: every numbered migration
+-- through 0247 except 0003 to 0005 (fenced: never applied), checked by about 330 objects the
+-- migrations create (the only gaps were two indexes later migrations dropped on purpose; 35
+-- migrations create nothing checkable and count as applied), plus 0249 to 0255 and 0265 to
+-- 0267, run today (0248 was never used). It checks the list again right before running this
+-- pack: delete the line of any number that isn't on production, so the ledger never claims a
+-- change that isn't there. These numbers predate the ledger, so they don't write themselves.
 insert into public.presence_change_ledger (number, name, how) values
   (0, 'baseline', 'backfill'),
   (1, 'tenants_enrich', 'backfill'),
@@ -259,7 +262,17 @@ insert into public.presence_change_ledger (number, name, how) values
   (235, 'stripe_daily_check', 'backfill'),
   (245, 'deleted_customers', 'backfill'),
   (246, 'history_trim', 'backfill'),
-  (247, 'health_counts', 'backfill')
+  (247, 'health_counts', 'backfill'),
+  (249, 'invoice_changes_reminders', 'backfill'),
+  (250, 'invoice_settings_costs', 'backfill'),
+  (251, 'fill_paid_ref', 'backfill'),
+  (252, 'client_reminders', 'backfill'),
+  (253, 'backup_codes', 'backfill'),
+  (254, 'portal_slug', 'backfill'),
+  (255, 'goes_to_customers', 'backfill'),
+  (265, 'client_runs_site', 'backfill'),
+  (266, 'old_tables_tidy', 'backfill'),
+  (267, 'account_checks', 'backfill')
 on conflict (number) do nothing;
 -- BACKFILL-LIST-END
 
