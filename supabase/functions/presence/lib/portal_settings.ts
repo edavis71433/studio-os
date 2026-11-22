@@ -50,6 +50,18 @@ export interface SignIn { google: boolean; password: boolean }
  *  "They usually reply within a day" was fixed text no studio set; now the studio picks a reply
  *  time and may add its working hours, and the portal says exactly that, or nothing at all. */
 export interface ReplyWords { within: ReplyWithin; hours: string }
+/** Builder items 247 and 335 (Nov 22 review), direction A: the portal's look is the studio's.
+ *  A cover picture (one of the studio's own files) for the sign-in page, and the heading font. */
+export interface PortalLook { cover_media_id: string | null; heading_font: HeadingFont }
+export const HEADING_FONTS = ['fraunces', 'inter'] as const;
+export type HeadingFont = typeof HEADING_FONTS[number];
+const MEDIA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function cleanLook(v: unknown): PortalLook {
+  const r = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const cover = typeof r.cover_media_id === 'string' && MEDIA_ID.test(r.cover_media_id) ? r.cover_media_id.toLowerCase() : null;
+  const font = (HEADING_FONTS as readonly string[]).includes(String(r.heading_font || '')) ? String(r.heading_font) as HeadingFont : 'fraunces';
+  return { cover_media_id: cover, heading_font: font };
+}
 export const REPLY_WITHIN = ['', 'within a few hours', 'within one business day', 'within two business days', 'within a week'] as const;
 export type ReplyWithin = typeof REPLY_WITHIN[number];
 export const REPLY_HOURS_MAX = 60;
@@ -62,7 +74,7 @@ export function cleanReply(v: unknown): ReplyWords {
   return { within, hours };
 }
 export const SIGNIN_KEYS = ['google', 'password'] as const;
-export interface PortalSettings { off: PortalPart[]; clients: Record<string, ClientChoices>; welcome: string; home_off: HomeCard[]; parts_at: string | null; previewed_at: string | null; signin: SignIn; reply: ReplyWords; reminders_off: string[] }
+export interface PortalSettings { off: PortalPart[]; clients: Record<string, ClientChoices>; welcome: string; home_off: HomeCard[]; parts_at: string | null; previewed_at: string | null; signin: SignIn; reply: ReplyWords; reminders_off: string[]; look: PortalLook }
 
 const SITE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isSiteId = (v: unknown): v is string => typeof v === 'string' && SITE_ID.test(v);
@@ -114,7 +126,8 @@ export function normalizePortal(raw: unknown): PortalSettings {
   return { off: partsOf(r.off), clients, welcome: cleanWelcome(r.welcome), home_off: cardsOf(r.home_off), parts_at: isoOrNull(r.parts_at), previewed_at: isoOrNull(r.previewed_at),
     signin: { google: si.google === true, password: si.password !== false }, reply: cleanReply(r.reply),
     // builder item 336: the clients the studio asked us not to remind (their site ids)
-    reminders_off: Array.from(new Set((Array.isArray(r.reminders_off) ? r.reminders_off : []).filter(isSiteId).map((id) => String(id).toLowerCase()))).slice(0, PORTAL_MAX_CLIENTS) };
+    reminders_off: Array.from(new Set((Array.isArray(r.reminders_off) ? r.reminders_off : []).filter(isSiteId).map((id) => String(id).toLowerCase()))).slice(0, PORTAL_MAX_CLIENTS),
+    look: cleanLook(r.look) };
 }
 
 /** Is this part shown to this client? The client's own choice first, else the studio's. Pure. */
@@ -131,7 +144,7 @@ export function resolveOff(s: PortalSettings, clientSiteId: string | null | unde
   return PORTAL_PARTS.filter((p) => off.has(p));
 }
 
-export interface StudioChange { part?: { key: PortalPart; shown: boolean }; card?: { key: HomeCard; shown: boolean }; welcome?: string; signin?: { key: typeof SIGNIN_KEYS[number]; on: boolean }; reply?: ReplyWords }
+export interface StudioChange { part?: { key: PortalPart; shown: boolean }; card?: { key: HomeCard; shown: boolean }; welcome?: string; signin?: { key: typeof SIGNIN_KEYS[number]; on: boolean }; reply?: ReplyWords; look?: PortalLook }
 /** The studio-wide change Settings sends, one thing at a time so two quick flips (or two
  *  people) never undo each other: { part, shown }, { card, shown } or { welcome }. Pure. */
 export function pickStudioChange(b: unknown): StudioChange {
@@ -143,6 +156,7 @@ export function pickStudioChange(b: unknown): StudioChange {
   const si = (r.signin && typeof r.signin === 'object' ? r.signin : {}) as Record<string, unknown>;
   if ((SIGNIN_KEYS as readonly string[]).includes(String(si.key)) && typeof si.on === 'boolean') out.signin = { key: si.key as typeof SIGNIN_KEYS[number], on: si.on };
   if (r.reply && typeof r.reply === 'object') out.reply = cleanReply(r.reply);   // item 353
+  if (r.look && typeof r.look === 'object') out.look = cleanLook(r.look);   // items 247 and 335
   return out;
 }
 /** The change applied to what's stored now (read just before the write). A part's switch
@@ -152,7 +166,7 @@ export function applyStudioChange(cur: PortalSettings, change: StudioChange, now
   if (change.part) { if (change.part.shown) off.delete(change.part.key); else off.add(change.part.key); }
   if (change.card) { if (change.card.shown) homeOff.delete(change.card.key); else homeOff.add(change.card.key); }
   const signin = change.signin ? { ...cur.signin, [change.signin.key]: change.signin.on } : cur.signin;
-  return normalizePortal({ ...cur, off: [...off], home_off: [...homeOff], welcome: change.welcome === undefined ? cur.welcome : change.welcome, parts_at: change.part ? nowIso : cur.parts_at, signin, reply: change.reply || cur.reply });
+  return normalizePortal({ ...cur, off: [...off], home_off: [...homeOff], welcome: change.welcome === undefined ? cur.welcome : change.welcome, parts_at: change.part ? nowIso : cur.parts_at, signin, reply: change.reply || cur.reply, look: change.look || cur.look });
 }
 /** One client's change: { part, shown: true | false | null } (null: back to the studio's
  *  choice for that part) or { reset: true } (every part back to the studio's). Pure. */
