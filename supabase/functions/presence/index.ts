@@ -255,6 +255,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // The branded, print-ready Document of Record — server-rendered HTML, opened
     // directly in a browser and saved as PDF. Authorized ONLY by a signed `doc`
     // token (site_id inside it); renders existing immutable rows, never mutates.
+    // sales item 172: the client says they paid another way, under the invoice's own token (public)
+    m = route.match(/^\/sales\/doc\/([^/]+)\/said-paid$/);
+    if (m && method === 'POST') return (await import('./routes/invoice_changes.ts')).handleSaidPaid(req, m[1], cors);
     m = route.match(/^\/sales\/doc\/(.+)$/);
     if (m && method === 'GET') return handleSalesDocument(req, m[1], cors);
     m = route.match(/^\/sales\/proposals\/([0-9a-f-]{36})\/decide$/);
@@ -923,8 +926,15 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     // hand on one paid by hand, and send one reminder now (lazy: routes/invoice_changes.ts)
     m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})$/);
     if (m && method === 'PATCH') return (await import('./routes/invoice_changes.ts')).handleInvoiceEdit(req, site, principal, m[1], cors);
-    m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/(remind|money-back)$/);
-    if (m && method === 'POST') return m[2] === 'remind' ? (await import('./routes/invoice_changes.ts')).handleInvoiceRemindNow(req, site, principal, m[1], cors) : (await import('./routes/invoice_changes.ts')).handleInvoiceMoneyBack(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/invoices\/([0-9a-f-]{36})\/(remind|money-back|not-paid)$/);
+    if (m && method === 'POST') { const ic = await import('./routes/invoice_changes.ts'); return m[2] === 'remind' ? ic.handleInvoiceRemindNow(req, site, principal, m[1], cors) : m[2] === 'not-paid' ? ic.handleInvoiceNotPaid(req, site, principal, m[1], cors) : ic.handleInvoiceMoneyBack(req, site, principal, m[1], cors); }
+    // sales item 171: a customer's statement (a PDF, or emailed); item 176: costs paid for a customer
+    if (route === '/sales/statement' && method === 'GET') return (await import('./routes/statement.ts')).handleStatement(req, site, principal, cors);
+    if (route === '/sales/statement/email' && method === 'POST') return (await import('./routes/statement.ts')).handleStatementEmail(req, site, principal, cors);
+    m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/costs$/);
+    if (m && (method === 'GET' || method === 'POST')) return (await import('./routes/costs.ts')).handleDealCosts(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/costs\/([0-9a-f-]{36})$/);
+    if (m && (method === 'PATCH' || method === 'DELETE')) return (await import('./routes/costs.ts')).handleCost(req, site, principal, m[1], cors);
     // Sales item 127: the proof Studio OS holds for a disputed payment, in one zip (lazy: rarely needed)
     m = route.match(/^\/sales\/disputes\/([0-9a-f-]{36})\/proof$/);
     if (m && method === 'GET') return (await import('./routes/dispute_proof.ts')).handleDisputeProof(req, site, principal, m[1], cors);
@@ -974,8 +984,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'DELETE') return handleSalesContractDelete(site, principal, m[1], cors);
     // Mint the printable Document-of-Record URL for the deal drawer (proposal /
     // contract / invoice). Studio-gated & site-scoped like every authed /sales/*.
-    m = route.match(/^\/sales\/(proposals|contracts|invoices|estimates)\/([0-9a-f-]{36})\/document$/);
-    if (m && method === 'GET') return handleSalesDocumentLink(site, (m[1] === 'invoices' ? 'invoice' : m[1] === 'contracts' ? 'contract' : m[1] === 'estimates' ? 'estimate' : 'proposal'), m[2], cors);
+    m = route.match(/^\/sales\/(proposals|contracts|invoices|estimates|charges)\/([0-9a-f-]{36})\/document$/);
+    if (m && method === 'GET') return handleSalesDocumentLink(site, (m[1] === 'invoices' ? 'invoice' : m[1] === 'contracts' ? 'contract' : m[1] === 'estimates' ? 'estimate' : m[1] === 'charges' ? 'charge' : 'proposal'), m[2], cors);   // charges: a retainer charge's receipt (sales item 163)
     // ── item 47: estimates (a price before anything is agreed) and recurring
     //    invoices (a fresh bill on a schedule). Studio-gated & site-scoped like
     //    every authed /sales/* route; the client's answer is pre-auth above. ──

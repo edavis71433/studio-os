@@ -1556,6 +1556,8 @@ function renderBillingTab(host){
         <a class="abtn" href="${esc(link)}#schedule" style="text-decoration:none">Payment schedule (in pipeline)</a>
         ${retLive?'':'<button type="button" class="abtn" data-bform="retainer">Set up a retainer</button>'}
         <a class="abtn" href="${esc(link)}#recSec" style="text-decoration:none">Recurring invoice (in pipeline)</a>
+        <button type="button" class="abtn" data-bform="statement">Statement</button>
+        <button type="button" class="abtn" data-bform="cost">Add a cost</button>
       </div></span></span></div>
   </div></section>`;
   if(noEmail)html+=`<p class="muted" style="margin:0 0 12px;font-size:13.5px">There’s no email on this client, so nothing can be emailed — links are copied for you to send. Add their email under Details.</p>`;
@@ -1586,7 +1588,10 @@ function renderBillingTab(host){
     else{state=`<span class="schip ${MONEY_TONE[st]}">${MONEY_WORD[st]}</span>`;
       if(parts.length)sub=(sub?sub+' · ':'')+esc(fmtC(parts.reduce((a,b)=>a+(b.amount_cents||0),0)))+' paid so far';
       if(!v.stripe_url)sub=(sub?sub+' · ':'')+(parts.length?'Send it for a link for what’s left':'Not sent yet');
+      if(v.late_fee_cents>0)sub=(sub?sub+' · ':'')+'incl. '+esc(fmtC(v.late_fee_cents))+' late fee';   // sales item 167
       due=v.due_date?esc(dueLabel(v.due_date)):'On receipt'; dueCls=st==='overdue'?'due':'';
+      // sales item 172: the client says they paid another way; Confirm records it, Not received puts the reminders back
+      if(v.client_says_paid){sub=(sub?sub+' · ':'')+'<b>They say they paid '+esc((PAY_WORDS[v.client_says_paid.method]||'Paid').replace(/^Paid ?/,'')||'another way')+(v.client_says_paid.on?' on '+esc(dueLabel(v.client_says_paid.on)):'')+'</b>';acts+=act(`data-confirm-inv="${esc(v.id)}"`,'Confirm','Record the payment they say they made')+act(`data-notpaid-inv="${esc(v.id)}"`,'Not received','The money never came: reminders carry on');}
       acts+=act(`data-pay-inv="${esc(v.id)}"`,'Record payment','Paid by check, cash, bank transfer or Zelle? Mark it paid here');
       acts+=act(`data-send-inv="${esc(v.id)}"`,v.stripe_url?'Resend':'Send');
       if(v.stripe_url)acts+=act(`data-copy="${esc(v.stripe_url)}"`,'Copy link')+act(`data-remind-inv="${esc(v.id)}"`,'Remind now','One reminder email now, in words for where the invoice stands');   // sales item 166
@@ -1660,8 +1665,11 @@ function renderBillingTab(host){
       return `<div class="rrow brow"><span class="rt"><strong>Recurring invoice</strong> · ${esc(s.title||'Invoice')} · ${esc(fmtC(s.amount_cents))} ${esc(everyWord(s.every))}<span class="s">${esc([state,count].filter(Boolean).join(' · '))}</span></span><span class="racts">${chip}${acts}</span></div>`;
     }).join('');
   html+=`<section id="bRecurring"><h2>Ongoing</h2><div class="card">${ongoing||`<p class="muted" style="font-size:13.5px;margin:0">Nothing recurring. A retainer charges the same amount every month or year once they authorize it with Stripe; a recurring invoice sends them a fresh bill on a schedule that they pay themselves. Both are under More.</p>`}<div id="rform"></div></div></section>`;
+  // sales item 176: costs paid for this customer (read after the tab draws; the card fills itself)
+  html+=`<section id="bCosts" hidden><h2>Costs paid for them</h2><div class="card" id="costsCard"><p class="muted" style="font-size:13.5px;margin:0">Loading…</p></div></section>`;
   host.innerHTML=html;
   wireBilling(host,d);
+  loadCosts(d.id);   // sales item 176
   // the one main button does the next step
   const nx=host.querySelector('#moneyNext'); if(nx)nx.addEventListener('click',async()=>{
     const a=nx.getAttribute('data-next')||'';   // 'both' never lands here: that button is #sendBothBtn, which wireBilling's [data-send-both] handles
@@ -1730,6 +1738,9 @@ function wireBilling(host,d){
       toast((v.payment_for?'Part payment undone. Its amount is due again.':`Payment undone. ${no} is open again.`)+link+(x.moved_back?' The deal is back where it was.':''));reloadDeal();}
     else{toast((r.body&&r.body.message)||'Couldn’t undo it.','err');b.disabled=false;}}));
   const ea=host.querySelector('[data-edit-address]'); if(ea)ea.addEventListener('click',()=>{WANT_EDIT='ec-address';showTab('details');});   // item 81
+  // sales item 172: Confirm opens Record payment with what they said; Not received clears it
+  host.querySelectorAll('[data-confirm-inv]').forEach(b=>b.addEventListener('click',()=>{const v=((DEAL&&DEAL.invoices)||[]).find(x=>x.id===b.getAttribute('data-confirm-inv'));const row=b.closest('tr');if(!v||!row)return;payForm(row,v);const sp=v.client_says_paid||{};const how=host.querySelector(`#payhost input[name="pf-how"][value="${sp.method}"]`)||document.querySelector(`#payhost input[name="pf-how"][value="${sp.method}"]`);if(how)how.checked=true;const on=$('pf-on');if(on&&sp.on)on.value=String(sp.on).slice(0,10);}));
+  host.querySelectorAll('[data-notpaid-inv]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await apiAg('/sales/invoices/'+b.getAttribute('data-notpaid-inv')+'/not-paid','POST',{});if(r.ok){toast('Noted: not received. Reminders carry on.');reloadDeal();}else{toast((r.body&&r.body.message)||'That didn’t go through.','err');b.disabled=false;}}));
   // sales item 166: one reminder now
   host.querySelectorAll('[data-remind-inv]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await apiAg('/sales/invoices/'+b.getAttribute('data-remind-inv')+'/remind?today='+recTodayYmd(),'POST',{});if(r.ok){const x=(r.body&&r.body.data)||{};toast('Reminder emailed to '+(x.to_first||'the client')+'.');}else toast((r.body&&r.body.message)||'The reminder didn’t go out.','err');b.disabled=false;}));
   // sales item 162: change an unpaid invoice, under its row
@@ -1960,6 +1971,8 @@ function billingForm(kind){
   const today=recTodayYmd();   // item 65: after 5pm in Los Angeles the UTC slice refused today as a due date
   const c=DEAL.contact||REC.header||{};
   const who=[c.company,c.name].filter(Boolean).join(', ')||'the client';
+  if(kind==='statement'){statementForm(host,d);return;}
+  if(kind==='cost'){costForm(host,d);return;}
   if(kind==='retainer'){
     host.innerHTML=`<div class="bform"><div class="brow2"><label>Amount (USD)<input type="number" id="bf-amt" step="0.01" min="1" placeholder="500"></label><label>Every<select id="bf-int"><option value="month">month</option><option value="year">year</option></select></label></div><div class="bacts"><button type="button" id="bf-cancel">Cancel</button><button type="button" class="primary" id="bf-go">Start retainer</button></div></div>`;
   }else{
@@ -2029,6 +2042,62 @@ function billingForm(kind){
     if(ev&&ev.detail&&ev.detail.save)body.send=false;   // saved as a draft: numbered, not sent (sales item 141's "Not sent yet")
     await sendMoney(body,host);
   });
+}
+// ── sales item 171: a customer's statement, picked by dates, downloaded as a PDF or emailed ──
+function statementForm(host,d){
+  const today=recTodayYmd(); const jan=today.slice(0,4)+'-01-01';
+  host.innerHTML=`<div class="bform" role="group" aria-labelledby="st-h"><p class="pf-h" id="st-h">Statement for this customer</p><p class="muted" style="font-size:13px;margin:0 0 8px">One page: every invoice, payment, charge and refund in those days, with the balance as it went.</p>
+    <div class="brow2"><label>From<input type="date" id="st-from" value="${jan}" max="${today}"></label><label>To<input type="date" id="st-to" value="${today}" max="${today}"></label></div>
+    <p class="muted" id="st-err" role="alert" style="font-size:13px;margin:6px 0 0" hidden></p>
+    <div class="bacts"><button type="button" id="st-cancel">Cancel</button><button type="button" id="st-email">Email it to them</button><button type="button" class="primary" id="st-dl">Download the PDF</button></div></div>`;
+  host.scrollIntoView({block:'center',behavior:'smooth'});
+  const err=(m)=>{const e=$('st-err');e.textContent=m;e.hidden=!m;};
+  const range=()=>{const f=$('st-from').value,t=$('st-to').value;if(!f||!t){err('Pick the first and last day.');return null;}return{f,t};};
+  $('st-cancel').addEventListener('click',()=>{host.innerHTML='';});
+  $('st-dl').addEventListener('click',async()=>{const r=range();if(!r)return;const b=$('st-dl');b.disabled=true;err('');
+    try{const res=await ddsApi.raw('/sales/statement?deal='+encodeURIComponent(d.id)+'&from='+r.f+'&to='+r.t+'&tzo='+new Date().getTimezoneOffset()+'&today='+recTodayYmd(),{scope:ownBusiness()});
+      if(!res.ok||!/pdf/.test(res.headers.get('Content-Type')||'')){const x=await res.json().catch(()=>({}));throw new Error((x&&x.message)||(res.status===404?'Statements arrive with the next update.':'The statement didn’t download. Try again.'));}
+      const blob=await res.blob();const name=(/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition')||'')||[])[1]||'Statement.pdf';const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);toast('Downloaded '+name);}
+    catch(x){err(x&&x.message?x.message:'The statement didn’t download. Try again.');}
+    b.disabled=false;});
+  $('st-email').addEventListener('click',async()=>{const r=range();if(!r)return;const b=$('st-email');b.disabled=true;err('');
+    const res=await apiAg('/sales/statement/email?tzo='+new Date().getTimezoneOffset()+'&today='+recTodayYmd(),'POST',{deal:d.id,from:r.f,to:r.t});
+    if(res.ok){toast('Statement emailed to '+(((res.body||{}).data||{}).to_first||'the customer')+'.');host.innerHTML='';}else{err((res.body&&res.body.message)||'The statement didn’t send.');b.disabled=false;}});
+}
+// ── sales item 176: costs paid for this customer ──
+let COSTS=null;
+async function loadCosts(dealId){
+  const sec=$('bCosts'),card=$('costsCard'); if(!sec||!card||!dealId)return;
+  const r=await apiAg('/sales/deals/'+encodeURIComponent(dealId)+'/costs');
+  if(r.status===503||r.status===404){sec.hidden=true;COSTS=null;return;}   // before the database update: nothing to show
+  if(!r.ok){card.innerHTML='<p class="muted" style="font-size:13.5px;margin:0">Couldn’t load the costs just now.</p>';sec.hidden=false;return;}
+  COSTS=(r.body&&r.body.data)||{items:[]};
+  const items=COSTS.items||[];
+  if(!items.length){sec.hidden=true;return;}
+  sec.hidden=false;
+  const inv=(DEAL&&DEAL.invoices)||[];
+  card.innerHTML=items.map(c=>{const on=c.invoice_id?inv.find(v=>v.id===c.invoice_id):null;const state=c.invoice_id?'On '+(on&&invNo(on.number)?invNo(on.number):'an invoice'):c.bill?'Goes on the next invoice':'Not billed to them';
+    return `<div class="rrow brow"><span class="rt">${esc(c.label)}<span class="s">${esc(dueLabel(c.spent_on))} · ${esc(state)}${c.note?' · '+esc(c.note):''}</span></span><span class="racts"><b>${esc(fmtC(c.amount_cents))}</b>${c.invoice_id?'':`<button type="button" class="rbtn" data-cost-bill="${esc(c.id)}" data-on="${c.bill?'1':''}">${c.bill?'Don’t bill it':'Bill it next'}</button><button type="button" class="rbtn" data-cost-del="${esc(c.id)}" data-needs="delete">Remove</button>`}</span></div>`;}).join('')
+    +(COSTS.unbilled_cents?`<p class="muted" style="font-size:13px;margin:8px 0 0">${esc(fmtC(COSTS.unbilled_cents))} goes on the next invoice you send, as its own lines.</p>`:'');
+  card.querySelectorAll('[data-cost-bill]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await apiAg('/sales/costs/'+b.getAttribute('data-cost-bill'),'PATCH',{bill:!b.getAttribute('data-on')});if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save.','err');b.disabled=false;return;}loadCosts(dealId);}));
+  card.querySelectorAll('[data-cost-del]').forEach(b=>b.addEventListener('click',async()=>{if(!(await ddsConfirm('Remove this cost? It was never billed, so nothing the customer saw changes.',null,'Remove cost',{danger:true})))return;b.disabled=true;const r=await apiAg('/sales/costs/'+b.getAttribute('data-cost-del'),'DELETE');if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t remove it.','err');b.disabled=false;return;}toast('Cost removed');loadCosts(dealId);}));
+}
+function costForm(host,d){
+  const today=recTodayYmd();
+  host.innerHTML=`<div class="bform" role="group" aria-labelledby="co-h"><p class="pf-h" id="co-h">A cost you paid for them</p>
+    <div class="brow2"><label>What for<input type="text" id="co-label" maxlength="200" placeholder="e.g. Domain renewal, example.com"></label><label>How much (USD)<input type="number" id="co-amt" step="0.01" min="0.01" placeholder="18.00"></label><label>The day you paid it<input type="date" id="co-on" value="${today}" max="${today}"></label></div>
+    <label class="pf-private">Note (optional)<input type="text" id="co-note" maxlength="300" placeholder="e.g. Namecheap order 12345"></label>
+    <label class="pf-rcpt"><input type="checkbox" id="co-bill" checked> Add it to the next invoice, as its own line</label>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 0">Listed in the bookkeeper file either way. A receipt photo can be kept in Files for now.</p>
+    <div class="bacts"><button type="button" id="co-cancel">Cancel</button><button type="button" class="primary" id="co-go">Save the cost</button></div></div>`;
+  host.scrollIntoView({block:'center',behavior:'smooth'});
+  setTimeout(()=>{$('co-label').focus({preventScroll:true});},100);
+  $('co-cancel').addEventListener('click',()=>{host.innerHTML='';});
+  $('co-go').addEventListener('click',async()=>{const go=$('co-go');const label=$('co-label').value.trim();const amt=Math.round((parseFloat($('co-amt').value)||0)*100);
+    if(!label){toast('Say what the cost was for.','err');$('co-label').focus();return;}if(!(amt>0)){toast('Enter what it cost.','err');$('co-amt').focus();return;}
+    go.disabled=true;const r=await apiAg('/sales/deals/'+encodeURIComponent(d.id)+'/costs?today='+today,'POST',{label,amount_cents:amt,spent_on:$('co-on').value||today,bill:$('co-bill').checked,note:$('co-note').value.trim()});
+    if(!r.ok){toast((r.body&&r.body.message)||'That cost didn’t save.','err');go.disabled=false;return;}
+    toast('Cost saved'+($('co-bill').checked?'. It goes on the next invoice.':'.'));host.innerHTML='';loadCosts(d.id);});
 }
 async function sendMoney(body,host){
   const d=(DEAL&&DEAL.deal)||{}; const label=body.purpose==='deposit'?'Deposit request':'Invoice';

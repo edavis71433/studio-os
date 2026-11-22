@@ -41,7 +41,7 @@ export async function readInvoiceBook(site: SiteRow, today: string, more = false
   // what came back through Stripe with APPLY-0233 (sales items 126, 127)
   // sales item 141: first_sent_at and link_gen (APPLY-0188) say whether an invoice ever went out
   // sales item 162: lines ride along (the page's Change dialog edits them); the export asked for them before
-  const shapes = [`${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status,first_sent_at,link_gen,lines`, `${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status${more ? ',lines' : ''}`, `${base},processing_since,number,paid_method,paid_note,payment_for${more ? ',lines' : ''}`, `${base},processing_since`, base];
+  const shapes = [`${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status,first_sent_at,link_gen,lines,client_says_paid,late_fee_cents`, `${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status,first_sent_at,link_gen,lines`, `${base},processing_since,number,paid_method,paid_note,payment_for,refunded_cents,dispute_status${more ? ',lines' : ''}`, `${base},processing_since,number,paid_method,paid_note,payment_for${more ? ',lines' : ''}`, `${base},processing_since`, base];
   const page = (sel: string, off: number) => svc(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&select=${sel}&order=created_at.desc,id.desc&limit=${PAGE}&offset=${off}`);
   let sel = shapes[0], r = await page(sel, 0);
   for (let i = 1; !r.ok && i < shapes.length; i++) { sel = shapes[i]; r = await page(sel, 0); }
@@ -90,6 +90,8 @@ export async function readInvoiceBook(site: SiteRow, today: string, more = false
       has_email: !!(p && p.email), first: p ? String(p.name || '').trim().split(/\s+/)[0] || '' : '',
       returned: returnedBy.get(String(i.id)) || [],
       note: String(i.description || ''), lines: Array.isArray(i.lines) ? i.lines : [],
+      // sales items 172, 167: what the client told us, and a late fee added
+      client_says_paid: i.client_says_paid && typeof i.client_says_paid === 'object' ? i.client_says_paid : null, late_fee_cents: Number(i.late_fee_cents) || 0,
       ...(more ? { paid_note: String(i.paid_note || '') } : {}),
     };
   });

@@ -27,7 +27,7 @@ import { scheduleView } from './proposal_schedule.ts';   // sales item 106: paid
 export interface DocBrand { name: string; accent: string; accentDark: string; logoUrl?: string | null }   // logoUrl: the studio's logo, a signed https link (item 59)
 const DEFAULT_BRAND: DocBrand = { name: 'Studio OS', accent: '#5b3fa0', accentDark: '#3a2470' };
 
-export type DocKind = 'proposal' | 'contract' | 'invoice' | 'estimate';   // estimate: item 47
+export type DocKind = 'proposal' | 'contract' | 'invoice' | 'estimate' | 'charge';   // estimate: item 47; charge: a retainer charge's receipt (sales item 163)
 
 // ── signed document token (own type `doc` so it can NEVER be mistaken for a
 //    sign/accept token — a doc link only ever RENDERS, it never mutates). Mirrors
@@ -36,7 +36,7 @@ export type DocKind = 'proposal' | 'contract' | 'invoice' | 'estimate';   // est
 export interface DocTokenPayload { t: 'doc'; k: DocKind; id: string; site_id: string; exp: number; e?: 1 }   // e: 1 = the copy linked from an email (item 69)
 function b64url(s: string): string { return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function unb64url(s: string): string { const pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : ''; return atob(s.replace(/-/g, '+').replace(/_/g, '/') + pad); }
-const isKind = (k: unknown): k is DocKind => k === 'proposal' || k === 'contract' || k === 'invoice' || k === 'estimate';
+const isKind = (k: unknown): k is DocKind => k === 'proposal' || k === 'contract' || k === 'invoice' || k === 'estimate' || k === 'charge';
 
 export async function signDocToken(payload: DocTokenPayload, secret: string): Promise<string> {
   const body = b64url(JSON.stringify(payload));
@@ -67,7 +67,7 @@ export async function verifyDocToken(token: string, secret: string, nowSec: numb
  *  what they say can change. Pure. */
 export function lastingRecord(kind: DocKind, row: { status?: unknown } | null | undefined): boolean {
   const st = String(row?.status || '');
-  return (kind === 'contract' && st === 'signed') || (kind === 'invoice' && st === 'paid');
+  return (kind === 'contract' && st === 'signed') || (kind === 'invoice' && st === 'paid') || kind === 'charge';   // a retainer charge's receipt is always a record (sales item 163)
 }
 
 // ── formatting (pure) ────────────────────────────────────────────────────────
@@ -85,7 +85,7 @@ export function utcStamp(iso: unknown): string {
 }
 // ── sales item 81: what a proper invoice carries beyond its own row ──────────
 /** A party on the page: the studio (From) or the client (Billed to). */
-export interface DocParty { name?: string; company?: string; email?: string; phone?: string; address?: string }
+export interface DocParty { name?: string; company?: string; email?: string; phone?: string; address?: string; taxId?: string }   // taxId: the studio's tax or licence number (sales item 168)
 /** A part payment recorded toward an invoice (item 77): its own paid row. */
 export interface DocPayment { amount_cents: number; paid_at?: string | null; paid_method?: string; paid_note?: string }
 /** Everything the page shows that isn't in the document's own row. All optional:
@@ -99,6 +99,9 @@ export interface DocContext {
   payments?: DocPayment[] | null;  // part payments recorded toward this invoice
   forWhat?: string | null;         // the deal it bills ("Website refresh")
   returned?: Array<{ cents: number; at: string | null; kind: string; method?: string }> | null;   // sales item 145: each refund or lost dispute on it, with its day; item 165: how, when given back by hand
+  payOther?: string | null;        // sales item 168: how else to pay (check, Zelle), from Settings
+  saidPaidUrl?: string | null;     // sales item 172: where the page posts "Paid another way? Tell us" (the invoice's own token)
+  saidPaid?: { method?: string; on?: string } | null;   // sales item 172: what the client already told us
 }
 /** Sales item 145 (Nov 22 2026 review): what a paid invoice's page and PDF say when money went
  *  back after it. The row stays `paid` and carries refunded_cents and dispute_status (APPLY-0233);
@@ -162,6 +165,7 @@ export function partyLines(p?: DocParty | null): string[] {
   push(p.name); push(p.company);
   for (const l of String(p.address || '').split(/\r?\n/)) push(l);
   push(p.email); push(p.phone);
+  if (String(p.taxId || '').trim()) push('Tax ID ' + String(p.taxId).trim());   // sales item 168
   return out;
 }
 export interface InvoiceLine { label: string; qty: number; amount_cents: number }
@@ -383,6 +387,11 @@ const forWhomOf = (ctx?: DocContext | null): string => String(ctx?.billTo?.compa
 const pdfButton = (label: string, solid = false): string => `<button type="button" class="btn${solid ? ' solid' : ''}" data-dlpdf>${esc(label)}</button>`;
 /** One party as a column: a small label, then its lines, the first in bold. */
 const partyBox = (k: string, lines: string[]): string => lines.length ? `<div class="party"><div class="k">${esc(k)}</div>${lines.map((l, i) => i === 0 ? `<div class="first">${esc(l)}</div>` : `<div>${esc(l)}</div>`).join('')}</div>` : '';
+/** Sales item 172: the small form posts how and when; the page then says so and keeps it. */
+function tellUsScript(url: string): string {
+  const j = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c');
+  return `<style>.tellus{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}.tellus summary{cursor:pointer;font-weight:600;color:var(--accent-deep);min-height:44px;display:flex;align-items:center}.tellus form{display:grid;gap:8px;margin-top:8px}.tellus label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--soft);font-weight:600}.tellus select,.tellus input{font:inherit;font-size:15px;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:#fff}.tellnote{font-size:12.5px;color:var(--soft);margin:0}.said{font-size:13.5px;color:var(--soft);margin-top:12px}.other div{font-size:14px}.print-only{display:none}@media print{.print-only{display:block}}</style><script>(function(){var u=${j(url)};var f=document.getElementById('tellForm');if(!f)return;f.addEventListener('submit',async function(e){e.preventDefault();var b=f.querySelector('button');b.disabled=true;var fd=new FormData(f);try{var r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({method:fd.get('method'),on:fd.get('on')})});var x=await r.json().catch(function(){return{}});if(!r.ok)throw new Error((x&&x.message)||'That didn’t go through.');var d=document.getElementById('tellUs');var p=document.createElement('p');p.className='said';p.textContent=(x.data&&x.data.words)||'Thank you. We have told the studio; reminders pause while they check.';d.replaceWith(p);}catch(err){b.disabled=false;document.getElementById('tellNote').textContent=err.message||'That didn’t go through. Try again.';}});})();</script>`;
+}
 /** The line under a document (sales item 79): a finished record (a signed agreement, a receipt)
  *  says its link keeps working; anything that can still change makes no promise about its link. Pure. */
 export function footerWords(name: string, lasting: boolean, hasPdf: boolean): string {
@@ -463,6 +472,17 @@ function renderLineItemsDocument(p: any, brandIn: Partial<DocBrand> | null | und
 export function invoiceDocLabel(v: any): string {
   return v?.status === 'paid' ? 'Receipt' : v?.purpose === 'deposit' ? 'Deposit request' : 'Invoice';
 }
+/** Sales item 168: how else to pay, as lines (one per line typed). Pure. */
+export function payOtherLines(s: unknown): string[] {
+  return String(s || '').split(/\r?\n|\s·\s|\s\|\s/).map((l) => l.trim()).filter(Boolean).slice(0, 8);
+}
+/** Sales item 172: the words under "Paid another way? Tell us", once the client has. Pure. */
+export function saidPaidWords(sp: { method?: string; on?: string } | null | undefined, tz?: string | null): string {
+  if (!sp) return '';
+  const how = payMethodWords(sp.method);
+  const day = dayLabel(sp.on, tz);
+  return `You told us you paid${how && how !== 'online' ? ' ' + how : ''}${day ? ' on ' + day : ''}. Thank you; reminders pause while it is checked.`;
+}
 export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null, ctx?: DocContext | null): string {
   const brand = brandOf(brandIn);
   const tz = ctx?.tz || null;
@@ -508,11 +528,16 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
   // A live pay link is an ACTION, not part of the printed record → no-print (the side card, and the bar a phone keeps at the bottom).
   const payUrl = (!paid && !voided && !settling && v?.stripe_url) ? String(v.stripe_url) : '';   // item 118: none while a bank payment settles
   const payLink = payUrl ? `<a class="paylink" href="${esc(payUrl)}">Pay ${esc(money(v?.amount_cents, currency))} securely →</a>` : '';
+  // sales item 168: how else to pay, under the pay button (and on paper)
+  const otherWays = !paid && !voided ? payOtherLines(ctx?.payOther) : [];
+  const otherHtml = otherWays.length ? `<div class="lbl" style="margin-top:16px">Other ways to pay</div><div class="other">${otherWays.map((l) => `<div>${esc(l)}</div>`).join('')}</div>` : '';
+  // sales item 172: the client can say they paid another way; the studio confirms
+  const tellUs = !paid && !voided && !settling && ctx?.saidPaidUrl ? (ctx.saidPaid ? `<p class="said" id="saidPaid">${esc(saidPaidWords(ctx.saidPaid, tz))}</p>` : `<details class="tellus" id="tellUs"><summary>Paid another way? Tell us</summary><form id="tellForm"><label>How<select name="method" required><option value="">Pick one</option><option value="check">Check</option><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option><option value="zelle">Zelle</option><option value="other">Another way</option></select></label><label>When<input name="on" type="date" required></label><button type="submit" class="btn solid">Tell ${esc(brand.name)}</button><p class="tellnote" id="tellNote">They check their bank and mark it paid. Reminders pause meanwhile.</p></form></details>`) : '';
   const note = paid ? (back.state ? back.note : 'Thank you — this is your receipt of payment.')
     : voided ? 'This request was voided and is no longer payable.'
     : settling ? 'Your payment is on its way. A bank payment takes a few days to arrive, and there is nothing more to do. You’ll get a receipt when it lands.'
     : `Payment is processed securely.${no ? ` Please quote ${no} with any payment by check or transfer.` : ''} This document is your copy of the request.`;
-  const body = `${parties}${table}<p class="note">${esc(note)}</p>`;
+  const body = `${parties}${table}<p class="note">${esc(note)}</p>${otherWays.length ? `<p class="note print-only">Other ways to pay: ${esc(otherWays.join(' · '))}</p>` : ''}`;
   // the side card: the amount and the one thing to do next
   const dueWords = v?.due_date ? `Due ${dayLabel(v.due_date, tz)}.` : 'Due on receipt.';
   const dl = ctx?.pdfUrl ? pdfButton(paid ? 'Download the receipt' : 'Download PDF', paid) : '';
@@ -522,10 +547,11 @@ export function renderInvoiceDocument(v: any, brandIn?: Partial<DocBrand> | null
       ? `<div class="lbl">Voided</div><div class="n struck">${esc(money(amount, currency))}</div><p>This request was voided and is no longer payable.</p>${dl}`
       : settling
       ? `<div class="lbl">Payment on its way</div><div class="n">${esc(money(amount, currency))}</div><p>A bank payment takes a few days to arrive. There is nothing more to do, and you’ll get a receipt when it lands.</p>${dl}`
-      : `<div class="lbl">Amount due</div><div class="n">${esc(money(amount, currency))}</div><p>${esc(dueWords)}${paidParts ? ` ${esc(money(paidParts, currency))} of ${esc(money(billed, currency))} is already paid.` : ''}</p>${payLink}${payLink ? '<p>A receipt comes by email as soon as it goes through.</p>' : ''}${payLink && dl ? '<hr>' : ''}${dl}`;
+      : `<div class="lbl">Amount due</div><div class="n">${esc(money(amount, currency))}</div><p>${esc(dueWords)}${paidParts ? ` ${esc(money(paidParts, currency))} of ${esc(money(billed, currency))} is already paid.` : ''}</p>${payLink}${payLink ? '<p>A receipt comes by email as soon as it goes through.</p>' : ''}${otherHtml}${tellUs}${(payLink || otherHtml) && dl ? '<hr>' : ''}${dl}`;
   const payBar = payLink ? `${ctx?.pdfUrl ? pdfButton('PDF') : ''}${payLink}` : '';
   const sub = [v?.created_at ? 'Issued ' + dayLabel(v.created_at, tz) : '', paid ? (dayLabel(v?.paid_at, tz) ? 'Paid ' + dayLabel(v.paid_at, tz) : '') : voided ? 'Voided' : settling ? 'Payment on its way' : (v?.due_date ? 'Due ' + dayLabel(v.due_date, tz) : 'Due on receipt')].filter(Boolean).join(' · ');
-  return shell({ title: `${heading}${no ? ' ' + no : ''} — ${brand.name}`, brand, kickerHtml: kicker(`<div class="doclabel">${esc(docLabel)}${no ? ' ' + esc(no) : ''}</div>`, forWhomOf(ctx)), heading, sub, figure: { label: totalLabel, amount: money(totalCents, currency), pillHtml: pill }, bannerHtml: banner, bodyHtml: body, asideHtml: aside, payBarHtml: payBar || undefined, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName, lasting: paid });
+  const page = shell({ title: `${heading}${no ? ' ' + no : ''} — ${brand.name}`, brand, kickerHtml: kicker(`<div class="doclabel">${esc(docLabel)}${no ? ' ' + esc(no) : ''}</div>`, forWhomOf(ctx)), heading, sub, figure: { label: totalLabel, amount: money(totalCents, currency), pillHtml: pill }, bannerHtml: banner, bodyHtml: body, asideHtml: aside, payBarHtml: payBar || undefined, pdfUrl: ctx?.pdfUrl, pdfName: ctx?.pdfName, lasting: paid });
+  return tellUs && ctx?.saidPaidUrl ? page.replace('</body>', tellUsScript(String(ctx.saidPaidUrl)) + '</body>') : page;
 }
 
 // ── CONTRACT (draft/sent = copy · signed = Document of Record) ────────────────
@@ -584,6 +610,6 @@ export function signaturesHtml(c: any, brand: DocBrand, ctx?: DocContext | null)
 export function renderDocument(kind: DocKind, data: any, brand?: Partial<DocBrand> | null, ctx?: DocContext | null): string {
   if (kind === 'proposal') return renderProposalDocument(data, brand, ctx);
   if (kind === 'estimate') return renderEstimateDocument(data, brand, ctx);
-  if (kind === 'invoice') return renderInvoiceDocument(data, brand, ctx);
+  if (kind === 'invoice' || kind === 'charge') return renderInvoiceDocument(data, brand, ctx);   // a retainer charge's receipt is drawn as a paid invoice (sales item 163)
   return renderContractDocument(data, brand, ctx);
 }

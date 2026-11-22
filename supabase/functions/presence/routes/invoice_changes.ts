@@ -25,7 +25,11 @@ import { raiseNotice } from '../lib/notice.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
 import { sendEmail } from '../commerce/account.ts';
 import { missingInsertColumns } from '../lib/inbound_email.ts';
-import { paidAtOf } from '../lib/invoice_billing.ts';
+import { paidAtOf, PAY_METHODS, PAY_METHOD_LABEL, type PayMethod } from '../lib/invoice_billing.ts';
+import { readDocToken, saidPaidWords } from '../lib/documents.ts';
+import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
+import { clearNotice, clearNoticePrefix } from '../lib/notice.ts';
+import { dayLabel } from '../lib/documents.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 
@@ -55,6 +59,69 @@ async function dealContact(siteId: string, dealId: unknown): Promise<{ name: str
   return { name: String(c?.name || ''), email: String(c?.email || '').trim() };
 }
 const wasSent = (inv: any) => !!(inv.stripe_url || inv.first_sent_at || Number(inv.link_gen) > 0);
+
+// ═══ 172. the client says they paid another way; the studio confirms or says not received ═══
+const SAID_PREFIX = (id: string) => `saidpaid:${id}:`;
+/** Pure: what the client sent, checked. */
+export function validateSaidPaid(b: any, todayYmd: string): { ok: true; value: { method: PayMethod; on: string } } | { ok: false; message: string } {
+  const method = String(b?.method || '') as PayMethod;
+  if (!(PAY_METHODS as readonly string[]).includes(method)) return { ok: false, message: 'Pick how you paid.' };
+  const on = String(b?.on || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(on) || !Number.isFinite(Date.parse(on + 'T12:00:00Z')) || on < '2000-01-01') return { ok: false, message: 'Enter the day you paid.' };
+  if (on > todayYmd) return { ok: false, message: 'That day hasn’t come yet.' };
+  return { ok: true, value: { method, on } };
+}
+/** POST /sales/doc/:token/said-paid (public, under the invoice's own signed token). */
+export async function handleSaidPaid(req: Request, token: string, cors: Record<string, string>): Promise<Response> {
+  if (!(await rateAllow(`said_paid:${clientIp(req)}`, 10, 60))) return tooMany(cors);
+  const { linkSecret } = await import('./sales.ts');
+  const secret = linkSecret();
+  if (!secret) return json({ error: 'unavailable', message: 'This isn’t available right now.' }, 503, cors);
+  const tok = await readDocToken(token, secret);
+  if (!tok || tok.k !== 'invoice') return json({ error: 'invalid_link', message: 'This link isn’t valid.' }, 403, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json', message: 'That didn’t come through. Try again.' }, 400, cors); }
+  const today = nowIso().slice(0, 10);
+  const v = validateSaidPaid(b, today);
+  if (!v.ok) return json({ error: 'validation', message: v.message }, 422, cors);
+  const got = await loadInvoice(tok.site_id, tok.id);
+  if (!got.ok) return json({ error: 'read_failed', message: 'Something went wrong. Try again in a moment.' }, 502, cors);
+  const inv = got.row;
+  if (!inv || inv.payment_for) return json({ error: 'not_found', message: 'This invoice is no longer here.' }, 404, cors);
+  if (inv.status === 'paid') return json({ data: { words: 'This invoice is already marked paid. Thank you.' } }, 200, cors);
+  if (inv.status !== 'open' || inv.processing_since) return json({ error: 'bad_state', message: inv.processing_since ? 'Your payment is already on its way.' : 'This invoice is no longer payable.' }, 409, cors);
+  const at = nowIso();
+  const claim = { method: v.value.method, on: v.value.on, at };
+  const up = await svc(`presence_invoices?id=eq.${inv.id}&site_id=eq.${tok.site_id}&status=eq.open&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ client_says_paid: claim, updated_at: at }) });
+  if (!up.ok) return json({ error: 'unavailable', message: 'This isn’t switched on yet. Reply to the email instead and we will mark it paid.' }, 503, cors);   // before APPLY-0250
+  if (!rows(up)[0]) return json({ error: 'conflict', message: 'This invoice just changed. Reload and take another look.' }, 409, cors);
+  // the studio's Needs-you line, once per claim; recording the payment or Not received takes it down
+  const site = rows(await svc(`presence_sites?id=eq.${tok.site_id}&select=client_id&limit=1`).catch(() => ({ json: [] })))[0];
+  const who = await dealContact(tok.site_id, inv.deal_id);
+  const no = invoiceNo(inv.number);
+  const first = String(who.name || '').trim().split(/\s+/)[0] || 'The client';
+  const amount = '$' + ((Number(inv.amount_cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+  if (site?.client_id) {
+    await raiseNotice({ siteId: tok.site_id, clientId: String(site.client_id), kind: 'client_said_paid', period: `${SAID_PREFIX(inv.id)}${at.slice(0, 10)}`,
+      headline: `${first} says they paid ${no || 'the invoice'} (${amount}) by ${PAY_METHOD_LABEL[v.value.method].toLowerCase()} on ${dayLabel(v.value.on)}`,
+      body: 'Check your bank. On the invoice, press Confirm to record the payment, or Not received to carry on reminding them. Reminders are paused meanwhile.' }).catch(() => false);
+  }
+  return json({ data: { words: saidPaidWords(claim, null) } }, 200, cors);
+}
+/** The claim and its line go: the payment was recorded, or the studio pressed Not received. */
+export async function clearSaidPaid(site: SiteRow, id: string): Promise<void> {
+  await svc(`presence_invoices?id=eq.${id}&site_id=eq.${site.id}&client_says_paid=not.is.null`, { method: 'PATCH', body: JSON.stringify({ client_says_paid: null }) }).catch(() => {});
+  if (site.client_id) await clearNoticePrefix(String(site.client_id), 'client_said_paid', SAID_PREFIX(id)).catch(() => {});
+}
+/** POST /sales/invoices/:id/not-paid: the money never came; the reminders carry on. */
+export async function handleInvoiceNotPaid(_req: Request, site: SiteRow, _principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const got = await loadInvoice(site.id, id);
+  if (!got.ok) return json({ error: 'read_failed', message: 'We couldn’t read that invoice just now. Try again.' }, 502, cors);
+  if (!got.row) return json({ error: 'not_found', message: 'That invoice is no longer here.' }, 404, cors);
+  await clearSaidPaid(site, id);
+  void clearNotice;
+  return json({ data: { ok: true, cleared: true } }, 200, cors);
+}
 
 // ═══ 162. Change an unpaid invoice ═══
 export async function handleInvoiceEdit(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {

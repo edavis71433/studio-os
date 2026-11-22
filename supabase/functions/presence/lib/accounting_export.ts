@@ -54,7 +54,9 @@ export interface BookRow {
   paid_method?: unknown; paid_note?: unknown; payment_for?: unknown; deal_title?: unknown; business?: unknown; person?: unknown; lines?: unknown; description?: unknown;
 }
 
-export const INVOICE_HEAD = ['InvoiceNo', 'Customer', 'InvoiceDate', 'DueDate', 'Memo', 'Item(Product/Service)', 'ItemDescription', 'ItemQuantity', 'ItemRate', 'ItemAmount', 'Status', 'PaidDate'];
+export const INVOICE_HEAD = ['InvoiceNo', 'Customer', 'InvoiceDate', 'DueDate', 'Memo', 'Item(Product/Service)', 'ItemDescription', 'ItemQuantity', 'ItemRate', 'ItemAmount', 'Status', 'PaidDate', 'Tax'];   // Tax: sales item 175
+/** Sales item 175: a tax line ("Tax (8.5%)") is not income. Pure. */
+export const isTaxLine = (label: unknown) => /^tax\b/i.test(String(label || '').trim());
 /** invoices.csv: each invoice issued in the period, open or paid (never a voided one, and a
  *  part payment is a payment, not an invoice), one row per line. Lines add up to what it
  *  billed: its amount now plus what was paid toward it in parts. Pure. */
@@ -73,13 +75,17 @@ export function invoiceExportRows(items: BookRow[], p: ExportPeriod, tzo = 0): {
     const paid = i.status === 'paid';
     const head = [no, who(i), usDate(day), usDate(due), memo];
     const tail = [paid ? 'Paid' : 'Open', paid ? usDate(localYmd(i.paid_at, tzo)) : ''];
-    const lines = invoiceLines({ lines: i.lines, title: i.title, description: i.description }, billed);
+    const all = invoiceLines({ lines: i.lines, title: i.title, description: i.description }, billed);
+    // sales item 175: sales tax is its own column, never a Services line filed as income
+    const taxCents = all.filter((l) => isTaxLine(l.label)).reduce((n, l) => n + l.amount_cents, 0);
+    const lines = all.filter((l) => !isTaxLine(l.label));
+    const taxCol = taxCents ? dollars(taxCents) : '';
     if (lines.every((l) => l.amount_cents >= 0)) {
-      for (const l of lines) out.push([...head, 'Services', l.label, String(l.qty), dollars(l.amount_cents / l.qty), dollars(l.amount_cents), ...tail]);
+      lines.forEach((l, n) => out.push([...head, 'Services', l.label, String(l.qty), dollars(l.amount_cents / l.qty), dollars(l.amount_cents), ...tail, n === 0 ? taxCol : '']));
     } else {
       // QuickBooks refuses a negative line: one line of what it billed, the lines spelled out
       const said = lines.map((l) => `${l.label} ${l.amount_cents < 0 ? '-' : ''}$${dollars(Math.abs(l.amount_cents))}`).join('; ');
-      out.push([...head, 'Services', said.slice(0, 4000), '1', dollars(billed), dollars(billed), ...tail]);
+      out.push([...head, 'Services', said.slice(0, 4000), '1', dollars(billed - taxCents), dollars(billed - taxCents), ...tail, taxCol]);
     }
     invoices++; cents += billed;
   }
@@ -90,6 +96,14 @@ export function invoiceExportRows(items: BookRow[], p: ExportPeriod, tzo = 0): {
 // payment taken by hand (check, cash, Zelle...) has no fee and was kept whole; one Stripe
 // took shows its fee once Stripe has been read (routes/accounting_export.ts, staff only).
 export const PAYMENT_HEAD = ['Date', 'Customer', 'Invoice', 'For', 'How it was paid', 'Amount', 'Stripe fee', 'You kept', 'Paid out on', 'Note'];
+// Sales item 176: costs paid for a customer, each on the day it was paid
+export const COST_HEAD = ['Date', 'Customer', 'What', 'Amount', 'On invoice', 'Note'];
+export interface CostOut { spent_on: string; customer: string; label: string; amount_cents: number; invoice_no: string; note: string }
+/** costs.csv: every cost paid in the period, oldest first. Pure. */
+export function costExportRows(costs: CostOut[], p: ExportPeriod): { rows: string[][]; costs: number; cents: number } {
+  const list = costs.filter((c) => inPeriod(String(c.spent_on || '').slice(0, 10), p)).sort((a, b) => String(a.spent_on).localeCompare(String(b.spent_on)));
+  return { rows: list.map((c) => [usDate(String(c.spent_on).slice(0, 10)), c.customer || 'Customer', String(c.label || '').slice(0, 200), dollars(c.amount_cents), c.invoice_no, String(c.note || '').slice(0, 300)]), costs: list.length, cents: list.reduce((n, c) => n + c.amount_cents, 0) };
+}
 export interface RetainerCharge { amount_cents: number; paid_at: string; customer: string; deal_title: string; stripe_invoice?: string }
 /** Money that went back (sales items 126, 127): a refund made in Stripe or a dispute lost,
  *  on the day it happened, or Stripe's dispute fee, on the day Stripe took it. `what` is
@@ -148,7 +162,7 @@ export function paymentExportRows(items: BookRow[], retainers: RetainerCharge[],
 /** READ-ME.txt: what the files hold and how to bring them into QuickBooks Online. `stripe`
  *  is set when Stripe's fees and payouts were read (sales item 133). */
 export function exportReadMe(p: ExportPeriod, inv: { invoices: number; cents: number }, pay: { payments: number; cents: number; returned?: number; returned_cents?: number; fee_cents?: number; kept_cents?: number; fees_missing?: number }, partial: boolean,
-  stripe: { payouts: number; cents: number; capped: boolean } | null = null): string {
+  stripe: { payouts: number; cents: number; capped: boolean } | null = null, costs: { costs: number; cents: number } | null = null): string {
   const money = (c: number) => '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return [
     `Export for your bookkeeper: ${usDate(p.from)} to ${usDate(p.to)}`,
@@ -158,6 +172,8 @@ export function exportReadMe(p: ExportPeriod, inv: { invoices: number; cents: nu
     ...(stripe ? [`              Stripe kept ${money(pay.fee_cents || 0)} in fees from the ones it took, so you kept ${money(pay.kept_cents || 0)}.`] : []),
     ...(pay.returned ? [`              ${pay.returned} row${pay.returned === 1 ? '' : 's'} of money that went back, ${money(pay.returned_cents || 0)} in all: refunds made in Stripe, disputes lost and Stripe's dispute fees, each with a minus amount on the day it went.`] : []),
     ...(stripe ? [`payouts.csv   ${stripe.payouts} payout${stripe.payouts === 1 ? '' : 's'} from Stripe due in these days, ${money(stripe.cents)} arrived. Each row is one deposit; its columns show what made it up.`] : []),
+    ...(costs && costs.costs ? [`costs.csv     ${costs.costs} cost${costs.costs === 1 ? '' : 's'} paid for customers in these days, ${money(costs.cents)} in all, each saying which invoice it went on.`] : []),
+    'invoices.csv has a Tax column: sales tax on an invoice is there, not among its Services lines.',
     ...(partial ? ['', 'Note: this studio has more invoices than one export reads (2,000). The oldest ones are left out; pick a shorter stretch of days to get them.'] : []),
     ...(stripe && pay.fees_missing ? ['', `Note: Stripe had no fee for ${pay.fees_missing} payment${pay.fees_missing === 1 ? '' : 's'} it took, so their Stripe fee and You kept are blank. Its dashboard has them.`] : []),
     ...(stripe && stripe.capped ? ['', 'Note: Stripe had more for these days than one export reads. Pick a shorter stretch of days to get all of it.'] : []),
