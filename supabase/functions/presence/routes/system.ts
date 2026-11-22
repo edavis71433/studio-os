@@ -190,38 +190,79 @@ function authorized(req: Request, body: any): boolean {
 const CRON_STALE_MS = 45 * 60_000;   // 3 missed 15-min ticks = the scheduler is dead
 const FAILURE_ALARM_24H = 10;        // sustained failures = something systemic
 
+// ── Builder item 403: every count the health check needs, in one trip ─────────────
+// The 5-minute alarm check made 16 or 17 reads, 6 or 7 of them one after another and
+// three of them twice, from Ohio, at about 200 ms each: 2.8 s a check, 288 times a day.
+// presence_health_counts (migration 0247) answers them all in one database trip. Before
+// 0247 the function isn't there (404): the same counts are read as one wave of reads
+// side by side, none twice. A database that can't answer at all leaves `counts` null.
+export interface HealthCounts {
+  active_sites: number; last_cycle: { status: string; started_at: string | null; finished_at: string | null; site_id: string | null } | null;
+  failures_24h: number; last_failure: { run_type: string; last_error: string; at: string } | null; stuck_runs: number;   // `at`: the watchdog's SQL reads last_failure->>'at'
+  live_sites: number; domains_watched: number; domains_soon: number; ent_paused: number; ent_lapsed: number;
+  notices: number; failed_publishes: number; ai_ops: number; paid_publishes_30d: number;
+}
+export async function readHealthCounts(now = Date.now()): Promise<HealthCounts | null> {
+  const nowIso = new Date(now).toISOString();
+  const r = await svc('rpc/presence_health_counts', { method: 'POST', body: '{}' }).catch(() => null);
+  if (r && r.ok && r.json && typeof r.json === 'object' && !Array.isArray(r.json)) {
+    const j = r.json as Record<string, unknown>;
+    const n = (k: string) => Number(j[k] ?? 0) || 0;
+    return {
+      active_sites: n('active_sites'), last_cycle: (j.last_cycle as HealthCounts['last_cycle']) || null,
+      failures_24h: n('failures_24h'), last_failure: j.last_failure ? { run_type: String((j.last_failure as any).run_type || ''), last_error: String((j.last_failure as any).last_error || '').slice(0, 300), at: String((j.last_failure as any).created_at || '') } : null,
+      stuck_runs: n('stuck_runs'), live_sites: n('live_sites'), domains_watched: n('domains_watched'), domains_soon: n('domains_soon'),
+      ent_paused: n('ent_paused'), ent_lapsed: n('ent_lapsed'), notices: n('notices'), failed_publishes: n('failed_publishes'), ai_ops: n('ai_ops'), paid_publishes_30d: n('paid_publishes_30d'),
+    };
+  }
+  if (r && !r.ok && r.status !== 404) return null;
+  // before 0247 (404), or an answer that isn't the counts: one wave, side by side, nothing read twice
+  const period = nowIso.slice(0, 7);
+  const soon = new Date(now + 30 * 86400_000).toISOString();
+  const since7 = new Date(now - 7 * 86400_000).toISOString();
+  const since24 = new Date(now - 24 * 3600_000).toISOString();
+  const since30 = new Date(now - 30 * 86400_000).toISOString();
+  const twoHoursAgo = new Date(now - 2 * 3600_000).toISOString();
+  try {
+    const [entActive, last, failures24h, lf, stuck, live, doms, domsSoon, entPaused, entLapsed, notices, failPub, aiRows, paid] = await Promise.all([
+      svcCount('presence_entitlements?product=eq.presence&status=eq.active'),
+      // Liveness reads the last FINISHED tick, not the last STARTED one: a chain that dies
+      // mid-run keeps inserting fresh 'running' rows, so finish time is the only honest signal.
+      svc('presence_scheduled_runs?run_type=in.(tick,cycle)&status=eq.done&finished_at=not.is.null&order=created_at.desc&select=status,started_at,finished_at,site_id&limit=1'),
+      svcCount(`presence_scheduled_runs?status=eq.failed&created_at=gte.${encodeURIComponent(since24)}`),
+      // the newest failure in its own words, so the watchdog's email can say WHY
+      svc(`presence_scheduled_runs?status=eq.failed&created_at=gte.${encodeURIComponent(since24)}&order=created_at.desc&select=run_type,last_error,created_at&limit=1`),
+      // runs stuck 'running' past any plausible invocation lifetime: the chain dies before its own reaper
+      svcCount(`presence_scheduled_runs?status=eq.running&started_at=lt.${encodeURIComponent(twoHoursAgo)}`),
+      svcCount('presence_sites?edition=eq.presence&offline_at=is.null&or=(status.eq.live,last_published_at.not.is.null)'),   // item 261: the one rule (lib/site_live.ts), as a count
+      svcCount('presence_sites?custom_domain=not.is.null'),
+      svcCount(`presence_sites?custom_domain=not.is.null&domain_expires_at=lte.${encodeURIComponent(soon)}&domain_expires_at=gte.${encodeURIComponent(nowIso)}`),
+      svcCount('presence_entitlements?product=eq.presence&status=eq.paused'),
+      svcCount('presence_entitlements?product=eq.presence&status=eq.lapsed'),
+      svcCount('presence_plan_notices?status=eq.active'),
+      svcCount(`presence_publishes?status=eq.failed&created_at=gte.${encodeURIComponent(since7)}`),
+      svcAll(`presence_ai_usage?period=eq.${period}&select=client_id,generative_ops,assistive_ops`, 'client_id'),
+      svcCount(`presence_publishes?netlify_deploy_id=not.is.null&created_at=gte.${encodeURIComponent(since30)}`),
+    ]);
+    if (!last.ok || entActive === null) return null;
+    const row = lf.json?.[0];
+    return {
+      active_sites: entActive ?? 0, last_cycle: last.json?.[0] || null, failures_24h: failures24h ?? 0,
+      last_failure: row ? { run_type: row.run_type, last_error: String(row.last_error || '').slice(0, 300), at: row.created_at } : null,
+      stuck_runs: stuck ?? 0, live_sites: live ?? 0, domains_watched: doms ?? 0, domains_soon: domsSoon ?? 0, ent_paused: entPaused ?? 0, ent_lapsed: entLapsed ?? 0,
+      notices: notices ?? 0, failed_publishes: failPub ?? 0,
+      ai_ops: (aiRows as Array<{ generative_ops?: number; assistive_ops?: number }>).reduce((n, r) => n + (r.generative_ops || 0) + (r.assistive_ops || 0), 0),
+      paid_publishes_30d: paid ?? 0,
+    };
+  } catch { return null; }
+}
+
 async function health(): Promise<any> {
   const secrets = validateSecrets();
-  // db reachability + cheap operational reads (exact counts — never fetch-to-count)
-  let dbOk = false, activeSites = 0, lastCycle: any = null, failures24h = 0, stuckRuns = 0, lastFailure: any = null;
-  try {
-    const ping = await svc('presence_sites?select=id&limit=1');
-    dbOk = ping.ok;
-    activeSites = (await svcCount('presence_entitlements?product=eq.presence&status=eq.active')) ?? 0;
-    // Liveness reads the last FINISHED tick — not the last STARTED one. A chain
-    // that dies mid-run keeps inserting fresh 'running' rows every 15 minutes,
-    // so measuring start time would report a healthy scheduler while trial
-    // expiry, billing enforcement, and all hygiene silently never complete.
-    // Finish time is the only honest liveness signal.
-    const last = await svc('presence_scheduled_runs?run_type=in.(tick,cycle)&status=eq.done&finished_at=not.is.null&order=created_at.desc&select=status,started_at,finished_at,site_id&limit=1');
-    lastCycle = last.json?.[0] || null;
-    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    failures24h = (await svcCount(`presence_scheduled_runs?status=eq.failed&created_at=gte.${since}`)) ?? 0;
-    // The newest failure in its own words, so the watchdog's email can say WHY.
-    // From Jul to Nov 2026 every tick failed on one refused cleanup step (0141)
-    // and nothing on the alert path said which.
-    if (failures24h > 0) {
-      const lf = await svc(`presence_scheduled_runs?status=eq.failed&created_at=gte.${since}&order=created_at.desc&select=run_type,last_error,created_at&limit=1`);
-      const row = lf.json?.[0];
-      if (row) lastFailure = { run_type: row.run_type, last_error: String(row.last_error || '').slice(0, 300), at: row.created_at };
-    }
-    // Runs stuck 'running' past any plausible invocation lifetime = the chain is
-    // dying before its own reaper (which is the LAST step of that same chain).
-    // Counted here so a persistently-dying tick pages even though nothing ever
-    // reaches 'failed' status on its own.
-    const twoHoursAgo = new Date(Date.now() - 2 * 3600_000).toISOString();
-    stuckRuns = (await svcCount(`presence_scheduled_runs?status=eq.running&started_at=lt.${encodeURIComponent(twoHoursAgo)}`)) ?? 0;
-  } catch { /* dbOk stays false */ }
+  // db reachability + the operational counts, in one trip (builder item 403)
+  const counts = await readHealthCounts();
+  const dbOk = !!counts;
+  const activeSites = counts?.active_sites ?? 0, lastCycle = counts?.last_cycle ?? null, failures24h = counts?.failures_24h ?? 0, stuckRuns = counts?.stuck_runs ?? 0, lastFailure = counts?.last_failure ?? null;
   // Top-level ok is what the external watchdog pages on, so it must reflect the
   // failures a human needs to hear about — not just "the box is on". A dead cron
   // (no COMPLETED tick in 45 min, once one has EVER completed), sustained
@@ -230,37 +271,22 @@ async function health(): Promise<any> {
   const cronStale = Number.isFinite(lastCycleAt) && (Date.now() - lastCycleAt) > CRON_STALE_MS;
   const failureAlarm = failures24h >= FAILURE_ALARM_24H || stuckRuns > 0;
   const ok = secrets.ok && dbOk && !cronStale && !failureAlarm;
-  const health_center = await computeHealthCenter().catch(() => null);
+  const health_center = await computeHealthCenter(counts).catch(() => null);
   return { ok, secrets, db_ok: dbOk, cron_stale: cronStale, failure_alarm: failureAlarm, stuck_runs: stuckRuns, active_sites: activeSites, last_cycle: lastCycle, failures_last_24h: failures24h, last_failure: lastFailure, health_center, checked_at: new Date().toISOString() };
 }
 
 // ── PT-8: the Admin Health Center — ONE unified operational read (no new monitoring).
 // Aggregates signals the platform already produces into one status per area.
 // Self-contained so it also powers the operator-authenticated /admin/health-center.
-export async function computeHealthCenter(): Promise<any> {
+// Builder item 403: the counts come in once (readHealthCounts); the health check hands
+// in the ones it already read, so nothing is read twice.
+export async function computeHealthCenter(counts?: HealthCounts | null): Promise<any> {
   const nowIso = new Date().toISOString();
-  const period = nowIso.slice(0, 7);
-  const soon = new Date(Date.now() + 30 * 86400_000).toISOString();
-  const since = new Date(Date.now() - 7 * 86400_000).toISOString();
-  const since24 = new Date(Date.now() - 24 * 3600_000).toISOString();
-  const arr = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []);
-  const cronQ = await svc('presence_scheduled_runs?run_type=in.(tick,cycle)&status=eq.done&finished_at=not.is.null&order=created_at.desc&select=status,started_at,finished_at&limit=1');
-  const lastCycle = arr(cronQ)[0] || null;
-  // Exact counts (HEAD + count=exact) — fetch-to-count went WRONG past the
-  // PostgREST max-rows cap, silently under-reporting at scale.
-  const [failedRuns, live, doms, domsSoon, entActive, entPaused, entLapsed, notices, failPub, aiUseQ] = await Promise.all([
-    svcCount(`presence_scheduled_runs?status=eq.failed&created_at=gte.${encodeURIComponent(since24)}`),
-    svcCount('presence_sites?edition=eq.presence&offline_at=is.null&or=(status.eq.live,last_published_at.not.is.null)'),   // item 261: the one rule (lib/site_live.ts), as a count
-    svcCount('presence_sites?custom_domain=not.is.null'),
-    svcCount(`presence_sites?custom_domain=not.is.null&domain_expires_at=lte.${encodeURIComponent(soon)}&domain_expires_at=gte.${encodeURIComponent(nowIso)}`),
-    svcCount('presence_entitlements?product=eq.presence&status=eq.active'),
-    svcCount('presence_entitlements?product=eq.presence&status=eq.paused'),
-    svcCount('presence_entitlements?product=eq.presence&status=eq.lapsed'),
-    svcCount('presence_plan_notices?status=eq.active'),
-    svcCount(`presence_publishes?status=eq.failed&created_at=gte.${encodeURIComponent(since)}`),
-    svcAll(`presence_ai_usage?period=eq.${period}&select=client_id,generative_ops,assistive_ops`, 'client_id').then((rows) => ({ ok: true, json: rows })),
-  ]);
-  const aiOps = (arr(aiUseQ) as Array<{ generative_ops?: number; assistive_ops?: number }>).reduce((n, r) => n + (r.generative_ops || 0) + (r.assistive_ops || 0), 0);
+  const c = counts === undefined ? await readHealthCounts() : counts;
+  const lastCycle = c?.last_cycle ?? null;
+  const [failedRuns, live, doms, domsSoon, entActive, entPaused, entLapsed, notices, failPub] = [c?.failures_24h, c?.live_sites, c?.domains_watched, c?.domains_soon, c?.active_sites, c?.ent_paused, c?.ent_lapsed, c?.notices, c?.failed_publishes];
+  const aiOps = c?.ai_ops ?? 0;
+
   const missing = Object.values(SECRET_GROUPS).flat().filter((d) => d.required && !envPresent(d.name)).map((d) => d.name);
   return summarizeHealthCenter({
     nowIso,
@@ -278,8 +304,11 @@ export async function computeHealthCenter(): Promise<any> {
     activeNotices: notices ?? 0,
     backupsVerified: envPresent('BACKUPS_VERIFIED'),
     stripeKey: heldKeyKind(),   // sales item 131: restricted or full-power, from the prefix alone
-    hosting: netlifyConfigured() ? await readHostPlan(nowIso, (await svcCount(`presence_publishes?netlify_deploy_id=not.is.null&created_at=gte.${encodeURIComponent(new Date(Date.now() - 30 * 86400_000).toISOString())}`).catch(() => null)) ?? 0).catch(() => null) : null,   // builder list item 269: the host's plan, as the host tells it; the paid publishes it knows of say whether "0 used" can be believed
-    stock: await stockHealth().catch(() => null),   // item 263: a refused photo key shows here, not only in a failed search
+    // builder item 403: the two calls out (the host's plan, the photo key) go side by side
+    ...await Promise.all([
+      netlifyConfigured() ? readHostPlan(nowIso, c?.paid_publishes_30d ?? 0).catch(() => null) : Promise.resolve(null),   // builder list item 269: the host's plan, as the host tells it; the paid publishes it knows of say whether "0 used" can be believed
+      stockHealth().catch(() => null),   // item 263: a refused photo key shows here, not only in a failed search
+    ]).then(([hosting, stock]) => ({ hosting, stock })),
   });
 }
 
@@ -325,6 +354,9 @@ export async function handleSystem(req: Request, route: string, method: string, 
   if (route === '/system/run' && method === 'POST') {
     const task = String(body?.task || 'cycle');
     const limit = Number.isFinite(body?.limit) ? Math.max(1, Math.min(200, Number(body.limit))) : undefined;
+    // Builder item 404: a tiny call every 4 minutes that touches nothing, so the worker the
+    // next person meets is already awake (a cold start cost 0.75 to 1.7 s on the first click).
+    if (task === 'ping') return json({ data: { ok: true, awake: true } }, 200, cors);
     try {
       if (task === 'retry') return json({ data: await retryFailedRuns(limit) }, 200, cors);
       if (task === 'coach') return json({ data: await runOperationsCycle({ limit, withCoach: true }) }, 200, cors);

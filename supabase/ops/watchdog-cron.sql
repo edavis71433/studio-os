@@ -181,11 +181,14 @@ begin
   end if;
 
   -- fire this tick's probe; the secret goes in a header, and anything after a
-  -- "?" in the stored address is dropped so it can never travel in the address
+  -- "?" in the stored address is dropped so it can never travel in the address.
+  -- Builder item 403: x-region asks the function to run beside the database (Oregon),
+  -- the header the app's pages send; from Ohio each read used to cross the country.
   select net.http_get(
     url := split_part((select decrypted_secret from vault.decrypted_secrets where name = 'watchdog_health_url'), '?', 1),
     headers := jsonb_build_object('x-system-secret',
-      coalesce((select decrypted_secret from vault.decrypted_secrets where name = 'watchdog_target_secret'), '')),
+      coalesce((select decrypted_secret from vault.decrypted_secrets where name = 'watchdog_target_secret'), ''),
+      'x-region', 'us-west-2'),
     timeout_milliseconds := 20000
   ) into req;
   update public.watchdog_state set last_request_id = req where id = 1;

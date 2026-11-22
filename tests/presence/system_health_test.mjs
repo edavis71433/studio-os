@@ -29,6 +29,8 @@ globalThis.fetch = async (input, init = {}) => {
   if (!url.startsWith(`${SB}/rest/v1/`)) throw new Error(`unexpected fetch ${url}`);
   const path = decodeURIComponent(url.slice(`${SB}/rest/v1/`.length));
   seen.push(`${method} ${path}`);
+  // a database before migration 0247 (builder item 403): the one-trip counts aren't there
+  if (path.startsWith('rpc/presence_health_counts')) return new Response(JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }), { status: 404, headers: { 'content-type': 'application/json' } });
   const runs = path.startsWith('presence_scheduled_runs');
   if (method === 'HEAD') {
     const n = runs && path.includes('status=eq.failed') ? world.failures
@@ -62,7 +64,8 @@ let r = await withHeader();
 ok('the secret in the x-system-secret header is accepted', r.status === 200, String(r.status));
 ok('a healthy production says ok:true', r.data?.ok === true && r.data?.failure_alarm === false);
 ok('...with no last_failure', r.data?.last_failure === null);
-ok('no failure, no extra read for one', !seen.some((s) => s.includes('select=run_type,last_error,created_at')));
+// builder item 403: before migration 0247 every count goes out as one wave, the newest failure's read with it, never as a second trip after the count
+ok('the newest failure is asked for in the same wave as the counts (one wave, before 0247)', seen.some((s) => s.includes('select=run_type,last_error,created_at')) && seen.filter((s) => s.startsWith('POST rpc/presence_health_counts')).length === 1);
 
 // ═══ 2. July to November: every tick failed on the refused prune ═══
 world = { failures: 96, stuck: 0, lastError: 'retention.evidence_runs failed' };
