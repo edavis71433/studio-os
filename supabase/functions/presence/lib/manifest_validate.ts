@@ -8,6 +8,7 @@ import type { SiteBlock, SnapshotContent } from './render_types.ts';
 import { sectionIdsFor } from './site_blocks.ts';
 import { jumpTarget, sectionLinks } from './section_links.ts';
 import { sampleWordWarnings } from './sample_words_check.ts';
+import { isStandIn } from './stand_in.ts';
 
 export interface ValidationResult {
   ok: boolean;
@@ -102,6 +103,8 @@ export function validateSnapshot(snapshot: Snapshot, manifest: TemplateManifest)
   for (const message of deadJumps(c)) w.push({ field: 'links', message });
   // item 275: sections still carrying the sample words a new section arrives with (a warning, never a block)
   for (const warn of sampleWordWarnings(c)) w.push(warn);
+  // item 332: a first draft opens with a stand-in picture until a real photo is swapped in (a warning, never a block)
+  if (isStandIn(c.settings?.cover?.alt)) w.push({ field: 'settings.cover', message: 'The photo at the top of your home page is a stand-in picture. Swap it for a photo of the business before people see it.' });
 
   // contract/template compatibility
   if (snapshot.content_contract_version !== manifest.content_contract_version) {

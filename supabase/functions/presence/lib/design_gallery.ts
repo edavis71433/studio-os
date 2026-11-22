@@ -85,6 +85,29 @@ export const FAMILY_BADGE: Record<Family, string> = {
   community: 'Good for nonprofits', other: 'A good start',
 };
 
+/** Item 332: + New site's optional first draft. Three things each kind of business usually
+ *  offers, filled in for the studio to change, and how the words can sound: each tone's name
+ *  on its chip, and what the writer is told. */
+export const STARTER_SERVICES: Record<Family, readonly string[]> = {
+  food: ['Dinner', 'Lunch', 'Catering'],
+  beauty: ['Haircuts and styling', 'Color', 'Treatments'],
+  home: ['Repairs', 'Installations', 'Maintenance'],
+  health: ['Checkups', 'Same-day visits', 'Preventive care'],
+  professional: ['Consultations', 'Ongoing support', 'Project work'],
+  retail: ['In-store shopping', 'Gift cards', 'Local delivery'],
+  fitness: ['Classes', 'Personal training', 'Memberships'],
+  creative: ['Portraits', 'Events', 'Weddings'],
+  community: ['Programs', 'Volunteering', 'Ways to give'],
+  other: [],
+};
+export const DRAFT_TONES: ReadonlyArray<{ key: string; label: string; words: string }> = [
+  { key: 'friendly', label: 'Friendly', words: 'friendly and welcoming' },
+  { key: 'professional', label: 'Professional', words: 'professional and clear' },
+  { key: 'warm', label: 'Warm', words: 'warm and personal' },
+  { key: 'bold', label: 'Bold', words: 'bold and confident' },
+  { key: 'calm', label: 'Calm', words: 'calm and reassuring' },
+];
+
 /** Which family an industry key belongs to; anything unknown is "other". */
 export function familyOf(industryKey: string | null | undefined): Family {
   const k = String(industryKey || '');
@@ -107,7 +130,8 @@ export function galleryIndustryKeys(): string[] {
 export function galleryPayload(templates: ReadonlyArray<{ slug: string; name: string }>) {
   return {
     designs: templates.map((t) => ({ slug: t.slug, name: t.name, line: DESIGN_WORDS[t.slug]?.line || '', good_for: DESIGN_WORDS[t.slug]?.good_for || '', picture: `/thumbs/templates/${t.slug}.jpg` })),
-    kinds: BUSINESS_KINDS.map((k) => ({ key: k.key, label: k.label, hint: k.hint, family: k.family, exact: k.exact })),
+    kinds: BUSINESS_KINDS.map((k) => ({ key: k.key, label: k.label, hint: k.hint, family: k.family, exact: k.exact, services: STARTER_SERVICES[k.family] })),
+    tones: DRAFT_TONES.map((t) => ({ key: t.key, label: t.label })),
     suggested: SUGGESTED,
     badges: FAMILY_BADGE,
     default_kind: 'generic',

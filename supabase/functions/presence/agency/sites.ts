@@ -835,9 +835,19 @@ export async function handleAgencySites(req: Request, route: string, method: str
     }
   }
 
-  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied|invite|trash|restore)$/);
+  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied|invite|trash|restore|first-draft)$/);
   if (!m) return null;
   const siteId = m[1], what = m[2];
+
+  // ── + New site's optional first draft (item 332): the starter draft into the site's private draft ──
+  if (what === 'first-draft' && method === 'POST') {
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notYours(cors);
+    const site = rowsOf<SiteRow>(await svc(`presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`))[0];
+    if (!site || site.edition === 'monitor') return notYours(cors);
+    const { handleFirstDraft } = await import('./first_draft.ts');
+    return handleFirstDraft(req, site, principal, cors);
+  }
 
   // ── a card's live thumbnail ──
   if (what === 'thumb' && method === 'GET') {
