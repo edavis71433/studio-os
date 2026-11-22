@@ -74,11 +74,14 @@ if (before) {
   ok('fewer calls than before', after.calls < before.calls, `${before.calls} → ${after.calls}`);
   ok('the chores run in the same order as before', JSON.stringify(afterOrder) === JSON.stringify(beforeOrder), afterOrder.join(','));
 }
-ok('39 chores, as listed', afterOrder.length === 39, String(afterOrder.length));
-ok('the progress note is written a bounded number of times (at most 6 of the 41)', after.noteWrites <= 6 && after.noteWrites >= 1, String(after.noteWrites));
+// sales item 163 (money polish, Nov 22) added a 40th chore, retainer_notes, right after invoice_nudges:
+// the week-before note for a yearly retainer, which reads the deals with a retainer on the daily Stripe
+// check's own path (commerce/retainers.ts retainerDealsPath), so this run's shared reads answer it
+ok('40 chores, as listed: retainer_notes (sales item 163) runs right after invoice_nudges', afterOrder.length === 40 && afterOrder.indexOf('retainer_notes') === afterOrder.indexOf('invoice_nudges') + 1, `${afterOrder.length}: ${afterOrder.join(',')}`);
+ok('the progress note is written a bounded number of times (at most 6 of the 42)', after.noteWrites <= 6 && after.noteWrites >= 1, String(after.noteWrites));
 {
   const row = db.tables.presence_scheduled_runs.find((x) => x.run_type === 'tick');
-  ok('…and the finished note carries every chore', row && row.status === 'done' && Object.keys(row.result?.progress || {}).length === 39 && row.finished_at, row ? Object.keys(row.result?.progress || {}).length : 'no row');
+  ok('…and the finished note carries every chore', row && row.status === 'done' && Object.keys(row.result?.progress || {}).length === 40 && row.finished_at, row ? Object.keys(row.result?.progress || {}).length : 'no row');
 }
 console.log(`\nCALLS per idle tick, 9 sites: before ${before ? before.calls : '?'} (${before ? before.reads : '?'} reads), after ${after.calls} (${after.reads} reads); progress notes ${before ? before.noteWrites : '?'} → ${after.noteWrites}`);
 

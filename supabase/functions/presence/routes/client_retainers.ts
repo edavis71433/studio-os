@@ -30,12 +30,23 @@ export async function clientRetainers(clientId: string): Promise<Array<Record<st
     const dr = await svc(`presence_deals?converted_client_id=eq.${clientId}&retainer=not.is.null&deleted_at=is.null&select=id,site_id,title,retainer&order=created_at.desc&limit=20`);
     const deals = dr.ok ? rows(dr) : [];
     if (!deals.length) return [];
-    const er = await svc(`presence_deal_events?deal_id=in.(${deals.map((d) => d.id).join(',')})&kind=eq.invoice_paid&select=deal_id,detail,created_at&order=created_at.desc&limit=500`);
+    const er = await svc(`presence_deal_events?deal_id=in.(${deals.map((d) => d.id).join(',')})&kind=eq.invoice_paid&select=id,deal_id,site_id,detail,created_at&order=created_at.desc&limit=500`);
+    // sales item 174: a charge refunded in Stripe (presence_money_returns, applies_to retainer, by its Stripe invoice) says so
+    const rr = await svc(`presence_money_returns?deal_id=in.(${deals.map((d) => d.id).join(',')})&applies_to=eq.retainer&counted_cents=gt.0&select=stripe_invoice,counted_cents,counted_at&limit=500`).catch(() => ({ ok: false, json: null }));
+    const back = new Map<string, { cents: number; at: string }>();
+    for (const x of rr.ok ? rows(rr) : []) { const k = String(x.stripe_invoice || ''); if (!k) continue; const prev = back.get(k); back.set(k, { cents: (prev?.cents || 0) + (Number(x.counted_cents) || 0), at: String(x.counted_at || prev?.at || '') }); }
+    // sales item 163: each charge's receipt is its own page (lib/documents.ts kind 'charge'), linked for 30 days
+    const { signDocToken } = await import('../lib/documents.ts');
+    const { linkSecret, docViewerUrl } = await import('./sales.ts');
+    const secret = linkSecret();
+    const exp = Math.floor(Date.now() / 1000) + 30 * 86400;
     const charges = new Map<string, RetainerCharge[]>();
     for (const e of er.ok ? rows(er) : []) {
       if (e?.detail?.retainer !== true) continue;
       const list = charges.get(String(e.deal_id)) || [];
-      list.push({ at: String(e.created_at || ''), amount: (Number(e.detail.amount_cents) || 0) / 100 });
+      const b = back.get(String(e.detail.stripe_invoice || ''));
+      const receipt = secret && e.id && e.site_id ? docViewerUrl(await signDocToken({ t: 'doc', k: 'charge', id: String(e.id), site_id: String(e.site_id), exp }, secret)) : null;
+      list.push({ at: String(e.created_at || ''), amount: (Number(e.detail.amount_cents) || 0) / 100, id: String(e.id || ''), refunded: b ? b.cents / 100 : 0, refunded_at: b ? b.at : null, receipt_url: receipt });
       charges.set(String(e.deal_id), list);
     }
     return deals.map((d) => retainerPortalView(d, charges.get(String(d.id)) || [])).filter((x): x is Record<string, unknown> => !!x);

@@ -151,7 +151,7 @@ test.describe('The Invoices page (item 85)', () => {
     await expect(tot.nth(0).locator('.v')).toHaveText('$2,800');      // open: 1,800 + 350 + 650
     await expect(tot.nth(1).locator('.v')).toHaveText('$650');        // one overdue
     await expect(tot.nth(2).locator('.v')).toHaveText(new Date(Date.now() - 86400000).getMonth() === new Date().getMonth() ? '$1,400' : /\$/);
-    await expect(page.locator('.chip')).toHaveText([/All\s*5/, /Unpaid\s*3/, /Overdue\s*1/, /Paid\s*1/, /Void\s*1/]);
+    await expect(page.locator('.chip')).toHaveText([/All\s*5/, /Unpaid\s*3/, /Overdue\s*1/, /Paid\s*1/, /Void\s*1/, /Who owes/]);   // sales item 171: who owes what, how old
     if (!isPhone(page)) {
       const rows = page.locator('tbody tr:not(.part)');
       await expect(rows).toHaveCount(5);

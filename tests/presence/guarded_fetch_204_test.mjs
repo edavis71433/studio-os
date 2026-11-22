@@ -113,7 +113,7 @@ const SAFE = {
   'routes/handover_pack.ts': [1, 'our own storage: a file the hand-over pack carries, read by its stored path'],
   'visual/model.ts': [2, 'the image model’s endpoint, from the platform’s own settings'],
   // scripts drawn into pages: the visitor's browser runs these, never the server
-  'lib/documents.ts': [1, 'a page script'], 'lib/feedback_panel.ts': [2, 'a page script'], 'lib/search_index.ts': [1, 'a page script'],
+  'lib/documents.ts': [2, 'two page scripts: Download PDF, and "Paid another way? Tell us" (sales item 172)'], 'lib/feedback_panel.ts': [2, 'a page script'], 'lib/search_index.ts': [1, 'a page script'],
   'lib/site_send.ts': [3, 'a page script'], 'routes/reviews.ts': [1, 'a page script'],
 };
 {
