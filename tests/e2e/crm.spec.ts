@@ -584,7 +584,7 @@ test.describe('Relationship view', () => {
     await expect(menu).toBeVisible();
     await expect(menu.locator('[data-send-prop="p-1"]')).toHaveText('Send the proposal only');
     await expect(menu.locator('[data-send-con="k-1"]')).toHaveText('Send the agreement only');
-    await expect(menu.locator('[data-bform="deposit"]')).toHaveText('Request deposit');
+    await expect(menu.locator('[data-bform="deposit"]')).toHaveText('Request a deposit');
     await page.keyboard.press('Escape');
     await expect(menu).toBeHidden();
     await expect(page.locator('#sendMore')).toBeFocused();
@@ -619,7 +619,7 @@ test.describe('Relationship view', () => {
     await expect(page.locator('#act-invoice')).not.toHaveClass(/primary/);   // the Path's "Mark stage complete" is the record's one filled button
     await expect(page.locator('#markComplete')).toHaveClass(/primary/);
     await expect(page.locator('.rrow [data-send-prop="p-1"]')).toHaveText('Send to client');
-    await expect(page.locator('h2 [data-bform="deposit"]')).toBeVisible();
+    await expect(page.locator('#sendMoreMenu [data-bform="deposit"]')).toHaveCount(1);   // sales item 164: the deposit sits under More on every screen
   });
 
   // Oct 2026 benchmark (item 2): the record's Billing tab prints the SAME four

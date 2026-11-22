@@ -71,7 +71,7 @@ test.describe('item 107 — Billing tells the truth', () => {
     });
     await page.route(`**/functions/v1/presence/sales/invoices/${INV_OPEN}/send`, (route) => { resent.push(route.request().method()); return route.fulfill(json({ data: { ...balance }, url: balance.stripe_url, emailed: true, resent: true, double_tap: false })); });
     await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
-    await billing(page).getByRole('button', { name: '+ Invoice' }).click();
+    await page.locator('#sendMore').click(); await page.locator('#sendMoreMenu [data-bform="invoice"]').click();   // sales item 164: under More
     await expect(page.locator('#bf-hint')).toHaveText('Leave the amount blank to bill what’s left of the accepted proposal: $3,000 of $5,000.');
     await page.locator('#bf-go').click();
     await expect.poll(() => posted.length).toBe(1);
@@ -87,7 +87,7 @@ test.describe('item 107 — Billing tells the truth', () => {
   test('J2: a proposal billed in full says so before anything is sent', async ({ page }) => {
     await installApp(page, { api: API({ proposals: [ACCEPTED], invoices: [{ ...PAID_DEPOSIT, amount_cents: 500000 }] }) });
     await page.goto(`/crm.html?client=${CLIENT}&tab=billing`);
-    await billing(page).getByRole('button', { name: '+ Invoice' }).click();
+    await page.locator('#sendMore').click(); await page.locator('#sendMoreMenu [data-bform="invoice"]').click();   // sales item 164: under More
     await expect(page.locator('#bf-hint')).toHaveText('The accepted proposal ($5,000) is billed in full. Enter an amount to bill something else.');
   });
 
