@@ -313,6 +313,7 @@
     .hl-v{font-size:16px}
   }
   .hl-s{font-size:12px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hl-v.wrap{white-space:normal;overflow-wrap:anywhere;font-size:15px;line-height:1.3}   /* sales item 194: the next step reads in full */
   .hl-edit{font-size:11.5px}
   /* the action bar: one filled button, quiet secondaries, the rest under More */
   .actbar{margin-top:var(--dds-s4,16px);gap:6px;align-items:center}
@@ -692,7 +693,7 @@ async function loadRecord(){
     if(q0.get('deal')||q0.get('project')){if(id.deal_id)to.set('deal',id.deal_id);if(id.project_id)to.set('project',id.project_id);}
     const t=q0.get('tab')||REC.default_tab||''; if(t)to.set('tab',t);
     if(q0.get('act'))to.set('act',q0.get('act'));
-    location.replace('/crm.html?'+to.toString()); return;
+    location.replace(location.pathname+'?'+to.toString()); return;
   }
   const want=QP().get('tab');
   if(want==='messages')FOCUS_COMPOSER=true;
@@ -707,7 +708,7 @@ async function loadRecord(){
   // deal has loaded; ?act=message brings the composer forward. One hop from
   // "Send invoice to Jordan" in the palette to the amount field.
   const act=QP().get('act');
-  if(act){const q=QP();q.delete('act');history.replaceState(null,'','/crm.html?'+q.toString());}   // once: a reload doesn't open the form again
+  if(act){const q=QP();q.delete('act');history.replaceState(null,'',location.pathname+'?'+q.toString());}   // once: a reload doesn't open the form again
   if(act==='invoice'||act==='deposit')DEAL_READY.then(()=>{if(idParams().deal)openBilling(act);});
   else if(act==='message'||act==='note'||act==='task'||act==='email')setTimeout(()=>focusComposer(act),300);
 }
@@ -721,7 +722,7 @@ function recWhoHtml(){
   if(hd.person)bits.push(esc(hd.person));   // item 22: the business leads, the person beside it
   if(hd.company&&hd.company!==nm)bits.push(esc(hd.company));
   if(hd.email)bits.push(`<a href="mailto:${esc(hd.email)}">${esc(hd.email)}</a>`);
-  if(hd.phone)bits.push(`<a href="tel:${esc(hd.phone)}">${esc(hd.phone)}</a>`);
+  if(hd.phone)bits.push(`<a href="tel:${esc(hd.phone)}">${esc(phoneWords(hd.phone))}</a>`);
   // visual refresh: an initials avatar instead of an emoji object tile
   const initials=String(nm).split(/\s+/).map(w=>Array.from(w).find(ch=>/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(ch))||'').filter(Boolean).slice(0,2).map(ch=>{const up=ch.toUpperCase();return up.length===1?up:ch;}).join('')||'?';   // batch C: an emoji or "ß" stays whole; a word's first letter, never a bracket
   return `<div class="obj-ic ${isCust?'customer':''}" aria-hidden="true">${esc(initials)}</div>
@@ -793,6 +794,8 @@ function renderShell(){
 // Adding a customer saves them and nothing else, so the profile offers what comes next:
 // Create website (+ New site's sheet, opened for them on Sites) and Invite to their portal.
 // Each card says where that step stands once it has happened. Drawn in Figma first.
+// sales item 194: a ten-digit phone number reads (818) 555-0142; anything else stays as it was typed
+const phoneWords=(p)=>{const s=String(p||'').trim(),d=s.replace(/\D/g,''),t=d.length===11&&d[0]==='1'?d.slice(1):d;return t.length===10&&/^[\d\s().+-]+$/.test(s)?'('+t.slice(0,3)+') '+t.slice(3,6)+'-'+t.slice(6):s;};
 const fmtDay=(iso)=>{const t=Date.parse(iso||'');return isFinite(t)?new Date(t).toLocaleDateString([], {month:'short',day:'numeric'}):'';};
 let INVITE_OPEN=false,ELSE_OPEN=false;
 function renderCustSteps(){
@@ -952,7 +955,7 @@ function renderDetailsCard(){
   // item 89: both numbers are a tap to call (from a deal, coming back offers to log the call), the job title,
   // the address and the tags beside them
   const dealId=(REC&&REC.identity&&REC.identity.deal_id)||'';
-  const call=(p)=>{const t=String(p||'').trim().replace(/[^\d+]/g,'').replace(/(?!^)\+/g,'');return `<a href="tel:${esc(t)}"${dealId?` data-call-deal="${esc(dealId)}" data-call-who="${esc(hd.person||hd.name||'')}"`:''}>${esc(p)}</a>`;};
+  const call=(p)=>{const t=String(p||'').trim().replace(/[^\d+]/g,'').replace(/(?!^)\+/g,'');return `<a href="tel:${esc(t)}"${dealId?` data-call-deal="${esc(dealId)}" data-call-who="${esc(hd.person||hd.name||'')}"`:''}>${esc(phoneWords(p))}</a>`;};
   if(hd.phone)rows.push([svg('phone'),call(hd.phone)]);
   if(hd.phone2)rows.push([svg('phone'),call(hd.phone2)+' <span class="muted">· second phone</span>']);
   if(hd.job_title)rows.push([svg('person'),esc(hd.job_title)]);
@@ -1127,7 +1130,8 @@ function renderHighlights(){
   // Phase 3 (stage-aware): with no next step set, the tile suggests the stage's
   // own "do next" (a won deal says "open their project", never a blank dash)
   const suggested=(d.id&&!ns&&d.stage)?guideNow(d.stage).action:'';
-  if(d.id||ns)tiles.push({k:'Next step',v:esc(ns||(suggested?'Suggested':'—')),ico:'next',tone:'info',edit:!!d.id,s:(ns&&d.next_step_at)?esc(dueLabel(d.next_step_at)):(ns?'':(suggested?esc(suggested):'Set one'))});   // inline-editable when a real deal field backs it
+  // sales item 194: a suggestion is the step itself, in full, with "Suggested" small under it (it was the big word, the step cut off)
+  if(d.id||ns)tiles.push({k:'Next step',v:esc(ns||suggested||'—'),wrap:!!(ns||suggested),ico:'next',tone:'info',edit:!!d.id,s:(ns&&d.next_step_at)?esc(dueLabel(d.next_step_at)):(ns?'':(suggested?'Suggested, not set yet':'Set one'))});   // inline-editable when a real deal field backs it
   // bold redesign: the fifth fact — when you last spoke (the deal's last contact). item 98 (B4): the
   // date comes BESIDE the deal in the deal read (as the Deal tab reads it), never inside the deal row,
   // so looking for it there said "Nothing logged yet" on every record
@@ -1139,7 +1143,7 @@ function renderHighlights(){
   if(!d.id&&p&&p.health)tiles.push({k:'Health',v:`<span class="word">${esc(p.health==='attention'?'Needs attention':p.health==='new'?'Getting set up':p.health)}</span>`,ico:'health',tone:p.health==='attention'?'warn':'good',s:''});
   if(!d.id&&p)tiles.push({k:'Website',v:esc(siteWord(p)),ico:'site',tone:'',s:''});
   if(!tiles.length){host.innerHTML='';return;}
-  host.innerHTML=`<div class="hl-panel">${tiles.slice(0,5).map((t,i)=>`<div class="hl"><span class="ico ${t.tone||''}">${svg(t.ico)}</span><div class="hl-main"><div class="hl-k">${t.k}${t.edit?`<button class="hl-edit" data-hledit aria-label="Edit next step">✎</button>`:''}</div><div class="hl-v" data-hlv="${i}">${t.v}</div>${t.s?`<div class="hl-s">${t.s}</div>`:''}</div></div>`).join('')}</div>`;
+  host.innerHTML=`<div class="hl-panel">${tiles.slice(0,5).map((t,i)=>`<div class="hl"><span class="ico ${t.tone||''}">${svg(t.ico)}</span><div class="hl-main"><div class="hl-k">${t.k}${t.edit?`<button class="hl-edit" data-hledit aria-label="Edit next step">✎</button>`:''}</div><div class="hl-v${t.wrap?' wrap':''}" data-hlv="${i}">${t.v}</div>${t.s?`<div class="hl-s">${t.s}</div>`:''}</div></div>`).join('')}</div>`;
   const eb=host.querySelector('[data-hledit]');
   if(eb)eb.addEventListener('click',()=>{
     const tile=eb.closest('.hl'); const cur=(DEAL&&DEAL.deal&&DEAL.deal.next_step)||'';
@@ -1278,7 +1282,8 @@ async function moveStage(to,btn){
   else{toast((r.body&&r.body.message)||'Couldn’t move the stage.','err');if(btn)btn.disabled=false;renderPath();}
 }
 
-function setTabUrl(tab){ const q=QP(); q.set('tab',tab); history.replaceState(null,'', '/crm.html?'+q.toString()); }
+// sales item 198: a tab keeps the page's own address (/crm), never the old /crm.html
+function setTabUrl(tab){ const q=QP(); q.set('tab',tab); history.replaceState(null,'', location.pathname+'?'+q.toString()); }
 
 function showTab(tab,initial){
   TAB=tab;
@@ -1316,7 +1321,7 @@ async function loadDetails(host){
   if(d){
     const c=d.contact||{}; const cf=d.custom_fields||[]; const cv=c.custom||{};
     DETAIL={cid,c,cf};
-    const rows=[['Name',c.name],['Business',c.company],['Email',c.email],['Phone',c.phone]].filter(x=>x[1]);
+    const rows=[['Name',c.name],['Business',c.company],['Email',c.email],['Phone',phoneWords(c.phone)]].filter(x=>x[1]);
     html+=`<section><h2>Contact <button class="link" id="editContact" style="border:none;background:none;font-size:13px;color:var(--p);cursor:pointer;padding:0;text-transform:none;letter-spacing:0">Edit</button></h2><div class="card"><div class="kv">`+(rows.length?rows.map(x=>`<div class="k">${esc(x[0])}</div><div>${esc(x[1])}</div>`).join(''):'<div class="muted">No details yet — tap Edit to add them.</div>')+`</div></div></section>`;
     if(cf.length){
       html+=`<section><h2>Custom fields</h2><div class="card"><div class="kv">`+cf.map(f=>`<div class="k">${esc(f.label||f.key)}</div><div>${esc(cv[f.key]!=null&&cv[f.key]!==''?cv[f.key]:'—')}</div>`).join('')+`</div></div></section>`;
@@ -1333,12 +1338,13 @@ async function loadDetails(host){
     const p=PROFILE.profile||{}; const h=p.health;
     const facts=[
       ['Website', siteWord(p), p.last_published_at?('published '+when(p.last_published_at)):''],
-      ['Approvals', String(p.pending_approvals||0), p.pending_approvals?'waiting':'all clear'],
-      ['Connected', String(p.connected||0), p.connected_needing_attention?(p.connected_needing_attention+' need a look'):'healthy'],
-      ['Moments', String(p.active_moments||0), 'worth a look'],
+      // sales item 194: each fact says what it counts ("Connected 0 healthy", "Moments 3 worth a look" were the builder's words)
+      ['Changes to approve', String(p.pending_approvals||0), p.pending_approvals?'waiting on them':'none waiting'],
+      ['Linked accounts', String(p.connected||0), p.connected_needing_attention?(p.connected_needing_attention+' need a look'):p.connected?'all working':'none linked yet'],
+      ['Updates to share', String(p.active_moments||0), p.active_moments?'ready for them':'none right now'],
       ['Team', String(p.members||0), 'with access'],
     ];
-    html+=`<section><h2>Relationship</h2><div class="card">`;
+    html+=`<section><h2>At a glance</h2><div class="card">`;
     if(h)html+=`<div style="margin-bottom:8px"><span class="chip ${esc(h)}"><span class="d"></span>${h==='attention'?'Needs attention':h==='new'?'Getting set up':h==='quiet'?'Quiet':'Healthy'}</span></div>`;
     if(PROFILE.summary)html+=`<p class="muted" style="margin:0 0 12px;font-size:14.5px">${esc(PROFILE.summary)}</p>`;
     html+=`<div class="facts">`+facts.map(f=>`<div class="fact"><div class="k">${esc(f[0])}</div><div class="v">${esc(f[1])} <small>${esc(f[2])}</small></div></div>`).join('')+`</div></div></section>`;
@@ -1423,7 +1429,7 @@ function renderDealTab(host){
   const d=DEAL.deal||{}; const link=agHref('pipeline.html','deal='+encodeURIComponent(d.id||''));
   const propChip=(s)=>s==='accepted'?'good':s==='declined'?'bad':s==='sent'?'':'warn';
   const conChip=(s)=>s==='signed'?'good':s==='sent'?'':'warn';
-  let html=`<section><div class="card"><div class="card-h"><span class="t">${esc(d.title||'Deal')}</span><a class="link" href="${esc(link)}">Open in pipeline →</a></div><div class="kv">`;
+  let html=`<section><div class="card"><div class="card-h"><span class="t">${esc(d.title?'Deal · '+d.title:'Deal')}</span><a class="link" href="${esc(link)}">Open in pipeline →</a></div><div class="kv">`;
   const rows=[];
   if(d.expected_value_cents)rows.push(['Value',fmtC(d.expected_value_cents)]);
   if(d.stage)rows.push(['Stage',stageLabel(d.stage)]);
@@ -2140,9 +2146,9 @@ function renderDeliveryTab(host){
   const ms=PROJ.milestones||[]; const tasks=PROJ.tasks||[]; const dl=PROJ.deliverables||[];
   const waiting=tasks.filter(t=>t.client_action_required&&t.status!=='done').length;
   const progress=PROJ.progress||{};
-  let html=`<section><div class="card"><div class="card-h"><span class="t">${esc(p.name||'Project')}</span><a class="link" href="${esc(link)}">Open project →</a></div>
+  let html=`<section><div class="card"><div class="card-h"><span class="t">${esc(p.name?'Project · '+p.name:'Project')}</span><a class="link" href="${esc(link)}">Open project →</a></div>
     <div class="kv">
-      <div class="k">Status</div><div><span class="word">${esc(String(p.status||'').replace('_',' '))}</span></div>
+      <div class="k">Status</div><div><span class="word">${esc(SC_STATUS[p.status]||String(p.status||'').replace('_',' '))}</span></div>
       ${progress.pct!=null?`<div class="k">Progress</div><div>${esc(String(progress.pct))}% along</div>`:''}
       <div class="k">Waiting on them</div><div>${waiting?waiting+' task'+(waiting===1?'':'s'):'nothing'}</div>
       <div class="k">Files shared</div><div>${dl.filter(x=>x.status==='shared').length}</div>
@@ -2153,7 +2159,7 @@ function renderDeliveryTab(host){
   if(rel.length>1){
     html+=`<section id="allProjects"><h2>All projects · ${rel.length}</h2><div class="card">`+rel.map(r=>{
       const cur=String(r.id)===String(ids.project);
-      const st=String(r.status||'active').replace('_',' ');
+      const st=SC_STATUS[r.status||'active']||String(r.status||'active').replace('_',' ');
       return `<div class="rrow"><span class="rt">${esc(r.name||'Project')}${cur?'<span class="s">shown above</span>':''}</span><span style="display:flex;gap:8px;align-items:center"><span class="schip${r.status==='complete'||r.status==='completed'?' good':''}">${esc(st)}</span><a class="link" href="${esc(agHref('projects.html','project='+encodeURIComponent(r.id)))}">Open →</a></span></div>`;
     }).join('')+`</div></section>`;
   }

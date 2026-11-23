@@ -27,9 +27,9 @@ const site = { id: SITE, client_id: CLIENT, status: 'live', edition: 'presence' 
 const owner = { kind: 'client', userId: 'u1', email: 'owner@studio.test', jwt: 'jwt', requestId: 't' };
 const cors = {};
 const world = () => ({
-  presence_identity: [{ site_id: SITE, business_name: 'Brightline Studio' }],
+  presence_identity: [{ site_id: SITE, business_name: 'Brightline Studio', email: 'hello@studio.test', service_area: 'Burbank, CA' }],
   presence_locations: [{ site_id: SITE, address_line1: '12 Main St', city: 'Burbank' }],
-  presence_settings: [{ site_id: SITE, brand_kit: {}, logo_media_id: null }],
+  presence_settings: [{ site_id: SITE, brand_kit: {}, logo_media_id: null, signs_as_name: 'Pat Example' }],
   presence_sales_templates: [{ id: 'svc', site_id: SITE, kind: 'proposal', name: '__services_catalog__', line_items: [{ label: 'Website build', qty: 1, unit_cents: 300000 }], deleted_at: null, updated_at: '2026-11-01T00:00:00Z' }],
   presence_contacts: [],
   presence_deals: [{ id: 'd1', site_id: SITE, deleted_at: null }, { id: 'd2', site_id: '99999999-9999-4999-8999-999999999999', deleted_at: null }],
@@ -54,7 +54,7 @@ ok('route: a choice that isn\'t one is a 422', w.status === 422);
 db.reset(world()); db.fail.add('presence_contacts');
 r = await get();
 ok('route: a check that couldn\'t be read leaves its step off, never "not done"', !r.d.steps.some((s) => s.key === 'contact') && r.d.total === 5);
-db.reset(world()); db.tables.presence_contacts = [{ id: 'c1', site_id: SITE, deleted_at: null }]; db.tables.presence_settings = [{ site_id: SITE, brand_kit: { logo_media_id: 'm1' }, logo_media_id: null }];
+db.reset(world()); db.tables.presence_contacts = [{ id: 'c1', site_id: SITE, deleted_at: null }]; db.tables.presence_settings = [{ site_id: SITE, brand_kit: { logo_media_id: 'm1' }, logo_media_id: null, signs_as_name: 'Pat Example' }];
 r = await get();
 ok('route: the month\'s goal is the one step left (sales item 94)', r.d.done === 5 && r.d.total === 6 && r.d.shows === true && r.d.steps.find((s) => s.key === 'goal')?.href === '/settings.html#goal');
 db.tables.presence_sales_templates.push({ id: 'goal', site_id: SITE, kind: 'proposal', name: '__sales_goal_ai__', body: JSON.stringify({ goal_cents: 800000 }), deleted_at: null, updated_at: '2026-11-02T00:00:00Z' });
@@ -63,6 +63,22 @@ ok('route: everything done, the strip goes by itself', r.d.done === 6 && r.d.sho
 db.reset(world()); db.failMethod.set('presence_sales_templates', 'GET');
 r = await get();
 ok('route: a hide that can\'t be read never brings the strip back', r.d.hidden === true && r.d.shows === false);
+
+// ═══ sales item 195: "Your business details" ticks only when the Studio profile boxes it names are filled ═══
+const B = (i, s, okRead = true) => L.businessDetailsDone(i, s, okRead);
+const full = { business_name: 'Brightline Studio', email: 'hello@studio.test', service_area: 'Burbank, CA' };
+eq('195: all four boxes, or not done; an unread row leaves the step off', [B(full, { signs_as_name: 'Pat' }), B({ ...full, email: '' }, { signs_as_name: 'Pat' }), B({ ...full, service_area: '  ' }, { signs_as_name: 'Pat' }), B(full, { signs_as_name: '' }), B({ ...full, business_name: '' }, { signs_as_name: 'Pat' }), B(full, null, false)], [true, false, false, false, false, null]);
+ok('195: the step names the boxes it checks and opens their page', (() => { const s = L.SETUP_STEPS.find((x) => x.key === 'business'); return s.why === 'Studio name, email, where you work from and who signs your agreements' && s.href === '/settings.html#studio'; })());
+db.reset(world()); db.tables.presence_identity = [{ site_id: SITE, business_name: 'Brightline Studio', email: '', service_area: '' }];
+r = await get();
+ok('195 route: blank email and "Where you work from" keep it open, an address on a location no longer ticks it', r.d.steps.find((s) => s.key === 'business')?.done === false, JSON.stringify(r.d.steps));
+db.reset(world()); db.tables.presence_settings = [{ site_id: SITE, brand_kit: {}, logo_media_id: null, signs_as_name: '' }];
+r = await get();
+ok('195 route: nobody named to sign agreements, not done', r.d.steps.find((s) => s.key === 'business')?.done === false);
+db.reset(world()); db.fail.add('presence_settings');
+r = await get();
+ok('195 route: the settings row unread, the step is left off rather than ticked', !r.d.steps.some((s) => s.key === 'business'));
+ok('195 route: the check reads the boxes the step names', db.log.some((c) => c.url.includes('presence_identity') && c.url.includes('select=business_name,email,service_area')));
 
 // ═══ 3. Home draws it ═══
 const home = Deno.readTextFileSync(new URL('../../agency.html', import.meta.url));

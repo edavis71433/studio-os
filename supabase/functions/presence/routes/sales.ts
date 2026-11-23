@@ -1117,7 +1117,9 @@ export async function loadMyTasks(siteId: string, userId: string | null, team: T
 }
 export async function handleSalesMyTasks(_req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   const { all, partial } = await loadMyTasks(site.id, principal.userId || null, await teamOf(principal));
-  return json({ data: { items: all.slice(0, MY_TASKS_MAX), total: all.length, partial } }, 200, cors);
+  // sales item 158: `now` is what Home's heading counts (not the project steps waiting behind an earlier one),
+  // over the whole list, so it matches To-dos' "open" past the 50 Home shows
+  return json({ data: { items: all.slice(0, MY_TASKS_MAX), total: all.length, now: all.filter((t) => !t.later).length, partial } }, 200, cors);
 }
 
 // ═══ DEALS ═══

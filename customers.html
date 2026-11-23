@@ -354,7 +354,7 @@ const viewMatch=(c)=>matchView(VIEWNAME,c);
 // two letters for an avatar: "Juniper Floral Co." → JF, "Marlow’s Kitchen" → MK
 const ini2=(s)=>{const w=String(s||'').trim().split(/\s+/).filter(x=>/^[\p{L}\p{N}]/u.test(x));if(!w.length)return '?';return (Array.from(w[0])[0]+(w[1]?Array.from(w[1])[0]:'')).toUpperCase();};
 // Table ⇄ Cards display choice, persisted. Since the bold redesign (part 2)
-// the rows ("Cards") are the default on every screen; the Table is one click
+// the rows ("List", sales item 198; it said "Cards" over rows) are the default on every screen; the Table is one click
 // away and remembered.
 const DISPLAY_KEY='dds-display:customers';
 let DISPLAY=(function(){try{const v=localStorage.getItem(DISPLAY_KEY);if(v==='table'||v==='cards')return v;}catch(_){/* storage may be denied */}
@@ -529,7 +529,7 @@ function chipsHtml(){
 }
 function toolsHtml(){
   return `<div class="trow">${chipsHtml()}<div class="ltools">
-    <div class="seg" role="group" aria-label="Display as"><button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button><button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button></div>
+    <div class="seg" role="group" aria-label="Display as"><button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button><button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">List</button></div>
     ${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}
     <button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}
     <button class="lbtn txt" id="importCsv" type="button">Import CSV</button>

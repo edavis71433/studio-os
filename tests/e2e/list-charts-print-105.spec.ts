@@ -64,7 +64,7 @@ test.describe('Pipeline: charts on the list (item 105)', () => {
     await tool(page, 'charts');
     await expect(page.locator('#charts')).toBeVisible();
     await expect(page.locator('#chartsBtn')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('#charts h3')).toHaveText(['Open deals by stage', 'Where they came from']);
+    await expect(page.locator('#charts h3')).toHaveText(['Open deals by stage', 'How they found you']);   // sales item 196
     // label · count · value, in stage order; won deals aren't on the board, so they aren't counted
     await expect(rowsOf(page, 0)).toHaveText([/^New lead\s*3 deals\s*\$6,500$/, /^Qualified\s*1 deal\s*\$3,200$/, /^Proposal sent\s*2 deals\s*\$6,050$/, /^Agreement out\s*1 deal\s*\$1,400$/]);
     // most first; "Not recorded" last, in grey

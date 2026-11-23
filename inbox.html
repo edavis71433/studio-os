@@ -976,7 +976,10 @@ function renderList(){
     // count of everything that needs the studio; this counts conversations (item 11)
     const oldN=convs.filter(i=>(i.unread||i.needs)&&oldOf(i)).length;
     const cut=[CUT.convs?`${CUT.convs} conversations`:'',CUT.enq?`${CUT.enq} new enquiries`:''].filter(Boolean);   // C15: the counts stop where the list was cut
-    $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'} · ${need} waiting for a reply${oldN?`, ${oldN} over a month old`:''} · Sorted by newest${cut.length?` · Showing your newest ${cut.join(' and ')} only`:''}`;
+    // sales item 158: the rows that aren't conversations (the "Worth a look" notices) are counted and named too,
+    // so the line adds up to the All chip ("1 conversation" sat beside "All 8")
+    const sysN=vis.length-convs.length;
+    $('lmeta').textContent=`${convs.length} conversation${convs.length===1?'':'s'}${sysN?` and ${sysN} thing${sysN===1?'':'s'} worth a look`:''} · ${need} waiting for a reply${oldN?`, ${oldN} over a month old`:''} · Sorted by newest${cut.length?` · Showing your newest ${cut.join(' and ')} only`:''}`;
   }
   paintVchips();   // the counts follow the data and the lens
   // partial-failure honesty: one of the two reads failed (loadData renders the

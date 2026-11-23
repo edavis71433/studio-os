@@ -136,15 +136,16 @@ export function relationshipSummary(p: ClientProfileSummary, lastActivityAt: str
   const name = p.business_name || 'This business';
   const parts: string[] = [];
   if (p.edition === 'monitor' && !p.live) parts.push(`${name}’s website is hosted elsewhere.`);
-  else if (p.health === 'new') parts.push(`${name} is getting set up — nothing has been published yet.`);
+  else if (p.health === 'new') parts.push(`${name} is getting set up: nothing has been published yet.`);
   else if (p.live) parts.push(`${name}’s website is live.`);
   else parts.push(`${name}’s website isn’t live right now.`);
 
   if (p.last_published_at) parts.push(`Last published ${humanWhen(p.last_published_at, nowIso)}.`);
   if (p.pending_approvals > 0) parts.push(`${p.pending_approvals} ${p.pending_approvals === 1 ? 'change is' : 'changes are'} waiting for approval.`);
-  if (p.connected_needing_attention > 0) parts.push(`${p.connected_needing_attention} connected ${p.connected_needing_attention === 1 ? 'service needs' : 'services need'} a look.`);
-  else if (p.connected > 0) parts.push(`${p.connected} connected ${p.connected === 1 ? 'service is' : 'services are'} healthy.`);
-  if (p.active_moments > 0) parts.push(`${p.active_moments} ${p.active_moments === 1 ? 'moment is' : 'moments are'} worth a look.`);
+  // sales item 194: the record's own words, the ones its At a glance card uses ("moments" and "healthy" were the builder's)
+  if (p.connected_needing_attention > 0) parts.push(`${p.connected_needing_attention} linked ${p.connected_needing_attention === 1 ? 'account needs' : 'accounts need'} a look.`);
+  else if (p.connected > 0) parts.push(`${p.connected === 1 ? 'Their linked account is' : `All ${p.connected} linked accounts are`} working.`);
+  if (p.active_moments > 0) parts.push(`${p.active_moments} ${p.active_moments === 1 ? 'update is' : 'updates are'} ready to share with them.`);
   return parts.join(' ');
 }
 
