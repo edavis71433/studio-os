@@ -38,13 +38,11 @@ comment on column public.presence_deals.revision_rounds is
 comment on column public.presence_estimates.extra_work is
   'Sales item 179: made from a change request beyond the included rounds; approving it adds a project to-do and a draft invoice.';
 
-
-select public.presence_ledger_note(291, 'documents_rounds');
-
--- Verify right away (expect: 7 columns; the deal check; the unique index; then 291 in the ledger):
+-- Verify right away (expect: 7 columns; the deal check; the unique index; the ledger line follows):
 select table_name, column_name from information_schema.columns
  where table_schema = 'public' and (column_name = 'reminded_at' or (table_name = 'presence_deals' and column_name = 'revision_rounds')
    or (table_name = 'presence_estimates' and column_name in ('extra_work', 'approval_id', 'project_id'))) order by 1, 2;
 select conname from pg_constraint where conname = 'presence_deals_revision_rounds_check';
 select indexname from pg_indexes where indexname = 'presence_estimates_approval_uniq';
-select max(number) as ledger_newest from public.presence_change_ledger;
+
+select public.presence_ledger_note(291, 'documents_rounds');

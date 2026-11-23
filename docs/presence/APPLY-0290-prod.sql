@@ -11,10 +11,10 @@
 --  and a proposal's Accept takes a typed name while every signature, accept and approval keeps
 --  its internet address and browser privately with it, for the certificate (184).
 --
---  The two status lists keep every value they had and add 'withdrawn' only. They are written
---  from the repo's definitions (0074 for proposals, 0145 for estimates), which no migration
---  has changed since. FIRST run the check just below: if either list on production has any
---  value not in the lists further down, stop and add it to them before running the rest.
+--  The two status lists keep every value they had and add 'withdrawn' only. Checked against
+--  production on Nov 23 2026 (pg_get_constraintdef): both match 0074's and 0145's lists exactly.
+--  Each check is dropped and re-added, so the pack can run twice. The read just below shows
+--  them again before the change.
 --
 --  Covers: supabase/migrations/0290_documents_signing.sql
 -- ===========================================================================
@@ -73,10 +73,7 @@ comment on table public.presence_sign_evidence is
 comment on column public.presence_proposals.decided_name is 'Sales item 184: the name the client typed to accept.';
 comment on column public.presence_estimates.decided_name is 'Sales item 183: the name the client typed to approve.';
 
-
-select public.presence_ledger_note(290, 'documents_signing');
-
--- Verify right away (expect: both lists end with 'withdrawn'; 8 new columns; the table with no policy; then 290 in the ledger):
+-- Verify right away (expect: both lists end with 'withdrawn'; 8 new columns; the table with no policy; the ledger line follows):
 select conrelid::regclass as tbl, pg_get_constraintdef(oid) as def from pg_constraint
  where conname in ('presence_proposals_status_check', 'presence_estimates_status_check');
 select table_name, column_name from information_schema.columns
@@ -84,4 +81,5 @@ select table_name, column_name from information_schema.columns
    and table_name in ('presence_proposals', 'presence_estimates', 'presence_contracts') order by 1, 2;
 select relname, relrowsecurity, (select count(*) from pg_policies where tablename = 'presence_sign_evidence') as policies
   from pg_class where relname = 'presence_sign_evidence';
-select max(number) as ledger_newest from public.presence_change_ledger;
+
+select public.presence_ledger_note(290, 'documents_signing');
