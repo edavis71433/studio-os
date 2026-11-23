@@ -3158,9 +3158,10 @@ export async function handleSalesPublicView(req: Request, token: string, cors: R
     // only once the agreement is signed.
     const deal = rows(await svc(`presence_deals?id=eq.${tok.id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=id,title,stage&limit=1`))[0];
     if (!deal) return json({ error: 'not_found' }, 404, cors);
-    // sales item 182: a deal closed as Not a fit shows that it is closed, and nothing to answer
-    if (deal.stage === 'lost') return json({ data: { kind: 'flow', brand, closed: true, deal: { id: deal.id, title: deal.title }, proposal: null, proposal_pending: false, contract: null, contract_pending: false, deposit: null } }, 200, cors);
     const { proposal, proposal_pending, contract, contract_pending, contract_withdrawn } = await flowDocuments(tok.site_id, tok.id);
+    // sales item 182: a deal closed as Not a fit shows that it is closed, and nothing to answer
+    // (an agreement they already signed stays theirs to read: closing only takes back what is out)
+    if (deal.stage === 'lost' && contract?.status !== 'signed') return json({ data: { kind: 'flow', brand, closed: true, deal: { id: deal.id, title: deal.title }, proposal: null, proposal_pending: false, contract: null, contract_pending: false, deposit: null } }, 200, cors);
     // Item 69: each document the client can actually read counts as opened (firstOpen).
     const opens: Promise<void>[] = [];
     if (proposal && !proposal.first_viewed_at) opens.push(firstOpen('presence_proposals', proposal.id, tok.site_id, tok.id, 'proposal'));

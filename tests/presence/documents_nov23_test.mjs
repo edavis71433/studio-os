@@ -157,6 +157,11 @@ world({
   ok('182: so does the estimate\'s', e.status === 409 && e.body?.error === 'withdrawn');
   const v = await res(await SALES.handleSalesPublicView(req('GET', '/x'), await tokenFor(DEAL, 'flow'), cors));
   ok('182: the one-link page shows a closed deal, with nothing to answer', v.body?.data?.closed === true && v.body.data.proposal === null && v.body.data.contract === null);
+  // an agreement they had already signed stays readable on their link after the close
+  const signedCon = row('presence_contracts', CON); signedCon.status = 'signed'; signedCon.signed_at = ago(1); signedCon.signer_name = 'Riley Park';
+  const s2 = await res(await SALES.handleSalesPublicView(req('GET', '/x'), await tokenFor(DEAL, 'flow'), cors));
+  ok('182: …but an agreement they already signed stays theirs to read', !s2.body?.data?.closed && s2.body?.data?.contract?.status === 'signed', JSON.stringify(s2.body?.data && { closed: s2.body.data.closed, c: s2.body.data.contract && s2.body.data.contract.status }));
+  signedCon.status = 'voided'; signedCon.signed_at = null; signedCon.signer_name = '';
   // builder item 75's Undo, a few minutes later: what that close took back goes back out
   T('presence_deal_events').forEach((x) => { if (x.kind === 'stage_change') x.created_at = daysFrom(PINNED_NOW, -2 / 1440); });
   const u = await res(await SALES.handleSalesDealStage(req('POST', `/sales/deals/${DEAL}/stage`, { to: 'proposal', undo: true }), site, owner, DEAL, cors));
