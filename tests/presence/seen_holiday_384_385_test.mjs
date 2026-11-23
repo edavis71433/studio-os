@@ -38,7 +38,7 @@ const eq = (n, a, b) => ok(n, JSON.stringify(a) === JSON.stringify(b), `got ${JS
 
 // ── 385: the main holidays, a week ahead ──
 {
-  eq('385: Thanksgiving 2026 is Thursday Nov 26, seen a week before', H.holidaySoon('2026-11-19'), { key: 'thanksgiving-2026', name: 'Thanksgiving', date: '2026-11-26', days: 7, when: 'a week from today' });
+  eq('385: Thanksgiving 2026 is Thursday Nov 26, seen a week before', H.holidaySoon('2026-11-19'), { key: 'thanksgiving-2026', name: 'Thanksgiving', date: '2026-11-26', days: 7, when: 'a week from today', day: 'thu' });
   eq('385: six days before, it names the weekday', H.holidaySoon('2026-11-20')?.when, 'Thursday');
   eq('385: the day before says tomorrow, the day says today', [H.holidaySoon('2026-11-25')?.when, H.holidaySoon('2026-11-26')?.when], ['tomorrow', 'today']);
   eq('385: eight days before, and the day after, it isn’t there', [H.holidaySoon('2026-11-18'), H.holidaySoon('2026-11-27')], [null, null]);
@@ -52,7 +52,8 @@ const eq = (n, a, b) => ok(n, JSON.stringify(a) === JSON.stringify(b), `got ${JS
   const week = D.composeDoNext(facts, { decided: {} }, '2026-11-20T18:00:00.000Z');
   const hol = week.items.find((i) => i.source === 'holiday');
   eq('385: the line, right after Needs you', week.items.map((i) => i.source), ['needs', 'holiday', 'health']);
-  eq('385: its words and its link to the Hours card', [hol.key, hol.title, hol.verb, hol.href], ['holiday:thanksgiving-2026', 'Thanksgiving is Thursday: are you open?', 'Set hours', `/presence.html?client=${SITE}#hours`]);
+  eq('385: its words and its link to the Hours card', [hol.key, hol.title, hol.verb, hol.href], ['holiday:thanksgiving-2026', 'Thanksgiving is Thursday: are you open?', 'Set hours', `/presence.html?client=${SITE}#hours-thu`]);
+  eq('431: the link names the holiday’s weekday the way the Hours card names its rows', ['2026-12-20', '2026-12-29', '2027-07-01'].map((d) => H.holidaySoon(d)?.day), ['fri', 'fri', 'sun']);
   ok('385: it says what to do there, without em-dashes', /Hours card/.test(hol.sub) && !/—/.test(hol.sub + hol.title));
   ok('385: a key the decisions accept', !('error' in D.applyDecision({ decided: {} }, hol.key, 'not_relevant', hol.title, null, '2026-11-20T18:00:00.000Z')));
   const away = D.applyDecision({ decided: {} }, hol.key, 'done', hol.title, null, '2026-11-20T18:00:00.000Z');

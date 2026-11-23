@@ -34,7 +34,9 @@ const HOLIDAYS: Array<{ key: string; name: string; on: (y: number) => [number, n
   { key: 'christmas', name: 'Christmas Day', on: () => [12, 25] },
 ];
 
-export interface HolidaySoon { key: string; name: string; date: string; days: number; when: string }
+// `day` is the weekday's key as the editor's Hours card names its rows (mon to sun): the line's
+// link opens that row (builder item 431)
+export interface HolidaySoon { key: string; name: string; date: string; days: number; when: string; day: string }
 
 /** Today's date ('YYYY-MM-DD') in a time zone, from an ISO moment. Pure. */
 export function localDay(nowIso: string, zone = HOLIDAY_ZONE): string {
@@ -55,10 +57,10 @@ export function holidaySoon(today: string): HolidaySoon | null {
       const [month, day] = h.on(year);
       const at = Date.UTC(year, month - 1, day), days = Math.round((at - at0) / DAY_MS);
       if (days < 0 || days > HOLIDAY_DAYS_AHEAD || (best && best.days <= days)) continue;
-      const weekday = WEEKDAYS[new Date(at).getUTCDay()];
+      const weekday = WEEKDAYS[new Date(at).getUTCDay()], dkey = weekday.slice(0, 3).toLowerCase();
       best = {
         key: `${h.key}-${year}`, name: h.name, date: new Date(at).toISOString().slice(0, 10), days,
-        when: days === 0 ? 'today' : days === 1 ? 'tomorrow' : days === HOLIDAY_DAYS_AHEAD ? 'a week from today' : weekday,
+        when: days === 0 ? 'today' : days === 1 ? 'tomorrow' : days === HOLIDAY_DAYS_AHEAD ? 'a week from today' : weekday, day: dkey,
       };
     }
   }
