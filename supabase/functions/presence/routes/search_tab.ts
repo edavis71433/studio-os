@@ -12,6 +12,8 @@
 //   GET /visibility            (builder list item 219) adds near_miss: the searches Google
 //                              showed the site for at places 8 to 20, each with its page and
 //                              one thing to fix there; and drop: why last month's visits fell
+//   GET /visibility            (builder list item 384) adds seen_little: the pages Google
+//                              showed at least 100 times last month that few people picked
 // Under /visibility for the reason routes/visibility.ts gives: search works whoever
 // hosts the site, and the /search segment is closed to a watch-only plan. Each read
 // here is best-effort and leaves its own part out when it fails.
@@ -25,6 +27,7 @@ import { searchTasks, pageMovers, normalizeFollowed, applyFollow, followedSeries
 import { applyPhrases, normalizePhrases, pageHeadlines, phraseFoundIn, phraseIdeas, PHRASES_MAX } from '../lib/search_phrases.ts';
 import { phraseTasks } from '../lib/search_tools.ts';
 import { nearMisses, type NearMiss } from '../lib/near_miss.ts';
+import { seenLittleClicked } from '../lib/seen_little.ts';
 import { readVisitDrop, lastWholeMonths, type VisitDrop } from '../lib/visit_drop.ts';
 import { vocabFor } from '../lib/industry_vocab.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -80,7 +83,7 @@ export async function handlePhrasesGet(site: SiteRow, cors: Record<string, strin
 
 /** What GET /visibility adds for the new Search tab. */
 export async function searchTabExtras(site: SiteRow, i: { address: { url: string } | null; consoleConnected: boolean; listingConnected: boolean; period: string | null; review: { issues?: Array<{ title: string; priority: string; fix?: string }> } | null }) {
-  const [set, identQ, redirQ, followRaw, healthQ, nowPages, priorPages, phrases, nearMiss, drop] = await Promise.all([
+  const [set, identQ, redirQ, followRaw, healthQ, nowPages, priorPages, phrases, nearMiss, drop, seenPages] = await Promise.all([
     searchSettings(site.id),
     safe(svc(`presence_identity?site_id=eq.${site.id}&select=seo_title,seo_description&limit=1`)),
     safe(svc(`presence_redirects?site_id=eq.${site.id}&select=id&limit=50`)),
@@ -91,6 +94,7 @@ export async function searchTabExtras(site: SiteRow, i: { address: { url: string
     phrasesView(site),
     i.period ? safe(nearMissView(site, i.period, i.address ? i.address.url : '')) : Promise.resolve(null),
     safe(dropView(site)),
+    i.period ? safe(readSearchPages(site.client_id, i.period, 50, 'impressions')) : Promise.resolve(null),
   ]);
   const s = set.row, ident = rows(identQ)[0] || {};
   const followed = normalizeFollowed(followRaw).terms;
@@ -120,6 +124,8 @@ export async function searchTabExtras(site: SiteRow, i: { address: { url: string
     phrases,
     near_miss: nearMiss,
     drop,
+    // item 384: null when the month's pages couldn't be read, so the list waits instead of saying "none"
+    seen_little: i.period && seenPages ? { period: i.period, list: seenLittleClicked(seenPages) } : null,
   };
 }
 

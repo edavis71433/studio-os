@@ -39,9 +39,10 @@ export async function readSearchTerms(clientId: string, period: string): Promise
 /** The pages Google sends people to, for the per-page table: the path alone, since
  *  Search Console reports whole URLs and a table of one domain repeated says
  *  nothing. The same store the sync writes and the top terms read. */
-export async function readSearchPages(clientId: string, period: string, limit = 10): Promise<Array<{ path: string; clicks: number; impressions: number }>> {
+// builder item 384: `by` 'impressions' reads the most seen first, for "Seen a lot, clicked little"
+export async function readSearchPages(clientId: string, period: string, limit = 10, by: 'clicks' | 'impressions' = 'clicks'): Promise<Array<{ path: string; clicks: number; impressions: number }>> {
   if (!clientId || !period) return [];
-  const r = await svc(`presence_search_terms?client_id=eq.${encodeURIComponent(clientId)}&period=eq.${encodeURIComponent(period)}&dimension=eq.page&select=key,clicks,impressions&order=clicks.desc&limit=${limit}`);
+  const r = await svc(`presence_search_terms?client_id=eq.${encodeURIComponent(clientId)}&period=eq.${encodeURIComponent(period)}&dimension=eq.page&select=key,clicks,impressions&order=${by === 'impressions' ? 'impressions' : 'clicks'}.desc&limit=${limit}`);
   const rows = Array.isArray((r as any).json) ? (r as any).json : [];
   return rows.map((x: any) => ({ path: searchPagePath(x.key), clicks: Number(x.clicks) || 0, impressions: Number(x.impressions) || 0 }));
 }

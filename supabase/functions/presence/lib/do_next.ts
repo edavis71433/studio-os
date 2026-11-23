@@ -7,13 +7,16 @@
 // done (the enquiry answered, the page fixed). "Done" puts one away for 30 days
 // (back if it is still true then); "Not relevant" puts it away for good. Decisions
 // are kept on the client's site (reserved JSON `__do_next__`). Pure.
+// Builder item 385: in the week before a main holiday, "Thanksgiving is Thursday: are you
+// open?" comes right after Needs you, once per holiday (its key carries the year).
 import { TYPE_TITLES, HEADINGS, headingOf } from './health_score.ts';
+import { holidaySoon, localDay } from './holidays.ts';
 
 export const DO_NEXT_SHOWN = 8;
 export const DONE_HIDES_DAYS = 30;
 export const DECISIONS_KEPT = 300;
 
-export type DoNextSource = 'needs' | 'health' | 'search' | 'reviews' | 'ai' | 'idea';
+export type DoNextSource = 'needs' | 'holiday' | 'health' | 'search' | 'reviews' | 'ai' | 'idea';
 export interface DoNextItem { key: string; source: DoNextSource; title: string; sub: string; verb: string; href: string }
 export interface Decision { state: 'done' | 'not_relevant'; at: string; by: string | null; title: string }
 
@@ -63,6 +66,8 @@ export function composeDoNext(f: DoNextFacts, decisions: { decided: Record<strin
   const add = (it: DoNextItem) => { if (!all.some((x) => x.key === it.key)) all.push(it); };
   // Needs you writes "changes are sitting unpublished" after the site's name; here it stands alone
   for (const n of f.needs) add({ key: n.key, source: 'needs', title: n.what.charAt(0).toUpperCase() + n.what.slice(1), sub: n.when, verb: n.verb || 'Open', href: n.href });
+  const hol = holidaySoon(localDay(nowIso));
+  if (hol) add({ key: `holiday:${hol.key}`, source: 'holiday', title: `${hol.name} is ${hol.when}: are you open?`, sub: 'If you close or keep shorter hours, say so on the website’s Hours card so customers know before they come.', verb: 'Set hours', href: `${ws}#hours` });
   const healthTypes = new Set<string>();
   for (const h of (f.health || []).slice().sort((a, b) => (a.severity === b.severity ? b.n - a.n : a.severity === 'critical' ? -1 : 1)).slice(0, 3)) {
     healthTypes.add(h.type);

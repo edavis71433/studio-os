@@ -295,7 +295,8 @@ test.describe('Sites: tags (builder list item 176)', () => {
     await expect(page).toHaveURL(/\/sites\.html$/);   // ticking a row never opens the site
     const bar = page.getByRole('region', { name: 'Picked sites' });
     await expect(bar.locator('b')).toHaveText('2 sites picked');
-    await expect(bar.getByRole('button')).toHaveText(['Move to folder', 'Add a tag', 'Remove a tag ▾', 'Clear']);
+    // builder item 368: and the three a site manager can do to many sites at once
+    await expect(bar.getByRole('button')).toHaveText(['Move to folder', 'Add a tag', 'Remove a tag ▾', 'Monthly report ▾', 'Notifications ▾', 'Check domains now', 'Clear']);
 
     await bar.getByRole('button', { name: 'Add a tag' }).click();
     const ask = page.locator('dialog.dds-ask');

@@ -342,6 +342,8 @@
 </div>
 <script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
+// builder item 370: inside a client this is one of the website's tabs, so the sidebar keeps the Website menu, this one lit
+if(window.ddsSiteMenu)window.ddsSiteMenu.mount('analytics');
 const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});

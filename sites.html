@@ -39,26 +39,43 @@
 
   /* ── Command center (Nov 9 2026, Eric's pick of three Figma directions): the band
      across every site, what needs you next, filter pills, then each site as a card ── */
-  .sband{position:relative;display:grid;grid-template-columns:minmax(220px,1.15fr) repeat(4,minmax(0,1fr));gap:var(--dds-s3,12px);align-items:stretch;background:var(--dds-grad,linear-gradient(135deg,#4a2c8c,#6436c4 55%,#7d3fb8));color:#fff;border-radius:var(--dds-r-xl,20px);padding:20px 22px;margin-bottom:var(--dds-s4,16px);box-shadow:0 22px 44px -24px rgba(74,44,140,.7);overflow:hidden}
-  .sband .lead{display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0;padding-right:var(--dds-s2,8px)}
-  .sband .eyebrow{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.72)}
-  .sband .hi{font-family:var(--serif);font-weight:600;font-size:24px;line-height:1.12;letter-spacing:-.015em;color:#fff}
-  .sband .hsub{font-size:13px;color:rgba(255,255,255,.85)}
-  .kpi{font:inherit;text-align:left;display:flex;flex-direction:column;gap:2px;background:rgba(255,255,255,.12);border:1px solid transparent;border-radius:var(--dds-r-lg,14px);padding:12px 14px;color:#fff;cursor:pointer;min-width:0;min-height:44px;transition:background var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+  /* builder item 366: the band, Needs you and the folders are slim rows, so a site shows on the first screen */
+  .sband{position:relative;display:flex;flex-wrap:wrap;gap:var(--dds-s2,8px);align-items:stretch;background:var(--dds-grad,linear-gradient(135deg,#4a2c8c,#6436c4 55%,#7d3fb8));color:#fff;border-radius:var(--dds-r-lg,14px);padding:8px;margin-bottom:var(--dds-s3,12px);box-shadow:0 14px 30px -22px rgba(74,44,140,.7);overflow:hidden}
+  .sband .lead{flex:1 1 170px;display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0;padding:0 8px}
+  .sband .eyebrow{font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+  .sband .hi{font-family:var(--serif);font-weight:600;font-size:16px;line-height:1.2;letter-spacing:-.01em;color:#fff}
+  .sband .hsub{font-size:12.5px;color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kpi{font:inherit;text-align:left;flex:1 1 150px;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"v l" "v n";column-gap:8px;align-items:center;background:rgba(255,255,255,.12);border:1px solid transparent;border-radius:var(--dds-r,10px);padding:5px 12px;color:#fff;cursor:pointer;min-width:0;min-height:44px;transition:background var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
   .kpi:hover{background:rgba(255,255,255,.2)} .kpi[aria-pressed="true"]{background:#fff;color:#3d2185;border-color:#fff}
-  .kpi .l{font-size:12px;font-weight:500;opacity:.85} .kpi .v{font-size:26px;font-weight:700;line-height:1.1;letter-spacing:-.02em} .kpi .n{font-size:11.5px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kpi .l{grid-area:l;font-size:12.5px;font-weight:600;line-height:1.25;opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .kpi .v{grid-area:v;font-size:20px;font-weight:700;line-height:1;letter-spacing:-.02em} .kpi .n{grid-area:n;font-size:11px;line-height:1.25;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .kpi.ok .v::after{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#7fd3a5;margin-left:8px;vertical-align:middle}
   .sband :focus-visible{outline:2px solid #fff;outline-offset:2px}
-  @media (max-width:900px){.sband{grid-template-columns:1fr 1fr}.sband .lead{grid-column:1/-1}.sband .hi{font-size:21px}}
-  .nhead{display:flex;align-items:center;gap:var(--dds-s2,8px);margin:0 0 10px}
+  @media (max-width:900px){.sband .lead{flex-basis:100%;padding:2px 6px 4px}.kpi{flex:1 1 calc(50% - 4px)}}
+  #needsHost:not(:empty){display:flex;align-items:center;gap:var(--dds-s2,8px) var(--dds-s3,12px);flex-wrap:wrap;margin:0 0 var(--dds-s3,12px)}
+  .nhead{display:contents}
   .nhead h2{font-family:var(--sans);font-weight:600;font-size:15.5px;margin:0}
   .nhead .count{font-size:12px;font-weight:600;color:var(--p);background:var(--p-soft);border-radius:999px;padding:1px 8px}
-  .nhead a{margin-left:auto;font-size:13px;font-weight:500;color:var(--p);text-decoration:none} .nhead a:hover{text-decoration:underline}
-  .nstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--dds-s3,12px);margin-bottom:var(--dds-s5,20px)}
-  .task{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r-lg,14px);padding:10px 12px 10px 14px;box-shadow:var(--shadow);min-width:0}
-  .task .av{width:34px;height:34px;font-size:13px;flex:0 0 auto;background:var(--dds-grad-brand,var(--p));color:#fff}
-  .task .tx{flex:1;min-width:0} .task .tn{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .task .tw{font-size:12.5px;color:var(--soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .nhead a{order:2;font-size:13px;font-weight:500;color:var(--p);text-decoration:none;white-space:nowrap;min-height:44px;display:inline-flex;align-items:center} .nhead a:hover{text-decoration:underline}
+  .nstrip{order:1;flex:1 1 320px;min-width:0;display:flex}
+  .task{flex:1;display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,10px);padding:4px 6px 4px 8px;box-shadow:var(--shadow);min-width:0}
+  .task .av{width:28px;height:28px;font-size:12px;flex:0 0 auto;background:var(--dds-grad-brand,var(--p));color:#fff}
+  .task .tx{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px} .task .tn{flex:0 1 auto;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .task .tw{flex:1 1 0;min-width:0;font-size:12.5px;color:var(--soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .task .sbtn{flex:0 0 auto}
+  /* item 366 on a phone: the numbers are one row that scrolls sideways (the header's line already says
+     how many and how many need you), Needs you is its count and See all (each card says what it needs),
+     the sort line is one line, and the filter pills are one row that scrolls */
+  @media (max-width:767px){
+    .lmeta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sband{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:6px;gap:6px}
+    .sband::-webkit-scrollbar{display:none}
+    .sband .lead{display:none}
+    .kpi{flex:0 0 auto}
+    .nstrip{display:none}
+    .nhead a{margin-left:auto}
+    #fpills{display:flex!important;flex:1 1 100%;min-width:0;gap:var(--dds-s2,8px);overflow-x:auto;scrollbar-width:none;padding:2px 0}
+    #fpills::-webkit-scrollbar{display:none}
+    #fpills .fpill{flex:0 0 auto}
+  }
   .frow{display:flex;align-items:center;gap:var(--dds-s2,8px);flex-wrap:wrap;margin-bottom:var(--dds-s4,16px)}
   .fpill{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);padding:6px 12px;cursor:pointer;min-height:36px}
   .fpill:hover{border-color:var(--p);color:var(--p)} .fpill[aria-pressed="true"]{background:var(--p);border-color:var(--p);color:var(--dds-on-p,#fff)}
@@ -389,14 +406,14 @@
 
   /* ── builder list item 176 (Nov 2026, drawn in Figma and agreed): folders across the top, saved
      views and a tag picker on the filter row, tags under each card's address, tick boxes in the table ── */
-  .fstrip{display:flex;gap:10px;margin:0 0 var(--dds-s4,16px);overflow-x:auto;scrollbar-width:none;padding:2px 2px 6px;align-items:stretch}
+  .fstrip{display:flex;gap:8px;margin:0 0 var(--dds-s3,12px);overflow-x:auto;scrollbar-width:none;padding:2px 2px 6px;align-items:stretch}
   .fstrip::-webkit-scrollbar{display:none}
-  .ftile{font:inherit;display:flex;align-items:center;gap:12px;flex:0 0 auto;min-height:60px;padding:10px 18px 10px 12px;border-radius:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-align:left;box-shadow:var(--shadow)}
+  .ftile{font:inherit;display:flex;align-items:center;gap:8px;flex:0 0 auto;min-height:44px;padding:4px 14px 4px 6px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-align:left;box-shadow:var(--shadow)}
   .ftile:hover{border-color:var(--p)}
-  .ftile[aria-pressed="true"]{background:var(--p-soft);border:2px solid var(--p);padding:9px 17px 9px 11px}
-  .ftile .fg{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:0 0 auto}
-  .ftile .fg svg{width:20px;height:20px;display:block}
-  .ftile .fw{display:flex;flex-direction:column;min-width:0}
+  .ftile[aria-pressed="true"]{background:var(--p-soft);border:2px solid var(--p);padding:3px 13px 3px 5px}
+  .ftile .fg{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto}
+  .ftile .fg svg{width:18px;height:18px;display:block}
+  .ftile .fw{display:flex;align-items:baseline;gap:6px;min-width:0}
   .ftile .fw b{font-size:14px;font-weight:600;white-space:nowrap}
   .ftile .fw span{font-size:12px;color:var(--soft);white-space:nowrap}
   .ftile[aria-pressed="true"] .fw b{color:var(--p-deep);font-weight:700} .ftile[aria-pressed="true"] .fw span{color:var(--p)}
@@ -465,7 +482,7 @@
   .mrow .ib{font:inherit;width:36px;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--soft);cursor:pointer;flex:0 0 auto}
   .mrow .ib:hover{color:var(--p);border-color:var(--p)}
   .mrow .ib:disabled{opacity:.4;cursor:default}
-  @media (max-width:767px){.ftile{min-height:52px;padding:8px 14px 8px 10px}.ftile[aria-pressed="true"]{padding:7px 13px 7px 9px}.ftile .fg{width:32px;height:32px}.vbtn,.fmanage,.pbar button,.tsug button,.mrow .ib{min-height:44px}.mrow .ib{width:44px}.stags .tagchip,.stags .fchip,.stags .addtag{min-height:32px}.vdiv{display:none}.frow .vbtn{flex:1 1 auto}}
+  @media (max-width:767px){.ftile .fg{width:30px;height:30px}.vbtn,.fmanage,.pbar button,.tsug button,.mrow .ib{min-height:44px}.mrow .ib{width:44px}.stags .tagchip,.stags .fchip,.stags .addtag{min-height:32px}.vdiv{display:none}.frow .vbtn{flex:1 1 auto}}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
 </style>
 <link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
@@ -904,7 +921,7 @@ function peopleCell(s){
   return META.can_people?`<button type="button" class="lnk" data-people="${esc(s.site_id)}" aria-label="People on ${esc(s.name||'this site')}">${n?n+(n===1?' person':' people'):'Only your studio'}</button>`:esc(n?n+(n===1?' person':' people'):'Only your studio');
 }
 function tableHtml(list){
-  const pick=ORG.read&&ORG.can_change;   // item 176: tick boxes, to move or tag several at once
+  const pick=ORG.read&&ORG.can_change;   // item 176: tick boxes, to move or tag several at once (and item 368's three: the same manager role)
   const cap=NUM_HEAD?`<div class="tcap"><span>${esc(NUM_HEAD.month_label)}, compared with ${esc(NUM_HEAD.prior_label)}. A drop is red.</span><button type="button" class="lnk" data-sort="drop" aria-pressed="${SORT&&SORT.key==='drop'?'true':'false'}">Biggest drop first</button></div>`:'';
   const allOn=pick&&list.length&&list.every(s=>PICKED.has(s.site_id));
   const ths=(pick?`<th scope="col" class="pick"><label class="pk"><input type="checkbox" id="pickAll" aria-label="Pick every site shown"${allOn?' checked':''}><span class="pkw" aria-hidden="true">All</span></label></th>`:'')+COLS.map(([k,label])=>{const on=SORT&&SORT.key===k;if(k==='tags'&&ORG.read&&ORG.folders.length)label='Folder · Tags';return `<th scope="col"${['owner','plan','people','updated','tags'].includes(k)?' class="wide"':''}${on?` aria-sort="${SORT.dir>0?'ascending':'descending'}"`:''}><button type="button" class="thb" data-sort="${k}">${esc(label)}${on?`<span class="arrow" aria-hidden="true">${SORT.dir>0?'▲':'▼'}</span>`:''}</button></th>`;}).join('')+'<th scope="col" class="acts"><span class="sr-only">Actions</span></th>';
@@ -1000,12 +1017,13 @@ function bandHtml(){
     ${kpi('domains','Domains to renew',String(doms),soon?`${esc(soon.s.domain)} in ${soon.d} day${soon.d===1?'':'s'}`:'none within 30 days')}
   </section>`;
 }
-// what needs you next, from Home's own list: the first three rows that belong to a site here
+// what needs you next, from Home's own list: the first row that belongs to a site here, on one
+// slim line with how many there are (builder item 366: the first screen shows a site)
 function needsHtml(){
   const rows=NEEDS_ROWS.filter(r=>r.site_id&&SITES.some(s=>s.site_id===r.site_id));
   if(!rows.length)return '';
   return `<div class="nhead"><h2>Needs you</h2><span class="count">${rows.length}</span><a href="/agency.html">See all on Home →</a></div>
-  <div class="nstrip">${rows.slice(0,3).map(r=>`<div class="task"><span class="av" aria-hidden="true">${esc(initial(r.name))}</span><div class="tx"><div class="tn">${esc(r.name)}</div><div class="tw" title="${esc(r.what)}">${esc(r.what)}</div></div><a class="sbtn main" href="${esc(/^\//.test(String(r.href||''))?r.href:'/agency.html')}">${esc(r.verb||'Open')}</a></div>`).join('')}</div>`;
+  <div class="nstrip">${rows.slice(0,1).map(r=>`<div class="task"><span class="av" aria-hidden="true">${esc(initial(r.name))}</span><div class="tx"><div class="tn">${esc(r.name)}</div><div class="tw" title="${esc(r.what)}">${esc(r.what)}</div></div><a class="sbtn main" href="${esc(/^\//.test(String(r.href||''))?r.href:'/agency.html')}">${esc(r.verb||'Open')}</a></div>`).join('')}</div>`;
 }
 function pillsHtml(){
   const keys=['all','needs','live','notlive','elsewhere','drops'].filter(k=>k==='all'||countOf(k)||FILTER===k);
@@ -1414,11 +1432,38 @@ async function submitManageFolders(e){
   if(FOLDER==='none'&&!ORG.folders.length)FOLDER='';
   $('mfDlg').close();paintOrg();applyView();toast('Your folders are saved.');
 }
-// the table's picked bar: move them, tag them, untag them
+// the table's picked bar: move them, tag them, untag them; and (builder item 368) switch their
+// monthly reports and notifications on or off, and check their domains now
 function pickedTags(){const m=new Set();for(const id of PICKED){const x=SITES.find(y=>y.site_id===id);for(const t of ((x&&x.tags)||[]))m.add(t);}return [...m].sort();}
 function pickBarHtml(){
-  const n=PICKED.size;
-  return `<div class="pbar" role="region" aria-label="Picked sites"><b>${n} site${n===1?'':'s'} picked</b><button type="button" class="go" data-bulk="move">Move to folder</button><button type="button" data-bulk="addtag">Add a tag</button>${pickedTags().length?'<button type="button" data-bulk="rmtag" aria-haspopup="menu" aria-expanded="false">Remove a tag ▾</button>':''}<button type="button" data-bulk="clear">Clear</button></div>`;
+  const n=PICKED.size,org=ORG.read&&ORG.can_change,man=!!META.can_create;
+  const doms=[...PICKED].some(id=>(SITES.find(x=>x.site_id===id)||{}).domain);
+  return `<div class="pbar" role="region" aria-label="Picked sites"><b>${n} site${n===1?'':'s'} picked</b>${org?`<button type="button" class="go" data-bulk="move">Move to folder</button><button type="button" data-bulk="addtag">Add a tag</button>${pickedTags().length?'<button type="button" data-bulk="rmtag" aria-haspopup="menu" aria-expanded="false">Remove a tag ▾</button>':''}`:''}${man?`<button type="button" data-bulk="report" aria-haspopup="menu" aria-expanded="false">Monthly report ▾</button><button type="button" data-bulk="notify" aria-haspopup="menu" aria-expanded="false">Notifications ▾</button>${doms?'<button type="button" data-bulk="check">Check domains now</button>':''}`:''}<button type="button" data-bulk="clear">Clear</button></div>`;
+}
+// Builder item 368: each of the three does what that site's own switch or button does, one site
+// after another through that site's own route (PUT /report/monthly in its scope, PUT
+// /agency/notify/:site, POST /agency/domains/:site/check), so the rules are the same as one at a
+// time: the manager role, a client who can't be emailed gets no report, a domain checked a moment
+// ago waits. It says how many went through, and why the rest didn't.
+const BULK_WORDS={report:['Monthly report','Their report goes out on the 4th to 6th of each month.'],notify:['Notifications','Money owed, something broken and messages from your clients always reach you.']};
+async function bulkEach(kind,on,btn){
+  if(ORG_BUSY)return;
+  const ids=[...PICKED].filter(id=>kind!=='check'||(SITES.find(x=>x.site_id===id)||{}).domain);
+  if(!ids.length)return;
+  ORG_BUSY=true;const was=btn.textContent;btn.disabled=true;btn.textContent=kind==='check'?'Checking…':'Saving…';
+  let done=0;const why=[];
+  for(const id of ids){
+    const r=kind==='report'?await ddsApi('/report/monthly',{method:'PUT',body:{enabled:on},scope:id})
+      :kind==='notify'?await apiSend('PUT','/agency/notify/'+encodeURIComponent(id),{on})
+      :await apiSend('POST','/agency/domains/'+encodeURIComponent(id)+'/check');
+    if(r.ok)done++;else why.push((r.body&&r.body.message)||'That didn’t go through just now.');
+  }
+  ORG_BUSY=false;btn.disabled=false;btn.textContent=was;
+  const total=ids.length,many=(k)=>k+' site'+(k===1?'':'s');
+  const head=kind==='check'?`Checked ${done===total?'':done+' of '}${total} domain${total===1?'':'s'} just now.`
+    :`${BULK_WORDS[kind][0]} ${on?'on':'off'} for ${done===total?many(total):done+' of '+many(total)}.`;
+  const rest=total-done,tail=rest?` ${rest===1?'The other one':'The other '+rest}: ${why[0]}`:kind==='check'?' Domains has what we found.':on||kind==='notify'?' '+BULK_WORDS[kind][1]:'';
+  toast(head+tail,!!rest);
 }
 async function bulkTag(body,words){
   if(ORG_BUSY)return;ORG_BUSY=true;
@@ -1439,6 +1484,13 @@ async function bulk(kind,btn){
     const tag=t&&k.cleanTag(t);if(!tag)return;
     await bulkTag({add:tag},'“'+tag+'” is on '+PICKED.size+' site'+(PICKED.size===1?'':'s')+'.');return;
   }
+  if(kind==='report'||kind==='notify'){
+    const n=PICKED.size,many=n+' site'+(n===1?'':'s');
+    const html=`<div class="rowmenu" role="menu" aria-label="${esc(BULK_WORDS[kind][0]+' for '+many)}"><button type="button" role="menuitem" data-bon="1">Turn on for ${many}</button><button type="button" role="menuitem" data-bon="0">Turn off for ${many}</button></div>`;
+    openOrgMenu(kind,btn,html,(m)=>m.querySelectorAll('[data-bon]').forEach(b=>b.addEventListener('click',()=>{const on=b.getAttribute('data-bon')==='1';closeOrgMenu(false);bulkEach(kind,on,btn);})));
+    return;
+  }
+  if(kind==='check'){bulkEach('check',true,btn);return;}
   if(kind==='rmtag'){
     const html=`<div class="rowmenu" role="menu" aria-label="Tag to take off">${pickedTags().map(t=>`<button type="button" role="menuitem" data-rmt="${esc(t)}">${esc(t)}</button>`).join('')}</div>`;
     openOrgMenu('rmtag',btn,html,(m)=>m.querySelectorAll('[data-rmt]').forEach(b=>b.addEventListener('click',async()=>{const t=b.getAttribute('data-rmt');closeOrgMenu(false);await bulkTag({remove:t},'“'+t+'” is off the '+PICKED.size+' site'+(PICKED.size===1?'':'s')+' picked.');})));

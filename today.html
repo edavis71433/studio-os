@@ -203,6 +203,7 @@
   .dn-tag.search span,.dn-tag.ai span{background:var(--dds-info-soft,#e8f1fb);color:var(--dds-info,#2a6fb5)}
   .dn-tag.reviews span{background:var(--warn-soft);color:var(--warn)}
   .dn-tag.idea span{background:var(--good-soft);color:var(--good)}
+.dn-tag.holiday span{background:var(--warn-soft);color:var(--warn)}
   .dn-t{flex:1;min-width:0}
   .dn-t b{display:block;font-size:14px;font-weight:500;overflow-wrap:anywhere}
   .dn-t span{display:block;font-size:12px;color:var(--faint)}
@@ -570,7 +571,7 @@ const apiPostStudio=(path,body)=>ddsApi(path,{method:'POST',body,scope:''}).then
 // client, in that order. Most items leave on their own when the thing is done; Done puts one
 // away for 30 days and Not relevant for good (POST …/do-next/decide). A failed read leaves
 // the Overview as it was.
-const DN_TAG = { 'needs': 'Needs you', 'health': 'Health', 'search': 'Search', 'reviews': 'Reviews', 'ai': 'AI answers', 'idea': 'Idea' };   // quoted: the role-limits test reads an unquoted needs: as a marked control
+const DN_TAG = { 'needs': 'Needs you', 'holiday': 'Holiday', 'health': 'Health', 'search': 'Search', 'reviews': 'Reviews', 'ai': 'AI answers', 'idea': 'Idea' };   // quoted: the role-limits test reads an unquoted needs: as a marked control
 let DN = null, DN_SHOW = false;
 async function mountDoNext(){
   const id=new URLSearchParams(location.search).get('client');if(!id)return;
