@@ -105,7 +105,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Sites' })).toBeVisible();
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('.scard')).toHaveCount(3);
-    await expect(page.locator('.lmeta')).toContainText('3 sites · Pinned first, then the ones you opened last');
+    await expect(page.locator('.lmeta')).toContainText('Pinned first, then the ones you opened last');   // builder item 367: the count is the header's, not said again here
     await expect(page.locator('.dds-ph-tabs a[aria-current="page"]')).toHaveText('Sites');
     await expect(page.locator('.dds-ph-tabs a[href="/domains.html"]')).toHaveText('Domains');
     const isMobile = (page.viewportSize()?.width || 1280) < 761;
