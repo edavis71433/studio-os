@@ -180,6 +180,26 @@ test.describe('direction A — the website is the hero', () => {
   });
 });
 
+test.describe('direction A — a touch screen', () => {
+  test.use({ hasTouch: true });
+  test('every button in Needs you is a full finger’s tap (44px), the small rows too', { tag: '@touch' }, async ({ page }) => {
+    const two = bundle({ tasks: [
+      { id: 't1', title: 'Send your logo and photos', status: 'todo', client_action_required: true, source: 'checklist:content' },
+      { id: 't2', title: 'Write a few words about your shop', status: 'todo', client_action_required: true },
+    ] });
+    await installApp(page, { api: API({ [`/client/projects/${PID}`]: two }) });
+    await page.goto('/client.html');
+    expect(await page.evaluate(() => matchMedia('(pointer:coarse)').matches)).toBe(true);
+    const rows = page.locator('#needs-body .qcard .qrow');
+    await expect(rows.nth(1)).toBeVisible();   // a second, small row
+    const acts = page.locator('#needs-body .qcard .qact button, #needs-body .qcard .qact a');
+    await expect(rows.nth(1).locator('.qact button, .qact a').first()).toBeVisible();
+    const heights = await acts.evaluateAll((els) => els.filter((e) => (e as HTMLElement).offsetParent !== null).map((e) => Math.round(e.getBoundingClientRect().height * 10) / 10));
+    expect(heights.length).toBeGreaterThan(1);
+    for (const h of heights) expect(h).toBeGreaterThanOrEqual(44);
+  });
+});
+
 test.describe('direction A — the sign-in page and Settings', () => {
   test('the sign-in page has a real picture behind the words, and the studio’s own when it chose one', async ({ page }) => {
     await installApp(page, { session: null, api: { [`/public/studio/${STUDIO_SITE}/brand`]: { data: { ...STUDIO, cover_url: 'https://pictures.example/cover.jpg', signin: { google: false, password: true } } } } });
