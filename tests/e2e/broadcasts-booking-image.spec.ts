@@ -35,7 +35,7 @@ test.describe('Send an update — + Booking link and + Image (bold redesign)', (
     await expect(pv).toContainText('Brightline Studio');   // Business details have been read
     await body.fill('Spring is here.');
     await page.getByRole('button', { name: '+ Booking link' }).click();
-    await expect(body).toHaveValue('Spring is here.\n{{booking_link}}\n');
+    await expect(body).toHaveValue('Spring is here.\n[Booking link]\n');   // sales item 208: the words in the box, the code in the email
     await expect(body).toBeFocused();
     await expect(pv.locator('.mail-cta')).toHaveText('Book a time');
     await expect(page.locator('#varNote')).toBeHidden();
