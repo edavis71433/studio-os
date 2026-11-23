@@ -191,5 +191,20 @@ eq('190: nothing to go on, nothing found', (await check({})).body.data.matches, 
   ok('188: without it the search is the deal name alone, as + Create uses it', r.body.data.length === 0);
 }
 
+// ═══ 8. a line Studio OS wrote stays as it happened (item 186's live check, Nov 23) ═══
+{
+  const Act = await import('../../supabase/functions/presence/crm/activity.ts');
+  const resent = { id: ev(9), deal_id: DEAL, site_id: SITE, kind: 'note', actor: 'owner@studio.test', created_at: ago(5), detail: { activity_kind: 'email', body: 'Welcome email re-sent to ana@harbor.example', occurred_at: ago(5) } };
+  eq('186: the re-sent welcome line is Studio OS\'s, old (by its words) or new (via app); a line you typed is yours', [
+    A.writtenByStudioOs(resent.detail), A.writtenByStudioOs({ ...resent.detail, via: 'app' }), A.writtenByStudioOs({ body: 'Sent the quote', via: 'bcc' }), A.writtenByStudioOs({ body: 'I re-sent the welcome email by hand' }),
+  ], [true, true, true, false]);
+  ok('186: the deal page offers no Change on it', !A.markMine(A.mergeDealTimeline([resent]), 'owner@studio.test')[0].mine);
+  const item = Act.mapConversationItem({ id: ev(9), kind: 'activity', activity_kind: 'email', from: 'studio', actor: 'owner@studio.test', body: resent.detail.body, created_at: ago(5), via: '' }, 'owner@studio.test');
+  ok('186: …nor does the customer record', item && item.log && item.log.mine === false);
+  db.reset(world()); db.tables.presence_deal_events.push(resent);
+  r = await logs(ev(9), { remove: true });
+  ok('186: …and the route won\'t change or remove it', r.status === 404 && db.tables.presence_deal_events.find((x) => x.id === ev(9)).detail.activity_kind === 'email');
+}
+
 console.log(`\n════ SALES ITEMS 186-200 (Nov 22): ${pass}/${pass + fail} PASSED ════`);
 if (fail) { console.log('Failed:\n  ' + failed.join('\n  ')); Deno.exit(1); }
