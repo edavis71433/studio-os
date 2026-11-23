@@ -86,6 +86,7 @@
   button.ttl{font:inherit;font-weight:600;font-size:15px;color:inherit;background:none;border:0;padding:0;text-align:left;cursor:pointer;min-height:44px}
   button.ttl:hover{text-decoration:underline}
   .moves{display:flex;gap:6px;flex:0 0 auto}
+  @media (max-width:720px){.trow:has(.moves){flex-wrap:wrap}.moves{flex-basis:100%;padding-left:36px}}   /* on a phone the moves take their own line under the title */
   .mv,.tedit button{min-height:44px;min-width:44px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--p);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
   .tedit{flex:1 1 auto;display:grid;gap:8px;grid-template-columns:1fr auto;align-items:center}
   .tedit input[type=text]{grid-column:1 / -1;min-height:44px;font:inherit;font-size:15px;padding:0 10px;border:1px solid var(--line);border-radius:8px}

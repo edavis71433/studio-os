@@ -2504,7 +2504,6 @@ function renderCurrent(){
     host.innerHTML='<div class="dds-empty"><h3>No deals match that.</h3><p>Try a different deal, company, or contact name.</p></div>';return;
   }
   if(VIEW==='table')renderTable();else renderList();
-  paintListMore(host);   // item 188
 }
 // A deal is closed once it is won or not a fit; a closed deal's next step that
 // the server says is finished (next_step_done) is not shown at all.
@@ -2532,6 +2531,7 @@ function renderList(){
     return `<div class="card" data-id="${d.id}"${needsConvert(d)?' data-convert="1"':''} tabindex="0" role="button"><div><div class="t">${esc(d.title||'Untitled deal')}</div><div class="m">${esc([sourceWord(d.source),d.expected_close&&d.stage!=='won'&&d.stage!=='lost'?'closes '+niceDay(d.expected_close):'',teamOn()&&personOf(ownerOf(d))?'Owner: '+personOf(ownerOf(d)).label:''].filter(Boolean).join(' · '))}</div>${ns}${lc}${cv}</div><div style="text-align:right">${stageBadge(d.stage,d.agreement_signed)}<div class="val">${money(d.expected_value_cents)}</div></div></div>`;
   }).join('');
   host.querySelectorAll('.card').forEach(c=>{const open=()=>{if(c.dataset.convert)WANT_CONVERT_NEXT=true;openDeal(c.dataset.id);};c.onclick=open;c.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
+  paintListMore(host);   // item 188
 }
 // ── Sales review items 31 + 32 (Nov 2026): saved views (stage filter, search,
 // table columns and sort; GET/PUT /sales/views, shared by the team), picking
@@ -2883,6 +2883,7 @@ function renderTable(){
     tr.onclick=(e)=>{if(e.target.closest('input,td.pick,.cedit,.ced'))return;open();};
     tr.onkeydown=(e)=>{if(e.target.closest('input,button,select,.ced'))return;if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};
   });
+  paintListMore(host);   // item 188: Show more, after every paint of the table (a pick re-draws it)
 }
 
 // ── Stale after N days per stage — VERBATIM mirror of lib/sales_lifecycle.ts
