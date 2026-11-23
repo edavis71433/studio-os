@@ -1085,7 +1085,7 @@ export const HOSTING_WAIT_MS = 1500;
 function hostingForList(principal: Principal, now: string): Promise<HostPlan | null> {
   // platform staff only: the hosting account is the platform's, never a studio's to see
   if (principal.kind !== 'staff' || !netlifyConfigured()) return Promise.resolve(null);
-  let t: number | undefined;
+  let t: ReturnType<typeof setTimeout> | undefined;
   return Promise.race([readHostPlan(now).catch(() => null), new Promise<null>((r) => { t = setTimeout(() => r(null), HOSTING_WAIT_MS); })]).finally(() => clearTimeout(t));
 }
 async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: string, now: string, today?: string) {
