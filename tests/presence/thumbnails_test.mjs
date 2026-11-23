@@ -30,6 +30,15 @@ ok('no sample for a type the builder no longer offers', extra.length === 0, extr
 
 const noTemplatePic = TEMPLATES.filter((t) => !jpeg(`thumbs/templates/${t}.jpg`));
 ok('every template has its picture', TEMPLATES.length >= 8 && noTemplatePic.length === 0, noTemplatePic.join(', '));
+// item 331: every design has a picture for every kind of business, each small
+{
+  const { FAMILIES } = await import('../../supabase/functions/presence/lib/design_gallery.ts');
+  const want = TEMPLATES.flatMap((t) => FAMILIES.map((f) => `thumbs/templates/${t}/${f}.jpg`));
+  const missing = want.filter((p) => !jpeg(p));
+  ok('every design has a picture for each of the ten kinds of business', want.length === TEMPLATES.length * 10 && missing.length === 0, missing.slice(0, 4).join(', '));
+  const heavy = want.filter((p) => { try { return Deno.statSync(new URL(p, ROOT)).size > 60_000; } catch { return false; } });
+  ok('each kind picture stays small, under 60 KB', heavy.length === 0, heavy.join(', '));
+}
 
 // item 216: every ready-made page in Add a page has its picture, and each draws every section it brings
 {
@@ -54,7 +63,9 @@ ok('every template has its picture', TEMPLATES.length >= 8 && noTemplatePic.leng
 {
   let record = {};
   try { record = JSON.parse(Deno.readTextFileSync(new URL('tests/presence/golden/pictures.json', ROOT))); } catch { /* absent */ }
-  const onDisk = ['templates', 'sections', 'pages'].flatMap((d) => [...Deno.readDirSync(new URL(`thumbs/${d}/`, ROOT))].filter((e) => e.name.endsWith('.jpg')).map((e) => `${d}/${e.name}`)).sort();
+  // item 331: each design's pictures for the ten kinds sit in thumbs/templates/<slug>/
+  const kindPics = TEMPLATES.flatMap((t) => { try { return [...Deno.readDirSync(new URL(`thumbs/templates/${t}/`, ROOT))].filter((e) => e.name.endsWith('.jpg')).map((e) => `templates/${t}/${e.name}`); } catch { return []; } });
+  const onDisk = [...['templates', 'sections', 'pages'].flatMap((d) => [...Deno.readDirSync(new URL(`thumbs/${d}/`, ROOT))].filter((e) => e.name.endsWith('.jpg')).map((e) => `${d}/${e.name}`)), ...kindPics].sort();
   const listed = Object.keys(record).sort();
   const unrecorded = onDisk.filter((k) => !listed.includes(k)), gone = listed.filter((k) => !onDisk.includes(k));
   ok('the record lists every picture, and only them', !unrecorded.length && !gone.length, [unrecorded.length ? `not recorded: ${unrecorded.slice(0, 4).join(', ')}` : '', gone.length ? `recorded, no picture: ${gone.join(', ')}` : ''].filter(Boolean).join('; '));

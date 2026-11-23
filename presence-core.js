@@ -1028,7 +1028,8 @@ function bizShows() {
     story: "Shows on your About page.",
     phone: bar ? "Shows in your footer and on your Contact page, on the Call button of the phone bar, and to Google." : "Shows in your footer and on your Contact page, and to Google.",
     email: "Shows in your footer and on your Contact page as an email link.",
-    service_area: rc ? "Shows on your About page." : "Shows at the top of your home page and on your About page, and tells Google the places you serve.",
+    service_area: goesOn() ? (rc ? "Shows where an address would: in your footer, on your Contact page and on your About page. Google is told the places you serve." : "Shows where an address would: at the top of your home page, in your footer, on your Contact page and on your About page. Google is told the places you serve.")
+      : rc ? "Shows on your About page." : "Shows at the top of your home page and on your About page, and tells Google the places you serve.",
     booking_url: rc ? "Your home page’s Reserve a table button opens it, and Google is told you take reservations." : "The first button at the top of your home page opens it.",
     ordering_url: "Your home page’s Order online button opens it.",
     address: "Shows in your footer and on your Contact page with a Get directions link. Google uses it for your listing.",
@@ -1226,6 +1227,43 @@ $("closedSwitch").addEventListener("change", async () => {
     // item 81: the switch goes back to what's saved, so it never shows a closure that didn't happen
     $("closedSwitch").checked = !now; S.location = { ...(S.location || {}), temporarily_closed: !now }; $("f-closednote").hidden = now;
     whisper("save-hours", ""); whisper("topWhisper", "failed"); toast(nice(err), true);
+  }
+});
+// Builder list item 334: "We go to our customers". A business with no shopfront shows the
+// places it serves where its address was (footer, Contact page, under the opening) and offers
+// no directions; publishing asks for those places instead of a street. Here the address folds
+// away (kept, unshown, so switching back brings it straight back) and Where you work moves
+// into this card, where the address was. The switch shows only once the database has the
+// column (migration 0255): /site says so in location_fields, and before it a save would fail.
+const goesKnown = () => (S.locationFields || []).includes("goes_to_customers") || !!(S.location && "goes_to_customers" in S.location);
+const goesOn = () => goesKnown() && !!(S.location && S.location.goes_to_customers === true);
+function renderGoesSwitch() {
+  const row = $("goesRow"); if (!row) return;
+  row.hidden = !goesKnown();
+  $("goesSwitch").checked = goesOn();
+  paintGoes();
+}
+function paintGoes() {
+  const on = goesOn(), field = $("areaField");
+  $("bizAddr").hidden = on;
+  const hint = $("goesHint"); hint.hidden = !on;
+  hint.textContent = on ? "No street address or Get directions link shows on your site. It names the places you serve instead, from Where you work. Your address stays saved here, unshown." : "";
+  const home = on ? $("goesArea") : $("areaHome");
+  if (field && field.parentElement !== home) home.appendChild(field);
+  paintBizShows();
+}
+$("goesSwitch").addEventListener("change", async () => {
+  const now = $("goesSwitch").checked;
+  UNDO_BEFORE = { goes_to_customers: !now };
+  S.location = { ...(S.location || {}), goes_to_customers: now };
+  paintGoes();
+  if (now && !$("f-service_area").value.trim()) $("f-service_area").focus();
+  whisper("save-location", "saving"); whisper("topWhisper", "saving");
+  try { await api("PUT", "/location", { goes_to_customers: now }); whisper("save-location", "saved"); whisper("topWhisper", "saved"); scheduleChangesRefresh(); }
+  catch (err) {
+    // the switch goes back to what's saved, the way the closed switch does (item 81)
+    $("goesSwitch").checked = !now; S.location = { ...(S.location || {}), goes_to_customers: !now }; paintGoes();
+    whisper("save-location", ""); whisper("topWhisper", "failed"); toast(nice(err), true);
   }
 });
 // Item 61: the published site's visit counter, and the privacy page that describes it,
@@ -6860,6 +6898,7 @@ function fillSingles() {
   const l = S.location || {};
   [["f-address_line1","address_line1"],["f-city","city"],["f-region","region"],["f-postal_code","postal_code"],["f-locphone","phone"]]
     .forEach(([id, k]) => { $(id).value = l[k] || ""; });
+  renderGoesSwitch();
   renderHours();
   PLACE2 = undoClone(l.second_location) || null;
   renderPlace2();
@@ -6913,6 +6952,7 @@ async function refreshAll() {
   const ctxP = SHELL_LOADED.then(() => (window.ddsContext ? window.ddsContext().then((d) => ({ data: d })) : Promise.reject())).catch(() => api("GET", "/portal/context").catch(() => null));
   const [[siteR, off, faq, tes, pos, med, set], ctxR] = await Promise.all([openReads(soft, tagged), ctxP]);
   S.site = siteR.data.site; S.identity = siteR.data.identity; S.location = siteR.data.location;
+  S.locationFields = Array.isArray(siteR.data.location_fields) ? siteR.data.location_fields : [];   // item 334: what the database can save
   S.live = siteR.data.live || null;   // item 261: the one live rule, from the server
   S.offerings = off.data || []; S.faqs = faq.data || []; S.testimonials = tes.data || []; S.posts = pos.data || [];
   S.media = med.data || []; S.settings = set.data || {};
