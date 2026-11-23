@@ -203,9 +203,9 @@ for (const slug of TEMPLATES) {
   fx.content.settings.logo = { alt: '', variants: { w400: '/img/logo-400.webp', w800: '/img/logo-800.webp' }, width: 800, height: 200 };
   const with_ = async (tokens) => String((await renderSnapshot({ ...fx, dev_customization: { theme_tokens: tokens, custom_css: '', custom_html: '' } }, SITE))['index.html']);
   const both = await with_({}), logo = await with_({ header_brand: 'logo', logo_height: '56' }), name = await with_({ header_brand: 'name' }), noSearch = await with_({ site_search: 'off' });
-  ok('296: logo and name by default, with the logo\'s own width and height so the header never jumps', /<a class="brand" href="\/"><img src="\/img\/logo-400.webp" alt="" class="brandlogo" width="800" height="200">Golden Hour Events<\/a>/.test(both));
+  ok('296: logo and name by default, with the logo\'s own width and height so the header never jumps', /<a class="brand" href="\/"><img src="\/img\/logo-400.webp" alt="" class="brandlogo" width="800" height="200"><span class="brand-name">Golden Hour Events<\/span><\/a>/.test(both));
   ok('296: logo only keeps the name as the logo\'s alt text, at the chosen height', /<a class="brand brand-logo-only" href="\/" style="--logo-h:56px"><img src="\/img\/logo-400.webp" alt="Golden Hour Events" class="brandlogo" width="800" height="200"><\/a>/.test(logo));
-  ok('296: name only draws no logo', /<a class="brand" href="\/">Golden Hour Events<\/a>/.test(name) && !name.includes('brandlogo'));
+  ok('296: name only draws no logo', /<a class="brand" href="\/"><span class="brand-name">Golden Hour Events<\/span><\/a>/.test(name) && !name.includes('brandlogo'));
   ok('296: the settings take the three words and a height from 24 to 80', validateThemeTokens({ header_brand: 'logo', logo_height: '80' }).rejected.length === 0 && validateThemeTokens({ header_brand: 'big', logo_height: '81' }).rejected.length === 2);
   ok('295: the search box can be left out, and the switch takes on or off', !noSearch.includes('class="sitesearch"') && both.includes('class="sitesearch"') && validateThemeTokens({ site_search: 'off' }).tokens.site_search === 'off' && validateThemeTokens({ site_search: 'maybe' }).rejected.length === 1);
 }
