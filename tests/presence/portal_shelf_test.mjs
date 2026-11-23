@@ -31,7 +31,7 @@ const tokenOf = (u) => decodeURIComponent(new URL(u).searchParams.get('t') || ''
 {
   const paid = by(ids.paid), open = by(ids.open);
   ok('shelf: a paid invoice opens as its receipt, an unpaid one as the invoice (doc.html)', /\/doc\.html\?t=/.test(paid.view_url || '') && /\/doc\.html\?t=/.test(open.view_url || ''));
-  const tp = await readDocToken(tokenOf(paid.view_url), 'test-secret');
+  const tp = await readDocToken(tokenOf(paid.view_url), (await import('../../supabase/functions/presence/routes/sales.ts')).linkSecret());   // item 394: the server's own key for documents
   ok('shelf: the link names exactly that invoice on the studio’s site', !!tp && tp.k === 'invoice' && tp.id === ids.paid && tp.site_id === AGENCY);
   ok('shelf: a withdrawn invoice opens nothing; one with no studio site opens nothing', by(ids.voided).view_url === null && by(ids.nosite).view_url === null);
   ok('shelf: paying still works as before (Pay only while waiting)', open.pay_url === 'https://pay.example/x' && paid.pay_url === null && by(ids.voided).pay_url === null);

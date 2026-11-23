@@ -40,6 +40,18 @@ ok('every template has its picture', TEMPLATES.length >= 8 && noTemplatePic.leng
   ok('each kind picture stays small, under 60 KB', heavy.length === 0, heavy.join(', '));
 }
 
+// the openings made for a kind of business: each has its picture, as small as a design's
+{
+  const { KIND_OPENINGS } = await import('../../supabase/functions/presence/lib/kind_openings.ts');
+  const want = KIND_OPENINGS.map((o) => `thumbs/openings/${o.key}.jpg`);
+  const missing = want.filter((p) => !jpeg(p));
+  ok('every opening made for a kind of business has its picture', want.length === 9 && missing.length === 0, missing.join(', '));
+  const heavy = want.filter((p) => { try { return Deno.statSync(new URL(p, ROOT)).size > 60_000; } catch { return false; } });
+  ok('each opening picture stays small, under 60 KB', heavy.length === 0, heavy.join(', '));
+  const extra = [...Deno.readDirSync(new URL('thumbs/openings/', ROOT))].map((e) => `thumbs/openings/${e.name}`).filter((p) => !want.includes(p));
+  ok('no picture of an opening that isn’t offered', extra.length === 0, extra.join(', '));
+}
+
 // item 216: every ready-made page in Add a page has its picture, and each draws every section it brings
 {
   const ready = listReadyPages();
@@ -65,7 +77,7 @@ ok('every template has its picture', TEMPLATES.length >= 8 && noTemplatePic.leng
   try { record = JSON.parse(Deno.readTextFileSync(new URL('tests/presence/golden/pictures.json', ROOT))); } catch { /* absent */ }
   // item 331: each design's pictures for the ten kinds sit in thumbs/templates/<slug>/
   const kindPics = TEMPLATES.flatMap((t) => { try { return [...Deno.readDirSync(new URL(`thumbs/templates/${t}/`, ROOT))].filter((e) => e.name.endsWith('.jpg')).map((e) => `templates/${t}/${e.name}`); } catch { return []; } });
-  const onDisk = [...['templates', 'sections', 'pages'].flatMap((d) => [...Deno.readDirSync(new URL(`thumbs/${d}/`, ROOT))].filter((e) => e.name.endsWith('.jpg')).map((e) => `${d}/${e.name}`)), ...kindPics].sort();
+  const onDisk = [...['templates', 'sections', 'pages', 'openings'].flatMap((d) => [...Deno.readDirSync(new URL(`thumbs/${d}/`, ROOT))].filter((e) => e.name.endsWith('.jpg')).map((e) => `${d}/${e.name}`)), ...kindPics].sort();
   const listed = Object.keys(record).sort();
   const unrecorded = onDisk.filter((k) => !listed.includes(k)), gone = listed.filter((k) => !onDisk.includes(k));
   ok('the record lists every picture, and only them', !unrecorded.length && !gone.length, [unrecorded.length ? `not recorded: ${unrecorded.slice(0, 4).join(', ')}` : '', gone.length ? `recorded, no picture: ${gone.join(', ')}` : ''].filter(Boolean).join('; '));

@@ -29,6 +29,7 @@ export interface PortfolioInput {
   enquiries?: EnquiryLite[];                     // the same leads with who/when — Needs you names them
   filesPending?: Record<string, number>;         // DAM-2: site_id → files awaiting approval
   billingBySite?: Record<string, string>;       // site_id → entitlement status (active|paused|lapsed)
+  planWordsBySite?: Record<string, string | null>;   // item 426: site_id → the plan as Sites says it (null: the read failed)
   lastChange: Record<string, string>;      // site_id → latest change event at
   nowIso: string;
 }
@@ -80,6 +81,7 @@ export function buildPortfolio(i: PortfolioInput) {
       files_pending: (i.filesPending || {})[s.id] || 0,   // DAM-2: files awaiting approval
       search_issues,
       billing_issue,
+      plan_words: (i.planWordsBySite || {})[s.id] ?? null,   // item 426: "Website + tools", never the edition code
       // one number the agency scans: things actively asking for someone (active notices + approvals + waiting leads + files)
       attention: noticeRows.length + plansWaiting + (leads.get(s.id) || []).length + ((i.filesPending || {})[s.id] || 0),
       review_open: (reviews.get(s.id) || []).some((r) => r.status === 'open' && r.open_count > 0)

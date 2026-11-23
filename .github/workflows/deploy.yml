@@ -128,8 +128,7 @@ jobs:
             echo "Production deploys only from main. Aborting."; exit 1
           fi
 
-      - uses: actions/checkout@v4
-
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Guard — canonical clever-api file must exist
         run: test -f supabase/functions/clever-api/index.ts || { echo "clever-api/index.ts missing — see docs/runbooks/BYTE-CHECK.md item 1"; exit 1; }
 

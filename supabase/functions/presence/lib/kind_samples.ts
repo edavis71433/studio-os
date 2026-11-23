@@ -9,6 +9,8 @@
 import SAMPLES from './kind_samples.json' with { type: 'json' };
 import { FAMILIES, familyOf, type Family } from './design_gallery.ts';
 import { getTemplate, latestTemplateVersion, renderSnapshot } from './render.ts';
+import { startedSnapshot } from './template_openings.ts';
+import { kindOpening } from './kind_openings.ts';
 import type { Snapshot, SnapshotContent } from './render_types.ts';
 
 /** Samples carry no clock: one fixed date keeps every picture and every full-size view the same. */
@@ -31,14 +33,19 @@ export function sampleSnapshot(kind: string | null | undefined, templateSlug: st
 }
 
 /** "See it full size": a kind's sample home page in one design, as one page a frame can show
- *  (the stylesheet inside it, no scripts, photos from the app). Null for an unknown design. */
-const PAGES = new Map<string, string>();   // drawn once per design and kind for this instance: the samples never change
-export async function samplePage(kind: string | null | undefined, templateSlug: string): Promise<string | null> {
-  const key = `${templateSlug}|${sampleFamily(kind)}`;
+ *  (the stylesheet inside it, no scripts, photos and fonts from the app). It opens the way a new
+ *  site on the design does: the design's own layout and fonts (lib/template_openings.ts), or with
+ *  `opening` one of the openings made for a kind of business (lib/kind_openings.ts), which must be
+ *  one of this design's. The design pictures and the opening pictures are drawn the same way
+ *  (scripts/thumbnails). A today card shows Friday's line, the day its picture is taken on.
+ *  Null for an unknown design or opening. */
+const PAGES = new Map<string, string>();   // drawn once per design, kind and opening for this instance: the samples never change
+export async function samplePage(kind: string | null | undefined, templateSlug: string, opening = ''): Promise<string | null> {
+  const key = `${templateSlug}|${sampleFamily(kind)}|${opening}`;
   if (PAGES.has(key)) return PAGES.get(key)!;
   const snap = sampleSnapshot(kind, templateSlug);
-  if (!snap) return null;
-  const files = await renderSnapshot(snap, { baseUrl: 'https://example.com' });
+  if (!snap || (opening && kindOpening(opening)?.design !== templateSlug)) return null;
+  const files = await renderSnapshot(startedSnapshot(snap, opening), { baseUrl: 'https://example.com' });
   let html = String(files['index.html'] || '');
   const css = Object.keys(files).find((k) => k.startsWith('assets/') && k.endsWith('.css'));
   if (css) html = html.replace(/<link rel="stylesheet" href="[^"]*">/, () => `<style>${files[css]}</style>`);
@@ -48,6 +55,7 @@ export async function samplePage(kind: string | null | undefined, templateSlug: 
     .replace(/<link\b[^>]*\brel="(?:preload|prefetch|modulepreload|preconnect|dns-prefetch|manifest|icon|apple-touch-icon|alternate|canonical)"[^>]*>/gi, '')
     .replace(/<source\b[^>]*>/gi, '')
     .replace(/\s(?:srcset|sizes)="[^"]*"/gi, '')
+    .replace(/(<p class="hc-when" data-day="fri") hidden>/, '$1>')
     .replaceAll('https://example.com', '');
   PAGES.set(key, page);
   return page;

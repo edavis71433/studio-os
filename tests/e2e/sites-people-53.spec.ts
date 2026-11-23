@@ -151,3 +151,31 @@ test.describe('Sites: who owns each site (builder item 53)', () => {
     await expect(menu.getByRole('menuitem', { name: 'Transfer ownership' })).toHaveCount(0);
   });
 });
+
+// ── Builder item 387: what the client may do on their own site, the studio's switch ──
+test.describe('People: "They can publish and run their website" (builder item 387)', () => {
+  test('off by default and said in the owner\'s name; a manager switches it on, and it is saved for that site', async ({ page }) => {
+    const sent: unknown[] = [];
+    await openSites(page);   // the pretend server is set up there; this answer comes after it, so it wins
+    await page.route(`**/functions/v1/presence/agency/sites/${MAPLE_ID}/runs`, (route: Route) => {
+      if (route.request().method() === 'PUT') { const b = route.request().postDataJSON(); sent.push(b); return route.fulfill(json({ data: { site_id: MAPLE_ID, on: b.on, at: '2026-11-15T18:00:00Z', by: 'owner@studio.example', can_change: true } })); }
+      return route.fulfill(json({ data: { site_id: MAPLE_ID, on: false, at: null, by: null, can_change: true } }));
+    });
+    await card(page, 'Maple & Main Realty').getByRole('button', { name: 'People on Maple & Main Realty' }).click();
+    const sw = page.getByRole('switch', { name: 'They can publish and run their website' });
+    await expect(sw).not.toBeChecked();
+    await expect(page.locator('[data-runs-words]')).toHaveText('Off: your studio publishes, takes the site offline, and changes its template, domain and people. Sam can still edit the draft.');
+    await sw.click();
+    await expect.poll(() => sent).toEqual([{ on: true }]);
+    await expect(sw).toBeChecked();
+    await expect(page.locator('[data-runs-words]')).toHaveText('On: Sam can publish, take the site offline, and change its template, domain and people themselves.');
+  });
+
+  test('a seat that can\'t manage clients sees it, greyed, and why', async ({ page }) => {
+    await openSites(page);
+    await page.route(`**/functions/v1/presence/agency/sites/${MAPLE_ID}/runs`, (route: Route) => route.fulfill(json({ data: { site_id: MAPLE_ID, on: false, at: null, by: null, can_change: false } })));
+    await card(page, 'Maple & Main Realty').getByRole('button', { name: 'People on Maple & Main Realty' }).click();
+    await expect(page.getByRole('switch', { name: 'They can publish and run their website' })).toBeDisabled();
+    await expect(page.locator('#dds-people')).toContainText('Only your studio’s owners, admins and account managers can change this.');
+  });
+});

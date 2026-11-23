@@ -61,7 +61,7 @@ test.describe('Analytics — the studio’s numbers lead (bold redesign)', () =>
     await expect(page.getByRole('heading', { level: 1, name: 'Analytics' })).toBeVisible();
     await expect(page.locator('#phLine')).toContainText('How the studio is doing — in plain numbers.');
     await expect(nums(page)).toHaveCount(4);
-    await expect(nums(page).nth(0)).toContainText('Revenue · Nov');
+    await expect(nums(page).nth(0)).toContainText('Money in · Nov');   // sales item 215: money paid, not deals won
     await expect(nums(page).nth(0).locator('.num-v')).toHaveText('$1,950');
     await expect(nums(page).nth(0)).toContainText('$22,900 in the last 12 months');
     await expect(nums(page).nth(1).locator('.num-v')).toHaveText('83%');

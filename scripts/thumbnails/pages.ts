@@ -10,6 +10,8 @@ import { SAMPLE_BLOCKS, FILE_ID } from './samples.ts';
 import { listReadyPages } from '../../supabase/functions/presence/lib/page_layouts.ts';
 import { FAMILIES, familyOf } from '../../supabase/functions/presence/lib/design_gallery.ts';
 import { sampleSnapshot } from '../../supabase/functions/presence/lib/kind_samples.ts';
+import { startedSnapshot } from '../../supabase/functions/presence/lib/template_openings.ts';
+import { KIND_OPENINGS } from '../../supabase/functions/presence/lib/kind_openings.ts';
 
 const ROOT = new URL('../../', import.meta.url);
 const SITE = { baseUrl: 'https://example.com' };
@@ -62,22 +64,35 @@ const COMPANY: Record<string, string[]> = { toc: ['title', 'features', 'process'
 
 /** Each template's sample site. Item 331: its photos are the stand-in picture for its own kind
  *  of business (thumbs/stand-ins), not the soft placeholder; the placeholders are still numbered
- *  as before, so the section pictures keep theirs. */
+ *  as before, so the section pictures keep theirs. The design pictures show what a new site on the
+ *  design starts with: its own layout and fonts (lib/template_openings.ts startedSnapshot). */
 export async function templatePages(): Promise<Record<string, FileMap>> {
   const out: Record<string, FileMap> = {};
   for (const slug of TEMPLATES) {
     const fx = fixture(slug);
     const own = familyOf(fx.content.settings?.industry);
-    out[slug] = await renderSnapshot(JSON.parse(JSON.stringify(fx).replace(/\/ph\/\d+\.svg/g, `/thumbs/stand-ins/${own}.jpg`)), SITE);
+    out[slug] = await renderSnapshot(startedSnapshot(JSON.parse(JSON.stringify(fx).replace(/\/ph\/\d+\.svg/g, `/thumbs/stand-ins/${own}.jpg`))), SITE);
   }
   return out;
 }
 /** Item 331: every design drawn with every kind's sample business, so a salon owner sees
- *  eight salons. Keyed "<template>/<family>". */
+ *  eight salons, each as a new site on the design starts. Keyed "<template>/<family>". */
 export async function kindPages(): Promise<Record<string, FileMap>> {
   const out: Record<string, FileMap> = {};
-  for (const slug of TEMPLATES) for (const f of FAMILIES) out[`${slug}/${f}`] = await renderSnapshot(sampleSnapshot(f, slug)!, SITE);
+  for (const slug of TEMPLATES) for (const f of FAMILIES) out[`${slug}/${f}`] = await renderSnapshot(startedSnapshot(sampleSnapshot(f, slug)!), SITE);
   return out;
+}
+/** The openings made for a kind of business (lib/kind_openings.ts): each drawn with its kind's
+ *  sample business, as a new site with it starts. Keyed by the opening's key. */
+export async function openingPages(): Promise<Record<string, FileMap>> {
+  const out: Record<string, FileMap> = {};
+  for (const o of KIND_OPENINGS) out[o.key] = await renderSnapshot(startedSnapshot(sampleSnapshot(o.family, o.design)!, o.key), SITE);
+  return out;
+}
+/** The library fonts a page loads (a design's new-site fonts, a look's), from the app's own copies. */
+export function fontFiles(files: FileMap): Record<string, Uint8Array> {
+  const used = new Set([...String(files['index.html'] || '').matchAll(/\/(fonts\/library\/[a-z0-9-]+\.woff2)/g)].map((m) => m[1]));
+  return Object.fromEntries([...used].sort().map((p) => [p, Deno.readFileSync(new URL(p, ROOT))]));
 }
 /** The stand-in pictures the pages load, from the app's own copies. */
 export function standInFiles(): Record<string, Uint8Array> {
@@ -132,14 +147,14 @@ export function placeholderFiles(): Record<string, string> {
 export async function allPages() {
   media.clear();
   // the ready-made pages come last, so the pictures before them keep their placeholder numbers
-  const templates = await templatePages(), sections = await sectionPages(), pages = await readyPages(), kinds = await kindPages();
-  return { templates, sections, pages, kinds, ph: { ...placeholderFiles(), ...standInFiles() } };
+  const templates = await templatePages(), sections = await sectionPages(), pages = await readyPages(), kinds = await kindPages(), openings = await openingPages();
+  return { templates, sections, pages, kinds, openings, ph: { ...placeholderFiles(), ...standInFiles() } };
 }
 
 /** What each picture shows, as a digest: its page, the stylesheet and the placeholders the
  *  page loads. shoot.mjs records it beside the picture; the test compares it with today's. */
 export async function pictureSources(): Promise<Record<string, string>> {
-  const { templates, sections, pages, kinds, ph } = await allPages();
+  const { templates, sections, pages, kinds, openings, ph } = await allPages();
   const hex = async (b: Uint8Array) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', b))].map((x) => x.toString(16).padStart(2, '0')).join('');
   const sha = (s: string) => hex(new TextEncoder().encode(s));
   const shown = async (files: FileMap) => {
@@ -147,6 +162,7 @@ export async function pictureSources(): Promise<Record<string, string>> {
     const used = Object.keys(files).filter((k) => k.startsWith('assets/')).sort().map((k) => [k, String(files[k])]);
     for (const n of new Set([...page.matchAll(/\/ph\/(\d+)\.svg/g)].map((m) => m[1]))) used.push([`ph/${n}.svg`, String(ph[`ph/${n}.svg`])]);
     for (const f of new Set([...page.matchAll(/\/thumbs\/stand-ins\/(\w+)\.jpg/g)].map((m) => m[1]))) used.push([`thumbs/stand-ins/${f}.jpg`, await hex(ph[`thumbs/stand-ins/${f}.jpg`] as Uint8Array)]);
+    for (const [path, bytes] of Object.entries(fontFiles(files))) used.push([path, await hex(bytes)]);   // the library fonts it draws in
     return sha(JSON.stringify([['index.html', page], ...used]));
   };
   const out: Record<string, string> = {};
@@ -154,5 +170,6 @@ export async function pictureSources(): Promise<Record<string, string>> {
   for (const [type, files] of Object.entries(sections)) out[`sections/${type}.jpg`] = await shown(files);
   for (const [key, files] of Object.entries(pages)) out[`pages/${key}.jpg`] = await shown(files);
   for (const [key, files] of Object.entries(kinds)) out[`templates/${key}.jpg`] = await shown(files);
+  for (const [key, files] of Object.entries(openings)) out[`openings/${key}.jpg`] = await shown(files);
   return out;
 }

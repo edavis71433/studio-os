@@ -6,9 +6,10 @@
 // 200 when it is recorded (or isn't ours); 502 when Stripe or the database didn't
 // answer, so the webhook answers 500 and Stripe sends the event again.
 import { json } from '../../_shared/http.ts';
+import { timingSafeEqual } from '../../_shared/hmac.ts';   // builder item 397: secrets compared the careful way
 
 export async function handleChargeEvent(req: Request, secret: string, cors: Record<string, string>): Promise<Response> {
-  if (!secret || req.headers.get('x-commerce-secret') !== secret) return json({ error: 'forbidden' }, 403, cors);
+  if (!secret || !timingSafeEqual(req.headers.get('x-commerce-secret') || '', secret)) return json({ error: 'forbidden' }, 403, cors);
   let body: { charge?: unknown; dispute?: unknown } | null = null;
   try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const { stripeIdOk, syncChargeRefunds, syncDispute } = await import('../commerce/charge_returns.ts');

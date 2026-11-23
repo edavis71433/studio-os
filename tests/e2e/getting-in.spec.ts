@@ -35,7 +35,15 @@ async function fakeSignIn(page: Page) {
       } };
     } };` }));
 }
-const whoami = (page: Page, isTeam: boolean) => page.route('**/functions/v1/clever-api', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ role: isTeam ? 'admin' : null, isTeam }) }));
+// builder item 392: the main server answers who is on the team; the old server is asked only
+// while that answer isn't live yet, so a test that answers the main server never reaches it
+let oldServerAsked = 0;
+const whoami = async (page: Page, isTeam: boolean) => {
+  const body = JSON.stringify({ role: isTeam ? 'admin' : null, isTeam });
+  oldServerAsked = 0;
+  await page.route('**/functions/v1/presence/team/whoami', (route) => route.fulfill({ status: 200, contentType: 'application/json', body }));
+  await page.route('**/functions/v1/clever-api', (route) => { oldServerAsked++; return route.fulfill({ status: 200, contentType: 'application/json', body }); });
+};
 const saved = (page: Page) => page.evaluate(([a, b]) => ({ studio: !!localStorage.getItem(a), client: !!localStorage.getItem(b) }), [STUDIO_REALM, CLIENT_REALM]);
 async function setPassword(page: Page) {
   await page.locator('#em').fill('pat@example.com');
@@ -138,6 +146,7 @@ test.describe('Getting in (builder item 192)', () => {
     await page.locator('#pw').fill('a long enough password');
     await page.locator('#go').click();
     await expect(page.locator('#noWorkspace')).toBeVisible();
+    expect(oldServerAsked, 'the main server answered who is on the team, so the old one was never asked (builder item 392)').toBe(0);
     await page.locator('#signout1').click();
     await expect(page.locator('#loginPanel')).toBeVisible();
     await expect(page.locator('#go')).toBeEnabled();

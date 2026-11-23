@@ -10,7 +10,8 @@ export type SetupKey = 'business' | 'logo' | 'services' | 'contact' | 'deal' | '
 export interface SetupStep { key: SetupKey; title: string; why: string; act: string; href: string; done: boolean }
 
 export const SETUP_STEPS: ReadonlyArray<Omit<SetupStep, 'done'>> = [
-  { key: 'business', title: 'Your business details', why: 'Your name and address on invoices and emails', act: 'Add them', href: '/settings.html#studio' },
+  // sales item 195: it names the Studio profile boxes it checks (businessDetailsDone), the page it opens
+  { key: 'business', title: 'Your business details', why: 'Studio name, email, where you work from and who signs your agreements', act: 'Fill them in', href: '/settings.html#studio' },
   { key: 'logo', title: 'Your logo', why: 'On emails, invoices and the client portal', act: 'Choose it', href: '/files.html' },
   { key: 'services', title: 'Services and prices', why: 'Proposals fill themselves in', act: 'Add a service', href: '/pipeline.html?services=1' },
   { key: 'contact', title: 'Your first contact', why: 'Add one, or bring in a list', act: 'Add a contact', href: '/contacts.html?add=1' },
@@ -18,6 +19,15 @@ export const SETUP_STEPS: ReadonlyArray<Omit<SetupStep, 'done'>> = [
   { key: 'goal', title: 'A monthly goal', why: 'Home and Pipeline track it for you', act: 'Set a goal', href: '/settings.html#goal' },   // sales item 94
   { key: 'portal', title: 'Your client portal', why: 'A welcome note and what clients see, before they do', act: 'Set it up', href: '/client-portal.html' },   // builder item 342
 ];
+
+/** Sales item 195: "Your business details" is done only when every Studio profile box it names is
+ *  filled: the studio name and email, where you work from (the identity row) and who signs agreements
+ *  (the settings row). Either row unread is null: the step is left off, never ticked. Pure. */
+export function businessDetailsDone(ident: Record<string, unknown> | null | undefined, settings: Record<string, unknown> | null | undefined, readOk: boolean): boolean | null {
+  if (!readOk) return null;
+  const has = (v: unknown) => !!String(v ?? '').trim();
+  return has(ident?.business_name) && has(ident?.email) && has(ident?.service_area) && has(settings?.signs_as_name);
+}
 
 /** The steps, in order, from what was found: true done, false not yet, null (or missing)
  *  couldn't be checked, so that step is left off. */

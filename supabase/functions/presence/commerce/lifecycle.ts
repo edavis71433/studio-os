@@ -20,6 +20,7 @@
 //   • send-once → the notices table's unique(client,kind,period) IS the dedupe:
 //                emails go out only when the notice row is newly inserted.
 // Pure decision logic + copy up top (tested); the impure runner below.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { svc, svcCount } from '../lib/db.ts';
 import { isOpenDealStage, OPEN_DEAL_STAGES_FILTER } from '../lib/deal_stages.ts';   // sales item 146: the one list of open stages (the first is `lead`, never `new`)
 import { rateAllow } from '../lib/ratelimit.ts';
@@ -37,7 +38,7 @@ import { verifyApex, dkimPresent, NETLIFY_APEX_IP, bareDomain } from '../platfor
 import { clearFoundPlans } from '../platform/plan_found.ts';
 import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
 import { supportAgingDue, supportAgingPeriod, SUPPORT_AGING_DAYS } from '../lib/intake.ts';
-import { editionFromPlan, EDITION_DEFS } from './editions.ts';
+import { planWords } from './catalog.ts';   // builder item 426: plans in the words Sites uses
 import { sendEmail } from './account.ts';
 import { emailOperator, emailBridgedCustomer, ownerReplyTo } from '../lib/service_bridge.ts';
 import { ensureLeadContact } from '../lib/lead_contact.ts';   // sales item 142
@@ -484,16 +485,28 @@ async function watchDomainMail(site: DomainCheckSite, registered: string | null,
   if (w.alert && saved) await tellOwnerAndStudio({ id: site.id, client_id: site.client_id }, domainChangeEmail('mail_gone', { domain: bare, mx: saved.mx, recordsAt }), 'domain-mail-gone');
 }
 
-export async function runDomainWatch(limit = 10): Promise<{ checked: number; warned: number; reasked: number }> {
+// Builder list item 365 (Nov 22 review): the round took ten domains in no set order and stopped
+// at the first one that threw, so one bad row could hold up the rest every day. Now the ones
+// never checked go first, then the longest since a check; a check that fails is written down
+// on its own row (checked today, the lookup "failed", so the Domains page says it didn't work,
+// and it waits its turn tomorrow) and the round goes on to the next. Every step after a check's
+// save already keeps its own errors, so a break comes before its findings are written.
+export async function runDomainWatch(limit = 10): Promise<{ checked: number; warned: number; reasked: number; failed: number }> {
   const nowIso = new Date().toISOString();
   const staleBefore = new Date(Date.now() - 24 * 3600_000).toISOString();
-  const q = await svc(`presence_sites?custom_domain=not.is.null&or=(domain_checked_at.is.null,domain_checked_at.lt.${encodeURIComponent(staleBefore)})&select=id,client_id,custom_domain,netlify_site_id,edition,cert_pending_since&limit=${limit}`);
-  let checked = 0, warned = 0, reasked = 0;
+  const q = await svc(`presence_sites?custom_domain=not.is.null&or=(domain_checked_at.is.null,domain_checked_at.lt.${encodeURIComponent(staleBefore)})&select=id,client_id,custom_domain,netlify_site_id,edition,cert_pending_since&order=domain_checked_at.asc.nullsfirst,id.asc&limit=${limit}`);
+  let checked = 0, warned = 0, reasked = 0, failed = 0;
   for (const site of (Array.isArray(q.json) ? q.json : []) as DomainCheckSite[]) {
-    const r = await checkOneDomain(site, nowIso);
-    checked++; if (r.warned) warned++; if (r.reasked) reasked++;
+    try {
+      const r = await checkOneDomain(site, nowIso);
+      checked++; if (r.warned) warned++; if (r.reasked) reasked++;
+    } catch (e) {
+      failed++;
+      console.error('domain watch: one check failed', site.id, String((e as Error)?.message || e).slice(0, 200));
+      await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ domain_checked_at: nowIso, domain_lookup_status: 'failed' }) }).catch(() => null);
+    }
   }
-  return { checked, warned, reasked };
+  return { checked, warned, reasked, failed };
 }
 
 // ── Phase CRM (FD-CRM1): the un-replied lead follow-up nudge ──────────────────
@@ -511,7 +524,7 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number; fo
   const to = new Date(Date.now() - 24 * 3600_000).toISOString();     // aged at least a day
   const q = await svc(`presence_form_submissions?status=eq.new&spam=is.false&created_at=gte.${encodeURIComponent(from)}&created_at=lte.${encodeURIComponent(to)}&select=id,site_id,form_kind,name,email,created_at&order=created_at.asc&limit=${limit}`);
   const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
-  const base = (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
+  const base = appBase();
   let nudged = 0;
   for (const lead of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; form_kind: string; name?: string; email?: string; created_at: string }>) {
     if (!leadFollowupDue(lead, nowIso)) continue;                    // pure guard (defends the SQL window)
@@ -953,7 +966,7 @@ export async function runDealFollowups(limit = 20): Promise<{ nudged: number; ta
       // Parity with lead follow-ups: a quiet $5k proposal deserves at least the
       // email a fresh $0 lead gets. Send-once (gated on the notice insert above).
       try {
-        const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+        const base = appBase();
         const brand = await loadEmailBrand(deal.site_id);
         const safeBody = body.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
         emailOperator(deal.site_id, `Follow up on ${title}`, `<p>${safeBody}</p><p class="cta"><a href="${base}/pipeline.html?deal=${deal.id}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open the deal →</a></p>`, 'deal_followup').catch(() => {});
@@ -1002,7 +1015,7 @@ export function nextStepPeriod(dealId: string, nowMs: number): string {
 export async function runDealTaskReminders(limit = 20): Promise<{ nudged: number }> {
   const nowIso = new Date().toISOString();
   const today = nowIso.slice(0, 10);
-  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  const base = appBase();
   const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
   let nudged = 0;
   const siteClient = new Map<string, string>();
@@ -1092,7 +1105,7 @@ export async function runSupportAging(limit = 20): Promise<{ nudged: number }> {
   const to = new Date(Date.now() - SUPPORT_AGING_DAYS * 86400_000).toISOString();   // quiet at least N days
   const q = await svc(`presence_support_requests?deleted_at=is.null&status=in.(open,in_progress)&updated_at=gte.${encodeURIComponent(from)}&updated_at=lte.${encodeURIComponent(to)}&select=id,site_id,subject,status,priority,updated_at&order=updated_at.asc&limit=${limit}`);
   const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
-  const base = (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
+  const base = appBase();
   let nudged = 0;
   for (const r of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; subject?: string; status: string; priority?: string; updated_at: string }>) {
     if (!supportAgingDue(r, nowIso)) continue;                    // pure guard (defends the SQL window)
@@ -1345,7 +1358,7 @@ export async function runDraftInvoiceNudges(nowMs = Date.now(), limit = 20): Pro
 export async function runRenewalReminders(limit = 50): Promise<{ reminded: number }> {
   const nowIso = new Date().toISOString();
   const within = new Date(Date.now() + 31 * 86400_000).toISOString();
-  const base = (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
+  const base = appBase();
   const q = await svc(`presence_entitlements?product=eq.presence&term=eq.annual&cancel_at_period_end=eq.false&current_period_end=not.is.null&current_period_end=lte.${encodeURIComponent(within)}&select=client_id,plan,current_period_end&limit=${limit}`);
   let reminded = 0;
   for (const e of (Array.isArray(q.json) ? q.json : []) as Array<{ client_id: string; plan: string; current_period_end: string }>) {
@@ -1356,7 +1369,7 @@ export async function runRenewalReminders(limit = 50): Promise<{ reminded: numbe
     if (!siteId) continue;
     const pubQ = await svc(`presence_publishes?site_id=eq.${siteId}&status=eq.live&select=id&limit=200`);
     const published = Array.isArray(pubQ.json) ? pubQ.json.length : 0;
-    const planName = EDITION_DEFS[editionFromPlan(e.plan)]?.name || 'your';
+    const planName = planWords(e.plan) || 'your';   // item 426: "Your Website + tools plan renews", the words Sites uses
     const copy = renewalReminderCopy(planName, e.current_period_end, win, published);
     const fresh = await raiseNotice({ siteId, clientId: e.client_id, kind: 'renewal_reminder', period: renewalNoticePeriod(e.current_period_end, win), headline: copy.headline, body: copy.body });
     if (fresh) {
@@ -1378,7 +1391,7 @@ export async function runAgreementRenewalReminders(limit = 50): Promise<{ remind
   const nowIso = new Date().toISOString();
   const today = nowIso.slice(0, 10);
   const within = new Date(Date.now() + 31 * 86400_000).toISOString().slice(0, 10);
-  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  const base = appBase();
   // ISO date strings compare correctly as text, so the jsonb ->> filter windows by date.
   const q = await svc(`presence_contracts?status=eq.signed&deleted_at=is.null&terms_snapshot->>term_end=gte.${today}&terms_snapshot->>term_end=lte.${within}&select=id,site_id,deal_id,title,terms_snapshot&order=created_at.asc&limit=${limit}`);
   if (!q.ok) return { reminded: 0 };   // pre-0096 / older data → clean no-op
@@ -1469,7 +1482,7 @@ export async function runSalesDocReminders(limit = 20): Promise<{ reminded: numb
   if (!secret) return { reminded: 0, expiry };
   const from = new Date(Date.now() - 21 * 86400_000).toISOString();
   const to = new Date(Date.now() - 3 * 86400_000).toISOString();
-  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  const base = appBase();
   let reminded = 0;
   for (const kind of ['contract', 'proposal', 'estimate'] as const) {
     const table = kind === 'contract' ? 'presence_contracts' : kind === 'estimate' ? 'presence_estimates' : 'presence_proposals';
@@ -1536,7 +1549,7 @@ export async function runQuoteExpiryReminders(limit = 20): Promise<{ reminded: n
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
   const until = new Date(now + 7 * DAY_MS).toISOString();
-  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  const base = appBase();
   const cache = new Map<string, AutomationSettings>();
   let reminded = 0;
   for (const kind of ['proposal', 'estimate'] as const) {

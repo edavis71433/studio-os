@@ -140,8 +140,10 @@ export function galleryIndustryKeys(): string[] {
 }
 
 /** What GET /agency/designs answers: the registry's designs with their words, the kinds,
- *  and the suggestions. A template with no words yet still shows, with its name only. */
-export function galleryPayload(templates: ReadonlyArray<{ slug: string; name: string }>) {
+ *  and the suggestions. A template with no words yet still shows, with its name only.
+ *  `openings`: the openings made for a kind of business, by family (lib/kind_openings.ts
+ *  openingsPayload; the route passes them, so this file still imports nothing). */
+export function galleryPayload(templates: ReadonlyArray<{ slug: string; name: string }>, openings: Record<string, ReadonlyArray<{ key: string; design: string; name: string; line: string; picture: string }>> = {}) {
   return {
     // item 331: each design drawn with each kind's own sample business (scripts/thumbnails)
     designs: templates.map((t) => ({ slug: t.slug, name: t.name, line: DESIGN_WORDS[t.slug]?.line || '', good_for: DESIGN_WORDS[t.slug]?.good_for || '', picture: `/thumbs/templates/${t.slug}.jpg`,
@@ -150,6 +152,8 @@ export function galleryPayload(templates: ReadonlyArray<{ slug: string; name: st
     kinds: BUSINESS_KINDS.map((k) => ({ key: k.key, label: k.label, hint: k.hint, family: k.family, exact: k.exact, services: STARTER_SERVICES[k.family] })),
     tones: DRAFT_TONES.map((t) => ({ key: t.key, label: t.label })),
     suggested: SUGGESTED,
+    // a kind's openings show before the designs in + New site, the first one picked
+    openings,
     badges: FAMILY_BADGE,
     default_kind: 'generic',
   };

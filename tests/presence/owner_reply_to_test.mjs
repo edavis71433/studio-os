@@ -168,7 +168,7 @@ try {
     const conf = sentTo(w, 'sam@customer.example');
     ok('booking: the booking goes through', r.status === 200 && out.data?.status === 'confirmed', `${r.status} ${JSON.stringify(out)}`);
     ok('booking: the confirmation’s Reply-To is the salon’s own email', conf.length === 1 && conf[0].reply_to === 'hello@salon.example', JSON.stringify(conf.map((e) => e.reply_to)));
-    ok('booking: …and it still says "just reply to this email"', /Just reply to this email/.test(String(conf[0]?.html || '')));
+    ok('booking: …and it still says "just reply to this email"', /just reply to this email/i.test(String(conf[0]?.html || '')));
     const alert = sentTo(w, 'hello@salon.example');
     ok('booking: the owner’s own "New booking" alert keeps the platform’s reply-to', alert.length === 1 && /^New booking/.test(alert[0].subject) && alert[0].reply_to === PLATFORM, JSON.stringify(alert.map((e) => [e.subject, e.reply_to])));
     ok('booking: nothing in this flow replies to the platform but the owner’s own alert', w.emails.filter((e) => e.reply_to === PLATFORM).length === 1);

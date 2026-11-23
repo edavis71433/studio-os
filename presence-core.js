@@ -1020,10 +1020,12 @@ document.querySelectorAll("[data-sing]").forEach((inp) => {
 function bizShows() {
   const rc = (S.site && S.site.template_slug) === "restaurant-classic", bar = !!pbNow();
   const footHours = !(S.settings && S.settings.footer_hours === false);   // Edit site's footer switch
+  // item 330: the three newer front-page layouts make the tagline the headline and show the short description under it
+  const opens = ["panel", "editorial", "type"].includes(String((S.settings && S.settings.hero_layout) || ""));
   return {
     business_name: "Shows at the top of every page, in the browser tab, in Google results and on the emails you send.",
-    tagline: "Shows under your name at the top of your home page.",
-    short_description: "What Google, AI assistants and directories quote about you, and the line under your link when someone shares your site. One sentence: what you are, where, and what you’re known for.",
+    tagline: opens ? "Shows as the big headline at the top of your home page." : "Shows under your name at the top of your home page.",
+    short_description: (opens ? "Shows under the headline at the top of your home page. " : "") + "What Google, AI assistants and directories quote about you, and the line under your link when someone shares your site. One sentence: what you are, where, and what you’re known for.",
     description: "Shows on your home page and your About page. Google uses it when you have no short description or search description.",
     story: "Shows on your About page.",
     phone: bar ? "Shows in your footer and on your Contact page, on the Call button of the phone bar, and to Google." : "Shows in your footer and on your Contact page, and to Google.",
@@ -7476,11 +7478,11 @@ function renderSvListing() {
     const nums = el("div", "sv-nums");
     const tile = (v, k) => { if (v == null) return; const t = el("div"); t.append(el("b", null, v), el("span", null, k)); nums.appendChild(t); };
     tile(d.rating != null ? d.rating + "★" : null, d.review_count != null ? `${svNum(d.review_count)} review${d.review_count === 1 ? "" : "s"}` : "rating");
-    tile(d.calls != null ? svNum(d.calls) : null, "calls");
+    tile(d.calls != null ? svNum(d.calls) : null, "calls from Google");   // item 381: Google's own count, not the taps on the site's number
     tile(d.direction_requests != null ? svNum(d.direction_requests) : null, "direction requests");
     tile(d.website_clicks != null ? svNum(d.website_clicks) : null, "website clicks");
     host.appendChild(nums);
-    if (d.calls != null || d.direction_requests != null) host.appendChild(el("p", "hint", "Calls, directions and website clicks are for the last 30 days."));
+    if (d.calls != null || d.direction_requests != null) host.appendChild(el("p", "hint", "Google counts these calls, direction requests and website clicks from your listing, over the last 30 days."));
     if (d.unreplied_reviews) host.appendChild(el("p", "sv-why", `${svNum(d.unreplied_reviews)} of your latest reviews ${d.unreplied_reviews === 1 ? "has" : "have"} no reply yet.`));
     if (d.hours_set === false) host.appendChild(el("p", "sv-why", "Your listing has no opening hours. People often check those first."));
     if (d.listing_maps_uri) { const a = el("a", null, "Open on Google Maps"); a.href = d.listing_maps_uri; a.target = "_blank"; a.rel = "noopener"; a.style.cssText = "font-size:13px;color:var(--plum)"; host.appendChild(a); }

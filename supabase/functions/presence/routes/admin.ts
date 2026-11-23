@@ -7,6 +7,7 @@
 // Publishing actions run the ONE pipeline exported by routes/publish.ts —
 // force publish, retry and snapshot-restore are the same path with a staff
 // actor, never a second renderer or deploy route.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { estimateUsageCostUsd } from '../commerce/pricing.ts';
@@ -399,7 +400,7 @@ async function handleDomainWrite(req: Request, method: string, site: SiteRow, pr
           if (look.status === 'ok') { registered = look.name; where = whereToGo(look.info.registrar, look.facts.dns_host).records_at || null; }
         }
       }
-      const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+      const base = appBase();
       await tellOwnerAndStudio(who, domainChangeEmail(mainSwitch ? 'main' : old ? 'changed' : 'attached', { domain, old, forwarded: keepOld, by: byWhom(principal),
         records: mainSwitch ? [] : connectRecords(domain, registered, hostName).records, recordsAt: where?.company || null, signIn: where?.sign_in || null, link: `${base}/presence.html#domain` }),
         mainSwitch ? 'domain-main' : old ? 'domain-changed' : 'domain-attached');
@@ -729,7 +730,7 @@ async function handleAgencyProvision(req: Request, cors: Record<string, string>)
   if (!seat.ok) { await rollbackOwner(); await rollbackAgency(); return json({ error: 'write_failed', message: 'The owner seat didn’t save.' }, 502, cors); }
 
   // 5) the set-password invite (best-effort; the seat row is the truth)
-  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  const base = appBase();
   const link = await generateSetPasswordLink(ownerEmail, `${base}/set-password.html?next=/agency.html`);
   const cta = link
     ? `<a href="${link}">Create your password &amp; sign in →</a> — you’ll land in your agency workspace.`
@@ -761,6 +762,13 @@ export async function handleAdmin(req: Request, route: string, method: string, p
     const { checkStripeKey } = await import('../commerce/stripe_key.ts');
     const { heldKeyKind, stripeProbe } = await import('../commerce/stripe.ts');
     return json({ data: await checkStripeKey(heldKeyKind(), stripeProbe) }, 200, cors);
+  }
+
+  // builder item 398: the outside accounts Studio OS depends on, and the owner's tick each quarter
+  if (route === '/admin/accounts' && method === 'GET') return (await import('./accounts_check.ts')).handleAccountsList(principal, cors);
+  {
+    const acc = route.match(/^\/admin\/accounts\/([a-z][a-z0-9_]{1,30})\/checked$/);
+    if (acc && method === 'POST') return (await import('./accounts_check.ts')).handleAccountChecked(acc[1], principal, cors);
   }
 
   // ── L4.0: Connected Platform inventory — the living, generated-from-registry

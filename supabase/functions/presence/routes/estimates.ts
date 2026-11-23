@@ -16,6 +16,7 @@
 // only the storage (presence_estimates, migration 0145) and the answers differ.
 // Studio-gated and site-scoped like every authed /sales/* route; the decide
 // route is public, authorized only by the estimate's signed link.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { sendEmail } from '../commerce/account.ts';
@@ -34,7 +35,7 @@ import { UUID_RE } from '../lib/uuid.ts';
 const clean = (s: unknown, max = 500) => String(s ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, max);
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const nowIso = () => new Date().toISOString();
-const siteUrl = () => (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+const siteUrl = () => appBase();
 const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
 const usd = (cents: number) => '$' + (Math.round(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const totalOf = (e: { line_items?: unknown }) => proposalTotals(e?.line_items).total_cents;

@@ -10,6 +10,7 @@ import { renderSnapshot, renderForBuilder, listTemplates, FIXED_COLOR_TEMPLATES 
 import { validateThemeTokens } from '../../supabase/functions/presence/lib/devmode.ts';
 import { contrastRatio, mix } from '../../supabase/functions/presence/lib/brand_kit.ts';
 import { BUTTON_SETS, FORM_STYLES, buttonSetOf, formStyleOf, applyButtonStyles, buttonStyle, siteColours, buttonChoice, contrast, mixHex } from '../../supabase/functions/presence/lib/site_buttons.ts';
+import { STYLE_LOOKS } from '../../supabase/functions/presence/lib/style_looks.ts';   // the ready-made looks: the server's one list
 import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
@@ -69,7 +70,7 @@ ok('mixing agrees with brand_kit (there t is the share of the second colour)', m
 
 // ── every set reads on every template, under every palette and look the editor offers ──
 const pageArray = (name) => new Function(`return ${PAGE.match(new RegExp(`\\nconst ${name} = (\\[[\\s\\S]*?\\n\\]);`))[1]};`)();
-const CHOICES = [{ name: 'its own colours', tokens: {} }, ...[...pageArray('PALETTES'), ...pageArray('STYLE_LOOKS')].filter((p) => p.tokens && Object.keys(p.tokens).length)];
+const CHOICES = [{ name: 'its own colours', tokens: {} }, ...[...pageArray('PALETTES'), ...STYLE_LOOKS].filter((p) => p.tokens && Object.keys(p.tokens).length)];
 const DARK_BAND = '#1a1622';   // BLOCK_CSS .block--bg-dark
 const sample = new Map();
 for (const { slug } of listTemplates()) {

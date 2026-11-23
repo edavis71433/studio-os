@@ -266,6 +266,8 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-
 ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// the Stripe card names a refusal (Nov 22 2026: a key missing one permission read only as "couldn't be read")
+function stripeFailWords(code){const c=String(code||'').replace(/[^a-z0-9_]/gi,'').slice(0,60);if(c==='more_permissions_required')return 'Stripe refused this read: the Stripe key is missing a permission (Stripe said: more_permissions_required). The Health Center’s Stripe key check names it.';return 'Stripe couldn’t be read just now'+(c?' (Stripe said: '+c+')':'')+'. The bookkeeper file has the fees and payouts.';}
 let TOKEN="",DATA=null,SHOW='all',Q='',MONTH='',LIMIT=50,PAYING=null,AGE='',HOME=null;   // AGE: a piece of the owed bar pressed (current · d30 · d60 · d90); HOME: /sales/money-home
 sb.auth.onAuthStateChange(function(_e,s){if(s&&s.access_token)TOKEN=s.access_token;});
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
@@ -363,7 +365,7 @@ function homeCardsHtml(today){
   const who=`<div class="mcard"><h2>Who owes most</h2>${top.length?`<div class="who">${top.map(r=>`<div class="r"><span><b>${esc(r.name)}</b><small class="${r.oldest>0?'late':''}">${r.oldest>0?plural(r.oldest,'day')+' late':plural(r.n,'invoice')+' not due yet'}</small></span><span class="amt">${esc(money(r.total))}</span></div>`).join('')}</div>${top.some(r=>r.oldest>0)?`<button type="button" class="remind-all" id="remindAll">Remind ${top.filter(r=>r.oldest>0).length===1?'them':'all '+(top.filter(r=>r.oldest>0).length===2?'two':'three')}</button>`:''}`:`<p class="note" style="margin-top:0">Nobody owes you anything.</p>`}</div>`;
   const s=HOME&&HOME.stripe;
   const stripe=s?`<div class="mcard stripe"><h2>Stripe this month</h2><div class="tot"><div class="l">Paid online</div><div class="v">${esc(money(s.paid_online_cents))}</div></div><div class="tot"><div class="l">Stripe’s fees</div><div class="v">${s.fee_cents?'−'+esc(money(s.fee_cents)):money(0)}</div></div><div class="tot"><div class="l">Reached your bank</div><div class="v">${esc(money(s.reached_bank_cents))}</div></div><div class="tot"><div class="l">Next payout</div><div class="v">${s.next_payout?esc(money(s.next_payout.cents))+' · '+esc(niceDay(s.next_payout.arrival)):'None on its way'}</div></div>${s.more?'<p class="note">Stripe had more this month than one read brings.</p>':''}</div>`
-    :(HOME&&HOME.stripe_failed?`<div class="mcard stripe"><h2>Stripe this month</h2><p class="note" style="margin-top:0">Stripe couldn’t be read just now. The bookkeeper file has the fees and payouts.</p></div>`:'');
+    :(HOME&&HOME.stripe_failed?`<div class="mcard stripe"><h2>Stripe this month</h2><p class="note" style="margin-top:0">${stripeFailWords(HOME.stripe_error)}</p></div>`:'');
   return(chart||who||stripe)?`<div class="homecards">${chart}${who}${stripe}</div>`:'';
 }
 function filtered(today){

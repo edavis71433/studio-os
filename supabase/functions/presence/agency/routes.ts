@@ -4,6 +4,7 @@
 // per-site engines / read EXISTING rows. Nothing here has a power that a
 // single-site route lacks; nothing bypasses client ownership (drafts and
 // plans still wait on the client; publishing runs the one frozen pipeline).
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc, svcPages } from '../lib/db.ts';
 /** Builder item 411: every row, paged, in the shape of one svc() answer ([] when a page failed). */
@@ -12,6 +13,7 @@ import { draftChangesOnly } from '../lib/provenance.ts';
 import { noticeTier } from '../lib/inbox_feed.ts';
 import { can, agencySiteIds, STUDIO_ROLE_WORDS } from './auth.ts';
 import { buildPortfolio, filterPortfolio, buildQueues, buildPatterns } from './portfolio.ts';
+import { planWords } from '../commerce/catalog.ts';   // builder item 426
 import { needsYouPayload, dealNoticeIds, staleDealNotices, snoozeUntil, SNOOZE_KEY_RE, SNOOZE_MAX_DAYS } from './needs_you.ts';
 import { clearNotice } from '../lib/notice.ts';
 import { healSupportOwners, supportActivity } from '../lib/service_bridge.ts';
@@ -139,7 +141,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
     runIds.length ? allRows(`presence_evidence?run_id=in.(${runIds.join(',')})&severity=in.(critical,warning)&select=run_id,type,severity,human`, 'id') : Promise.resolve({ json: [] as unknown[] }),
     clientIds.length ? svc(`clients?id=in.(${clientIds.join(',')})&select=id,name&limit=1000`) : Promise.resolve({ json: [] as unknown[] }),
     // Section 3: authoritative billing status per client → mapped to each of their sites (one query, fixed cost).
-    clientIds.length ? svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,status&limit=1000`) : Promise.resolve({ json: [] as unknown[] }),
+    clientIds.length ? svc(`presence_entitlements?client_id=in.(${clientIds.join(',')})&product=eq.presence&select=client_id,plan,status&limit=1000`) : Promise.resolve({ json: [] as unknown[] }),
   ]);
   const nameByClient = Object.fromEntries(((namesQ.json ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name]));
   // Sales review item 49 (the rest, Nov 8): Home's Needs you, its roster and
@@ -159,6 +161,11 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
   } catch { /* the stored names stand */ }
   const statusByClient = Object.fromEntries(((entQ.json ?? []) as Array<{ client_id: string; status: string }>).map((e) => [e.client_id, e.status]));
   const billingBySite = Object.fromEntries(sites.map((s) => [s.id, statusByClient[s.client_id] || 'active']));
+  // builder item 426: each site's plan in the words Sites uses, from the same read (no row is
+  // "No plan on file", as on Sites); a failed read leaves null, which Analytics shows as a dash
+  const entRows = Array.isArray(entQ.json) ? entQ.json as Array<{ client_id: string; plan?: string | null }> : null;
+  const planByClient = new Map((entRows || []).map((e) => [e.client_id, String(e.plan || '')]));
+  const planWordsBySite = Object.fromEntries(sites.map((s) => [s.id, entRows ? (planByClient.get(s.client_id) ? planWords(planByClient.get(s.client_id)) : 'No plan on file') : null]));
   return {
     sites, links,
     clientNames: Object.fromEntries(sites.map((s) => [s.id, bizBySite[s.id] || nameByClient[s.client_id] || ''])),
@@ -172,7 +179,7 @@ export async function gather(agencyId: string, nowIso: string): Promise<Portfoli
     enquiries: (leadsQ.json ?? []) as PortfolioInput['enquiries'],
     notices: (noticesQ.json ?? []) as Array<{ id?: string; site_id: string; kind: string; period?: string; headline?: string; body?: string; created_at?: string }>,
     filesPending,
-    billingBySite,
+    billingBySite, planWordsBySite,
     lastChange, nowIso,
   };
 }
@@ -200,8 +207,9 @@ export function forgetAgencyReads(agencyId: string): void {
 
 // builder list items 236 and 232: the portal's address (the one the invite email carries), the
 // clients a studio looks after in name order, and when each last got a sign-in link (two minutes apart)
-// builder item 350: the short address when the studio chose a name (lib/portal_slug.ts), else the long one
-const portalAddress = (studioSiteId: string, slug?: string | null) => portalAddressOf(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com', studioSiteId, slug);
+// builder item 350: the short address when the studio chose a name (lib/portal_slug.ts), else the long one;
+// on the app's own address (item 388)
+const portalAddress = (studioSiteId: string, slug?: string | null) => portalAddressOf(appBase(), studioSiteId, slug);
 async function portalSlugOf(siteId: string): Promise<string | null> {
   const r = await svc(`presence_sites?id=eq.${siteId}&select=portal_slug&limit=1`).catch(() => ({ ok: false, json: null }));
   return r.ok && Array.isArray(r.json) ? (r.json[0]?.portal_slug ?? null) : null;   // pre-0254: no column, no name
@@ -1183,8 +1191,9 @@ async function ownSiteOf(jwt: string, principal: Principal): Promise<SiteRow | n
   try {
     const s = await resolveSite(jwt);
     if (s) return s;
-    if (!principal.userId && !principal.email) return null;
-    const or = `or=(user_id.eq.${encodeURIComponent(principal.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((principal.email || '').toLowerCase())})`;
+    const { seatFilter } = await import('../lib/workspace.ts');   // builder items 389 + 397
+    const or = seatFilter(principal);
+    if (!or) return null;
     const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id&order=created_at.asc&limit=1`);
     const siteId = Array.isArray(m.json) && (m.json as Array<{ site_id: string }>)[0]?.site_id;
     if (!siteId) return null;
