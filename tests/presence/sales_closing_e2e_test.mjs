@@ -102,9 +102,10 @@ if (!secretPresent) {
   const view3 = await P(`/sales/p/${propToken}`);
   // Oct 2026: a send mints the deal's ONE link (kind 'flow', the proposal nested); a pre-flow proposal token still answers kind 'proposal'
   ok('public: prospect can VIEW the proposal by token', view3.ok && ((view3.body?.data?.kind === 'flow' && view3.body?.data?.proposal?.subtotal_cents === 250000) || (view3.body?.data?.kind === 'proposal' && view3.body?.data?.subtotal_cents === 250000)), `${view3.status} ${JSON.stringify(view3.body).slice(0, 200)}`);
-  const accept3 = await P(`/sales/proposals/${prop3Id}/decide`, 'POST', { decision: 'accepted', token: propToken });
+  // sales item 184 (PR 515): Accept takes the name the client types, as sign.html sends it
+  const accept3 = await P(`/sales/proposals/${prop3Id}/decide`, 'POST', { decision: 'accepted', token: propToken, name: 'Dana Prospect' });
   ok('public: prospect ACCEPTS via token → deal advances to contract', accept3.ok && accept3.body?.data?.status === 'accepted', `${accept3.status} ${JSON.stringify(accept3.body).slice(0, 200)}`);
-  const reaccept3 = await P(`/sales/proposals/${prop3Id}/decide`, 'POST', { decision: 'accepted', token: propToken });
+  const reaccept3 = await P(`/sales/proposals/${prop3Id}/decide`, 'POST', { decision: 'accepted', token: propToken, name: 'Dana Prospect' });
   ok('public: re-accept is idempotent', reaccept3.ok && reaccept3.body?.already === true, `${reaccept3.status} ${JSON.stringify(reaccept3.body).slice(0, 200)}`);
 
   const con3 = await A(`/sales/deals/${deal3}/contracts`, 'POST', { title: 'Agreement', body: 'The agreed terms of engagement.', proposal_id: prop3Id });

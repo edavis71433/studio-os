@@ -36,14 +36,15 @@ const prop = await call(`/sales/deals/${dealId}/proposals`, 'POST', { line_items
 ok('4. proposal created from the opportunity', prop.ok && prop.body?.data?.id && prop.body?.data?.subtotal_cents === 250000);
 const propId = prop.body?.data?.id;
 
-// 5. send + accept the proposal (needs the signing secret to mint the link)
+// 5. send + accept the proposal (needs the signing secret to mint the link). Since sales item 184
+// (PR 515) Accept takes the name the client types, as sign.html sends it.
 const sent = await call(`/sales/proposals/${propId}/send`, 'POST', {});
 ok('5a. proposal sent', sent.ok);
 if (sent.body?.url) {
   const token = decodeURIComponent(String(sent.body.url).split('?t=')[1] || '');   // sign.html?t=<token> (a deal-bound flow token since Oct 2026)
-  const dec = await call(`/sales/proposals/${propId}/decide`, 'POST', { decision: 'accepted', token }, { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON });
+  const dec = await call(`/sales/proposals/${propId}/decide`, 'POST', { decision: 'accepted', token, name: 'E2E Buyer' }, { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON });
   ok('5b. proposal accepted via signed link (public)', dec.ok);
-  const decAgain = await call(`/sales/proposals/${propId}/decide`, 'POST', { decision: 'accepted', token }, { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON });
+  const decAgain = await call(`/sales/proposals/${propId}/decide`, 'POST', { decision: 'accepted', token, name: 'E2E Buyer' }, { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON });
   ok('5c. accept is idempotent', decAgain.ok && decAgain.body?.already === true);
 } else { ok('5b/c. accept link (skipped — no signing secret in env)', true); }
 
