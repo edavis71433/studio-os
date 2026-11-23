@@ -80,6 +80,7 @@ try {
         row(5, { created_at: '2026-11-18T10:00:00Z' }),                         // older than the 48 hours
         row(6, { deleted_at: '2026-11-21T17:50:00Z' }),                         // in the trash
         row(7, { mime: 'image/png', storage_path: `presence-media/${SITE}/7.png` }),   // a web page posing as a photo
+        row(8, { mime: '', bytes: null, metadata: { copied_from: 'your “Menu” page' }, created_at: '2026-11-21T17:30:00Z' }),   // the server's copy for a saved page
       ],
     });
     store.clear(); deleted.length = 0;
@@ -91,13 +92,14 @@ try {
   seed();
   const res = await U.runUploadChecks();
   const media = (n) => db.tables.presence_media.find((x) => x.id === id(n));
-  ok('the run reads only new, unchecked, kept uploads', res.read === 4, JSON.stringify(res));
+  ok('the run reads only new, unchecked, kept uploads', res.read === 5, JSON.stringify(res));
   ok('an honest upload: marked checked, its size now the one storage counted', !!media(1).checked_at && media(1).bytes === 987 && !media(1).deleted_at);
   ok('larger than it said: out of Files, its bytes deleted', !!media(2).deleted_at && deleted.includes(`${SITE}/2.jpg`) && !!media(2).checked_at);
   ok('a web page posing as a photo: out too', !!media(7).deleted_at && deleted.includes(`${SITE}/7.png`));
   ok('not uploaded yet: left for the next run, untouched', !media(3).checked_at && !media(3).deleted_at);
   ok('the rest are never read', [4, 5, 6].every((n) => !deleted.includes(`${SITE}/${n}.jpg`)) && media(4).bytes === 1000);
-  ok('the run counts what it did', res.checked === 1 && res.refused === 2 && res.waiting === 1, JSON.stringify(res));
+  ok('the server\'s own copy of a kept file (a saved page, a studio kit) is marked, never judged or deleted', !!media(8).checked_at && !media(8).deleted_at && !deleted.includes(`${SITE}/8.jpg`));
+  ok('the run counts what it did', res.checked === 2 && res.refused === 2 && res.waiting === 1, JSON.stringify(res));
   const notes = db.tables.presence_plan_notices.filter((x) => x.kind === 'upload_refused');
   ok('the site is told, once per file, in plain words', notes.length === 2 && notes.every((x) => x.client_id === CLIENT && x.site_id === SITE) && notes.some((x) => x.period === `media:${id(2)}` && /Photo 2/.test(x.headline) && /larger than it said/.test(x.body) && /upload it again/.test(x.body)), JSON.stringify(notes.map((x) => x.headline + ' | ' + x.body)));
   ok('…with no dashes in the words people see', notes.every((x) => !/—/.test(x.headline + x.body)));
@@ -107,7 +109,7 @@ try {
   seed();
   storageDown = true;
   const down = await U.runUploadChecks();
-  ok('storage not answering: nothing refused, nothing marked, all left for next time', down.refused === 0 && down.checked === 0 && down.waiting === 4 && !media(2).deleted_at, JSON.stringify(down));
+  ok('storage not answering: nothing refused, nothing judged, all left for next time', down.refused === 0 && down.checked === 1 && down.waiting === 4 && !media(2).deleted_at && !media(1).checked_at, JSON.stringify(down));
   storageDown = false;
   db.failMethod.set('presence_media', 'GET');
   ok('a read that fails is a failed chore', sweepIssues({ upload_checks: await U.runUploadChecks() }).length === 1);

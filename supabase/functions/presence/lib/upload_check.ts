@@ -165,14 +165,20 @@ export const uploadCheckDeps = { fetch: (input: string, init?: RequestInit) => f
 export async function runUploadChecks(limit = UPLOAD_CHECKS_PER_RUN): Promise<Record<string, unknown>> {
   const now = uploadCheckDeps.now();
   const since = new Date(now - UPLOAD_CHECK_WINDOW_MS).toISOString();
-  const r = await svc(`presence_media?checked_at=is.null&deleted_at=is.null&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc&limit=${Math.max(1, Math.min(100, limit))}&select=id,site_id,storage_path,mime,bytes,alt_text,created_at`).catch(() => null);
+  const r = await svc(`presence_media?checked_at=is.null&deleted_at=is.null&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc&limit=${Math.max(1, Math.min(100, limit))}&select=id,site_id,storage_path,mime,bytes,alt_text,metadata,created_at`).catch(() => null);
   if (!r || !r.ok || !Array.isArray(r.json)) return r && r.status === 400 ? { skipped_not_ready: true } : { ok: false };   // 400: before migration 0269 (no checked_at)
-  const list = r.json as Array<{ id: string; site_id: string; storage_path: string; mime: string; bytes: number; alt_text: string }>;
+  const list = r.json as Array<{ id: string; site_id: string; storage_path: string; mime: string; bytes: number; alt_text: string; metadata?: Record<string, unknown> | null }>;
   let checked = 0, refused = 0, waiting = 0;
   const f = uploadCheckDeps.fetch as unknown as Fetch;
   await fewAtATime(list, 4, async (m) => {
-    const v = await inspectStoredFile(String(m.storage_path || ''), String(m.mime || ''), Number(m.bytes) || 0, f).catch(() => ({ kind: 'unknown' }) as StoredVerdict);
     const at = new Date(uploadCheckDeps.now()).toISOString();
+    // the server's own copy of a file a site already keeps (a studio kit, a saved page), or a row
+    // that claims no kind at all: nothing came through a browser to check, so it is marked and left
+    if ((m.metadata && typeof m.metadata === 'object' && m.metadata.copied_from) || !String(m.mime || '').trim()) {
+      await svc(`presence_media?id=eq.${m.id}&site_id=eq.${m.site_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ checked_at: at }) }).catch(() => {});
+      checked++; return;
+    }
+    const v = await inspectStoredFile(String(m.storage_path || ''), String(m.mime || ''), Number(m.bytes) || 0, f).catch(() => ({ kind: 'unknown' }) as StoredVerdict);
     if (v.kind === 'missing' || v.kind === 'unknown') { waiting++; return; }
     if (v.kind === 'ok') {
       await svc(`presence_media?id=eq.${m.id}&site_id=eq.${m.site_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ checked_at: at, ...(v.size !== null && v.size > 0 ? { bytes: v.size } : {}) }) }).catch(() => {});

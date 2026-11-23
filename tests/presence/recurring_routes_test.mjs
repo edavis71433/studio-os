@@ -27,7 +27,8 @@ let stripeDown = false, mailDown = false;
 globalThis.fetch = async (url, init = {}) => {
   const u = new URL(String(url));
   const j = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
-  if (u.hostname === 'api.resend.com' && mailDown) return j({ message: 'Resend is having a moment' }, 500);
+  // builder item 393: a refusal for good (422) is "not sent", as it always was; a service having a bad hour (500) keeps the email in the outbox
+  if (u.hostname === 'api.resend.com' && mailDown) return mailDown === 'hour' ? j({ message: 'Resend is having a moment' }, 500) : j({ name: 'validation_error', message: 'Invalid `to` field.' }, 422);
   if (u.hostname === 'api.resend.com') { mail.push(JSON.parse(String(init.body || '{}'))); return j({ id: `em_${mail.length}` }); }
   if (u.hostname === 'api.stripe.com') {
     const p = Object.fromEntries(new URLSearchParams(String(init.body || '')));
@@ -272,6 +273,17 @@ const change = (id, body) => RI.handleRecurringChange(req('PATCH', `/sales/recur
   ok('8: Needs you asks to send it again', (db.tables.presence_plan_notices || []).some((n) => n.kind === 'deal_followup' && /didn’t reach/.test(String(n.headline))), JSON.stringify(db.tables.presence_plan_notices));
   ok('8: the date moved on, so next month is not billed twice', sched().next_on > TODAY && sched().sent_count === 1, sched().next_on);
   ok('8: the next tick leaves it alone', (await RI.runRecurringInvoices(20)).sent === 0 && invoices().length === 1 && mail.length === 0);
+}
+// builder item 393: the sending service having a bad hour isn't a lost invoice any more: the email
+// waits in the outbox (tried again every 15 minutes for a day), so the invoice is written as sent
+{
+  world({ presence_recurring_invoices: [schedule()] });
+  mailDown = 'hour';
+  const r = await RI.runRecurringInvoices(20);
+  mailDown = false;
+  const kept = (db.tables.email_outbox || []).filter((x) => x.status === 'queued' && x.kind === 'money');
+  ok('8b: the service down for a while: the invoice email waits in the outbox, and the invoice is written as sent', r.sent === 1 && r.failed === 0 && kept.length === 1 && !!kept[0].payload && events('invoice_sent').length === 1, JSON.stringify(r));
+  ok('8b: …and Needs you doesn\'t ask for a resend that is already on its way', !(db.tables.presence_plan_notices || []).some((n) => n.kind === 'deal_followup' && /didn’t reach/.test(String(n.headline))));
 }
 
 console.log(`\n════ RECURRING INVOICES (routes + sweep): ${pass}/${pass + fail} ${fail ? 'FAILED' : 'PASSED'} ════`);

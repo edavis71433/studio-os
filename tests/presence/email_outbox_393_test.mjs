@@ -112,9 +112,12 @@ try {
     resend.mode = 'lost';
     const sent = await invoice();
     ok('an answer lost after the service took it: kept, the caller hears sent', sent === true && rows()[0].status === 'queued' && /no answer|aborted/i.test(rows()[0].last_error || ''), JSON.stringify(rows()[0]));
+    // the database keeps the message in a jsonb column, which stores its keys in an order of its own
+    const reorder = (v) => Array.isArray(v) ? v.map(reorder) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).reverse().map((k) => [k, reorder(v[k])])) : v;
+    rows()[0].payload = reorder(rows()[0].payload);
     moveTo(at(16)); resend.mode = 'ok';
     const run = await O.runEmailOutbox();
-    ok('…the retry gets the first answer back and ticks it', run.sent === 1 && rows()[0].status === 'sent');
+    ok('…the retry, even with the keys stored in another order, is the same message, so it gets the first answer back and ticks it', run.sent === 1 && rows()[0].status === 'sent' && resend.calls[1].body === resend.calls[0].body, JSON.stringify(run));
     ok('…and nothing more is delivered: one copy, ever', resend.deliveries.length === 1 && resend.calls.length === 2);
   }
 
