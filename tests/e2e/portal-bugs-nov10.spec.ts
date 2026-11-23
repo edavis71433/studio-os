@@ -206,9 +206,14 @@ test.describe('G7 — the one-tap approval page tells a dead link from a dropped
 
 // ── project-survey.html (G6) ──
 test.describe('G6 — the older survey page sends once and says saved only when it is', () => {
+  // builder item 392: the page posts to the main server (/presence/survey); it asks the old server
+  // only while the main one answers "sign in" or "no such page", before the deploy. Every test
+  // answers both doors itself, so nothing here ever reaches a real server.
+  const SURVEY = '**/functions/v1/presence/survey', OLD = '**/functions/v1/clever-api';
   test('a double tap sends once; the thanks waits for the server', async ({ page }) => {
-    let calls = 0;
-    await page.route('**/functions/v1/clever-api', async (route) => { calls++; await new Promise((r) => setTimeout(r, 400)); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, saved: true, emailed: true }) }); });
+    let calls = 0, old = 0;
+    await page.route(OLD, (route) => { old++; return route.fulfill({ status: 500, body: '{}' }); });
+    await page.route(SURVEY, async (route) => { calls++; await new Promise((r) => setTimeout(r, 400)); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, saved: true, emailed: true }) }); });
     await page.goto('/project-survey.html?c=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     await page.getByRole('button', { name: '3 stars' }).click();
     const send = page.locator('#sendBtn');
@@ -216,9 +221,21 @@ test.describe('G6 — the older survey page sends once and says saved only when 
     await send.click({ force: true }).catch(() => {});
     await expect(page.getByRole('heading', { name: 'Thank you' })).toBeVisible();
     expect(calls).toBe(1);
+    expect(old, 'the main server answered, so the old one was never asked').toBe(0);
+  });
+  test('before the main server\'s door is live (it says "sign in"), the old server takes it', async ({ page }) => {
+    let old = 0;
+    await page.route(SURVEY, (route) => route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'unauthorized', message: 'Please sign in.' }) }));
+    await page.route(OLD, (route) => { old++; return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, saved: true, emailed: true }) }); });
+    await page.goto('/project-survey.html?c=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    await page.getByRole('button', { name: '4 stars' }).click();
+    await page.locator('#sendBtn').click();
+    await expect(page.getByRole('heading', { name: 'Thank you' })).toBeVisible();
+    expect(old).toBe(1);
   });
   test('no signal → the form stays with a try-again line and the button works again', async ({ page }) => {
-    await page.route('**/functions/v1/clever-api', (route) => route.abort());
+    await page.route(SURVEY, (route) => route.abort());
+    await page.route(OLD, (route) => route.abort());
     await page.goto('/project-survey.html?c=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     await page.getByRole('button', { name: '5 stars' }).click();
     await page.locator('#sendBtn').click();
@@ -227,7 +244,8 @@ test.describe('G6 — the older survey page sends once and says saved only when 
     await expect(page.locator('#surveyForm')).toBeVisible();
   });
   test('nothing saved and nothing emailed is not a success', async ({ page }) => {
-    await page.route('**/functions/v1/clever-api', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, saved: false, emailed: false }) }));
+    await page.route(SURVEY, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, saved: false, emailed: false }) }));
+    await page.route(OLD, (route) => route.fulfill({ status: 500, body: '{}' }));
     await page.goto('/project-survey.html');
     await page.getByRole('button', { name: '2 stars' }).click();
     await page.locator('#sendBtn').click();

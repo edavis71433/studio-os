@@ -2117,7 +2117,7 @@ function openPeople(id,view){
   PEOPLE_DIRTY=false;PEOPLE_FOR=id;
   // opened from the menu, which is gone now: the sheet hands focus back to the site's ⋯ button
   const ae=document.activeElement;if(!ae||ae===document.body||!document.contains(ae)){const b=visibleMenuBtn(id);if(b)b.focus();}
-  ddsPeople.open({siteName:s.name||'',address:s.domain||hostOf(s.address),view:view||'people',sb,api:scopedApi(id),onChanged:()=>{PEOPLE_DIRTY=true;}});
+  ddsPeople.open({siteId:id,siteName:s.name||'',address:s.domain||hostOf(s.address),view:view||'people',sb,api:scopedApi(id),onChanged:()=>{PEOPLE_DIRTY=true;}});   // siteId: the studio's switch (item 387)
   const dlg=document.getElementById('dds-people');
   if(dlg&&!dlg.dataset.sitesWired){dlg.dataset.sitesWired='1';dlg.addEventListener('close',()=>{
     if(!PEOPLE_DIRTY)return;PEOPLE_DIRTY=false;const was=PEOPLE_FOR;

@@ -233,7 +233,7 @@ let MADE;
   MAIL_DOWN = false;
   ok('invite, email refused: the email was tried before the answer came back', outside.some((o) => o.to === 'resend'));
   ok('invite, email refused: 200, and it does not say invited', r.status === 200 && r.body.data.invited === false, JSON.stringify(r.body));
-  ok('invite, email refused: the studio gets the sign-in page to share, under its own name', r.body.data.portal_url === `https://davisdigitalstudio.com/portal.html?studio=${OWN}`, r.body.data.portal_url);
+  ok('invite, email refused: the studio gets the sign-in page to share, under its own name', r.body.data.portal_url === `https://app.davisdigitalstudio.com/portal.html?studio=${OWN}`, r.body.data.portal_url);   // item 388: the app's address
   ok('invite, email refused: the owner still has their sign-in and is a customer', outside.some((o) => o.to === 'auth' && o.path === '/auth/v1/admin/users' && o.method === 'POST') && (T.presence_projects || []).some((p) => p.site_id === OWN && p.client_id === made.client_id));
 }
 

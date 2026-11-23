@@ -10,20 +10,19 @@
 // is a signed, expiring pointer to "this site's current preview", exactly like
 // the opaque /p/:token — it just also expires. No new snapshot, no DB column.
 
+import { linkKey, signedWithAny } from '../../_shared/link_keys.ts';   // builder item 394: each kind of link has its own key
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { UUID_RE } from './uuid.ts';
 
 
 export interface PreviewLinkPayload { site_id: string; exp: number; scope: 'preview'; }
 
-/** Resolve the signing secret from existing config — no NEW required secret.
- *  Fail-closed: null when none is set (minting + verifying both refuse). */
+/** The key shared draft links are signed with: PREVIEW_LINK_SECRET when it is set, else one
+ *  of its own derived from the link root (builder item 394, _shared/link_keys.ts), never the
+ *  scheduler's secret. Links signed before still open. Null only when the server holds no
+ *  root at all (minting and verifying both refuse). */
 export function previewLinkSecret(): string | null {
-  return Deno.env.get('PREVIEW_LINK_SECRET')
-    || Deno.env.get('APPROVAL_SECRET')
-    || Deno.env.get('STATE_SIGNING_SECRET')
-    || Deno.env.get('SCHEDULER_SECRET')
-    || null;
+  return linkKey('preview') || null;
 }
 
 export const PREVIEW_LINK_DEFAULT_TTL_S = 24 * 3600;   // 24h
@@ -57,8 +56,7 @@ export async function verifyPreviewToken(token: string, secret: string, nowSec: 
   const parts = String(token || '').split('.');
   if (parts.length !== 2 || !parts[0] || !parts[1]) return { ok: false, error: 'malformed' };
   const [body, sig] = parts;
-  const expected = await hmacHex(secret, body);
-  if (!timingSafeEqual(sig, expected)) return { ok: false, error: 'bad_signature' };
+  if (!(await signedWithAny('preview', secret, async (k) => timingSafeEqual(sig, await hmacHex(k, body))))) return { ok: false, error: 'bad_signature' };
   let payload: PreviewLinkPayload;
   try { payload = JSON.parse(unb64url(body)); } catch { return { ok: false, error: 'malformed' }; }
   if (!payload || payload.scope !== 'preview' || typeof payload.site_id !== 'string' || !UUID_RE.test(payload.site_id) || typeof payload.exp !== 'number') {

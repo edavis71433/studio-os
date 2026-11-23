@@ -56,6 +56,17 @@ ok('the folder listing finds the functions', functions.includes('presence'));
 ok('the typecheck line holds paths and nothing else', checked.length > 0 && checked.every((word) => word.endsWith('/index.ts')));
 for (const name of functions) ok(`typechecks ${name}`, checked.includes('supabase/functions/*/index.ts') || checked.includes(`supabase/functions/${name}/index.ts`));
 
+// ── Builder item 397 (review file 07, finding 20): every outside action is pinned to the exact
+// commit it ran as, with its version beside it, so a moved tag can't change what a build runs ──
+{
+  const dir = new URL('../../.github/workflows/', import.meta.url);
+  const uses = [...Deno.readDirSync(dir)].filter((e) => e.name.endsWith('.yml')).flatMap((e) =>
+    [...Deno.readTextFileSync(new URL(e.name, dir)).matchAll(/^\s*-?\s*uses:\s*(\S+)(.*)$/gm)].map((m) => ({ file: e.name, ref: m[1], rest: m[2] })));
+  const outside = uses.filter((u) => !u.ref.startsWith('./'));
+  const loose = outside.filter((u) => !/^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/.test(u.ref) || !/^\s+# v\d+\.\d+\.\d+\s*$/.test(u.rest));
+  ok('every outside action is pinned to a commit, with its version written beside it', outside.length > 0 && loose.length === 0, loose.map((u) => `${u.file}: ${u.ref}${u.rest}`).join('; '));
+}
+
 const passed = results.filter((x) => x.p).length;
 console.log(`\n════ CI SCOPE: ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);

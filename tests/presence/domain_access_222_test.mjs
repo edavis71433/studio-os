@@ -165,6 +165,13 @@ const ASK = { company: 'Namecheap', invite: 'hello@davisdigital.studio', note: '
   reset();
   const n = () => writes.length + mails.length;
   ok('who: a view-only member can\'t ask, tick or clear', (await call(asMember({ member_id: RO, role: 'readonly', email: 'ro@studio.example' }), 'POST', `/agency/domains/${S1}/access`, ASK)).status === 403 && (await call(asMember({ member_id: RO, role: 'readonly', email: 'ro@studio.example' }), 'PUT', `/agency/domains/${S1}/access`, { arrived: true })).status === 403 && n() === 0);
+  // builder item 396 (review file 06): Check now can email the client, so it is a manager's
+  const ro = asMember({ member_id: RO, role: 'readonly', email: 'ro@studio.example' });
+  const before = n();
+  const refused = await call(ro, 'POST', `/agency/domains/${S1}/check`);
+  ok('Check now: a view-only member is refused, and nothing is checked, written or sent (item 396)', refused.status === 403 && n() === before);
+  ok('…and the panel tells the page so: can_manage false for them, true for a manager', (await call(ro, 'GET', `/agency/domains/${S1}`)).body.data.can_manage === false && (await call(asMember(), 'GET', `/agency/domains/${S1}`)).body.data.can_manage === true);
+  ok('…as for every seat that can\'t manage clients (support, the content strategist, the developer)', (await Promise.all(['support', 'content_strategist', 'developer'].map((role) => call(asMember({ member_id: RO, role, email: 'x@studio.example' }), 'POST', `/agency/domains/${S1}/check`)))).every((r) => r.status === 403) && n() === before);
   ok('the studio\'s own domain: no one to ask', (await call(asMember(), 'POST', `/agency/domains/${OWN}/access`, ASK)).body.error === 'own_domain' && n() === 0);
   ok('someone else\'s site is not yours', (await call(asMember(), 'POST', `/agency/domains/${STRANGER}/access`, ASK)).status === 404 && n() === 0);
   const hv = await call(asMember(), 'POST', `/agency/domains/${HOVER}/access`, { invite: 'hello@davisdigital.studio' });

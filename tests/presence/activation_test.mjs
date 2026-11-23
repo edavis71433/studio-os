@@ -42,10 +42,10 @@ const v = validateSecrets();
   ok('clean env → no capability falsely live', Object.values(v.capabilities).every((x) => x === false));
 }
 
-// ═══ 5. one-tap approvals accept either APPROVAL_SECRET or SCHEDULER_SECRET ═══
+// ═══ 5. signed links: their own keys, never the scheduler's secret (builder item 394) ═══
 {
   const approvals = v.groups.approvals;
-  ok('approvals group documents the SCHEDULER_SECRET fallback', approvals.some((s) => /SCHEDULER_SECRET/.test(s.enables)));
+  ok('approvals group says links get their own keys, from LINK_SECRET or APPROVAL_SECRET, never the scheduler\'s secret', approvals.some((s) => s.name === 'LINK_SECRET' && /never the scheduler/.test(s.enables)) && approvals.some((s) => s.name === 'APPROVAL_SECRET') && !approvals.some((s) => /falls back to SCHEDULER_SECRET/.test(s.enables)));
 }
 
 const passed = results.filter((r) => r.p).length;

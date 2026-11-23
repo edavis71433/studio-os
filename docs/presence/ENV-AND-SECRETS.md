@@ -24,7 +24,7 @@ Supersedes `docs/SECRETS-INVENTORY.md` (which predates the Connected Platform an
 | `VISUAL_MODEL_NAME` | image model name override | optional | default `gpt-image-1` |
 | `REPLICATE_API_TOKEN` | the photo editor's **Cut out the subject** (Replicate, open model pinned in `lib/cutout.ts`) | optional | absent → the button doesn't show; the free plain-background tool still works. About $0.0004 a photo; Replicate deletes inputs and outputs after an hour |
 | `STRIPE_SECRET` | checkout + subscriptions | **activation** (billing) | **TEST key on staging, always** |
-| `SITE_URL` | Stripe success/cancel + connect redirect base | yes | staging: the staging/preview URL |
+| `SITE_URL` | the app's address for every emailed link and every Stripe return (builder item 388: one helper, `_shared/app_url.ts`) | optional | Production sets it to `https://app.davisdigitalstudio.com`. Without it: `APP_URL`, then the app's address. Never the main site: its pages are on Squarespace and answer "not found". Staging: the staging/preview URL. |
 | `BILLING_SYNC_SECRET` | gates the Stripe webhook sync tier | recommended | |
 | `NETLIFY_AUTH_TOKEN` | site publish/deploy | yes (publish) | rotation runbook exists |
 | Per-provider OAuth: `CONNECTED_<PROVIDER_KEY>_CLIENT_ID` / `_SECRET` (e.g. `CONNECTED_GOOGLE_SEARCH_CONSOLE_CLIENT_ID`), `CONNECTED_<KEY>_WRITE=1` | per connected provider | **activation** (per provider) | These are the ONLY names `connected/auth.ts` reads (`creds()`). `GOOGLE_CLIENT_ID`/`_SECRET` are **not** read by the Connected Platform — setting them activates nothing. Absent → that provider honestly reports what is missing |
@@ -39,8 +39,9 @@ Supersedes `docs/SECRETS-INVENTORY.md` (which predates the Connected Platform an
 | `PLATFORM_REPLY_TO` | the reply-to address on the platform's own mail | optional | defaults to the studio's address |
 | `AGENCY_SITE_ID` | the platform's own agency site, the only site whose owner alerts may fall back to `OPS_ALERT_EMAIL` | optional | absent → that fallback doesn't exist and the alert is skipped, the safe default |
 | `NURTURE_DRIP` | switches on the day-7 follow-up email after a free review | optional | set to `1` to turn it on |
-| `APPROVAL_SECRET` | signs one-tap client approval links and the sales pages' signed links | recommended | falls back to `SCHEDULER_SECRET` |
-| `PREVIEW_LINK_SECRET` | signs shared draft links | optional | falls back to `APPROVAL_SECRET`, then `STATE_SIGNING_SECRET`, then `SCHEDULER_SECRET` |
+| `LINK_SECRET` | the root every signed link's own key is made from (builder item 394, `_shared/link_keys.ts`): one-tap approvals, proposals, agreements, estimates, documents, the retainer card link, shared drafts, booking, form, spam and Join our list links, and every emailed unsubscribe link, open counter and photo | optional | Any long random value. Without it `APPROVAL_SECRET` is the root, else the database key. Never the scheduler's secret. Setting it later breaks no link already sent. |
+| `APPROVAL_SECRET` | the link root when `LINK_SECRET` isn't set; each kind of link gets a key of its own from it | recommended | Links signed with it directly before Nov 23 2026 still open until Feb 21 2027. No longer falls back to `SCHEDULER_SECRET` (item 394). |
+| `PREVIEW_LINK_SECRET` | shared draft links' own key | optional | Without it: a key of their own made from the link root (item 394). |
 | `OPERATOR_SECRET` | lets a program act as the operator (the `x-operator-secret` header) for marketplace and enterprise management | optional | absent → only a signed-in staff member can do those |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | managed domains: DNS run on Amazon Route 53 (`lib/route53.ts`) | optional (domains) | both needed; absent → those routes answer 503 |
 | `PEXELS_API_KEY` | the stock photo search (Pexels) | optional | absent → the stock search is off |

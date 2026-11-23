@@ -15,6 +15,7 @@
 // through the auth ADMIN API with the service role (DELETE /auth/v1/admin/users/:id/factors/:fid);
 // a code is never verified with the person's session (that signs them out), and nothing here
 // calls mfa verify. The person then signs in with their first step and sets two-step up again.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { maskEmail } from '../../_shared/email_infra.ts';
@@ -39,7 +40,7 @@ export const USE_PER_EMAIL = 5, USE_PER_IP = 20, USE_WINDOW_SEC = 15 * 60;
 const sbUrl = () => Deno.env.get('SUPABASE_URL') || '';
 const sbKey = () => Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const adminHeaders = () => ({ apikey: sbKey(), Authorization: `Bearer ${sbKey()}`, 'Content-Type': 'application/json' });
-const signInUrl = () => `${Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com'}/portal.html`;
+const signInUrl = () => `${appBase()}/portal.html`;   // item 388: the app's address
 const noStore = (cors: Record<string, string>) => ({ ...cors, 'Cache-Control': 'no-store' });
 const refuse = (cors: Record<string, string>, status: number, body: Record<string, unknown>) => json(body, status, noStore(cors));
 const notYet = (cors: Record<string, string>) => refuse(cors, 503, { error: 'unavailable', message: 'This needs a one-time database update first.' });

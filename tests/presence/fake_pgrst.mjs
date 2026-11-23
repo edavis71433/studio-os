@@ -95,7 +95,9 @@ export function installFakePostgrest(opts = {}) {
     const h = new Headers(init.headers); const token = (h.get('Authorization') || '').replace(/^Bearer /, '');
     let body = null; try { body = init.body ? JSON.parse(String(init.body)) : null; } catch { body = null; }
     db.log.push({ method, url: decodeURIComponent(u.pathname + u.search), body });
-    if (u.pathname === '/auth/v1/user') return users[token] ? reply(users[token]) : reply({}, 401);
+    // builder item 389: a person who can sign in has proved their email (Supabase stamps the time
+    // when they use an emailed link or code); a test of someone who hasn't sets email_confirmed_at: null
+    if (u.pathname === '/auth/v1/user') return users[token] ? reply({ email_confirmed_at: '2026-01-01T00:00:00Z', ...users[token] }) : reply({}, 401);
     if (u.pathname.startsWith('/auth/v1/admin/users/')) { const id = u.pathname.split('/').pop(); const x = Object.values(users).find((y) => y.id === id); return x ? reply(x) : reply({}, 404); }
     if (!u.pathname.startsWith('/rest/v1/')) return reply({}, 404);
     const table = u.pathname.slice('/rest/v1/'.length);
