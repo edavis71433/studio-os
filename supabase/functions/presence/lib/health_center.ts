@@ -7,6 +7,7 @@
 
 import { stockHealthWords } from './stock/health.ts';
 import { changesArea } from './schema_ledger.ts';
+import { hostPace, hostPaceWords, HOST_CREDITS_WARN } from './host_credits.ts';   // builder item 358: the credits left and the pace
 
 export interface HealthCenterInputs {
   nowIso: string;
@@ -75,8 +76,16 @@ export function hostingArea(h: HostingRead | null | undefined): { state: AreaSta
   const plan = [h.plan, h.credits_included !== null ? `${h.credits_included.toLocaleString('en-US')} credits a period` : null].filter(Boolean).join(', ');
   const renews = day(h.next_period_start);
   if (h.exceeded) return { state: 'attention', detail: `The host’s plan is used up: publishes are paused${renews ? ` until ${renews}` : ''}. Buy credits at the host or wait.` };
+  // builder item 358: the credits left, how long they last at this pace, and that publishing is on;
+  // at 75% used it asks for a look (Home's Needs you asks the studio too)
+  const pace = hostPace(h);
+  if (pace) {
+    const left = `${pace.left.toLocaleString('en-US')} of ${pace.included.toLocaleString('en-US')} credits left (${Math.min(100, Math.floor(pace.pct * 100))}% used)`;
+    const how = hostPaceWords(pace) || (renews ? `It renews ${renews}.` : '');
+    return { state: pace.pct >= HOST_CREDITS_WARN ? 'attention' : 'ok', detail: `${plan || 'Plan read'}; ${left}. ${how ? how + ' ' : ''}Publishing is on.` };
+  }
   const used = h.credits_used !== null ? `${h.credits_used.toLocaleString('en-US')} used` : 'credits used: not known (the host reports 0, which it does even when credits were spent)';
-  return { state: 'ok', detail: `${plan || 'Plan read'}; ${used}${renews ? `; renews ${renews}` : ''}.` };
+  return { state: 'ok', detail: `${plan || 'Plan read'}; ${used}${renews ? `; renews ${renews}` : ''}. Publishing is on.` };
 }
 
 export type AreaState = 'ok' | 'attention' | 'off';

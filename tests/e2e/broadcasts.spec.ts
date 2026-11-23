@@ -93,6 +93,7 @@ test.describe('SS4 — broadcasts console', () => {
     // the composer is the draft again — subject, body, audience
     await expect(page.locator('#subj')).toHaveValue('July opening hours');
     await expect(page.locator('#bodytx')).toHaveValue(/open late all of July/);
+    await expect(page.locator('#bodytx')).toHaveValue(/^Hi \[First name\],/);   // sales item 208: a saved draft's code reads as its words
     await expect(page.locator('[data-seg="contacts"]')).toHaveAttribute('aria-pressed', 'true');
     // and previewing UPDATES the same draft (ensureDraft must PATCH, not POST)
     const patched = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/broadcasts/' + D_ID));
@@ -459,7 +460,8 @@ test.describe('SS4 — broadcasts console', () => {
     await body.fill('Hi ');
     await body.evaluate((el) => { const t = el as HTMLTextAreaElement; t.setSelectionRange(3, 3); });
     await page.getByRole('button', { name: '+ First name' }).click();
-    await expect(body).toHaveValue('Hi {{first_name}}');
+    await expect(body).toHaveValue('Hi [First name]');               // sales item 208: the words, drawn as a chip, never the code
+    await expect(page.locator('#bodyHl mark')).toHaveText(['[First name]']);
     await expect(body).toBeFocused();                               // the caret stays in the message, ready for more
     await body.fill('first\nsecond');
     await body.evaluate((el) => { const t = el as HTMLTextAreaElement; t.setSelectionRange(0, t.value.length); });

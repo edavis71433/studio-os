@@ -13,6 +13,7 @@
 //   · the progress note is written a bounded number of times, and at the end.
 //   deno run --allow-read --allow-env --allow-net tests/presence/tick_calls_402_test.mjs
 import { installFakePostgrest } from './fake_pgrst.mjs';
+import { pinClock } from './clock.mjs';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -24,6 +25,7 @@ Deno.env.delete('RESEND_KEY'); Deno.env.delete('STRIPE_SECRET'); Deno.env.delete
 
 const db = installFakePostgrest();
 const NOW = '2026-11-22T12:00:00Z';
+const restoreClock = pinClock('2026-11-22T13:00:00Z');   // the code reads the clock: an hour after the sites were swept and checked, on every day this runs
 const SITES = Array.from({ length: 9 }, (_, i) => String(i + 1)).map((d) => ({ site: uuid('1', d), client: uuid('2', d) }));
 const world = () => ({
   presence_sites: SITES.map(({ site, client }, i) => ({ id: site, client_id: client, status: 'live', last_published_at: '2026-11-01T00:00:00Z', template_slug: 'atelier', template_version: '1', custom_domain: i === 0 ? 'maple.example' : null, netlify_site_id: `nf-${i}`, edition: 'presence', last_observed_at: NOW, domain_checked_at: NOW, uptime_checked_at: NOW, offline_at: null, next_window_at: 'infinity', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' })),
@@ -103,6 +105,7 @@ console.log(`\nCALLS per idle tick, 9 sites: before ${before ? before.calls : '?
   ok('a remembered answer is a copy: changing it changes nothing for the next reader', (() => { tickMemoBegin(); return svc('presence_identity?select=site_id&limit=1').then((r1) => { r1.json.push('x'); return svc('presence_identity?select=site_id&limit=1'); }).then((r2) => { tickMemoEnd(); return r2.json.length === 1; }); })() instanceof Promise);
 }
 
+restoreClock();
 const passed = results.filter((r) => r.p).length;
 console.log(`\n${passed}/${results.length} passed`);
 if (passed !== results.length) { for (const r of results) if (!r.p) console.log('  FAIL ' + r.n); Deno.exit(1); }

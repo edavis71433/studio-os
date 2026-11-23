@@ -738,8 +738,18 @@ const HASH_VIEWS = { today: "today", pages: "pages", business: "business", setti
 // load merely hid. The early pass only switches the visible view (go(v, true):
 // no loaders, no hint, no URL write); the full routeHash() after the data
 // wave runs the loaders and the data-dependent hashes (#monitor, #publish…).
+// Builder item 431: "#hours" or "#hours-<day>" (mon to sun) is the Hours card; anything else is itself
+function hoursHash(h) { return /^hours(-(mon|tue|wed|thu|fri|sat|sun))?$/.test(h) ? "hours" : h; }
+// Focus lands on the day's first control that can take it: its opening time when it's open, its
+// Closed tick when it's closed. No day, or one not in the list, is Monday, the card's first row.
+function focusHoursDay(day) {
+  const rows = [...(($("hoursGrid") || document.createElement("div")).querySelectorAll(".hrow"))];
+  const row = rows[Math.max(0, DAYS.findIndex(([k]) => k === day))];
+  const f = row && [...row.querySelectorAll("input")].find((x) => !x.disabled);
+  if (f) f.focus({ preventScroll: true });
+}
 function routeHashEarly() {
-  const h = (location.hash || "").replace("#", "").toLowerCase() || String(new URLSearchParams(location.search).get("view") || "").toLowerCase();
+  const h = hoursHash((location.hash || "").replace("#", "").toLowerCase()) || String(new URLSearchParams(location.search).get("view") || "").toLowerCase();
   const v = HASH_VIEWS[h] || (h && $("view-" + h) ? h : "");
   if (v && v !== "today" && $("view-" + v)) go(v, true);
 }
@@ -756,8 +766,9 @@ function routeHash() {
   if (h === "preview") { openPreview("draft"); return; }
   if (h === "plan") { if (hasFeature("business_moments")) openCoachDesk(); return; }   // builder list item 184: a coach idea on the client's Do next list
   if (h === "foundations" || h === "export") { openFoundationsDesk(); return; }
-  // builder item 385: the Do next list's "Thanksgiving is Thursday: are you open?" opens the Hours card
-  if (h === "hours") { go("business"); setTimeout(() => { const c = $("bizHoursH"); if (c) { c.scrollIntoView({ behavior: "smooth", block: "center" }); const f = $("hoursGrid").querySelector("input,button"); if (f) f.focus({ preventScroll: true }); } }, 350); return; }   // deep-link the technical desk (approvals + "Download everything I own" live here)
+  // builder item 385: the Do next list's "Thanksgiving is Thursday: are you open?" opens the Hours card;
+  // item 431: "#hours-thu" puts focus on that day's row (a closed day's times are switched off, so its Closed tick)
+  if (hoursHash(h) === "hours") { go("business"); setTimeout(() => { const c = $("bizHoursH"); if (c) { c.scrollIntoView({ behavior: "smooth", block: "center" }); focusHoursDay(h.slice(6)); } }, 350); return; }
   // #monitor — the analytics "Add their website address" CTA (routes/analytics.ts
   // record_href). The card lives far down the Business view; without the scroll,
   // the link lands on a screen where the affordance it promised isn't in sight.
@@ -1175,11 +1186,13 @@ function renderHours() {
   const grid = $("hoursGrid"); grid.innerHTML = "";
   hoursFromState().forEach((day) => {
     const row = el("div", "hrow");
-    row.appendChild(el("span", "day", DAYS.find(([k]) => k === day.day)[1]));
+    const dayName = DAYS.find(([k]) => k === day.day)[1];
+    row.appendChild(el("span", "day", dayName)); row.dataset.day = day.day;
     const iv = day.intervals && day.intervals[0] ? day.intervals[0] : { open: "09:00", close: "17:00" };
-    const open = el("input"); open.type = "time"; open.value = iv.open || "09:00"; open.disabled = !!day.closed;
-    const close = el("input"); close.type = "time"; close.value = iv.close || "17:00"; close.disabled = !!day.closed;
-    const lab = el("label", "closedlab"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!day.closed;
+    // item 431: each field says its day, so focus landing here (the holiday line's link) reads "Thursday opens"
+    const open = el("input"); open.type = "time"; open.value = iv.open || "09:00"; open.disabled = !!day.closed; open.setAttribute("aria-label", dayName + " opens");
+    const close = el("input"); close.type = "time"; close.value = iv.close || "17:00"; close.disabled = !!day.closed; close.setAttribute("aria-label", dayName + " closes");
+    const lab = el("label", "closedlab"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!day.closed; cb.setAttribute("aria-label", dayName + " closed");
     lab.append(cb, document.createTextNode("Closed"));
     row.append(open, el("span", "to", "to"), close, lab);
     const save = () => {
@@ -1638,6 +1651,10 @@ function blogLook() {
 // ── builder item 370: the Styles tab: the look as it is now, and the door to the editor's panel ──
 // The site's own colours and fonts (GET /dev/customization) over its template's; a failed read
 // shows the template's, said so. Nothing here changes the site.
+// Builder items 327 and 431: a font the browser picks (system-ui and the like) is named in words, never by its code name
+const FONT_GENERIC = { "system-ui": "Your device’s own font", "-apple-system": "Your device’s own font", "blinkmacsystemfont": "Your device’s own font", "ui-sans-serif": "Your device’s own font", "sans-serif": "Your device’s own font",
+  "serif": "Your device’s serif font", "ui-serif": "Your device’s serif font", "monospace": "Your device’s typewriter font", "ui-monospace": "Your device’s typewriter font", "cursive": "Your device’s handwriting font" };
+function fontWords(name) { const n = String(name || "").trim(); return FONT_GENERIC[n.toLowerCase()] || n; }
 let STYLES_READ = null;
 async function paintStylesView() {
   const host = $("stLook"); if (!host) return;
@@ -1648,7 +1665,7 @@ async function paintStylesView() {
   const btn = $("btnStylesEdit"); if (btn) btn.hidden = locked;
   const keep = DESIGN_TOKENS; DESIGN_TOKENS = tokens || DESIGN_TOKENS || {};
   const L = blogLook(); DESIGN_TOKENS = keep;
-  const font = (f) => esc(String(f || "").split(",")[0].replace(/['"]/g, "").trim() || "The system font");
+  const font = (f) => esc(fontWords(String(f || "").split(",")[0].replace(/['"]/g, "").trim()) || "Your device’s own font");   // item 431: never "system-ui"
   const sw = (label, c) => `<div class="st-sw"><svg class="st-dot" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11" fill="${esc(c)}"/></svg><span><b>${esc(label)}</b><span class="st-hex">${esc(String(c).toUpperCase())}</span></span></div>`;
   host.innerHTML = `<div class="st-row" role="list" aria-label="Colours">${[["Accent", L.accent], ["Text", L.ink], ["Background", L.bg]].map(([l, c]) => `<div role="listitem">${sw(l, c)}</div>`).join("")}</div>
     <div class="st-row"><div class="st-font"><span class="st-k">Headings</span><b>${font(L.display)}</b></div><div class="st-font"><span class="st-k">Text</span><b>${font(L.body)}</b></div><div class="st-font"><span class="st-k">Corners</span><b>${esc(L.radius === "0" || L.radius === "0px" ? "Square" : "Rounded")}</b></div></div>
