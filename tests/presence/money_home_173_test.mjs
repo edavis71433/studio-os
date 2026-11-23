@@ -5,6 +5,10 @@
 // the route: months for everyone, Stripe for the platform's own studio only, and an honest
 // "couldn't be read" when Stripe is down. Stripe and the database are fakes.
 import { installFakePostgrest } from './fake_pgrst.mjs';
+import { pinClock, PINNED_NOW } from './clock.mjs';
+// Builder item 433: the month's money and the next payout are counted from today, and these fixtures hold fixed dates, so "today" is pinned
+// (it starts at PINNED_NOW and ticks). Found by running the suites with the clock moved ahead.
+const restoreClock = pinClock(PINNED_NOW, { ticking: true });
 
 Deno.env.set('STRIPE_SECRET', 'sk_test_fake_173');
 const db = installFakePostgrest();
@@ -100,6 +104,7 @@ const TODAY = '2026-11-18';
   db.fail.delete('presence_invoices');
 }
 
+restoreClock();
 const passed = results.filter((r) => r.p).length;
 console.log(`\n${passed}/${results.length} passed`);
 if (passed !== results.length) { console.log('FAILED:'); for (const r of results.filter((x) => !x.p)) console.log('  ' + r.n); Deno.exit(1); }

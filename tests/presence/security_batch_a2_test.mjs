@@ -8,6 +8,11 @@
 //   F5  the Won / Not a fit report dates a close by when it closed
 //   F6  a client's request list and bell pick requests by real activity
 import { installFakePostgrest } from './fake_pgrst.mjs';
+import { pinClock, PINNED_NOW } from './clock.mjs';
+// Builder item 433: the report's 365-day window is counted from today, and these fixtures hold fixed dates, so "today" is pinned
+// (it starts at PINNED_NOW and ticks). Found by running the suites with the clock moved ahead.
+const restoreClock = pinClock(PINNED_NOW, { ticking: true });
+
 const SITE = '11111111-1111-4111-8111-111111111111';
 const db = installFakePostgrest({
   unique: { presence_sales_templates: [{ cols: ['site_id', 'kind', 'name'], where: (r) => r.deleted_at == null && /^__.*__$/.test(String(r.name)) }] },
@@ -205,5 +210,6 @@ db.reset({
   ok('F6: both read only this client\'s requests on their studio\'s site', db.reads('presence_support_requests').every((c) => c.url.includes(`site_id=eq.${SITE}`) && c.url.includes(`requester=eq.${client.userId}`)));
 }
 
+restoreClock();
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('Failed:\n  ' + failed.join('\n  ')); Deno.exit(1); }

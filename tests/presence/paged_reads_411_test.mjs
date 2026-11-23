@@ -10,6 +10,10 @@
 //   · no read in those files still carries limit=2000 or limit=5000.
 //   deno run --allow-read --allow-env --allow-net tests/presence/paged_reads_411_test.mjs
 import { installFakePostgrest } from './fake_pgrst.mjs';
+import { pinClock, PINNED_NOW } from './clock.mjs';
+// Builder item 433: the reports count their days and windows from today, and these fixtures hold fixed dates, so "today" is pinned
+// (it starts at PINNED_NOW and ticks). Found by running the suites with the clock moved ahead.
+const restoreClock = pinClock(PINNED_NOW, { ticking: true });
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -97,6 +101,7 @@ const quiet = async (fn) => { const e = console.error, w = console.warn; console
 }
 
 globalThis.fetch = inner;
+restoreClock();
 const passed = results.filter((r) => r.p).length;
 console.log(`\n${passed}/${results.length} passed`);
 if (passed !== results.length) { for (const r of results) if (!r.p) console.log('  FAIL ' + r.n); Deno.exit(1); }

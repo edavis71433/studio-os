@@ -15,10 +15,13 @@
 set -uo pipefail
 export TMPDIR="${TMPDIR:-/tmp}"
 DENO="${DENO:-deno}"
+# Builder item 433: TIME_TRAVEL_DAYS=N runs every suite with the clock moved N days ahead
+# (tests/presence/time_travel.mjs), as .github/workflows/time-travel.yml does.
+pre=""; [ -n "${TIME_TRAVEL_DAYS:-}" ] && pre="--preload=tests/presence/time_travel.mjs"
 
 pass=0; fail=0; skip=0; failed=""
 for f in tests/presence/*_test.mjs; do
-  out=$("$DENO" run --allow-read --allow-env --allow-net "$f" 2>&1); rc=$?
+  out=$("$DENO" run $pre --allow-read --allow-env --allow-net "$f" 2>&1); rc=$?
   # Exit code decides. A suite that returns 0 PASSED its pure portion (it may
   # additionally print an "integration tier skipped" note for optional live
   # tests — that is not a skip of the whole suite). Only a NON-ZERO exit whose
@@ -40,4 +43,5 @@ done
 
 echo ""
 echo "════ CI pure sweep: $pass passed, $fail failed, $skip skipped ════"
+[ -n "$pre" ] && echo "Every suite ran with the clock ${TIME_TRAVEL_DAYS} days ahead. One that fails only here holds dates that meet code reading the real clock: pin its clock (pinClock in tests/presence/clock.mjs)."
 if [ "$fail" -ne 0 ]; then printf "Failed suites:%b\n" "$failed"; exit 1; fi

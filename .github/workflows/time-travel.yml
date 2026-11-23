@@ -1,0 +1,41 @@
+name: Pure suites with the clock moved ahead
+
+# Builder item 433. A suite whose fixed dates meet code that reads the real clock passes the
+# day it lands and breaks every pull request on a later day: tick_calls_402 did on Nov 23
+# 2026, 24 hours after its fixture, and running the suites ahead found six more. The clock
+# rule can't see that by reading the code, so this runs every pure suite again with the
+# clock moved 32 and 400 days ahead (tests/presence/time_travel.mjs). A suite that fails only
+# here will fail for real within that many days: pin its clock with pinClock from
+# tests/presence/clock.mjs. Two jobs of about four minutes beside the other checks, free on a
+# public repository. Not a required check, and a release doesn't run it.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: time-travel-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  time-travel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        days: [32, 400]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: "2.9.1"
+      - name: Every pure suite, with the clock moved ahead
+        env:
+          TIME_TRAVEL_DAYS: ${{ matrix.days }}
+        run: bash scripts/ci-pure-tests.sh

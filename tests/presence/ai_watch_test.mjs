@@ -5,6 +5,11 @@
 // check per tick, claims the month first, stops at the spend cap, tries a failed check
 // again three times at most, and keeps each month's answers for the chart and for
 // "what Claude said". Claude, Google and the database are all scripted here.
+import { pinClock, PINNED_NOW } from './clock.mjs';
+// Builder item 433: the next monthly check is counted from today, and these fixtures hold fixed dates, so "today" is pinned
+// (it starts at PINNED_NOW and ticks). Found by running the suites with the clock moved ahead.
+const restoreClock = pinClock(PINNED_NOW, { ticking: true });
+
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', ANTHROPIC_KEY: 'sk-test', DAILY_SPEND_CAP_USD: '10' })) Deno.env.set(k, v);
 
 const results = [];
@@ -163,6 +168,7 @@ const NOV = '2026-11-11T09:00:00.000Z';
   }
 }
 
+restoreClock();
 const failed = results.filter((r) => !r.p).length;
 console.log(`ai_watch: ${results.length - failed} passed, ${failed} failed`);
 if (failed) Deno.exit(1);
