@@ -216,11 +216,18 @@ export function isRemovedLog(row: any): boolean {
   const d = row && typeof row.detail === 'object' ? row.detail : null;
   return row?.kind === 'note' && !!d && d.activity_kind === 'removed';
 }
+/** A line Studio OS wrote itself, which stays as it happened: an email it sent (via 'app'), one
+ *  logged from your BCC address (via 'bcc'), and the "Welcome email re-sent to …" line the re-send
+ *  writes. That line carries via 'app' since Nov 23 2026; the ones before it are known by their
+ *  words (the live check of sales item 186 found them offering Change). Pure. */
+export function writtenByStudioOs(d: { via?: unknown; body?: unknown } | null | undefined): boolean {
+  return !!String(d?.via ?? '') || /^Welcome email re-sent to /.test(String(d?.body ?? ''));
+}
 /** The timeline as one reader sees it: their own hand-logged lines say so (`mine`), never one
- *  Studio OS wrote (an email it sent, or one logged from a BCC). `actor` is who reads. Pure. */
-export function markMine<T extends { source?: string; who?: string; via?: string }>(items: T[], actor: string): Array<T & { mine?: boolean }> {
+ *  Studio OS wrote (writtenByStudioOs). `actor` is who reads. Pure. */
+export function markMine<T extends { source?: string; who?: string; via?: string; body?: string }>(items: T[], actor: string): Array<T & { mine?: boolean }> {
   const me = String(actor || '').trim().toLowerCase();
-  return items.map((it) => (it.source === 'activity' && me && !it.via && String(it.who || '').trim().toLowerCase() === me ? { ...it, mine: true } : it));
+  return items.map((it) => (it.source === 'activity' && me && !writtenByStudioOs(it) && String(it.who || '').trim().toLowerCase() === me ? { ...it, mine: true } : it));
 }
 
 /** Is this raw presence_deal_events row a manual (operator-logged) activity? */
