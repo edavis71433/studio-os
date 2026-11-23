@@ -149,6 +149,8 @@ const LOCATION_FIELDS: Record<string, FieldRule> = {
   temporarily_closed: { kind: 'bool' }, temporarily_closed_note: { max: 200 },
   // builder list item 127 (0182): a second location, made safe as it's saved; null removes it
   second_location: { kind: 'json', json: { bytes: 8 * KB, shape: 'object' }, place: true },
+  // builder list item 334 (0255): "We go to our customers"; the service area shows instead of the address
+  goes_to_customers: { kind: 'bool' },
 };
 const SETTINGS_FIELDS: Record<string, FieldRule> = {
   category_order: { kind: 'json', json: { bytes: 64 * KB, shape: 'list', items: 200 } }, cover_media_id: { kind: 'uuid' },
@@ -453,7 +455,7 @@ async function singleton(req: Request, db: SiteDb, site: SiteRow, principal: Pri
 export const handleLocation = (req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>) =>
   singleton(req, db, site, principal, cors, {
     table: 'presence_locations', entityType: 'location', noun: 'address & hours', fields: LOCATION_FIELDS,
-    select: 'id,address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note,updated_at,' + PLACE_SETTINGS_COLS,
+    select: 'id,address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note,updated_at,' + PLACE_SETTINGS_COLS + ',' + GOES_SETTINGS_COLS,
     conflict: 'site_id', summary: 'Updated hours & location',
   });
 
@@ -489,9 +491,14 @@ const ICON_SETTINGS_COLS = 'icon_media_id';
 const ASKED_SETTINGS_COLS = 'invoice_reminders_asked';
 // The 0250 columns (sales items 167, 168: the "On every invoice" card and the late fee).
 const INVOICE_SETTINGS_COLS = 'invoice_pay_other,invoice_tax_id,invoice_number_start,late_fee_mode,late_fee_value,late_fee_days';
+// The 0255 column on presence_locations (builder list item 334's "We go to our customers").
+// Business details shows the switch only when a read returns it, so before the pack the
+// switch stays hidden and every other field reads and saves as before.
+const GOES_SETTINGS_COLS = 'goes_to_customers';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-const OPTIONAL_SETTINGS_COLS = [ICON_SETTINGS_COLS, INVOICE_SETTINGS_COLS, ASKED_SETTINGS_COLS, PLACE_SETTINGS_COLS, BLOG_SETTINGS_COLS, SIGNER_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+// (0255's column sits right after 0184's: it is only ever in the location's read, which holds no icon or invoice column, so it steps down first there all the same)
+const OPTIONAL_SETTINGS_COLS = [ICON_SETTINGS_COLS, GOES_SETTINGS_COLS, INVOICE_SETTINGS_COLS, ASKED_SETTINGS_COLS, PLACE_SETTINGS_COLS, BLOG_SETTINGS_COLS, SIGNER_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;

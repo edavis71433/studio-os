@@ -692,6 +692,16 @@ export async function handleAgencySites(req: Request, route: string, method: str
   //    the studio's customers when its owner is invited. The account and the site
   //    are made the one way every customer's are (routes/sales.ts
   //    provisionCustomerAccount, no email: "a studio-managed workspace"). ──
+  // ── item 331: "See it full size", a kind's sample site drawn in one design ──
+  const sm = route.match(/^\/agency\/designs\/([a-z0-9-]{1,60})\/sample$/);
+  if (sm && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    const { samplePage } = await import('../lib/kind_samples.ts');
+    const html = await samplePage(new URL(req.url).searchParams.get('kind'), sm[1]);
+    if (!html) return json({ error: 'not_found', message: 'That design isn’t one of the built-in ones.' }, 404, cors);
+    return json({ data: { html } }, 200, cors);
+  }
+
   if (route === '/agency/sites' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
     let b: { business_name?: unknown; kit_id?: unknown; template_slug?: unknown; industry_key?: unknown; client_id?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
@@ -835,9 +845,19 @@ export async function handleAgencySites(req: Request, route: string, method: str
     }
   }
 
-  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied|invite|trash|restore)$/);
+  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied|invite|trash|restore|first-draft)$/);
   if (!m) return null;
   const siteId = m[1], what = m[2];
+
+  // ── + New site's optional first draft (item 332): the starter draft into the site's private draft ──
+  if (what === 'first-draft' && method === 'POST') {
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notYours(cors);
+    const site = rowsOf<SiteRow>(await svc(`presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`))[0];
+    if (!site || site.edition === 'monitor') return notYours(cors);
+    const { handleFirstDraft } = await import('./first_draft.ts');
+    return handleFirstDraft(req, site, principal, cors);
+  }
 
   // ── a card's live thumbnail ──
   if (what === 'thumb' && method === 'GET') {

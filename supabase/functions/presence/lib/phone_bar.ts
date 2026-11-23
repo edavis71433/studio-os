@@ -12,7 +12,7 @@ interface Interval { open: string; close: string }
 interface Details {
   identity?: { phone?: string; email?: string } | null;
   locations?: Array<{
-    address_line1?: string; address_line2?: string; city?: string; region?: string; postal_code?: string;
+    address_line1?: string; address_line2?: string; city?: string; region?: string; postal_code?: string; goes_to_customers?: boolean;
     phone?: string; timezone?: string; hours?: Array<{ day: string; closed?: boolean; intervals?: Interval[] }>;
     temporarily_closed?: boolean; temporarily_closed_note?: string;
   }> | null;
@@ -51,7 +51,8 @@ export function phoneBarButtons(c: Details | null | undefined): BarButton[] {
   const tel = dialable(c);
   if (tel) out.push({ key: 'call', label: 'Call', href: 'tel:' + tel });
   const line1 = String(loc.address_line1 || '').trim();
-  if (line1) {
+  // builder list item 334: a business that goes to its customers has nowhere to drive to
+  if (line1 && loc.goes_to_customers !== true) {
     const place = [line1, loc.address_line2, loc.city, [loc.region, loc.postal_code].map((x) => String(x || '').trim()).filter(Boolean).join(' ')]
       .map((x) => String(x || '').trim()).filter(Boolean).join(', ');
     out.push({ key: 'directions', label: 'Directions', href: 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(place) });

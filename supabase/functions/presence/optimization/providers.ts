@@ -109,7 +109,7 @@ export const OPTIMIZATION_PROVIDERS: Provider[] = [
       const loc = i.draft.locations?.[0];
       const missing: string[] = [];
       if (!i.draft.identity?.business_name || !text.includes(i.draft.identity.business_name)) missing.push('name');
-      if (loc?.address_line1 && !text.includes(loc.address_line1)) missing.push('address');
+      if (loc?.address_line1 && loc.goes_to_customers !== true && !text.includes(loc.address_line1)) missing.push('address');   // item 334: shown as the area instead
       if (i.draft.identity?.phone && !text.includes(String(i.draft.identity.phone).slice(-4))) missing.push('phone');
       const hasHours = (loc?.hours || []).some((d) => !d.closed && (d.intervals || []).length);
       if (hasHours && !/\d{1,2}(:\d{2})?\s*(am|pm|–|-)/i.test(bodyText(text))) missing.push('hours');
