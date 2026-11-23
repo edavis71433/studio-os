@@ -3332,7 +3332,8 @@ export async function handleSalesResendInvite(req: Request, site: SiteRow, princ
   if (!email || !validEmail(email)) return json({ error: 'no_email', message: 'This customer has no email on file, so there’s nothing to send. Add an email to their contact first.' }, 409, cors);
   const sent = await sendCustomerInvite(site.id, email, false);
   if (!sent) return json({ error: 'send_failed', message: 'We couldn’t send the welcome email just now — please try again in a moment.' }, 502, cors);
-  await dealEvent(site.id, dealId, 'note', principal, { detail: buildActivityDetail('email', `Welcome email re-sent to ${email}`, nowIso()) });
+  // sales item 186 (live check, Nov 23): Studio OS wrote this line, so it says so (via 'app') and stays as it happened
+  await dealEvent(site.id, dealId, 'note', principal, { detail: { ...buildActivityDetail('email', `Welcome email re-sent to ${email}`, nowIso()), via: 'app' } });
   return json({ data: { sent: true, email } }, 200, cors);
 }
 

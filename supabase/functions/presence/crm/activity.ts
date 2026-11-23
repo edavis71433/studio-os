@@ -15,7 +15,7 @@
 // a read-time merge, no new tables ("one log, derived views"). Tested in
 // isolation (tests/presence/crm_activity_test.mjs).
 import type { TimelineItem } from './contract.ts';
-import { describeSystemEvent, isActivityRow, usd } from './deal_activity.ts';
+import { describeSystemEvent, isActivityRow, usd, writtenByStudioOs } from './deal_activity.ts';
 import { moneyState } from '../lib/money_state.ts';
 
 // The six timeline types — each drives one icon + one connector color on the
@@ -116,7 +116,7 @@ export function mapConversationItem(m: any, viewer = ''): ActivityItem | null {
       if (ak === 'email' && str(m.via) === 'app') map.email = { type: 'email', title: `${who} sent an email${m.subject ? ` — ${str(m.subject)}` : ''}`, meta: 'Email' };
       const t = map[ak] || { type: 'note' as ActivityType, title: `${who} logged an activity`, meta: 'Activity' };
       const edited = str(m.edited_at) || null;
-      const log = map[ak] && str(m.id) ? { log: { id: str(m.id), kind: ak, body: str(m.body), at, mine: isViewer(m.actor, viewer) && !str(m.via), edited_at: edited } } : {};
+      const log = map[ak] && str(m.id) ? { log: { id: str(m.id), kind: ak, body: str(m.body), at, mine: isViewer(m.actor, viewer) && !writtenByStudioOs(m), edited_at: edited } } : {};
       return { id, kind: 'activity', type: t.type, title: t.title, body, at, meta: t.meta + (edited ? ' · edited' : ''), href: null, ...log };
     }
     default:
