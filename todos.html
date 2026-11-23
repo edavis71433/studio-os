@@ -67,6 +67,7 @@
   .add input[type=text]{flex:1 1 260px;min-width:0;font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-height:44px}
   .add input[type=date],.add select{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--dds-line-strong,#d6d4e2);border-radius:999px;padding:8px 14px;min-height:44px;max-width:240px}
   .add input:focus,.add select:focus{outline:2px solid var(--p);outline-offset:1px}
+  .add input.addfind{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--dds-line-strong,#d6d4e2);border-radius:999px;padding:8px 14px;min-height:44px;width:190px;max-width:100%}   /* sales item 204 */
   .addgo{font:inherit;font-size:15px;font-weight:600;border:0;border-radius:999px;padding:10px 22px;min-height:44px;cursor:pointer;background:var(--dds-grad-btn,var(--p));color:var(--dds-on-p,#fff);box-shadow:0 6px 16px -8px var(--p)}
   .addgo[disabled]{opacity:.6;cursor:default}
   /* the list */
@@ -122,6 +123,7 @@
     .add input[type=text]{flex-basis:100%}
     .add input[type=date]{flex:0 1 150px;min-width:0;max-width:none}   /* the day and who it's for share a row, as drawn */
     .add select{flex:1 1 120px;min-width:0;max-width:none}
+    .add input.addfind{flex:1 1 140px;width:auto;min-width:0}
     .addgo{margin-left:auto}
     .trow{align-items:flex-start;padding:12px 16px}
     .ghead{padding:14px 16px 4px}
@@ -230,13 +232,13 @@ function render(focusSel){
   const all=((DATA&&DATA.items)||[]).filter(upNow);
   const tog=teamOn()?`<div class="owntog" role="group" aria-label="Whose to-dos"><button type="button" data-own="mine" aria-pressed="${MINE?'true':'false'}">Mine <span class="n">${all.filter(mineItem).length}</span></button><button type="button" data-own="all" aria-pressed="${MINE?'false':'true'}">Everyone <span class="n">${all.length}</span></button></div>`:'';
   // builder item 165: the one page header (shell.css .dds-ph). Who the list is for sits beside the title;
-  // the line counts the whole list; Print waits behind ⋯ on a phone; + Add a to-do takes you to the box below.
+  // the line counts the whole list; Print waits behind ⋯ on a phone. Sales item 204: the add row below is the
+  // one place to add (the header's "+ Add a to-do" was a second add control that only jumped to it).
   let h=`<header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" data-ic="todos" aria-hidden="true"></span>
       <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">To-dos</h1><label class="sr-only" for="forFilter">Show the to-dos for</label><select id="forFilter" class="forpick dds-ph-pick"><option value="">For: Everyone</option>${((DATA.items||[]).some(t=>t.for==='me')?'<option value="me"'+(WHO==='me'?' selected':'')+'>For: Just me</option>':'')}${whos.map(([k,n])=>`<option value="${esc(k)}"${WHO===k?' selected':''}>For: ${esc(n)}</option>`).join('')}</select>${tog}</div>
         <p class="dds-ph-line" id="phLine">${esc(headLine(today))}</p></div>
       <div class="dds-ph-acts"><button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
-        <div class="dds-ph-more" id="phMore" popover><button type="button" class="pill" id="printBtn">${svg('print')} Print</button><button type="button" class="pill" id="dlBtn" title="A spreadsheet (CSV) of the to-dos in view">Download</button></div>
-        <button type="button" class="addgo primary dds-ph-fill" id="addJump">+ Add a to-do</button></div></div></header>`;
+        <div class="dds-ph-more" id="phMore" popover><button type="button" class="pill" id="printBtn">${svg('print')} Print</button><button type="button" class="pill" id="dlBtn" title="A spreadsheet (CSV) of the to-dos in view">Download</button></div></div></div></header>`;
   h+=`<div class="stats" role="group" aria-label="Show">`+[['open','All open',''],['over','Overdue','over'],['today','Today','today'],['week','This week',''],['later','Later',''],['done','Done · last 30 days','done']].map(([k,l,c])=>`<button type="button" class="stat ${c}" data-show="${k}" aria-pressed="${SHOW===k?'true':'false'}"><b>${counts[k]}</b><span>${l}</span></button>`).join('')+`</div>`;
   h+=addHtml();
   if(DATA.partial)h+=`<p class="partial" role="status">Some of your to-dos couldn’t be checked just now, so this may not be everything. Refresh to try again.</p>`;
@@ -332,21 +334,40 @@ function openEdit(btn){
   });
 }
 function addHtml(){
-  return `<form class="add" id="addForm" aria-label="Add a to-do"><label class="sr-only" for="addTitle">What needs doing?</label><input type="text" id="addTitle" maxlength="200" autocomplete="off" placeholder="+ What needs doing?" value="${esc(DRAFT.title)}">
+  return `<form class="add" id="addForm" aria-label="Add a to-do"><label class="sr-only" for="addTitle">What needs doing?</label><input type="text" id="addTitle" maxlength="200" autocomplete="off" placeholder="+ What needs doing? Add a day: “Call Ivy friday”" value="${esc(DRAFT.title)}">
     <label class="sr-only" for="addDue">Due date (optional)</label><input type="date" id="addDue" value="${esc(DRAFT.due)}">
+    <label class="sr-only" for="addFind">Find who it’s for</label><input type="search" id="addFind" class="addfind" autocomplete="off" spellcheck="false" placeholder="Who it’s for: type a name" aria-controls="addFor">
     <label class="sr-only" for="addFor">Who it’s for</label><select id="addFor">${forOptions()}</select>
     ${teamOn()?`<label class="sr-only" for="addOwner">Whose to-do it is</label><select id="addOwner">${TEAM.people.map(p=>`<option value="${esc(p.uid)}"${(DRAFT.owner||TEAM.me)===p.uid?' selected':''}>${p.me?'Yours':esc(p.label)}</option>`).join('')}</select>`:''}
     <button type="submit" class="addgo" id="addGo">Add to-do</button></form>`;
 }
-function forOptions(){
-  const o=(v,l)=>`<option value="${esc(v)}"${DRAFT.for===v?' selected':''}>${esc(l)}</option>`;
-  let h=o('','For anyone');
+// sales item 204: `q` is what's typed in the find box beside the picker: only the names with every
+// word typed stay, still under People, Customers and Open deals, and the first of them is picked
+function forOptions(q){
+  const words=String(q||'').toLowerCase().split(/\s+/).filter(Boolean),hit=(l)=>words.every(w=>String(l||'').toLowerCase().includes(w));
+  let first=words.length>0;
+  const o=(v,l)=>{const on=first?!(first=false):(!words.length&&DRAFT.for===v);return `<option value="${esc(v)}"${on?' selected':''}>${esc(l)}</option>`;};
+  const grp=(label,list,val,txt)=>{const xs=list.filter(x=>hit(txt(x)));return xs.length?`<optgroup label="${label}">${xs.map(x=>o(val(x),txt(x))).join('')}</optgroup>`:'';};
+  let h=words.length?'':o('','For anyone');
   if(PICK){
-    if(PICK.people.length)h+=`<optgroup label="People">${PICK.people.map(c=>o('contact:'+c.id,c.label||c.name)).join('')}</optgroup>`;
-    if(PICK.customers.length)h+=`<optgroup label="Customers">${PICK.customers.map(c=>o('client:'+c.id,c.label||c.name)).join('')}</optgroup>`;
-    if(PICK.deals.length)h+=`<optgroup label="Open deals">${PICK.deals.map(d=>o('deal:'+d.id,d.title)).join('')}</optgroup>`;
+    h+=grp('People',PICK.people,c=>'contact:'+c.id,c=>c.label||c.name);
+    h+=grp('Customers',PICK.customers,c=>'client:'+c.id,c=>c.label||c.name);
+    h+=grp('Open deals',PICK.deals,d=>'deal:'+d.id,d=>d.title);
   }
-  return h;
+  return h||`<option value="" selected>${PICK?'No one by that name: for anyone':'Still loading the names…'}</option>`;
+}
+// Sales item 204: the add row reads a day at the end of what's typed: "Call Ivy friday", "Send the
+// invoice by tomorrow", "Email Jo on Mon". A weekday is the coming one (today included), "next week"
+// is the coming Monday. The date box shows it as you type; change or clear the box and the words stay
+// as typed. Pure but for the clock, read once by the caller.
+const DAYWORDS={sun:0,sunday:0,mon:1,monday:1,tue:2,tues:2,tuesday:2,wed:3,weds:3,wednesday:3,thu:4,thur:4,thurs:4,thursday:4,fri:5,friday:5,sat:6,saturday:6};
+function dueFromWords(text,nowMs){
+  const m=/^(.*?\S)\s+(?:(?:by|on|due|for)\s+)?(today|tonight|tomorrow|tmrw|next week|sun(?:day)?|mon(?:day)?|tue(?:s|sday)?|wed(?:s|nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?)[.!]?$/i.exec(String(text||'').trim());
+  if(!m)return null;
+  const w=m[2].toLowerCase(),d=new Date(nowMs);d.setHours(12,0,0,0);
+  const add=w==='tomorrow'||w==='tmrw'?1:w==='next week'?((8-d.getDay())%7||7):w in DAYWORDS?(DAYWORDS[w]-d.getDay()+7)%7:0;
+  d.setDate(d.getDate()+add);
+  return {title:m[1].trim(),due:ymd(d.getTime())};
 }
 // sales item 204: everyone, not the first 100. A read gives 100 at most, so the reads go page by page
 // until a short page (or `most`); a failed page keeps what came before it
@@ -377,7 +398,7 @@ function loadPick(){
     const customers=rows(k).filter(x=>x&&x.client_id).map(x=>({id:x.client_id,name:x.name||x.email||'A customer',email:x.email||''}));
     PICK={people:pickLabels(people,'person',customers),customers:pickLabels(customers,'customer',people),
       deals:d.filter(x=>x&&x.id&&['lead','qualified','proposal','contract'].includes(x.stage)&&!x.converted_client_id).map(x=>({id:x.id,title:x.title||'A deal'}))};
-    const sel=$('addFor');if(sel&&document.activeElement!==sel){sel.innerHTML=forOptions();}
+    const sel=$('addFor');if(sel&&document.activeElement!==sel){const fi=$('addFind');sel.innerHTML=forOptions(fi&&fi.value);}
   }).catch(()=>{PICK_P=null;});
   return PICK_P;
 }
@@ -392,10 +413,18 @@ function wire(){
   const ff=$('forFilter');if(ff)ff.addEventListener('change',()=>{WHO=ff.value;render('#forFilter');});
   const pb=$('printBtn');if(pb)pb.addEventListener('click',()=>{const m=$('phMore');try{if(m&&m.matches(':popover-open'))m.hidePopover();}catch(_){/* */}printTodos();});
   const db=$('dlBtn');if(db)db.addEventListener('click',()=>{const m=$('phMore');try{if(m&&m.matches(':popover-open'))m.hidePopover();}catch(_){/* */}downloadTodos();});
-  const aj=$('addJump');if(aj)aj.addEventListener('click',()=>{const ti=$('addTitle');if(ti){ti.scrollIntoView({block:'center'});ti.focus();}});
   const f=$('addForm');if(f)f.addEventListener('submit',add);
-  const ti=$('addTitle');if(ti){ti.addEventListener('input',()=>{DRAFT.title=ti.value;});ti.addEventListener('focus',loadPick,{once:true});}
-  const du=$('addDue');if(du)du.addEventListener('change',()=>{DRAFT.due=du.value;});
+  const ti=$('addTitle'),du=$('addDue');
+  if(ti){ti.addEventListener('input',()=>{DRAFT.title=ti.value;
+    // sales item 204: a day typed at the end fills the date box (only one it filled itself, or an empty one)
+    const got=dueFromWords(ti.value,Date.now()),auto=du&&du.dataset.auto;
+    if(du&&got&&(!du.value||du.value===auto)){du.value=got.due;du.dataset.auto=got.due;DRAFT.due=got.due;}
+    else if(du&&!got&&auto&&du.value===auto){du.value='';du.dataset.auto='';DRAFT.due='';}
+  });ti.addEventListener('focus',loadPick,{once:true});}
+  if(du)du.addEventListener('change',()=>{DRAFT.due=du.value;});
+  const fi=$('addFind');if(fi){fi.addEventListener('focus',()=>{loadPick().then(()=>{const s=$('addFor');if(s&&fi.value)s.innerHTML=forOptions(fi.value);});});
+    fi.addEventListener('input',()=>{const s=$('addFor');if(!s)return;s.innerHTML=forOptions(fi.value);DRAFT.for=s.value;});
+    fi.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();const s=$('addFor');if(s)s.focus();}});}   // Enter takes the pick; the row's Add is a Tab away
   document.querySelectorAll('[data-own]').forEach(b=>b.addEventListener('click',()=>{MINE=b.getAttribute('data-own')==='mine';try{localStorage.setItem('dds-todos-mine',MINE?'1':'0');}catch(_){/* */}render('[data-own="'+(MINE?'mine':'all')+'"]');}));
   const ow=$('addOwner');if(ow)ow.addEventListener('change',()=>{DRAFT.owner=ow.value;});
   const fo=$('addFor');if(fo){fo.addEventListener('change',()=>{DRAFT.for=fo.value;});fo.addEventListener('focus',loadPick);fo.addEventListener('pointerdown',loadPick);}
@@ -433,8 +462,9 @@ async function reopen(btn){
 }
 async function add(e){
   e.preventDefault();
-  const title=($('addTitle').value||'').trim();if(!title){toast('Say what needs doing first.',true);$('addTitle').focus();return;}
+  let title=($('addTitle').value||'').trim();if(!title){toast('Say what needs doing first.',true);$('addTitle').focus();return;}
   const due=$('addDue').value||'';const fv=$('addFor').value||'';
+  const said=dueFromWords(title,Date.now());if(said&&due&&due===$('addDue').dataset.auto)title=said.title;   // sales item 204: "Call Ivy friday" is "Call Ivy", due Friday
   const body={title,...(due?{due_date:due}:{})};
   if(fv.startsWith('contact:'))body.contact_id=fv.slice(8);else if(fv.startsWith('client:'))body.client_id=fv.slice(7);else if(fv.startsWith('deal:'))body.deal_id=fv.slice(5);
   const ow=$('addOwner');if(ow&&ow.value&&TEAM&&ow.value!==TEAM.me)body.assigned_to=ow.value;   // item 37: yours unless you pick a teammate
