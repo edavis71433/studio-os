@@ -445,14 +445,14 @@ const notices = (pred = () => true) => db.tables.presence_plan_notices.filter(pr
   const newer = { id: PROP2, site_id: STUDIO.id, deal_id: DEAL, title: 'Website', status: 'draft', line_items: [...items, { __meta__: { revised_from: PROP1 } }], subtotal_cents: 300000, currency: 'usd', version: 2, deleted_at: null, created_at: '2026-11-02T00:00:00Z' };
   const token = await S.signSalesToken({ t: 'proposal', id: PROP1, site_id: STUDIO.id, exp: Math.floor(Date.now() / 1000) + 3600 }, S.linkSecret());
   seed({ proposals: [old, newer] });
-  let r = await res(await S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP1}/decide`, { token, decision: 'accepted' }), PROP1, cors));
+  let r = await res(await S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP1}/decide`, { token, decision: 'accepted', name: 'Riley Park' }), PROP1, cors));
   ok('160: accepting the old version is refused when the newer one names it, though its own stamp is missing', r.status === 409 && r.body.error === 'superseded' && db.tables.presence_proposals[0].status === 'sent', JSON.stringify(r.body));
   seed({ proposals: [old] });
-  r = await res(await S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP1}/decide`, { token, decision: 'accepted' }), PROP1, cors));
+  r = await res(await S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP1}/decide`, { token, decision: 'accepted', name: 'Riley Park' }), PROP1, cors));
   ok('160: with no newer version it accepts as before', r.status === 200 && db.tables.presence_proposals[0].status === 'accepted', JSON.stringify(r.body));
   seed({ proposals: [old, newer] });
   db.fail.add('presence_proposals');
-  r = await res(await S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP1}/decide`, { token, decision: 'accepted' }), PROP1, cors));
+  r = await res(await S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP1}/decide`, { token, decision: 'accepted', name: 'Riley Park' }), PROP1, cors));
   db.fail.delete('presence_proposals');
   ok('160: a read that fails refuses rather than accepting and hoping', r.status !== 200);
 }

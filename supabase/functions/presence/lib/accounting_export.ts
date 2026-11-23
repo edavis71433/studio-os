@@ -54,6 +54,14 @@ export interface BookRow {
   paid_method?: unknown; paid_note?: unknown; payment_for?: unknown; deal_title?: unknown; business?: unknown; person?: unknown; lines?: unknown; description?: unknown;
 }
 
+/** Sales item 185: QuickBooks multiplies the quantity by the rate, and 0.75 × $83.33 is not the
+ *  $62.50 the line billed, so a part quantity goes in as quantity 1 at the line's own total, its
+ *  words saying the real quantity: "Design hours (2.5 × $100.00)". Whole quantities are as before. Pure. */
+export function wholeQtyLine(l: { label: string; qty: number; amount_cents: number }): { label: string; qty: number; amount_cents: number } {
+  const q = Number(l.qty) || 1;
+  if (Number.isInteger(q)) return l;
+  return { label: `${l.label} (${q} × $${dollars(l.amount_cents / q)})`, qty: 1, amount_cents: l.amount_cents };
+}
 export const INVOICE_HEAD = ['InvoiceNo', 'Customer', 'InvoiceDate', 'DueDate', 'Memo', 'Item(Product/Service)', 'ItemDescription', 'ItemQuantity', 'ItemRate', 'ItemAmount', 'Status', 'PaidDate', 'Tax'];   // Tax: sales item 175
 /** Sales item 175: a tax line ("Tax (8.5%)") is not income. Pure. */
 export const isTaxLine = (label: unknown) => /^tax\b/i.test(String(label || '').trim());
@@ -81,7 +89,7 @@ export function invoiceExportRows(items: BookRow[], p: ExportPeriod, tzo = 0): {
     const lines = all.filter((l) => !isTaxLine(l.label));
     const taxCol = taxCents ? dollars(taxCents) : '';
     if (lines.every((l) => l.amount_cents >= 0)) {
-      lines.forEach((l, n) => out.push([...head, 'Services', l.label, String(l.qty), dollars(l.amount_cents / l.qty), dollars(l.amount_cents), ...tail, n === 0 ? taxCol : '']));
+      lines.forEach((l, n) => { const w = wholeQtyLine(l); out.push([...head, 'Services', w.label, String(w.qty), dollars(w.amount_cents / w.qty), dollars(w.amount_cents), ...tail, n === 0 ? taxCol : '']); });
     } else {
       // QuickBooks refuses a negative line: one line of what it billed, the lines spelled out
       const said = lines.map((l) => `${l.label} ${l.amount_cents < 0 ? '-' : ''}$${dollars(Math.abs(l.amount_cents))}`).join('; ');

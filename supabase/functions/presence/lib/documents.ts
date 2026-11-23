@@ -18,7 +18,7 @@
 // with the proposal it renders. Escaping reuses lib/markdown.ts `esc`.
 import { signedWithAny } from '../../_shared/link_keys.ts';   // builder item 394: links signed before still open
 import { esc } from './markdown.ts';
-import { splitLineItems, computeProposalTotals, subtotalOf, type LineItem } from './sales_lifecycle.ts';
+import { splitLineItems, computeProposalTotals, subtotalOf, readQty, type LineItem } from './sales_lifecycle.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { UUID_RE } from './uuid.ts';
 import { agreementHtml, agreementBlocks, agreementContents } from './agreement_layout.ts';   // sales item 88: headings and numbered sections
@@ -177,7 +177,7 @@ export function invoiceLines(v: any, billedCents: number): InvoiceLine[] {
   const raw = Array.isArray(v?.lines) ? v.lines : [];
   const lines: InvoiceLine[] = raw
     .filter((l: any) => l && typeof l === 'object' && String(l.label || '').trim())
-    .map((l: any) => ({ label: String(l.label).trim().slice(0, 200), qty: Math.max(1, Math.trunc(Number(l.qty) || 1)), amount_cents: Math.round(Number(l.amount_cents) || 0) }));
+    .map((l: any) => ({ label: String(l.label).trim().slice(0, 200), qty: readQty(l.qty) || 1, amount_cents: Math.round(Number(l.amount_cents) || 0) }));   // sales item 185: 2.5 stays 2.5
   if (lines.length && lines.reduce((n, l) => n + l.amount_cents, 0) === billedCents) return lines;
   return [{ label: String(v?.description || v?.title || 'Invoice').trim(), qty: 1, amount_cents: billedCents }];
 }
@@ -408,22 +408,55 @@ function pdfScript(url: string, name: string): string {
   return `<script>(function(){var u=${j(url)};Array.prototype.forEach.call(document.querySelectorAll('[data-dlpdf]'),function(b){var label=b.textContent;b.addEventListener('click',async function(){b.disabled=true;b.textContent='Preparing…';try{var r=await fetch(u);if(!r.ok)throw new Error(String(r.status));var blob=new Blob([await r.arrayBuffer()],{type:'application/pdf'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=${j(name)};document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},5000);b.textContent=label;}catch(e){b.textContent='Couldn’t download — try again';}b.disabled=false;});});})();</script>`;
 }
 
+/** Sales item 184: the browser in plain words from its user-agent string, "Safari on iPhone"; '' when unknown. Pure. */
+export function browserName(ua: unknown): string {
+  const s = String(ua || '');
+  if (!s) return '';
+  const os = /iPhone/.test(s) ? 'iPhone' : /iPad/.test(s) ? 'iPad' : /Android/.test(s) ? 'Android' : /Windows/.test(s) ? 'Windows' : /CrOS/.test(s) ? 'Chromebook' : /Mac OS X|Macintosh/.test(s) ? 'Mac' : /Linux/.test(s) ? 'Linux' : '';
+  const br = /Edg(e|A|iOS)?\//.test(s) ? 'Edge' : /OPR\/|Opera/.test(s) ? 'Opera' : /Firefox\/|FxiOS/.test(s) ? 'Firefox' : /SamsungBrowser/.test(s) ? 'Samsung Internet' : /Chrome\/|CriOS/.test(s) ? 'Chrome' : /Safari\//.test(s) ? 'Safari' : '';
+  return br && os ? `${br} on ${os}` : br || os;
+}
+/** Sales item 184: where a signature came from, as the certificate prints it: the internet address
+ *  and the browser kept privately with it (presence_sign_evidence), or, for one made before they
+ *  were kept, a line saying so (the old scrambled address helped no one). Pure. */
+export function signedFromLines(ev: { ip?: unknown; user_agent?: unknown } | null | undefined): Array<[string, string]> {
+  const ip = String(ev?.ip || '').trim();
+  if (!ip) return [['Signed from', 'Not kept: this was signed before Studio OS kept the internet address and browser']];
+  const ua = String(ev?.user_agent || '').trim();
+  const name = browserName(ua);
+  const out: Array<[string, string]> = [['Internet address', ip === 'unknown' ? 'Not known' : ip]];
+  if (ua) out.push(['Browser', name ? `${name} (${ua})` : ua]);
+  return out;
+}
+/** Sales items 183, 184: who said yes, when and from where, under an accepted proposal or an
+ *  approved estimate: "Accepted by Ana Ruiz, 2026-11-23 15:04:05 UTC, from 203.0.113.7 (Safari on
+ *  iPhone)." '' when no name was typed (a yes from before names were asked). Pure. */
+export function yesLine(d: { status?: unknown; decided_name?: unknown; decided_at?: unknown; sign_evidence?: { ip?: unknown; user_agent?: unknown } | null } | null | undefined, word: string): string {
+  const name = String(d?.decided_name || '').trim();
+  if (!name) return '';
+  const ip = String(d?.sign_evidence?.ip || '').trim();
+  const b = browserName(d?.sign_evidence?.user_agent);
+  return `${word} by ${name}${d?.decided_at ? ', ' + utcStamp(d.decided_at) : ''}${ip && ip !== 'unknown' ? `, from ${ip}${b ? ` (${b})` : ''}` : ''}.`;
+}
+
 // ── PROPOSAL (and ESTIMATE, item 47 — the same lines, its own label and note) ──
 export function renderProposalDocument(p: any, brandIn?: Partial<DocBrand> | null, ctx?: DocContext | null): string {
-  const statusNote = p?.status === 'accepted' ? 'Accepted — thank you.'
+  const statusNote = p?.status === 'accepted' ? ['Accepted — thank you.', yesLine(p, 'Accepted')].filter(Boolean).join(' ')
     : p?.status === 'declined' ? 'This proposal was declined.'
+    : p?.status === 'withdrawn' ? 'Your studio withdrew this proposal, so it can no longer be accepted.'   // sales item 182
     : 'This is a proposal — nothing is final until you accept.';
-  const pill = p?.status === 'accepted' ? '<span class="pill paid">Accepted</span>' : p?.status === 'declined' ? '<span class="pill void">Declined</span>' : '';
+  const pill = p?.status === 'accepted' ? '<span class="pill paid">Accepted</span>' : p?.status === 'declined' ? '<span class="pill void">Declined</span>' : p?.status === 'withdrawn' ? '<span class="pill void">Withdrawn</span>' : '';
   return renderLineItemsDocument(p, brandIn, { docLabel: 'Proposal', heading: String(p?.title || 'Proposal'), note: statusNote, pill }, ctx);
 }
 /** An estimate prints like a proposal: its lines, discount, tax and total, its
  *  notes, and a closing line that says what it is (and how long it is good for). */
 export function renderEstimateDocument(e: any, brandIn?: Partial<DocBrand> | null, ctx?: DocContext | null): string {
   const until = /^\d{4}-\d{2}-\d{2}/.test(String(e?.expires_at || '')) ? String(e.expires_at).slice(0, 10) : '';
-  const note = e?.status === 'approved' ? 'Approved — thank you.'
+  const note = e?.status === 'approved' ? ['Approved — thank you.', yesLine(e, 'Approved')].filter(Boolean).join(' ')
     : e?.status === 'declined' ? 'You chose not now on this estimate.'
+    : e?.status === 'withdrawn' ? 'Your studio withdrew this estimate, so it can no longer be approved.'
     : `This is an estimate, not a final price — nothing is charged until you get an invoice.${until ? ` Good until ${until}.` : ''}`;
-  const pill = e?.status === 'approved' ? '<span class="pill paid">Approved</span>' : e?.status === 'declined' ? '<span class="pill void">Not now</span>' : until ? `<span class="pill due">Good until ${esc(dayLabel(until) || until)}</span>` : '';
+  const pill = e?.status === 'approved' ? '<span class="pill paid">Approved</span>' : e?.status === 'declined' ? '<span class="pill void">Not now</span>' : e?.status === 'withdrawn' ? '<span class="pill void">Withdrawn</span>' : until ? `<span class="pill due">Good until ${esc(dayLabel(until) || until)}</span>` : '';
   return renderLineItemsDocument(e, brandIn, { docLabel: 'Estimate', heading: String(e?.title || 'Estimate'), note, pill }, ctx);
 }
 function renderLineItemsDocument(p: any, brandIn: Partial<DocBrand> | null | undefined, o: { docLabel: string; heading: string; note: string; pill?: string }, ctx?: DocContext | null): string {
@@ -566,19 +599,21 @@ export function renderContractDocument(c: any, brandIn?: Partial<DocBrand> | nul
     // The certificate of record: rendered ENTIRELY from existing immutable data —
     // the typed signer, the ONE signing timestamp (UTC), the document fingerprint
     // (content_hash — signing bound to it, so it identifies the exact executed
-    // text), and the stored signing evidence (hashed signer IP). No new data.
+    // text), and where it was signed from (sales item 184: the internet address and
+    // browser kept privately with the signature, presence_sign_evidence).
     const rows: string[] = [];
     rows.push(`<div class="kv"><span class="k">Signed by</span><span>${esc(String(c?.signer_name || ''))}</span></div>`);
     if (c?.signer_email) rows.push(`<div class="kv"><span class="k">Signer email</span><span>${esc(String(c.signer_email))}</span></div>`);
     if (c?.countersigned_name) rows.push(`<div class="kv"><span class="k">Countersigned by</span><span>${esc(String(c.countersigned_name))}${c?.countersigned_title ? ', ' + esc(String(c.countersigned_title)) : ''} for ${esc(brand.name)}</span></div>`);   // sales item 88
     rows.push(`<div class="kv"><span class="k">Signed at</span><span>${esc(utcStamp(c?.signed_at || ev?.at))}</span></div>`);
     rows.push(`<div class="kv"><span class="k">Document fingerprint (SHA-256)</span><span class="mono">${esc(hash)}</span></div>`);
-    if (ev?.ip_hash) rows.push(`<div class="kv"><span class="k">Signing evidence (hashed IP)</span><span class="mono">${esc(String(ev.ip_hash))}</span></div>`);
-    cert = `<div class="cert" id="certificate"><h2>Certificate of record</h2><p class="certsub">Proof of who signed, when, and exactly which words.</p>${rows.join('')}
+    for (const [k, v] of signedFromLines(c?.sign_evidence)) rows.push(`<div class="kv"><span class="k">${esc(k)}</span><span${k === 'Browser' ? ' class="mono"' : ''}>${esc(v)}</span></div>`);
+    cert = `<div class="cert" id="certificate"><h2>Certificate of record</h2><p class="certsub">Proof of who signed, when, from where, and exactly which words.</p>${rows.join('')}
       <p class="note">Typing a name to sign constitutes an electronic signature. The fingerprint identifies the exact text that was signed — it changes if even one character does, so this copy is tamper-evident.</p></div>`;
   }
   const statusSub = signed ? 'Executed copy — this is the signed document of record.'
     : c?.status === 'sent' ? 'Sent for signature — not yet signed.'
+    : c?.status === 'voided' ? 'Taken back by the studio to update it. It can’t be signed.'   // sales item 181
     : 'Draft — not yet sent for signature.';
   // sales item 88: the text laid out as a document (the signed characters unchanged), then both signatures
   const sigs = signed ? `<div class="hr"></div><h2 class="sigh" id="signatures">Signatures</h2>${signaturesHtml(c, brand, ctx)}` : '';

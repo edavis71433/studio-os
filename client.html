@@ -51,6 +51,7 @@
   .center{text-align:center;padding:52px 20px}
   .center h2{font-family:var(--serif);font-weight:500;font-size:22px;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 8px}
   .muted{color:var(--soft);font-size:14px}
+  .aprnd{font-size:13.5px;font-weight:600;color:var(--ink);margin-top:10px}   /* sales item 179: which round of changes */
   a.link{color:var(--p);text-decoration:none;font-weight:600} a.link:hover{text-decoration:underline}
   a.btn{display:inline-block;font-size:14px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:8px 17px;color:var(--ink);text-decoration:none;transition:.15s} a.btn:hover{border-color:var(--p);color:var(--p)}
   .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto}
@@ -3716,7 +3717,7 @@ async function openApproval(pid,aid,from){
   let answer='';
   if(a.due_date&&pending)answer+=`<p class="apdue${approvalOverdue(a)?' late':''}" style="margin-top:14px">${approvalOverdue(a)?'Overdue — your answer was due '+esc(niceDay(a.due_date))+'. Nothing moves until you decide.':'Please answer by '+esc(niceDay(a.due_date))+'.'}</p>`;
   if(pending)answer+=`<div class="apacts"><button class="approve" id="apok">Looks good — approve</button><button id="apchg" aria-expanded="false" aria-controls="apchgbox">Ask for a change</button></div>`+
-    `<div class="card notecard" id="apchgbox" hidden><label class="nhead" for="apchgt">What would you like changed?</label><textarea id="apchgt" class="fieldin" rows="3" placeholder="This goes straight to ${esc(studioBrand())}."></textarea><p class="muted" style="font-size:12.5px;margin-top:8px">Nothing changes until you approve. This just tells your studio what to adjust.</p><div class="row"><button class="approve" id="apchgsend">Send request</button></div></div>`;
+    `<div class="card notecard" id="apchgbox" hidden><label class="nhead" for="apchgt">What would you like changed?</label><textarea id="apchgt" class="fieldin" rows="3" placeholder="This goes straight to ${esc(studioBrand())}."></textarea><p class="muted" style="font-size:12.5px;margin-top:8px">Nothing changes until you approve. This just tells your studio what to adjust.</p>${data.rounds&&data.rounds.next?`<p class="aprnd" id="aprnd">${esc(data.rounds.next)}</p>`:''}<div class="row"><button class="approve" id="apchgsend">Send request</button></div></div>`;
   else{const d=AP_DONE[a.status]||[String(a.status||'').replace(/_/g,' '),''];answer+=`<div class="card" style="margin-top:16px"><ul class="hist"><li><span class="ht">Your answer</span><span class="hs ${d[1]}">${esc(d[0])}${a.decided_at?` · ${esc(rel(a.decided_at))}`:''}</span></li></ul></div>`;}
   if(draft&&(pending||a.status==='changes_requested'))answer+=`<div class="card notecard" id="notecard"><span class="nhead">Or leave a note on one part</span><label class="nlabel" for="npart">Which part?</label><select id="npart" class="fieldin"><option value="">The whole page</option></select><textarea id="nbody" class="fieldin" rows="3" aria-label="Your note" placeholder="Tell ${esc(studioBrand())} what you’d change…"></textarea><div class="row"><button id="nsend">Send note</button></div><p class="muted" style="font-size:12.5px;margin-top:8px">Nothing goes live until you approve. Your studio sees each note pinned to that part of the draft.</p></div>`;
   if(draft)answer+=`<section id="draftnotes" hidden style="margin-top:22px"><h2>Your notes on this draft</h2><div class="card"><ul class="notelist" id="notelist"></ul></div></section>`;
@@ -3760,7 +3761,7 @@ async function openApproval(pid,aid,from){
     btn.disabled=true;
     const r=await api('/client/approvals/'+aid+'/decide','POST',{decision,presented_hash:a.content_hash||'',note:note||''});
     if(view!==VIEW_SEQ)return;
-    if(r.ok){PORTAL.snaps=null;return paintApprovalDone(back,decision,draft);}
+    if(r.ok){PORTAL.snaps=null;return paintApprovalDone(back,decision,draft,r.body&&r.body.data&&r.body.data.round);}   // sales item 179: which round it was
     toast((r.body&&r.body.message)||'That didn’t go through — please try again.');
     if(r.status===409){PORTAL.snaps=null;return openApproval(pid,aid,from);}   // it changed under you — re-read, never decide blind
     btn.disabled=false;
@@ -3770,11 +3771,13 @@ async function openApproval(pid,aid,from){
   $('apchgsend').addEventListener('click',()=>{const v=($('apchgt').value||'').trim();if(!v){toast('Say what you’d like changed.');$('apchgt').focus();return;}decide('changes_requested',v,$('apchgsend'));});
 }
 // one clear answer after the tap; the row has left Needs you
-function paintApprovalDone(back,decision,draft){
+function paintApprovalDone(back,decision,draft,round){
   const ok=decision==='approved';
+  // sales item 179: "Round 1 of 2", or, past the included rounds, that a price comes first
+  const rnd=!ok&&round&&round.of!=null?(round.extra?`<p class="aprnd">These changes go beyond the ${round.of} round${round.of===1?'':'s'} included, so ${esc(studioBrand())} will send you a price for them first.</p>`:`<p class="aprnd">That was round ${round.n} of ${round.of} included.</p>`):'';
   $('main').innerHTML=sheetBackHtml(back)+`<div class="card thanks${ok?'':' chg'}" role="status"><span class="tick" aria-hidden="true">${ok?'✓':'✎'}</span>`+
     `<h1 tabindex="-1">${ok?'Approved — thank you.':'Sent — your studio will take a look.'}</h1>`+
-    `<p class="muted">${ok?(draft?`${esc(studioBrand())} has been told. They’ll put it live and let you know here.`:`${esc(studioBrand())} has been told and will take it from here.`):'Nothing changes until you approve the next version.'}</p>`+
+    `<p class="muted">${ok?(draft?`${esc(studioBrand())} has been told. They’ll put it live and let you know here.`:`${esc(studioBrand())} has been told and will take it from here.`):'Nothing changes until you approve the next version.'}</p>`+rnd+
     `<div class="row"><button class="approve" id="thxback">Back to ${esc(back.label==='Home'?'Home':'the project')}</button></div></div>`+
     (ok?`<p class="muted" style="text-align:center;font-size:14.5px;margin-top:12px">Changed your mind? Message your studio and they’ll hold off.</p>`:'');
   wireSheet(back);

@@ -12,6 +12,9 @@
 // deal, on a person or customer with no deal, on a customer's record, on an enquiry);
 // messages.csv holds the conversations (project messages, support replies, your replies
 // to enquiries). A removed log (item 186) is left out, as it is everywhere else.
+// Sales items 179 to 184 (Nov 23): the name typed on each yes, an estimate's version and whether
+// it is Extra work, when Remind was pressed, and a deal's rounds of changes. Where a signature came
+// from (the internet address and browser) stays out: it is kept for the certificate only.
 import { svc } from '../lib/db.ts';
 import { siteCan, isSiteRole } from '../lib/site_roles.ts';
 import { loadStageLabels } from '../lib/stage_names.ts';
@@ -200,14 +203,14 @@ export async function handleSalesExport(site: SiteRow, principal: Principal, cor
     // item 212: every field a contact keeps, your own fields last (one column each, by their label)
     { name: 'contacts.csv', header: [...CONTACT_HEADER, ...fieldDefs.map((f) => f.label)],
       rows: contacts && contacts.map((c) => [...contactRow(c), ...fieldDefs.map((f) => s(c.custom && typeof c.custom === 'object' ? (c.custom as any)[f.key] : ''))]) },
-    { name: 'deals.csv', header: ['Deal', 'Stage', 'Value', 'Expected close', 'Where it came from', 'How they found you', 'Contact email', 'Not a fit because', 'Opened', 'Won on'],
-      rows: deals && deals.map((d) => [d.title, stage(d.stage), dollars(d.expected_value_cents), d.expected_close, d.source, d.found_via, contactEmail(d.contact_id), d.lost_reason, s(d.created_at).slice(0, 10), s(d.converted_at).slice(0, 10)]) },
-    { name: 'proposals.csv', header: ['Deal', 'Proposal', 'Version', 'Status', 'Total', 'Sent', 'Decided'],
-      rows: proposals && proposals.map((p) => [dealTitle(p.deal_id), p.title, p.version, p.status, dollars(proposalTotalCents(p)), s(p.sent_at).slice(0, 10), s(p.decided_at).slice(0, 10)]) },
-    { name: 'agreements.csv', header: ['Deal', 'Agreement', 'Status', 'Sent', 'Signed', 'Signed by'],
-      rows: contracts && contracts.map((c) => [dealTitle(c.deal_id), c.title, c.status, s(c.sent_at).slice(0, 10), s(c.signed_at).slice(0, 10), c.signer_name || c.signed_name]) },
-    { name: 'estimates.csv', header: ['Deal', 'Estimate', 'Status', 'Total', 'Sent', 'Answered', 'Their note'],
-      rows: estimates && estimates.map((e) => [dealTitle(e.deal_id), e.title, e.status === 'declined' ? 'not now' : e.status, dollars(proposalTotals(e.line_items).total_cents), s(e.sent_at).slice(0, 10), s(e.decided_at).slice(0, 10), e.decided_note]) },
+    { name: 'deals.csv', header: ['Deal', 'Stage', 'Value', 'Expected close', 'Where it came from', 'How they found you', 'Contact email', 'Not a fit because', 'Opened', 'Won on', 'Rounds of changes included'],
+      rows: deals && deals.map((d) => [d.title, stage(d.stage), dollars(d.expected_value_cents), d.expected_close, d.source, d.found_via, contactEmail(d.contact_id), d.lost_reason, s(d.created_at).slice(0, 10), s(d.converted_at).slice(0, 10), d.revision_rounds ?? '']) },
+    { name: 'proposals.csv', header: ['Deal', 'Proposal', 'Version', 'Status', 'Total', 'Sent', 'Decided', 'Accepted by', 'Reminded'],
+      rows: proposals && proposals.map((p) => [dealTitle(p.deal_id), p.title, p.version, p.status, dollars(proposalTotalCents(p)), s(p.sent_at).slice(0, 10), s(p.decided_at).slice(0, 10), p.decided_name, s(p.reminded_at).slice(0, 10)]) },
+    { name: 'agreements.csv', header: ['Deal', 'Agreement', 'Status', 'Sent', 'Signed', 'Signed by', 'Reminded'],
+      rows: contracts && contracts.map((c) => [dealTitle(c.deal_id), c.title, c.status === 'voided' ? 'withdrawn' : c.status, s(c.sent_at).slice(0, 10), s(c.signed_at).slice(0, 10), c.signer_name || c.signed_name, s(c.reminded_at).slice(0, 10)]) },
+    { name: 'estimates.csv', header: ['Deal', 'Estimate', 'Version', 'Extra work', 'Status', 'Total', 'Sent', 'Answered', 'Approved by', 'Their note', 'Reminded'],
+      rows: estimates && estimates.map((e) => [dealTitle(e.deal_id), e.title, e.version ?? 1, e.extra_work ? 'yes' : '', e.status === 'declined' ? 'not now' : e.status, dollars(proposalTotals(e.line_items).total_cents), s(e.sent_at).slice(0, 10), s(e.decided_at).slice(0, 10), e.decided_name, e.decided_note, s(e.reminded_at).slice(0, 10)]) },
     { name: 'recurring-invoices.csv', header: ['Deal', 'What it’s for', 'Amount', 'How often', 'Next invoice', 'Sent so far', 'How many in all', 'Status', 'Started'],
       rows: recurring && recurring.map((r) => [dealTitle(r.deal_id), r.title, dollars(r.amount_cents), r.every === 'quarter' ? 'every 3 months' : r.every === 'year' ? 'every year' : 'every month', s(r.next_on).slice(0, 10), r.sent_count, r.times ?? 'until stopped', r.status, s(r.created_at).slice(0, 10)]) },
     { name: 'invoices-and-payments.csv', header: ['Deal', 'Invoice', 'Amount', 'Status', 'Due', 'Paid on', 'Created'],

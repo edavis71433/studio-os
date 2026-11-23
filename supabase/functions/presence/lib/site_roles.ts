@@ -164,6 +164,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `DELETE /sales/todo-templates/${ID}`,   // sales item 106: removing a saved to-do list, the same
     `POST /comments/${ID}/delete`,
     `POST /sales/invoices/${ID}/void`,
+    `POST /sales/contracts/${ID}/withdraw`,   // sales item 181: taking back a sent agreement, like voiding an invoice
     `POST /sales/invoices/${ID}/payment/undo`,   // sales review item 77: taking back a recorded payment changes the books, like a void
     `POST /sales/invoices/${ID}/money-back`,   // sales item 165: money given back by hand changes the books, like an undo
     `DELETE /sales/costs/${ID}`,   // sales item 176: removing a cost changes the books
@@ -276,7 +277,8 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /sales/deals/${ID}/(stage|activity|tasks|proposals|contracts|convert|resend-invite|invoice|schedule|retainer|send|estimates|recurring)`,
     `POST /sales/deals/${ID}/retainer/card-link`,   // sales item 129: emailing the client Stripe's page for a new card is like sending an invoice
     `POST /client/retainers/${ID}/card`,   // sales item 129: a new card keeps the business's retainer paid; it stops and changes nothing owed
-    `POST /sales/estimates/${ID}/(send|proposal|invoice)`,   // sales review item 47: send an estimate, or turn it into a proposal or an invoice (drafts)
+    `POST /sales/estimates/${ID}/(send|proposal|invoice|revise)`,   // sales review item 47: send an estimate, or turn it into a proposal or an invoice (drafts); item 183: its next version
+    `PATCH /sales/(proposals|estimates)/${ID}`,   // sales item 183: changing a draft before it goes out
     `PATCH /sales/recurring/${ID}`,
     `POST /sales/recurring/${ID}/(pause|resume|skip)`,
     `POST /sales/invoices/${ID}/(send|payment|remind)`,   // item 77: recording a check, cash, transfer or Zelle payment is everyday bookkeeping; item 166: a reminder now
@@ -284,6 +286,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /sales/invoices/${ID}/not-paid`,   // sales item 172: "Not received" puts the reminders back
     `POST /sales/deals/${ID}/costs`, `PATCH /sales/costs/${ID}`,   // sales item 176: a cost paid for a customer
     'POST /sales/statement/email',   // sales item 171: emailing a customer their statement
+    'POST /sales/documents/remind',   // sales item 180: re-sending a client's link, once, like an invoice reminder
     `POST /sales/contracts/${ID}/(term|send)`,
     `POST /sales/proposals/${ID}/(send|revise)`,
     'POST /projects',

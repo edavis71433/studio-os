@@ -114,6 +114,12 @@ test.describe('sign.html — one page from proposal to deposit', () => {
   test('Accept POSTs the decision with the link token; then Choose folds away and the agreement unlocks', async ({ page, isMobile }) => {
     const served = await serve(page);
     await open(page);
+    // sales item 184: Accept takes the name they type; without one it asks, and nothing is sent
+    await page.locator('#accept').click();
+    await expect(page.locator('#softErr')).toHaveText('Type your full name first. That’s how you say yes.');
+    await expect(page.locator('#yesName')).toBeFocused();
+    expect(served.posts).toEqual([]);
+    await page.locator('#yesName').fill('Riley Park');
     await page.locator('#accept').click();
     // the open step, and the folded one below it
     const chosen = page.locator('details#step-choose');
@@ -121,7 +127,7 @@ test.describe('sign.html — one page from proposal to deposit', () => {
     await expect(chosen.locator('summary')).toContainText('Proposal accepted — $5,000 total');
     await expect(chosen).not.toHaveAttribute('open', '');
     await expect(page.locator('#accept')).toHaveCount(0);
-    expect(served.posts).toEqual([{ path: '/sales/proposals/p-1/decide', body: { token: TOKEN, decision: 'accepted' } }]);
+    expect(served.posts).toEqual([{ path: '/sales/proposals/p-1/decide', body: { token: TOKEN, decision: 'accepted', name: 'Riley Park' } }]);
     await expect(steps(page).nth(0)).toHaveClass(/done/);
     await expect(steps(page).nth(0)).toHaveText('✓Chosen — done');
     await expect(steps(page).nth(1)).toHaveAttribute('aria-current', 'step');
@@ -330,9 +336,10 @@ test.describe('sign.html — one page from proposal to deposit', () => {
     await expect(page.locator('.steps')).toHaveCount(0);
     await expect(page.locator('#step-sign')).toHaveCount(0);
     await expect(page.locator('#accept')).toBeVisible();
+    await page.locator('#yesName').fill('Riley Park');
     await page.locator('#accept').click();
     await expect(page.locator('h1')).toHaveText('Accepted — thank you!');
-    expect(served.posts).toEqual([{ path: '/sales/proposals/p-1/decide', body: { token: TOKEN, decision: 'accepted' } }]);
+    expect(served.posts).toEqual([{ path: '/sales/proposals/p-1/decide', body: { token: TOKEN, decision: 'accepted', name: 'Riley Park' } }]);
   });
 
   test('an old per-document link (a contract token) still signs and hands over the deposit link', async ({ page }) => {

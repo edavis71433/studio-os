@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
+<title>Documents — Studio OS</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Every proposal, estimate and agreement you've sent: which are still out, opened, accepted, signed or expired.">
+<link rel="stylesheet" href="/fonts/brand.css">
+<!-- ═══════════════════════════════════════════════════════════════════════
+  Documents (sales item 180, Nov 22 2026 review; built like Invoices).
+  "Which proposals are still out?" meant opening deals one by one. Every
+  proposal, estimate and agreement is one row here (GET /sales/documents): what
+  it is, the customer, the amount, where it stands and when it went out. Chips
+  narrow it (Out, Opened, Accepted, Signed, Expired; Out counts the opened ones
+  too, since both still wait on the client), a search finds a document or a
+  customer. Remind re-sends the client's link once per document (POST
+  /sales/documents/remind; the server refuses a second time), and each row
+  opens its deal's Billing tab.
+═════════════════════════════════════════════════════════════════════════ -->
+<style>
+  :root{
+    --bg:var(--dds-bg,#faf8f5);--card:var(--dds-card,#fff);--ink:var(--dds-ink,#1b1525);--soft:var(--dds-soft,#6b6478);--faint:var(--dds-faint,#746b8a);--line:var(--dds-line,#eee9e0);
+    --p:var(--dds-p,#5b3fa0);--p-soft:var(--dds-p-soft,#efeafa);
+    --bad:var(--dds-bad,#a3423a);--bad-soft:var(--dds-bad-soft,#fbeaea);--good:var(--dds-good,#2f6b48);--good-soft:var(--dds-good-soft,#e5f2ea);
+    --info:var(--dds-info,#2b5c8a);--info-soft:var(--dds-info-soft,#e8f0f8);--tag:var(--dds-tag,#f1eff5);
+    --shadow:var(--dds-shadow,0 1px 2px rgba(27,21,37,.04),0 8px 24px rgba(27,21,37,.06));
+    --serif:'Fraunces',"Iowan Old Style",Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bad-soft:#3d2224;--good-soft:#1d3327;--info-soft:#1c2a3a;--tag:#2a2536;--bad:#f0a0a0;--good:#8fd3a8;--info:#9cc3ea}}
+  :root[data-theme="dark"]{--bad-soft:#3d2224;--good-soft:#1d3327;--info-soft:#1c2a3a;--tag:#2a2536;--bad:#f0a0a0;--good:#8fd3a8;--info:#9cc3ea}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:var(--dds-s6,24px) var(--dds-s5,20px) 90px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  header.dds-ph .dds-ph-acts{max-width:100%}
+  .pill{font:inherit;font-size:14px;font-weight:600;border:1px solid var(--dds-line-strong,#d6d4e2);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 18px;min-height:44px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+  .pill:hover{background:var(--p-soft)}
+  .pill.go{background:var(--dds-grad-btn,var(--p));border-color:transparent;color:var(--dds-on-p,#fff)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pill.go,:root:not([data-theme="light"]) .chip[aria-pressed="true"]{color:#171320}}
+  :root[data-theme="dark"] .pill.go,:root[data-theme="dark"] .chip[aria-pressed="true"]{color:#171320}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:18px 0 14px}
+  .chip{font:inherit;font-size:14px;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 14px;min-height:44px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .chip b{font-weight:700;font-variant-numeric:tabular-nums}
+  .chip[aria-pressed="true"]{background:var(--dds-grad-btn,var(--p));border-color:transparent;color:var(--dds-on-p,#fff)}
+  .bar .grow{flex:1}
+  .find{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--dds-line-strong,#d6d4e2);border-radius:999px;padding:8px 14px;min-height:44px;width:260px}
+  .list{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:14.5px}
+  thead th{text-align:left;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+  th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+  tbody td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody tr:last-child td{border-bottom:0}
+  .kind{display:block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
+  .ttl{font-weight:600}.ver{font-size:12.5px;color:var(--soft);font-weight:500}
+  .biz{font-weight:600}.per{display:block;font-size:13px;color:var(--soft)}
+  .amt{font-weight:700}
+  .st{display:inline-block;font-size:13px;font-weight:600;border-radius:999px;padding:3px 10px;white-space:nowrap;background:var(--tag);color:var(--soft)}
+  .st.good{background:var(--good-soft);color:var(--good)}.st.wait{background:var(--info-soft);color:var(--info)}.st.bad{background:var(--bad-soft);color:var(--bad)}
+  .when{display:block;font-size:12.5px;color:var(--soft);margin-top:3px}
+  .acts{display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+  .acts .pill{padding:7px 14px;font-size:13.5px}
+  .done{font-size:13px;color:var(--soft);white-space:nowrap}
+  .cards{display:none}
+  .empty{text-align:center;padding:40px 20px;color:var(--soft)}
+  .empty h2{font-size:17px;font-weight:600;color:var(--ink);margin-bottom:6px}
+  .partial{margin:0 0 12px;font-size:14px;color:var(--bad)}
+  .center{text-align:center;padding:48px 12px}
+  .center h2{font-family:var(--serif);font-weight:500;font-size:22px;margin-bottom:8px}
+  .muted{color:var(--soft);font-size:14.5px}
+  .link{color:var(--p);font-weight:600}
+  .spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--p);border-radius:50%;margin:60px auto;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (max-width:767px){
+    .wrap{padding:16px 16px 100px}
+    .bar .chips{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px 8px;width:calc(100% + 32px)}
+    .bar .chips::-webkit-scrollbar{display:none}
+    .chip{flex:0 0 auto}
+    .bar .grow{display:none}
+    .find{flex:1 1 100%;width:auto;min-width:0}
+    table{display:none}
+    .cards{display:block}
+    .card{border-bottom:1px solid var(--line);padding:14px 16px}
+    .card:last-child{border-bottom:0}
+    .card .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .card .who{font-size:13.5px;color:var(--soft);margin:2px 0 8px}
+    .card .bot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+    .card .amt{font-size:20px}
+  }
+</style>
+<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
+</div>
+<script src="/shell-kit.js"></script><script src="/vendor/supabase-js-2.45.4.js"></script>
+<script>
+const SUPABASE_URL="https://qksstlqzbhesadrrofgn.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrc3N0bHF6Ymhlc2FkcnJvZmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NzMwMDMsImV4cCI6MjA5NzU0OTAwM30.4V94Ua7z5cntPWtvtqN24TUnfY5A6K6-zCxY0iEcgYo";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:'dds-portal-auth',persistSession:true,autoRefreshToken:true}});
+ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's sign-in
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let DATA=null,SHOW='all',Q='';
+const scope=()=>new URLSearchParams(location.search).get('client')||'';
+const SHELL_READY=document.readyState==='loading'?new Promise((r)=>document.addEventListener('DOMContentLoaded',r,{once:true})):Promise.resolve();
+async function inClientNow(){const id=scope();if(!id)return false;await SHELL_READY;if(window.ddsContext)await window.ddsContext().catch(()=>null);return window.ddsScopeInfo&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)?!!window.ddsScopeInfo(id).client:true;}
+const api=(path,method,body)=>ddsApi(path,{method,body,scope:scope()});
+const toast=(m,bad)=>ddsToast(m,bad?'err':'ok');
+const ymd=()=>ddsDate.ymd();
+const niceDay=(s)=>{const t=Date.parse(s||'');return isFinite(t)?ddsDate.short(ddsDate.ymd(t)):'';};
+const money=(c)=>ddsMoney(c||0);
+const plural=(n,w)=>n+' '+w+(n===1?'':'s');
+const KIND={proposal:'Proposal',estimate:'Estimate',contract:'Agreement'};
+// where it stands, in words (the server's docState): [word, tone, when]
+function stateOf(d){
+  const est=d.kind==='estimate';
+  switch(d.state){
+    case 'out':return ['Out','wait',d.sent_at?'Sent '+niceDay(d.sent_at):''];
+    case 'opened':return ['Opened','wait',d.opened_at?'Opened '+niceDay(d.opened_at):''];
+    case 'accepted':return [est?'Approved':'Accepted','good',d.decided_at?niceDay(d.decided_at):''];
+    case 'signed':return ['Signed','good',d.decided_at?niceDay(d.decided_at):''];
+    case 'expired':return ['Expired','bad',d.expires_at?'Ended '+niceDay(d.expires_at):''];
+    case 'declined':return [est?'Not now':'Declined','',d.decided_at?niceDay(d.decided_at):''];
+    case 'withdrawn':return ['Withdrawn','',''];
+    case 'replaced':return ['Replaced','','A newer version went out'];
+    default:return ['Draft','','Not sent yet'];
+  }
+}
+const CHIPS=[['all','All'],['out','Out'],['opened','Opened'],['accepted','Accepted'],['signed','Signed'],['expired','Expired']];
+const inChip=(d,k)=>k==='all'?true:k==='out'?(d.state==='out'||d.state==='opened'):d.state===k;
+const matches=(d)=>!Q||[d.title,d.business,d.person,d.deal_title,KIND[d.kind]].join(' ').toLowerCase().includes(Q);
+const dealHref=(d)=>'/pipeline.html?deal='+encodeURIComponent(d.deal_id)+'&dtab=billing';
+function actsHtml(d){
+  const open=`<a class="pill" href="${esc(dealHref(d))}" aria-label="Open the deal for ${esc(d.title)}">Open</a>`;
+  if(d.can_remind)return `<button type="button" class="pill" data-remind="${esc(d.kind)}:${esc(d.id)}" data-needs="edit" aria-label="Remind them about ${esc(d.title)}">Remind</button>${open}`;
+  if(d.reminded_at)return `<span class="done">Reminded ${esc(niceDay(d.reminded_at))}</span>${open}`;
+  return open;
+}
+function render(){
+  const all=DATA.items||[];
+  const n=(k)=>all.filter(d=>inChip(d,k)).length;
+  const list=all.filter(d=>inChip(d,SHOW)&&matches(d));
+  const out=n('out'),late=n('expired');
+  let h=`<header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" data-ic="documents" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Documents</h1></div>
+        <p class="dds-ph-line" id="phLine">${all.length?`${plural(all.length,'document')}${out?` · ${out} still out`:''}${late?` · ${late} expired`:''}`:'Every proposal, estimate and agreement you send shows here'}</p></div>
+      <div class="dds-ph-acts"><a class="pill go dds-ph-fill" href="/pipeline.html">Make one on a deal</a></div></div></header>`;
+  if(DATA.partial)h+=`<p class="partial" role="status">Only your newest documents are here, so the counts may be short.</p>`;
+  h+=`<div class="bar"><div class="chips" role="group" aria-label="Show">${CHIPS.map(([k,l])=>`<button type="button" class="chip" data-show="${k}" aria-pressed="${SHOW===k?'true':'false'}">${l} <b>${n(k)}</b></button>`).join('')}</div><span class="grow"></span>
+    <label class="sr-only" for="find">Find a document or a customer</label><input id="find" class="find" type="search" placeholder="Find a document or a customer" value="${esc(Q)}"></div>`;
+  if(!all.length)h+=`<div class="list"><div class="empty"><h2>No documents yet</h2><p>Make a proposal, an estimate or an agreement on a deal, and it shows here.</p></div></div>`;
+  else if(!list.length)h+=`<div class="list"><div class="empty"><h2>Nothing here</h2><p>No document matches. Try All, or another word.</p></div></div>`;
+  else{
+    const who=(d)=>`<span class="biz">${esc(d.business||d.person||d.deal_title||'Customer')}</span>${d.business&&d.person?`<span class="per">${esc(d.person)}</span>`:''}`;
+    const what=(d)=>`<span class="kind">${KIND[d.kind]}</span><span class="ttl">${esc(d.title)}</span>${d.version>1?` <span class="ver">v${d.version}</span>`:''}`;
+    const st=(d)=>{const [w,tone,when]=stateOf(d);return `<span class="st ${tone}">${esc(w)}</span>${when?`<span class="when">${esc(when)}</span>`:''}`;};
+    h+=`<div class="list"><table aria-label="Documents"><thead><tr><th scope="col">Document</th><th scope="col">Customer</th><th scope="col" class="num">Amount</th><th scope="col">Where it stands</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>`
+      +list.map(d=>`<tr data-doc="${esc(d.id)}"><td>${what(d)}</td><td>${who(d)}</td><td class="num amt">${esc(money(d.amount_cents))}</td><td>${st(d)}</td><td><div class="acts">${actsHtml(d)}</div></td></tr>`).join('')
+      +`</tbody></table><div class="cards">`
+      +list.map(d=>`<div class="card" data-doc="${esc(d.id)}"><div class="top"><div>${what(d)}</div><span class="amt">${esc(money(d.amount_cents))}</span></div><div class="who">${esc(d.business||d.person||d.deal_title||'Customer')}${d.business&&d.person?' · '+esc(d.person):''}</div><div class="bot"><div>${st(d)}</div><div class="acts">${actsHtml(d)}</div></div></div>`).join('')
+      +`</div></div>`;
+  }
+  $('main').innerHTML=h;
+  document.querySelectorAll('[data-show]').forEach(b=>b.addEventListener('click',()=>{SHOW=b.dataset.show;render();const again=document.querySelector(`[data-show="${SHOW}"]`);if(again)again.focus();}));
+  const f=$('find');if(f)f.addEventListener('input',()=>{Q=f.value.trim().toLowerCase();const at=f.selectionStart;render();const g=$('find');g.focus();try{g.setSelectionRange(at,at);}catch(_){}} );
+  document.querySelectorAll('[data-remind]').forEach(b=>b.addEventListener('click',()=>remind(b)));
+}
+async function remind(b){
+  const [kind,id]=b.dataset.remind.split(':');
+  const d=(DATA.items||[]).find(x=>x.id===id&&x.kind===kind);if(!d)return;
+  b.disabled=true;
+  const r=await api('/sales/documents/remind','POST',{kind,id});
+  if(r.ok){d.can_remind=false;d.reminded_at=(r.body&&r.body.data&&r.body.data.reminded_at)||new Date().toISOString();toast('Reminder sent to '+(d.person||d.business||'them')+'. One per document, so it never nags.');render();return;}
+  if(r.body&&r.body.error==='already_reminded'){d.can_remind=false;d.reminded_at=r.body.reminded_at||d.reminded_at||new Date().toISOString();render();}
+  else b.disabled=false;
+  toast((r.body&&r.body.message)||'That didn’t go through. Try again.',true);
+}
+async function load(){
+  if(await inClientNow()){$('main').innerHTML=`<div class="center"><h2>Documents live at the studio level.</h2><p class="muted">You’re looking at one client. Their proposals, estimates and agreements are on their deal.</p><p style="margin-top:16px"><a class="link" data-noscope href="/documents.html">Leave this client and see all your documents →</a></p></div>`;return;}
+  const r=await api('/sales/documents?today='+ymd());
+  if(r.status===401){signedOut();return;}
+  if(r.status===404&&!(r.body&&r.body.data)){$('main').innerHTML=`<div class="center"><h2>Documents is on its way.</h2><p class="muted">This page arrives with an update that’s being rolled out. Your documents are on each deal’s Billing tab meanwhile.</p><p style="margin-top:16px"><a class="link" href="/pipeline.html">Open Pipeline →</a></p></div>`;return;}
+  if(!r.ok||!r.body||!r.body.data){trouble();return;}
+  DATA=r.body.data;render();
+}
+function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your documents.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+function trouble(){$('main').innerHTML=`<div class="center"><h2>We couldn’t load your documents just now.</h2><p class="muted" style="margin-bottom:16px">A brief hiccup. Try again.</p><button id="retry" class="pill go">Try again</button></div>`;const rt=$('retry');if(rt)rt.addEventListener('click',()=>{$('main').innerHTML='<div class="spin" role="status" aria-label="Loading"></div>';load();});}
+(async function(){try{const{data}=await sb.auth.getSession();if(!(data&&data.session&&data.session.access_token)){signedOut();return;}await load();}catch(_){trouble();}})();
+</script>
+</body>
+</html>

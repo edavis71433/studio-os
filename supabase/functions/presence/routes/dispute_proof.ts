@@ -2,7 +2,8 @@
 // When a client disputes a payment, Stripe gives the studio a deadline to send proof, and
 // Studio OS holds the best there is. One download, for the answer in Stripe:
 //   Signed-agreement-*.pdf   each signed agreement on the deal, with its certificate of record
-//                            (who signed, when, from where, the document's fingerprint)
+//                            (the name typed and the email, when to the second, the internet
+//                            address and browser it was signed from, the words' fingerprint)
 //   Proposal-*.pdf           the accepted proposal: what they agreed to buy
 //   Receipt-*.pdf            the disputed invoice as the paid receipt it now is
 //   history.txt              the deal's history, oldest first: what was sent, opened, signed and paid;
@@ -33,7 +34,7 @@ export function proofReadMe(p: { what: string; amount: number; due: string; file
     ...p.files.map((f) => `  ${f}`),
     '',
     'Where each one goes in Stripe (open the dispute, then Counter dispute):',
-    ...(p.signed ? ['  The signed agreement: under the customer\'s signature, or service documentation. Its last page is the certificate of who signed, when and from where.'] : []),
+    ...(p.signed ? ['  The signed agreement: under the customer\'s signature, or service documentation. Its last page is the certificate: the name they typed and their email, when they signed (to the second, in UTC), the fingerprint of the exact words, and the internet address and browser they signed from. Studio OS keeps that address and browser for agreements signed from November 23, 2026; the certificate of one signed before then says it was not kept.'] : []),
     ...(p.accepted ? ['  The proposal: under service documentation. It shows what they chose to buy.'] : []),
     '  The receipt: under receipt. It is the invoice, showing what they paid and when.',
     '  history.txt: under customer communication, or service documentation. It shows every step, from the first message to the payment, and the work delivered.',
