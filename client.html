@@ -430,6 +430,8 @@
   .qrow.unread h3::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--p);margin-right:8px;vertical-align:middle}
   .qact{flex:0 0 auto;display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;padding-top:2px}
   .qact button{font-size:12.5px;padding:6px 13px}
+  /* a full finger's tap on a phone or tablet: every row action in Needs you, the small rows too (builder item 98's 44px rule) */
+  @media (pointer:coarse){.qact button,.qact a{min-height:44px}.qact a{display:inline-flex;align-items:center}}
   /* ── the activity timeline (type-colored connector + icon rings) — scoped
      under .tlhost (stamped on the drill-in's #ptl AND the Messages pane's
      thread): the tab bar's icon spans also use class "ti" (mobile nav,
