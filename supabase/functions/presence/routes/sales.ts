@@ -55,10 +55,11 @@ import {
 import {
   isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt,
   buildActivityDetail, mergeDealTimeline, lastContactedAt, type DealActivityKind,
+  markMine, dealChanges,   // sales items 186 and 191
 } from '../crm/deal_activity.ts';
 import { composeContactDetail } from '../crm/contact_detail.ts';
 import { normalizeFieldDefs, normalizeFieldValues, applyFieldValues, type CustomFieldDef } from '../crm/custom_fields.ts';
-import { findPossibleDuplicates } from '../crm/dedupe.ts';
+import { findPossibleDuplicates, phoneKey } from '../crm/dedupe.ts';
 import { normalizeFoundVia } from '../lib/found_via.ts';   // sales review item 69: "How did they find you?"
 import { stageNotes, normalizeStageNotes, withStageNote, isNoteStage, STAGE_NOTE_DEFAULTS } from '../lib/stage_notes.ts';   // item 124: what to do now at each stage
 import { missingInsertColumns } from '../lib/inbound_email.ts';
@@ -236,7 +237,7 @@ export async function handleSalesContactRestore(site: SiteRow, id: string, cors:
 // A contact merged into another is left out: its own Undo (unmerge) puts it back with what moved.
 // Every read is best-effort and says when it failed (never a false "nothing deleted").
 export const DELETED_DAYS = 30;
-export async function handleSalesDeleted(site: SiteRow, cors: Record<string, string>): Promise<Response> {
+export async function handleSalesDeleted(site: SiteRow, cors: Record<string, string>, principal?: Principal): Promise<Response> {
   const since = encodeURIComponent(new Date(Date.now() - DELETED_DAYS * 86_400_000).toISOString());
   const failed: string[] = [];
   const read = async (key: string, ...paths: string[]): Promise<any[]> => {
@@ -244,6 +245,8 @@ export async function handleSalesDeleted(site: SiteRow, cors: Record<string, str
     failed.push(key); return [];
   };
   const labelsP = loadStageLabels(site.id).catch(() => null);
+  // sales item 186: the calls, emails, meetings and notes you removed (yours only: only you can put them back)
+  const logsP = principal ? import('./sales_history.ts').then((m) => m.deletedLogs(site.id, principal.email || principal.userId || 'system')).catch(() => null) : Promise.resolve([] as any[]);
   // builder item 241: a deleted customer, and whether their website went to the Trash with them
   const deletedCustomersP = import('./customers.ts').then((m) => m.deletedCustomers(site.id)).catch(() => null);
   const [deals, contacts, todos] = await Promise.all([
@@ -269,6 +272,22 @@ export async function handleSalesDeleted(site: SiteRow, cors: Record<string, str
   const labels = await labelsP;
   const goneCustomers = await deletedCustomersP;
   if (goneCustomers === null) failed.push('customers');
+  const goneLogs = await logsP;
+  if (goneLogs === null) failed.push('logs');
+  const logDeals = new Map<string, string>();
+  {
+    const dids = [...new Set((goneLogs || []).map((l: any) => String(l.deal_id || '')).filter((x) => UUID_RE.test(x)))].slice(0, 200);
+    const pids = [...new Set((goneLogs || []).map((l: any) => String(l.contact_id || '')).filter((x) => UUID_RE.test(x) && !who.has(x)))].slice(0, 200);
+    const kids = [...new Set((goneLogs || []).map((l: any) => String(l.client_id || '')).filter((x) => UUID_RE.test(x) && !customer.has(x)))].slice(0, 200);
+    const [ld, lp, lk] = await Promise.all([
+      dids.length ? read('names', `presence_deals?site_id=eq.${site.id}&id=in.(${dids.join(',')})&select=id,title`) : Promise.resolve([] as any[]),
+      pids.length ? read('names', `presence_contacts?site_id=eq.${site.id}&id=in.(${pids.join(',')})&select=id,name,email`) : Promise.resolve([] as any[]),
+      kids.length ? read('names', `clients?id=in.(${kids.join(',')})&select=id,name,email`) : Promise.resolve([] as any[]),
+    ]);
+    for (const d of ld) logDeals.set(String(d.id), String(d.title || 'a deal'));
+    for (const c of lp) who.set(String(c.id), String(c.name || c.email || ''));
+    for (const k of lk) customer.set(String(k.id), String(k.name || k.email || ''));
+  }
   return json({ data: {
     days: DELETED_DAYS,
     customers: goneCustomers || [],
@@ -278,6 +297,10 @@ export async function handleSalesDeleted(site: SiteRow, cors: Record<string, str
     todos: todos.map((t: any) => { const d = onDeal.get(String(t.deal_id || '')); return { id: t.id, title: String(t.title || 'To-do'), due_date: t.due_date || null, deal_id: t.deal_id || null, deal_title: d ? String(d.title || '') : '', deal_gone: !!(d && d.deleted_at),
       for_name: t.deal_id ? (d ? String(d.title || '') : '') : t.contact_id ? (who.get(String(t.contact_id)) || '') : t.client_id ? (customer.get(String(t.client_id)) || '') : 'yourself',
       href: t.deal_id ? `/pipeline.html?deal=${t.deal_id}` : t.contact_id ? `/crm.html?contact=${t.contact_id}` : t.client_id ? `/crm.html?client_id=${t.client_id}` : '/todos.html', deleted_at: t.deleted_at }; }),
+    // sales item 186: a removed call, email, meeting or note says whose it was and opens where it lived
+    logs: (goneLogs || []).map((l: any) => ({ id: l.id, kind: l.kind, body: l.body.slice(0, 200), at: l.at, deleted_at: l.removed_at,
+      for_name: l.deal_id ? (logDeals.get(String(l.deal_id)) || '') : l.contact_id ? (who.get(String(l.contact_id)) || '') : (customer.get(String(l.client_id || '')) || ''),
+      href: l.deal_id ? `/pipeline.html?deal=${l.deal_id}` : l.contact_id ? `/crm.html?contact=${l.contact_id}` : l.client_id ? `/crm.html?client_id=${l.client_id}` : '/recently-deleted.html' })),
     partial: failed,
   } }, 200, cors);
 }
@@ -479,6 +502,18 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
         return json({ data: rows(existing)[0], deduped: true }, 200, cors);
       }
     }
+    // sales item 190: a row of an import with a phone and no email is matched on the phone, so a
+    // file of people with phones and no emails no longer comes in twice
+    if (imp && !email && phone) {
+      const same = (await samePhone(site.id, phone))[0];
+      if (same) {
+        if (imp.on_existing === 'update') {
+          const u = await importUpdate(site.id, imp.id, same, importIncoming(c));
+          if (u) return json({ data: u.row, deduped: true, updated: u.updated }, 200, cors);
+        }
+        return json({ data: same, deduped: true }, 200, cors);
+      }
+    }
     // FUZZY near-duplicate: past the exact-email check, a typo'd re-entry
     // ("Jayne" for "Jane") or an alt format ("Doe, Jane") with the same phone
     // can still be the same person. When the caller opts in (dedupe_check) and
@@ -487,9 +522,7 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // deliberate save. Bulk CSV import doesn't set the flag (exact-email dedupe
     // already covers its common case), so it stays fast.
     if (b.dedupe_check === true && b.confirm !== true && (name || phone)) {
-      const CAP = 1000;
-      const pool = rows(await svc(`presence_contacts?site_id=eq.${site.id}&deleted_at=is.null&select=id,name,email,phone,company&limit=${CAP}`));
-      const matches = findPossibleDuplicates({ name, phone, email }, pool, 5);
+      const matches = await possibleSamePeople(site.id, { name, phone, email });
       if (matches.length) return json({ error: 'possible_duplicate', matches, message: `This looks like someone you already have. Is it the same person?` }, 409, cors);
     }
     // item 69: "How did they find you?" ('' = not recorded); item 89: address, job title, second phone, tags
@@ -507,6 +540,35 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     return json({ data: rows(ins)[0] }, 201, cors);
   }
   return json({ error: 'method_not_allowed' }, 405, cors);
+}
+
+// ── sales item 190: "is this someone you already have?" on every way a person is added ──
+// The pool is the newest 1,000 people (it was the first 1,000 the database gave, so past a
+// thousand a recent one could be missed), plus anyone of any age with the same email or phone.
+const DUP_COLS = 'id,name,email,phone,company';
+async function samePhone(siteId: string, phone: string): Promise<any[]> {
+  const key = phoneKey(phone);
+  if (key.length < 7) return [];
+  const r = await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&phone=like.*${encodeURIComponent(key.slice(-4))}&select=${DUP_COLS}&order=created_at.desc&limit=50`).catch(() => null);
+  return r ? rows(r).filter((c: any) => phoneKey(c.phone) === key) : [];
+}
+export async function possibleSamePeople(siteId: string, who: { name?: string; phone?: string; email?: string }) {
+  const [pool, byEmail, byPhone] = await Promise.all([
+    svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&select=${DUP_COLS}&order=created_at.desc&limit=1000`).then(rows).catch(() => [] as any[]),
+    who.email ? svc(`presence_contacts?site_id=eq.${siteId}&${emailMatch(who.email)}&deleted_at=is.null&select=${DUP_COLS}&limit=1`).then(rows).catch(() => [] as any[]) : Promise.resolve([] as any[]),
+    who.phone ? samePhone(siteId, who.phone).catch(() => [] as any[]) : Promise.resolve([] as any[]),
+  ]);
+  const seen = new Set<string>(), all: any[] = [];
+  for (const c of [...byEmail, ...byPhone, ...pool]) { const k = String(c?.id || ''); if (k && !seen.has(k)) { seen.add(k); all.push(c); } }
+  return findPossibleDuplicates({ name: who.name, phone: who.phone, email: who.email }, all, 5);
+}
+/** GET /sales/people/check?name=&email=&phone= → { matches }: Add a customer and + Create ask
+ *  before adding someone, the way Add a contact does. A read: it saves nothing. */
+export async function handlePeopleCheck(req: Request, site: SiteRow, cors: Record<string, string>): Promise<Response> {
+  const u = new URL(req.url);
+  const name = clean(u.searchParams.get('name'), 120), email = clean(u.searchParams.get('email'), 160).toLowerCase(), phone = clean(u.searchParams.get('phone'), 40);
+  if (!name && !email && !phone) return json({ data: { matches: [] } }, 200, cors);
+  return json({ data: { matches: await possibleSamePeople(site.id, { name, email, phone }) } }, 200, cors);
 }
 
 /** Item 69 (and 89): insert a row; when the database doesn't have one of the newer
@@ -1018,12 +1080,25 @@ export async function handleDealTaskUpdate(req: Request, site: SiteRow, principa
   if (b.delete === true) patch.deleted_at = nowIso();
   else if (b.status === 'done') { patch.status = 'done'; patch.completed_at = nowIso(); }
   else if (b.status === 'open') { patch.status = 'open'; patch.completed_at = null; }
-  else if (b.title !== undefined) { const t = clean(b.title, 200); if (!t) return json({ error: 'validation' }, 422, cors); patch.title = t; }
+  else if (b.title !== undefined) { const t = clean(b.title, 200); if (!t) return json({ error: 'validation', message: 'Say what needs doing.' }, 422, cors); patch.title = t; }
+  // sales item 200: a to-do moves to another day (or to no day), and goes to someone else, in the same save as its words
+  if (b.due_date !== undefined && !patch.deleted_at && b.status === undefined) {
+    const due = b.due_date ? clean(b.due_date, 10) : '';
+    if (due && !DATE_RE.test(due)) return json({ error: 'validation', message: 'The day must be a date (YYYY-MM-DD).' }, 422, cors);
+    patch.due_date = due || null;
+  }
+  if (b.for !== undefined && !patch.deleted_at && b.status === undefined) {
+    const f = b.for && typeof b.for === 'object' ? b.for : {};
+    const t = await (await import('./todos.ts')).resolveTarget(site.id, { deal_id: f.deal_id, contact_id: f.contact_id, client_id: f.client_id });
+    if ('error' in t) return json({ error: 'bad_target', message: t.error }, 422, cors);
+    patch.deal_id = t.deal_id; patch.contact_id = t.contact_id; patch.client_id = t.client_id;
+  }
   // item 37: the owner is changed on the to-do, to someone on the team (empty = the business owner)
   if (b.assigned_to !== undefined && !patch.deleted_at) { const o = ownerToSet(await teamOf(principal), b.assigned_to); if (!o.ok) return json({ error: 'validation', message: 'That person isn’t on your team.' }, 422, cors); patch.assigned_to = o.value; }
   if (!Object.keys(patch).length) return json({ error: 'bad_request' }, 400, cors);
-  const up = await svc(`presence_deal_tasks?id=eq.${taskId}&site_id=eq.${site.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
-  return up.ok ? json({ data: { ok: true } }, 200, cors) : json({ error: 'write_failed' }, 502, cors);
+  // sales item 200: only a to-do that is still here changes (a deleted one comes back from Recently deleted)
+  const up = await svc(`presence_deal_tasks?id=eq.${taskId}&site_id=eq.${site.id}${patch.deleted_at ? '' : '&deleted_at=is.null'}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+  return up.ok ? json({ data: { ok: true } }, 200, cors) : json({ error: 'write_failed', message: 'That didn’t save. Try again in a moment.' }, 502, cors);
 }
 
 // ═══ FIXED REPORTS — Analytics' five printable tables (sales review item 33) ═══
@@ -1146,7 +1221,16 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     // search is a filter PostgREST reads: `title=ilike.*q*` (it was `&title.ilike.*q*`, a part with no
     // "=" that PostgREST quietly ignores, so + Create's search by deal name found only what was already loaded).
     const openOnly = u.searchParams.get('open') === '1';
-    const filters = `${openOnly ? `&stage=in.(${REPORT_OPEN_STAGES.join(',')})&converted_client_id=is.null` : stage && isStage(stage) ? `&stage=eq.${stage}` : ''}${q ? `&title=ilike.*${encodeURIComponent(q)}*` : ''}${mine}`;
+    // sales item 188: people=1 (Pipeline's search box) finds a deal by its person's name, email or
+    // company too, the way the page's own filter matches what is loaded. Removed people count: their deals are still theirs.
+    let who = '';
+    if (q && u.searchParams.get('people') === '1' && !mine) {
+      const like = encodeURIComponent(`*${q}*`);
+      const found = await svc(`presence_contacts?site_id=eq.${site.id}&or=(name.ilike.${like},email.ilike.${like},company.ilike.${like})&select=id&limit=200`).catch(() => null);
+      const ids = (found ? rows(found) : []).map((c: any) => String(c.id)).filter((x: string) => UUID_RE.test(x));
+      if (ids.length) who = `&or=(title.ilike.${like},contact_id.in.(${ids.join(',')}))`;
+    }
+    const filters = `${openOnly ? `&stage=in.(${REPORT_OPEN_STAGES.join(',')})&converted_client_id=is.null` : stage && isStage(stage) ? `&stage=eq.${stage}` : ''}${who || (q ? `&title=ilike.*${encodeURIComponent(q)}*` : '')}${mine}`;
     // id breaks ties in the order, so offset pages never repeat or skip a deal (item 66's rule for contacts)
     const order = 'updated_at.desc,id.desc';
     // item 105: found_via (APPLY-0143) rides along for the list's "Where they came from" chart, then the same read without it.
@@ -1344,14 +1428,17 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     // they merge by EFFECTIVE time (occurred_at for a back-dated log). `events`
     // stays for backward-compat; `timeline` + `last_contacted_at` are the new shape.
     const stageNames = await stageNamesP;   // item 38: "Moved to <their name for it>"
-    const timeline = mergeDealTimeline(eventRows).map((it) => (stageNames && it.kind === 'stage_change' ? { ...it, text: renameMovedTo(it.text, stageNames) } : it));
+    // sales item 186: the reader's own hand-logged lines can be corrected or removed (markMine)
+    const timeline = markMine(mergeDealTimeline(eventRows).map((it) => (stageNames && it.kind === 'stage_change' ? { ...it, text: renameMovedTo(it.text, stageNames) } : it)), actorOf(principal).actor);
     // Sales review B5: one total per proposal, after discount and tax — the
     // record showed the stored pre-discount subtotal while the deal page added
     // up the lines ($0 after a full discount) for the same draft.
     const proposalRows = rows(proposals).map((p: any) => ({ ...p, total_cents: proposalTotals(p.line_items).total_cents }));
     // item 108 (J4): the retainer's payments, for Paid. null = couldn't read them (never a false $0)
     const retainer_paid = (paidEvents as any)?.ok ? retainerPaid(rows(paidEvents as any)) : null;
-    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: proposalRows, contracts: rows(contracts), events: eventRows, timeline, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows, estimates, recurring, retainer_paid, returns: returned } }, 200, cors);
+    // sales item 191: the read holds the newest 80 lines; history_before is where "Show older" starts (GET /sales/deals/:id/history)
+    const historyBefore = eventRows.length >= 80 ? String(eventRows[eventRows.length - 1].created_at || '') || null : null;
+    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: proposalRows, contracts: rows(contracts), events: eventRows, timeline, history_before: historyBefore, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows, estimates, recurring, retainer_paid, returns: returned } }, 200, cors);
   }
   if (req.method === 'PATCH') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -1399,6 +1486,13 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
       up = await svc(`presence_deals?id=eq.${id}&site_id=eq.${site.id}&select=*`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
     }
     if (!up.ok || !rows(up)[0]) return json({ error: 'write_failed' }, 502, cors);
+    // sales item 191: a ticked next step, and a changed value, close date or owner, each write a line
+    // in the deal's history; Undo on a ticked step (step_undo) takes its "Done:" line back
+    {
+      const hx = await import('./sales_history.ts');
+      await hx.writeDealChanges(site.id, id, principal, dealChanges(deal, patch, b.step_done === true));
+      if (b.step_undo === true && typeof patch.next_step === 'string' && patch.next_step) await hx.undoStepDone(site.id, id, principal, patch.next_step);
+    }
     // item 69: set once, shown everywhere — the deal's person gets the same answer
     // when theirs is still blank (best-effort; never overwrites one already given)
     const savedDeal = rows(up)[0];

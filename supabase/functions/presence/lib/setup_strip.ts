@@ -6,7 +6,7 @@
 // away for the whole studio (a reserved row, lib/reserved_store.ts). A step whose
 // check couldn't be read is left off rather than shown as not done. Pure.
 
-export type SetupKey = 'business' | 'logo' | 'services' | 'contact' | 'deal' | 'goal' | 'portal';
+export type SetupKey = 'business' | 'logo' | 'services' | 'contact' | 'deal' | 'goal' | 'followups' | 'ai' | 'portal' | 'twostep';
 export interface SetupStep { key: SetupKey; title: string; why: string; act: string; href: string; done: boolean }
 
 export const SETUP_STEPS: ReadonlyArray<Omit<SetupStep, 'done'>> = [
@@ -17,7 +17,11 @@ export const SETUP_STEPS: ReadonlyArray<Omit<SetupStep, 'done'>> = [
   { key: 'contact', title: 'Your first contact', why: 'Add one, or bring in a list', act: 'Add a contact', href: '/contacts.html?add=1' },
   { key: 'deal', title: 'Your first deal', why: 'Pipeline follows it to Won', act: 'Add a deal', href: '/pipeline.html' },
   { key: 'goal', title: 'A monthly goal', why: 'Home and Pipeline track it for you', act: 'Set a goal', href: '/settings.html#goal' },   // sales item 94
+  // sales item 209: the switches that make it work for you, which stay off until someone turns them on
+  { key: 'followups', title: 'Turn on your follow-ups', why: 'About a minute. Quiet enquiries and late invoices get a short follow-up in your words', act: 'Turn them on', href: '/settings.html#automations' },
+  { key: 'ai', title: 'Turn on AI help', why: 'About 1 cent a press. It drafts a reply and sums a person up', act: 'Turn it on', href: '/settings.html#goal' },
   { key: 'portal', title: 'Your client portal', why: 'A welcome note and what clients see, before they do', act: 'Set it up', href: '/client-portal.html' },   // builder item 342
+  { key: 'twostep', title: 'Add two-step sign-in', why: 'A code from your phone as well as your password, so a password alone gets nobody in', act: 'Add it', href: '/settings.html#security' },   // sales item 209
 ];
 
 /** Sales item 195: "Your business details" is done only when every Studio profile box it names is
@@ -27,6 +31,13 @@ export function businessDetailsDone(ident: Record<string, unknown> | null | unde
   if (!readOk) return null;
   const has = (v: unknown) => !!String(v ?? '').trim();
   return has(ident?.business_name) && has(ident?.email) && has(ident?.service_area) && has(settings?.signs_as_name);
+}
+
+/** Sales item 209: whether the follow-ups are on. The enquiry follow-ups are the one the step
+ *  names; the settings row unread (or from before 0175) is null, and the step is left off. Pure. */
+export function followupsOn(settings: Record<string, unknown> | null | undefined, readOk: boolean): boolean | null {
+  if (!readOk || !settings || !('enquiry_followups' in settings)) return null;
+  return settings.enquiry_followups === true;
 }
 
 /** The steps, in order, from what was found: true done, false not yet, null (or missing)

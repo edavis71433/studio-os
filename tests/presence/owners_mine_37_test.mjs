@@ -152,7 +152,7 @@ const world = (extra = {}) => db.reset({
   const read = (f) => Deno.readTextFileSync(new URL('../../' + f, import.meta.url));
   const pipe = read('pipeline.html'), todos = read('todos.html'), inbox = read('inbox.html');
   ok('Pipeline: Everyone / Mine in front of the stage chips', /<div class="ownbar" id="ownerBar" hidden><\/div>\s*<div class="bar" id="filters"/.test(pipe) && /data-own="mine"/.test(pipe) && /const teamOn=\(\)=>!!\(TEAM&&TEAM\.people\.length>1\)/.test(pipe));
-  ok('Pipeline: Mine narrows every view', /const base=MINE&&teamOn\(\)\?DEALS\.filter\(isMineDeal\):DEALS;/.test(pipe));
+  ok('Pipeline: Mine narrows every view', /const base=MINE&&teamOn\(\)\?all\.filter\(isMineDeal\):all;/.test(pipe));
   ok('Pipeline: the deal and its quick view change the owner through PATCH /sales/deals/:id', /api\('\/sales\/deals\/'\+encodeURIComponent\(id\),'PATCH',\{assigned_to:uid\|\|null\}\)/.test(pipe) && /id="dOwnSlot"/.test(pipe) && /data-own-sel/.test(pipe));
   ok('Pipeline: only active seats can own something, as the server checks', /\(m\.status\|\|'active'\)==='active'&&m\.user_id/.test(pipe));
   ok('To-dos: opens on Mine, and a new one can be a teammate’s', /let TEAM=null,MINE=true;/.test(todos) && /body\.assigned_to=ow\.value/.test(todos) && /id="addOwner"/.test(todos));

@@ -82,6 +82,18 @@
   .tick svg{width:14px;height:14px}
   .tmain{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .ttl{font-weight:600;font-size:15px}
+  /* sales item 200: a to-do opens to be changed; Tomorrow and Next week move it in one tap */
+  button.ttl{font:inherit;font-weight:600;font-size:15px;color:inherit;background:none;border:0;padding:0;text-align:left;cursor:pointer;min-height:44px}
+  button.ttl:hover{text-decoration:underline}
+  .moves{display:flex;gap:6px;flex:0 0 auto}
+  @media (max-width:720px){.trow:has(.moves){flex-wrap:wrap}.moves{flex-basis:100%;padding-left:36px}}   /* on a phone the moves take their own line under the title */
+  .mv,.tedit button{min-height:44px;min-width:44px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--p);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  .tedit{flex:1 1 auto;display:grid;gap:8px;grid-template-columns:1fr auto;align-items:center}
+  .tedit input[type=text]{grid-column:1 / -1;min-height:44px;font:inherit;font-size:15px;padding:0 10px;border:1px solid var(--line);border-radius:8px}
+  .tedit input[type=date],.tedit select{min-height:44px;font:inherit;padding:0 8px;border:1px solid var(--line);border-radius:8px;max-width:100%}
+  .tedit-a{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:8px}
+  .tedit .te-save{background:var(--p);color:#fff;border-color:transparent}
+  .tedit .te-del{margin-left:auto;color:var(--bad,#a3423a)}
   .trow.isdone .ttl{color:var(--soft);font-weight:500;text-decoration:line-through;text-decoration-color:var(--faint)}
   .who{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--p);background:var(--p-soft);border-radius:999px;padding:3px 10px;text-decoration:none;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .who:hover{text-decoration:underline}
@@ -223,7 +235,7 @@ function render(focusSel){
       <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">To-dos</h1><label class="sr-only" for="forFilter">Show the to-dos for</label><select id="forFilter" class="forpick dds-ph-pick"><option value="">For: Everyone</option>${((DATA.items||[]).some(t=>t.for==='me')?'<option value="me"'+(WHO==='me'?' selected':'')+'>For: Just me</option>':'')}${whos.map(([k,n])=>`<option value="${esc(k)}"${WHO===k?' selected':''}>For: ${esc(n)}</option>`).join('')}</select>${tog}</div>
         <p class="dds-ph-line" id="phLine">${esc(headLine(today))}</p></div>
       <div class="dds-ph-acts"><button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
-        <div class="dds-ph-more" id="phMore" popover><button type="button" class="pill" id="printBtn">${svg('print')} Print</button></div>
+        <div class="dds-ph-more" id="phMore" popover><button type="button" class="pill" id="printBtn">${svg('print')} Print</button><button type="button" class="pill" id="dlBtn" title="A spreadsheet (CSV) of the to-dos in view">Download</button></div>
         <button type="button" class="addgo primary dds-ph-fill" id="addJump">+ Add a to-do</button></div></div></header>`;
   h+=`<div class="stats" role="group" aria-label="Show">`+[['open','All open',''],['over','Overdue','over'],['today','Today','today'],['week','This week',''],['later','Later',''],['done','Done · last 30 days','done']].map(([k,l,c])=>`<button type="button" class="stat ${c}" data-show="${k}" aria-pressed="${SHOW===k?'true':'false'}"><b>${counts[k]}</b><span>${l}</span></button>`).join('')+`</div>`;
   h+=addHtml();
@@ -253,7 +265,71 @@ function render(focusSel){
 function rowHtml(t,today,g){
   const tag=KIND_TAG[t.kind]?`<span class="kind">${KIND_TAG[t.kind]}</span>`:'';
   const block=t.blocked?'<span class="kind">Blocked</span>':'';
-  return `<div class="trow" data-row="${esc(keyOf(t))}" data-group="${g}"><button type="button" class="tick" data-done="${esc(keyOf(t))}" aria-label="Done: ${esc(t.title)}"${t.blocked?' disabled title="Unblock it on the project first"':''}></button><div class="tmain"><span class="ttl">${esc(t.title)}</span><span class="chips">${whoChip(t)}${tag}${block}${ownChip(t)}</span></div>${dueChip(t,today)}</div>`;
+  return `<div class="trow" data-row="${esc(keyOf(t))}" data-group="${g}"><button type="button" class="tick" data-done="${esc(keyOf(t))}" aria-label="Done: ${esc(t.title)}"${t.blocked?' disabled title="Unblock it on the project first"':''}></button><div class="tmain">${canEdit(t)?`<button type="button" class="ttl" data-edit="${esc(keyOf(t))}" aria-label="Change: ${esc(t.title)}">${esc(t.title)}</button>`:`<span class="ttl">${esc(t.title)}</span>`}<span class="chips">${whoChip(t)}${tag}${block}${ownChip(t)}</span></div>${dueChip(t,today)}${canEdit(t)&&(g==='over'||g==='today')?`<span class="moves"><button type="button" class="mv" data-move="1" data-key="${esc(keyOf(t))}" aria-label="Move ${esc(t.title)} to tomorrow">Tomorrow</button><button type="button" class="mv" data-move="7" data-key="${esc(keyOf(t))}" aria-label="Move ${esc(t.title)} to next week">Next week</button></span>`:''}</div>`;
+}
+// ── Sales item 200 (Nov 22 2026 review): change a to-do where it sits. Your to-dos change their
+// words, day and who they're for; a deal's next step its words and day (it lives on the deal); a
+// project's steps change on their project. Delete has Undo (and Recently deleted keeps a to-do 30
+// days); Tomorrow and Next week move one in a tap, from the day it is today. ──
+const canEdit=(t)=>t.kind==='deal_task'||t.kind==='next_step';
+const plusDays=(n)=>{const d=new Date();d.setDate(d.getDate()+n);return ymd(d.getTime());};
+function forValue(t){return t.for==='person'?'contact:'+t.parent_id:t.for==='customer'?'client:'+t.parent_id:t.for==='deal'?'deal:'+t.parent_id:'';}
+function forBody(v){return v.startsWith('contact:')?{contact_id:v.slice(8)}:v.startsWith('client:')?{client_id:v.slice(7)}:v.startsWith('deal:')?{deal_id:v.slice(5)}:{};}
+// the one save each kind goes to: a to-do's own route, or the deal's next step
+function editReq(t,ch){
+  if(t.kind==='next_step')return['PATCH','/sales/deals/'+encodeURIComponent(t.id),{...(ch.title!==undefined?{next_step:ch.title}:{}),...(ch.due!==undefined?{next_step_at:ch.due||null}:{})}];
+  return['PATCH','/sales/deal-tasks/'+encodeURIComponent(t.id),{...(ch.title!==undefined?{title:ch.title}:{}),...(ch.due!==undefined?{due_date:ch.due||null}:{}),...(ch.for!==undefined?{for:forBody(ch.for)}:{})}];
+}
+async function saveTodo(t,ch,said){
+  const was={title:t.title,due:t.due||'',...(ch.for!==undefined?{for:forValue(t)}:{})};
+  const [m,path,body]=editReq(t,ch);
+  const r=await api(path,m,body);
+  if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save. Try again in a moment.',true);return false;}
+  await load();
+  toast(said,false,{label:'Undo',onClick:async()=>{const [m2,p2,b2]=editReq(t,was);const u=await api(p2,m2,b2);if(!u.ok){toast('That couldn’t be undone just now.',true);return;}toast('Put back.');await load();}});
+  return true;
+}
+async function moveTodo(btn){
+  const t=(DATA.items||[]).find(x=>keyOf(x)===btn.getAttribute('data-key'));if(!t)return;
+  const n=Number(btn.getAttribute('data-move'))||1,day=plusDays(n);
+  btn.disabled=true;
+  if(!(await saveTodo(t,{due:day},'Moved to '+niceDay(day,true)+': '+t.title)))btn.disabled=false;
+}
+async function deleteTodo(t){
+  const r=t.kind==='next_step'?await api('/sales/deals/'+encodeURIComponent(t.id),'PATCH',{next_step:'',next_step_at:''}):await api('/sales/deal-tasks/'+encodeURIComponent(t.id),'PATCH',{delete:true});
+  if(!r.ok){toast((r.body&&r.body.message)||'That couldn’t be deleted just now.',true);return;}
+  await load();
+  toast('Deleted: '+t.title+(t.kind==='next_step'?'':'. It stays in Recently deleted for 30 days.'),false,{label:'Undo',onClick:async()=>{
+    const u=t.kind==='next_step'?await api('/sales/deals/'+encodeURIComponent(t.id),'PATCH',{next_step:t.title,next_step_at:t.due||null}):await api('/sales/deal-tasks/'+encodeURIComponent(t.id),'PATCH',{restore:true});
+    if(!u.ok){toast('That couldn’t be undone just now.',true);return;}
+    toast('Back on your list.');await load();
+  }});
+}
+function openEdit(btn){
+  const key=btn.getAttribute('data-edit'),t=(DATA.items||[]).find(x=>keyOf(x)===key),row=btn.closest('.trow');if(!t||!row)return;
+  const mine=t.kind==='deal_task',cur=forValue(t);
+  row.innerHTML=`<form class="tedit" aria-label="Change this to-do"><label class="sr-only" for="te-t">What needs doing?</label><input type="text" id="te-t" maxlength="200" value="${esc(t.title)}">
+    <label class="sr-only" for="te-d">Due date</label><input type="date" id="te-d" value="${esc(t.due||'')}">
+    ${mine?`<label class="sr-only" for="te-f">Who it’s for</label><select id="te-f">${forOptions().replace(/ selected/g,'')}</select>`:''}
+    <div class="tedit-a"><button type="button" data-te-move="1">Tomorrow</button><button type="button" data-te-move="7">Next week</button><button type="submit" class="te-save">Save</button><button type="button" class="te-x">Cancel</button><button type="button" class="te-del">Delete</button></div></form>`;
+  const f=row.querySelector('form'),sel=row.querySelector('#te-f');
+  const pick=()=>{if(!sel)return;if(!Array.from(sel.options).some(o=>o.value===cur)){const o=document.createElement('option');o.value=cur;o.textContent=t.context||'This one';sel.appendChild(o);}sel.value=cur;};
+  pick();if(sel)loadPick().then(()=>{if(document.activeElement!==sel){sel.innerHTML=forOptions().replace(/ selected/g,'');pick();}});
+  const ti=row.querySelector('#te-t');ti.focus();ti.select();
+  const back=()=>{render('[data-edit="'+key.replace(/"/g,'')+'"]');};
+  f.addEventListener('keydown',(e)=>{if(e.key==='Escape'){e.preventDefault();back();}});
+  row.querySelector('.te-x').addEventListener('click',back);
+  row.querySelector('.te-del').addEventListener('click',()=>deleteTodo(t));
+  row.querySelectorAll('[data-te-move]').forEach(b=>b.addEventListener('click',()=>{row.querySelector('#te-d').value=plusDays(Number(b.getAttribute('data-te-move'))||1);f.requestSubmit();}));
+  f.addEventListener('submit',async(e)=>{
+    e.preventDefault();
+    const title=ti.value.trim(),due=row.querySelector('#te-d').value||'';
+    if(!title){toast('Say what needs doing first.',true);ti.focus();return;}
+    const ch={};if(title!==t.title)ch.title=title;if(due!==(t.due||''))ch.due=due;if(sel&&sel.value!==cur)ch.for=sel.value;
+    if(!Object.keys(ch).length){back();return;}
+    f.querySelectorAll('button,input,select').forEach(x=>{x.disabled=true;});
+    if(!(await saveTodo(t,ch,'Saved: '+title)))f.querySelectorAll('button,input,select').forEach(x=>{x.disabled=false;});
+  });
 }
 function addHtml(){
   return `<form class="add" id="addForm" aria-label="Add a to-do"><label class="sr-only" for="addTitle">What needs doing?</label><input type="text" id="addTitle" maxlength="200" autocomplete="off" placeholder="+ What needs doing?" value="${esc(DRAFT.title)}">
@@ -310,9 +386,12 @@ function wire(){
   // Show (a group's rest, or Later): the group opens, and focus lands on the first row it showed
   document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{const g=b.getAttribute('data-open');const before=document.querySelectorAll('[data-group="'+g+'"]').length;OPENED.add(g);render();const rows=document.querySelectorAll('[data-group="'+g+'"] [data-done]');const n=rows[Math.min(before,rows.length-1)];if(n)n.focus();}));
   document.querySelectorAll('[data-done]').forEach(b=>b.addEventListener('click',()=>done(b)));
+  document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openEdit(b)));   // sales item 200
+  document.querySelectorAll('[data-move]').forEach(b=>b.addEventListener('click',()=>moveTodo(b)));
   document.querySelectorAll('[data-reopen]').forEach(b=>b.addEventListener('click',()=>reopen(b)));
   const ff=$('forFilter');if(ff)ff.addEventListener('change',()=>{WHO=ff.value;render('#forFilter');});
   const pb=$('printBtn');if(pb)pb.addEventListener('click',()=>{const m=$('phMore');try{if(m&&m.matches(':popover-open'))m.hidePopover();}catch(_){/* */}printTodos();});
+  const db=$('dlBtn');if(db)db.addEventListener('click',()=>{const m=$('phMore');try{if(m&&m.matches(':popover-open'))m.hidePopover();}catch(_){/* */}downloadTodos();});
   const aj=$('addJump');if(aj)aj.addEventListener('click',()=>{const ti=$('addTitle');if(ti){ti.scrollIntoView({block:'center'});ti.focus();}});
   const f=$('addForm');if(f)f.addEventListener('submit',add);
   const ti=$('addTitle');if(ti){ti.addEventListener('input',()=>{DRAFT.title=ti.value;});ti.addEventListener('focus',loadPick,{once:true});}
@@ -323,7 +402,8 @@ function wire(){
 }
 // Done: the route that owns each kind (Home's card does the same), then Undo
 function doneReq(t,back){
-  if(t.kind==='next_step')return['PATCH','/sales/deals/'+encodeURIComponent(t.id),back?{next_step:t.title,next_step_at:t.due||null}:{next_step:'',next_step_at:''}];
+  // sales item 191: ticking it writes "Done: …" in the deal's history; Undo takes that line back
+  if(t.kind==='next_step')return['PATCH','/sales/deals/'+encodeURIComponent(t.id),back?{next_step:t.title,next_step_at:t.due||null,step_undo:true}:{next_step:'',next_step_at:'',step_done:true}];
   if(t.kind==='deal_task')return['PATCH','/sales/deal-tasks/'+encodeURIComponent(t.id),{status:back?'open':'done'}];
   return['PATCH','/projects/'+encodeURIComponent(t.parent_id)+'/tasks/'+encodeURIComponent(t.id),{status:back?'todo':'done'}];
 }
@@ -367,10 +447,12 @@ async function add(e){
   await load();
   const ti=$('addTitle');if(ti)ti.focus();
 }
-function printTodos(){
-  const k=window.ddsListKit;if(!k||!k.printList)return;
+// sales item 213: Print and Download share one sheet, the to-dos in view
+function printTodos(){const k=window.ddsListKit;if(k&&k.printList)k.printList(todosSheet());}
+function downloadTodos(){const k=window.ddsListKit;if(!k||!k.downloadList)return;const o=todosSheet();k.downloadList(o);toast('Downloaded '+o.rows.length+' to-do'+(o.rows.length===1?'':'s')+' as a spreadsheet.');}
+function todosSheet(){
   const today=ymd(),items=visible();
-  k.printList({title:'To-dos',sub:[items.filter(upNow).length+' open','printed '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})].join(' · '),
+  return ({title:'To-dos',sub:[items.filter(upNow).length+' open','printed '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})].join(' · '),
     cols:[{label:'To-do'},{label:'For'},{label:'Due'}],
     rows:items.map(t=>[t.title,t.for==='me'?'You':t.context,t.due?(dayDiff(t.due,today)<0?'Overdue, ':'')+niceDay(t.due):''])});
 }

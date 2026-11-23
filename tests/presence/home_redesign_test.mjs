@@ -138,7 +138,7 @@ let basePartial = null;
   const doneOf = (home.match(/function doneOf\(r\)\{[\s\S]*?\n\}/) || [''])[0];
   ok('Done uses the route that owns each thing: an enquiry is marked read', /apiSend\('POST','\/forms\/inbox\/'\+encodeURIComponent\(id\),\{status:'read'\},c\.site_id\|\|''\)/.test(doneOf));
   ok('…a support request closed', /apiSend\('PATCH','\/support\/'\+encodeURIComponent\(id\),\{status:'closed'\}\)/.test(doneOf));
-  ok('…a late next step cleared (as My tasks does)', /\^deal:\(\[0-9a-f-\]\{36\}\)\$/.test(doneOf) && /\{next_step:'',next_step_at:''\}/.test(doneOf));
+  ok('…a late next step cleared (as My tasks does)', /\^deal:\(\[0-9a-f-\]\{36\}\)\$/.test(doneOf) && /\{next_step:'',next_step_at:'',step_done:true\}/.test(doneOf));
   ok('…a notice dismissed', /\^notice:\(\[0-9a-f-\]\{36\}\)\$/.test(doneOf) && /\/commerce\/notices\/dismiss/.test(doneOf));
   ok('…and money, a broken site or a plan get no Done (doing the thing clears them)', !/money|broken|plan|publish/.test(doneOf.replace(/^.*?\{/, '')));
   ok('My tasks is a tab of the list (and not a second card in the studio strip)', /if\(MYTASKS\)t\.push\(\{k:'tasks',label:'My to-dos'/.test(home) && !/if\(tasks\)h\+=myTasksHtml\(\);/.test(home));

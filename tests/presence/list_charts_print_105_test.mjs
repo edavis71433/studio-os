@@ -75,7 +75,7 @@ const selects = (table) => db.log.filter((l) => l.method === 'GET' && l.url.star
     ok('the footnote says what was counted', h.endsWith('<p class="dc-foot">From the 5 deals in this view.</p>'));
     ok('labels are escaped', charts([{ title: '<b>', rows: [{ label: '<i>x</i>', n: 1 }] }], '').includes('&lt;i&gt;x&lt;/i&gt;'));
   }
-  ok('the kit exports charts, chartTips and printList', /charts: charts, chartTips: chartTips, printList: printList \};/.test(shell));
+  ok('the kit exports charts, chartTips and printList', /charts: charts, chartTips: chartTips, printList: printList, downloadList: downloadList, downloadTables: downloadTables, csvText: csvText \};/.test(shell));
   ok('printList hides the page while it prints and gives it back after (afterprint, or the next tap or key)', /document\.body\.setAttribute\('data-print', 'list'\)/.test(shell) && /window\.addEventListener\('afterprint', back\)/.test(shell) && /document\.addEventListener\('pointerdown', back, true\)/.test(shell));
 }
 

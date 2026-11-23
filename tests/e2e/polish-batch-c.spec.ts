@@ -223,7 +223,7 @@ test.describe('batch C — the phone', () => {
     await expect(page.locator('#colsBtn')).toBeVisible();
     await page.locator('.dds-ph-dots').click();
     const sheet = page.locator('#phMore');
-    await expect(sheet.getByRole('button')).toHaveText(['Manage services', 'Import CSV', 'Charts', 'Print', /Refresh/]);
+    await expect(sheet.getByRole('button')).toHaveText(['Manage services', 'Import CSV', 'Charts', 'Print', 'Download', /Refresh/])   // sales item 213: Download beside Print;
     const r = (await sheet.boundingBox())!;
     expect(r.x).toBeGreaterThanOrEqual(0);
     expect(r.x + r.width).toBeLessThanOrEqual(page.viewportSize()!.width);   // on screen

@@ -1060,7 +1060,7 @@ const apiSend=(path,method,body)=>ddsApi(path,{method,body:body||{},scope:qClien
 async function todoDone(id, btn){
   const row = btn.closest('.trow'); btn.disabled = true;
   try{
-    await apiSend('/sales/deals/'+encodeURIComponent(id), 'PATCH', { next_step: '', next_step_at: '' });
+    await apiSend('/sales/deals/'+encodeURIComponent(id), 'PATCH', { next_step: '', next_step_at: '', step_done: true });   // sales item 191: a line in the deal's history
     const sec = row && row.closest('#this-week');
     if(row) row.remove();
     if(sec && !sec.querySelector('.trow')) sec.remove();

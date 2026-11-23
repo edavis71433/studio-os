@@ -13,7 +13,7 @@
 // already on production and in APPLY-0260's backfill list: 0265 to 0267 ran before the
 // ledger existed (Nov 22 2026).
 
-export const CODE_NEWEST_CHANGE = 270;
+export const CODE_NEWEST_CHANGE = 273;
 
 /** The Health page's "Database changes" area, from the ledger's newest number. Pure. */
 export function changesArea(newest: number | null | undefined, expected = CODE_NEWEST_CHANGE): { state: 'ok' | 'attention' | 'off'; detail: string } {
