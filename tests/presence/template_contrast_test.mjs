@@ -5,6 +5,8 @@
 // back to the light bronze: 3.8:1 against the 4.5:1 the accessibility page promises.
 // This renders each template's own sample and measures that colour on its page colour.
 import { renderSnapshot, listTemplates } from '../../supabase/functions/presence/lib/render.ts';
+import { lookStyle } from '../../supabase/functions/presence/lib/site_looks.ts';
+import { STYLE_LOOKS } from '../../supabase/functions/presence/lib/style_looks.ts';   // the ready-made looks: the server's one list
 import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
 const results = [];
@@ -34,8 +36,12 @@ for (const { slug } of listTemplates()) {
 const PAGE = editorSource();
 const pageArray = (name) => new Function(`return ${PAGE.match(new RegExp(`\\nconst ${name} = (\\[[\\s\\S]*?\\n\\]);`))[1]};`)();
 const FIXED = new Set(JSON.parse(/const FIXED_COLOR_TEMPLATES = new Set\((\[[^\]]*\])\)/.exec(PAGE)[1]));
-const CHOICES = [...pageArray('PALETTES'), ...pageArray('STYLE_LOOKS')].filter((p) => p.tokens && p.tokens.ink)
-  .map((p) => ({ name: p.name, vars: Object.fromEntries(['accent', 'accent_dark', 'ink', 'soft', 'bg'].filter((k) => p.tokens[k]).map((k) => [k.replace('_', '-'), p.tokens[k]])) }));
+// Item 333: a ready-made look also names its cards' colour (the two dark ones), and brings its own
+// small layer of rules (lib/site_looks.ts), read here after the template's own: each of its rules
+// starts at :root only to outrank the template's, so the last rule with the selector is the one drawn.
+const CHOICES = [...pageArray('PALETTES'), ...STYLE_LOOKS].filter((p) => p.tokens && p.tokens.ink)
+  .map((p) => ({ name: p.name, tokens: p.tokens, vars: Object.fromEntries(['accent', 'accent_dark', 'ink', 'soft', 'bg', 'card', 'accent_band'].filter((k) => p.tokens[k]).map((k) => [k.replace('_', '-'), p.tokens[k]])) }));
+const lookRules = (tokens, slug) => screenRules(lookStyle(tokens, { template: slug }).replace(/<\/?style[^>]*>/g, '').replace(/:root /g, ''));
 /** Rules outside @media blocks: print and narrow-screen rules don't recolour the table on screen. */
 const screenRules = (css) => {
   let s = css, i;
@@ -71,11 +77,12 @@ for (const { slug } of listTemplates()) {
   const stray = rules.flatMap((r) => r.sels.filter((s) => /\bhours\b.*\bth\b/.test(s) && !/data-today/.test(s) && !known.has(s) && /(?:^|;)\s*color\s*:/.test(r.decl)));
   ok(`${slug}: every rule colouring the day names is one this check reads`, stray.length === 0, stray.join(' | '));
   for (const [place, band] of [['footer band', 'footer.site'], ["contact page's card", '.card']]) {
-    const fg = prop(rules, `${band} table.hours th`, 'color') ?? prop(rules, 'table.hours th', 'color') ?? prop(rules, 'table.hours', 'color') ?? prop(rules, band, 'color') ?? prop(rules, 'body', 'color');
-    // a band with no colour of its own (Editorial's card is transparent) shows the page behind it
-    const bgs = [prop(rules, band, 'background-color'), prop(rules, band, 'background'), prop(rules, 'body', 'background-color'), prop(rules, 'body', 'background')];
     let worst = { r: Infinity };
     for (const c of [{ name: 'its own colours', vars: {} }, ...(FIXED.has(slug) ? [] : CHOICES)]) {
+      const all = c.tokens ? [...rules, ...lookRules(c.tokens, slug)] : rules;
+      const fg = prop(all, `${band} table.hours th`, 'color') ?? prop(all, 'table.hours th', 'color') ?? prop(all, 'table.hours', 'color') ?? prop(all, band, 'color') ?? prop(all, 'body', 'color');
+      // a band with no colour of its own (Editorial's card is transparent) shows the page behind it
+      const bgs = [prop(all, band, 'background-color'), prop(all, band, 'background'), prop(all, 'body', 'background-color'), prop(all, 'body', 'background')];
       const vars = { ...own, ...c.vars }, f = hexOf(fg, vars), b = bgs.map((v) => hexOf(v, vars)).find(Boolean);
       const r = f && b ? ratio(f, b) : 0;
       if (r < worst.r) worst = { r, note: `${f} on ${b} with ${c.name}` };

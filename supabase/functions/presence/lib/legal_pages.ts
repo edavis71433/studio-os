@@ -25,7 +25,8 @@ import type { SiteConfig, SnapshotContent } from './render_types.ts';
 function contactLine(c: SnapshotContent): string {
   const i = c.identity; const l = c.locations?.[0];
   const bits = [
-    l ? [l.address_line1, l.city, `${l.region} ${l.postal_code}`].filter(Boolean).join(', ') : '',
+    // builder list item 334: a business that goes to its customers names no street, here as everywhere
+    l && l.goes_to_customers !== true ? [l.address_line1, l.city, `${l.region} ${l.postal_code}`].filter(Boolean).join(', ') : '',
     (l?.phone || i.phone || '').trim(),
     i.email,
   ].filter(Boolean).map((x) => esc(String(x)));

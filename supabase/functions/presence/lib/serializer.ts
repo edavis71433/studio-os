@@ -427,6 +427,8 @@ export function buildSnapshot(rows: DraftRows, manifest: TemplateManifest, opts:
       country: loc.country || 'US', phone: loc.phone || '', timezone: loc.timezone || 'America/Los_Angeles',
       hours: loc.hours || [], holiday_exceptions: loc.holiday_exceptions || [],
       temporarily_closed: !!loc.temporarily_closed, temporarily_closed_note: loc.temporarily_closed_note || '',
+      // builder list item 334 (0255): only when on, so a business with a shopfront is unchanged
+      ...(loc.goes_to_customers === true ? { goes_to_customers: true as const } : {}),
     })), locArr as any[]),
     settings: {
       category_order: Array.isArray(settings.category_order) ? settings.category_order : [],

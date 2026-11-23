@@ -68,6 +68,7 @@ const listOf = (items: string[]) => (items.length > 1 ? items.slice(0, -1).join(
 const BASIC_WORDS: Record<string, string> = {
   business_name: 'your business name', description: 'a short description', address_line1: 'your street address',
   city: 'your city', postal_code: 'your ZIP code', hours: 'your opening hours', contact: 'a phone number or email',
+  service_area: 'the places you serve',   // builder list item 334: a business that goes to its customers
 };
 
 /** One template per customer-audience recommendation rule (integrity-tested).

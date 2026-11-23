@@ -1,0 +1,2410 @@
+{
+ "food": {
+  "identity": {
+   "business_name": "Vermilion & Vine",
+   "tagline": "Neighborhood wine bar & wood-fired kitchen in Highland Park",
+   "description": "A small neighborhood spot where wood-fired plates meet a thoughtful natural wine list. Walk-ins welcome at the bar; the patio seats twenty under the pepper tree.",
+   "story": "We opened in 2019 with one oven, six tables, and a wine list written on butcher paper.\n\nFive years later the butcher paper is framed above the bar, the patio doubled, and the menu still changes with whatever the Wednesday farmers market has too much of.",
+   "phone": "(323) 555-0142",
+   "email": "hello@vermilionandvine.example",
+   "service_area": "Highland Park, Eagle Rock, and northeast Los Angeles",
+   "booking_url": "https://resy.example/vermilion-and-vine",
+   "ordering_url": "",
+   "social": {
+    "instagram": "https://instagram.com/vermilionvine.example"
+   },
+   "seo_title": "Vermilion & Vine — Wine Bar & Wood-Fired Kitchen, Highland Park",
+   "seo_description": "Wood-fired plates and natural wine in Highland Park, Los Angeles. Patio seating, weekend brunch, walk-ins welcome."
+  },
+  "offerings": [
+   {
+    "id": "o1",
+    "name": "Charred Leeks & Romesco",
+    "category": "To Start",
+    "description": "Wood-fired leeks, almond romesco, smoked olive oil",
+    "price_text": "$14",
+    "sort_order": 1,
+    "media": {
+     "alt": "Charred leeks on almond romesco",
+     "variants": {
+      "w400": "/thumbs/stand-ins/food.jpg",
+      "w800": "/thumbs/stand-ins/food.jpg",
+      "w1600": "/thumbs/stand-ins/food.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o2",
+    "name": "Burrata & Market Peaches",
+    "category": "To Start",
+    "description": "With basil, chile crisp, grilled sourdough",
+    "price_text": "$17",
+    "sort_order": 2
+   },
+   {
+    "id": "o3",
+    "name": "Oven Chicken for Two",
+    "category": "Wood-Fired",
+    "description": "Half chicken, salsa verde, pan drippings, little gems",
+    "price_text": "$38",
+    "sort_order": 1
+   },
+   {
+    "id": "o4",
+    "name": "Mushroom Cavatelli",
+    "category": "Wood-Fired",
+    "description": "Maitake, brown butter, pecorino, black pepper",
+    "price_text": "$24",
+    "sort_order": 2
+   },
+   {
+    "id": "o5",
+    "name": "Whole Branzino",
+    "category": "Wood-Fired",
+    "description": "Charred lemon, herb salad — market price",
+    "price_text": "market price",
+    "sort_order": 3
+   },
+   {
+    "id": "o6",
+    "name": "Basque Cheesecake",
+    "category": "Sweet",
+    "description": "Burnt top, cold center",
+    "price_text": "$11",
+    "sort_order": 1
+   }
+  ],
+  "testimonials": [
+   {
+    "id": "t1",
+    "quote": "The chicken for two is the best date-night order on the east side.",
+    "author": "Maria G.",
+    "source": "Google",
+    "sort_order": 1
+   },
+   {
+    "id": "t2",
+    "quote": "Wine list is small and perfect. Staff always finds us something new.",
+    "author": "Devon P.",
+    "source": "Yelp",
+    "sort_order": 2
+   }
+  ],
+  "faqs": [
+   {
+    "id": "f1",
+    "question": "Do you take walk-ins?",
+    "answer": "Always at the bar, and we keep a third of the patio unreserved. Parties of 5+ should book ahead.",
+    "sort_order": 1
+   },
+   {
+    "id": "f2",
+    "question": "Is the patio dog-friendly?",
+    "answer": "Yes — water bowls provided, treats negotiable.",
+    "sort_order": 2
+   },
+   {
+    "id": "f3",
+    "question": "Do you have vegetarian options?",
+    "answer": "About half the menu, and the kitchen is happy to adapt most plates. Just ask your server.",
+    "sort_order": 3
+   }
+  ],
+  "posts": [
+   {
+    "id": "p1",
+    "title": "Winter menu is live",
+    "slug": "winter-menu-2026",
+    "excerpt": "Six new plates, two returning favorites, and a mulled thing for the patio.",
+    "body_md": "The **winter menu** landed this week.\n\n## What's new\n\n- Squash agnolotti with brown butter\n- Wood-fired cabbage with bagna cauda\n- The return of the *short rib* for two\n\nBook the patio heaters early on weekends — [reservations here](https://resy.example/vermilion-and-vine).",
+    "published_at": "2026-01-12T18:00:00Z",
+    "hero": {
+     "alt": "Squash agnolotti in brown butter",
+     "variants": {
+      "w400": "/thumbs/stand-ins/food.jpg",
+      "w800": "/thumbs/stand-ins/food.jpg",
+      "w1600": "/thumbs/stand-ins/food.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   }
+  ],
+  "redirects": [
+   {
+    "from_path": "/menu.html",
+    "to_path": "/menu/"
+   },
+   {
+    "from_path": "/reservations",
+    "to_path": "https://resy.example/vermilion-and-vine"
+   }
+  ],
+  "locations": [
+   {
+    "address_line1": "5119 York Boulevard",
+    "address_line2": "",
+    "city": "Los Angeles",
+    "region": "CA",
+    "postal_code": "90042",
+    "country": "US",
+    "phone": "(323) 555-0142",
+    "timezone": "America/Los_Angeles",
+    "hours": [
+     {
+      "day": "mon",
+      "closed": true,
+      "intervals": []
+     },
+     {
+      "day": "tue",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "17:00",
+        "close": "22:00"
+       }
+      ]
+     },
+     {
+      "day": "wed",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "17:00",
+        "close": "22:00"
+       }
+      ]
+     },
+     {
+      "day": "thu",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "17:00",
+        "close": "23:00"
+       }
+      ]
+     },
+     {
+      "day": "fri",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "12:00",
+        "close": "14:30"
+       },
+       {
+        "open": "17:00",
+        "close": "24:00"
+       }
+      ]
+     },
+     {
+      "day": "sat",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "14:30"
+       },
+       {
+        "open": "17:00",
+        "close": "24:00"
+       }
+      ]
+     },
+     {
+      "day": "sun",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "15:00"
+       }
+      ]
+     }
+    ],
+    "holiday_exceptions": [
+     {
+      "date": "2026-11-26",
+      "label": "Thanksgiving",
+      "closed": true
+     },
+     {
+      "date": "2026-12-24",
+      "label": "Christmas Eve",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "12:00",
+        "close": "20:00"
+       }
+      ]
+     }
+    ],
+    "temporarily_closed": false,
+    "temporarily_closed_note": ""
+   }
+  ],
+  "settings": {
+   "category_order": [],
+   "industry": "restaurant"
+  }
+ },
+ "beauty": {
+  "identity": {
+   "business_name": "Linden Hair Atelier",
+   "tagline": "Color, cuts and bridal hair in Studio City, by appointment",
+   "description": "A quiet eight-chair studio for precise cuts, lived-in color and bridal styling. Every appointment starts with a real consultation, and we only use color lines we trust.",
+   "story": "Camille Noor trained in London and Paris before opening Linden in 2016, in a sunlit space on Ventura Boulevard.\n\nOur stylists keep their books small so nothing is rushed, and the espresso is always on.",
+   "phone": "(818) 555-0181",
+   "email": "bookings@lindenhair.example",
+   "service_area": "Studio City, Sherman Oaks and the Hollywood Hills",
+   "booking_url": "https://book.example/linden-hair",
+   "ordering_url": "",
+   "social": {
+    "instagram": "https://instagram.com/lindenhair.example"
+   },
+   "seo_title": "Linden Hair Atelier — Color, Cuts and Bridal Hair in Studio City",
+   "seo_description": "Balayage, precision cuts and wedding hair on Ventura Boulevard in Studio City. Free color consultations; book online."
+  },
+  "offerings": [
+   {
+    "id": "o1",
+    "name": "Signature cut and style",
+    "category": "Cuts",
+    "description": "Consultation, wash, precision cut and blowout.",
+    "price_text": "from $95",
+    "sort_order": 1,
+    "media": {
+     "alt": "A stylist finishing a haircut in a bright salon",
+     "variants": {
+      "w400": "/thumbs/stand-ins/beauty.jpg",
+      "w800": "/thumbs/stand-ins/beauty.jpg",
+      "w1600": "/thumbs/stand-ins/beauty.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o2",
+    "name": "Men's cut",
+    "category": "Cuts",
+    "description": "Scissor or clipper cut, a hot towel and a style.",
+    "price_text": "$55",
+    "sort_order": 2
+   },
+   {
+    "id": "o3",
+    "name": "Balayage",
+    "category": "Color",
+    "description": "Hand-painted, lived-in color with toner and gloss.",
+    "price_text": "from $260",
+    "sort_order": 1
+   },
+   {
+    "id": "o4",
+    "name": "Root touch-up",
+    "category": "Color",
+    "description": "Single-process color at the roots, with a gloss.",
+    "price_text": "from $85",
+    "sort_order": 2
+   },
+   {
+    "id": "o5",
+    "name": "Bridal trial",
+    "category": "Bridal",
+    "description": "A full run-through of your wedding hair, with photos to keep.",
+    "price_text": "$150",
+    "sort_order": 1
+   },
+   {
+    "id": "o6",
+    "name": "Wedding day styling",
+    "category": "Bridal",
+    "description": "Styling on site for you and your party.",
+    "price_text": "from $225",
+    "sort_order": 2
+   }
+  ],
+  "testimonials": [
+   {
+    "id": "t1",
+    "quote": "Best balayage I have ever had. Camille listened, then did exactly what we talked about.",
+    "author": "Sofia D.",
+    "source": "Google",
+    "sort_order": 1
+   },
+   {
+    "id": "t2",
+    "quote": "They made my wedding morning calm, and my hair held all night.",
+    "author": "Hannah K.",
+    "source": "Yelp",
+    "sort_order": 2
+   }
+  ],
+  "faqs": [
+   {
+    "id": "f1",
+    "question": "Do you charge for consultations?",
+    "answer": "No. Color consultations are free, in person or by sending us a few photos.",
+    "sort_order": 1
+   },
+   {
+    "id": "f2",
+    "question": "What is your cancellation policy?",
+    "answer": "Please give us 24 hours' notice. Late cancellations are charged half the service.",
+    "sort_order": 2
+   },
+   {
+    "id": "f3",
+    "question": "Do you travel for weddings?",
+    "answer": "Yes, anywhere within 30 miles of the studio, with a travel fee beyond that.",
+    "sort_order": 3
+   }
+  ],
+  "posts": [
+   {
+    "id": "p1",
+    "title": "Caring for color between visits",
+    "slug": "color-care",
+    "excerpt": "Three small habits that keep your color bright for weeks longer.",
+    "body_md": "**Fresh color** fades fastest in its first two weeks.\n\n## Keep it bright\n\n- Wash in *cool* water\n- Use a sulfate-free shampoo\n- Gloss every six weeks\n\nAsk about a gloss when you [book your next visit](https://book.example/linden-hair).",
+    "published_at": "2026-02-10T18:00:00Z",
+    "hero": {
+     "alt": "Bottles of hair care products on a marble shelf",
+     "variants": {
+      "w400": "/thumbs/stand-ins/beauty.jpg",
+      "w800": "/thumbs/stand-ins/beauty.jpg",
+      "w1600": "/thumbs/stand-ins/beauty.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   }
+  ],
+  "redirects": [
+   {
+    "from_path": "/services.html",
+    "to_path": "/services/"
+   },
+   {
+    "from_path": "/book",
+    "to_path": "https://book.example/linden-hair"
+   }
+  ],
+  "locations": [
+   {
+    "address_line1": "12045 Ventura Blvd",
+    "address_line2": "",
+    "city": "Studio City",
+    "region": "CA",
+    "postal_code": "91604",
+    "country": "US",
+    "phone": "(818) 555-0181",
+    "timezone": "America/Los_Angeles",
+    "hours": [
+     {
+      "day": "mon",
+      "closed": true,
+      "intervals": []
+     },
+     {
+      "day": "tue",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "19:00"
+       }
+      ]
+     },
+     {
+      "day": "wed",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "19:00"
+       }
+      ]
+     },
+     {
+      "day": "thu",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "20:00"
+       }
+      ]
+     },
+     {
+      "day": "fri",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "19:00"
+       }
+      ]
+     },
+     {
+      "day": "sat",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "17:00"
+       }
+      ]
+     },
+     {
+      "day": "sun",
+      "closed": true,
+      "intervals": []
+     }
+    ],
+    "holiday_exceptions": [
+     {
+      "date": "2026-11-26",
+      "label": "Thanksgiving",
+      "closed": true
+     },
+     {
+      "date": "2026-12-24",
+      "label": "Christmas Eve",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "14:00"
+       }
+      ]
+     }
+    ],
+    "temporarily_closed": false,
+    "temporarily_closed_note": ""
+   }
+  ],
+  "settings": {
+   "category_order": [],
+   "industry": "salon"
+  }
+ },
+ "home": {
+  "identity": {
+   "business_name": "Copper Line Plumbing",
+   "tagline": "Licensed plumbers for Glendale and Burbank homes, with same-day repairs",
+   "description": "Leaks, clogs, water heaters and repipes, done by licensed plumbers who clean up after themselves. You get the price before we start, and every repair is guaranteed for a year.",
+   "story": "Luis Arroyo started Copper Line in 2009 with one van and a promise to show up when we say we will.\n\nToday six plumbers cover Glendale, Burbank and the foothills, and the same family still answers the phone.",
+   "phone": "(818) 555-0167",
+   "email": "service@copperlineplumbing.example",
+   "service_area": "Glendale, Burbank, La Crescenta and Pasadena",
+   "booking_url": "https://book.example/copper-line",
+   "ordering_url": "",
+   "social": {
+    "google_maps": "https://maps.example/copper-line-plumbing",
+    "yelp": "https://yelp.example/biz/copper-line-plumbing"
+   },
+   "seo_title": "Copper Line Plumbing — Licensed Plumbers in Glendale and Burbank",
+   "seo_description": "Same-day leak repairs, drain cleaning and water heaters in Glendale, Burbank and La Crescenta. Prices before we start, a year's guarantee."
+  },
+  "offerings": [
+   {
+    "id": "o1",
+    "name": "Leak repair",
+    "category": "Repairs",
+    "description": "Dripping faucets, running toilets and leaks under the sink, fixed the same day.",
+    "price_text": "from $145",
+    "sort_order": 1,
+    "media": {
+     "alt": "A plumber fixing the pipes under a kitchen sink",
+     "variants": {
+      "w400": "/thumbs/stand-ins/home.jpg",
+      "w800": "/thumbs/stand-ins/home.jpg",
+      "w1600": "/thumbs/stand-ins/home.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o2",
+    "name": "Drain cleaning",
+    "category": "Repairs",
+    "description": "Kitchen, bathroom and main-line clogs cleared, with a camera check.",
+    "price_text": "from $175",
+    "sort_order": 2
+   },
+   {
+    "id": "o3",
+    "name": "Emergency calls",
+    "category": "Repairs",
+    "description": "A burst pipe or no water? We answer day and night.",
+    "price_text": "$95 visit",
+    "sort_order": 3
+   },
+   {
+    "id": "o4",
+    "name": "Water heater replacement",
+    "category": "Water heaters",
+    "description": "Tank or tankless, the old one hauled away and the new one in the same day, with permits.",
+    "price_text": "from $1,650",
+    "sort_order": 1
+   },
+   {
+    "id": "o5",
+    "name": "Water heater repair",
+    "category": "Water heaters",
+    "description": "Pilot lights, thermostats and leaks, on any brand.",
+    "price_text": "from $165",
+    "sort_order": 2
+   },
+   {
+    "id": "o6",
+    "name": "Whole-house repipe",
+    "category": "Repipes",
+    "description": "Old galvanized pipes replaced with copper or PEX, usually in two days.",
+    "price_text": "free estimate",
+    "sort_order": 1
+   }
+  ],
+  "testimonials": [
+   {
+    "id": "t1",
+    "quote": "Called at 7am with a burst pipe. They were here by 8:30 and cleaned up after.",
+    "author": "Karen M.",
+    "source": "Google",
+    "sort_order": 1
+   },
+   {
+    "id": "t2",
+    "quote": "Fair price for our water heater, and they hauled the old one away.",
+    "author": "David L.",
+    "source": "Yelp",
+    "sort_order": 2
+   },
+   {
+    "id": "t3",
+    "quote": "They explained every option and never pushed the expensive one.",
+    "author": "Grace P.",
+    "source": "Nextdoor",
+    "sort_order": 3
+   }
+  ],
+  "faqs": [
+   {
+    "id": "f1",
+    "question": "Do you charge for estimates?",
+    "answer": "No. Estimates for repipes and water heaters are free, and we text you the price before any work starts.",
+    "sort_order": 1
+   },
+   {
+    "id": "f2",
+    "question": "Are you licensed and insured?",
+    "answer": "Yes. We are licensed plumbing contractors in California and fully insured, and every plumber is background checked.",
+    "sort_order": 2
+   },
+   {
+    "id": "f3",
+    "question": "Do you work weekends?",
+    "answer": "Saturdays are regular hours, and we answer emergency calls every day of the year.",
+    "sort_order": 3
+   }
+  ],
+  "posts": [
+   {
+    "id": "p1",
+    "title": "Is your water heater near the end?",
+    "slug": "water-heater-signs",
+    "excerpt": "Four signs it is time to replace it, before it floods the garage.",
+    "body_md": "Most **tank water heaters** last 10 to 12 years.\n\n## Signs it is time\n\n- Rusty or *cloudy* hot water\n- Rumbling or popping sounds\n- A small puddle under the tank\n\nNot sure? [Book a free check](https://book.example/copper-line).",
+    "published_at": "2026-01-20T17:00:00Z",
+    "hero": {
+     "alt": "A new water heater in a garage",
+     "variants": {
+      "w400": "/thumbs/stand-ins/home.jpg",
+      "w800": "/thumbs/stand-ins/home.jpg",
+      "w1600": "/thumbs/stand-ins/home.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   }
+  ],
+  "redirects": [
+   {
+    "from_path": "/services.html",
+    "to_path": "/services/"
+   },
+   {
+    "from_path": "/quote",
+    "to_path": "https://book.example/copper-line"
+   }
+  ],
+  "locations": [
+   {
+    "address_line1": "1420 S Central Ave",
+    "address_line2": "",
+    "city": "Glendale",
+    "region": "CA",
+    "postal_code": "91204",
+    "country": "US",
+    "phone": "(818) 555-0167",
+    "timezone": "America/Los_Angeles",
+    "hours": [
+     {
+      "day": "mon",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "07:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "tue",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "07:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "wed",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "07:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "thu",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "07:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "fri",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "07:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "sat",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "16:00"
+       }
+      ]
+     },
+     {
+      "day": "sun",
+      "closed": true,
+      "intervals": []
+     }
+    ],
+    "holiday_exceptions": [
+     {
+      "date": "2026-11-26",
+      "label": "Thanksgiving",
+      "closed": true
+     },
+     {
+      "date": "2026-12-24",
+      "label": "Christmas Eve",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "07:00",
+        "close": "12:00"
+       }
+      ]
+     }
+    ],
+    "temporarily_closed": false,
+    "temporarily_closed_note": ""
+   }
+  ],
+  "settings": {
+   "category_order": [],
+   "industry": "plumber"
+  }
+ },
+ "health": {
+  "identity": {
+   "business_name": "Brightside Family Dental",
+   "tagline": "Gentle dentistry for the whole family in Pasadena",
+   "description": "Checkups, cleanings and fillings for kids and grown-ups, with evening hours twice a week and a team that goes at your pace.",
+   "story": "Dr. Amara Okafor opened Brightside in 2015 so families could see one dentist they trust, from a first tooth to a first crown.\n\nWe explain everything before we start, and we never rush.",
+   "phone": "(626) 555-0131",
+   "email": "hello@brightside.example",
+   "service_area": "Pasadena, Altadena and South Pasadena",
+   "booking_url": "https://book.example/brightside",
+   "ordering_url": "",
+   "social": {},
+   "seo_title": "Brightside Family Dental in Pasadena",
+   "seo_description": "Family dentist in Pasadena: checkups, cleanings, fillings and whitening, with evening hours."
+  },
+  "offerings": [
+   {
+    "id": "o1",
+    "name": "Checkup and cleaning",
+    "category": "Everyday care",
+    "description": "An exam, a gentle cleaning and X-rays when you need them.",
+    "price_text": "Most insurance",
+    "sort_order": 1,
+    "media": {
+     "alt": "A bright, calm treatment room",
+     "variants": {
+      "w400": "/thumbs/stand-ins/health.jpg",
+      "w800": "/thumbs/stand-ins/health.jpg",
+      "w1600": "/thumbs/stand-ins/health.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o2",
+    "name": "Fillings",
+    "category": "Everyday care",
+    "description": "Tooth-colored fillings, usually in one visit.",
+    "price_text": "from $160",
+    "sort_order": 2,
+    "media": {
+     "alt": "A dentist talking with a patient",
+     "variants": {
+      "w400": "/thumbs/stand-ins/health.jpg",
+      "w800": "/thumbs/stand-ins/health.jpg",
+      "w1600": "/thumbs/stand-ins/health.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o3",
+    "name": "Whitening",
+    "category": "Smile care",
+    "description": "In-office whitening or trays to use at home.",
+    "price_text": "from $250",
+    "sort_order": 3,
+    "media": {
+     "alt": "A smile after whitening",
+     "variants": {
+      "w400": "/thumbs/stand-ins/health.jpg",
+      "w800": "/thumbs/stand-ins/health.jpg",
+      "w1600": "/thumbs/stand-ins/health.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o4",
+    "name": "Same-day visits",
+    "category": "Urgent care",
+    "description": "Toothache or a chipped tooth? Call before noon and we see you today.",
+    "price_text": "",
+    "sort_order": 4,
+    "media": null
+   }
+  ],
+  "testimonials": [
+   {
+    "id": "t1",
+    "quote": "My son used to dread the dentist. Now he asks when we are going back.",
+    "author": "Renee T.",
+    "source": "Google",
+    "sort_order": 1
+   },
+   {
+    "id": "t2",
+    "quote": "They saw me the same day for a cracked tooth and explained every step.",
+    "author": "Marcus L.",
+    "source": "Google",
+    "sort_order": 2
+   },
+   {
+    "id": "t3",
+    "quote": "Kind, careful and on time. The evening hours are a lifesaver.",
+    "author": "Joy P.",
+    "source": "Yelp",
+    "sort_order": 3
+   }
+  ],
+  "faqs": [
+   {
+    "id": "f1",
+    "question": "Do you take my insurance?",
+    "answer": "We take most dental plans. Call with your plan name and we will check before your visit.",
+    "sort_order": 1
+   },
+   {
+    "id": "f2",
+    "question": "Do you see children?",
+    "answer": "Yes, from their first tooth. Kids get a short, friendly first visit.",
+    "sort_order": 2
+   },
+   {
+    "id": "f3",
+    "question": "I am nervous. Can you help?",
+    "answer": "Tell us when you book. We go slowly, explain each step and stop whenever you ask.",
+    "sort_order": 3
+   }
+  ],
+  "posts": [
+   {
+    "id": "p1",
+    "title": "How often should you see the dentist?",
+    "slug": "how-often",
+    "excerpt": "For most people, twice a year. Here is why.",
+    "body_md": "Most people do well with a **checkup every six months**.\n\nIf your gums bleed when you brush, come sooner.",
+    "published_at": "2026-10-12T17:00:00Z",
+    "hero": {
+     "alt": "A toothbrush and a glass by a window",
+     "variants": {
+      "w400": "/thumbs/stand-ins/health.jpg",
+      "w800": "/thumbs/stand-ins/health.jpg",
+      "w1600": "/thumbs/stand-ins/health.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   }
+  ],
+  "redirects": [],
+  "locations": [
+   {
+    "address_line1": "210 E Colorado Blvd",
+    "address_line2": "",
+    "city": "Pasadena",
+    "region": "CA",
+    "postal_code": "91101",
+    "country": "US",
+    "phone": "(626) 555-0131",
+    "timezone": "America/Los_Angeles",
+    "hours": [
+     {
+      "day": "mon",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "17:00"
+       }
+      ]
+     },
+     {
+      "day": "tue",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "17:00"
+       }
+      ]
+     },
+     {
+      "day": "wed",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "17:00"
+       }
+      ]
+     },
+     {
+      "day": "thu",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "17:00"
+       }
+      ]
+     },
+     {
+      "day": "fri",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "17:00"
+       }
+      ]
+     },
+     {
+      "day": "sat",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "13:00"
+       }
+      ]
+     },
+     {
+      "day": "sun",
+      "closed": true,
+      "intervals": []
+     }
+    ],
+    "holiday_exceptions": [],
+    "temporarily_closed": false,
+    "temporarily_closed_note": ""
+   }
+  ],
+  "settings": {
+   "category_order": [],
+   "industry": "dental"
+  }
+ },
+ "professional": {
+  "identity": {
+   "business_name": "Larkspur Tax & Bookkeeping",
+   "tagline": "Tax returns and monthly books for small businesses and families in Burbank",
+   "description": "A small accounting office that does your taxes, keeps your books and answers the phone. Flat prices quoted before we start, and meetings in person or by video.",
+   "story": "Dana Whitfield opened the office in 2011 after twelve years at a downtown firm, with one desk and a promise to return every call the same day.\n\nToday a team of five looks after about 400 households and 120 small businesses, from food trucks to dental offices, and we still answer our own phone.",
+   "phone": "(818) 555-0143",
+   "email": "hello@larkspurtax.example",
+   "service_area": "Burbank, Glendale and the east San Fernando Valley",
+   "booking_url": "https://book.example/larkspur-tax",
+   "ordering_url": "",
+   "social": {
+    "linkedin": "https://linkedin.com/company/larkspurtax.example",
+    "facebook": "https://facebook.com/larkspurtax.example"
+   },
+   "seo_title": "Larkspur Tax & Bookkeeping — Accountants in Burbank, CA",
+   "seo_description": "Tax returns, bookkeeping and payroll for small businesses and families in Burbank and Glendale. Flat prices and same-day callbacks."
+  },
+  "offerings": [
+   {
+    "id": "o1",
+    "name": "Personal tax return",
+    "category": "Taxes",
+    "description": "Federal and California returns, filed electronically, with a review call.",
+    "price_text": "from $225",
+    "sort_order": 1,
+    "media": {
+     "alt": "An accountant going over a tax return with a client",
+     "variants": {
+      "w400": "/thumbs/stand-ins/professional.jpg",
+      "w800": "/thumbs/stand-ins/professional.jpg",
+      "w1600": "/thumbs/stand-ins/professional.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o2",
+    "name": "Small business tax return",
+    "category": "Taxes",
+    "description": "Sole owners, partnerships and S corporations, with quarterly estimates.",
+    "price_text": "from $650",
+    "sort_order": 2
+   },
+   {
+    "id": "o3",
+    "name": "IRS and state letters",
+    "category": "Taxes",
+    "description": "We read the letter, explain it plainly and answer it for you.",
+    "price_text": "from $150",
+    "sort_order": 3
+   },
+   {
+    "id": "o4",
+    "name": "Monthly bookkeeping",
+    "category": "Books and payroll",
+    "description": "Reconciled books in QuickBooks or Xero, with a one-page report each month.",
+    "price_text": "from $300 a month",
+    "sort_order": 1
+   },
+   {
+    "id": "o5",
+    "name": "Payroll",
+    "category": "Books and payroll",
+    "description": "Pay runs, direct deposit, W-2s and the quarterly filings.",
+    "price_text": "from $90 a month",
+    "sort_order": 2
+   },
+   {
+    "id": "o6",
+    "name": "New business setup",
+    "category": "Books and payroll",
+    "description": "Choosing the right entity, getting an EIN and setting up your books.",
+    "price_text": "$400",
+    "sort_order": 3
+   }
+  ],
+  "testimonials": [
+   {
+    "id": "t1",
+    "quote": "They found a credit our old preparer missed two years running. Calm, quick and clear.",
+    "author": "Renee T.",
+    "source": "Google",
+    "sort_order": 1
+   },
+   {
+    "id": "t2",
+    "quote": "Our bakery's books were a shoebox. Now we get a one-page report every month and actually read it.",
+    "author": "Omar K.",
+    "source": "Yelp",
+    "sort_order": 2
+   }
+  ],
+  "faqs": [
+   {
+    "id": "f1",
+    "question": "What should I bring to the first meeting?",
+    "answer": "Last year's return, this year's W-2s and 1099s, and any letters from the IRS or the state. We send a checklist when you book.",
+    "sort_order": 1
+   },
+   {
+    "id": "f2",
+    "question": "Can we meet by video?",
+    "answer": "Yes. About half our clients never visit the office, and you can send documents through a secure link.",
+    "sort_order": 2
+   },
+   {
+    "id": "f3",
+    "question": "Do you work with people outside Burbank?",
+    "answer": "Yes, anywhere in California, and we file in most other states for clients who moved.",
+    "sort_order": 3
+   }
+  ],
+  "posts": [
+   {
+    "id": "p1",
+    "title": "Five things to do before tax season",
+    "slug": "before-tax-season",
+    "excerpt": "A short checklist that saves you time and money in April.",
+    "body_md": "**Tax season** opens in late January, and a little work now makes it painless.\n\n## Before you book\n\n- Keep each *1099* as it arrives\n- Write down big changes: a move, a new baby, a new business\n- Check your estimated payments\n\nSpots fill up in March, so [book yours early](https://book.example/larkspur-tax).",
+    "published_at": "2026-01-12T18:00:00Z",
+    "hero": {
+     "alt": "A desk with a calculator and tax forms",
+     "variants": {
+      "w400": "/thumbs/stand-ins/professional.jpg",
+      "w800": "/thumbs/stand-ins/professional.jpg",
+      "w1600": "/thumbs/stand-ins/professional.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   }
+  ],
+  "redirects": [
+   {
+    "from_path": "/services.html",
+    "to_path": "/services/"
+   },
+   {
+    "from_path": "/book",
+    "to_path": "https://book.example/larkspur-tax"
+   }
+  ],
+  "locations": [
+   {
+    "address_line1": "411 N Glenoaks Blvd, Suite 3",
+    "address_line2": "",
+    "city": "Burbank",
+    "region": "CA",
+    "postal_code": "91502",
+    "country": "US",
+    "phone": "(818) 555-0143",
+    "timezone": "America/Los_Angeles",
+    "hours": [
+     {
+      "day": "mon",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "17:30"
+       }
+      ]
+     },
+     {
+      "day": "tue",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "17:30"
+       }
+      ]
+     },
+     {
+      "day": "wed",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "17:30"
+       }
+      ]
+     },
+     {
+      "day": "thu",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "17:30"
+       }
+      ]
+     },
+     {
+      "day": "fri",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "17:00"
+       }
+      ]
+     },
+     {
+      "day": "sat",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "14:00"
+       }
+      ]
+     },
+     {
+      "day": "sun",
+      "closed": true,
+      "intervals": []
+     }
+    ],
+    "holiday_exceptions": [
+     {
+      "date": "2026-11-26",
+      "label": "Thanksgiving",
+      "closed": true
+     },
+     {
+      "date": "2026-12-24",
+      "label": "Christmas Eve",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "12:00"
+       }
+      ]
+     }
+    ],
+    "temporarily_closed": false,
+    "temporarily_closed_note": ""
+   }
+  ],
+  "settings": {
+   "category_order": [],
+   "industry": "accounting"
+  }
+ },
+ "retail": {
+  "identity": {
+   "business_name": "Fernwood Flower Co.",
+   "tagline": "Seasonal bouquets, wedding flowers and same-day delivery in Eagle Rock",
+   "description": "A neighborhood flower shop that buys from California growers each morning. Bouquets to take home, arrangements delivered the same day, and flowers for weddings large and small.",
+   "story": "Mia Thornton grew up on her family's flower farm near Lompoc and opened Fernwood in 2018, in a former bakery on Colorado Boulevard.\n\nWe buy what is in season, waste as little as we can, and compost the rest in the garden out back.",
+   "phone": "(323) 555-0119",
+   "email": "hello@fernwoodflowers.example",
+   "service_area": "Eagle Rock, Highland Park, Glendale and Pasadena",
+   "booking_url": "",
+   "ordering_url": "https://shop.example/fernwood",
+   "social": {
+    "instagram": "https://instagram.com/fernwoodflowers.example",
+    "facebook": "https://facebook.com/fernwoodflowers.example"
+   },
+   "seo_title": "Fernwood Flower Co. — Florist in Eagle Rock, Los Angeles",
+   "seo_description": "Seasonal bouquets, sympathy flowers and wedding flowers from California growers. Same-day delivery in Eagle Rock, Highland Park and Glendale."
+  },
+  "offerings": [
+   {
+    "id": "o1",
+    "name": "Market bouquet",
+    "category": "Bouquets",
+    "description": "The best of the morning's flowers, wrapped in paper.",
+    "price_text": "$45",
+    "sort_order": 1,
+    "media": {
+     "alt": "A seasonal bouquet of ranunculus and garden roses",
+     "variants": {
+      "w400": "/thumbs/stand-ins/retail.jpg",
+      "w800": "/thumbs/stand-ins/retail.jpg",
+      "w1600": "/thumbs/stand-ins/retail.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o2",
+    "name": "Grand bouquet",
+    "category": "Bouquets",
+    "description": "A generous armful for birthdays and big thank-yous.",
+    "price_text": "$95",
+    "sort_order": 2
+   },
+   {
+    "id": "o3",
+    "name": "Weekly flowers",
+    "category": "Bouquets",
+    "description": "A fresh bouquet delivered every week, to your home or office.",
+    "price_text": "from $55 a week",
+    "sort_order": 3
+   },
+   {
+    "id": "o4",
+    "name": "Low table arrangement",
+    "category": "Arrangements",
+    "description": "A garden-style arrangement in a vessel you can keep.",
+    "price_text": "$85",
+    "sort_order": 1
+   },
+   {
+    "id": "o5",
+    "name": "Sympathy flowers",
+    "category": "Arrangements",
+    "description": "Arrangements and standing sprays, delivered with care.",
+    "price_text": "from $120",
+    "sort_order": 2
+   },
+   {
+    "id": "o6",
+    "name": "Wedding flowers",
+    "category": "Weddings and events",
+    "description": "Bouquets, boutonnieres and centerpieces, designed with you.",
+    "price_text": "from $1,800",
+    "sort_order": 1
+   }
+  ],
+  "testimonials": [
+   {
+    "id": "t1",
+    "quote": "The bouquet for my mom's birthday was even prettier than the photo, and it arrived by noon.",
+    "author": "Jasmine L.",
+    "source": "Google",
+    "sort_order": 1
+   },
+   {
+    "id": "t2",
+    "quote": "Mia did our wedding flowers on a modest budget, and they were the talk of the night.",
+    "author": "Ben and Clara S.",
+    "source": "Yelp",
+    "sort_order": 2
+   }
+  ],
+  "faqs": [
+   {
+    "id": "f1",
+    "question": "Do you deliver the same day?",
+    "answer": "Yes, for orders placed by 1pm, Monday to Saturday, within our delivery area.",
+    "sort_order": 1
+   },
+   {
+    "id": "f2",
+    "question": "Can I choose the flowers?",
+    "answer": "Tell us the colors and the mood, and we pick the freshest flowers that fit. For one particular flower, call us first.",
+    "sort_order": 2
+   },
+   {
+    "id": "f3",
+    "question": "How far ahead should we book wedding flowers?",
+    "answer": "Three to six months is ideal. We take a small number of weddings each weekend.",
+    "sort_order": 3
+   }
+  ],
+  "posts": [
+   {
+    "id": "p1",
+    "title": "What's in season this spring",
+    "slug": "spring-flowers",
+    "excerpt": "Ranunculus, sweet peas and the first garden roses are here.",
+    "body_md": "Spring is our favorite season in the shop.\n\n## In the cooler now\n\n- **Ranunculus** in coral and cream\n- Sweet peas from a farm in *Carpinteria*\n- The first garden roses\n\n[Order a spring bouquet](https://shop.example/fernwood) for delivery this week.",
+    "published_at": "2026-03-02T17:00:00Z",
+    "hero": {
+     "alt": "Buckets of spring flowers in the shop's cooler",
+     "variants": {
+      "w400": "/thumbs/stand-ins/retail.jpg",
+      "w800": "/thumbs/stand-ins/retail.jpg",
+      "w1600": "/thumbs/stand-ins/retail.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   }
+  ],
+  "redirects": [
+   {
+    "from_path": "/shop",
+    "to_path": "https://shop.example/fernwood"
+   },
+   {
+    "from_path": "/flowers.html",
+    "to_path": "/products/"
+   }
+  ],
+  "locations": [
+   {
+    "address_line1": "2116 Colorado Blvd",
+    "address_line2": "",
+    "city": "Los Angeles",
+    "region": "CA",
+    "postal_code": "90041",
+    "country": "US",
+    "phone": "(323) 555-0119",
+    "timezone": "America/Los_Angeles",
+    "hours": [
+     {
+      "day": "mon",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "tue",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "wed",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "thu",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "fri",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "sat",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "sun",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "15:00"
+       }
+      ]
+     }
+    ],
+    "holiday_exceptions": [
+     {
+      "date": "2026-11-26",
+      "label": "Thanksgiving",
+      "closed": true
+     },
+     {
+      "date": "2026-12-24",
+      "label": "Christmas Eve",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "14:00"
+       }
+      ]
+     }
+    ],
+    "temporarily_closed": false,
+    "temporarily_closed_note": ""
+   }
+  ],
+  "settings": {
+   "category_order": [],
+   "industry": "florist"
+  }
+ },
+ "fitness": {
+  "identity": {
+   "business_name": "Ember Boxing & Strength",
+   "tagline": "Boxing, strength and conditioning classes in North Hollywood. Your first class is free.",
+   "description": "A coach-led gym for boxing, strength training and conditioning. Classes are capped at fourteen, beginners are welcome at every one, and your first class is on us.",
+   "story": "Coach Andre Little boxed as an amateur for ten years before opening Ember in a North Hollywood warehouse in 2020.\n\nWe built it for people who want real coaching without the attitude: wraps on, phones away, and someone watching your form every set.",
+   "phone": "(818) 555-0152",
+   "email": "coach@emberboxing.example",
+   "service_area": "North Hollywood, Studio City, Toluca Lake and Burbank",
+   "booking_url": "https://book.example/ember",
+   "ordering_url": "",
+   "social": {
+    "instagram": "https://instagram.com/emberboxing.example",
+    "youtube": "https://youtube.com/@emberboxing.example"
+   },
+   "seo_title": "Ember Boxing & Strength — Boxing Gym in North Hollywood",
+   "seo_description": "Coach-led boxing, barbell strength and conditioning classes in North Hollywood, capped at fourteen. Your first class is free."
+  },
+  "offerings": [
+   {
+    "id": "o1",
+    "name": "Boxing fundamentals",
+    "category": "Boxing",
+    "description": "Stance, footwork and combinations on the bag and the pads. Gloves provided.",
+    "price_text": "$28 drop-in",
+    "sort_order": 1,
+    "media": {
+     "alt": "Two boxers training on the pads in a gym",
+     "variants": {
+      "w400": "/thumbs/stand-ins/fitness.jpg",
+      "w800": "/thumbs/stand-ins/fitness.jpg",
+      "w1600": "/thumbs/stand-ins/fitness.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o2",
+    "name": "Fight conditioning",
+    "category": "Boxing",
+    "description": "Rounds of bag work, sprints and core. Hard, but scaled to you.",
+    "price_text": "$28 drop-in",
+    "sort_order": 2
+   },
+   {
+    "id": "o3",
+    "name": "Barbell strength",
+    "category": "Strength",
+    "description": "Squat, press and deadlift with a coach, in small groups.",
+    "price_text": "$30 drop-in",
+    "sort_order": 1
+   },
+   {
+    "id": "o4",
+    "name": "Mobility and recovery",
+    "category": "Strength",
+    "description": "Forty minutes of stretching and breathing to undo the week.",
+    "price_text": "$20 drop-in",
+    "sort_order": 2
+   },
+   {
+    "id": "o5",
+    "name": "Unlimited membership",
+    "category": "Memberships",
+    "description": "Every class, open gym hours and a monthly form check.",
+    "price_text": "$179 a month",
+    "sort_order": 1
+   },
+   {
+    "id": "o6",
+    "name": "Ten-class pack",
+    "category": "Memberships",
+    "description": "Ten classes to use any time within three months.",
+    "price_text": "$240",
+    "sort_order": 2
+   }
+  ],
+  "testimonials": [
+   {
+    "id": "t1",
+    "quote": "I had never boxed before. Two months in I'm stronger, calmer, and I look forward to 6am.",
+    "author": "Tasha R.",
+    "source": "Google",
+    "sort_order": 1
+   },
+   {
+    "id": "t2",
+    "quote": "Real coaching. Andre fixed my deadlift in one session.",
+    "author": "Marco V.",
+    "source": "ClassPass",
+    "sort_order": 2
+   }
+  ],
+  "faqs": [
+   {
+    "id": "f1",
+    "question": "I'm a complete beginner. Is that OK?",
+    "answer": "Yes. Every class has beginners in it, and the coaches scale each round to where you are.",
+    "sort_order": 1
+   },
+   {
+    "id": "f2",
+    "question": "What should I bring?",
+    "answer": "Water, a towel, and hand wraps if you have them. We lend gloves and wraps for your first visits.",
+    "sort_order": 2
+   },
+   {
+    "id": "f3",
+    "question": "Is the first class really free?",
+    "answer": "Yes. Book any class online and tell the coach it is your first time.",
+    "sort_order": 3
+   }
+  ],
+  "posts": [
+   {
+    "id": "p1",
+    "title": "A new 6am class starts in March",
+    "slug": "new-6am-class",
+    "excerpt": "Fight conditioning before work, on Monday, Wednesday and Friday.",
+    "body_md": "You asked, and **fight conditioning** is coming to the early slot.\n\n## The details\n\n- Monday, Wednesday and Friday at *6am*\n- Forty-five minutes, capped at fourteen\n- Open to every level\n\n[Book your spot](https://book.example/ember); the first week fills fast.",
+    "published_at": "2026-02-20T17:00:00Z",
+    "hero": {
+     "alt": "A row of heavy bags in an empty gym at dawn",
+     "variants": {
+      "w400": "/thumbs/stand-ins/fitness.jpg",
+      "w800": "/thumbs/stand-ins/fitness.jpg",
+      "w1600": "/thumbs/stand-ins/fitness.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   }
+  ],
+  "redirects": [
+   {
+    "from_path": "/schedule",
+    "to_path": "/classes/"
+   },
+   {
+    "from_path": "/join",
+    "to_path": "https://book.example/ember"
+   }
+  ],
+  "locations": [
+   {
+    "address_line1": "5300 Lankershim Blvd",
+    "address_line2": "",
+    "city": "North Hollywood",
+    "region": "CA",
+    "postal_code": "91601",
+    "country": "US",
+    "phone": "(818) 555-0152",
+    "timezone": "America/Los_Angeles",
+    "hours": [
+     {
+      "day": "mon",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "06:00",
+        "close": "21:00"
+       }
+      ]
+     },
+     {
+      "day": "tue",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "06:00",
+        "close": "21:00"
+       }
+      ]
+     },
+     {
+      "day": "wed",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "06:00",
+        "close": "21:00"
+       }
+      ]
+     },
+     {
+      "day": "thu",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "06:00",
+        "close": "21:00"
+       }
+      ]
+     },
+     {
+      "day": "fri",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "06:00",
+        "close": "20:00"
+       }
+      ]
+     },
+     {
+      "day": "sat",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "14:00"
+       }
+      ]
+     },
+     {
+      "day": "sun",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "09:00",
+        "close": "12:00"
+       }
+      ]
+     }
+    ],
+    "holiday_exceptions": [
+     {
+      "date": "2026-11-26",
+      "label": "Thanksgiving",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "11:00"
+       }
+      ]
+     },
+     {
+      "date": "2026-12-24",
+      "label": "Christmas Eve",
+      "closed": true
+     }
+    ],
+    "temporarily_closed": false,
+    "temporarily_closed_note": ""
+   }
+  ],
+  "settings": {
+   "category_order": [],
+   "industry": "gym"
+  }
+ },
+ "creative": {
+  "identity": {
+   "business_name": "Golden Hour Events",
+   "tagline": "Weddings, celebrations and company events, planned from the first call to the last dance",
+   "description": "A planning team of four for weddings, milestone parties and company events. We find the venue, manage the vendors and run the day, so you get to enjoy it.",
+   "story": "Nadia Brooks planned her first wedding, her sister's, in a backyard in Altadena in 2012.\n\nGolden Hour has since planned more than 300 events, from dinners for twenty to product launches for six hundred, and we still visit every venue before we book it.",
+   "phone": "(213) 555-0174",
+   "email": "plan@goldenhourevents.example",
+   "service_area": "Los Angeles, Pasadena, Malibu and Orange County",
+   "booking_url": "",
+   "ordering_url": "",
+   "social": {
+    "instagram": "https://instagram.com/goldenhourevents.example",
+    "facebook": "https://facebook.com/goldenhourevents.example"
+   },
+   "seo_title": "Golden Hour Events — Wedding and Event Planners in Los Angeles",
+   "seo_description": "Full wedding planning, day-of coordination, parties and company events across Los Angeles and Orange County."
+  },
+  "offerings": [
+   {
+    "id": "o1",
+    "name": "Full wedding planning",
+    "category": "Weddings",
+    "description": "Venue search, budget, vendors, design and a coordinator on the day.",
+    "price_text": "from $6,500",
+    "sort_order": 1,
+    "media": {
+     "alt": "A long dinner table set for a wedding at sunset",
+     "variants": {
+      "w400": "/thumbs/stand-ins/creative.jpg",
+      "w800": "/thumbs/stand-ins/creative.jpg",
+      "w1600": "/thumbs/stand-ins/creative.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o2",
+    "name": "Day-of coordination",
+    "category": "Weddings",
+    "description": "We take over a month before and run the day to the minute.",
+    "price_text": "from $2,200",
+    "sort_order": 2
+   },
+   {
+    "id": "o3",
+    "name": "Milestone parties",
+    "category": "Celebrations",
+    "description": "Birthdays, anniversaries and showers, planned and styled.",
+    "price_text": "from $1,500",
+    "sort_order": 1
+   },
+   {
+    "id": "o4",
+    "name": "Rehearsal dinners",
+    "category": "Celebrations",
+    "description": "Restaurant buyouts and backyard dinners, with seating and toasts.",
+    "price_text": "from $1,200",
+    "sort_order": 2
+   },
+   {
+    "id": "o5",
+    "name": "Company parties",
+    "category": "Company events",
+    "description": "Holiday parties and summer picnics people actually enjoy.",
+    "price_text": "from $3,000",
+    "sort_order": 1
+   },
+   {
+    "id": "o6",
+    "name": "Product launches",
+    "category": "Company events",
+    "description": "Venues, staging, guest check-in and a minute-by-minute plan.",
+    "price_text": "quoted per event",
+    "sort_order": 2
+   }
+  ],
+  "testimonials": [
+   {
+    "id": "t1",
+    "quote": "A vendor didn't show and Nadia's team fixed it before we ever knew. The day was perfect.",
+    "author": "Erin and Josh T.",
+    "source": "Google",
+    "sort_order": 1
+   },
+   {
+    "id": "t2",
+    "quote": "Our holiday party for 250 ran to the minute, and people are still talking about it.",
+    "author": "Maya G.",
+    "source": "Yelp",
+    "sort_order": 2
+   }
+  ],
+  "faqs": [
+   {
+    "id": "f1",
+    "question": "How far ahead should we book?",
+    "answer": "For weddings, nine to twelve months. For parties and company events, six to eight weeks is usually enough.",
+    "sort_order": 1
+   },
+   {
+    "id": "f2",
+    "question": "Can you work with our budget?",
+    "answer": "Yes. Every plan starts with the budget, and we show you where each dollar goes.",
+    "sort_order": 2
+   },
+   {
+    "id": "f3",
+    "question": "Do you travel?",
+    "answer": "We plan events across Southern California, and destination weddings with a travel fee.",
+    "sort_order": 3
+   }
+  ],
+  "posts": [
+   {
+    "id": "p1",
+    "title": "Questions to ask every wedding venue",
+    "slug": "venue-questions",
+    "excerpt": "Seven questions that save money and headaches later.",
+    "body_md": "Most **venue surprises** come from the contract, not the day.\n\n## Ask before you sign\n\n- What does the rental fee include?\n- Is there a *noise curfew*?\n- Which vendors are required?\n\n[Get in touch](/contact/) and we will send you our full checklist.",
+    "published_at": "2026-01-28T18:00:00Z",
+    "hero": {
+     "alt": "Guests dancing under string lights",
+     "variants": {
+      "w400": "/thumbs/stand-ins/creative.jpg",
+      "w800": "/thumbs/stand-ins/creative.jpg",
+      "w1600": "/thumbs/stand-ins/creative.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   }
+  ],
+  "redirects": [
+   {
+    "from_path": "/services.html",
+    "to_path": "/services/"
+   },
+   {
+    "from_path": "/inquire",
+    "to_path": "/contact/"
+   }
+  ],
+  "locations": [
+   {
+    "address_line1": "1150 S Olive St, Suite 300",
+    "address_line2": "",
+    "city": "Los Angeles",
+    "region": "CA",
+    "postal_code": "90015",
+    "country": "US",
+    "phone": "(213) 555-0174",
+    "timezone": "America/Los_Angeles",
+    "hours": [
+     {
+      "day": "mon",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "tue",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "wed",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "thu",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "fri",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "17:00"
+       }
+      ]
+     },
+     {
+      "day": "sat",
+      "closed": true,
+      "intervals": []
+     },
+     {
+      "day": "sun",
+      "closed": true,
+      "intervals": []
+     }
+    ],
+    "holiday_exceptions": [
+     {
+      "date": "2026-11-26",
+      "label": "Thanksgiving",
+      "closed": true
+     },
+     {
+      "date": "2026-12-24",
+      "label": "Christmas Eve",
+      "closed": true
+     }
+    ],
+    "temporarily_closed": false,
+    "temporarily_closed_note": ""
+   }
+  ],
+  "settings": {
+   "category_order": [],
+   "industry": "event_planning"
+  }
+ },
+ "community": {
+  "identity": {
+   "business_name": "Northside Community Kitchen",
+   "tagline": "Free meals and cooking classes in Glendale, open to everyone",
+   "description": "Hot meals every Saturday, cooking classes for families and a pantry shelf you can take from, run by neighbors and volunteers.",
+   "story": "We started in a church kitchen in 2018 with eleven volunteers and one big pot of soup.\n\nToday more than 200 neighbors help cook, serve and drive meals across the north side.",
+   "phone": "(818) 555-0158",
+   "email": "hello@northsidekitchen.example",
+   "service_area": "Glendale, Montrose and La Crescenta",
+   "booking_url": "",
+   "ordering_url": "",
+   "social": {},
+   "seo_title": "Northside Community Kitchen, Glendale",
+   "seo_description": "Free Saturday meals, family cooking classes and volunteer shifts in Glendale."
+  },
+  "offerings": [
+   {
+    "id": "o1",
+    "name": "Saturday meals",
+    "category": "Programs",
+    "description": "A hot, free meal every Saturday from noon. Everyone is welcome.",
+    "price_text": "Free",
+    "sort_order": 1,
+    "media": {
+     "alt": "Neighbors sharing a meal at long tables",
+     "variants": {
+      "w400": "/thumbs/stand-ins/community.jpg",
+      "w800": "/thumbs/stand-ins/community.jpg",
+      "w1600": "/thumbs/stand-ins/community.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o2",
+    "name": "Family cooking classes",
+    "category": "Programs",
+    "description": "Cook simple, healthy dinners together. Ingredients included.",
+    "price_text": "Free",
+    "sort_order": 2,
+    "media": {
+     "alt": "A family cooking class",
+     "variants": {
+      "w400": "/thumbs/stand-ins/community.jpg",
+      "w800": "/thumbs/stand-ins/community.jpg",
+      "w1600": "/thumbs/stand-ins/community.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o3",
+    "name": "Volunteer shifts",
+    "category": "Get involved",
+    "description": "Two-hour shifts in the kitchen, on the serving line or driving meals.",
+    "price_text": "",
+    "sort_order": 3,
+    "media": {
+     "alt": "Volunteers packing meals",
+     "variants": {
+      "w400": "/thumbs/stand-ins/community.jpg",
+      "w800": "/thumbs/stand-ins/community.jpg",
+      "w1600": "/thumbs/stand-ins/community.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   }
+  ],
+  "testimonials": [
+   {
+    "id": "t1",
+    "quote": "The Saturday meal is where I met half my neighbors.",
+    "author": "Gloria M.",
+    "source": "",
+    "sort_order": 1
+   },
+   {
+    "id": "t2",
+    "quote": "My kids now ask to cook dinner on Tuesdays.",
+    "author": "Daniel R.",
+    "source": "",
+    "sort_order": 2
+   }
+  ],
+  "faqs": [
+   {
+    "id": "f1",
+    "question": "Do I need to sign up for a meal?",
+    "answer": "No. Come by on Saturday from noon. There is always enough.",
+    "sort_order": 1
+   },
+   {
+    "id": "f2",
+    "question": "How can I give?",
+    "answer": "Volunteer a shift, bring pantry items on Fridays, or give online.",
+    "sort_order": 2
+   }
+  ],
+  "posts": [
+   {
+    "id": "p1",
+    "title": "A thank-you to our volunteers",
+    "slug": "thank-you",
+    "excerpt": "What one year of Saturdays looked like.",
+    "body_md": "This year our volunteers served **meals every single Saturday**.\n\nThank you for showing up.",
+    "published_at": "2026-10-05T17:00:00Z",
+    "hero": {
+     "alt": "Volunteers in the kitchen",
+     "variants": {
+      "w400": "/thumbs/stand-ins/community.jpg",
+      "w800": "/thumbs/stand-ins/community.jpg",
+      "w1600": "/thumbs/stand-ins/community.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   }
+  ],
+  "redirects": [],
+  "locations": [
+   {
+    "address_line1": "618 N Verdugo Rd",
+    "address_line2": "",
+    "city": "Glendale",
+    "region": "CA",
+    "postal_code": "91206",
+    "country": "US",
+    "phone": "(818) 555-0158",
+    "timezone": "America/Los_Angeles",
+    "hours": [
+     {
+      "day": "mon",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "16:00"
+       }
+      ]
+     },
+     {
+      "day": "tue",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "16:00"
+       }
+      ]
+     },
+     {
+      "day": "wed",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "16:00"
+       }
+      ]
+     },
+     {
+      "day": "thu",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "16:00"
+       }
+      ]
+     },
+     {
+      "day": "fri",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "10:00",
+        "close": "16:00"
+       }
+      ]
+     },
+     {
+      "day": "sat",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "11:00",
+        "close": "15:00"
+       }
+      ]
+     },
+     {
+      "day": "sun",
+      "closed": true,
+      "intervals": []
+     }
+    ],
+    "holiday_exceptions": [],
+    "temporarily_closed": false,
+    "temporarily_closed_note": ""
+   }
+  ],
+  "settings": {
+   "category_order": [],
+   "industry": "nonprofit"
+  }
+ },
+ "other": {
+  "identity": {
+   "business_name": "Cobalt Auto Care",
+   "tagline": "Honest repairs and oil changes in Burbank, done while you wait",
+   "description": "Brakes, oil changes, tires and check-engine lights, with the price agreed before we start and a free ride home if it takes longer than an hour.",
+   "story": "Two mechanics opened Cobalt in 2012 to run the kind of shop they would send their own families to.\n\nWe show you the worn part, explain the fix and let you decide.",
+   "phone": "(818) 555-0176",
+   "email": "shop@cobaltauto.example",
+   "service_area": "Burbank, Toluca Lake and North Hollywood",
+   "booking_url": "https://book.example/cobalt",
+   "ordering_url": "",
+   "social": {},
+   "seo_title": "Cobalt Auto Care, Burbank auto repair",
+   "seo_description": "Auto repair in Burbank: brakes, oil changes, tires and diagnostics, priced before we start."
+  },
+  "offerings": [
+   {
+    "id": "o1",
+    "name": "Oil change",
+    "category": "Maintenance",
+    "description": "Synthetic oil and a 20-point check, usually in 30 minutes.",
+    "price_text": "from $69",
+    "sort_order": 1,
+    "media": {
+     "alt": "A mechanic checking the oil",
+     "variants": {
+      "w400": "/thumbs/stand-ins/other.jpg",
+      "w800": "/thumbs/stand-ins/other.jpg",
+      "w1600": "/thumbs/stand-ins/other.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o2",
+    "name": "Brakes",
+    "category": "Repairs",
+    "description": "Pads, rotors and a test drive with you before you pay.",
+    "price_text": "from $189",
+    "sort_order": 2,
+    "media": {
+     "alt": "New brake pads on a car",
+     "variants": {
+      "w400": "/thumbs/stand-ins/other.jpg",
+      "w800": "/thumbs/stand-ins/other.jpg",
+      "w1600": "/thumbs/stand-ins/other.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o3",
+    "name": "Check-engine light",
+    "category": "Repairs",
+    "description": "We read the code, find the cause and price the fix.",
+    "price_text": "$95",
+    "sort_order": 3,
+    "media": {
+     "alt": "A diagnostic tool plugged into a car",
+     "variants": {
+      "w400": "/thumbs/stand-ins/other.jpg",
+      "w800": "/thumbs/stand-ins/other.jpg",
+      "w1600": "/thumbs/stand-ins/other.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   },
+   {
+    "id": "o4",
+    "name": "Tires",
+    "category": "Maintenance",
+    "description": "New tires, rotation and balancing.",
+    "price_text": "",
+    "sort_order": 4,
+    "media": null
+   }
+  ],
+  "testimonials": [
+   {
+    "id": "t1",
+    "quote": "They showed me the worn pads before replacing anything. Fair price, no upsell.",
+    "author": "Tom H.",
+    "source": "Google",
+    "sort_order": 1
+   },
+   {
+    "id": "t2",
+    "quote": "Oil change done while I had a coffee next door.",
+    "author": "Lena K.",
+    "source": "Google",
+    "sort_order": 2
+   },
+   {
+    "id": "t3",
+    "quote": "The only shop I trust with my car.",
+    "author": "The Ortiz family",
+    "source": "Yelp",
+    "sort_order": 3
+   }
+  ],
+  "faqs": [
+   {
+    "id": "f1",
+    "question": "Do I need an appointment?",
+    "answer": "For oil changes and checks, walk in. For repairs, book online so the part is here.",
+    "sort_order": 1
+   },
+   {
+    "id": "f2",
+    "question": "Is your work guaranteed?",
+    "answer": "Yes. Parts and work are covered for a year.",
+    "sort_order": 2
+   }
+  ],
+  "posts": [
+   {
+    "id": "p1",
+    "title": "When to change your brakes",
+    "slug": "brakes",
+    "excerpt": "Three sounds that mean it is time.",
+    "body_md": "A **squeal**, a grind or a soft pedal means book a check.",
+    "published_at": "2026-09-20T17:00:00Z",
+    "hero": {
+     "alt": "A car on a lift",
+     "variants": {
+      "w400": "/thumbs/stand-ins/other.jpg",
+      "w800": "/thumbs/stand-ins/other.jpg",
+      "w1600": "/thumbs/stand-ins/other.jpg"
+     },
+     "width": 1600,
+     "height": 1000
+    }
+   }
+  ],
+  "redirects": [],
+  "locations": [
+   {
+    "address_line1": "905 W Olive Ave",
+    "address_line2": "",
+    "city": "Burbank",
+    "region": "CA",
+    "postal_code": "91506",
+    "country": "US",
+    "phone": "(818) 555-0176",
+    "timezone": "America/Los_Angeles",
+    "hours": [
+     {
+      "day": "mon",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "tue",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "wed",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "thu",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "fri",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "18:00"
+       }
+      ]
+     },
+     {
+      "day": "sat",
+      "closed": false,
+      "intervals": [
+       {
+        "open": "08:00",
+        "close": "14:00"
+       }
+      ]
+     },
+     {
+      "day": "sun",
+      "closed": true,
+      "intervals": []
+     }
+    ],
+    "holiday_exceptions": [],
+    "temporarily_closed": false,
+    "temporarily_closed_note": ""
+   }
+  ],
+  "settings": {
+   "category_order": [],
+   "industry": "auto_repair"
+  }
+ }
+}

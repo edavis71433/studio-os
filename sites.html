@@ -281,6 +281,47 @@
   .kind:has(input:checked) b,.kind:has(input:checked) span{color:var(--p-deep)}
   .kind:has(input:focus-visible),.dcard:has(input:focus-visible),.tcard:has(input:focus-visible){outline:2px solid var(--p);outline-offset:2px}
   .srule{border:none;border-top:1px solid var(--line);margin:4px 0}
+  /* item 331: each design card has "See it full size" under it; the viewer draws a sample live */
+  .dcell{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .dfull{align-self:flex-start;min-height:36px;padding:6px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--p);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  .dfull:hover{border-color:var(--p)}
+  @media (pointer:coarse){.dfull{min-height:44px}}
+  dialog.bigview{width:min(1240px,96vw);max-width:none;height:92vh;max-height:none;padding:0;border:none;border-radius:20px;background:var(--bg);color:var(--ink);overflow:hidden}
+  dialog.bigview[open]{display:flex;flex-direction:column}
+  dialog.bigview::backdrop{background:rgba(23,21,34,.55)}
+  .bvtop{flex:0 0 auto;display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--line)}
+  .bvt{flex:1 1 auto;min-width:0} .bvt h3{margin:0;font-size:20px} .bvt p{margin:2px 0 0;font-size:13px;color:var(--soft)}
+  .bvseg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;flex:0 0 auto}
+  .bvseg button{min-height:44px;padding:0 16px;border:none;background:var(--card);color:var(--soft);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+  .bvseg button[aria-pressed="true"]{background:var(--p-soft);color:var(--p-deep)}
+  .bvbody{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;background:var(--card)}
+  .bvwait{position:absolute;inset:0;display:grid;place-items:center;margin:0;color:var(--soft);font-size:14px}
+  .bvframe{position:absolute;inset:0;overflow:hidden}
+  .bvframe iframe{display:block;border:0;background:#fff;transform-origin:0 0}
+  .bvframe.phone{display:flex;justify-content:center;padding:16px 0;background:var(--bg)}
+  .bvframe.phone iframe{width:390px;height:100%;border-radius:18px;box-shadow:0 10px 30px -10px rgba(0,0,0,.35)}
+  .bvfoot{flex:0 0 auto;display:flex;justify-content:flex-end;gap:12px;padding:12px 20px;border-top:1px solid var(--line)}
+  .bvfoot .btn{min-height:44px;padding:10px 18px;border-radius:10px;font-weight:600}
+  @media (max-width:760px){dialog.bigview{width:100%;height:100vh;height:100dvh;border-radius:0}.bvtop{flex-wrap:wrap;padding:12px 16px}.bvt{flex-basis:calc(100% - 60px)}}
+  /* item 332: the optional first draft */
+  .ndraft{display:flex;flex-direction:column;gap:12px}
+  .ndraft-on{display:flex;align-items:flex-start;gap:12px;min-height:44px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;background:var(--card)}
+  .ndraft-on input{flex:0 0 auto;width:20px;height:20px;margin:1px 0 0;accent-color:var(--p)}
+  .ndraft-on b{display:block;font-size:14px;font-weight:600;line-height:1.3}
+  .ndraft-on span span{display:block;font-size:12px;color:var(--faint);margin-top:2px;line-height:1.35}
+  .ndraft-on:has(input:checked){border:2px solid var(--p);padding:11px 13px;background:var(--p-soft)}
+  .ndraft-fields{display:flex;flex-direction:column;gap:8px}
+  .nsvcs{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+  .ntones{display:flex;flex-wrap:wrap;gap:8px}
+  .ntone{position:relative;display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:14px;font-weight:600;color:var(--ink);cursor:pointer}
+  .ntone input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+  .ntone:has(input:checked){border:2px solid var(--p);padding:0 15px;background:var(--p-soft);color:var(--p-deep)}
+  .ntone:has(input:focus-visible),.ndraft-on:has(input:focus-visible){outline:2px solid var(--p);outline-offset:2px}
+  .ndraft-line{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+  .ndraft-line.ok{color:var(--ink)}
+  .nspin{flex:0 0 auto;width:16px;height:16px;margin-top:2px;border:2px solid var(--p-soft);border-top-color:var(--p);border-radius:50%;animation:nspin .9s linear infinite}
+  @keyframes nspin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.nspin{animation:none}}
   .sright h4{font-family:var(--serif);font-weight:600;font-size:24px;margin:0;letter-spacing:-.01em}
   .sright .lookline{font-size:13.5px;color:var(--soft);line-height:1.45;margin:4px 0 0}
   .designs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
@@ -295,6 +336,10 @@
   .dcard:has(input:checked) .dtick{display:grid}
   .dcard b{font-size:15px;font-weight:600}
   .dline{font-size:13px;color:var(--soft);line-height:1.4}
+  /* the openings made for a kind of business (lib/kind_openings.ts): three cards before the designs */
+  .nopen{display:flex;flex-direction:column;gap:12px;margin-bottom:12px}
+  .ohead{margin:0;font-size:14px;font-weight:600;color:var(--ink)}
+  #new-open-then{margin-top:8px}
   .tpls{display:flex;flex-wrap:wrap;gap:14px}
   .tcard{position:relative;display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--card);cursor:pointer;min-width:0;flex:1 1 300px}
   .tcard:has(input:checked){border:3px solid var(--p);padding:10px}
@@ -495,6 +540,23 @@
             <div class="kinds" id="new-kinds"></div>
           </fieldset>
           <div id="new-exact-wrap" hidden><label class="fl" for="new-exact">More exactly (optional)</label><select id="new-exact"></select></div>
+          <fieldset id="new-draft-wrap" class="ndraft" hidden>
+            <legend class="sr-only">A first draft</legend>
+            <label class="ndraft-on"><input type="checkbox" id="new-draft" aria-controls="new-draft-fields"><span><b>Write the first draft for me</b><span>Home, About, Services and Contact, written into a private draft you can change. Optional.</span></span></label>
+            <div id="new-draft-fields" class="ndraft-fields" hidden>
+              <p class="fl" id="new-svc-l">Three things they offer</p>
+              <div class="nsvcs" role="group" aria-labelledby="new-svc-l">
+                <input type="text" id="new-svc-0" maxlength="80" aria-label="First thing they offer" autocomplete="off">
+                <input type="text" id="new-svc-1" maxlength="80" aria-label="Second thing they offer" autocomplete="off">
+                <input type="text" id="new-svc-2" maxlength="80" aria-label="Third thing they offer" autocomplete="off">
+              </div>
+              <label class="fl" for="new-town">The town</label>
+              <input type="text" id="new-town" maxlength="80" placeholder="Burbank, CA" autocomplete="off">
+              <p class="fl" id="new-tone-l">How it should sound</p>
+              <div class="ntones" id="new-tones" role="radiogroup" aria-labelledby="new-tone-l"></div>
+              <p class="shint" id="new-draft-note">The words land in a private draft for you to change. Nothing is published and nobody is emailed. Until the stock photo library is on, the site opens with a stand-in picture to swap for a photo of the business.</p>
+            </div>
+          </fieldset>
           <div id="new-kit-wrap" hidden>
             <hr class="srule">
             <label class="fl" for="new-kit">Bring a starter kit too (optional)</label>
@@ -505,7 +567,9 @@
         <div class="sright">
           <div><h4>Pick a look</h4><p class="lookline" id="new-lookline">Pick the kind of business and the designs that suit it come first. Your words stay yours; a look can be changed any time in the editor, under Styles.</p></div>
           <p class="shint" id="new-nodesigns" hidden>The designs couldn’t load just now. The site starts on the usual look, and you can change it in the editor, under Styles.</p>
-          <fieldset id="new-look-wrap" hidden><legend class="sr-only">Pick a look</legend><div class="designs" id="new-designs"></div></fieldset>
+          <fieldset id="new-look-wrap" hidden><legend class="sr-only">Pick a look</legend>
+            <div id="new-open-wrap" class="nopen" hidden><p class="ohead" id="new-open-h">Made for this kind of business</p><div class="designs" id="new-openings" role="group" aria-labelledby="new-open-h"></div><p class="ohead" id="new-open-then">Or start from one of the eight designs</p></div>
+            <div class="designs" id="new-designs"></div></fieldset>
           <fieldset id="new-tpl-wrap" hidden><legend class="fl" style="font-size:14px;color:var(--ink)">Or start from one of your templates</legend><div class="tpls" id="new-tpls" style="margin-top:10px"></div></fieldset>
         </div>
       </div>
@@ -517,6 +581,16 @@
     </div>
     <div id="new-done" class="dbody sdone" style="display:none"></div>
   </form>
+</dialog>
+<!-- item 331: "See it full size", a kind's sample site drawn live in one design -->
+<dialog id="bigDlg" class="bigview" aria-labelledby="bigHead">
+  <div class="bvtop">
+    <div class="bvt"><h3 id="bigHead">Design</h3><p id="bigSub"></p></div>
+    <div class="bvseg" role="group" aria-label="See it on"><button type="button" id="bigDesk" aria-pressed="true">Computer</button><button type="button" id="bigPhone" aria-pressed="false">Phone</button></div>
+    <button type="button" class="sx" id="bigX" aria-label="Close">×</button>
+  </div>
+  <div class="bvbody" id="bigBody"><p class="bvwait" id="bigWait" role="status">Drawing the sample…</p><div class="bvframe" id="bigWrap"><iframe id="bigFrame" title="A sample site in this design" sandbox="" referrerpolicy="no-referrer"></iframe></div></div>
+  <div class="bvfoot"><button type="button" class="btn ghost" id="bigBack">Back</button><button type="button" class="btn" id="bigUse">Use this design</button></div>
 </dialog>
 <!-- Invite the owner (item 135): the later, separate step for a site with no owner
      yet. Their sign-in email goes out from the studio (POST /agency/sites/:id/invite) -->
@@ -1649,7 +1723,11 @@ let NEW_BUSY=false,NEW_MADE=null,KITS=[],DESIGNS=null;
 // what's picked: the kind (a chip), the closer kind, the design, and a kit or a saved template.
 // chosen: the studio picked a kind or a design, so the design is sent; the untouched sheet
 // sends none and the site keeps the usual look.
-let NEWS={kind:'',industry:'',look:'',chosen:false,byHand:false,kit:'',tpl:false};
+// opening: one of the openings made for the kind (a design, its layout and a look, picked as one);
+// it belongs to its kind, so picking another kind picks that kind's first one, or its first design
+let NEWS={kind:'',industry:'',look:'',chosen:false,byHand:false,kit:'',tpl:false,opening:''};
+// item 332: the optional first draft's answers, kept from Create site until the site is made
+let NEW_ASK=null,DRAFT_TYPED=false;
 // builder item 241: Create website on a customer's profile opens this sheet for them (?for=<their id>):
 // it names them, fills in their business, and the site is made for their record
 let NEW_FOR=null;
@@ -1659,6 +1737,20 @@ const kitHintOf=(k)=>k&&k.kind==='template'
   :'Starter kit: the services, FAQs, voice and colors it was saved with.';
 const kindOf=(key)=>((DESIGNS&&DESIGNS.kinds)||[]).find(k=>k.key===key)||null;
 const designOf=(slug)=>((DESIGNS&&DESIGNS.designs)||[]).find(d=>d.slug===slug)||null;
+// item 331: with a kind picked, each design is pictured with that kind's own sample business
+const picOf=(d)=>{const k=kindOf(NEWS.kind);return (k&&d.pictures&&d.pictures[k.family])||d.picture;};
+// the openings made for the kind picked (salons, home services, restaurants), the first one first
+const openingsOfKind=()=>{const k=kindOf(NEWS.kind),o=DESIGNS&&DESIGNS.openings;return (k&&o&&Array.isArray(o[k.family]))?o[k.family]:[];};
+const openingOf=(key)=>openingsOfKind().find(o=>o.key===key)||null;
+// a kind picked by hand: its first opening, else the first design that suits it (a design picked by hand stays)
+function pickForKind(){
+  if(NEWS.tpl)return;
+  const first=openingsOfKind()[0];
+  if(NEWS.opening&&!openingOf(NEWS.opening))NEWS.opening='';
+  if(NEWS.byHand)return;
+  if(first){NEWS.opening=first.key;NEWS.look=first.design;return;}
+  NEWS.opening='';const s=newSuggested();if(s[0])NEWS.look=s[0];
+}
 function newSuggested(){const k=kindOf(NEWS.kind);return k&&DESIGNS&&DESIGNS.suggested?(DESIGNS.suggested[k.family]||[]):[];}
 function roomFull(){const r=META.room;return !!(r&&typeof r.limit==='number'&&r.used>=r.limit);}
 async function loadDesigns(){
@@ -1677,15 +1769,25 @@ function paintExact(){
   $('new-exact').innerHTML=k.exact.map(e=>`<option value="${esc(e.key)}"${NEWS.industry===e.key?' selected':''}>${esc(e.label)}</option>`).join('');
   $('new-exact-wrap').hidden=false;
 }
+function paintOpenings(){
+  const list=openingsOfKind(),k=kindOf(NEWS.kind),badge=k&&DESIGNS.badges?DESIGNS.badges[k.family]||'':'';
+  $('new-open-wrap').hidden=!list.length;
+  if(!list.length){$('new-openings').innerHTML='';return;}
+  $('new-open-h').textContent=badge?badge.replace(/^Good for /,'Made for '):'Made for this kind of business';
+  $('new-openings').innerHTML=list.map(o=>{const on=!NEWS.tpl&&NEWS.opening===o.key;
+    return `<div class="dcell"><label class="dcard ocard" data-opening="${esc(o.key)}"><input type="radio" name="newlook" value="op:${esc(o.key)}"${on?' checked':''}><span class="dpic"><img src="${esc(o.picture)}" alt="" loading="lazy" width="640" height="440"><span class="dtick" aria-hidden="true">✓</span></span><b>${esc(o.name)}</b><span class="dline">${esc(o.line)}</span></label><button type="button" class="dfull" data-full-opening="${esc(o.key)}" aria-label="See ${esc(o.name)} full size">See it full size</button></div>`;}).join('');
+}
 function paintDesigns(){
   const all=(DESIGNS&&DESIGNS.designs)||[];
   $('new-look-wrap').hidden=!all.length;
+  paintOpenings();
   const sug=newSuggested(),k=kindOf(NEWS.kind),badge=k&&DESIGNS.badges?DESIGNS.badges[k.family]||'':'';
   const order=[...sug.map(designOf).filter(Boolean),...all.filter(d=>!sug.includes(d.slug))];
-  $('new-designs').innerHTML=order.map(d=>{const on=!NEWS.tpl&&NEWS.look===d.slug;
-    return `<label class="dcard" data-design="${esc(d.slug)}"><input type="radio" name="newlook" value="${esc(d.slug)}"${on?' checked':''}><span class="dpic"><img src="${esc(d.picture)}" alt="" loading="lazy" width="640" height="440">${badge&&sug.includes(d.slug)?`<span class="dbadge"><span aria-hidden="true">★</span>${esc(badge)}</span>`:''}<span class="dtick" aria-hidden="true">✓</span></span><b>${esc(d.name)}</b><span class="dline">${esc(d.line)}</span></label>`;}).join('');
+  $('new-designs').innerHTML=order.map(d=>{const on=!NEWS.tpl&&!NEWS.opening&&NEWS.look===d.slug;
+    return `<div class="dcell"><label class="dcard" data-design="${esc(d.slug)}"><input type="radio" name="newlook" value="${esc(d.slug)}"${on?' checked':''}><span class="dpic"><img src="${esc(picOf(d))}" alt="" loading="lazy" width="640" height="440">${badge&&sug.includes(d.slug)?`<span class="dbadge"><span aria-hidden="true">★</span>${esc(badge)}</span>`:''}<span class="dtick" aria-hidden="true">✓</span></span><b>${esc(d.name)}</b><span class="dline">${esc(d.line)}</span></label><button type="button" class="dfull" data-full="${esc(d.slug)}" aria-label="See ${esc(d.name)} full size">See it full size</button></div>`;}).join('');
   const good=badge.replace(/^Good for /,'');
-  $('new-lookline').textContent=(k?(k.family==='other'?'Three good places to start come first.':`The three that suit ${good} come first.`):'Pick the kind of business and the designs that suit it come first.')+' Your words stay yours; a look can be changed any time in the editor, under Styles.';
+  const opens=openingsOfKind().length;
+  $('new-lookline').textContent=(k?(opens?`Three ways to open made for ${good} come first, then the eight designs.`:k.family==='other'?'Three good places to start come first.':`The three that suit ${good} come first.`):'Pick the kind of business and the designs that suit it come first.')+' Your words stay yours; a look can be changed any time in the editor, under Styles.';
 }
 function paintTemplates(){
   const tpls=KITS.filter(k=>k.kind==='template');
@@ -1697,14 +1799,51 @@ function paintStarter(){
   $('new-kit-wrap').hidden=!kits.length||NEWS.tpl;   // a template brings its own setup
   $('new-kit').innerHTML='<option value="">None</option>'+kits.map(k=>`<option value="${esc(k.id)}"${!NEWS.tpl&&NEWS.kit===k.id?' selected':''}>${esc(k.name)}</option>`).join('');
 }
+// item 332: the first draft. The three services start as the kind's usual ones until the studio
+// types its own; a saved template brings its own words, so the step steps aside for one.
+function paintDraft(){
+  $('new-draft-wrap').hidden=!!NEWS.tpl;
+  $('new-draft-fields').hidden=!$('new-draft').checked;
+  const tones=(DESIGNS&&DESIGNS.tones)||[{key:'friendly',label:'Friendly'},{key:'professional',label:'Professional'},{key:'warm',label:'Warm'},{key:'bold',label:'Bold'},{key:'calm',label:'Calm'}];
+  const box=$('new-tones');
+  if(!box.children.length)box.innerHTML=tones.map((t,i)=>`<label class="ntone"><input type="radio" name="newtone" value="${esc(t.key)}"${i?'':' checked'}>${esc(t.label)}</label>`).join('');
+  if(!DRAFT_TYPED){const k=kindOf(NEWS.kind),svc=(k&&k.services)||[];[0,1,2].forEach(i=>{$('new-svc-'+i).value=svc[i]||'';});}
+}
+// what the step asks for, or null when it's off; something to write from is needed
+function draftAsk(){
+  if(NEWS.tpl||!$('new-draft').checked)return null;
+  const services=[0,1,2].map(i=>$('new-svc-'+i).value.trim()).filter(Boolean),town=$('new-town').value.trim();
+  const t=document.querySelector('input[name="newtone"]:checked');
+  if(!services.length&&!town)return {error:'Add one thing they offer, or the town, so the first draft has something to write from.'};
+  return {services,town,tone:t?t.value:'friendly'};
+}
+function draftDoneWords(d){
+  const n=(c,w)=>c+' '+w+(c===1?'':'s');
+  const parts=[d.services?n(d.services,'service'):'',d.questions?n(d.questions,'question')+' answered':''].filter(Boolean);
+  const photo=d.photos==='stock'?' It opens with stock photos.':d.photos==='stand_in'?' It opens with a stand-in picture to swap for a photo of the business.':'';
+  return 'The first draft is written: the words for Home, About, Services and Contact'+(parts.length?', with '+parts.join(' and '):'')+'.'+photo+' Every word is yours to change in the editor. Nothing is published.';
+}
+// the site is made; now the words (about half a minute). The sheet can close meanwhile.
+async function firstDraft(siteId,ask){
+  const line=$('new-draft-line');if(!line)return;
+  line.classList.remove('ok');
+  line.innerHTML='<span class="nspin" aria-hidden="true"></span><span>Writing the first draft: Home, About, Services and Contact. It takes about half a minute, and you can close this meanwhile.</span>';
+  let r=null;try{r=await apiSend('POST','/agency/sites/'+encodeURIComponent(siteId)+'/first-draft',ask);}catch(_){r=null;}
+  const now=$('new-draft-line');if(!now)return;   // the sheet has moved on to another site
+  if(r&&r.ok){now.textContent=draftDoneWords((r.body&&r.body.data)||{});now.classList.add('ok');return;}
+  const msg=(r&&r.body&&r.body.message)||(r&&r.status===0?'We lost the connection while the first draft was being written. Open the editor to see whether it landed.':'The first draft didn’t come through. The site is ready, with sample words to change by hand.');
+  const retry=!r||![400,403,503].includes(r.status);   // a plan, a switch or a ceiling won't change by trying again
+  now.innerHTML=esc(msg)+(retry?' <button type="button" class="btn ghost" id="new-draft-again">Try again</button>':'');
+  const again=$('new-draft-again');if(again)again.onclick=()=>firstDraft(siteId,ask);
+}
 function paintNewSum(){
   const name=$('new-biz').value.trim()||'Your new site';
   const k=kindOf(NEWS.kind),ex=k&&(k.exact||[]).find(e=>e.key===NEWS.industry);
   const word=ex?ex.label:k?k.label:'';
-  const tpl=NEWS.tpl?KITS.find(x=>x.id===NEWS.kit):null,d=tpl?null:designOf(NEWS.look);
-  $('new-sum-pic').innerHTML=d?`<img src="${esc(d.picture)}" alt="" width="640" height="440">`:'▤';
+  const tpl=NEWS.tpl?KITS.find(x=>x.id===NEWS.kit):null,d=tpl?null:designOf(NEWS.look),o=tpl?null:openingOf(NEWS.opening);
+  $('new-sum-pic').innerHTML=o?`<img src="${esc(o.picture)}" alt="" width="640" height="440">`:d?`<img src="${esc(picOf(d))}" alt="" width="640" height="440">`:'▤';
   $('new-sum-a').textContent=name+(word?' · '+word:'');
-  $('new-sum-b').textContent=(tpl?'From your “'+tpl.name+'” template':d?d.name+' look':'The usual look')+' · starts private, nothing published';
+  $('new-sum-b').textContent=(tpl?'From your “'+tpl.name+'” template':o?o.name:d?d.name+' look':'The usual look')+' · starts private, nothing published';
 }
 // a full plan (item 198): the server's own words when it said so, else the same words from the count
 function paintNewFull(msg){
@@ -1725,7 +1864,8 @@ async function openNewSite(preset,forCustomer){
   $('newHead').textContent=NEW_FOR?'New website for '+(NEW_FOR.business||NEW_FOR.person||'your customer'):'New site';
   $('newHead').nextElementSibling.textContent=NEW_FOR?'For your customer'+(NEW_FOR.person?' '+NEW_FOR.person:'')+'. Nothing is published, and nobody is emailed.':'Build it in private. Nobody is emailed until you invite the owner.';
   if(NEW_FOR&&NEW_FOR.business)$('new-biz').value=NEW_FOR.business;
-  NEWS={kind:'',industry:'',look:'',chosen:false,byHand:false,kit:'',tpl:false};
+  NEWS={kind:'',industry:'',look:'',chosen:false,byHand:false,kit:'',tpl:false,opening:''};
+  NEW_ASK=null;DRAFT_TYPED=false;$('new-draft').checked=false;$('new-town').value='';$('new-tones').innerHTML='';
   $('new-fields').style.display='';$('new-done').style.display='none';$('new-done').innerHTML='';
   const b=$('new-submit');b.textContent=NEW_FOR?'Create website':'Create site';
   paintNewFull('');paintNewSum();
@@ -1739,8 +1879,49 @@ async function openNewSite(preset,forCustomer){
     if(want&&designOf(want)){NEWS.look=want;NEWS.chosen=true;NEWS.byHand=true;}
     else NEWS.look=((designs.suggested&&designs.suggested.other)||[])[0]||designs.designs[0].slug;   // the usual look, shown picked
   }
-  paintKinds();paintExact();paintDesigns();paintTemplates();paintStarter();paintNewSum();
+  paintKinds();paintExact();paintDesigns();paintTemplates();paintStarter();paintDraft();paintNewSum();
 }
+// item 331: "See it full size". The server draws the kind's sample site in the design (no
+// scripts, photos from the app); the frame shows it at a computer's width scaled to fit, or a phone's.
+let BIG=null;
+function paintBig(){
+  if(!BIG)return;
+  const wrap=$('bigWrap'),f=$('bigFrame'),phone=BIG.phone;
+  $('bigDesk').setAttribute('aria-pressed',String(!phone));$('bigPhone').setAttribute('aria-pressed',String(phone));
+  wrap.classList.toggle('phone',phone);
+  if(phone){f.style.transform='';f.style.width='';f.style.height='';return;}
+  const w=wrap.clientWidth||1,h=wrap.clientHeight||1,scale=Math.min(1,w/1280);
+  f.style.width='1280px';f.style.height=Math.ceil(h/scale)+'px';f.style.transform=`scale(${scale})`;
+}
+async function openBig(slug,openingKey){
+  const d=designOf(slug),o=openingKey?openingOf(openingKey):null;if(!d||(openingKey&&!o))return;
+  const k=kindOf(NEWS.kind),fam=k?k.family:(d.family||'other'),noun=(DESIGNS.sample_nouns||{})[fam]||'business';
+  BIG={slug,opening:o?o.key:'',phone:window.innerWidth<761};
+  $('bigHead').textContent=o?o.name:d.name;
+  $('bigSub').textContent=`A sample ${noun} ${o?'opening this way, on the '+d.name+' design':'in this design'}. The site’s own words and photos replace it.`;
+  $('bigUse').textContent=o?'Use this look':'Use this design';
+  $('bigWait').hidden=false;$('bigWait').textContent='Drawing the sample…';$('bigWrap').style.visibility='hidden';   // one srcdoc write per look: WebKit can stay on the first of two quick writes (item 100)
+  $('bigDlg').showModal();paintBig();$('bigX').focus();
+  let r=null;try{r=await api('/agency/designs/'+encodeURIComponent(slug)+'/sample?kind='+encodeURIComponent(NEWS.industry||fam)+(o?'&opening='+encodeURIComponent(o.key):''));}catch(_){r=null;}
+  if(!BIG||BIG.slug!==slug||BIG.opening!==(o?o.key:'')||!$('bigDlg').open)return;
+  const html=r&&r.ok&&r.body&&r.body.data&&r.body.data.html;
+  if(!html){$('bigWait').textContent='We couldn’t draw this design just now. Its picture shows how it starts.';return;}
+  $('bigFrame').srcdoc=html;$('bigWait').hidden=true;$('bigWrap').style.visibility='';paintBig();
+}
+$('new-designs').addEventListener('click',(e)=>{const b=e.target.closest('[data-full]');if(b)openBig(b.getAttribute('data-full'));});
+$('new-openings').addEventListener('click',(e)=>{const b=e.target.closest('[data-full-opening]');const o=b&&openingOf(b.getAttribute('data-full-opening'));if(o)openBig(o.design,o.key);});
+$('bigDesk').onclick=()=>{if(BIG){BIG.phone=false;paintBig();}};
+$('bigPhone').onclick=()=>{if(BIG){BIG.phone=true;paintBig();}};
+$('bigX').onclick=$('bigBack').onclick=()=>$('bigDlg').close();
+$('bigUse').onclick=()=>{
+  const o=BIG&&BIG.opening?openingOf(BIG.opening):null;
+  if(o){NEWS.opening=o.key;NEWS.look=o.design;NEWS.chosen=true;NEWS.byHand=false;if(NEWS.tpl){NEWS.tpl=false;NEWS.kit='';}paintDesigns();paintStarter();paintDraft();paintNewSum();}
+  else if(BIG&&designOf(BIG.slug)){NEWS.look=BIG.slug;NEWS.opening='';NEWS.chosen=true;NEWS.byHand=true;if(NEWS.tpl){NEWS.tpl=false;NEWS.kit='';}paintDesigns();paintStarter();paintDraft();paintNewSum();}
+  const slug=BIG&&BIG.slug;$('bigDlg').close();
+  const i=o?document.querySelector(`#new-openings input[value="op:${CSS.escape(o.key)}"]`):slug&&document.querySelector(`#new-designs input[value="${CSS.escape(slug)}"]`);if(i)i.focus();
+};
+$('bigDlg').addEventListener('close',()=>{BIG=null;$('bigFrame').removeAttribute('srcdoc');});
+window.addEventListener('resize',()=>{if(BIG)paintBig();});
 $('new-x').onclick=()=>$('newDlg').close();
 $('new-cancel').onclick=()=>$('newDlg').close();
 $('new-back').onclick=()=>{$('newDlg').close();const h=$('pagehead');if(h)h.focus();};   // back to the list, to move one to the Trash
@@ -1748,13 +1929,19 @@ $('new-biz').addEventListener('input',paintNewSum);
 $('new-kinds').addEventListener('change',(e)=>{
   const i=e.target.closest('input[name="newkind"]');if(!i)return;
   NEWS.kind=i.value;NEWS.industry=i.value;NEWS.chosen=true;
-  if(!NEWS.byHand&&!NEWS.tpl){const s=newSuggested();if(s[0])NEWS.look=s[0];}   // a design picked by hand stays picked
-  paintExact();paintDesigns();paintNewSum();
+  pickForKind();   // its first opening, or the first design that suits it; a design picked by hand stays picked
+  paintExact();paintDesigns();paintDraft();paintNewSum();
 });
 $('new-exact').addEventListener('change',()=>{NEWS.industry=$('new-exact').value;paintNewSum();});
 // the designs and your templates are one choice: a template brings its own look
-$('new-designs').addEventListener('change',(e)=>{const i=e.target.closest('input[name="newlook"]');if(!i)return;NEWS.look=i.value;NEWS.chosen=true;NEWS.byHand=true;if(NEWS.tpl){NEWS.tpl=false;NEWS.kit='';}paintStarter();paintNewSum();});
-$('new-tpls').addEventListener('change',(e)=>{const i=e.target.closest('input[name="newlook"]');if(!i)return;NEWS.kit=i.value.slice(4);NEWS.tpl=true;paintStarter();paintNewSum();});
+$('new-designs').addEventListener('change',(e)=>{const i=e.target.closest('input[name="newlook"]');if(!i)return;NEWS.look=i.value;NEWS.opening='';NEWS.chosen=true;NEWS.byHand=true;if(NEWS.tpl){NEWS.tpl=false;NEWS.kit='';}paintStarter();paintDraft();paintNewSum();});
+// an opening is a design, its layout and a look as one; it belongs to its kind, so it isn't "by hand"
+$('new-openings').addEventListener('change',(e)=>{const i=e.target.closest('input[name="newlook"]');const o=i&&openingOf(i.value.slice(3));if(!o)return;NEWS.opening=o.key;NEWS.look=o.design;NEWS.chosen=true;NEWS.byHand=false;if(NEWS.tpl){NEWS.tpl=false;NEWS.kit='';}paintStarter();paintDraft();paintNewSum();});
+$('new-tpls').addEventListener('change',(e)=>{const i=e.target.closest('input[name="newlook"]');if(!i)return;NEWS.kit=i.value.slice(4);NEWS.tpl=true;paintStarter();paintDraft();paintNewSum();});
+// Ticking the box opens the three fields, already filled in for the kind, right after it; focus stays on
+// the box (Tab goes on into them), so a phone's keyboard doesn't open over fields that may need no typing.
+$('new-draft').addEventListener('change',paintDraft);
+['new-svc-0','new-svc-1','new-svc-2'].forEach((id)=>$(id).addEventListener('input',()=>{DRAFT_TYPED=true;}));
 $('new-kit').addEventListener('change',()=>{if(!NEWS.tpl)NEWS.kit=$('new-kit').value;paintNewSum();});
 function newKitLine(k){
   if(!k)return'';
@@ -1767,7 +1954,11 @@ function newKitLine(k){
 // item 198: what the design and the kind came to
 function newLookLine(d){
   const l=d.look;if(!l)return'';
-  return l.applied?'It starts with the '+esc(l.name)+' design. You can change it any time in the editor, under Styles.':'The '+esc(l.name)+' design didn’t save, so it has the usual look. You can change it in the editor, under Styles.';
+  if(!l.applied)return'The '+esc(l.name)+' design didn’t save, so it has the usual look. You can change it in the editor, under Styles.';
+  const o=d.opening&&d.opening.key?d.opening:null;   // one of the openings made for the kind
+  if(o)return o.applied&&o.applied.layout&&o.applied.style?'It starts with the '+esc(l.name)+' design, opening as “'+esc(o.name)+'”. You can change it any time in the editor, under Styles.'
+    :'It starts with the '+esc(l.name)+' design. “'+esc(o.name)+'” didn’t fully save, so it may open the usual way. You can change it in the editor, under Styles.';
+  return 'It starts with the '+esc(l.name)+' design. You can change it any time in the editor, under Styles.';
 }
 function paintNewDone(d,name){
   $('new-fields').style.display='none';
@@ -1775,7 +1966,7 @@ function paintNewDone(d,name){
   const open=META.can_open?`<a class="btn" id="new-open" href="${esc(scoped('/presence.html',d.site_id))}" style="text-decoration:none;display:inline-flex;align-items:center">Open the editor</a>`:'';
   // builder item 241: made for a customer, the way back is their profile, where Invite to their portal is
   const prof=d.for_customer?`<a class="btn" id="new-profile" href="/crm.html?client=${encodeURIComponent(d.site_id)}" style="text-decoration:none;display:inline-flex;align-items:center">Back to their profile</a>`:'';
-  done.innerHTML=`<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">${esc(name)}’s ${d.for_customer?'website':'site'} is ready</h3>${look?`<p id="new-look-line">${look}</p>`:''}${kit?`<p id="new-kit-line">${newKitLine(kit)}</p>`:''}<p>${d.for_customer?'Nobody has been emailed. Invite them to their portal from their profile when you’re ready.':'Nobody has been emailed. Invite the owner from its card when you’re ready to show them.'}</p></div>`
+  done.innerHTML=`<div class="done"><div class="tick" aria-hidden="true">✓</div><h3 style="margin:0 0 4px">${esc(name)}’s ${d.for_customer?'website':'site'} is ready</h3>${look?`<p id="new-look-line">${look}</p>`:''}${kit?`<p id="new-kit-line">${newKitLine(kit)}</p>`:''}${NEW_ASK?'<p id="new-draft-line" class="ndraft-line" role="status" aria-live="polite"></p>':''}<p>${d.for_customer?'Nobody has been emailed. Invite them to their portal from their profile when you’re ready.':'Nobody has been emailed. Invite the owner from its card when you’re ready to show them.'}</p></div>`
     +`<div class="row2">${kit&&kit.failed?'<button type="button" class="btn ghost" id="new-kit-again">Try the kit again</button>':''}${prof?(open?open.replace('class="btn"','class="btn ghost"'):'')+prof:`<button type="button" class="btn${open?' ghost':''}" id="new-close">Done</button>${open}`}</div>`;
   done.style.display='';
   const cl=$('new-close');if(cl)cl.onclick=()=>$('newDlg').close();
@@ -1794,10 +1985,13 @@ $('newForm').onsubmit=async(e)=>{
   const business_name=$('new-biz').value.trim();
   if(!business_name){toast('Name the business.',true);$('new-biz').focus();return;}
   if(roomFull()){paintNewFull('');return;}
-  const kit_id=NEWS.kit||'',template_slug=!NEWS.tpl&&NEWS.chosen&&NEWS.look?NEWS.look:'',industry_key=NEWS.industry||'';
+  const ask=draftAsk();   // item 332: checked before anything is made
+  if(ask&&ask.error){toast(ask.error,true);$('new-svc-0').focus();return;}
+  NEW_ASK=ask;
+  const kit_id=NEWS.kit||'',template_slug=!NEWS.tpl&&NEWS.chosen&&NEWS.look?NEWS.look:'',industry_key=NEWS.industry||'',opening=!NEWS.tpl&&NEWS.chosen&&NEWS.opening?NEWS.opening:'';
   NEW_BUSY=true;const btn=$('new-submit');btn.disabled=true;btn.textContent='Making the site…';
   let r=null;
-  try{r=await apiSend('POST','/agency/sites',{business_name,kit_id:kit_id||undefined,template_slug:template_slug||undefined,industry_key:industry_key||undefined,client_id:(NEW_FOR&&NEW_FOR.client_id)||undefined});}
+  try{r=await apiSend('POST','/agency/sites',{business_name,kit_id:kit_id||undefined,template_slug:template_slug||undefined,industry_key:industry_key||undefined,client_id:(NEW_FOR&&NEW_FOR.client_id)||undefined,opening:opening||undefined});}
   finally{NEW_BUSY=false;}
   // no answer at all: the site may or may not have been made
   if(r&&r.status===0){r=null;toast('We lost the connection, so we can’t tell whether the site was made. Refresh Sites before trying again.',true);}
@@ -1810,6 +2004,7 @@ $('newForm').onsubmit=async(e)=>{
   NEW_MADE=(r.body&&r.body.data)||{};
   paintNewDone(NEW_MADE,NEW_MADE.name||business_name);
   load(true);
+  if(NEW_ASK&&NEW_MADE.site_id)firstDraft(NEW_MADE.site_id,NEW_ASK);
 };
 // ⌘K "New site" lands here as /sites.html#new, and the Templates tab's "New site with this" as
 // #new=<design>: open the sheet once the page knows who you are

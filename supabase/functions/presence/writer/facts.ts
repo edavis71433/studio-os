@@ -32,7 +32,8 @@ const DAYS: Record<string, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 
 export async function buildFactSheet(site: SiteRow): Promise<FactSheet> {
   const [ident, loc, voice, offs, faqs, posts, tes] = await Promise.all([
     svc(`presence_identity?site_id=eq.${site.id}&select=business_name,tagline,description,story,service_area,phone,email,booking_url,ordering_url&limit=1`),
-    svc(`presence_locations?site_id=eq.${site.id}&select=address_line1,city,region,postal_code,hours&limit=1`),
+    // every column (*): reads the same before and after 0255 adds goes_to_customers
+    svc(`presence_locations?site_id=eq.${site.id}&select=*&limit=1`),
     // M9.5G: the Brand Profile is the ONE canonical voice source (presence_voice retired)
     svc(`presence_brand_profile?site_id=eq.${site.id}&select=voice_characteristics,personality,preferred_vocabulary,never_claims&limit=1`),
     svc(`presence_offerings?site_id=eq.${site.id}&deleted_at=is.null&select=id,name,category,price_text,description,is_visible&order=sort_order.asc&limit=100`),
@@ -52,7 +53,8 @@ export async function buildFactSheet(site: SiteRow): Promise<FactSheet> {
     tagline: i.tagline || '', description: i.description || '', story: i.story || '',
     service_area: i.service_area || '', phone: i.phone || '', email: i.email || '',
     booking_url: i.booking_url || '', ordering_url: i.ordering_url || '',
-    address: [l.address_line1, l.city, l.region, l.postal_code].filter(Boolean).join(', '),
+    // builder list item 334: a business that goes to its customers shows no street, so the writer never writes one
+    address: l.goes_to_customers === true ? '' : [l.address_line1, l.city, l.region, l.postal_code].filter(Boolean).join(', '),
     hours_text: hours,
     offerings: (offs.json ?? []).map((o: Record<string, unknown>) => ({
       id: o.id, name: o.name, category: o.category, price_text: o.price_text || '',

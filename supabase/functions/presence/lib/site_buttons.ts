@@ -76,7 +76,8 @@ export function siteColours(css: string, tokens?: Record<string, string> | null)
   const vars: Record<string, string> = {};
   for (const r of rules) if (r.sels.includes(':root')) for (const m of r.decl.matchAll(/--([\w-]+)\s*:\s*([^;]+)/g)) vars[m[1]] = m[2].trim();
   for (const [k, v] of Object.entries(tokens || {})) {
-    if (!/^(accent|accent_dark|ink|soft|bg)$/.test(k) || !hex6(v)) continue;
+    // item 333: a dark look names its cards' colour and its accent sections' (lib/site_looks.ts)
+    if (!/^(accent|accent_dark|ink|soft|bg|card|accent_band)$/.test(k) || !hex6(v)) continue;
     vars[k] = String(v); vars[k.replace(/_/g, '-')] = String(v);
   }
   const bodyBg = (() => {
