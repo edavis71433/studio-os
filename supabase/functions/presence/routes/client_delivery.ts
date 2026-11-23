@@ -17,6 +17,7 @@ import { csatRatingsForProject } from '../lib/csat.ts';
 import { clientMayTick } from '../lib/project_checklist.ts';
 import { deriveTaskState, compareOrder, clampLimit, clampOffset, progressOf, reportSummary } from '../lib/service_delivery.ts';
 import { canDecideApproval, isDecision } from '../lib/approvals.ts';
+import { roundsUsed, roundOf, nextRoundWords, type Rounds } from '../lib/revision_rounds.ts';   // sales item 179
 import { normalizeAnswers, isSupportPriority, composeServiceBrief } from '../lib/intake.ts';
 import { missingColumnSignal } from '../lib/inbound_email.ts';
 import { notifHref, notifLabel, isRead } from '../lib/notifications.ts';
@@ -362,7 +363,9 @@ export async function handleClientProject(_req: Request, site: SiteRow, principa
   const tasks = rows(ts).sort(compareOrder).map((t) => ({ ...t, derived: deriveTaskState(t, now) }));
   const answered = new Set(rows(mine as any).map((r) => String(r.survey_id)));
   const surveys = rows(sv).map((r) => (answered.has(String(r.id)) ? { ...r, answered: true } : r));
-  return json({ data: { project: ctx.project, milestones: rows(ms).sort(compareOrder), tasks, events: rows(ev), deliverables: rows(dl), approvals: ap, surveys, progress: progressOf(rows(ts)) } }, 200, cors);
+  // sales item 179: which round of changes they're on, when their deal counts rounds
+  const rounds = await clientRounds(s, id, Array.isArray(ap) ? ap : []).catch(() => null);
+  return json({ data: { project: ctx.project, milestones: rows(ms).sort(compareOrder), tasks, events: rows(ev), deliverables: rows(dl), approvals: ap, surveys, progress: progressOf(rows(ts)), ...(rounds ? { rounds } : {}) } }, 200, cors);
 }
 
 export async function handleClientReport(_req: Request, site: SiteRow, _principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
@@ -431,6 +434,33 @@ export async function handleClientDeliverableDownload(_req: Request, site: SiteR
   return url ? json({ data: { url, title: d.title } }, 200, cors) : json({ error: 'unavailable' }, 502, cors);
 }
 
+// ═══ REVISION ROUNDS (sales item 179) ═══
+/** The project's deal, when it counts rounds of changes. */
+async function roundsDeal(agencySiteId: string, projectId: string): Promise<{ id: string; title: string; revision_rounds: number } | null> {
+  const p = rows(await svc(`presence_projects?id=eq.${projectId}&site_id=eq.${agencySiteId}&select=deal_id&limit=1`))[0];
+  if (!UUID_RE.test(String(p?.deal_id || ''))) return null;
+  const d = rows(await svc(`presence_deals?id=eq.${p.deal_id}&site_id=eq.${agencySiteId}&select=id,title,revision_rounds&limit=1`))[0];
+  return d && d.revision_rounds !== null && d.revision_rounds !== undefined ? { id: String(d.id), title: String(d.title || ''), revision_rounds: Number(d.revision_rounds) } : null;
+}
+/** What the portal shows: rounds used of those included, and what the next request would be. */
+async function clientRounds(agencySiteId: string, projectId: string, approvals: any[]): Promise<(Rounds & { next: string }) | null> {
+  const d = await roundsDeal(agencySiteId, projectId);
+  if (!d) return null;
+  const r = { included: d.revision_rounds, used: roundsUsed(approvals) };
+  return { ...r, next: nextRoundWords(r) };
+}
+/** The round this change request used ("Round 1 of 2"); past the last one it is extra work, and an
+ *  "Extra work" estimate is drafted on the deal for the studio to price (routes/estimates.ts). */
+async function requestRound(agencySiteId: string, a: any, note: string): Promise<{ n: number; of: number; extra: boolean } | null> {
+  const d = await roundsDeal(agencySiteId, String(a.project_id || ''));
+  if (!d) return null;
+  const asked = rows(await svc(`presence_approvals?project_id=eq.${a.project_id}&site_id=eq.${agencySiteId}&status=eq.changes_requested&client_visible=is.true&deleted_at=is.null&select=id,decided_at&order=decided_at.asc&limit=200`));
+  const at = asked.findIndex((x) => String(x.id) === String(a.id));
+  const round = roundOf(at >= 0 ? at + 1 : asked.length + 1, d.revision_rounds);
+  if (round && round.extra) await (await import('./estimates.ts')).draftExtraWork(agencySiteId, d, String(a.project_id), { id: String(a.id), title: String(a.title || '') }, note);
+  return round;
+}
+
 // ═══ APPROVAL DECIDE (client) ═══
 export async function handleClientApprovalDecide(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
@@ -462,7 +492,9 @@ export async function handleClientApprovalDecide(req: Request, site: SiteRow, pr
     excerpt: clean(b.note, 400),
     href: `/crm.html?project=${a.project_id}&tab=approvals`,
   }).catch(() => {});
-  return json({ data: { status: b.decision } }, 200, cors);
+  // sales item 179: a change request uses a round; past the deal's last one it becomes an Extra work estimate
+  const round = b.decision === 'changes_requested' ? await requestRound(s, a, clean(b.note, 1000)).catch(() => null) : null;
+  return json({ data: { status: b.decision, ...(round ? { round } : {}) } }, 200, cors);
 }
 
 // ═══ SURVEY view (client fetches the questions to fill) ═══

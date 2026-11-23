@@ -132,6 +132,7 @@ test.describe('sign.html — no signal, and the zero-quantity line', () => {
   test('G3: Accept with no signal → the button is live again with a try-again line; the proposal stays', async ({ page }) => {
     await serveSign(page, { postAborts: true });
     await page.goto(`/sign.html?t=${TOKEN}`);
+    await page.locator('#yesName').fill('Riley Park');   // sales item 184: a yes takes a typed name
     await page.locator('#accept').click();
     await expect(page.locator('#softErr')).toHaveText('We couldn’t reach your studio — check your connection and try again.');
     await expect(page.locator('#accept')).toBeEnabled();

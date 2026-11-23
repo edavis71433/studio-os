@@ -57,18 +57,37 @@ export function normalizeLineItems(raw: unknown): { ok: true; items: LineItem[];
   const items: LineItem[] = [];
   for (const r of onlyItems) {
     const label = String((r && (r as any).label) || '').trim().slice(0, 200);
-    const qty = Math.trunc(Number((r as any)?.qty));
+    // sales item 185: halves and quarters (2.5 hours), refused out loud otherwise, never cut down
+    const qty = quarterQty((r as any)?.qty);
     const unit = Math.trunc(Number((r as any)?.unit_cents));
     if (!label) return { ok: false, error: 'each line item needs a label' };
-    if (!Number.isFinite(qty) || qty < 0 || qty > 1_000_000) return { ok: false, error: `invalid quantity for “${label}”` };
+    if (qty === null || qty < 0 || qty > 1_000_000) return { ok: false, error: `The quantity for “${label}” must be a whole number, a half or a quarter, like 2, 2.5 or 0.25.` };
     if (!Number.isFinite(unit) || unit < 0 || unit > 1_000_000_00) return { ok: false, error: `invalid price for “${label}”` };
     items.push({ label, qty, unit_cents: unit });
   }
   return { ok: true, items, subtotal_cents: subtotalOf(items) };
 }
-/** Deterministic subtotal in cents. Pure. */
+/** Sales item 185: a quantity in whole quarters (2, 2.5, 0.25), or null when it isn't one.
+ *  A tiny float error (0.1 + 0.15) still counts as the quarter it means. Pure. */
+export function quarterQty(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  const q = Math.round(n * 4);
+  return Math.abs(n * 4 - q) > 1e-6 ? null : q / 4;
+}
+/** A stored quantity as it is read back: its quarter, never below 0 (rows were checked when saved). Pure. */
+export const readQty = (raw: unknown): number => Math.max(0, quarterQty(raw) ?? (Math.round((Number(raw) || 0) * 4) / 4));
+/** Sales item 185: one line's price, quantity × the price each, rounded to the cent once, here and
+ *  nowhere else; a subtotal adds the rounded lines. Pure. */
+export function lineCents(qty: unknown, unitCents: unknown): number {
+  return Math.max(0, Math.round(readQty(qty) * Math.max(0, Math.trunc(Number(unitCents)) || 0)));
+}
+/** "2.5" and "0.25": a quantity as it prints. Pure. */
+export const qtyWords = (qty: unknown): string => String(readQty(qty));
+/** Deterministic subtotal in cents: the lines, each rounded once (lineCents). Pure. */
 export function subtotalOf(items: LineItem[]): number {
-  return (items || []).reduce((n, i) => n + Math.max(0, Math.trunc(i.qty)) * Math.max(0, Math.trunc(i.unit_cents)), 0);
+  return (items || []).reduce((n, i) => n + lineCents(i.qty, i.unit_cents), 0);
 }
 export type ProposalStatus = 'draft' | 'sent' | 'accepted' | 'declined';
 /** A proposal decision is only valid from 'sent'. Pure (idempotent-safe). */
@@ -97,7 +116,7 @@ export interface ProposalTotals { subtotal_cents: number; discount_cents: number
 export function splitLineItems(raw: unknown): { items: LineItem[]; meta: ProposalMeta } {
   const arr = Array.isArray(raw) ? raw : [];
   const items: LineItem[] = arr.filter((el) => !isProposalMetaEl(el))
-    .map((i: any) => ({ label: String(i?.label ?? ''), qty: Math.trunc(Number(i?.qty)) || 0, unit_cents: Math.trunc(Number(i?.unit_cents)) || 0 }));
+    .map((i: any) => ({ label: String(i?.label ?? ''), qty: readQty(i?.qty), unit_cents: Math.trunc(Number(i?.unit_cents)) || 0 }));
   const metaEl = arr.find(isProposalMetaEl) as Record<string, unknown> | undefined;
   const m = metaEl && metaEl[PROPOSAL_META_KEY] && typeof metaEl[PROPOSAL_META_KEY] === 'object' ? metaEl[PROPOSAL_META_KEY] as ProposalMeta : {};
   return { items, meta: m || {} };
@@ -141,7 +160,7 @@ export function packLineItems(items: Array<Partial<LineItem>>, meta: ProposalMet
   if (meta?.revised_from) clean.revised_from = meta.revised_from;
   if (meta?.superseded_by) clean.superseded_by = meta.superseded_by;
   if (Array.isArray(meta?.schedule) && meta.schedule.length) clean.schedule = meta.schedule;   // sales item 106 (already normalized by the route)
-  const packed: unknown[] = items.map((i) => ({ label: String(i?.label ?? ''), qty: Math.trunc(Number(i?.qty)) || 0, unit_cents: Math.trunc(Number(i?.unit_cents)) || 0 }));
+  const packed: unknown[] = items.map((i) => ({ label: String(i?.label ?? ''), qty: readQty(i?.qty), unit_cents: Math.trunc(Number(i?.unit_cents)) || 0 }));
   if (metaHasContent(clean)) packed.push({ [PROPOSAL_META_KEY]: clean });
   return packed;
 }

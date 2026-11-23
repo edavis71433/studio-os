@@ -26,8 +26,8 @@ import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
 import { normalizeLineItems, normalizeProposalMeta, splitLineItems, packLineItems, proposalTotals, computeProposalTotals, type ProposalMeta } from '../lib/sales_lifecycle.ts';
 import { linesFromProposal } from '../lib/invoice_billing.ts';   // sales item 81
 import { missingInsertColumns } from '../lib/inbound_email.ts';
-import { canDecideEstimate, isEstimateDecision, estimateExpired, estimateExpiresAt, ESTIMATE_DEFAULT_TITLE, ESTIMATE_TTL_DAYS } from '../lib/estimates.ts';
-import { linkSecret, signSalesToken, verifySalesToken, dealEvent, loadDeal, firstOpen } from './sales.ts';
+import { canDecideEstimate, canReviseEstimate, isEstimateDecision, estimateExpired, estimateExpiresAt, ESTIMATE_DEFAULT_TITLE, ESTIMATE_TTL_DAYS } from '../lib/estimates.ts';
+import { linkSecret, signSalesToken, verifySalesToken, dealEvent, loadDeal, firstOpen, keepEvidence, supersededByNewer } from './sales.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
@@ -39,7 +39,8 @@ const siteUrl = () => appBase();
 const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
 const usd = (cents: number) => '$' + (Math.round(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const totalOf = (e: { line_items?: unknown }) => proposalTotals(e?.line_items).total_cents;
-const EST_COLS = 'id,deal_id,title,line_items,subtotal_cents,currency,terms,status,sent_at,expires_at,first_viewed_at,decided_at,decided_note,proposal_id,invoice_id,created_at';
+// sales items 182, 183 (APPLY-0290): the version, the typed name on a yes, and when it was withdrawn
+const EST_COLS = 'id,deal_id,title,line_items,subtotal_cents,currency,terms,status,sent_at,expires_at,first_viewed_at,decided_at,decided_note,proposal_id,invoice_id,created_at,version,decided_name,withdrawn_at';
 
 /** Before APPLY-0145 the table isn't there. PostgREST answers 404 with PGRST205
  *  ("could not find the table") — or 42P01 from an older PostgREST. Pure. */
@@ -76,7 +77,7 @@ export async function estimateLink(siteId: string, id: string): Promise<string |
 
 /** "Your estimate from <studio>" — to the deal's contact, on the studio's brand.
  *  Best-effort: false when the deal has no contact email. */
-async function emailEstimate(siteId: string, dealId: string, url: string | null, totalCents: number): Promise<boolean> {
+export async function emailEstimate(siteId: string, dealId: string, url: string | null, totalCents: number): Promise<boolean> {
   if (!url) return false;
   try {
     const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
@@ -137,7 +138,8 @@ export async function estimatePublicView(tok: { id: string; site_id: string }, b
   // a link is only ever minted when the estimate is sent, so a draft is "not here"
   if (!e || e.status === 'draft') return json({ error: 'not_found', message: 'This estimate is no longer available — ask your studio for a fresh one.' }, 404, cors);
   if (!e.first_viewed_at) await firstOpen('presence_estimates', e.id, tok.site_id, e.deal_id, 'estimate');   // "They opened your estimate"
-  const out = { id: e.id, title: e.title, line_items: e.line_items, subtotal_cents: e.subtotal_cents, currency: e.currency, terms: e.terms, status: e.status, expires_at: e.expires_at, decided_at: e.decided_at, decided_note: e.decided_note };
+  // sales item 183: its version, whether a newer one replaced it, and the name typed on a yes
+  const out = { id: e.id, title: e.title, line_items: e.line_items, subtotal_cents: e.subtotal_cents, currency: e.currency, terms: e.terms, status: e.status, expires_at: e.expires_at, decided_at: e.decided_at, decided_note: e.decided_note, version: e.version || 1, decided_name: e.decided_name || '', superseded: !!splitLineItems(e.line_items).meta.superseded_by };
   return json({ data: { kind: 'estimate', brand, expired: estimateExpired(e, nowIso()), ...out } }, 200, cors);
 }
 
@@ -156,11 +158,24 @@ export async function handleEstimateDecide(req: Request, id: string, cors: Recor
   const e = rows(await svc(`presence_estimates?id=eq.${id}&site_id=eq.${tok.site_id}&deleted_at=is.null&select=${EST_COLS}&limit=1`))[0];
   if (!e) return json({ error: 'not_found', message: 'This estimate is no longer available.' }, 404, cors);
   if (e.status === decision) return json({ data: { status: e.status }, already: true }, 200, cors);   // a second tap
+  // sales item 182: withdrawn when its deal closed; sales item 183: replaced by a newer version (its
+  // own mark, or the newer one naming it, as proposals check)
+  if (e.status === 'withdrawn') return json({ error: 'withdrawn', message: 'Your studio withdrew this estimate, so it can’t be answered. Ask them if you have questions.' }, 409, cors);
+  if (splitLineItems(e.line_items).meta.superseded_by) return json({ error: 'superseded', message: 'Your studio sent a newer version of this estimate. Use the latest link they sent you.' }, 409, cors);
+  if (decision === 'approved') {
+    const later = await svc(`presence_estimates?deal_id=eq.${e.deal_id}&site_id=eq.${tok.site_id}&deleted_at=is.null&id=neq.${id}&select=id,line_items&limit=50`);
+    if (!later.ok) return json({ error: 'unavailable', message: 'We couldn’t check this estimate just now. Try again in a moment.' }, 503, cors);
+    if (supersededByNewer(id, rows(later))) return json({ error: 'superseded', message: 'Your studio sent a newer version of this estimate. Use the latest link they sent you.' }, 409, cors);
+  }
   if (decision === 'approved' && estimateExpired(e, nowIso())) return json({ error: 'expired', message: 'This estimate has expired — ask your studio for a new one. Nothing is lost.' }, 409, cors);
   if (!canDecideEstimate(e.status, decision)) return json({ error: 'bad_state', message: 'This estimate was already answered.' }, 409, cors);
+  // sales item 183: Approve takes the name they type (kept with where it came from, item 184)
+  const yesName = decision === 'approved' ? clean(b.name, 120) : '';
+  if (decision === 'approved' && !yesName) return json({ error: 'name_needed', message: 'Type your full name to approve.' }, 422, cors);
   const note = clean(b.note, 500);
-  const up = await svc(`presence_estimates?id=eq.${id}&site_id=eq.${tok.site_id}&status=eq.sent&select=id,deal_id`, { method: 'PATCH', headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ status: decision, decided_at: nowIso(), decided_note: note }) });
+  const fromWas = String(e.status);
+  const up = await svc(`presence_estimates?id=eq.${id}&site_id=eq.${tok.site_id}&status=${decision === 'approved' ? 'in.(sent,declined)' : 'eq.sent'}&select=id,deal_id`, { method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ status: decision, decided_at: nowIso(), decided_note: note, ...(yesName ? { decided_name: yesName } : {}) }) });
   if (!up.ok || !rows(up)[0]) return json({ error: 'conflict', message: 'That didn’t go through — reload the page and try again.' }, 409, cors);
   const dealId = String(e.deal_id);
   const total = totalOf(e);
@@ -174,7 +189,8 @@ export async function handleEstimateDecide(req: Request, id: string, cors: Recor
       if (rows(bf)[0]) backfilled = Math.min(1_000_000_00, total);
     } catch { /* the answer stands */ }
   }
-  await dealEvent(tok.site_id, dealId, 'estimate_decided', ANSWER_SYS, { detail: { estimate_id: id, decision, total_cents: total, ...(note ? { note } : {}), ...(backfilled ? { value_backfilled_cents: backfilled } : {}) } });
+  await dealEvent(tok.site_id, dealId, 'estimate_decided', ANSWER_SYS, { detail: { estimate_id: id, decision, total_cents: total, ...(yesName ? { name: yesName } : {}), ...(fromWas === 'declined' ? { after_not_now: true } : {}), ...(note ? { note } : {}), ...(backfilled ? { value_backfilled_cents: backfilled } : {}) } });
+  if (yesName) await keepEvidence(tok.site_id, dealId, 'estimate', id, yesName, req);   // sales item 184
   try {
     const st = rows(await svc(`presence_sites?id=eq.${tok.site_id}&select=client_id&limit=1`))[0];
     const title = String(rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${tok.site_id}&select=title&limit=1`))[0]?.title || 'a deal');
@@ -188,9 +204,103 @@ export async function handleEstimateDecide(req: Request, id: string, cors: Recor
       }
       // the reminder's silent ledger row (runSalesDocReminders) — belt and braces, as proposals do
       await clearNotice(st.client_id, 'deal_followup', `remind:${id}`);
+      if (decision === 'approved' && fromWas === 'declined') await clearNotice(st.client_id, 'deal_followup', `estdeclined:${dealId}:${id}`);   // item 183: the Not now line is over
     }
   } catch { /* the answer stands; the deal history has it */ }
+  // sales item 179: an approved Extra work estimate adds the to-do and the draft invoice, once
+  if (decision === 'approved') await extraWorkApproved(tok.site_id, id).catch(() => {});
   return json({ data: { status: decision } }, 200, cors);
+}
+
+// ═══ EDIT A DRAFT (sales item 183) ═══
+// A draft that was never sent can be changed in place: its lines, discount, tax, title and notes.
+// Once sent it is the record, and Revise makes the next version. The guard rides the write.
+export async function handleEstimateEdit(req: Request, site: SiteRow, _principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const e = await loadEstimate(site.id, id);
+  if (!e) return json({ error: 'not_found', message: 'That estimate isn’t here.' }, 404, cors);
+  if (e.status !== 'draft') return json({ error: 'already_sent', message: 'This was already sent, so it stays as it went out. Revise it to send a new version.' }, 409, cors);
+  let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
+  const prior = splitLineItems(e.line_items);
+  const norm = normalizeLineItems(b.line_items !== undefined ? b.line_items : prior.items);
+  if (!norm.ok) return json({ error: 'validation', message: norm.error }, 422, cors);
+  if (!norm.items.length) return json({ error: 'validation', message: 'Keep at least one line.' }, 422, cors);
+  const m = normalizeProposalMeta(b);
+  const meta: ProposalMeta = { discount: b.discount !== undefined ? (m.discount ?? null) : (prior.meta.discount ?? null), tax_pct: b.tax_pct !== undefined ? (m.tax_pct ?? null) : (prior.meta.tax_pct ?? null), revised_from: prior.meta.revised_from ?? null };
+  const patch: Record<string, unknown> = { line_items: packLineItems(norm.items, meta), subtotal_cents: norm.subtotal_cents };
+  if (b.title !== undefined) patch.title = clean(b.title, 200) || ESTIMATE_DEFAULT_TITLE;
+  if (b.terms !== undefined) patch.terms = clean(b.terms, 5000);
+  const up = await svc(`presence_estimates?id=eq.${id}&site_id=eq.${site.id}&status=eq.draft&deleted_at=is.null&select=${EST_COLS}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+  if (!up.ok) return json({ error: 'conflict', message: 'That didn’t save just now. Nothing changed. Try again.' }, 409, cors);
+  const row = rows(up)[0];
+  if (!row) return json({ error: 'already_sent', message: 'This was sent while you were editing it. Revise it to send a new version.' }, 409, cors);
+  return json({ data: { ...row, total_cents: totalOf(row) } }, 200, cors);
+}
+
+// ═══ REVISE (sales item 183) ═══
+// A sent estimate (also one past its date), one they said Not now to, or one withdrawn when its
+// deal closed becomes the next version: a new draft with its lines (or the editor's), sent the
+// usual way, while the old one is marked replaced so its link can no longer be approved. Like a
+// proposal's Revise. An approved one is settled: it becomes a proposal or an invoice instead.
+export async function handleEstimateRevise(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
+  const e = await loadEstimate(site.id, id);
+  if (!e) return json({ error: 'not_found', message: 'That estimate isn’t here.' }, 404, cors);
+  if (!canReviseEstimate(e.status)) return json({ error: 'bad_state', message: e.status === 'draft' ? 'This is still a draft. Edit it instead.' : 'They approved this estimate, so it is settled. Turn it into a proposal or bill it instead.' }, 409, cors);
+  const prior = splitLineItems(e.line_items);
+  if (prior.meta.superseded_by) return json({ error: 'already_revised', message: 'This estimate was already revised. Change the newest version instead.' }, 409, cors);
+  let b: any = {}; try { b = await req.json(); } catch { /* optional: a blank body copies it as it is */ }
+  const norm = normalizeLineItems(b.line_items !== undefined ? b.line_items : prior.items);
+  if (!norm.ok) return json({ error: 'validation', message: norm.error }, 422, cors);
+  if (!norm.items.length) return json({ error: 'validation', message: 'Keep at least one line.' }, 422, cors);
+  const m = normalizeProposalMeta(b);
+  const meta: ProposalMeta = { discount: b.discount !== undefined ? (m.discount ?? null) : (prior.meta.discount ?? null), tax_pct: b.tax_pct !== undefined ? (m.tax_pct ?? null) : (prior.meta.tax_pct ?? null), revised_from: id };
+  const version = (Math.trunc(Number(e.version)) || 1) + 1;
+  const ins = await svc('presence_estimates', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: site.id, deal_id: e.deal_id, title: b.title !== undefined ? (clean(b.title, 200) || ESTIMATE_DEFAULT_TITLE) : (String(e.title || '') || ESTIMATE_DEFAULT_TITLE),
+      line_items: packLineItems(norm.items, meta), subtotal_cents: norm.subtotal_cents, currency: e.currency || 'usd',
+      terms: b.terms !== undefined ? clean(b.terms, 5000) : String(e.terms || ''), status: 'draft', version, created_by: principal.email || principal.userId || '' }) });
+  const row = rows(ins)[0];
+  if (!ins.ok || !row) return json({ error: 'write_failed', message: 'The new version didn’t save. Please try again.' }, 502, cors);
+  // mark the old one replaced (in its own meta, keeping its lines); the approve step also checks
+  // the new one's trail, so a missed mark can't let the old link be approved
+  await svc(`presence_estimates?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ line_items: packLineItems(prior.items, { ...prior.meta, superseded_by: row.id }) }) }).catch(() => {});
+  return json({ data: { ...row, total_cents: totalOf(row) }, revised_from: id, version }, 201, cors);
+}
+
+// ═══ EXTRA WORK (sales item 179) ═══
+// A change request past the deal's included rounds becomes an estimate marked "Extra work": a
+// draft on the deal titled for what they asked to change, one line with their words at $0 for
+// the studio to price, the request kept in its notes. One per request (approval_id is unique).
+export async function draftExtraWork(siteId: string, deal: { id: string; title?: string }, projectId: string, approval: { id: string; title?: string }, note: string): Promise<string | null> {
+  const had = rows(await svc(`presence_estimates?approval_id=eq.${approval.id}&site_id=eq.${siteId}&deleted_at=is.null&select=id&limit=1`))[0];
+  if (had) return String(had.id);
+  const title = `Extra work: ${clean(approval.title, 150) || 'the changes they asked for'}`;
+  const ins = await svc('presence_estimates', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: siteId, deal_id: deal.id, title, line_items: [{ label: clean(note, 200) || 'The changes they asked for', qty: 1, unit_cents: 0 }], subtotal_cents: 0, currency: 'usd',
+      terms: note ? `What they asked for: ${clean(note, 1000)}` : '', status: 'draft', extra_work: true, approval_id: approval.id, project_id: projectId, created_by: 'client-request' }) });
+  const row = rows(ins)[0];
+  if (!ins.ok || !row) return null;   // a second request that raced this one made it (the unique index)
+  await dealEvent(siteId, deal.id, 'note', ANSWER_SYS, { detail: { change: 'extra_work', title, estimate_id: row.id } });
+  try {
+    const st = rows(await svc(`presence_sites?id=eq.${siteId}&select=client_id&limit=1`))[0];
+    if (st?.client_id) await raiseNotice({ siteId, clientId: st.client_id, kind: 'deal_followup', period: `extrawork:${approval.id}`, headline: `Extra work to price — ${deal.title || 'a deal'}`, body: 'They asked for changes beyond the rounds included. An Extra work estimate is drafted on the deal with their words: price it and send it. Nothing reaches them until you do.' });
+  } catch { /* the estimate is on the deal either way */ }
+  return String(row.id);
+}
+/** Once an Extra work estimate is approved: a to-do on the project and a draft invoice (the
+ *  estimate's own Bill it as an invoice, which makes one once and never sends it). */
+export async function extraWorkApproved(siteId: string, estId: string): Promise<void> {
+  const e = rows(await svc(`presence_estimates?id=eq.${estId}&site_id=eq.${siteId}&select=id,deal_id,title,line_items,status,extra_work,project_id&limit=1`))[0];
+  if (!e || !e.extra_work || e.status !== 'approved') return;
+  if (UUID_RE.test(String(e.project_id || ''))) {
+    const source = `extra_work:${estId}`;
+    const has = rows(await svc(`presence_tasks?project_id=eq.${e.project_id}&site_id=eq.${siteId}&source=eq.${encodeURIComponent(source)}&deleted_at=is.null&select=id&limit=1`))[0];
+    if (!has) await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: siteId, project_id: e.project_id, title: String(e.title || 'Extra work').slice(0, 200), status: 'todo', priority: 'normal', client_visible: false, source }) }).catch(() => {});
+  }
+  const st = rows(await svc(`presence_sites?id=eq.${siteId}&select=id,client_id&limit=1`))[0];
+  await handleEstimateToInvoice(new Request('https://estimate.local/'), { id: siteId, client_id: st?.client_id || null } as SiteRow, ANSWER_SYS, estId, {}).catch(() => null);
+  if (st?.client_id) await raiseNotice({ siteId, clientId: st.client_id, kind: 'deal_followup', period: `extradone:${estId}`, headline: `Extra work approved — ${String(e.title || '').replace(/^Extra work: /, '')} (${usd(totalOf(e))})`, body: 'They approved it. A to-do is on the project and a draft invoice is ready: press Send on it when the work is done.' }).catch(() => false);
 }
 
 // ═══ REMOVE A DRAFT ═══

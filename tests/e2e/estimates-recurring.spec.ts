@@ -231,9 +231,10 @@ test.describe('The client\'s estimate page (item 47)', () => {
     await expect(page.getByText('Good until December 31, 2026.', { exact: false })).toBeVisible();
     await expect(page).toHaveTitle('Your estimate — Example Studio');
     await page.getByLabel('Anything you’d like to add? (optional)').fill('Can we start in May?');
+    await page.getByLabel('Type your full name to approve').fill('Riley Park');   // sales item 183
     await page.getByRole('button', { name: 'Approve this estimate' }).click();
     await expect(page.getByRole('heading', { name: 'Approved — thank you!' })).toBeVisible();
-    expect(posts).toEqual([{ path: `/sales/estimates/${EST}/decide`, body: { token: TOKEN, decision: 'approved', note: 'Can we start in May?' } }]);
+    expect(posts).toEqual([{ path: `/sales/estimates/${EST}/decide`, body: { token: TOKEN, decision: 'approved', note: 'Can we start in May?', name: 'Riley Park' } }]);
   });
 
   test('Not now takes two taps', async ({ page }) => {
@@ -251,7 +252,7 @@ test.describe('The client\'s estimate page (item 47)', () => {
   test('an answered or expired estimate offers no buttons', async ({ page }) => {
     await serveEstimate(page, { ...PAGE_EST, status: 'approved' });
     await page.goto(`/sign.html?t=${TOKEN}`);
-    await expect(page.getByText('You approved this estimate — your studio has been told.')).toBeVisible();
+    await expect(page.getByText('You approved this estimate. Your studio has been told.')).toBeVisible();
     await expect(page.getByRole('button')).toHaveCount(0);
     await page.unroute('**/functions/v1/presence/**');
     await serveEstimate(page, { ...PAGE_EST, expired: true });
