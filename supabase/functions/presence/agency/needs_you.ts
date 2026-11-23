@@ -25,7 +25,7 @@
 // Pure: no DB, no network, no clock (nowIso is an input). routes.ts gathers the
 // rows (fixed query count) and calls needsYouPayload().
 import { OPEN_DEAL_STAGES } from '../lib/deal_stages.ts';   // sales item 146: the one list of open stages
-import { hostOutOfCredits, OUT_OF_CREDITS_ROW } from '../lib/host_credits.ts';   // builder item 358
+import { hostOutOfCredits, OUT_OF_CREDITS_ROW, hostingNeed, type HostPlanRead } from '../lib/host_credits.ts';   // builder item 358
 
 // Builder item 358: why a publish failed, in plain words, by the stage it stopped at. The host's
 // raw error stays on the publish row for whoever looks into it; Home never shows it.
@@ -126,6 +126,9 @@ export interface NeedsInput {
    *  (lib/site_notify.ts). Their visitors' enquiries leave the list; what is owed, what
    *  is broken and what a client wrote never do. */
   quiet?: string[];
+  /** Builder item 358: the host's plan (lib/netlify.ts readHostPlan), read for platform staff only:
+   *  the hosting account is the platform's. Paused is the list's first row; 75% used joins the account rows. */
+  hosting?: HostPlanRead | null;
   // accepted and deliberately IGNORED — the point of this list
   moments?: unknown[]; opportunities?: unknown[]; reviewReports?: unknown[]; brandReports?: unknown[];
 }
@@ -187,6 +190,10 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
   const out: NeedsRow[] = [];
   const seen = new Set<string>();
   const push = (r: NeedsRow) => { if (!seen.has(r.key)) { seen.add(r.key); out.push(r); } };
+  // builder item 358: the hosting account paused (nothing publishes, so first) or 75% used (with the account rows)
+  const host = hostingNeed(i.hosting);
+  const hostRow: NeedsRow | null = host ? { key: host.key, kind: 'account', site_id: null, client_id: null, name: 'The hosting account', what: host.what, when: host.when, verb: 'Open', href: '/admin-health.html' } : null;
+  if (hostRow && host!.key.endsWith(':paused')) push(hostRow);
 
   // ── a. money: overdue first (most overdue at the top), then due within 7 days ──
   {
@@ -440,6 +447,7 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
       what: account ? head.replace(/^\w/, (c) => c.toLowerCase()) : (firstSentence ? firstSentence.replace(/^\w/, (c) => c.toLowerCase()) : 'needs a look'),
       when: '', verb: 'Open', href: String(n.href || '/inbox.html') });
   }
+  if (hostRow) push(hostRow);   // the 75% row (a paused one is already first; push keeps one)
 
   return out;
 }
