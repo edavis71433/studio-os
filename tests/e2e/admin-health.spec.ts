@@ -31,6 +31,25 @@ const HC_OK = { data: { overall: 'ok', areas: [
 
 const HEALTH_GLOB = '**/functions/v1/presence/admin/health-center';
 
+// ── Builder item 358: the Hosting card sits in Money & usage, with the credits left, the pace and
+//    whether publishing is on (lib/health_center.ts hostingArea), and opens Usage ──
+test.describe('Admin Health Center — Hosting (builder item 358)', () => {
+  test('Hosting sits in Money & usage, says the credits left and the pace, and opens Usage', async ({ page }) => {
+    const detail = 'Pro, 5,000 credits a period; 1,100 of 5,000 credits left (78% used). At this pace that’s about 4 more days (to Nov 27), before it renews Dec 11. Publishing is on.';
+    const hc = { data: { ...HC.data, areas: [...HC.data.areas, { key: 'hosting', label: 'Hosting', state: 'attention', detail }] } };
+    await installApp(page, { api: { '/admin/health-center': hc } });
+    await page.goto('/admin-health.html');
+    const card = page.locator('.card.area', { has: page.locator('.t', { hasText: /^Hosting$/ }) });
+    // the band heading that comes before the card in the page
+    const band = await card.evaluate((el) => { let n: Element | null = el; while (n && !n.matches('h2.band')) n = n.previousElementSibling || n.parentElement; return n ? n.textContent : null; });
+    expect(band).toBe('Money & usage');
+    await expect(card).toHaveClass(/attention/);
+    await expect(card).toContainText('1,100 of 5,000 credits left (78% used)');
+    await expect(card).toContainText('Publishing is on.');
+    await expect(card.getByRole('link', { name: /Open Usage/ })).toHaveAttribute('href', '/usage.html');
+  });
+});
+
 // ── Item 3 · Banded dashboard layout + KPI band (analytics standard) ──────────
 test.describe('Admin Health Center — banded dashboard', () => {
   test('one area card per area, honest states, banded into sections', async ({ page }) => {

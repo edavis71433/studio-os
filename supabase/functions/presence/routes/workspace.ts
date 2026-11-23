@@ -429,7 +429,8 @@ export const noticeHrefFor = (n: { kind: string; period?: string | null }): stri
   // approval_overdue's period is approval:<project>:<approval> (lib/approvals.ts) → open that project's record
   const project = n.kind === 'approval_overdue' ? projectIdOfApprovalPeriod(n.period) : null;
   if (project) return `${base}?project=${project}`;
-  const id = n.kind === 'lead_followup' ? leadIdOfNoticePeriod(n.period) : null;
+  // sales item 201: the instant enquiry notice (website_enquiry, period lead:<id>) opens that enquiry too
+  const id = n.kind === 'lead_followup' || n.kind === 'website_enquiry' ? leadIdOfNoticePeriod(n.period) : null;
   if (id) return `${base}?sel=lead:${id}`;
   // sales review item 22: "Agreement signed — ready to convert" opens that deal at
   // its Convert step; "Proposal accepted" opens the deal (period signed:/accepted:<deal>)

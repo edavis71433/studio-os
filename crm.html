@@ -417,6 +417,16 @@
   /* sales item 94: Where things stand, at the top of the rail (sales-ai.js draws it) */
   #aicard,#aicardMain{margin-bottom:var(--dds-s3,12px)}
   #aicard:empty,#aicardMain:empty{display:none}
+  /* sales item 211: "Good to know about them", the note AI help reads, under "Where things stand" */
+  #gtk,#gtkMain{margin-bottom:var(--dds-s3,12px)} #gtk:empty,#gtkMain:empty{display:none}
+  .gtk{border:1px solid var(--line);border-radius:var(--dds-r-card,16px);background:var(--card);padding:12px 16px}
+  .gtk-h{display:flex;align-items:center;gap:8px} .gtk-h h2{font-family:inherit;font-size:14.5px;font-weight:650;margin:0;flex:1 1 auto;min-width:0}
+  .gtk-ed{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:none;border:0;padding:0;cursor:pointer;white-space:nowrap}
+  .gtk-t{margin:6px 0 0;font-size:13.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere} .gtk-t.none{color:var(--soft)}
+  .gtk-foot{margin:6px 0 0;font-size:12px;color:var(--faint)}
+  .gtk textarea{display:block;width:100%;box-sizing:border-box;margin-top:8px;font:inherit;font-size:16px;line-height:1.45;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;resize:vertical;min-height:96px}
+  .gtk-acts{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:10px} .gtk-n{margin-left:auto;font-size:12px;color:var(--faint)}
+  @media (pointer:coarse),(max-width:767px){.gtk-ed{min-height:44px;display:inline-flex;align-items:center}.gtk-acts .abtn{min-height:44px}}
   .sc{padding:14px 16px}
   .sc-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
   .sc-h h2{font-family:var(--sans);font-size:15px;font-weight:650;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -443,6 +453,18 @@
   /* sales item 93: the hand-over pack for a client who leaves */
   #handoverDlg{margin:auto;border:none;border-radius:20px;padding:0;width:min(620px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto;background:var(--card);color:var(--ink);box-shadow:0 24px 60px rgba(26,13,64,.25)}
   #handoverDlg::backdrop{background:rgba(23,21,34,.42)}
+  /* sales item 176: the receipt on a cost, from the studio's own Files or uploaded there */
+  .co-rcpt{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;font-size:13.5px}
+  .co-rcpt .rc-name{flex:1 1 100%;color:var(--soft)}
+  .co-rcpt .rc-name b{color:var(--ink);font-weight:600}
+  #rcptDlg{margin:auto;border:none;border-radius:20px;padding:20px 20px 16px;width:min(520px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto;background:var(--card);color:var(--ink);box-shadow:0 24px 60px rgba(26,13,64,.25)}
+  #rcptDlg::backdrop{background:rgba(23,21,34,.42)}
+  #rcptDlg h2{margin:0 0 10px;font-size:18px;font-weight:700}
+  #rcptDlg h2:focus{outline:none}
+  #rcptDlg ul{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:6px}
+  #rcptDlg li button{width:100%;min-height:44px;display:flex;align-items:center;gap:10px;text-align:left;font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer}
+  #rcptDlg li img{width:36px;height:36px;object-fit:cover;border-radius:6px;flex:none}
+  #rcptDlg .muted{margin:0 0 12px}
   #handoverDlg form{padding:24px 24px 20px}
   #handoverDlg h2{margin:0 0 4px;font-size:20px;font-weight:700;color:var(--ink);opacity:1}
   #handoverDlg h2:focus{outline:none}
@@ -760,10 +782,12 @@ function renderShell(){
     <div class="body">
       <div class="col-main">
         <div id="aicardMain"></div>
+        <div id="gtkMain"></div>
         ${avail.length?`<div class="tabs" role="tablist" aria-label="Record sections">${tabsHtml}</div><div id="tabbody" role="tabpanel" aria-labelledby="tab-${TAB||avail[0]}"><div class="spin" role="status" aria-label="Loading"></div></div>`:'<p class="muted">Nothing to show for this record yet.</p>'}
       </div>
       <aside class="rail" ${showRail?'':'hidden'}>
         <div id="aicard"></div>
+        <div id="gtk"></div>
         <div id="sumcards"></div>
         <div id="dcard"></div>
       </aside>
@@ -2086,25 +2110,70 @@ async function loadCosts(dealId){
   sec.hidden=false;
   const inv=(DEAL&&DEAL.invoices)||[];
   card.innerHTML=items.map(c=>{const on=c.invoice_id?inv.find(v=>v.id===c.invoice_id):null;const state=c.invoice_id?'On '+(on&&invNo(on.number)?invNo(on.number):'an invoice'):c.bill?'Goes on the next invoice':'Not billed to them';
-    return `<div class="rrow brow"><span class="rt">${esc(c.label)}<span class="s">${esc(dueLabel(c.spent_on))} · ${esc(state)}${c.note?' · '+esc(c.note):''}</span></span><span class="racts"><b>${esc(fmtC(c.amount_cents))}</b>${c.invoice_id?'':`<button type="button" class="rbtn" data-cost-bill="${esc(c.id)}" data-on="${c.bill?'1':''}">${c.bill?'Don’t bill it':'Bill it next'}</button><button type="button" class="rbtn" data-cost-del="${esc(c.id)}" data-needs="delete">Remove</button>`}</span></div>`;}).join('')
+    return `<div class="rrow brow"><span class="rt">${esc(c.label)}<span class="s">${esc(dueLabel(c.spent_on))} · ${esc(state)}${c.note?' · '+esc(c.note):''}${c.receipt_media_id?` · <a href="${esc(costReceiptHref(c.receipt_media_id))}" data-noscope="1" data-own-site="1">Receipt</a>`:''}</span></span><span class="racts"><b>${esc(fmtC(c.amount_cents))}</b>${c.invoice_id?'':`<button type="button" class="rbtn" data-cost-bill="${esc(c.id)}" data-on="${c.bill?'1':''}">${c.bill?'Don’t bill it':'Bill it next'}</button><button type="button" class="rbtn" data-cost-del="${esc(c.id)}" data-needs="delete">Remove</button>`}</span></div>`;}).join('')
     +(COSTS.unbilled_cents?`<p class="muted" style="font-size:13px;margin:8px 0 0">${esc(fmtC(COSTS.unbilled_cents))} goes on the next invoice you send, as its own lines.</p>`:'');
   card.querySelectorAll('[data-cost-bill]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;const r=await apiAg('/sales/costs/'+b.getAttribute('data-cost-bill'),'PATCH',{bill:!b.getAttribute('data-on')});if(!r.ok){toast((r.body&&r.body.message)||'That didn’t save.','err');b.disabled=false;return;}loadCosts(dealId);}));
   card.querySelectorAll('[data-cost-del]').forEach(b=>b.addEventListener('click',async()=>{if(!(await ddsConfirm('Remove this cost? It was never billed, so nothing the customer saw changes.',null,'Remove cost',{danger:true})))return;b.disabled=true;const r=await apiAg('/sales/costs/'+b.getAttribute('data-cost-del'),'DELETE');if(!r.ok){toast((r.body&&r.body.message)||'Couldn’t remove it.','err');b.disabled=false;return;}toast('Cost removed');loadCosts(dealId);}));
 }
+// ── Sales item 176: a receipt for a cost. Pick a photo or PDF already in the studio's own Files,
+//    or upload one through the same door Files uses (/media/upload-url, then the file itself). ──
+function pickReceipt(){
+  let d=$('rcptDlg');
+  if(!d){d=document.createElement('dialog');d.id='rcptDlg';d.setAttribute('aria-labelledby','rcptH');document.body.appendChild(d);d.addEventListener('click',(e)=>{if(e.target===d)d.close();});}
+  d.innerHTML='<h2 id="rcptH" tabindex="-1">Pick the receipt</h2><div id="rcptBody"><p class="muted" role="status">Loading your files…</p></div><div class="bacts"><button type="button" id="rcptX">Cancel</button></div>';
+  return new Promise((res)=>{
+    let picked=null;
+    d.addEventListener('close',()=>res(picked),{once:true});
+    $('rcptX').addEventListener('click',()=>d.close());
+    d.showModal();$('rcptH').focus();
+    apiAg('/assets').then((r)=>{
+      const body=$('rcptBody');if(!body||!d.open)return;
+      const all=(r.ok&&r.body&&r.body.data&&r.body.data.assets)||[];
+      const list=all.filter(a=>a&&a.asset_status!=='archived'&&(a.kind==='image'||a.kind==='document'||a.mime==='application/pdf')).slice(0,60);
+      if(!r.ok){body.innerHTML='<p class="muted">Your files couldn’t load just now. Upload the receipt instead.</p>';return;}
+      if(!list.length){body.innerHTML='<p class="muted">No photos or PDFs in your Files yet. Upload the receipt instead.</p>';return;}
+      body.innerHTML='<ul>'+list.map(a=>`<li><button type="button" data-rcpt="${esc(a.id)}">${a.thumb?`<img src="${esc(a.thumb)}" alt="">`:''}<span>${esc(a.name||'A file')}</span></button></li>`).join('')+'</ul>';
+      body.querySelectorAll('[data-rcpt]').forEach(b=>b.addEventListener('click',()=>{const a=list.find(x=>String(x.id)===b.getAttribute('data-rcpt'));picked=a?{id:String(a.id),name:String(a.name||'A file')}:null;d.close();}));
+    });
+  });
+}
+async function uploadReceipt(file,label){
+  const name=('Receipt'+(label?': '+label:'')).slice(0,120);
+  const up=await apiAg('/media/upload-url','POST',{mime:file.type,bytes:file.size,alt_text:name});
+  if(!up.ok||!up.body||!up.body.data||!up.body.data.upload_url)return {error:(up.body&&up.body.message)||'The receipt couldn’t upload just now.'};
+  let put;try{put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type},body:file});}catch(_){put={ok:false};}
+  if(!put.ok)return {error:'The receipt couldn’t upload just now.'};
+  await apiAg('/assets/'+encodeURIComponent(up.body.data.media_id),'PATCH',{name});   // its name in Files (the alt words stay as they are)
+  return {id:String(up.body.data.media_id),name};
+}
+// the studio's own Files, never the customer's: the link keeps no ?client= of the record's (data-noscope)
+function costReceiptHref(id){const b=ownBusiness();return '/files.html?'+(b?'client='+encodeURIComponent(b)+'&':'')+'focus='+encodeURIComponent(id);}
 function costForm(host,d){
   const today=recTodayYmd();
   host.innerHTML=`<div class="bform" role="group" aria-labelledby="co-h"><p class="pf-h" id="co-h">A cost you paid for them</p>
     <div class="brow2"><label>What for<input type="text" id="co-label" maxlength="200" placeholder="e.g. Domain renewal, example.com"></label><label>How much (USD)<input type="number" id="co-amt" step="0.01" min="0.01" placeholder="18.00"></label><label>The day you paid it<input type="date" id="co-on" value="${today}" max="${today}"></label></div>
     <label class="pf-private">Note (optional)<input type="text" id="co-note" maxlength="300" placeholder="e.g. Namecheap order 12345"></label>
     <label class="pf-rcpt"><input type="checkbox" id="co-bill" checked> Add it to the next invoice, as its own line</label>
-    <p class="muted" style="font-size:12.5px;margin:6px 0 0">Listed in the bookkeeper file either way. A receipt photo can be kept in Files for now.</p>
+    <div class="co-rcpt" role="group" aria-label="Receipt"><span class="rc-name" id="co-rc-name" aria-live="polite">Receipt (optional): none yet.</span><button type="button" class="abtn" id="co-rc-pick">Pick from Files</button><button type="button" class="abtn" id="co-rc-up">Upload a receipt</button><button type="button" class="abtn" id="co-rc-rm" hidden>Remove the receipt</button><input type="file" id="co-rc-file" accept="image/*,application/pdf" hidden></div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 0">Listed in the bookkeeper file either way. An uploaded receipt is kept in your Files.</p>
     <div class="bacts"><button type="button" id="co-cancel">Cancel</button><button type="button" class="primary" id="co-go">Save the cost</button></div></div>`;
   host.scrollIntoView({block:'center',behavior:'smooth'});
   setTimeout(()=>{$('co-label').focus({preventScroll:true});},100);
   $('co-cancel').addEventListener('click',()=>{host.innerHTML='';});
+  // sales item 176: the receipt is a file in the studio's own Files, picked there or uploaded now
+  let rcpt=null;const rcName=$('co-rc-name');
+  const showRcpt=()=>{rcName.innerHTML=rcpt?'Receipt: <b>'+esc(rcpt.name)+'</b>':'Receipt (optional): none yet.';$('co-rc-rm').hidden=!rcpt;};
+  $('co-rc-pick').addEventListener('click',async()=>{const got=await pickReceipt();if(got){rcpt=got;showRcpt();}$('co-rc-pick').focus();});
+  $('co-rc-up').addEventListener('click',()=>$('co-rc-file').click());
+  $('co-rc-rm').addEventListener('click',()=>{rcpt=null;showRcpt();$('co-rc-pick').focus();});
+  $('co-rc-file').addEventListener('change',async(e)=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+    const b=$('co-rc-up');b.disabled=true;rcName.textContent='Uploading '+f.name+'…';
+    const got=await uploadReceipt(f,$('co-label').value.trim());b.disabled=false;
+    if(got.error){toast(got.error,'err');showRcpt();return;}
+    rcpt=got;showRcpt();toast('Receipt uploaded to your Files');});
   $('co-go').addEventListener('click',async()=>{const go=$('co-go');const label=$('co-label').value.trim();const amt=Math.round((parseFloat($('co-amt').value)||0)*100);
     if(!label){toast('Say what the cost was for.','err');$('co-label').focus();return;}if(!(amt>0)){toast('Enter what it cost.','err');$('co-amt').focus();return;}
-    go.disabled=true;const r=await apiAg('/sales/deals/'+encodeURIComponent(d.id)+'/costs?today='+today,'POST',{label,amount_cents:amt,spent_on:$('co-on').value||today,bill:$('co-bill').checked,note:$('co-note').value.trim()});
+    go.disabled=true;const r=await apiAg('/sales/deals/'+encodeURIComponent(d.id)+'/costs?today='+today,'POST',{label,amount_cents:amt,spent_on:$('co-on').value||today,bill:$('co-bill').checked,note:$('co-note').value.trim(),...(rcpt?{receipt_media_id:rcpt.id}:{})});
     if(!r.ok){toast((r.body&&r.body.message)||'That cost didn’t save.','err');go.disabled=false;return;}
     toast('Cost saved'+($('co-bill').checked?'. It goes on the next invoice.':'.'));host.innerHTML='';loadCosts(d.id);});
 }
@@ -2478,6 +2547,73 @@ function renderAiCard(){
   if(!c||!c.value){host.innerHTML='';AI_SUM=null;return;}
   const go=()=>{if(!host.isConnected||!window.ddsSalesAi)return;AI_SUM=window.ddsSalesAi.summary(host,{req:api,subject:c.key+':'+c.value,query:aiRecordQuery,who:aiWho(),dealToo:!!idParams().deal,newSince:(iso)=>{const t=Date.parse(iso);return Number.isFinite(t)?(ACT.items||[]).filter(i=>i&&Date.parse(i.at)>t).length:0;}});};
   if(window.ddsSalesAi)go();else SHELL_READY.then(go);
+  renderGoodToKnow(inRail);
+}
+// ── sales item 211: "Good to know about them" ─────────────────────────────────────
+// One note per person (presence_contacts.good_to_know, 0287) that AI help reads whenever it drafts
+// to them or sums them up, kept here beside "Where things stand". The record names the person it
+// belongs to (identity.person_id: the record's person, or a customer's first person). Before the
+// database update the read answers null and no box shows. Saved by the contact's own PATCH.
+let GTK=null;   // {pid, text|null, editing, busy, draft}
+const GTK_MAX=1000;
+function gtkPid(){const i=REC&&REC.identity;return(i&&(i.person_id||i.contact_id))||'';}
+function renderGoodToKnow(inRail){
+  const host=$(inRail?'gtk':'gtkMain'),other=$(inRail?'gtkMain':'gtk');
+  if(other)other.innerHTML='';
+  if(!host)return;
+  const pid=gtkPid();
+  if(!pid){host.innerHTML='';GTK=null;return;}
+  if(!GTK||GTK.pid!==pid){
+    GTK={pid,text:undefined,editing:false,busy:false,draft:null};
+    // one read of the person, shared with the Details tab (CONTACT_CACHE) when it is the record's own
+    const own=pid===((REC.identity&&REC.identity.contact_id)||'');
+    const pr=(CONTACT_CACHE&&CONTACT_CACHE.cid===pid)?CONTACT_CACHE.promise:apiAg('/sales/contacts/'+encodeURIComponent(pid)).then(r=>r.ok?(r.body.data||{}):null);
+    if(own&&!(CONTACT_CACHE&&CONTACT_CACHE.cid===pid))CONTACT_CACHE={cid:pid,promise:pr};
+    pr.then(d=>{
+      if(!GTK||GTK.pid!==pid)return;
+      const c=d&&d.contact;
+      GTK.text=c&&typeof c.good_to_know==='string'?c.good_to_know:null;
+      drawGoodToKnow();
+    }).catch(()=>{if(GTK&&GTK.pid===pid){GTK.text=null;drawGoodToKnow();}});
+  }
+  drawGoodToKnow();
+}
+function gtkHost(){const rail=document.querySelector('aside.rail'),inRail=!!(rail&&!rail.hidden);return $(inRail?'gtk':'gtkMain');}
+function drawGoodToKnow(focusTa){
+  const host=gtkHost();if(!host)return;
+  if(!GTK||typeof GTK.text!=='string'){host.innerHTML='';return;}   // not read yet, or no box before the update
+  const who=aiWho(),t=GTK.text;
+  if(GTK.editing){
+    host.innerHTML=`<section class="gtk" aria-labelledby="gtkH"><div class="gtk-h"><h2 id="gtkH">Good to know about ${esc(who||'them')}</h2></div>
+      <label class="sr-only" for="gtkTa">Good to know about ${esc(who||'them')}</label>
+      <textarea id="gtkTa" maxlength="${GTK_MAX}" aria-describedby="gtkHow" placeholder="How they like to be reached, who pays the invoices, what matters to them">${esc(GTK.draft!=null?GTK.draft:t)}</textarea>
+      <p class="gtk-foot" id="gtkHow">AI help reads this whenever it drafts to ${esc(who||'them')} or sums them up.</p>
+      <div class="gtk-acts"><button type="button" class="abtn primary" data-gtk="save"${GTK.busy?' disabled':''}>Save</button><button type="button" class="abtn" data-gtk="cancel">Cancel</button><span class="gtk-n" id="gtkN" aria-live="polite"></span></div></section>`;
+    const ta=$('gtkTa'),n=$('gtkN');
+    const count=()=>{if(n)n.textContent=ta.value.length>GTK_MAX*0.8?ta.value.length+' of '+GTK_MAX:'';};
+    ta.addEventListener('input',()=>{GTK.draft=ta.value;count();});count();   // what's typed outlives a redraw of the record
+    if(focusTa){ta.focus();try{ta.setSelectionRange(ta.value.length,ta.value.length);}catch(_){}}
+  }else{
+    host.innerHTML=`<section class="gtk" aria-labelledby="gtkH"><div class="gtk-h"><h2 id="gtkH">Good to know about ${esc(who||'them')}</h2><button type="button" class="gtk-ed" data-gtk="edit">${t?'Edit':'Add a note'}</button></div>
+      ${t?`<p class="gtk-t">${esc(t)}</p>`:`<p class="gtk-t none">Nothing yet. Add what AI help should keep in mind when it writes to them.</p>`}</section>`;
+  }
+  host.querySelectorAll('[data-gtk]').forEach(b=>b.addEventListener('click',()=>gtkAct(b.getAttribute('data-gtk'))));
+}
+async function gtkAct(a){
+  if(!GTK)return;
+  if(a==='edit'){GTK.editing=true;drawGoodToKnow(true);return;}
+  if(a==='cancel'){GTK.editing=false;GTK.draft=null;drawGoodToKnow();const e=gtkHost()&&gtkHost().querySelector('[data-gtk="edit"]');if(e)e.focus();return;}
+  if(a!=='save'||GTK.busy)return;
+  const ta=$('gtkTa');if(!ta)return;
+  const v=ta.value.trim(),pid=GTK.pid;
+  GTK.busy=true;const sb=gtkHost().querySelector('[data-gtk="save"]');if(sb)sb.disabled=true;
+  let r;try{r=await apiAg('/sales/contacts/'+encodeURIComponent(pid),'PATCH',{good_to_know:v});}catch(_){r={ok:false,body:{}};}
+  if(!GTK||GTK.pid!==pid)return;
+  GTK.busy=false;
+  if(!r.ok){if(sb)sb.disabled=false;toast((r.body&&r.body.message)||'That didn’t save just now. Your note is still in the box.','err');return;}
+  GTK.text=(r.body&&r.body.data&&typeof r.body.data.good_to_know==='string')?r.body.data.good_to_know:v;GTK.editing=false;GTK.draft=null;CONTACT_CACHE=null;
+  drawGoodToKnow();toast(GTK.text?'Saved. AI help will keep it in mind.':'Note removed.');
+  const e=gtkHost()&&gtkHost().querySelector('[data-gtk="edit"]');if(e)e.focus();
 }
 function emAiTools(row,k){
   if(!window.ddsSalesAi)return;

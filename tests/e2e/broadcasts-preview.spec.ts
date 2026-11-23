@@ -38,6 +38,26 @@ async function drafts(page: Page) {
 const write = async (page: Page, subject: string, body: string) => { await page.locator('#subj').fill(subject); await page.locator('#bodytx').fill(body); };
 
 test.describe('Send an update — the preview is what goes out (bug hunt C1)', () => {
+  test('sales item 208: the name reads as a chip in the box, and the saved draft carries the code the server fills in', async ({ page }) => {
+    await installApp(page, { api: API });
+    const saved = await drafts(page);
+    await page.goto('/broadcasts.html');
+    const box = page.locator('#bodytx');
+    await page.locator('#subj').fill('Spring hours');
+    await box.fill('Hi ');
+    await box.evaluate((el) => { const t = el as HTMLTextAreaElement; t.setSelectionRange(3, 3); });
+    await page.getByRole('button', { name: '+ First name' }).click();
+    await box.press('End');
+    await box.pressSequentially(', we open at 9.');
+    await expect(box).toHaveValue('Hi [First name], we open at 9.');
+    await expect(page.locator('#bodyHl mark')).toHaveText(['[First name]']);   // drawn as a chip behind the words
+    const m = (await page.locator('#bodyHl mark').boundingBox())!, t = (await box.boundingBox())!;
+    expect(m.x > t.x + 12 && m.y > t.y && m.x + m.width < t.x + t.width && m.y + m.height < t.y + t.height).toBe(true);
+    await expect(page.locator('#livePv')).toContainText('Hi there, we open at 9.');
+    await page.locator('#preview').click();
+    await expect.poll(() => saved.length).toBeGreaterThan(0);
+    expect(saved[0].body.body).toBe('Hi {{first_name}}, we open at 9.');
+  });
   test('a change after Preview makes the card out of date: no Send until it is previewed again', async ({ page }) => {
     await installApp(page, { api: API });
     const saved = await drafts(page);

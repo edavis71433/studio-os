@@ -28,7 +28,7 @@ import { moneyState, moneyBuckets, invoiceNotSent, SENT_INVOICE_FILTER } from '.
 import { studioZone } from '../lib/studio_clock.ts';   // sales item 152
 import { ownStripeRefused, OWN_STRIPE_MESSAGE } from '../commerce/own_stripe.ts';   // sales item 149
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
-import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
+import { revenueByMonth, moneyInMonths, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { RETURNED_SELECT, returnedPayments } from '../lib/money_returns.ts';   // sales items 126, 127
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
 import { readReservedJsonOrThrow, readReservedJson, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
@@ -73,6 +73,8 @@ import { cleanRounds, roundsUsed, roundsLine } from '../lib/revision_rounds.ts';
 import { reopenEnquiry } from '../lib/enquiry_state.ts';
 import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.ts';   // item 110 (K1): one person, one email, whatever its capitals
 import { contactMoreFrom, cleanTag, CONTACT_MORE_COLS } from '../lib/contact_fields.ts';   // item 89: address, job title, second phone, tags
+import { phoneDigits } from '../lib/record_search.ts';   // sales item 192: a phone number by its digits in the Contacts box
+import { cleanNoteText, GOOD_TO_KNOW_MAX } from '../lib/sales_ai.ts';   // sales item 211: Good to know about them
 import { normalizeListFilters, quietCutoff, contactedContactIds, owingContactIds, keepIds, type ListFilters } from '../lib/list_filters.ts';   // item 90: field filters
 import { liveImport, importUpdate, noteImportRow } from './contacts_more.ts';   // item 86: imports that update and can be undone
 import { CONTACT_FIELDS_NAME, loadContactFieldDefs, contactIn, newContactRow, importIncoming } from '../lib/contact_row.ts';   // item 122: one cleaning for the add form and a whole-file import
@@ -448,6 +450,17 @@ async function contactFilterIds(siteId: string, more: string, order: string, lf:
   const ordered = rows(orderedR).map((r: any) => String(r.id));
   return { ids: keepIds(ordered, only, not), partial: ordered.length >= CONTACT_FILTER_CAP };
 }
+/** Sales item 192: what the Contacts list's own box finds, as one PostgREST or=(…) part. A name,
+ *  email, company, job title or town holding the words; a whole tag ("restaurant", as the tag
+ *  filter reads one); and a phone number by its digits in either number, whatever marks were
+ *  written between them ("(555) 010-4410" for "5550104410" or "010 4410"), never digits that
+ *  merely come in that order with others between. `q` is already cleaned of filter grammar. */
+export function contactSearchFilter(q: string): string {
+  const like = `ilike.*${encodeURIComponent(q)}*`;
+  const tag = cleanTag(q), digits = phoneDigits(q);
+  const run = digits ? encodeURIComponent(digits.split('').join('[^0-9]*')) : '';
+  return `&or=(name.${like},email.${like},company.${like},job_title.${like},address->>city.${like}${tag ? `,tags.cs.${encodeURIComponent(`{"${tag}"}`)}` : ''}${run ? `,phone.match.${run},phone2.match.${run}` : ''})`;
+}
 export async function handleSalesContacts(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method === 'GET') {
     const u = new URL(req.url);
@@ -468,7 +481,7 @@ export async function handleSalesContacts(req: Request, site: SiteRow, principal
     // select; retry the narrow one so the roster never goes dark pre-apply.
     // item 66: the filters past the site pin, shared by the page read and its count
     let more = withDeleted ? '' : '&deleted_at=is.null';
-    if (q) more += `&or=(name.ilike.*${encodeURIComponent(q)}*,email.ilike.*${encodeURIComponent(q)}*,company.ilike.*${encodeURIComponent(q)}*)`;
+    if (q) more += contactSearchFilter(q);
     if (ids.length) more += `&id=in.(${ids.join(',')})`;
     // item 110 (K4): past 100 people the page can't sort or filter what it hasn't loaded, so
     // it asks here: since= (an ISO time) is "Recently updated", customer=yes|no is People's
@@ -824,6 +837,12 @@ async function contactAttachments(siteId: string, contactId: string) {
   return { summary: summarizeAttachments(counts), unknown: [...new Set(unknown)] };
 }
 
+/** Sales item 211: a person's "Good to know about them" ('' when empty); null when it can't be read
+ *  (before APPLY-0287 there is no column), so the record shows no box rather than an empty one. */
+async function goodToKnowOf(siteId: string, id: string): Promise<string | null> {
+  const r = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${siteId}&select=good_to_know&limit=1`).catch(() => null);
+  return r && r.ok && Array.isArray(r.json) && r.json[0] ? String(r.json[0].good_to_know ?? '') : null;
+}
 export async function handleSalesContact(req: Request, site: SiteRow, principal: Principal, id: string, cors: Record<string, string>): Promise<Response> {
   if (!UUID_RE.test(id)) return json({ error: 'bad_request' }, 400, cors);
   const contact = await loadContact(site.id, id);
@@ -851,7 +870,8 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
     const custom = normalizeFieldValues(defs, contact.custom);
     return json({ data: {
       contact: { id: contact.id, name: contact.name, email: contact.email, phone: contact.phone, company: contact.company, notes: contact.notes, created_at: contact.created_at, updated_at: contact.updated_at, custom,
-        found_via: contact.found_via || '', job_title: contact.job_title || '', phone2: contact.phone2 || '', address: contact.address || {}, tags: Array.isArray(contact.tags) ? contact.tags : [] },   // item 89
+        found_via: contact.found_via || '', job_title: contact.job_title || '', phone2: contact.phone2 || '', address: contact.address || {}, tags: Array.isArray(contact.tags) ? contact.tags : [],   // item 89
+        good_to_know: await goodToKnowOf(site.id, id) },   // sales item 211: null before APPLY-0287 (the record then shows no box)
       deals: composed.deals, timeline: composed.timeline, last_contacted_at: composed.last_contacted_at,
       custom_fields: defs,
     } }, 200, cors);
@@ -865,6 +885,11 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
     if (b.company !== undefined) patch.company = clean(b.company, 120);
     if (b.notes !== undefined) patch.notes = clean(b.notes, 2000);
     if (b.found_via !== undefined) patch.found_via = normalizeFoundVia(b.found_via);   // item 69
+    // sales item 211: "Good to know about them", the note AI help reads (APPLY-0287)
+    if (b.good_to_know !== undefined) {
+      if (b.good_to_know !== null && typeof b.good_to_know !== 'string') return json({ error: 'validation', message: 'Write the note in words.' }, 422, cors);
+      patch.good_to_know = cleanNoteText(b.good_to_know ?? '', GOOD_TO_KNOW_MAX);
+    }
     Object.assign(patch, contactMoreFrom(b));   // item 89: address, job title, second phone, tags
     if (b.email !== undefined) {
       const email = clean(b.email, 160).toLowerCase();
@@ -885,6 +910,11 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
     }
     if (!Object.keys(patch).length) return json({ error: 'empty_update' }, 400, cors);
     let up = await svc(`presence_contacts?id=eq.${id}&site_id=eq.${site.id}&select=id,name,email,phone,company,notes,updated_at,custom`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+    // sales item 211, deploy-order tolerance: before APPLY-0287 the note has no column; it is saved alone, so it says so
+    if (!up.ok && 'good_to_know' in patch && missingInsertColumns(up.json, up.text, ['good_to_know']).length) {
+      return json({ error: 'fields_unavailable', message: '“Good to know about them” needs a quick database update before it can be saved.' }, 409, cors);
+    }
+    if (up.ok && rows(up)[0] && 'good_to_know' in patch) return json({ data: { ...rows(up)[0], good_to_know: patch.good_to_know, ...('found_via' in patch ? { found_via: patch.found_via } : {}) } }, 200, cors);
     // item 89, deploy-order tolerance: before APPLY-0166 the new fields can't be saved — the
     // rest of the save still goes through, and the answer says what didn't stick
     let moreLate: string[] = [];
@@ -970,6 +1000,20 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
 // (the browser only ever holds a page of ≤100, so it can't total them honestly).
 // The pure summarizePipeline does the math; this just fetches the minimal columns.
 // Site-scoped & studio-gated like every authed /sales/* route.
+// ── Sales item 215: Home's "Money in", read and worked out the way Analytics' is (the reports
+//    route below): paid invoices, retainer payments and money that went back, by the studio's
+//    own day, for this month and last. 70 days back covers last month whatever the zone. ──
+export async function readMoneyIn(site: SiteRow, now: string) {
+  const since = encodeURIComponent(new Date(Date.parse(now) - 70 * 86400_000).toISOString());
+  const [paid, events, back, tz] = await Promise.all([
+    svcPages(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${since}&select=amount_cents,paid_at`, 'paid_at'),
+    svcPages(`presence_deal_events?site_id=eq.${site.id}&kind=eq.invoice_paid&detail->>retainer=eq.true&created_at=gte.${since}&select=kind,detail,created_at`, 'created_at'),
+    svcPages(`presence_money_returns?site_id=eq.${site.id}&counted_cents=gt.0&counted_at=gte.${since}&select=${RETURNED_SELECT}`, 'counted_at'),
+    studioZone(site.id),
+  ]);
+  if (!paid || !events || !back) return null;   // a read that failed sends no figure, never a wrong one
+  return moneyInMonths(revenueByMonth(paid.rows, now, retainerPayments(events.rows), returnedPayments(back.rows), tz));
+}
 export async function handleSalesSummary(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method !== 'GET') return json({ error: 'method_not_allowed' }, 405, cors);
   const namesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
@@ -979,6 +1023,7 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   // tells the truth if we ever hit it — the totals are then a floor, never a
   // fabricated whole-set sum.
   const CAP = 2000;
+  const moneyInP = readMoneyIn(site, nowIso()).catch(() => null);   // sales item 215: side by side with the reads below; a failed read sends none
   const [r, invR] = await Promise.all([
     svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=stage,expected_value_cents,converted_client_id,converted_at,updated_at&limit=${CAP}`),
     // AR rollup — "who owes me money" across every deal, in one place (a Salesforce
@@ -1008,7 +1053,7 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   sum.by_stage = sum.by_stage.map((s) => ({ ...s, chance: chances[s.stage] ?? null, expected_cents: ex.by_stage[s.stage] ?? 0 }));
   // sales item 94: the month's goal against won this month and what open deals should still bring
   const goal = goalProgress(normalizeGoalAi(await goalP).goal_cents, sum.won_month.value_cents, ex.value_cents);
-  return json({ data: { ...sum, ar, expected: { value_cents: ex.value_cents }, goal }, truncated: deals.length >= CAP }, 200, cors);
+  return json({ data: { ...sum, ar, expected: { value_cents: ex.value_cents }, goal, money_in: await moneyInP }, truncated: deals.length >= CAP }, 200, cors);
 }
 
 // ═══ RECEIVABLES — the "who owes me money" list behind the AR strip ═══

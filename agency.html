@@ -1201,6 +1201,14 @@ function statTiles(s,deals){
     }
     t.push({id:'stat-won',k:'Won this month',v:money(s.won_month.value_cents),s:n?plur(n,'deal'):'Nothing closed yet',tone:'good',href:'/pipeline.html',chip,spark});
   }
+  // sales item 215: Money in beside Won this month, Analytics' own figure (money paid this month,
+  // by the studio's day), so the two pages show the same number; an older server sends none
+  const mi=s.money_in;
+  if(mi&&typeof mi.cents==='number'){
+    const last=Number(mi.last_cents)||0,d=mi.cents-last,mon=String(mi.last_label||'').split(' ')[0];
+    const chip=(mi.cents||last)&&mon?(d>0?{txt:'+'+money(d)+' vs '+mon,cls:'up'}:d<0?{txt:'−'+money(-d)+' vs '+mon,cls:''}:{txt:'Same as '+mon,cls:''}):null;
+    t.push({id:'stat-in',k:'Money in',v:money(mi.cents),s:mi.cents?'Paid this month':'Nothing paid yet this month',tone:'good',href:'/analytics.html',chip});
+  }
   if(s.open&&typeof s.open.count==='number'){
     const n=s.open.count;let chip=null;
     if(complete){const wk=Date.now()-7*86400000;const fresh=deals.filter(d=>d&&OPEN_STAGES.indexOf(d.stage)>=0&&!isWonDeal(d)&&Date.parse(String(d.created_at||''))>=wk).length;if(fresh)chip={txt:'+'+fresh+' this week',cls:'up'};}

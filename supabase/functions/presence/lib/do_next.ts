@@ -67,7 +67,7 @@ export function composeDoNext(f: DoNextFacts, decisions: { decided: Record<strin
   // Needs you writes "changes are sitting unpublished" after the site's name; here it stands alone
   for (const n of f.needs) add({ key: n.key, source: 'needs', title: n.what.charAt(0).toUpperCase() + n.what.slice(1), sub: n.when, verb: n.verb || 'Open', href: n.href });
   const hol = holidaySoon(localDay(nowIso));
-  if (hol) add({ key: `holiday:${hol.key}`, source: 'holiday', title: `${hol.name} is ${hol.when}: are you open?`, sub: 'If you close or keep shorter hours, say so on the website’s Hours card so customers know before they come.', verb: 'Set hours', href: `${ws}#hours` });
+  if (hol) add({ key: `holiday:${hol.key}`, source: 'holiday', title: `${hol.name} is ${hol.when}: are you open?`, sub: 'If you close or keep shorter hours, say so on the website’s Hours card so customers know before they come.', verb: 'Set hours', href: `${ws}#hours-${hol.day}` });   // item 431: the editor puts focus on that day's row
   const healthTypes = new Set<string>();
   for (const h of (f.health || []).slice().sort((a, b) => (a.severity === b.severity ? b.n - a.n : a.severity === 'critical' ? -1 : 1)).slice(0, 3)) {
     healthTypes.add(h.type);

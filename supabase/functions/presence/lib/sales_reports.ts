@@ -46,6 +46,14 @@ export function revenueByMonth(paid: Array<{ amount_cents?: unknown; paid_at?: u
   return { months, total_this_year: months.reduce((a, m) => a + m.this_year, 0), total_last_year: months.reduce((a, m) => a + m.last_year, 0), retainer_this_year: months.reduce((a, m) => a + m.retainer, 0), returned_this_year: months.reduce((a, m) => a + m.returned, 0) };
 }
 
+/** Sales item 215: Home's "Money in" is Analytics' figure, this month's and last month's from
+ *  revenueByMonth (paid invoices and retainer payments, less money that went back, on the studio's
+ *  own day), so the two pages can never disagree. Pure. */
+export function moneyInMonths(rev: { months: RevenueMonth[] }) {
+  const ms = rev.months, cur = ms[ms.length - 1], prev = ms[ms.length - 2];
+  return { month: cur.month, label: cur.label, cents: cur.this_year, last_month: prev.month, last_label: prev.label, last_cents: prev.this_year };
+}
+
 // ── 2. open deals by stage, with how long they have sat there ──
 export const OPEN_STAGES = ['lead', 'qualified', 'proposal', 'contract'];
 export const STAGE_LABEL: Record<string, string> = { lead: 'New lead', qualified: 'Qualified', proposal: 'Proposal sent', contract: 'Agreement out', won: 'Won', lost: 'Not a fit' };
