@@ -418,6 +418,80 @@
       .replace(/\byou\b/gi, function (w) { return cap(w, 'them'); })
       .replace(/\u0000/g, 'you');
   }
+  // ── The website's own menu (builder item 370): one list for every page it opens ──
+  // The website page draws it into the sidebar under Website (presence-core.js,
+  // mountSiteNav). Its Analytics and Connections are pages of their own, so inside a
+  // client those pages draw the same menu there too, their own item lit, instead of
+  // the sidebar losing it. Each item is [view, label]; a named group folds.
+  var SITE_MENU = [
+    [null, [['today', 'Overview'], ['pages', 'Pages'], ['styles', 'Styles'], ['media', 'Files'], ['search', 'Search']]],
+    ['Content', [['offerings', 'Menu'], ['faqs', 'Questions'], ['testimonials', 'Testimonials'], ['updates', 'Blog']]],
+    [null, [['bookings', 'Bookings'], ['reviews', 'Reviews'], ['analytics', 'Analytics']]],
+    ['Site settings', [['business', 'Business details'], ['domain', 'Domain & email'], ['history', 'Versions'], ['connections', 'Connections'], ['sharing', 'Sharing & access'], ['clientview', 'See the client’s view']]]
+  ];
+  var SITE_PAGES = { analytics: '/analytics.html?view=website', connections: '/connections.html', sharing: '/sharing.html', clientview: '/client.html' };
+  // the tabs about the business, not the website: a Designer never sees them (presence-core.js isBusinessTab)
+  var BUSINESS_TABS = ['search', 'bookings', 'reviews', 'analytics', 'domain', 'connections', 'clientview'];
+  var WATCH_HIDES = ['pages', 'styles', 'bookings', 'reviews', 'history'];
+  // the site's own word for its offerings (Menu, Services…), as the website page last said it
+  var WORD_KEY = 'dds-offer-word:';
+  function offerWord(client, set) {
+    try { if (set) { sessionStorage.setItem(WORD_KEY + client, set); return set; } return sessionStorage.getItem(WORD_KEY + client) || 'Services'; } catch (_) { return set || 'Services'; }
+  }
+  function siteMenuHref(view, client) {
+    var page = SITE_PAGES[view] || '/presence.html';
+    var q = client ? (page.indexOf('?') >= 0 ? '&' : '?') + 'client=' + encodeURIComponent(client) : '';
+    return page + q + (SITE_PAGES[view] || view === 'today' ? '' : '#' + view);
+  }
+  // Draws the menu under Website in the sidebar, `current` lit, and again after the shell redraws.
+  function mountSiteMenu(current) {
+    var client = new URLSearchParams(location.search).get('client');
+    if (!client) return;   // a client's website menu: studio-level pages keep their own sidebar
+    function build() {
+      var shell = document.getElementById('dds-shell'); if (!shell) return;
+      var it = shell.querySelector('.dds-nav .sec > .it[data-href="/presence.html"]'); if (!it) return;
+      var sec = it.parentElement, nav = document.getElementById('siteMenu');
+      if (nav && nav.parentElement === sec) return;
+      var ctx = window.__ddsContext || {}, feats = ctx.edition_features;
+      var off = function (f) { return Array.isArray(feats) && feats.indexOf(f) < 0; };
+      // a site hosted elsewhere (the watch plan) has no pages, look or content here: the website page hides them too
+      var watch = ctx.edition === 'monitor';
+      nav = document.createElement('nav'); nav.id = 'siteMenu'; nav.className = 'menu site-menu'; nav.setAttribute('aria-label', 'Website sections');
+      SITE_MENU.forEach(function (g) {
+        var host = nav;
+        if (watch && g[0] === 'Content') return;
+        if (g[0]) {
+          var fold = document.createElement('div'); fold.className = 'nav-fold';
+          var head = document.createElement('button'); head.type = 'button'; head.className = 'grp'; head.textContent = g[0]; head.setAttribute('aria-expanded', 'false');
+          head.addEventListener('click', function () { var o = fold.classList.toggle('open'); head.setAttribute('aria-expanded', String(o)); });
+          fold.appendChild(head); nav.appendChild(fold); host = fold;
+        }
+        g[1].forEach(function (t) {
+          if ((t[0] === 'connections' && off('connected')) || (t[0] === 'analytics' && off('reports'))) return;
+          if (watch && WATCH_HIDES.indexOf(t[0]) >= 0) return;
+          var a = document.createElement('a'); a.className = 'navitem'; a.href = siteMenuHref(t[0], client);
+          a.textContent = t[0] === 'offerings' ? offerWord(client) : t[1];
+          if (t[0] === 'today') a.setAttribute('data-view', 'today');   // Website itself is the Overview, as on the website page
+          if (BUSINESS_TABS.indexOf(t[0]) >= 0) a.setAttribute('data-needs', 'business');
+          if (t[0] === 'sharing') a.setAttribute('data-needs', 'owner');
+          if (t[0] === current) {
+            a.classList.add('on'); a.setAttribute('aria-current', 'page');
+            if (host !== nav) { host.classList.add('open'); host.firstChild.setAttribute('aria-expanded', 'true'); }
+          }
+          host.appendChild(a);
+        });
+      });
+      sec.classList.add('open', 'has-site-menu');
+      it.insertAdjacentElement('afterend', nav);
+    }
+    function startOn(sh) { new MutationObserver(build).observe(sh, { childList: true }); build(); }
+    var sh0 = document.getElementById('dds-shell');
+    if (sh0) { startOn(sh0); return; }
+    var wait = new MutationObserver(function () { var sh = document.getElementById('dds-shell'); if (sh) { wait.disconnect(); startOn(sh); } });
+    wait.observe(document.documentElement, { childList: true, subtree: true });
+  }
+  window.ddsSiteMenu = { groups: SITE_MENU, href: siteMenuHref, mount: mountSiteMenu, word: offerWord };
+
   window.ddsTheirVoice = theirVoice;
   window.ddsAskReminders = askReminders;
   window.ddsKit = { api: api, toast: toast, confirm: confirmBox, ask: askBox, money: money, date: DATE, askReminders: askReminders, theirVoice: theirVoice };

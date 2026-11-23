@@ -526,9 +526,9 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     expect(overflow).toBeLessThanOrEqual(0);
     const xs = await page.locator('.scard').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
     expect(new Set(xs).size).toBe(1);
-    await expect(page.locator('.sband .kpi')).toHaveCount(4);   // two by two on a phone
-    const ks = await page.locator('.sband .kpi').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
-    expect(new Set(ks).size).toBe(2);
+    await expect(page.locator('.sband .kpi')).toHaveCount(4);   // builder item 366: one slim row on a phone, scrolling sideways inside the band
+    const ks = await page.locator('.sband .kpi').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+    expect(new Set(ks).size).toBe(1);
   });
 
   // Nov 11 2026: on a phone the h1 gave its width up to the buttons beside it and "Sites"

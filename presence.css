@@ -154,20 +154,7 @@ html.plan-watch .site-stage{height:calc(100vh - 92px);height:calc(100dvh - 92px)
 html.ss-noplan .ss-dev{visibility:hidden}
 .hb-site-status{margin:0 0 var(--dds-s5,20px)}
 .hb-site-status .hb-card{flex:1 1 300px}
-/* The site menu, drawn into the sidebar under Website as its inline list */
-html.dds-side .dds-nav .sec .site-menu{display:flex;flex-direction:column;position:static;min-width:0;background:transparent;border:0;box-shadow:none;border-radius:0;padding:1px 0 var(--dds-s1,4px);margin:0;gap:1px;max-width:none;overflow:visible}
-html.dds-side .dds-nav .sec .site-menu .grp{display:flex;align-items:center;justify-content:space-between;width:100%;font:inherit;font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--dds-soft);text-align:left;margin:0;padding:4px 10px 4px 37px;border:0;border-radius:var(--dds-r);background:none;cursor:pointer}
-html.dds-side .dds-nav .sec .site-menu .grp::after{content:"\25BE";font-size:11px;color:var(--dds-faint);transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
-html.dds-side .dds-nav .sec .site-menu .nav-fold.open>.grp::after{transform:rotate(180deg)}
-html.dds-side .dds-nav .sec .site-menu .grp:hover{background:color-mix(in srgb,var(--dds-ink) 6%,transparent);color:var(--dds-ink)}
-html.dds-side .dds-nav .sec .site-menu .nav-fold:not(.open) .navitem{display:none}
-html.dds-side .dds-nav .sec .site-menu .nav-fold .navitem{padding-left:49px}
-html.dds-side .dds-nav .sec .site-menu .navitem[data-view="today"],html.dds-side .dds-nav .sec .site-menu .navitem.dup{display:none}
-html.dds-side .dds-nav .sec .site-menu .navitem{display:block;width:100%;font:inherit;font-size:13px;font-weight:500;color:var(--dds-soft);text-align:left;padding:4px 10px 4px 37px;border:0;border-radius:var(--dds-r);background:none;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0}
-html.dds-side .dds-nav .sec .site-menu .navitem:hover{background:color-mix(in srgb,var(--dds-ink) 6%,transparent);color:var(--dds-ink)}
-html.dds-side .dds-nav .sec .site-menu .navitem.on{background:color-mix(in srgb,var(--dds-p) 12%,transparent);color:var(--dds-p)}
-html.dds-side .dds-nav .sec.active.has-site-menu > .it{background:color-mix(in srgb,var(--dds-ink) 5%,transparent);color:var(--dds-ink)}
-html.site-home.dds-side .dds-nav .sec.active.has-site-menu > .it{background:color-mix(in srgb,var(--dds-p) 12%,transparent);color:var(--dds-p)}
+/* The site menu in the sidebar is styled in shell.css (builder item 370: Analytics and Connections draw it too) */
 /* the list scrolls inside the column, so the bottom row stays put (also in shell.css, which browsers keep for a day) */
 html.dds-side .dds-nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
 /* the sidebar is the map, so the launcher repeating it stays on the phone layout */
@@ -444,6 +431,15 @@ html:not(.is-studio) #dcModeSeg [data-dcmode="timewarp"]{display:none}
 /* item 125: a publish wears a filled dot, a saved checkpoint (never live) a hollow one */
 .ver-top{display:flex;align-items:center;justify-content:space-between;gap:var(--dds-s3,12px);flex-wrap:wrap;margin:calc(-1 * var(--dds-s2,8px)) 0 var(--dds-s2,8px)}
 .ver-legend{display:flex;gap:var(--dds-s5,20px);margin:0}
+/* builder item 370: the Styles tab, the look as it is now */
+.st-look{display:flex;flex-direction:column;gap:var(--dds-s4,16px);background:var(--card);border:1px solid var(--hair);border-radius:var(--dds-r-lg,14px);padding:var(--dds-s5,20px);max-width:640px}
+.st-row{display:flex;flex-wrap:wrap;gap:var(--dds-s4,16px) var(--dds-s6,24px)}
+.st-sw{display:flex;align-items:center;gap:10px}
+.st-dot{width:34px;height:34px;flex:0 0 auto;display:block}
+.st-dot circle{stroke:var(--hair);stroke-width:1}
+.st-sw b,.st-font b{display:block;font-size:14px;font-weight:600}
+.st-hex,.st-k{display:block;font-size:12px;color:var(--soft)}
+.st-acts{margin:var(--dds-s4,16px) 0 0}
 .ver-kind{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--sage);white-space:nowrap}
 .ver-kind::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:currentColor}
 .ver-kind.save{color:var(--ink-3)}
@@ -1222,7 +1218,7 @@ html.dc-edit:not(.plan-watch) .dds-hint{bottom:88px !important;z-index:80 !impor
   html.dc-edit:not(.plan-watch) .dc-twbar{width:auto;margin:0 10px 8px}
 }
 /* a watch plan observes: no building tools, no publish queue */
-html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .navitem[data-view="pages"],html.plan-watch .navitem[data-link="styles"],html.plan-watch .navitem[data-view="offerings"],html.plan-watch .navitem[data-view="faqs"],html.plan-watch .navitem[data-view="testimonials"],html.plan-watch .navitem[data-view="updates"],html.plan-watch .navitem[data-view="bookings"],html.plan-watch .navitem[data-view="reviews"],html.plan-watch .navitem[data-view="history"],html.plan-watch #pagesBar,html.plan-watch .dc-bar,html.plan-watch #dcDock,html.plan-watch #btnAddFab,html.plan-watch #btnEditSite,html.plan-watch #trayPanel,html.plan-watch #designPreviewWrap>.hint,html.plan-watch #statWaiting,html.plan-watch #recentWrap,html.plan-watch #designPreview,html.plan-watch #view-design .docsub{display:none !important}
+html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .navitem[data-view="pages"],html.plan-watch .navitem[data-view="styles"],html.plan-watch .navitem[data-view="offerings"],html.plan-watch .navitem[data-view="faqs"],html.plan-watch .navitem[data-view="testimonials"],html.plan-watch .navitem[data-view="updates"],html.plan-watch .navitem[data-view="bookings"],html.plan-watch .navitem[data-view="reviews"],html.plan-watch .navitem[data-view="history"],html.plan-watch #pagesBar,html.plan-watch .dc-bar,html.plan-watch #dcDock,html.plan-watch #btnAddFab,html.plan-watch #btnEditSite,html.plan-watch #trayPanel,html.plan-watch #designPreviewWrap>.hint,html.plan-watch #statWaiting,html.plan-watch #recentWrap,html.plan-watch #designPreview,html.plan-watch #view-design .docsub{display:none !important}
 #designPreviewEmpty.plan .ea{display:none}
 /* the builder's one icon set */
 .ti-ico svg,.dc-tree-ico svg,.pd-ico svg,.dc-tree-acts svg,.cm-badge svg{display:block}
@@ -1348,6 +1344,17 @@ html.plan-watch .ss-bar,html.plan-watch [data-grp="Content"],html.plan-watch .na
 .sv-drop li .c{font-weight:700;text-align:right;min-width:40px} .sv-drop li .c.down{color:var(--clay)} .sv-drop li .c.up{color:var(--sage)}
 .sv-drop li .w{font-size:12px;color:var(--ink-2);white-space:nowrap}
 .sv-near-src{font-size:12.5px;color:var(--ink-2)}
+/* builder item 384: seen a lot on Google, clicked little */
+.sv-seen{margin-top:var(--dds-s5,20px)}
+.sv-seen h4{font-size:14px;font-weight:600;margin:0 0 4px}
+.sv-seen-l{list-style:none;margin:var(--dds-s2,8px) 0 0;padding:0}
+.sv-seen-l li{display:flex;align-items:center;gap:var(--dds-s3,12px);padding:10px 0;border-top:1px solid var(--hair)}
+.sv-seen-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.sv-seen-t b{font-size:13.5px;overflow-wrap:anywhere}
+.sv-seen-n{font-size:12px;color:var(--ink-3)}
+.sv-seen-h{font-size:13px;color:var(--ink-2,var(--ink))}
+.sv-seen-l .pillbtn{flex:0 0 auto;min-height:44px}
+@media (max-width:640px){.sv-seen-l li{flex-direction:column;align-items:stretch}}
 .sv-near-t{width:100%;border-collapse:collapse;font-size:13.5px}
 .sv-near-t th{text-align:left;font-size:12px;font-weight:600;color:var(--ink-3);padding:8px 10px;border-bottom:1px solid var(--hair);white-space:nowrap}
 .sv-near-t td{padding:12px 10px;border-bottom:1px solid var(--hair);vertical-align:middle}

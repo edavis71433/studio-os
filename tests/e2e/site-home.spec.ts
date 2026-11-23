@@ -465,7 +465,7 @@ test.describe('a watch-plan site', () => {
     await open(page);
     for (const v of ['offerings', 'faqs', 'testimonials', 'updates', 'bookings', 'reviews', 'history']) expect(await page.locator(`#sectionsNav .navitem[data-view="${v}"]`).evaluate((n) => getComputedStyle(n).display), v).toBe('none');
     expect(await page.locator('#sectionsNav .grp[data-grp="Content"]').evaluate((n) => getComputedStyle(n).display)).toBe('none');
-    expect(await page.locator('#sectionsNav .navitem[data-link="styles"]').evaluate((n) => getComputedStyle(n).display)).toBe('none');
+    expect(await page.locator('#sectionsNav .navitem[data-view="styles"]').evaluate((n) => getComputedStyle(n).display)).toBe('none');
     expect(await page.locator('#sectionsNav .navitem[data-view="search"]').evaluate((n) => getComputedStyle(n).display)).not.toBe('none');
     await expect(page.locator('#ssTodo')).toBeHidden();
     await expect(page.locator('#ssBar')).toBeHidden();      // no "Not live yet", no Edit, no Publish, no Preview of a page it doesn't host

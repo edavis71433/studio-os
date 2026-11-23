@@ -1278,3 +1278,18 @@ html.dds-cr-on body{overflow:hidden}
 .dds-cr .cr-else{margin:0;padding:8px 10px 4px;font-size:12px;color:var(--dds-soft)}
 .dds-cr .cr-sub{margin:4px 2px 0;font-size:12px;color:var(--dds-soft)}
 .dds-cr select.cr-in{appearance:auto}
+/* The website's own menu, drawn into the sidebar under Website as its inline list: on the website
+   page, and inside a client on Analytics and Connections too (builder item 370, shell-kit.js) */
+html.dds-side .dds-nav .sec .site-menu{display:flex;flex-direction:column;position:static;min-width:0;background:transparent;border:0;box-shadow:none;border-radius:0;padding:1px 0 var(--dds-s1,4px);margin:0;gap:1px;max-width:none;overflow:visible}
+html.dds-side .dds-nav .sec .site-menu .grp{display:flex;align-items:center;justify-content:space-between;width:100%;font:inherit;font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--dds-soft);text-align:left;margin:0;padding:4px 10px 4px 37px;border:0;border-radius:var(--dds-r);background:none;cursor:pointer}
+html.dds-side .dds-nav .sec .site-menu .grp::after{content:"\25BE";font-size:11px;color:var(--dds-faint);transition:transform var(--dds-t-fast,120ms) var(--dds-ease,ease-out)}
+html.dds-side .dds-nav .sec .site-menu .nav-fold.open>.grp::after{transform:rotate(180deg)}
+html.dds-side .dds-nav .sec .site-menu .grp:hover{background:color-mix(in srgb,var(--dds-ink) 6%,transparent);color:var(--dds-ink)}
+html.dds-side .dds-nav .sec .site-menu .nav-fold:not(.open) .navitem{display:none}
+html.dds-side .dds-nav .sec .site-menu .nav-fold .navitem{padding-left:49px}
+html.dds-side .dds-nav .sec .site-menu .navitem[data-view="today"],html.dds-side .dds-nav .sec .site-menu .navitem.dup{display:none}
+html.dds-side .dds-nav .sec .site-menu .navitem{display:block;width:100%;font:inherit;font-size:13px;font-weight:500;color:var(--dds-soft);text-align:left;padding:4px 10px 4px 37px;border:0;border-radius:var(--dds-r);background:none;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0;text-decoration:none}
+html.dds-side .dds-nav .sec .site-menu .navitem:hover{background:color-mix(in srgb,var(--dds-ink) 6%,transparent);color:var(--dds-ink)}
+html.dds-side .dds-nav .sec .site-menu .navitem.on{background:color-mix(in srgb,var(--dds-p) 12%,transparent);color:var(--dds-p)}
+html.dds-side .dds-nav .sec.active.has-site-menu > .it{background:color-mix(in srgb,var(--dds-ink) 5%,transparent);color:var(--dds-ink)}
+html.site-home.dds-side .dds-nav .sec.active.has-site-menu > .it{background:color-mix(in srgb,var(--dds-p) 12%,transparent);color:var(--dds-p)}
