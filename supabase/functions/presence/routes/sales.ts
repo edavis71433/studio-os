@@ -930,6 +930,7 @@ export async function readMoneyIn(site: SiteRow, now: string) {
     svcPages(`presence_money_returns?site_id=eq.${site.id}&counted_cents=gt.0&counted_at=gte.${since}&select=${RETURNED_SELECT}`, 'counted_at'),
     studioZone(site.id),
   ]);
+  if (!paid || !events || !back) return null;   // a read that failed sends no figure, never a wrong one
   return moneyInMonths(revenueByMonth(paid.rows, now, retainerPayments(events.rows), returnedPayments(back.rows), tz));
 }
 export async function handleSalesSummary(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
