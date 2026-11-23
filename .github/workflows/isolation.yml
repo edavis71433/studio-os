@@ -1,8 +1,8 @@
 name: Walls between studios (scratch database)
 
 # Builder item 212: the suites that prove one studio can't read another's data run
-# with every release. Until Nov 2026 they ran by hand on a staging project, last on
-# Jul 5 2026, and that project no longer exists. Now scripts/isolation-scratch.sh makes
+# with every release. Until Nov 2026 they ran by hand on the staging project, last on
+# Jul 5 2026; that project now runs only the watchdog. Now scripts/isolation-scratch.sh makes
 # a throwaway database on the runner, with production's migrations, two studios and
 # both servers from this commit, and runs them there. tests/isolation/README.md says
 # what runs and what doesn't yet.

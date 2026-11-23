@@ -258,6 +258,7 @@ const MAY_SKIP = [
   'runbooks/deploy.md', 'sql/seed.sql', 'templates/PROPOSAL-TEMPLATE.md',
   'tests/presence/render_test.mjs', 'tests/isolation/a.mjs', 'tests/smoke/a.mjs', 'tests/workflows/e2e_scope_test.mjs',
   '.github/workflows/ci.yml', '.github/workflows/deploy.yml', '.github/workflows/rollback.yml', '.github/workflows/schema-dump.yml',
+  '.github/workflows/uptime.yml', '.github/workflows/rehearsal.yml',
   'README.md', 'MASTER-CHECKLIST.md', '01-add-scheduler-columns.sql',
 ];
 for (const file of MAY_SKIP) {

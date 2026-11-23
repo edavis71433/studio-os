@@ -101,6 +101,16 @@
   .pill{flex:none;font-size:12px;font-weight:500;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:999px;white-space:nowrap;text-transform:capitalize}
   .pill.ok{color:var(--ok);background:var(--ok-soft)} .pill.attention{color:var(--attn);background:var(--attn-soft)} .pill.off{color:var(--off);background:var(--off-soft)}
 
+  /* builder item 416: the newest crashes, one line each */
+  .crashes{grid-column:1/-1}
+  .crashes .cb{padding:var(--dds-s3,12px) var(--dds-s4,16px) var(--dds-s4,16px)}
+  .crashes ol{list-style:none;padding:0;margin:0}
+  .crashes li{display:grid;grid-template-columns:minmax(9ch,auto) minmax(0,1fr);gap:2px var(--dds-s3,12px);padding:var(--dds-s2,8px) 0;border-top:1px solid var(--line);font-size:13px}
+  .crashes li:first-child{border-top:0}
+  .crashes .when{color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .crashes .what{color:var(--ink);font-weight:600;overflow-wrap:anywhere}
+  .crashes .said{grid-column:2;color:var(--soft);overflow-wrap:anywhere;font-family:var(--mono,ui-monospace,monospace);font-size:12px}
+  .crashes .none{color:var(--soft);font-size:13.5px;margin:0}
   .foot{margin-top:var(--dds-s7,32px);color:var(--faint);font-size:12.5px}
   /* shared states */
   .center{text-align:center;padding:56px var(--dds-s5,20px)}
@@ -160,10 +170,10 @@ const RANK={attention:0,ok:1,off:2};
 function orderAreas(arr){return arr.slice().sort((a,b)=>(RANK[a.state]==null?3:RANK[a.state])-(RANK[b.state]==null?3:RANK[b.state]));}
 // Analytics-style banding of the ten operational areas.
 const BANDS=[
-  {label:'Jobs & delivery',keys:['cron','errors','email']},
+  {label:'Jobs & delivery',keys:['cron','crashes','errors','email']},
   {label:'Reach',keys:['domains','usage']},
   {label:'Money & usage',keys:['billing','stripe_key','ai']},
-  {label:'Notices',keys:['platform','alerts','backups']},
+  {label:'Notices',keys:['platform','changes','alerts','backups']},
 ];
 // Real navigations to the surface where each area is actually FIXED. Areas with no
 // in-app fixing surface (platform config, cron, AI, errors, alerts, backups) get
@@ -224,6 +234,19 @@ async function checkKey(){
   renderKey(r.ok&&r.body?r.body.data:null);
 }
 
+// builder item 416: the newest crashes, newest first. Each is one request that failed with
+// "Something went wrong": the route it asked for and the first line of what went wrong.
+function crashWhen(iso){const d=new Date(iso);if(isNaN(d))return '';const sameDay=d.toDateString()===new Date().toDateString();return (sameDay?'':d.toLocaleDateString([],{month:'short',day:'numeric'})+', ')+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});}
+function crashList(list){
+  if(!Array.isArray(list)) return '';
+  let h='<h2 class="band">Newest crashes</h2><section class="card crashes" aria-label="Newest crashes"><div class="cb">';
+  if(!list.length) h+='<p class="none">No crashes on record (they are kept 90 days).</p>';
+  else h+='<ol>'+list.map(function(c){
+    return '<li><span class="when">'+esc(crashWhen(c.at))+'</span><span class="what">'+esc(c.what||'A request')+'</span><span class="said">'+esc(c.said||'No words were kept.')+'</span></li>';
+  }).join('')+'</ol>';
+  return h+'</div></section>';
+}
+
 function render(hc){
   const areas=hc&&Array.isArray(hc.areas)?hc.areas:null;
   if(!areas){ emptyState(); return; }
@@ -253,10 +276,11 @@ function render(hc){
   // any area the payload adds beyond the known keys is never dropped
   const rest=orderAreas(areas.filter(a=>!seen[a.key]));
   if(rest.length){ h+='<h2 class="band">More</h2>'; h+=rest.map(areaCard).join(''); }
+  h+=crashList(hc.recent_crashes);
   // builder item 398: the accounts Studio OS depends on, filled in by loadAccounts()
   h+='<h2 class="band" id="acctH">Accounts Studio OS depends on</h2><section class="card c12" id="acctCard" aria-labelledby="acctH"><div class="cb"><p class="dt">Getting the list…</p></div></section>';
   h+='</div>';
-  h+='<p class="foot">Aggregated from what the platform already produces — activation dashboard, cron ledger, domain watch, billing, AI usage, email config, publish/run errors, active notices.</p>';
+  h+='<p class="foot">Aggregated from what the platform already produces: activation dashboard, cron ledger, domain watch, billing, AI usage, email config, publish/run errors, server crashes, the database change ledger, active notices.</p>';
   $('main').innerHTML=h;
   const kb=$('keyCheck'); if(kb) kb.addEventListener('click',checkKey);
   loadAccounts();

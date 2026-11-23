@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ── Walls between studios, checked on a scratch database (builder item 212) ──────
 # The suites that prove one studio can't read another's data need a real database:
-# real sign-ins, the real row rules and the real servers. They last ran on Jul 5 2026,
-# on a staging project that no longer exists. This script builds a throwaway one on
+# real sign-ins, the real row rules and the real servers. They last ran by hand on Jul 5
+# 2026, on the staging project, which now runs only the watchdog. This script builds a throwaway one on
 # the machine it runs on and runs them there, with every release
 # (.github/workflows/isolation.yml, called by deploy.yml).
 #

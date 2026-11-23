@@ -28,6 +28,7 @@
  "business_classic_test.mjs": 1,
  "business_details_127_test.mjs": 4,
  "button_sets_test.mjs": 2,
+ "change_ledger_420_test.mjs": 5,
  "change_log_215_test.mjs": 2,
  "change_log_kinds_239_test.mjs": 8,
  "clever_api_characterization_test.mjs": 17,
