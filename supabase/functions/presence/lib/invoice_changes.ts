@@ -12,6 +12,7 @@
 //      amount, a day, how and a note against a paid invoice: it reads "Paid, $100 refunded",
 //      comes off the month it went back, and shows on the receipt.
 import { PAY_METHODS, type PayMethod } from './invoice_billing.ts';
+import { quarterQty } from './sales_lifecycle.ts';   // sales item 185
 
 export interface InvoiceLineIn { label: string; qty: number; amount_cents: number }
 export interface InvoiceEdit { title?: string; description?: string; due_date?: string | null; amount_cents?: number; lines?: InvoiceLineIn[] | null }
@@ -24,7 +25,7 @@ export const MAX_INVOICE_CENTS = 100_000_000;
 export const MIN_INVOICE_CENTS = 50;
 
 /** The lines as the invoice will store them, or a sentence about what's wrong. Labels 1 to
- *  200 characters, a whole quantity 1 to 999, whole cents (a minus line is allowed: a
+ *  200 characters, a quantity from 0.25 to 999 in whole numbers, halves or quarters (sales item 185), whole cents (a minus line is allowed: a
  *  discount, "Less deposit"), up to 40 lines, and they must add up to more than nothing. Pure. */
 export function cleanLines(raw: unknown): { ok: true; lines: InvoiceLineIn[] } | { ok: false; message: string } {
   if (!Array.isArray(raw)) return { ok: false, message: 'The lines didn’t come through. Try again.' };
@@ -33,8 +34,8 @@ export function cleanLines(raw: unknown): { ok: true; lines: InvoiceLineIn[] } |
   for (const l of raw) {
     const label = tidy(l?.label, 200);
     if (!label) return { ok: false, message: 'Every line needs a few words saying what it is for.' };
-    const qty = Math.trunc(Number(l?.qty ?? 1));
-    if (!Number.isFinite(qty) || qty < 1 || qty > 999) return { ok: false, message: `The quantity on “${label}” must be a whole number from 1 to 999.` };
+    const qty = quarterQty(l?.qty ?? 1);
+    if (qty === null || qty < 0.25 || qty > 999) return { ok: false, message: `The quantity on “${label}” must be from 0.25 to 999: a whole number, a half or a quarter, like 2, 2.5 or 0.25.` };
     const cents = Math.round(Number(l?.amount_cents));
     if (!Number.isFinite(cents) || Math.abs(cents) > MAX_INVOICE_CENTS) return { ok: false, message: `The amount on “${label}” isn’t a number we can use.` };
     lines.push({ label, qty, amount_cents: cents });

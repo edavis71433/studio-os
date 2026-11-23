@@ -38,7 +38,7 @@ const { handleCheckpointDelete, handleTakeOffline, handleBackOnline, handleSiteP
 const { handleBookingTypeDelete, handleBookingSettingsPut } = await import(`${P}/routes/booking.ts`);
 const { handleKnowledgeDelete } = await import(`${P}/routes/knowledge.ts`);
 const { handleCommentDelete } = await import(`${P}/routes/comments.ts`);
-const { handleSalesContact, handleSalesContactFields, handleSalesDeal, handleSalesProposalDelete, handleSalesContractDelete, handleSalesTemplateDelete, handleSalesInvoiceVoid, handleSalesRetainerCancel } = await import(`${P}/routes/sales.ts`);
+const { handleSalesContact, handleSalesContactFields, handleSalesDeal, handleSalesProposalDelete, handleSalesContractDelete, handleSalesTemplateDelete, handleSalesInvoiceVoid, handleSalesRetainerCancel, handleSalesContractWithdraw } = await import(`${P}/routes/sales.ts`);
 const { handleDeliverable } = await import(`${P}/routes/project_delivery.ts`);
 const { handleProjectTemplates } = await import(`${P}/routes/projects.ts`);   // sales item 106
 const { handleTodoTemplates } = await import(`${P}/routes/todo_templates.ts`);   // sales item 106
@@ -150,6 +150,7 @@ const DECIDED = {
     'POST /sales/deals/:id/retainer/cancel', 'POST /sales/invoices/:id/void', 'DELETE /broadcasts/lists/:id',
     'POST /client/retainers/:id/cancel',   // sales item 117: a client stopping their own retainer is the owner's call
     'DELETE /sales/estimates/:id', 'POST /sales/recurring/:id/stop',   // sales review item 47
+    'POST /sales/contracts/:id/withdraw',   // sales item 181: taking back a sent agreement, like voiding an invoice
     'DELETE /sales/prospects/:id',   // sales review item 112: taking a prospect off the list
     'DELETE /forms/inbox/:id',   // builder list item 203: an enquiry and its files go for good
     // sales review items 86 + 105: undoing an import takes people off; a merge folds a record away (and back)
@@ -245,6 +246,7 @@ const DECIDED = {
     'PUT /service/saved-replies', 'PUT /sales/views',
     // sales review item 47: estimates and recurring invoices (stopping one is delete, above)
     'POST /sales/deals/:id/estimates', 'POST /sales/estimates/:id/send', 'POST /sales/estimates/:id/proposal', 'POST /sales/estimates/:id/invoice',
+    'POST /sales/estimates/:id/revise', 'PATCH /sales/estimates/:id', 'PATCH /sales/proposals/:id',   // sales item 183: a draft changed, a next version
     'POST /sales/deals/:id/recurring', 'PATCH /sales/recurring/:id', 'POST /sales/recurring/:id/pause', 'POST /sales/recurring/:id/resume', 'POST /sales/recurring/:id/skip',
     // sales review item 112: prospecting — find, save, move along, start the deal; the draft only returns words
     'POST /sales/prospects', 'POST /sales/prospects/discover', 'PATCH /sales/prospects/:id',
@@ -353,6 +355,7 @@ const CHANGED = [
   { name: 'DELETE /sales/todo-templates/:id', fx: { only: ['presence_sales_templates'], rows: { presence_sales_templates: { body: JSON.stringify([{ id: ROW, name: 'Website kickoff', items: [{ title: 'Send the contract', days: 2 }], created_at: '2026-11-11T00:00:00Z' }]), updated_at: '2026-11-11T00:00:00Z' } } }, run: (r, p) => handleTodoTemplates(r, A, p, ROW, cors) },   // sales item 106
   { name: 'DELETE /projects/:id/deliverables/:id2', run: (r, p) => handleDeliverable(r, p.jwt, A, p, ROW, ROW2, cors) },
   { name: 'POST /sales/invoices/:id/void', run: (r, p) => handleSalesInvoiceVoid(A, p, ROW, cors) },
+  { name: 'POST /sales/contracts/:id/withdraw', fx: { rows: { presence_contracts: { status: 'sent' } } }, run: (r, p) => handleSalesContractWithdraw(A, p, ROW, cors) },   // sales item 181: only a sent one is taken back
   { name: 'DELETE /broadcasts/lists/:id', fx: { only: ['presence_sales_templates'], rows: { presence_sales_templates: { body: JSON.stringify([{ id: ROW, name: 'Picked', people: [{ email: 'a@example.com' }], created_at: '2026-01-01T00:00:00Z' }]) } } }, run: (r, p) => handleBroadcastListDelete(A, p, ROW, cors) },
   { name: 'POST /sales/deals/:id/retainer/cancel', fx: { rows: { presence_deals: { retainer: { status: 'pending' } } } }, run: (r, p) => handleSalesRetainerCancel(r, A, p, ROW, cors) },
   { name: 'POST /client/retainers/:id/cancel', fx: { rows: { presence_deals: { retainer: { status: 'active' } } } }, run: async (r, p) => (await import('../../supabase/functions/presence/routes/client_retainers.ts')).handleClientRetainerCancel(r, A, p, ROW, cors) },   // sales item 117
@@ -518,6 +521,7 @@ const WRITE_HANDLERS = [
   'handleSalesConvert', 'handleSalesDeal', 'handleSalesDealActivity', 'handleSalesDealSend', 'handleSalesDealStage',
   'handleSalesDeals', 'handleSalesInvoice', 'handleSalesInvoiceSend', 'handleSalesInvoiceVoid',
   'handleSalesProposalCreate', 'handleSalesProposalDelete', 'handleSalesProposalRevise', 'handleSalesProposalSend',
+  'handleSalesContractWithdraw', 'handleSalesProposalEdit',   // sales items 181, 183 (see DECIDED.delete and .edit)
   'handleSalesResendInvite', 'handleSalesRetainer', 'handleSalesRetainerCancel', 'handleSalesSchedule',
   'handleSalesServices', 'handleSalesTemplateDelete', 'handleSalesStages', 'handleSalesTemplates', 'handleSalesViews', 'handleSavedReplies',
   'handleCalendarLink',   // sales review item 46: POST and DELETE /calendar/link need configure
@@ -527,6 +531,7 @@ const WRITE_HANDLERS = [
   'handleReviewGoogleLink',   // sales review item 115: POST /reviews/google-link needs configure
   // sales review item 47: estimates and recurring invoices (see DECIDED.edit and .delete)
   'handleEstimateCreate', 'handleEstimateSend', 'handleEstimateToProposal', 'handleEstimateToInvoice', 'handleEstimateDelete',
+  'handleEstimateEdit', 'handleEstimateRevise',   // sales item 183
   'handleRecurringStart', 'handleRecurringChange', 'handleRecurringAction',
   'handleInvoicePayment', 'handleInvoicePaymentUndo',   // sales review item 77 (see DECIDED.edit and .delete)
   'handleInvoiceEdit', 'handleInvoiceRemindNow', 'handleInvoiceMoneyBack',   // sales items 162, 166, 165 (see DECIDED.edit and .delete)

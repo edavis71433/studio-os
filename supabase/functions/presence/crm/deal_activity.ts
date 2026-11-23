@@ -136,6 +136,16 @@ export function dealChangeLine(d: any, year?: string): string {
     return from && to ? `Close date moved from ${from} to ${to}` : to ? `Close date set to ${to}` : from ? `Close date cleared (it was ${from})` : 'Close date changed';
   }
   if (d?.change === 'owner') return 'Owner changed';   // the page names them: only it knows the team's names
+  // sales items 181, 182: what Studio OS did with the deal's documents
+  if (d?.change === 'withdrawn' && d.what === 'agreement') return 'Agreement taken back to update it' + (d.title ? ': ' + String(d.title) : '');
+  if (d?.change === 'withdrawn' || d?.change === 'restored') {
+    const many = (k: unknown, w: string) => { const x = Math.trunc(Number(k) || 0); return x <= 0 ? '' : x === 1 ? `the ${w}` : `${x} ${w}s`; };
+    const parts = [many(d.proposals, 'proposal'), many(d.estimates, 'estimate'), many(d.agreements, 'agreement')].filter(Boolean);
+    const count = (Number(d.proposals) || 0) + (Number(d.estimates) || 0) + (Number(d.agreements) || 0);
+    const list = parts.length > 1 ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1] : (parts[0] || 'its open documents');
+    const said = list.charAt(0).toUpperCase() + list.slice(1) + (count === 1 ? ' was' : ' were');
+    return d.change === 'restored' ? `${said} put back out, with the deal` : `${said} withdrawn: the deal closed as Not a fit`;
+  }
   return 'Deal changed';
 }
 

@@ -122,6 +122,7 @@ export function validatePayment(b: any, inv: { status?: unknown; amount_cents?: 
  *  day from Hawaii to New Zealand, so the money reports file it on the right day. Pure. */
 export const paidAtOf = (ymd: string) => `${ymd}T12:00:00.000Z`;
 
+import { readQty, lineCents } from './sales_lifecycle.ts';   // sales item 185
 /** Sales item 81: the lines an invoice billed from the accepted proposal carries —
  *  the proposal's own lines, its discount and tax, then everything already billed
  *  on the deal coming off ("Less deposit #0012"), so the lines add up to exactly
@@ -134,9 +135,9 @@ export function linesFromProposal(
 ): Array<{ label: string; qty: number; amount_cents: number }> {
   const out: Array<{ label: string; qty: number; amount_cents: number }> = [];
   for (const i of items || []) {
-    const qty = Math.max(0, Math.trunc(Number(i.qty) || 0));
+    const qty = readQty(i.qty);   // sales item 185: 2.5 hours stays 2.5, priced by the one rule
     if (!qty) continue;
-    out.push({ label: String(i.label || '').slice(0, 200), qty, amount_cents: qty * Math.max(0, Math.trunc(Number(i.unit_cents) || 0)) });
+    out.push({ label: String(i.label || '').slice(0, 200), qty, amount_cents: lineCents(qty, i.unit_cents) });
   }
   if (totals.discount_cents > 0) out.push({ label: meta?.discount?.mode === 'percent' ? `Discount (${Number(meta.discount.value)}%)` : 'Discount', qty: 1, amount_cents: -totals.discount_cents });
   if (totals.tax_cents > 0) out.push({ label: meta?.tax_pct != null ? `Tax (${Number(meta.tax_pct)}%)` : 'Tax', qty: 1, amount_cents: totals.tax_cents });

@@ -600,7 +600,7 @@ function proposalOutcome(){
   return null;
 }
 // one word and one colour per proposal, the same on Billing, Deal and Files
-function propWord(p){if(propReplaced(p))return['Replaced',''];if(p.status==='accepted')return['Accepted','good'];if(p.status==='declined')return['Declined','bad'];if(propExpired(p))return['Expired',''];if(p.status==='sent')return['Sent',''];return['Draft','warn'];}
+function propWord(p){if(propReplaced(p))return['Replaced',''];if(p.status==='accepted')return['Accepted','good'];if(p.status==='declined')return['Declined','bad'];if(p.status==='withdrawn')return['Withdrawn',''];if(propExpired(p))return['Expired',''];if(p.status==='sent')return['Sent',''];return['Draft','warn'];}
 function guideNow(stage){
   const out=(stage!=='won'&&stage!=='lost')?proposalOutcome():null;
   if(out)return out.state==='declined'
@@ -1621,6 +1621,8 @@ function renderBillingTab(host){
       if(e.status!=='draft'&&!e.proposal_id&&!e.invoice_id)acts+=act(`data-est-prop="${esc(e.id)}"`,'Turn into a proposal','Drafts a proposal from these lines — nothing is sent')+act(`data-est-inv="${esc(e.id)}"`,'Bill it','Drafts an invoice for this total — press Send on it when you’re ready');
       acts+=act(`data-doc="estimates:${esc(e.id)}"`,'View');
       if(e.status==='draft')acts+=act(`data-del-est="${esc(e.id)}" data-needs="delete"`,'Delete','Remove this draft — it was never sent');
+      // sales item 183: change a draft, or make the next version, in the deal's editor
+      if(!closed&&!propReplaced(e)&&(e.status==='draft'||e.status==='sent'||e.status==='declined'))acts+=`<a class="rbtn" href="${esc(link)}" style="text-decoration:none">${e.status==='draft'?'Edit':'Revise'} in pipeline</a>`;
       const bits=[];
       if(e.status==='approved'&&e.decided_at)bits.push('Approved '+atLabel(e.decided_at));
       else if(e.status==='declined')bits.push('Not now'+(e.decided_at?' · '+atLabel(e.decided_at):''));
@@ -1647,7 +1649,7 @@ function renderBillingTab(host){
     if(k.status==='draft'&&!both)acts+=act(`data-send-con="${esc(k.id)}"`,'Send for signature');
     else if(k.status==='sent')acts+=act(`data-send-con="${esc(k.id)}" data-resend="1"`,'Copy signing link');
     acts+=act(`data-doc="contracts:${esc(k.id)}"`,k.status==='signed'?'View signed copy':'View / print');
-    return `<div class="rrow brow"><span class="rt">${esc(k.title||'Agreement')}<span class="s">${k.signer_name?'Signed by '+esc(k.signer_name)+(k.signed_at?' on '+esc(atLabel(k.signed_at)):''):(k.status==='sent'?'Out for signature':'Draft')}</span></span><span class="racts"><span class="schip ${conChip(k.status)}">${esc(k.status||'draft')}</span>${acts}</span></div>`;
+    return `<div class="rrow brow"><span class="rt">${esc(k.title||'Agreement')}<span class="s">${k.signer_name?'Signed by '+esc(k.signer_name)+(k.signed_at?' on '+esc(atLabel(k.signed_at)):''):(k.status==='sent'?'Out for signature':'Draft')}</span></span><span class="racts"><span class="schip ${conChip(k.status)}">${esc(k.status==='voided'?'withdrawn':(k.status||'draft'))}</span>${acts}</span></div>`;
   }).join(''):`<p class="muted" style="font-size:13.5px;margin:0">No agreement yet. <a class="link" href="${esc(link)}">Draft one in the pipeline →</a></p>`);
   html+=`<section><h2>Proposals and papers</h2><div class="card papers">${papers}</div></section>`;
   // ── ongoing money: the retainer and the recurring invoice, in one card ──
@@ -1965,14 +1967,14 @@ function backForm(row,v){
 function retainerPaidNow(){const r=DEAL&&DEAL.retainer_paid;return r&&typeof r==='object'?{cents:Number(r.cents)||0,count:Number(r.count)||0,last_at:r.last_at||null}:{cents:0,count:0,last_at:null};}
 // item 108 (J6): estimates and recurring invoices on the record, in the deal page's words
 const estExpired=(e)=>!!(e&&e.status==='sent'&&e.expires_at&&Date.parse(e.expires_at)<Date.now());
-function estWord(e){if(e.status==='approved')return['Approved','good'];if(e.status==='declined')return['Not now','bad'];if(estExpired(e))return['Expired',''];if(e.status==='sent')return['Sent',''];return['Draft','warn'];}
+function estWord(e){if(propReplaced(e))return['Replaced',''];if(e.status==='approved')return['Approved','good'];if(e.status==='declined')return['Not now','bad'];if(e.status==='withdrawn')return['Withdrawn',''];if(estExpired(e))return['Expired',''];if(e.status==='sent')return['Sent',''];return['Draft','warn'];}
 const everyWord=(e)=>e==='quarter'?'every 3 months':e==='year'?'every year':'every month';
 const pauseWhy=(r)=>r==='unpaid'?'the last two invoices are still unpaid':r==='no_email'?'there’s no client email on this deal':r==='no_stripe'?'Stripe isn’t connected':'you paused it';
 // the inline forms: invoice · deposit · proposal · estimate (each filled in like the document
 // itself, sales item 164: lines with words, quantity and amount, "+ another line", a due date
 // and a note) · retainer
-const docLine=(l,i,first)=>`<div class="dl"><input type="text" class="dl-l" maxlength="200" placeholder="${i?'Another line':'What this is for'}" value="${esc(l.label||'')}" aria-label="Line ${i+1}"><input type="number" class="dl-q" min="1" max="999" step="1" value="${Number(l.qty)||1}" aria-label="Quantity"><input type="text" class="dl-a" inputmode="decimal"${first?' id="bf-amt"':''} placeholder="${l.placeholder||'0.00'}" value="${l.amount_cents?((Number(l.amount_cents)||0)/100).toFixed(2):''}" aria-label="Amount"><button type="button" class="dl-x" aria-label="Remove line ${i+1}">×</button></div>`;
-function docLines(host){return [...host.querySelectorAll('.dl')].map(r=>({label:r.querySelector('.dl-l').value.trim(),qty:Math.max(1,Math.trunc(Number(r.querySelector('.dl-q').value)||1)),amount_cents:Math.round(parseFloat(String(r.querySelector('.dl-a').value).replace(/[^0-9.\-]/g,'')||'0')*100)}));}
+const docLine=(l,i,first)=>`<div class="dl"><input type="text" class="dl-l" maxlength="200" placeholder="${i?'Another line':'What this is for'}" value="${esc(l.label||'')}" aria-label="Line ${i+1}"><input type="number" class="dl-q" min="0.25" max="999" step="0.25" value="${Number(l.qty)||1}" aria-label="Quantity"><input type="text" class="dl-a" inputmode="decimal"${first?' id="bf-amt"':''} placeholder="${l.placeholder||'0.00'}" value="${l.amount_cents?((Number(l.amount_cents)||0)/100).toFixed(2):''}" aria-label="Amount"><button type="button" class="dl-x" aria-label="Remove line ${i+1}">×</button></div>`;
+function docLines(host){return [...host.querySelectorAll('.dl')].map(r=>({label:r.querySelector('.dl-l').value.trim(),qty:Number(r.querySelector('.dl-q').value)||1,amount_cents:Math.round(parseFloat(String(r.querySelector('.dl-a').value).replace(/[^0-9.\-]/g,'')||'0')*100)}));}
 function billingForm(kind){
   const d=(DEAL&&DEAL.deal)||{}; const host=kind==='retainer'?$('rform'):$('bform'); if(!host)return;
   const today=recTodayYmd();   // item 65: after 5pm in Los Angeles the UTC slice refused today as a due date
@@ -2000,7 +2002,7 @@ function billingForm(kind){
       <div class="bacts"><button type="button" id="bf-cancel">Cancel</button>${(prop||est)?'':'<button type="button" id="bf-save">Save without sending</button>'}<button type="button" class="primary" id="bf-go">${dep?'Request deposit':prop?'Save the draft':est?'Save the draft':'Send invoice'}</button></div></div>`;
     host.innerHTML=html;
     const lines=$('bf-lines');
-    const total=()=>{const t=docLines(lines).reduce((n,l)=>n+(prop||est?l.qty*Math.max(0,l.amount_cents):l.amount_cents),0);$('bf-total').textContent=fmtC(t);};
+    const total=()=>{const t=docLines(lines).reduce((n,l)=>n+(prop||est?Math.round(l.qty*Math.max(0,l.amount_cents)):l.amount_cents),0);$('bf-total').textContent=fmtC(t);};
     $('bf-add').addEventListener('click',()=>{lines.insertAdjacentHTML('beforeend',docLine({label:'',qty:1,amount_cents:0},lines.children.length));lines.lastElementChild.querySelector('.dl-l').focus();total();});
     lines.addEventListener('input',total);
     lines.addEventListener('click',(e)=>{const x=e.target.closest('.dl-x');if(!x)return;if(lines.children.length<=1){toast('Keep at least one line.','err');return;}x.closest('.dl').remove();total();});

@@ -131,7 +131,7 @@ const before0145 = (fn) => async (...a) => {
 {
   world({ presence_estimates: [sentEstimate()] });
   const tok = await tokenFor(EST);
-  const r = await res(await ES.handleEstimateDecide(req('POST', `/sales/estimates/${EST}/decide`, { token: tok, decision: 'approved', note: 'Looks good — can we start in May?' }), EST, cors));
+  const r = await res(await ES.handleEstimateDecide(req('POST', `/sales/estimates/${EST}/decide`, { token: tok, decision: 'approved', name: 'Riley Park', note: 'Looks good — can we start in May?' }), EST, cors));
   const row = est();
   ok('4: approved, with their note', r.status === 200 && row.status === 'approved' && row.decided_at && row.decided_note === 'Looks good — can we start in May?', JSON.stringify(r.body));
   ok('4: an empty deal value takes the estimate\'s total', db.tables.presence_deals[0].expected_value_cents === 117000);
@@ -146,7 +146,7 @@ const before0145 = (fn) => async (...a) => {
   const flip = await res(await ES.handleEstimateDecide(req('POST', `/sales/estimates/${EST}/decide`, { token: tok, decision: 'declined' }), EST, cors));
   ok('4: …and an answer can\'t be changed from the link', flip.status === 409 && est().status === 'approved');
   world({ presence_estimates: [sentEstimate()], presence_deals: [{ id: DEAL, site_id: SITE, title: 'Blue Finch Café website', stage: 'proposal', contact_id: CT, expected_value_cents: 500000 }] });
-  await ES.handleEstimateDecide(req('POST', '/x', { token: await tokenFor(EST), decision: 'approved' }), EST, cors);
+  await ES.handleEstimateDecide(req('POST', '/x', { token: await tokenFor(EST), decision: 'approved', name: 'Riley Park' }), EST, cors);
   ok('4: a deal value the studio set is kept', db.tables.presence_deals[0].expected_value_cents === 500000 && !events('estimate_decided')[0].detail.value_backfilled_cents);
   world({ presence_estimates: [sentEstimate({ expires_at: daysAgo(1) })] });
   const late = await res(await ES.handleEstimateDecide(req('POST', '/x', { token: await tokenFor(EST), decision: 'approved' }), EST, cors));
