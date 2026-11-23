@@ -2362,7 +2362,7 @@ function paintCharts(){
   const atCap=DEALS.length>=FETCH_LIMIT;
   host.innerHTML=k.charts([
     {title:VIEW==='board'?'Open deals by stage':'Deals by stage',rows:stages,unit:['deal','deals'],extra:true},
-    {title:'Where they came from',rows:from,unit:['deal','deals']},
+    {title:'How they found you',rows:from,unit:['deal','deals']},   // sales item 196: it counts found_via; where the deal came from is SOURCE_WORDS
   ],n?'From the '+n+' deal'+(n===1?'':'s')+' in this view.'+(atCap?' Only your newest '+FETCH_LIMIT+' deals are loaded, so older ones aren’t counted.':''):'');
   k.chartTips(host);
 }
@@ -3366,7 +3366,7 @@ async function openDeal(id){
       // it and when it lapses. first_viewed_at/expires_at are null before migration 0107.
       const vbits=[];
       if(p.first_viewed_at)vbits.push(svgi('eye')+' Opened '+ago(p.first_viewed_at)); else if(p.status==='sent')vbits.push('Not opened yet');
-      if(p.expires_at){const exp=new Date(p.expires_at);vbits.push(exp.getTime()<Date.now()?svgi('hourglass')+' Expired':'Expires '+exp.toLocaleDateString());}
+      if(p.expires_at){const exp=new Date(p.expires_at);vbits.push(exp.getTime()<Date.now()?svgi('hourglass')+' Expired':'Expires '+exp.toLocaleDateString('en-US',exp.getFullYear()===new Date().getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'}));}   // sales item 194: "Dec 8", like the rest of the page
       // sales item 88: a decline says what would make it a yes (the client's own words, from their page)
       if(p.status==='declined'&&declineWords(p.decided_reason,p.decided_note))vbits.push('Why: '+esc(declineWords(p.decided_reason,p.decided_note)));
       {const sch=splitPropLI(p.line_items).meta.schedule;if(Array.isArray(sch)&&sch.length)vbits.push('Paid in '+sch.length+' parts');}   // sales item 106

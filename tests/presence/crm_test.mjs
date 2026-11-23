@@ -65,7 +65,7 @@ const NOW = '2026-07-07T12:00:00.000Z';
 {
   const p = { business_name: 'Bacchus Kitchen', edition: 'presence', status: 'live', live: true, last_published_at: '2026-07-01T00:00:00Z', members: 2, connected: 3, connected_needing_attention: 0, active_moments: 1, pending_approvals: 2, health: 'attention' };
   const s = relationshipSummary(p, NOW, NOW);
-  ok('summary mentions live + approvals + connected + moments', /live/.test(s) && /waiting for approval/.test(s) && /connected/.test(s) && /moment/.test(s));
+  ok('summary mentions live + approvals + linked accounts + updates to share (sales item 194)', /live/.test(s) && /waiting for approval/.test(s) && /linked account/.test(s) && /ready to share/.test(s) && !/moment/.test(s));
   ok('summary has no percentage/score/grade', !/%|score|grade|rank/i.test(s));
   ok('new-account summary is gentle', /getting set up/.test(relationshipSummary({ ...p, health: 'new', live: false, last_published_at: null }, null, NOW)));
   ok('humanWhen is plain', humanWhen('2026-07-06T12:00:00Z', NOW) === 'yesterday' && humanWhen(NOW, NOW) === 'today');
