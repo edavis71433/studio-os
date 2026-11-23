@@ -114,7 +114,7 @@ for (const [name, src] of [['inbox.html', inbox], ['crm.html', crm], ['projects.
 }
 ok('Inbox: the support request body, each reply bubble and the timeline body fold the quote',
   /<div class="body">\$\{qh\(req\.body\)\}<\/div>/.test(inbox) && /\$\{qh\(m\.body\|\|''\)\}<span class="bwhen">/.test(inbox) && /<div class="ti-body">\$\{qh\(it\.body\)\}<\/div>/.test(inbox) && !/esc\(m\.body\|\|''\)\}<span class="bwhen">/.test(inbox));
-ok('Record activity folds the quote', /bodyHtml=`<div class="ti-body">\$\{qh\(it\.body\)\}/.test(crm));
+ok('Record activity folds the quote', /bodyHtml=`<div class="ti-body" data-logbody="\$\{esc\(it\.id\)\}">\$\{it\.body\?qh\(it\.body\):''\}/.test(crm));
 ok('Project messages and support threads fold the quote (all three lists)', (projects.match(/<div class="t">\$\{qh\(m\.body\)\}<\/div>/g) || []).length === 3 && !/<div class="t">\$\{esc\(m\.body\)\}<\/div>/.test(projects));
 
 // ═══ (d) the reply box tells the truth about how the reply reaches them ═══

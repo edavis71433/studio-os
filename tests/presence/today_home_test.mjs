@@ -600,7 +600,7 @@ ok('today: the strip renders only the tiles whose read came back honest (statTil
 ok('today: This week / Coming up hide entirely when empty',
   /function weekHtml\(todos\)\{\s*if\(!todos\.length\)return''/.test(today) && /function comingHtml\(items\)\{\s*if\(!items\.length\)return''/.test(today));
 ok('today: Done on a This-week row PATCHes the deal\'s next step through the existing per-deal route — the row leaves only after the write succeeds',
-  /todoDone\(id, btn\)\{[\s\S]*?await apiSend\('\/sales\/deals\/'\+encodeURIComponent\(id\), 'PATCH', \{ next_step: '', next_step_at: '' \}\);[\s\S]*?row\.remove\(\)/.test(today)
+  /todoDone\(id, btn\)\{[\s\S]*?await apiSend\('\/sales\/deals\/'\+encodeURIComponent\(id\), 'PATCH', \{ next_step: '', next_step_at: '', step_done: true \}\);[\s\S]*?row\.remove\(\)/.test(today)
   && /catch\(_\)\{ btn\.disabled = false;/.test(today));
 ok('today: the Customers card reads /studio/customers for the studio only — never for a drilled-in operator (D7)',
   today.includes("inC?Promise.resolve(null):apiGet('/studio/customers').catch(()=>null)")

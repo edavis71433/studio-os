@@ -6,7 +6,8 @@
 import { json } from '../../_shared/http.ts';
 import { svc, svcCount } from '../lib/db.ts';
 import { readReservedJsonOrThrow, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
-import { setupSteps, setupShows, setupHidden, businessDetailsDone } from '../lib/setup_strip.ts';
+import { setupSteps, setupShows, setupHidden, businessDetailsDone, followupsOn } from '../lib/setup_strip.ts';
+import { jwtClaims } from '../../_shared/auth.ts';   // sales item 209: was this sign-in two-step?
 import { normalizeGoalAi } from '../lib/sales_ai.ts';
 import { normalizePortal } from '../lib/portal_settings.ts';   // builder item 342
 import type { SiteRow } from '../lib/site.ts';
@@ -36,6 +37,10 @@ export async function handleSetupStrip(req: Request, site: SiteRow, principal: P
     readReservedJsonOrThrow(S, RESERVED_NAMES.portalSettings).then((v) => ({ v }), () => null),
     svcCount(`presence_service_links?agency_site_id=eq.${S}&status=eq.active`),
   ]);
+  // sales item 209: the follow-ups switch (its own read, so a database without it leaves the step off).
+  // The strip is shown to those who may change settings (agency.html, data-needs="configure"): the owner.
+  const switches = await first(`presence_settings?site_id=eq.${S}&select=enquiry_followups&limit=1`);
+  const claims = principal?.jwt ? jwtClaims(principal.jwt) : null;
   const steps = setupSteps({
     business: businessDetailsDone(ident?.row, settings?.row, !!(ident && settings)),
     logo: settings ? !!(settings.row?.logo_media_id || settings.row?.brand_kit?.logo_media_id) : null,
@@ -43,6 +48,11 @@ export async function handleSetupStrip(req: Request, site: SiteRow, principal: P
     contact: contacts === null ? null : contacts > 0,
     deal: deals === null ? null : deals > 0,
     goal: goal ? normalizeGoalAi(goal.v).goal_cents !== null : null,
+    followups: followupsOn(switches?.row, !!switches),
+    ai: goal ? normalizeGoalAi(goal.v).ai_on : null,
+    // a second factor makes every sign-in two-step (aal2): one without it means they haven't added it.
+    // A token that can't be read leaves the step off.
+    twostep: claims ? claims.aal === 'aal2' : null,
     // item 342: only a studio with clients is asked; done once a welcome note is written or the parts were chosen
     portal: clients === null || !clients ? null : portal ? (() => { const p = normalizePortal(portal.v); return !!(p.welcome || p.parts_at); })() : null,
   });

@@ -258,6 +258,7 @@
   .ti-body{font-size:13.5px;color:var(--soft);white-space:pre-wrap;margin-top:var(--dds-s1,4px);border-left:2px solid var(--line);padding-left:10px}
   .ti-body .note-acts{margin-top:6px}
   .ti-body .note-acts button{font-size:11.5px;padding:var(--dds-s1,4px) var(--dds-s2,8px)}
+  .ti-body .note-acts [data-logedit]{min-height:44px;min-width:44px;font-size:13px}   /* sales item 186 */
   .ti-when{font-size:11.5px;color:var(--faint);white-space:nowrap;flex:0 0 auto;padding-top:2px}
   .ti a.ti-link{color:var(--p);text-decoration:none;font-size:12px;font-weight:600}
   .ti a.ti-link:hover{text-decoration:underline}
@@ -2640,13 +2641,16 @@ function renderMergedTimeline(host){
     const type=TYPE_ICON[it.type]?it.type:'system';
     const open=EXPANDED.has(it.id);
     const meta=it.meta?`<span class="ti-meta">${esc(it.meta)}</span>`:'';
-    const head=it.body
+    // sales item 186: a line you logged by hand opens too, for Change (correct it or remove it)
+    const canOpen=!!(it.body||(it.log&&it.log.mine));
+    const head=canOpen
       ?`<button class="ti-head" data-x="${esc(it.id)}" aria-expanded="${open?'true':'false'}"><span class="ti-car" aria-hidden="true">${open?'▾':'▸'}</span><span class="ti-title">${esc(it.title)}</span>${meta}</button>`
       :`<div class="ti-head"><span class="ti-title">${esc(it.title)}</span>${meta}${it.href?` <a class="ti-link" href="${esc(pinHref(it.href))}">open →</a>`:''}</div>`;
     let bodyHtml='';
-    if(it.body&&open){
+    if(canOpen&&open){
       const noteId=(it.kind==='note'&&/note:([0-9a-f-]{36})$/i.test(it.id))?it.id.match(/note:([0-9a-f-]{36})$/i)[1]:'';
-      bodyHtml=`<div class="ti-body">${qh(it.body)}${noteId?`<div class="note-acts"><button data-delnote="${esc(noteId)}">Remove note</button></div>`:''}${it.href?`<div style="margin-top:5px"><a class="ti-link" href="${esc(pinHref(it.href))}">open →</a></div>`:''}</div>`;
+      const logBtn=it.log&&it.log.mine?`<div class="note-acts"><button type="button" data-logedit="${esc(it.id)}" aria-label="Change or remove this line">Change</button></div>`:'';
+      bodyHtml=`<div class="ti-body" data-logbody="${esc(it.id)}">${it.body?qh(it.body):''}${logBtn}${noteId?`<div class="note-acts"><button data-delnote="${esc(noteId)}">Remove note</button></div>`:''}${it.href?`<div style="margin-top:5px"><a class="ti-link" href="${esc(pinHref(it.href))}">open →</a></div>`:''}</div>`;
     }
     html+=`<div class="ti t-${type}"><span class="ti-icon" aria-hidden="true">${TYPE_ICON[type]}</span><div class="ti-main">${head}${bodyHtml}</div><span class="ti-when">${esc(when(it.at))}</span></div>`;
   }
@@ -2659,6 +2663,11 @@ function renderMergedTimeline(host){
     renderTimeline();
   }));
   host.querySelectorAll('[data-delnote]').forEach(b=>b.addEventListener('click',()=>removeNote(b)));
+  // sales item 186: correct or remove a call, email, meeting or note you logged (it lives on the studio's own site)
+  host.querySelectorAll('[data-logedit]').forEach(b=>b.addEventListener('click',()=>{
+    const it=(ACT.items||[]).find(x=>x.id===b.getAttribute('data-logedit'));const box=b.closest('.ti-body');if(!it||!it.log||!box||!window.ddsLogEdit)return;
+    window.ddsLogEdit.open(box,it.log,{send:apiAg,cancel:()=>{renderTimeline();const nb=host.querySelector('[data-logedit="'+it.id+'"]');if(nb)nb.focus();},saved:()=>{loadActivity();},removed:()=>{EXPANDED.delete(it.id);loadActivity();}});
+  }));
 }
 
 function picker(){$('main').innerHTML=`<div class="center"><h2>Open a client to see their record.</h2><p class="muted" style="margin-bottom:18px">Pick a customer, contact, or deal — their whole relationship opens here.</p><p><a class="link" href="/customers.html">Go to Customers →</a></p></div>`;}

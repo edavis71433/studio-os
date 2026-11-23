@@ -859,7 +859,7 @@ test.describe('Today — the studio home (mockup)', () => {
     await expect(rows).toHaveCount(1);
     expect(patched.length).toBe(1);
     expect(patched[0].url).toMatch(/\/sales\/deals\/d1$/);
-    expect(JSON.parse(patched[0].body)).toEqual({ next_step: '', next_step_at: '' });
+    expect(JSON.parse(patched[0].body)).toEqual({ next_step: '', next_step_at: '', step_done: true });
     // the last Done takes the (now empty) section with it
     const last = rows.nth(0).getByRole('button', { name: /^Done/ });
     await last.evaluate((el) => el.scrollIntoView({ block: 'center' }));
