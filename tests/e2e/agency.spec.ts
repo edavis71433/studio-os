@@ -543,6 +543,19 @@ const homeApi = {
 };
 
 test.describe('Agency home — one home, one roster', () => {
+  test('sales item 215: Money in sits beside Won this month, Analytics’ figure against last month', async ({ page }) => {
+    const sum = (homeApi['/sales/summary'] as { data: Record<string, unknown> }).data;
+    await installApp(page, { api: { ...homeApi, '/sales/summary': { data: { ...sum, money_in: { month: '2026-11', label: 'Nov 2026', cents: 230000, last_month: '2026-10', last_label: 'Oct 2026', last_cents: 410000 } } } } });
+    await page.goto('/agency.html');
+    const tile = page.locator('#studio #stat-in');
+    await expect(tile).toContainText('Money in');
+    await expect(tile).toContainText('$2,300');
+    await expect(tile).toContainText('Paid this month');
+    await expect(tile.locator('.dchip')).toHaveText('−$1,800 vs Oct');
+    await expect(tile).toHaveAttribute('href', '/analytics.html');
+    const ids = await page.locator('#studio .stat').evaluateAll((els) => els.map((e) => e.id));
+    expect(ids.indexOf('stat-in')).toBe(ids.indexOf('stat-won') + 1);
+  });
   test('the studio strip: money tiles, This week and Key deals from the studio’s own site', async ({ page }) => {
     await installApp(page, { api: homeApi });
     await page.goto('/agency.html');
@@ -552,6 +565,7 @@ test.describe('Agency home — one home, one roster', () => {
     await expect(strip.locator('#stat-owed')).toContainText('1 invoice');
     await expect(strip.locator('#stat-won')).toContainText('$8,000');
     await expect(strip.locator('#stat-open')).toContainText('1');
+    await expect(strip.locator('#stat-in')).toHaveCount(0);   // sales item 215: an older server sends no Money in, so no tile
     await expect(strip.locator('#this-week .rrows a')).toHaveCount(1);
     await expect(strip.locator('#this-week .rrows a').first()).toContainText('Send the proposal');
     await expect(strip.locator('#this-week .rrows a').first()).toHaveAttribute('href', `/crm.html?deal=${DEAL}`);

@@ -212,7 +212,7 @@ test.describe('Send an update › templates (item 221)', () => {
     await expect(ask).toContainText('“Holiday hours” comes in. Who it goes to stays as it is.');
     await ask.getByRole('button', { name: 'Use the template' }).click();
     await expect(page.locator('#subj')).toHaveValue('Our holiday hours');
-    await expect(page.locator('#bodytx')).toHaveValue('Hi {{first_name}},\n\nWe’re closed on the 25th and the 1st.');
+    await expect(page.locator('#bodytx')).toHaveValue('Hi [First name],\n\nWe’re closed on the 25th and the 1st.');   // sales item 208: the code reads as its words in the box
     await expect(page.locator('.frompost')).toContainText('Started from your template “Holiday hours”.');
     await expect(toast(page)).toContainText('“Holiday hours” is in.');
     expect(calls.some((x) => x.method === 'GET' && x.path === `/agency/update-templates/${T2}`)).toBe(true);

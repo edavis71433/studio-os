@@ -47,6 +47,12 @@
   input[type=text]{height:40px}
   input[type=text]:focus,textarea:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px var(--p-soft)}
   textarea{min-height:150px;resize:vertical;line-height:1.5}
+  /* sales item 208: a fill-in reads as a chip ("[First name]"): a highlight drawn behind the words,
+     in a layer the same size, font and wrapping as the box (the box itself goes see-through) */
+  .msgbox{position:relative;background:var(--card);border-radius:var(--dds-r,8px)}
+  .msgbox textarea{position:relative;z-index:1;background:transparent;display:block}
+  .msghl{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;color:transparent;font-family:inherit;font-size:14.5px;line-height:1.5;padding:var(--dds-s2,8px) var(--dds-s3,12px);border:1px solid transparent;white-space:pre-wrap;overflow-wrap:break-word;word-wrap:break-word}
+  .msghl mark{color:transparent;background:var(--p-soft);border-radius:6px;box-shadow:0 0 0 2px var(--p-soft)}
   input[type=datetime-local]{font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s3,12px)}
   /* the list picker: one row per list, an honest aria-pressed button each */
   .segs{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--dds-r,8px);overflow:hidden}
@@ -380,7 +386,7 @@ function render(){
       <label for="subj">Subject</label>
       <input type="text" id="subj" maxlength="200" placeholder="A quick update from us" value="${esc(DRAFT&&DRAFT.subject||'')}">
       <label for="bodytx">Message</label>
-      <textarea id="bodytx" placeholder="Hi there,&#10;&#10;Write your update here. + First name below greets each person by name.">${esc(DRAFT&&DRAFT.body||'')}</textarea>
+      <div class="msgbox"><div class="msghl" id="bodyHl" aria-hidden="true"></div><textarea id="bodytx" placeholder="Hi there,&#10;&#10;Write your update here. + First name below greets each person by name.">${esc(toBox(DRAFT&&DRAFT.body||''))}</textarea></div>
       <div class="fmt" role="toolbar" aria-label="Formatting">
         <button type="button" data-fmt="bold" aria-label="Bold" title="Bold">B</button>
         <button type="button" data-fmt="italic" aria-label="Italic" title="Italic"><i>I</i></button>
@@ -447,6 +453,18 @@ let PHOTOS=null,THUMBS={},PHOTOS_TRIED=false;   // the studio's shared photos (G
 // from Files, and an https link a button with its words (lib/update_media.ts renders them
 // the same way in the email; a blog post's photo may carry a caption, which the email leaves off)
 const BOOK_LINE=/^\{\{\s*booking_link\s*\}\}$/i,IMG_LINE=/^!\[([^\]\n]{0,200})\]\(media:([0-9a-f-]{36})(?:\s+"[^"\n]{0,200}")?\)$/i,LINK_LINE=/^\[([^\]\n]{1,80})\]\((https:\/\/[^\s)]+)\)$/i;
+// Sales item 208: the message box shows each fill-in as words in brackets, drawn as a chip
+// ("Hi [First name],"), never the code. The draft, the preview and the send keep the codes the
+// server fills in, so nothing past the box changes. Typing the words in brackets works too.
+const FILLINS=[['{{first_name}}','[First name]'],['{{business_name}}','[Business name]'],['{{booking_link}}','[Booking link]']];
+const toBox=(s)=>FILLINS.reduce((x,[c,w])=>x.split(c).join(w),String(s||'').replace(/\{\{\s*(first_name|business_name|booking_link)\s*\}\}/gi,(m,k)=>'{{'+k.toLowerCase()+'}}'));
+const toWire=(s)=>FILLINS.reduce((x,[c,w])=>x.replace(new RegExp(w.replace(/[[\]]/g,'\\$&')+'(?!\\()','gi'),c),String(s||''));
+function paintFillins(){
+  const t=$('bodytx'),hl=$('bodyHl');if(!t||!hl)return;
+  hl.innerHTML=esc(t.value).replace(/\[(First name|Business name|Booking link)\](?!\()/gi,'<mark>$&</mark>')+'\n';
+  hl.style.paddingRight='calc(var(--dds-s3,12px) + '+Math.max(0,t.offsetWidth-t.clientWidth-2)+'px)';   // a scrollbar narrows the box's words
+  hl.scrollTop=t.scrollTop;
+}
 const fillTokens=(t)=>String(t||'').replace(/\{\{\s*first_name\s*\}\}/g,'there').replace(/\{\{\s*business_name\s*\}\}/g,BIZ||'your business');
 function mdLite(src){
   const inline=(t)=>esc(t).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\*([^*]+)\*/g,'<i>$1</i>').replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,'<u>$1</u>');
@@ -479,7 +497,7 @@ function liveBody(src){
 }
 function paintLive(){
   const host=$('livePv');if(!host)return;
-  const subj=(($('subj')&&$('subj').value)||'').trim(),body=(($('bodytx')&&$('bodytx').value)||'').trim();
+  const subj=(($('subj')&&$('subj').value)||'').trim(),body=toWire((($('bodytx')&&$('bodytx').value)||'').trim());
   host.innerHTML=`<div class="mail-from"><span class="mail-mark" aria-hidden="true"></span>${esc(BIZ||'Your business')}</div>
     <div class="mail-subj">${subj?esc(fillTokens(subj)):'<span class="mail-ph">Your subject</span>'}</div>
     <div class="mail-body">${body?liveBody(fillTokens(body)):'<p class="mail-ph">Your message shows here as you write it.</p>'}</div>
@@ -552,7 +570,7 @@ function wire(){
   // failure of the OTHER section tear down its last-good render (the ↻ contract)
   const sr=$('segRetry');if(sr)sr.addEventListener('click',()=>load(true));
   const br=$('bcRetry');if(br)br.addEventListener('click',()=>load(true));
-  const s=$('subj'),t=$('bodytx');if(s)s.addEventListener('input',()=>{if(DRAFT)DRAFT.subject=s.value;paintLive();checkPreview();});if(t)t.addEventListener('input',()=>{if(DRAFT)DRAFT.body=t.value;paintLive();checkPreview();});
+  const s=$('subj'),t=$('bodytx');if(s)s.addEventListener('input',()=>{if(DRAFT)DRAFT.subject=s.value;paintLive();checkPreview();});if(t){t.addEventListener('input',()=>{if(DRAFT)DRAFT.body=toWire(t.value);paintFillins();paintLive();checkPreview();});t.addEventListener('scroll',paintFillins);paintFillins();}
   // repaint the drilled-open row; if a list refresh just dropped the DETAILS
   // cache, RE-READ it — the open panel gets fresh counts, never a blank
   if(OPEN){const box=$('d-'+OPEN);if(box){if(DETAILS[OPEN])paintDetail(box,OPEN);else loadDetail(OPEN);}}
@@ -637,14 +655,14 @@ async function reschedule(id){
 // ── the formatting bar: plain markdown the email renderer understands
 //    (lib/markdown.ts: **bold**, *italic*, "- " lists, [text](url)) ───────────
 function insertAtCaret(text){
-  const t=$('bodytx');if(!t)return;
+  const t=$('bodytx');if(!t)return;text=toBox(text);   // sales item 208: a fill-in goes in as its words
   const a=t.selectionStart||0,b=t.selectionEnd||0;
   t.value=t.value.slice(0,a)+text+t.value.slice(b);
   t.focus();t.selectionStart=t.selectionEnd=a+text.length;
   t.dispatchEvent(new Event('input',{bubbles:true}));
 }
 function insertLine(text){
-  const t=$('bodytx');if(!t)return;
+  const t=$('bodytx');if(!t)return;text=toBox(text);
   const used=t.dataset.caret==='1';
   const a=used?(t.selectionStart||0):t.value.length,b=used?(t.selectionEnd||0):t.value.length;
   const before=t.value.slice(0,a),after=t.value.slice(b);
@@ -748,7 +766,7 @@ function applyFormat(kind){
   t.focus();t.selectionStart=cs;t.selectionEnd=ce;
   t.dispatchEvent(new Event('input',{bubbles:true}));
 }
-function syncDraftFromForm(){const s=$('subj'),t=$('bodytx');if(s&&t){DRAFT=DRAFT||{};DRAFT.subject=s.value;DRAFT.body=t.value;}}
+function syncDraftFromForm(){const s=$('subj'),t=$('bodytx');if(s&&t){DRAFT=DRAFT||{};DRAFT.subject=s.value;DRAFT.body=toWire(t.value);}}
 
 async function assist(){
   syncDraftFromForm();   // capture what's typed FIRST, like every other render path — the proposal merges in, it never replaces
@@ -768,7 +786,7 @@ async function assist(){
 async function ensureDraft(){
   syncDraftFromForm();
   const subject=($('subj')&&$('subj').value||'').trim();
-  const body=($('bodytx')&&$('bodytx').value||'').trim();
+  const body=toWire(($('bodytx')&&$('bodytx').value||'').trim());
   if(!subject){toast('Add a subject line first.','err');return null;}
   if(!body){toast('Write your message first.','err');return null;}
   if(DRAFT&&DRAFT.id){
@@ -813,7 +831,7 @@ async function doPreview(opts){
 // words the card was built from, the card says it is out of date and offers
 // Preview again in place of Send (typing, + Booking link, + Image and the
 // formatting bar all arrive here through the boxes' input event).
-const formWords=()=>({subject:(($('subj')&&$('subj').value)||'').trim(),body:(($('bodytx')&&$('bodytx').value)||'').trim()});
+const formWords=()=>({subject:(($('subj')&&$('subj').value)||'').trim(),body:toWire((($('bodytx')&&$('bodytx').value)||'').trim())});
 function checkPreview(){
   if(!PV||PV.stale)return;
   const w=formWords();
