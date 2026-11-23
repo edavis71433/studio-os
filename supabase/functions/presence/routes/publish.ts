@@ -51,6 +51,7 @@ import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
 import { copiedBlockerFor } from '../lib/copied_record.ts';
 import { guardedFetch } from '../../_shared/tools/url_guard.ts';   // builder item 204
 import { lockStop } from '../lib/publish_lock.ts';
+import { hostOutOfCredits, OUT_OF_CREDITS_STUDIO, OUT_OF_CREDITS_CLIENT } from '../lib/host_credits.ts';   // builder item 358
 
 
 export const CALM = 'We hit a snag updating your site and we’re on it — nothing changed on your live site.';
@@ -210,6 +211,9 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
       headline: 'A publish didn’t go through',
       body: 'Your latest changes couldn’t be published (nothing on your live site changed). Open your website and try publishing again — your work is safe in the draft.',
     });
+    // Builder item 358: the host refused it for want of credits. Say so, not "we hit a snag":
+    // the studio is told what to do, a client only that it waits on the studio.
+    if (stage === 'deploy' && hostOutOfCredits(detail)) return json({ error: 'host_out_of_credits', message: actorKind === 'client' ? OUT_OF_CREDITS_CLIENT : OUT_OF_CREDITS_STUDIO }, 502, cors);
     return json({ error: 'publish_failed', message: CALM }, 502, cors);
   };
 

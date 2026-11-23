@@ -211,6 +211,18 @@ https://app.davisdigitalstudio.com/glendale-web-design   https://davisdigitalstu
 https://app.davisdigitalstudio.com/glendale-web-design.html https://davisdigitalstudio.com/los-angeles-web-design 301!
 https://app.davisdigitalstudio.com/pasadena-web-design   https://davisdigitalstudio.com/los-angeles-web-design 301!
 https://app.davisdigitalstudio.com/pasadena-web-design.html https://davisdigitalstudio.com/los-angeles-web-design 301!
+# Builder item 375: addresses only the main site has, asked of the app host, answered "not
+# found" (about 7% of the app's answers in a week). Each forwards to the same address on the
+# main site; its two menu folders are Squarespace's own, and it sends them on. The old Burbank
+# page keeps going to Los Angeles until the main site has a Burbank page again.
+https://app.davisdigitalstudio.com/home                  https://davisdigitalstudio.com/                      301!
+https://app.davisdigitalstudio.com/free-tools            https://davisdigitalstudio.com/free-tools            301!
+https://app.davisdigitalstudio.com/free-tools-menu       https://davisdigitalstudio.com/free-tools-menu       301!
+https://app.davisdigitalstudio.com/services-menu         https://davisdigitalstudio.com/services-menu         301!
+https://app.davisdigitalstudio.com/growth-partnership    https://davisdigitalstudio.com/growth-partnership    301!
+https://app.davisdigitalstudio.com/los-angeles-web-design https://davisdigitalstudio.com/los-angeles-web-design 301!
+https://app.davisdigitalstudio.com/website-audits        https://davisdigitalstudio.com/website-audits        301!
+https://app.davisdigitalstudio.com/work/*                https://davisdigitalstudio.com/work/:splat           301!
 https://app.davisdigitalstudio.com/site-review.html      https://tools.davisdigitalstudio.com/site-review     301!
 https://app.davisdigitalstudio.com/ai-visibility.html    https://tools.davisdigitalstudio.com/ai-visibility   301!
 https://app.davisdigitalstudio.com/report.html           https://tools.davisdigitalstudio.com/site-review     301!

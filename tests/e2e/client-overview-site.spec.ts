@@ -113,3 +113,36 @@ test.describe('item 129 — a client’s Overview leads with their website', () 
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   });
 });
+
+// Builder item 369 (Nov 22 2026 review, file 11, finding 24): a client's Overview spoke to the
+// client while the studio was looking: the client's own "Welcome to Studio OS" note, "Your
+// website is ready when you are", "Have a question about your website?", and a tab that said
+// Today. The studio now reads the app's words about the client; the client still reads them as
+// written to them.
+const READY = { id: 'm-ready', headline: 'Your website is ready when you are.', summary: 'Everything you’ve written is waiting in your draft. One look, one button, and customers can start finding you.', moment_type: 'needs_attention', tone: 'encouraging', dismissable: true };
+// this device last saw a smaller plan, so the plan's welcome note is due
+const SMALLER_PLAN = () => { try { localStorage.setItem('dds-oriented', JSON.stringify({ key: 'presence_monitor', feats: ['website'] })); } catch (_) { /* */ } };
+
+test.describe('item 369 — the Overview speaks to the studio when the studio is looking', () => {
+  test('the studio inside a client: their words, the tab says Overview, and never the client’s welcome note', async ({ page }) => {
+    await page.addInitScript(SMALLER_PLAN);
+    await installApp(page, { api: { '/portal/context': ctx(), '/crm/record': RECORD, '/sales/summary': QUIET, '/moments': { data: [READY] } } });
+    await page.goto(`/today.html?client=${CLIENT}`);
+    await expect(page.getByRole('heading', { name: 'Their website is ready when they are.' })).toBeVisible();
+    await expect(page.locator('#worth-a-look')).toContainText('Everything they’ve written is waiting in their draft. One look, one button, and customers can start finding them.');
+    await expect(page.getByRole('heading', { name: 'Have a question about their website?' })).toBeVisible();
+    await expect(page).toHaveTitle('Overview — Studio OS');
+    await expect(page.locator('#orientDone')).toHaveCount(0);
+    await expect(page.getByText('Welcome to Studio OS')).toHaveCount(0);
+  });
+
+  test('the client on their own Today: the same words written to them, and their welcome note when the plan grows', async ({ page }) => {
+    await page.addInitScript(SMALLER_PLAN);
+    await installApp(page, { api: { '/portal/context': ctx({ is_agency: false, scope: null }), '/sales/summary': QUIET, '/moments': { data: [READY] } } });
+    await page.goto('/today.html');
+    await expect(page.getByRole('heading', { name: 'Your website is ready when you are.' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Have a question about your website?' })).toBeVisible();
+    await expect(page).toHaveTitle('Today — Studio OS');
+    await expect(page.locator('#orientDone')).toBeVisible();
+  });
+});

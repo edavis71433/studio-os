@@ -952,9 +952,11 @@ function ordered(){
 // Builder item 165 (Figma 295:16): the one page header — the Sites icon in its tile, the title,
 // one line with the real counts, the other actions (behind ⋯ on a phone), + New site the one
 // filled action, and the tabs under it. The sort and freshness line stays, under the header.
-function headLine(){
+// Builder item 367: one count, said in full. With the plan's count the line is the plan line
+// (roomHtml, below); the band under it no longer repeats it, nor does the line under the header.
+function headLineHtml(){
   const n=SITES.length,needs=SITES.filter(FILTERS.needs.test).length;
-  return `${n} site${n===1?'':'s'} you look after${needs?` · ${needs} need${needs===1?'s':''} you`:''}`;
+  return (roomHtml()||esc(`${n} site${n===1?'':'s'} you look after`))+(needs?esc(` · ${needs} need${needs===1?'s':''} you`):'');
 }
 function headHtml(shown){
   return `<header class="dds-ph">
@@ -962,7 +964,7 @@ function headHtml(shown){
       <span class="dds-ph-ic" data-ic="sites" aria-hidden="true"></span>
       <div class="dds-ph-tt">
         <div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Sites</h1></div>
-        <p class="dds-ph-line" id="phLine">${esc(headLine())}</p>
+        <p class="dds-ph-line" id="phLine">${headLineHtml()}</p>
       </div>
       <div class="dds-ph-acts">
         <button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
@@ -987,11 +989,11 @@ function bandHtml(){
   const n=list.length,live=countOf('live'),needs=countOf('needs'),changes=countOf('changes'),doms=countOf('domains');
   const soon=list.filter(FILTERS.domains.test).map(s=>({s,d:domainDays(s)})).sort((a,b)=>a.d-b.d)[0];
   const down=list.filter(s=>s.state==='down'||s.state==='offline').length;
-  const lead=FOLDER===''?['Across your sites',`${n} site${n===1?'':'s'} you look after`]:FOLDER==='none'?['Not in a folder',`${n} site${n===1?'':'s'} in no folder`]:['In this folder',`${n} site${n===1?'':'s'} in ${folderName()}`];
+  const lead=FOLDER===''?['Across your sites','']:FOLDER==='none'?['Not in a folder',`${n} site${n===1?'':'s'} in no folder`]:['In this folder',`${n} site${n===1?'':'s'} in ${folderName()}`];
   const sub=[`${live} live`,needs?`${needs} need${needs===1?'s':''} you`:'nothing needs you',down?`${down} not answering`:(live?'all answering':'')].filter(Boolean).join(' · ');
   const kpi=(k,label,value,note,cls)=>`<button type="button" class="kpi${cls?' '+cls:''}" data-filter="${k}" aria-pressed="${FILTER===k?'true':'false'}"><span class="l">${esc(label)}</span><span class="v">${esc(value)}</span><span class="n">${esc(note)}</span></button>`;
   return `<section class="sband" aria-label="${esc(lead[0])}">
-    <div class="lead"><span class="eyebrow">${esc(lead[0])}</span><h2 class="hi">${esc(lead[1])}</h2><span class="hsub">${esc(sub)}</span></div>
+    <div class="lead"><span class="eyebrow">${esc(lead[0])}</span>${lead[1]?`<h2 class="hi">${esc(lead[1])}</h2>`:''}<span class="hsub">${esc(sub)}</span></div>
     ${kpi('live','Live',String(live),`of ${n} site${n===1?'':'s'}`,live&&!down?'ok':'')}
     ${kpi('needs','Needs you',String(needs),needs?'from Home’s own list':'nothing waiting')}
     ${kpi('changes','Changes waiting',String(changes),changes?'to be published':'everything published')}
@@ -1015,19 +1017,20 @@ function paintFilters(){
   const fp=$('fpills');if(fp)fp.innerHTML=pillsHtml();
 }
 function setFilter(k){if(!FILTERS[k])return;FILTER=FILTER===k&&k!=='all'?'all':k;MENU_OPEN=null;paintFilters();applyView();}
-// item 198: the plan's count, "8 of 25 sites" (every site but the Trash, archived ones too);
-// a full plan says so. Nothing when the server sent no count.
+// item 198: the plan's count (every site but the Trash, archived ones too), and builder item 367:
+// said in full in the header's line, "You’ve used 7 of your 25 sites: 6 here, 1 archived"; a full
+// plan says so in the warning colour. Nothing when the server sent no count.
 function roomHtml(){
   const r=META.room;if(!r||typeof r.limit!=='number')return '';
-  const full=r.used>=r.limit,archived=Math.max(0,r.used-SITES.length);
-  return `<b class="room${full?' full':''}" id="roomLine">${r.used} of ${r.limit} site${r.limit===1?'':'s'}${full?' · your plan is full':''}</b>${archived?` · ${archived} archived on Home`:''}`;
+  const n=SITES.length,full=r.used>=r.limit,archived=Math.max(0,r.used-n);
+  return `<b class="room${full?' full':''}" id="roomLine">You’ve used ${r.used} of your ${r.limit} site${r.limit===1?'':'s'}${archived?`: ${n} here, ${archived} archived`:''}${full?' · your plan is full':''}</b>`;
 }
 function lmetaText(shown){
   const m=Math.floor((Date.now()-LOADED_AT)/60000);
   const sorted=SORT?(SORT.key==='drop'?'Biggest drop first':`Sorted by ${(COLS.find(c=>c[0]===SORT.key)||COLS[0])[1]}`):'Pinned first, then the ones you opened last';
   const where=`${FOLDER==='none'?' in no folder':FOLDER?' in '+esc(folderName()):''}${TAG?' tagged '+esc(TAG):''}`;
-  const room=roomHtml(),count=!room||where||shown!==SITES.length?`${shown} site${shown===1?'':'s'}${where}`:'';
-  return [room,count,esc(sorted),m<1?'Updated just now':'Updated '+m+' min ago'].filter(Boolean).join(' · ');
+  const count=where||shown!==SITES.length?`${shown} site${shown===1?'':'s'}${where}`:'';   // item 367: only when it differs from the header's
+  return [count,esc(sorted),m<1?'Updated just now':'Updated '+m+' min ago'].filter(Boolean).join(' · ');
 }
 
 // render: the frame (header, search, the two views) once per load; after that

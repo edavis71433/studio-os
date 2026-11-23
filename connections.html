@@ -75,6 +75,7 @@
   .col-main{flex:999 1 480px;min-width:0}
   .col-rail{flex:1 1 300px;min-width:0}
   .sec{margin-bottom:var(--dds-s6,24px)}
+  .moresvc{margin:0 0 var(--dds-s6,24px);font-size:13.5px;color:var(--soft)} .moresvc a{color:var(--p);font-weight:600}   /* builder item 372 */
   .sec-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:var(--dds-s2,8px)}
   .sec-h h2{margin:0;font-size:14px;font-weight:600}
   .list{border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);background:var(--card);overflow:hidden}
@@ -445,12 +446,16 @@ function render(surface){
   const attention = headCounts(entries);
   let html = alertBand(attention);
   html += `<div class="cols"><div class="col-main">`;
+  // Builder item 372: only the services that work are rows. The ones not available yet fold into
+  // one line under Calendar, Email and Ad tags, instead of six dead ends in every seven rows.
   for(const g of keys){
-    html += `<section class="sec"><div class="sec-h"><h2>${esc(g)}</h2></div><div class="list">${(groups[g]||[]).map(row).join('')}</div></section>`;
+    const live = (groups[g]||[]).filter(e=>!statusOf(e).unavailable);
+    if(live.length) html += `<section class="sec"><div class="sec-h"><h2>${esc(g)}</h2></div><div class="list">${live.map(row).join('')}</div></section>`;
   }
   html += `<section class="sec" id="calSec" hidden></section>`;   // sales review item 46
   html += `<section class="sec" id="logSec" hidden></section>`;   // sales review item 69: the log-this-email address
   html += `<section class="sec" id="adSec" hidden></section>`;   // list item 152: ad tags
+  if(entries.some(e=>statusOf(e).unavailable)) html += `<p class="moresvc" id="moreSvc">Want another service connected? <a href="mailto:support@davisdigitalstudio.com?subject=${encodeURIComponent('A service to connect')}">Tell us which</a>.</p>`;
   html += `</div><aside class="col-rail">${railWhat(entries)}${railActivity(entries)}${railAsk()}</aside></div>`;
   $('main').innerHTML = html;
   wire();

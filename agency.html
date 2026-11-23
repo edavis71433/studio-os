@@ -972,7 +972,18 @@ function openClient(siteId){
   location.href = '/crm.html?client=' + encodeURIComponent(siteId);
 }
 function notAgency(){$('main').innerHTML=`<div class="center"><h2>This isn’t an agency account.</h2><p class="muted">Agency tools are for studios managing multiple businesses.</p><p style="margin-top:20px"><a class="link" href="/presence.html">Open your workspace →</a></p></div>`;}
-function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to your agency workspace.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
+// Builder item 357: nobody is signed in, so Home sends the visitor straight to the studio's
+// sign-in page, which brings them back here once they're in (dds-studio-return). Never twice in
+// half a minute: if the sign-in page sent them straight back, Home says so with the way in.
+function signedOut(){
+  let sent;
+  try{sent=Number(sessionStorage.getItem('dds-home-sent')||0);sessionStorage.setItem('dds-home-sent',String(Date.now()));}catch(_){sent=Date.now();}   // no storage, no guard: stay put
+  if(Date.now()-sent>30000){
+    try{localStorage.setItem('dds-studio-return',JSON.stringify({path:location.pathname+location.search+location.hash,at:Date.now()}));}catch(_){/* the sign-in page then opens Home anyway */}
+    location.replace('/studio.html');return;
+  }
+  $('main').innerHTML=`<div class="center"><h2>Sign in to your studio.</h2><p style="margin-top:20px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;
+}
 // FAILED read = an honest couldn't-load with Try-again wired to boot() in place
 // — NEVER the empty roster ("No clients yet" was the old lie). Try-again re-runs
 // the FULL boot path (me + load + mounts): a load()-only retry after a failed
