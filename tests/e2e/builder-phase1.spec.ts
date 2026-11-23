@@ -113,10 +113,11 @@ test.describe('full-screen Edit mode', () => {
 test.describe('one set of tabs', () => {
   test('the sidebar and the phone sheet list the same places, grouped by job', async ({ page }) => {
     await mount(page, '/presence.html');
-    const menu = (await page.locator('#nav .navitem').allTextContents()).map((s) => s.trim());
-    const sheet = (await page.locator('#sectionsNav .navitem').allTextContents()).map((s) => s.trim());
-    expect(menu).toEqual(['Overview', 'Pages', 'Styles', 'Files', 'Search', 'Services', 'Questions', 'Testimonials', 'Blog', 'Bookings', 'Reviews', 'Analytics', 'Business details', 'Domain & email', 'Versions', 'Connections', 'Sharing & access', 'See the client’s view']);
-    expect(sheet).toEqual(['Edit site', ...menu]);     // plus the way into Edit mode
+    // The services tab says "Menu" until the site's details arrive with its own word, so the
+    // lists are waited for, not read once (CI read them first on PR 508, Nov 23 2026).
+    const places = ['Overview', 'Pages', 'Styles', 'Files', 'Search', 'Services', 'Questions', 'Testimonials', 'Blog', 'Bookings', 'Reviews', 'Analytics', 'Business details', 'Domain & email', 'Versions', 'Connections', 'Sharing & access', 'See the client’s view'];
+    await expect(page.locator('#nav .navitem')).toHaveText(places);
+    await expect(page.locator('#sectionsNav .navitem')).toHaveText(['Edit site', ...places]);     // plus the way into Edit mode
     await page.evaluate(() => (window as any).go('faqs'));
     await expect(page.locator('#view-faqs')).toBeVisible();
     await expect(page.locator('#nav .navitem[data-view="faqs"]')).toHaveAttribute('aria-current', 'page');
