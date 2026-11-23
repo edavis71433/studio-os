@@ -15,6 +15,8 @@
 //     around the focal point the owner set (template_kit draws the point).
 //   · item 306: on a phone, the small links a thumb must hit (phone numbers, email, the footer's
 //     Privacy and Accessibility, the sign-up box's tick, "All updates") are 44px tall.
+//   · item 430: a business name long enough to wrap keeps the phone bar at about 60px: the name
+//     is a little smaller there and holds to two lines (its own box, .brand-name, in template_kit)
 // This file imports nothing, so a browser spec can draw a page with it and reach only this file.
 
 export const MENU_BREAK = 720;   // px: at this width and under, the menu folds
@@ -61,7 +63,8 @@ html{scroll-padding-top:calc(var(--hdr-h,72px) + 12px)}
 @media (max-width:${MENU_BREAK}px){
 html{--hdr-h:64px}
 header.site .nav{position:relative;flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:12px;padding-top:8px;padding-bottom:8px}
-header.site .brand{font-size:1.15rem;min-height:44px;display:inline-flex;align-items:center;min-width:0}
+header.site .brand{font-size:1.05rem;line-height:1.2;min-height:44px;display:inline-flex;align-items:center;min-width:0}
+header.site .brand-name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
 header.site .brand[style] .brandlogo{height:min(var(--logo-h),44px)}
 .menu-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;min-width:44px;padding:0 14px;border:1px solid var(--line,#ddd);border-radius:999px;background:transparent;color:inherit;font:inherit;font-weight:600;font-size:.95rem;cursor:pointer;flex:none}
 .menu-btn svg{display:block}

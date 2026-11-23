@@ -93,7 +93,7 @@ for (const slug of SLUGS) {
       const sec = w ? w[0] : '';
       const i = s.content.identity;
       ok(`B2 ${label}: the tagline is the headline; the name stays in the header and the page title`, sec.includes(`<h1${[...i.tagline].length > 60 ? ' class="op-long"' : ''} data-pr="identity.tagline">${escd(i.tagline)}</h1>`) && !sec.includes(`>${escd(i.business_name)}</h1>`)
-        && html.includes(`>${escd(i.business_name)}</a>`) && /<title>[^<]+<\/title>/.test(html));
+        && html.includes(`<span class="brand-name">${escd(i.business_name)}</span></a>`) && /<title>[^<]+<\/title>/.test(html));
       const boxes = [...sec.matchAll(/<div class="op-(?:photo|ph)">([\s\S]*?)<\/div>/g)];
       ok(`B3 ${label}: no empty photo box: every box holds its photo`, boxes.every((b) => /<img src="\/img\/p\d+-800\.webp"/.test(b[1])) && (want === 'type' ? boxes.length === 0 : boxes.length > 0));
       if (want === 'editorial') ok(`B4 ${label}: three photos in a row`, /<div class="wrap op-photos n3">/.test(sec) && boxes.length === 3);
