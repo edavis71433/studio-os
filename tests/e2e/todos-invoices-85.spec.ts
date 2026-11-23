@@ -89,7 +89,7 @@ test.describe('The To-dos page (item 85)', () => {
     expect(sent[1]).toEqual({ method: 'PATCH', path: `/sales/deal-tasks/${T(1)}`, body: { status: 'open' } });
     await page.getByRole('button', { name: 'Done: Call back about the menu photos' }).click();
     await expect.poll(() => sent.length).toBe(3);
-    expect(sent[2]).toEqual({ method: 'PATCH', path: '/sales/deals/dddddddd-0000-4000-8000-000000000001', body: { next_step: '', next_step_at: '' } });
+    expect(sent[2]).toEqual({ method: 'PATCH', path: '/sales/deals/dddddddd-0000-4000-8000-000000000001', body: { next_step: '', next_step_at: '', step_done: true } });
     await page.getByRole('button', { name: 'Done: Upload the new team photos' }).click();
     await expect.poll(() => sent.length).toBe(4);
     expect(sent[3]).toEqual({ method: 'PATCH', path: `/projects/eeeeeeee-0000-4000-8000-000000000001/tasks/${T(3)}`, body: { status: 'done' } });

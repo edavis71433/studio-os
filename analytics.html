@@ -1051,7 +1051,7 @@ function paintReports(){
   const host=$('reportsBody');if(!host||!REP)return;
   const label=(REPORTS.find(r=>r[0]===REP_ON)||REPORTS[0])[1];
   host.innerHTML=`<div class="rtabs noprint" role="tablist" aria-label="Reports">${REPORTS.map(([k,l])=>`<button type="button" role="tab" id="rt-${k}" aria-controls="repPrint" aria-selected="${k===REP_ON?'true':'false'}" tabindex="${k===REP_ON?'0':'-1'}" data-rep="${k}">${esc(l)}</button>`).join('')}</div>
-    <div class="rep" id="repPrint" role="tabpanel" aria-labelledby="rt-${REP_ON}"><div class="rep-h"><div><h3>${esc(label)}</h3><p>${esc(REPORT_NOTE[REP_ON]||'')}</p></div><button type="button" class="btn noprint" id="repPrintBtn">Print this report</button></div>
+    <div class="rep" id="repPrint" role="tabpanel" aria-labelledby="rt-${REP_ON}"><div class="rep-h"><div><h3>${esc(label)}</h3><p>${esc(REPORT_NOTE[REP_ON]||'')}</p></div><span class="noprint rep-acts"><button type="button" class="btn noprint" id="repPrintBtn">Print this report</button><button type="button" class="btn noprint" id="repDlBtn" title="A spreadsheet (CSV) of this report">Download</button></span></div>
     ${reportBody(REP_ON,REP[REP_ON])}<p class="rep-foot">Figures as of ${esc(asOf(REP.generated_at))}</p></div>`;
   const tabs=[...host.querySelectorAll('[data-rep]')];
   const pick=(k,focus)=>{REP_ON=k;try{localStorage.setItem('dds-report',k);}catch(_){/* */}paintReports();if(focus){const b=$('rt-'+k);if(b)b.focus();}};
@@ -1060,6 +1060,8 @@ function paintReports(){
     b.addEventListener('keydown',(e)=>{const j=e.key==='ArrowRight'?i+1:e.key==='ArrowLeft'?i-1:-9;if(j===-9)return;e.preventDefault();pick(tabs[(j+tabs.length)%tabs.length].getAttribute('data-rep'),true);});
   });
   const pb=$('repPrintBtn');if(pb)pb.addEventListener('click',printReport);
+  // sales item 213: the report's tables as a spreadsheet, the rows and columns on screen
+  const db=$('repDlBtn');if(db)db.addEventListener('click',()=>{const k=window.ddsListKit;if(!k||!k.downloadTables)return;const f=k.downloadTables($('repPrint'),'Report '+label);toast(f?'Downloaded '+label+' as a spreadsheet.':'There’s nothing in this report to download yet.',f?undefined:'err');});
 }
 function renderDash(d){
   if(WEBSITE_VIEW){

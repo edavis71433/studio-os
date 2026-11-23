@@ -441,8 +441,11 @@ function paintCharts(){
   k.chartTips(host);
 }
 // Print takes the whole view: the rest of it loads first (up to 1,000 people), then it prints
-async function printContacts(){
-  const k=KIT();if(!k||MORE_BUSY)return;
+// item 213: Print and Download share one sheet, the whole view
+async function printContacts(){const o=await contactsSheet();if(o)KIT().printList(o);}
+async function downloadContacts(){const o=await contactsSheet();if(o&&KIT().downloadList){KIT().downloadList(o);toast('Downloaded '+o.rows.length+' contact'+(o.rows.length===1?'':'s')+' as a spreadsheet.');}}
+async function contactsSheet(){
+  const k=KIT();if(!k||MORE_BUSY)return null;
   if(moreToLoad()){
     toast('Getting everyone in this view…');
     MORE_BUSY=true;renderListZone();
@@ -454,7 +457,7 @@ async function printContacts(){
     MORE_BUSY=false;renderListZone();
   }
   const rows=sortedRows(),n=rows.length,s=srchNow(),total=s?s.total:TOTAL,q=Q.trim(),part=moreToLoad()&&total!=null;
-  k.printList({
+  return ({
     title:'Contacts · '+viewLabel()+(TAG?', tagged '+TAG:''),
     sub:[(part?n+' of '+total:String(n))+' contact'+((part?total:n)===1?'':'s'),q?'matching “'+q+'”':'','printed '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})].filter(Boolean).join(' · '),
     cols:[{label:'Name'},{label:'Company'},{label:'Email'},{label:'Phone'},{label:'Tags'}],
@@ -607,7 +610,7 @@ function headerHtml(count){
   <div class="ltools"><div class="seg" role="group" aria-label="Display as">
         <button id="dispTable" aria-pressed="${DISPLAY==='table'?'true':'false'}">Table</button>
         <button id="dispCards" aria-pressed="${DISPLAY==='cards'?'true':'false'}">Cards</button>
-      </div>${studio?`<button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}<button class="lbtn txt" id="chartsBtn" type="button" aria-pressed="${CHARTS?'true':'false'}" aria-controls="charts">Charts</button><button class="lbtn txt" id="printBtn" type="button">Print</button>`:''}</div>`;
+      </div>${studio?`<button class="lbtn txt" id="saveView" type="button">Save view</button>${CURVIEW?'<button class="lbtn txt" id="dropView" type="button">Remove view</button>':''}${DISPLAY==='table'?'<span class="colsdd"><button class="lbtn txt" id="colsBtn" type="button" aria-haspopup="true" aria-expanded="false">Columns</button></span>':''}<button class="lbtn txt" id="chartsBtn" type="button" aria-pressed="${CHARTS?'true':'false'}" aria-controls="charts">Charts</button><button class="lbtn txt" id="printBtn" type="button">Print</button><button class="lbtn txt" id="dlBtn" type="button" title="A spreadsheet (CSV) of the people in view">Download</button>`:''}</div>`;
 }
 // The quiet "possible duplicate" note. The server annotates the roster read
 // (?dupes=1) with the SAME matcher the new-contact prompt already uses — phone
@@ -813,6 +816,7 @@ function wire(){
   const sv=$('saveView');if(sv)sv.addEventListener('click',saveView);
   const ch=$('chartsBtn');if(ch)ch.addEventListener('click',()=>{CHARTS=!CHARTS;try{localStorage.setItem(CHARTS_KEY,CHARTS?'1':'0');}catch(_){/* storage may be denied */}ch.setAttribute('aria-pressed',CHARTS?'true':'false');paintCharts();});
   const pr=$('printBtn');if(pr)pr.addEventListener('click',()=>{printContacts().catch(()=>toast('That couldn’t print just now.','err'));});
+  const dl=$('dlBtn');if(dl)dl.addEventListener('click',()=>{downloadContacts().catch(()=>toast('That couldn’t download just now.','err'));});
   const dv=$('dropView');if(dv)dv.addEventListener('click',dropView);
   // shell.js is deferred and can land after this draw, so the kit is looked up on the press (a check here left Columns dead)
   const cb=$('colsBtn');if(cb)cb.addEventListener('click',(e)=>{const k=KIT();if(!k)return;e.stopPropagation();k.columnsMenu(cb,COLS.map(c=>[c[0],c[1]]),HIDDEN,(next)=>{HIDDEN=next;try{localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));}catch(_){/* */}renderListZone();});});

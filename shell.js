@@ -759,7 +759,98 @@
       // a browser that never says the print is done gets the page back on the next tap or key
       setTimeout(function () { if (!done) { document.addEventListener('pointerdown', back, true); document.addEventListener('keydown', back, true); } }, 0);
     }
-    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, askIn: askIn, filterChips: filterChips, undoToast: undoToast, announce: announce, tagInput: tagInput, cleanTag: cleanTag, charts: charts, chartTips: chartTips, printList: printList };
+    // ── Sales item 213 (Nov 22 2026 review): Download beside Print. downloadList(o) makes a CSV of
+    // the same o printList prints ({ title, cols, rows }); downloadTables(el, title) of each table a
+    // report draws, as it is on screen. A cell that starts like a formula gets a leading apostrophe
+    // (the server's lib/zip_csv.ts csvCell); a byte-order mark lets Excel read accents. ──
+    function csvCell(v) { var t = v == null ? '' : String(v); if (/^[=+\-@\t\r]/.test(t) && !/^-\d+(\.\d+)?$/.test(t)) t = "'" + t; return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }
+    function csvText(rows) { return '\ufeff' + rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n') + '\r\n'; }
+    function csvName(title) {
+      var d = new Date(), day = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      return (String(title || 'list').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'list') + '-' + day + '.csv';
+    }
+    function saveCsv(title, rows) {
+      var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csvText(rows)], { type: 'text/csv;charset=utf-8' }));
+      a.download = csvName(title); a.hidden = true; document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+      return a.download;
+    }
+    function downloadList(o) {
+      var cols = (o && o.cols) || [];
+      return saveCsv(o && o.title, [cols.map(function (c) { return c && c.label != null ? c.label : c; })].concat((o && o.rows) || []));
+    }
+    function downloadTables(el, title) {
+      var out = [], cell = function (c) { return String(c.textContent || '').replace(/\s+/g, ' ').trim(); };
+      (el ? Array.prototype.slice.call(el.querySelectorAll('table')) : []).forEach(function (t, i) {
+        if (i) out.push([]);
+        var cap = t.querySelector('caption'); if (cap && cell(cap)) out.push([cell(cap)]);
+        Array.prototype.forEach.call(t.querySelectorAll('tr'), function (tr) { var r = Array.prototype.map.call(tr.querySelectorAll('th,td'), cell); if (r.length) out.push(r); });
+      });
+      return out.length ? saveCsv(title, out) : '';
+    }
+    return { use: function (fn) { REQ = fn; }, views: views, saveViews: saveViews, ask: ask, columnsMenu: columnsMenu, sendTo: sendTo, parseCsv: parseCsv, importPanel: importPanel, style: style, fit: fit, confirmIn: confirmIn, askIn: askIn, filterChips: filterChips, undoToast: undoToast, announce: announce, tagInput: tagInput, cleanTag: cleanTag, charts: charts, chartTips: chartTips, printList: printList, downloadList: downloadList, downloadTables: downloadTables, csvText: csvText };
+  })();
+
+  // ── Correct or remove a line you logged (sales item 186, Nov 22 2026 review) ──────────
+  //    One editor for the deal page's history and the record's timeline: what it was (call,
+  //    email, meeting, note), the words and the day, then Save, Cancel or Remove. A removed line
+  //    stays in Recently deleted for 30 days and Undo brings it straight back. PATCH /sales/logs/:id.
+  //    o = { send(path, method, body) → Promise<{ ok, status, body }>, saved(), removed(), cancel() } ──
+  window.ddsLogEdit = (function () {
+    var KINDS = [['call', 'Call'], ['email', 'Email'], ['meeting', 'Meeting'], ['note', 'Note']];
+    var CSS = '.dds-le{display:grid;gap:8px;margin:8px 0;padding:10px;border:1px solid var(--line,#e3e0d8);border-radius:10px;background:var(--card,#fff)}'
+      + '.dds-le-k{display:flex;flex-wrap:wrap;gap:6px}.dds-le button{min-height:44px;min-width:44px;padding:0 14px;border-radius:8px;border:1px solid var(--line,#d9d5cc);background:transparent;color:inherit;font:inherit;cursor:pointer}'
+      + '.dds-le-k button[aria-pressed=true]{background:var(--ink,#1f1d1a);color:var(--bg,#fff);border-color:transparent}'
+      + '.dds-le textarea{min-height:72px;width:100%;box-sizing:border-box;font:inherit;padding:8px;border:1px solid var(--line,#d9d5cc);border-radius:8px}'
+      + '.dds-le input[type=date]{min-height:44px;font:inherit;padding:0 8px;border:1px solid var(--line,#d9d5cc);border-radius:8px;max-width:200px}'
+      + '.dds-le-a{display:flex;flex-wrap:wrap;gap:8px}.dds-le .le-save{background:var(--ink,#1f1d1a);color:var(--bg,#fff);border-color:transparent}.dds-le .le-rm{margin-left:auto;color:var(--bad,#a3423a)}';
+    function esc(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function day(iso) { var t = Date.parse(iso || ''); if (!isFinite(t)) return ''; var d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    function say(m, bad, action) { try { if (window.ddsToast) window.ddsToast(m, bad ? 'err' : 'ok', action); } catch (_) { /* a toast is never worth an error */ } }
+    function msg(r, fallback) { return (r && r.body && (r.body.message || (r.body.error && r.body.error.message))) || fallback; }
+    function open(host, log, o) {
+      if (!host || !log || !log.id) return;
+      if (!document.getElementById('dds-le-css')) { var st = document.createElement('style'); st.id = 'dds-le-css'; st.textContent = CSS; document.head.appendChild(st); }
+      var kind = KINDS.some(function (k) { return k[0] === log.kind; }) ? log.kind : 'note', was = day(log.at);
+      var f = document.createElement('form'); f.className = 'dds-le'; f.setAttribute('aria-label', 'Change this line');
+      f.innerHTML = '<div class="dds-le-k" role="group" aria-label="What it was">' + KINDS.map(function (k) { return '<button type="button" data-le-k="' + k[0] + '" aria-pressed="' + (k[0] === kind) + '">' + k[1] + '</button>'; }).join('') + '</div>'
+        + '<label class="sr-only" for="le-body-' + esc(log.id) + '">What was said</label><textarea id="le-body-' + esc(log.id) + '" maxlength="2000" placeholder="What was said">' + esc(log.body || '') + '</textarea>'
+        + '<label class="sr-only" for="le-day-' + esc(log.id) + '">The day it happened</label><input type="date" id="le-day-' + esc(log.id) + '" value="' + esc(was) + '">'
+        + '<div class="dds-le-a"><button type="submit" class="le-save">Save</button><button type="button" class="le-x">Cancel</button><button type="button" class="le-rm">Remove</button></div>';
+      host.innerHTML = ''; host.appendChild(f);
+      var ta = f.querySelector('textarea'); ta.focus();
+      f.querySelectorAll('[data-le-k]').forEach(function (b) { b.addEventListener('click', function () { kind = b.getAttribute('data-le-k'); f.querySelectorAll('[data-le-k]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); });
+      f.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); if (o.cancel) o.cancel(); } });
+      f.querySelector('.le-x').addEventListener('click', function () { if (o.cancel) o.cancel(); });
+      var busy = function (on) { f.querySelectorAll('button,textarea,input').forEach(function (x) { x.disabled = on; }); };
+      f.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var words = ta.value.trim(), d = f.querySelector('input[type=date]').value;
+        if (kind === 'note' && !words) { say('A note needs a few words.', true); ta.focus(); return; }
+        var body = { kind: kind, body: words };
+        if (d && d !== was) body.occurred_at = d;   // an unchanged day keeps the time it was logged at
+        busy(true);
+        Promise.resolve(o.send('/sales/logs/' + encodeURIComponent(log.id), 'PATCH', body)).then(function (r) {
+          if (!r || !r.ok) { busy(false); say(msg(r, 'That didn’t save. Try again in a moment.'), true); return; }
+          say('Saved. The line says it was edited.');
+          if (o.saved) o.saved();
+        }, function () { busy(false); say('That didn’t save. Try again in a moment.', true); });
+      });
+      f.querySelector('.le-rm').addEventListener('click', function () {
+        busy(true);
+        Promise.resolve(o.send('/sales/logs/' + encodeURIComponent(log.id), 'PATCH', { remove: true })).then(function (r) {
+          if (!r || !r.ok) { busy(false); say(msg(r, 'That couldn’t be removed just now.'), true); return; }
+          if (o.removed) o.removed();
+          say('Removed. It stays in Recently deleted for 30 days.', false, { label: 'Undo', onClick: function () {
+            Promise.resolve(o.send('/sales/logs/' + encodeURIComponent(log.id), 'PATCH', { restore: true })).then(function (u) {
+              if (!u || !u.ok) { say(msg(u, 'That couldn’t be put back just now.'), true); return; }
+              say('Put back.'); if (o.saved) o.saved();
+            }, function () { say('That couldn’t be put back just now.', true); });
+          } });
+        }, function () { busy(false); say('That couldn’t be removed just now.', true); });
+      });
+    }
+    return { open: open };
   })();
 
   // ── The Email box (sales item 80, Nov 2026; drawn in Figma 264:1136, 264:1604 and 265:1452):
@@ -1079,7 +1170,8 @@
   }
   // what ticking does, the same requests To-dos and Home send (and their Undo)
   function dueDoneReq(t, back) {
-    if (t.kind === 'next_step') return ['PATCH', '/sales/deals/' + encodeURIComponent(t.id), back ? { next_step: t.title, next_step_at: t.due || null } : { next_step: '', next_step_at: '' }];
+    // sales item 191: ticking it writes "Done: …" in the deal's history; Undo takes that line back
+    if (t.kind === 'next_step') return ['PATCH', '/sales/deals/' + encodeURIComponent(t.id), back ? { next_step: t.title, next_step_at: t.due || null, step_undo: true } : { next_step: '', next_step_at: '', step_done: true }];
     if (t.kind === 'deal_task') return ['PATCH', '/sales/deal-tasks/' + encodeURIComponent(t.id), { status: back ? 'open' : 'done' }];
     return ['PATCH', '/projects/' + encodeURIComponent(t.parent_id) + '/tasks/' + encodeURIComponent(t.id), { status: back ? 'todo' : 'done' }];
   }

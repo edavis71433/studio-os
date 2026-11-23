@@ -331,6 +331,10 @@ html.dds-embed #detailWrap{padding-top:0}
   .tl-bd{flex:1;min-width:0}
   .tl-tx{font-size:13.5px;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
   .tl-mt{font-size:12px;color:var(--faint);margin-top:2px;font-variant-numeric:tabular-nums}
+  /* sales items 186 + 191: change a line you logged; the older history */
+  .tl-edit{min-height:44px;min-width:44px;padding:0 10px;margin:2px 0 0 -10px;border:0;background:transparent;color:var(--accent,#2f5d50);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer}
+  .tl-more{list-style:none;padding:10px 0}.tl-more .btn{min-height:44px}
+  .lmore{padding:12px 0;text-align:center}.lmore .btn{min-height:44px}.lmore-t{margin:0;font-size:13px}
   a{color:var(--p)}
   :focus-visible{outline:2px solid var(--p);outline-offset:2px}
   /* ── the deal stage bar and its What to do now note: deal-path.js brings their rules (builder item 102) ── */
@@ -560,7 +564,7 @@ html.dds-embed #detailWrap{padding-top:0}
     <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Pipeline</h1><span class="pvwrap"><button class="dds-ph-pick" id="pvBtn" type="button" aria-haspopup="true" aria-expanded="false">Views ▾</button><div id="pvMenu" class="pvmenu" role="menu" aria-label="Saved views" hidden></div></span></div>
       <p class="dds-ph-line" id="phLine"></p></div>
     <div class="dds-ph-acts"><button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
-      <div class="dds-ph-more" id="phMore" popover><button class="btn ghost" id="mngServicesTop" title="Your services and prices — used to fill proposals fast">Manage services</button><button class="btn ghost" id="importDeals" type="button">Import CSV</button><button class="btn ghost" id="chartsBtn" type="button" aria-pressed="false" aria-controls="charts">Charts</button><button class="btn ghost" id="printBtn" type="button">Print</button><button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻<span class="dds-ph-say" aria-hidden="true">Refresh</span></button></div>
+      <div class="dds-ph-more" id="phMore" popover><button class="btn ghost" id="mngServicesTop" title="Your services and prices — used to fill proposals fast">Manage services</button><button class="btn ghost" id="importDeals" type="button">Import CSV</button><button class="btn ghost" id="chartsBtn" type="button" aria-pressed="false" aria-controls="charts">Charts</button><button class="btn ghost" id="printBtn" type="button">Print</button><button class="btn ghost" id="dlBtn" type="button" title="A spreadsheet (CSV) of the deals in view">Download</button><button class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻<span class="dds-ph-say" aria-hidden="true">Refresh</span></button></div>
       <button class="btn primary dds-ph-fill" id="newDeal">+ New deal</button></div></div></header>
   <div class="lmeta" id="lmeta">From first enquiry through onboarding, one deal at a time.</div>
   <input class="search" id="dealSearch" type="search" autocomplete="off" aria-label="Search deals" placeholder="Search deals — title, company, or contact…">
@@ -900,6 +904,12 @@ const FETCH_LIMIT=100;
 // summary (SUM_COUNTS), which totals every deal on the server.
 const BOARD_MAX_PAGES=10;
 let BOARD_OPEN_ONLY=false,BOARD_CAPPED=false,ANY_DEALS=false,SUM_COUNTS=null;
+// Sales item 188: the List and the Table read the newest 100 deals, then Show more reads the next
+// 100; with more to read, the search box asks the server too (title, person, email or company),
+// so deal 101 can be found, sorted, printed and downloaded. LIST_MORE: the last page was full.
+let LIST_MORE=false,LIST_BUSY=false,SRCH=null,SRCH_T=0;
+const listCapped=()=>!BOARD_OPEN_ONLY&&LIST_MORE;
+const srchNow=()=>{const q=Q.trim();return VIEW!=='board'&&SRCH&&q&&SRCH.q===q&&SRCH.stage===FILTER?SRCH:null;};
 async function loadBoardDeals(){
   const all=[];let capped=false;
   for(let n=0;n<BOARD_MAX_PAGES;n++){
@@ -2126,6 +2136,7 @@ async function load(soft){
     if(gen!==REQ_SEQ)return;   // a newer request started — this response is stale, never paint it
     DEALS=res.data||[];DEALS_LOADED=true;
     BOARD_OPEN_ONLY=board;BOARD_CAPPED=!!(board&&res.capped);ANY_DEALS=board?!!res.any:DEALS.length>0;
+    LIST_MORE=!board&&DEALS.length>=FETCH_LIMIT;SRCH=null;askSoon(0);   // item 188
     // item 66: a deal whose contact sits outside the newest 100 gets its name too
     if(CONTACT_NAME&&!CONTACT_FAILED)fillMissingNames().then(got=>{if(got&&gen===REQ_SEQ)renderCurrent();});
     // item 65: picks left over from another stage chip go (the bar said "2 selected" with nothing ticked)
@@ -2141,7 +2152,59 @@ async function load(soft){
 // ↻ soft refresh + the static search input (never re-rendered → caret-safe).
 {
   const rf=$('refreshBtn'); if(rf)rf.addEventListener('click',()=>{load(true);});
-  const si=$('dealSearch'); if(si)si.addEventListener('input',()=>{Q=si.value;renderCurrent();});
+  const si=$('dealSearch'); if(si)si.addEventListener('input',()=>{Q=si.value;renderCurrent();askSoon(300);});
+}
+// item 188: the next 100 deals of the list's stage. Resolves true when it read a page.
+async function showMoreDeals(){
+  if(LIST_BUSY||!LIST_MORE)return false;
+  LIST_BUSY=true;const gen=REQ_SEQ;
+  try{
+    const qs=new URLSearchParams({limit:String(FETCH_LIMIT),offset:String(DEALS.length)});if(FILTER)qs.set('stage',FILTER);
+    const r=await api('/sales/deals?'+qs.toString());
+    if(gen!==REQ_SEQ)return false;
+    const page=(r&&r.data)||[],have=new Set(DEALS.map(d=>String(d.id)));
+    DEALS=DEALS.concat(page.filter(d=>!have.has(String(d.id))));LIST_MORE=page.length>=FETCH_LIMIT;
+    if(CONTACT_NAME&&!CONTACT_FAILED)fillMissingNames().then(got=>{if(got&&gen===REQ_SEQ)renderCurrent();});
+    return true;
+  }catch(e){toast(nice(e),true);return false;}
+  finally{LIST_BUSY=false;}
+}
+// Print and Download take the whole list: the rest of it loads first (up to 1,000 more deals)
+async function loadWholeList(){
+  if(VIEW==='board'||!LIST_MORE||srchNow())return;
+  toast('Getting every deal in this view…');
+  for(let i=0;i<10&&LIST_MORE;i++){if(!(await showMoreDeals()))break;}
+  renderCurrent();
+}
+// item 188: with deals still unread, a search asks the server as well (a short wait after typing)
+function askSoon(ms){
+  clearTimeout(SRCH_T);
+  const q=Q.trim();
+  if(VIEW==='board'||!LIST_MORE||!q){if(SRCH&&!q)SRCH=null;return;}
+  if(SRCH&&SRCH.q===q&&SRCH.stage===FILTER)return;
+  SRCH_T=setTimeout(async()=>{
+    const stage=FILTER,gen=REQ_SEQ;
+    const qs=new URLSearchParams({limit:String(FETCH_LIMIT),q,people:'1'});if(stage)qs.set('stage',stage);
+    let r;try{r=await api('/sales/deals?'+qs.toString());}catch(_){return;}   // the loaded deals still answer
+    if(gen!==REQ_SEQ||Q.trim()!==q||FILTER!==stage)return;
+    const rows=(r&&r.data)||[];
+    SRCH={q,stage,rows,ids:new Set(rows.map(d=>String(d.id))),more:rows.length>=FETCH_LIMIT};
+    if(CONTACT_NAME&&!CONTACT_FAILED)fillMissingNames().then(got=>{if(got&&gen===REQ_SEQ)renderCurrent();});
+    renderCurrent();
+  },ms);
+}
+// under the List and the Table: Show more while deals are unread, or how much a search found
+function paintListMore(host){
+  if(!host||VIEW==='board')return;
+  const s=srchNow();
+  let h='';
+  if(s)h=s.more?'<p class="mut lmore-t">Showing the first '+FETCH_LIMIT+' deals that match. Add a word to narrow it.</p>':'';
+  else if(LIST_MORE)h='<button type="button" class="btn ghost" id="listMore">Show more deals</button>';
+  if(!h)return;
+  const box=document.createElement('div');box.className='lmore';box.innerHTML=h;host.appendChild(box);
+  const b=box.querySelector('#listMore');
+  if(b)b.addEventListener('click',async()=>{b.disabled=true;b.textContent='Loading…';const before=visibleDeals().length;await showMoreDeals();renderCurrent();
+    const cards=host.querySelectorAll(VIEW==='table'?'tbody tr':'.card');const n=cards[before];const nb=$('listMore');if(n&&n.focus)n.focus();else if(nb)nb.focus();});
 }
 
 // ── Table view: the deals as a sortable list-view table (Deal · Contact ·
@@ -2180,7 +2243,7 @@ function callLink(phone,dealId,who,cls){const h=telOf(phone);return h?`<a class=
 let NAMES_ASKED=new Set();
 async function fillMissingNames(){
   if(!CONTACT_NAME||CONTACT_FAILED||!DEALS_LOADED)return false;
-  const miss=[...new Set(DEALS.map(d=>d.contact_id).filter(Boolean).map(String))].filter(id=>!(id in CONTACT_NAME)&&!NAMES_ASKED.has(id));
+  const miss=[...new Set(DEALS.concat(SRCH?SRCH.rows:[]).map(d=>d.contact_id).filter(Boolean).map(String))].filter(id=>!(id in CONTACT_NAME)&&!NAMES_ASKED.has(id));
   if(!miss.length)return false;
   miss.forEach(id=>NAMES_ASKED.add(id));
   const chunks=[];for(let i=0;i<miss.length;i+=100)chunks.push(miss.slice(i,i+100));
@@ -2258,12 +2321,15 @@ function visibleDeals(){
   // sales item 90: the field filters narrow the list and the table (the board keeps its own chips)
   const fl=VIEW!=='board'&&anyFilter()?(d)=>fMatch(FFILT,d):null;
   // sales item 37: Mine narrows every view
-  const base=MINE&&teamOn()?DEALS.filter(isMineDeal):DEALS;
+  // item 188: a search the server answered adds the deals it found that aren't loaded
+  const s=q?srchNow():null,have=s?new Set(DEALS.map(d=>String(d.id))):null;
+  const all=s?DEALS.concat(s.rows.filter(d=>!have.has(String(d.id)))):DEALS;
+  const base=MINE&&teamOn()?all.filter(isMineDeal):all;
   if(!q)return fl?base.filter(fl):base;
   if(!CONTACT_TEXT&&!CONTACT_LOADING)ensureContactNames().then(()=>{if(Q.trim())renderCurrent();});
   return base.filter(d=>{
     const ct=(CONTACT_TEXT&&d.contact_id&&CONTACT_TEXT[d.contact_id])||'';
-    return (String(d.title||'').toLowerCase()+' '+ct).includes(q)&&(!fl||fl(d));
+    return ((s&&s.ids.has(String(d.id)))||(String(d.title||'').toLowerCase()+' '+ct).includes(q))&&(!fl||fl(d));
   });
 }
 // ── the .lmeta line: visible count · value (money0 — the same cents formatter
@@ -2316,7 +2382,7 @@ function headLine(){
   const open=DEALS.filter(d=>BOARD_STAGES.includes(d.stage)&&!d.converted_client_id),n=open.length;
   const sum=open.reduce((a,d)=>a+(d.expected_value_cents||0),0);
   if(!n)return DEALS.length?'No open deals right now':(scope()?'':'No deals yet');   // inside a client the page itself says where deals live
-  return (DEALS.length>=FETCH_LIMIT?n+' open of the latest '+FETCH_LIMIT+' deals':n+' open deal'+(n===1?'':'s'))+' worth '+money0(sum);
+  return (listCapped()?n+' open of the latest '+DEALS.length+' deals':n+' open deal'+(n===1?'':'s'))+' worth '+money0(sum);
 }
 function renderMeta(){
   const el=$('lmeta'); if(!el)return;
@@ -2326,14 +2392,17 @@ function renderMeta(){
   // the sweep's wording). List/Table keep the full-fetched-set semantics.
   const list=board?boardVisible():visibleDeals();
   const sum=list.reduce((a,d)=>a+(d.expected_value_cents||0),0);
-  const n=list.length,atCap=board?BOARD_CAPPED:DEALS.length>=FETCH_LIMIT;
+  const n=list.length,atCap=board?BOARD_CAPPED:listCapped(),s=srchNow();
   let m;
   if(board){
     // item 121: the board holds every open deal; only past a thousand does it say it stopped
     m=(atCap?n+' open deals shown, your newest '+(FETCH_LIMIT*BOARD_MAX_PAGES):n+' open deal'+(n===1?'':'s'))+' · '+money0(sum)+' open · '+updatedLabel();
+  }else if(s){
+    // item 188: the server looked through every deal for the search
+    m=n+' deal'+(n===1?'':'s')+' found'+(s.more?', the first '+FETCH_LIMIT:'')+' · '+money0(sum)+' · '+updatedLabel();
   }else{
     const count=atCap
-      ?(n===DEALS.length?'Latest '+FETCH_LIMIT+' deals':n+' of the latest '+FETCH_LIMIT+' deals')
+      ?(n===DEALS.length?'Latest '+DEALS.length+' deals':n+' of the latest '+DEALS.length+' deals')
       :n+' deal'+(n===1?'':'s');
     m=count+' · '+money0(sum)+(atCap?'':' total')+' · '+updatedLabel();
   }
@@ -2359,11 +2428,11 @@ function paintCharts(){
   const seen={};list.forEach(d=>{const v=FOUND_VIA.includes(d.found_via)?d.found_via:'';seen[v]=(seen[v]||0)+1;});
   const from=FOUND_VIA.filter(v=>seen[v]).map(v=>({label:v,n:seen[v]})).sort((a,b)=>b.n-a.n);
   if(seen[''])from.push({label:'Not recorded',n:seen[''],none:true});
-  const atCap=DEALS.length>=FETCH_LIMIT;
+  const atCap=listCapped()&&!srchNow();
   host.innerHTML=k.charts([
     {title:VIEW==='board'?'Open deals by stage':'Deals by stage',rows:stages,unit:['deal','deals'],extra:true},
     {title:'How they found you',rows:from,unit:['deal','deals']},   // sales item 196: it counts found_via; where the deal came from is SOURCE_WORDS
-  ],n?'From the '+n+' deal'+(n===1?'':'s')+' in this view.'+(atCap?' Only your newest '+FETCH_LIMIT+' deals are loaded, so older ones aren’t counted.':''):'');
+  ],n?'From the '+n+' deal'+(n===1?'':'s')+' in this view.'+(atCap?' Only your newest '+DEALS.length+' deals are loaded, so older ones aren’t counted. Show more to count them.':''):'');
   k.chartTips(host);
 }
 // what the printed page is called: the saved view, the board's chip, or the list's stage
@@ -2378,20 +2447,24 @@ function printOrder(list){
   if(VIEW==='list')return listOrder(list);
   return [...list].sort((a,b)=>BOARD_STAGES.indexOf(a.stage)-BOARD_STAGES.indexOf(b.stage)||String(a.expected_close||'9999').localeCompare(String(b.expected_close||'9999')));
 }
-async function printDeals(){
-  const k=KIT();if(!k)return;
+// item 213: Print and Download share one sheet: the deals in view, in the order on screen (item 188: the whole list)
+async function dealsSheet(){
+  await loadWholeList();
   await ensureContactNames().catch(()=>{});   // the Contact column; if the names can't load it prints empty
   const list=printOrder(dealsInView()),n=list.length,q=Q.trim();
   const sum=list.reduce((a,d)=>a+(d.expected_value_cents||0),0);
-  k.printList({
+  return {
     title:'Pipeline · '+printName(),
-    sub:[n+' deal'+(n===1?'':'s'),money0(sum),q?'matching “'+q+'”':'',DEALS.length>=FETCH_LIMIT?'from your newest '+FETCH_LIMIT:'','printed '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})].filter(Boolean).join(' · '),
+    sub:[n+' deal'+(n===1?'':'s'),money0(sum),q?'matching “'+q+'”':'',listCapped()&&!srchNow()?'from your newest '+DEALS.length:'','printed '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})].filter(Boolean).join(' · '),
     cols:[{label:'Deal'},{label:'Contact'},{label:'Stage'},{label:'Value',num:true},{label:'Close date'},{label:'Next step'}],
     rows:list.map(d=>[d.title||'Untitled deal',(CONTACT_NAME&&d.contact_id&&CONTACT_NAME[d.contact_id])||'',stageLabel(d.stage),d.expected_value_cents?money0(d.expected_value_cents):'',d.expected_close?niceDay(d.expected_close):'',shownStep(d)]),
-  });
+  };
 }
+async function printDeals(){const k=KIT();if(!k)return;k.printList(await dealsSheet());}
+async function downloadDeals(){const k=KIT();if(!k||!k.downloadList)return;const o=await dealsSheet();k.downloadList(o);toast('Downloaded '+o.rows.length+' deal'+(o.rows.length===1?'':'s')+' as a spreadsheet.');}
 $('chartsBtn').onclick=()=>{CHARTS=!CHARTS;try{localStorage.setItem(CHARTS_KEY,CHARTS?'1':'0');}catch(_){/* storage may be denied */}paintCharts();};
 $('printBtn').onclick=()=>{printDeals().catch(()=>toast('That couldn’t print just now.',true));};
+$('dlBtn').onclick=()=>{downloadDeals().catch(()=>toast('That couldn’t download just now.',true));};
 // Roster-empty honesty: a stage-filtered empty says WHICH stage is empty (the
 // won landing gets its own line); only a truly empty pipeline gets the starter.
 function renderRosterEmpty(host){
@@ -2431,6 +2504,7 @@ function renderCurrent(){
     host.innerHTML='<div class="dds-empty"><h3>No deals match that.</h3><p>Try a different deal, company, or contact name.</p></div>';return;
   }
   if(VIEW==='table')renderTable();else renderList();
+  paintListMore(host);   // item 188
 }
 // A deal is closed once it is won or not a fit; a closed deal's next step that
 // the server says is finished (next_step_done) is not shown at all.
@@ -3293,6 +3367,39 @@ function closeDealDetail(){
   const c=(id&&document.querySelector('#list [data-id="'+id+'"], #board [data-id="'+id+'"], #table [data-id="'+id+'"]'))||document.querySelector('#list .card, #board .bcard, #table tr[data-id]');
   if(c&&c.focus)c.focus();
 }
+// ── Sales items 186 + 191: one history line. A change line names a new owner from the team (only the
+// page knows their names); a line you logged by hand gets Change, which corrects or removes it. ──
+function tlNamed(it){
+  if(it&&it.kind==='deal_change'&&it.change&&it.change.kind==='owner'&&TEAM){const p=personOf(it.change.to);return {...it,text:'Owner changed to '+(p?(p.me?'you':p.label):'the business owner')};}
+  return it;
+}
+function tlRowHtml(it){
+  // item 69: an open shows its time too — "Nov 8, 3:12 PM" tells you whether to call
+  const when=it.backdated?`${evtDate(it.at)} · logged ${evtDate(it.logged_at)}`:it.kind==='doc_opened'?evtDateTime(it.at):evtDate(it.at);
+  const who=(it.source==='activity'&&it.who)?(' · '+esc(it.who)):'';
+  const edited=it.edited_at?' · edited':'';
+  const change=it.mine&&it.log_id?`<button type="button" class="tl-edit" data-log-edit="${esc(it.log_id)}" aria-label="Change or remove this ${esc(it.kind==='note'?'note':it.kind)}">Change</button>`:'';
+  return `<li class="tl-i" data-tl="${esc(it.log_id||it.id)}"><span class="tl-ic">${it.icon?esc(it.icon):'·'}</span><div class="tl-bd"><div class="tl-tx">${esc(it.text)}</div><div class="tl-mt">${esc(when)}${who}${edited}</div>${change}</div></li>`;
+}
+let TL_ITEMS=[];
+function wireTimeline(dealId,host){
+  if(!host)return;
+  host.querySelectorAll('[data-log-edit]').forEach(b=>{if(b.dataset.w)return;b.dataset.w='1';b.addEventListener('click',()=>{
+    const it=TL_ITEMS.find(x=>x.log_id===b.getAttribute('data-log-edit'));const bd=b.closest('.tl-bd');if(!it||!bd||!window.ddsLogEdit)return;
+    const back=()=>{const li=bd.closest('li');if(li){li.outerHTML=tlRowHtml(it);wireTimeline(dealId,host);const nb=host.querySelector('[data-log-edit="'+it.log_id+'"]');if(nb)nb.focus();}};
+    window.ddsLogEdit.open(bd,{id:it.log_id,kind:it.kind,body:it.body||'',at:it.at},{send:apiR,cancel:back,saved:()=>openDeal(dealId),removed:()=>openDeal(dealId)});
+  });});
+  const older=host.querySelector('#tlOlder');
+  if(older&&!older.dataset.w){older.dataset.w='1';older.addEventListener('click',async()=>{
+    older.disabled=true;older.textContent='Loading…';
+    const r=await apiR('/sales/deals/'+encodeURIComponent(dealId)+'/history?before='+encodeURIComponent(older.getAttribute('data-before')||''),'GET');
+    const li=older.closest('li');
+    if(!r.ok||!r.body||!r.body.data){older.disabled=false;older.textContent='Show older';toast((r.body&&r.body.message)||'The older history couldn’t load just now.',true);return;}
+    const got=(r.body.data.timeline||[]).map(tlNamed);TL_ITEMS=TL_ITEMS.concat(got);
+    const html=got.map(tlRowHtml).join('')+(r.body.data.more&&r.body.data.before?`<li class="tl-more"><button type="button" class="btn ghost" id="tlOlder" data-before="${esc(r.body.data.before)}">Show older</button></li>`:'');
+    if(li){li.insertAdjacentHTML('afterend',html||'<li class="mut" style="padding:8px 0">That’s everything.</li>');const first=li.nextElementSibling;li.remove();wireTimeline(dealId,host);if(first){first.setAttribute('tabindex','-1');first.focus();}}
+  });}
+}
 async function openDeal(id){
   const dgen=++DET_SEQ;                  // detail-read generation: a slower older open must never paint over this one
   const wasOpen=!$('detailWrap').hidden; // an in-view refresh re-renders; remember to restore focus
@@ -3444,13 +3551,8 @@ async function openDeal(id){
     // Activity: the quick-log (call/email/meeting/dated note) + the ONE merged
     // timeline (manual activities interleaved with system events, newest first).
     const todayStr=localYmd();   // item 65: after 5pm in Los Angeles the UTC slice was tomorrow, and today couldn't be picked
-    const tlItems=data.timeline||[];
-    const tlHtml=tlItems.length?tlItems.map(it=>{
-      // item 69: an open shows its time too — "Nov 8, 3:12 PM" tells you whether to call
-      const when=it.backdated?`${evtDate(it.at)} · logged ${evtDate(it.logged_at)}`:it.kind==='doc_opened'?evtDateTime(it.at):evtDate(it.at);
-      const who=(it.source==='activity'&&it.who)?(' · '+esc(it.who)):'';
-      return `<li class="tl-i"><span class="tl-ic">${it.icon?esc(it.icon):'·'}</span><div class="tl-bd"><div class="tl-tx">${esc(it.text)}</div><div class="tl-mt">${esc(when)}${who}</div></div></li>`;
-    }).join(''):'<li class="mut" style="padding:8px 0">No activity yet — log your first call or note above.</li>';
+    const tlItems=(data.timeline||[]).map(tlNamed);
+    const tlHtml=tlItems.length?tlItems.map(tlRowHtml).join('')+(data.history_before?`<li class="tl-more"><button type="button" class="btn ghost" id="tlOlder" data-before="${esc(data.history_before)}">Show older</button></li>`:''):'<li class="mut" style="padding:8px 0">No activity yet — log your first call or note above.</li>';
     // ── the Overview rail: a Money card (what's paid, owed, signed, proposed —
     //    each a fact already on this read) and the three latest timeline items;
     //    plus the tab counts (open invoices · activity items) ──
@@ -3611,12 +3713,13 @@ async function openDeal(id){
             <div class="qrow"><label class="mut" for="qlDate" style="margin:0">When</label><input type="date" id="qlDate" max="${todayStr}" value="${todayStr}"><span style="flex:1"></span><button class="btn" id="qlSave">${logLabel('call')}</button></div>
             <div class="qrow qfu"><label class="mut" for="qlFollow" style="margin:0">Follow up on</label><input type="date" id="qlFollow" min="${todayStr}" aria-label="Follow up on (optional): adds a to-do"><button type="button" class="chip sm" data-fu="1">Tomorrow</button><button type="button" class="chip sm" data-fu="7">Next week</button><span class="mut" style="font-size:12.5px">optional, adds a to-do</span></div>
           </div>
-          <ul class="tl">${tlHtml}</ul>
+          <ul class="tl" id="dealTl">${tlHtml}</ul>
         </div>
         </div>
         ${(d.converted_client_id||d.stage==='converted')?'':`<div class="sec" data-needs="delete" style="border-top:1px solid var(--line);padding-top:14px;margin-top:8px"><button class="btn ghost" id="delDeal" style="border-color:transparent;color:var(--bad,#a3423a);font-size:13px">Delete this deal</button></div>`}
       </div>`;
     $('closeD').onclick=closeDealDetail;
+    TL_ITEMS=tlItems;wireTimeline(id,$('dealTl'));   // sales items 186 + 191
     paintDrawerOwner(d);   // sales item 37: who owns it, changeable here
     // ── tabs: show the requested one (a ?dtab= deep link, a refresh's current
     //    tab, else Overview); clicks + the record tablist's arrow-key contract ──

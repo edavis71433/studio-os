@@ -59,6 +59,16 @@
   .saved-row .facts{grid-column:1}
   .facts a{color:var(--p);text-decoration:none}
   .facts a:hover{text-decoration:underline}
+  /* sales item 189: a calling session — the number is a call, a note line, a call-back day, and the list filters */
+  .facts a.pcall{font-weight:600;min-height:44px;display:inline-flex;align-items:center}
+  .pwork{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .pwork textarea{flex:1 1 260px;min-height:44px;font:inherit;font-size:14px;padding:10px;border:1px solid var(--line);border-radius:var(--dds-r,8px);resize:vertical;box-sizing:border-box}
+  .pwork label.cb{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--soft)}
+  .pwork input[type=date],.pfilt select{min-height:44px;font:inherit;padding:0 8px;border:1px solid var(--line);border-radius:var(--dds-r,8px);background:var(--card)}
+  .pfilt{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 12px}
+  .pfilt label{font-size:13.5px;color:var(--soft);display:inline-flex;align-items:center;gap:6px}
+  .pback{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--p-soft);border-radius:var(--dds-r,8px);padding:8px 12px;font-weight:600}
+  .pback button{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);font:inherit;font-weight:600;cursor:pointer}
   .pick input{width:20px;height:20px;cursor:pointer}
   .badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;border-radius:999px;padding:3px 10px;background:var(--p-soft);color:var(--p-deep);white-space:nowrap}
   .badge.hot{background:#fdecec;color:#8a3030}
@@ -147,6 +157,32 @@ ddsApi.use(sb);   // the shell's one API helper (shell-kit.js) sends this page's
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TOKEN="",SAVED=[],FINDS=null,QUERYRAN="",BUSY=false,LEADS=[],LEADS_OK=false,LOADED=false;
+// sales item 189: the list's filters, and the call just made (asked about when the page shows again)
+let PF={status:'',town:''},BACK=null;
+// the town in a Google address: "12 Main St, Burbank, CA 91502, USA" → "Burbank"
+function townOf(a){
+  const parts=String(a||'').split(',').map(x=>x.trim()).filter(Boolean);
+  while(parts.length&&/^(usa|united states|us)$/i.test(parts[parts.length-1]))parts.pop();
+  if(parts.length>=2&&/^[A-Za-z]{2}(\s+\d{5}(-\d{4})?)?$/.test(parts[parts.length-1]))return parts[parts.length-2];
+  return parts.length>=3?parts[parts.length-2]:'';
+}
+const pShown=()=>SAVED.filter(p=>(!PF.status||p.status===PF.status)&&(!PF.town||townOf(p.address)===PF.town));
+// a tap on a number is kept for half an hour; back on the page (a phone returns from its dialler,
+// or reloads the page), the row asks how it went. A tap that never left the page asks nothing.
+const CALL_KEY='dds-prospect-call';
+function callTap(){try{return JSON.parse(sessionStorage.getItem(CALL_KEY)||'null');}catch(_){return null;}}
+function offerBack(){
+  const t=callTap();if(!t||!t.left||document.visibilityState==='hidden'||!LOADED)return;
+  try{sessionStorage.removeItem(CALL_KEY);}catch(_){/* */}
+  if(Date.now()-t.at>30*60000||!SAVED.some(p=>p.id===t.id))return;
+  BACK={id:t.id,fresh:true};render();
+}
+document.addEventListener('visibilitychange',()=>{
+  const t=callTap();if(!t)return;
+  if(document.visibilityState==='hidden'){t.left=true;try{sessionStorage.setItem(CALL_KEY,JSON.stringify(t));}catch(_){/* */}return;}
+  if(!t.left){try{sessionStorage.removeItem(CALL_KEY);}catch(_){/* */}return;}
+  offerBack();
+});
 const scope=()=>new URLSearchParams(location.search).get('client')||'';
 // the shell's one API helper (shell-kit.js): it never throws, so a button switched off for a
 // call comes back on a dropped connection too (no answer at all is { ok:false, status:0 })
@@ -156,9 +192,11 @@ const toast=(m,kind,action)=>ddsToast(m,kind,action);   // the shell's one toast
 // warmth: the server's score, read as a word the page colors by
 const heat=(p)=>p.site_health==='no_website'||p.site_health==='unreachable'?'hot':p.site_health==='dated'?'warm':'cool';
 const badge=(p)=>`<span class="badge ${heat(p)}">${esc(p.health_word||'Not checked')}${Number.isFinite(Number(p.score))?' · '+esc(p.score):''}</span>`;
+// sales item 189 (item 89's rule): a phone number is a tap to call
+const telOf=(ph)=>{const d=String(ph||'').trim().replace(/[^\d+]/g,'').replace(/(?!^)\+/g,'');return d.replace(/\D/g,'').length>=3?'tel:'+d:'';};
 const factsHtml=(p)=>{
   const bits=[];
-  if(p.phone)bits.push(`<span>${esc(p.phone)}</span>`);
+  if(p.phone){const h=telOf(p.phone);bits.push(h?`<a class="pcall" href="${esc(h)}"${p.id?` data-pcall="${esc(p.id)}"`:''} aria-label="Call ${esc(p.business_name||'them')} on ${esc(p.phone)}">${esc(p.phone)}</a>`:`<span>${esc(p.phone)}</span>`);}
   if(p.website)bits.push(`<a href="${esc(p.website)}" target="_blank" rel="noopener noreferrer">${esc(String(p.website).replace(/^https?:\/\//,'').replace(/\/$/,''))}</a>`);
   else bits.push('<span>No website found</span>');
   if(p.address)bits.push(`<span>${esc(p.address)}</span>`);
@@ -215,6 +253,19 @@ function packNotesHtml(p){
   if(!p.pack_url||!n.length)return'';
   return `<div class="pnotes" data-pack-notes="${esc(p.id)}"><b>Pitch pack notes</b>, only you see these:<ul>${n.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
 }
+function pFiltersHtml(){
+  const towns=[...new Set(SAVED.map(p=>townOf(p.address)).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  return `<div class="pfilt" role="group" aria-label="Show"><label>Status <select id="pfStatus"><option value="">All</option>${['New','Contacted','In pipeline','Not a fit'].map(x=>`<option${PF.status===x?' selected':''}>${x}</option>`).join('')}</select></label>${towns.length>1||PF.town?`<label>Town <select id="pfTown"><option value="">All towns</option>${towns.map(x=>`<option${PF.town===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>`:''}</div>`;
+}
+// a line added to a prospect's notes ("Tried Nov 22, no answer."), kept with what was there
+async function addNoteLine(p,line){
+  const notes=[String(p.notes||'').trim(),line].filter(Boolean).join('\n').slice(-2000);
+  const r=await api('/sales/prospects/'+encodeURIComponent(p.id),'PATCH',{notes});
+  if(!r.ok){toast('That note didn’t save. Try again.','err');return false;}
+  p.notes=notes;return true;
+}
+const shortDay=(ymd)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd||''));return m?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}):'';};
+const todayYmd=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 function render(){
   const m=$('main');
   const finds=FINDS?`
@@ -240,9 +291,11 @@ function render(){
   const saved=SAVED.length?`
     <section class="card" aria-label="Your prospects">
       <h2>Your list</h2>
-      <p class="hint">${SAVED.length} prospect${SAVED.length===1?'':'s'}, warmest first. “→ Deal” puts one in your pipeline, with the business as its contact; the email draft is only ever words to copy.</p>
+      <p class="hint">${pShown().length===SAVED.length?SAVED.length+' prospect'+(SAVED.length===1?'':'s'):pShown().length+' of '+SAVED.length+' prospects'}, warmest first. “→ Deal” puts one in your pipeline, with the business as its contact; the email draft is only ever words to copy.</p>
+      ${pFiltersHtml()}
       <div class="rows">
-        ${SAVED.map(p=>`
+        ${pShown().length?'':'<p class="muted">None of your prospects match. Change the status or the town.</p>'}
+        ${pShown().map(p=>`
           <div class="row saved-row" data-id="${esc(p.id)}">
             <div class="who"><div class="nm">${esc(p.business_name)} ${badge(p)}</div>${p.industry?`<div class="ind">${esc(p.industry)}</div>`:''}</div>
             <div class="acts">
@@ -255,6 +308,9 @@ function render(){
               <button data-needs="delete" data-remove="${esc(p.id)}" aria-label="Remove ${esc(p.business_name)}">Remove</button>
             </div>
             <div class="facts">${factsHtml(p)}</div>
+            ${BACK&&BACK.id===p.id?`<div class="pback" role="group" aria-label="Back from your call"><span>Back from your call with ${esc(p.business_name)}?</span><button type="button" data-pback="talked" id="pbackFirst">We talked</button><button type="button" data-pback="none">No answer</button><button type="button" data-pback="x" aria-label="Not now">Not now</button></div>`:''}
+            <div class="pwork"><label class="sr-only" for="pn-${esc(p.id)}">Notes on ${esc(p.business_name)}</label><textarea id="pn-${esc(p.id)}" rows="1" maxlength="2000" data-pnote="${esc(p.id)}" placeholder="Add a note: who you spoke to, what they said">${esc(p.notes||'')}</textarea>
+              <label class="cb">Call back on <input type="date" data-pcb="${esc(p.id)}" aria-label="Call ${esc(p.business_name)} back on (adds it to your To-dos)"></label></div>
             ${packNotesHtml(p)}
           </div>`).join('')}
       </div>
@@ -339,6 +395,36 @@ function wire(){
     if(!r.ok)return toast('That didn’t work — try again.','err');
     toast('Off the list.');await load();
   }));
+  // sales item 189: the calling session
+  const fs=$('pfStatus');if(fs)fs.addEventListener('change',()=>{PF.status=fs.value;render();const n=$('pfStatus');if(n)n.focus();});
+  const ft=$('pfTown');if(ft)ft.addEventListener('change',()=>{PF.town=ft.value;render();const n=$('pfTown');if(n)n.focus();});
+  document.querySelectorAll('a[data-pcall]').forEach(a=>a.addEventListener('click',()=>{try{sessionStorage.setItem(CALL_KEY,JSON.stringify({id:a.dataset.pcall,at:Date.now(),left:false}));}catch(_){/* storage may be denied */}}));
+  document.querySelectorAll('textarea[data-pnote]').forEach(t=>t.addEventListener('change',async()=>{
+    const p=SAVED.find(x=>x.id===t.dataset.pnote);if(!p)return;
+    const r=await api('/sales/prospects/'+encodeURIComponent(p.id),'PATCH',{notes:t.value.trim()});
+    if(!r.ok){toast('That note didn’t save. Try again.','err');return;}
+    p.notes=t.value.trim();toast('Note saved.');
+  }));
+  document.querySelectorAll('input[data-pcb]').forEach(d=>d.addEventListener('change',async()=>{
+    const p=SAVED.find(x=>x.id===d.dataset.pcb);if(!p||!d.value)return;
+    if(d.value<todayYmd()){toast('Pick today or a day ahead.','err');d.value='';return;}
+    d.disabled=true;
+    const r=await api('/sales/tasks','POST',{title:('Call back '+p.business_name+(p.phone?' on '+p.phone:'')).slice(0,200),due_date:d.value});
+    if(!r.ok){d.disabled=false;toast((r.body&&r.body.message)||'That didn’t go on your To-dos. Try again.','err');return;}
+    await addNoteLine(p,'Call back '+shortDay(d.value)+'.');
+    render();
+    toast('On your To-dos for '+shortDay(d.value)+'.',false,{label:'Open To-dos',onClick:()=>{location.href='/todos.html';}});
+  }));
+  document.querySelectorAll('[data-pback]').forEach(b=>b.addEventListener('click',async()=>{
+    const p=BACK&&SAVED.find(x=>x.id===BACK.id);const how=b.dataset.pback;BACK=null;
+    if(p&&how==='none'){await addNoteLine(p,'Tried '+shortDay(todayYmd())+', no answer.');render();const cb=document.querySelector('input[data-pcb="'+p.id+'"]');if(cb)cb.focus();toast('Noted: no answer. Pick a day to call back, if you like.');return;}
+    if(p&&how==='talked'){
+      if(p.status==='New'){const r=await api('/sales/prospects/'+encodeURIComponent(p.id),'PATCH',{status:'Contacted'});if(r.ok)p.status='Contacted';}
+      render();const t=document.querySelector('textarea[data-pnote="'+p.id+'"]');if(t)t.focus();return;
+    }
+    render();
+  }));
+  if(BACK&&BACK.fresh){BACK.fresh=false;const pb=$('pbackFirst');if(pb)pb.focus();}
   document.querySelectorAll('select[data-status]').forEach(s=>s.addEventListener('change',async()=>{
     const r=await api('/sales/prospects/'+s.dataset.status,'PATCH',{status:s.value});
     if(!r.ok){toast('That didn’t save — try again.','err');await load();return;}
@@ -421,6 +507,7 @@ async function load(){
     trouble();return;
   }
   SAVED=r.body.data||[];LOADED=true;
+  setTimeout(offerBack,0);   // sales item 189: a page the phone reloaded during the call still asks
   render();
 }
 function signedOut(){$('main').innerHTML=`<div class="center"><h2>Sign in to see your prospects.</h2><p style="margin-top:18px"><a class="link" href="/studio.html">Sign in →</a></p></div>`;}
