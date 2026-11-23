@@ -286,6 +286,7 @@ const MEMBER_WRITES: Array<[MemberWriteNeed, string[]]> = [
     `POST /sales/invoices/${ID}/not-paid`,   // sales item 172: "Not received" puts the reminders back
     `POST /sales/deals/${ID}/costs`, `PATCH /sales/costs/${ID}`,   // sales item 176: a cost paid for a customer
     'POST /sales/statement/email',   // sales item 171: emailing a customer their statement
+    'POST /sales/documents/remind',   // sales item 180: re-sending a client's link, once, like an invoice reminder
     `POST /sales/contracts/${ID}/(term|send)`,
     `POST /sales/proposals/${ID}/(send|revise)`,
     'POST /projects',

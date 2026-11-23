@@ -90,6 +90,8 @@
   Cache-Control: no-cache, must-revalidate
 /invoices
   Cache-Control: no-cache, must-revalidate
+/documents
+  Cache-Control: no-cache, must-revalidate
 /recently-deleted
   Cache-Control: no-cache, must-revalidate
 /pitch

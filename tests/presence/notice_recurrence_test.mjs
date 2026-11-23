@@ -112,6 +112,9 @@ const TERMINAL_OK = [
   { kind: 'approval_overdue', marker: 'approvalOverduePeriod(', why: 'one row per approval (audit change 8); deciding THAT approval is terminal — a re-request mints a new approval id' },
   // sales review item 47
   { kind: 'deal_signed', marker: 'estimate:', why: 'estimate:<deal>:<estimate> — an estimate is approved once; turning THAT estimate into a proposal or an invoice is terminal, and a new estimate mints a new id' },
+  // sales item 179: an Extra work estimate to price (one per change request) and its approval (one per estimate)
+  { kind: 'deal_followup', marker: 'extrawork:', why: 'extrawork:<approval> — a change request beyond the included rounds is answered once; a new request mints a new id' },
+  { kind: 'deal_followup', marker: 'extradone:', why: 'extradone:<estimate> — an Extra work estimate is approved once; its to-do and draft invoice are made once' },
   { kind: 'deal_followup', marker: 'estdeclined:', why: 'estdeclined:<deal>:<estimate> — an estimate gets one answer; a fresh estimate mints a new id' },
   { kind: 'deal_followup', marker: 'pausePeriod(', why: 'recurpause:<deal>:<schedule>:<date> — one row per send date that could not go out; resuming clears it, and a later pause is on a later date' },
   // sales item 87: the recipes, each a silent ledger row that gates ONE email

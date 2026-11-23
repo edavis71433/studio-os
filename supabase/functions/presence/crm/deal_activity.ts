@@ -126,6 +126,9 @@ export function dealChanges(before: Record<string, unknown>, patch: Record<strin
 }
 /** One change line in words. `year` is the line's own year, so a date in it reads "Nov 3". Pure. */
 export function dealChangeLine(d: any, year?: string): string {
+  // sales items 180, 179: what Studio OS did with the deal's documents
+  if (d?.change === 'reminded') return `Reminder sent for the ${d.what === 'contract' ? 'agreement' : String(d.what || 'document')}`;
+  if (d?.change === 'extra_work') return 'Extra work estimate drafted' + (d.title ? ': ' + String(d.title) : '');
   if (d?.change === 'step_done') return 'Done: ' + String(d.step || 'the next step');
   if (d?.change === 'value') {
     const from = usd(d.from), to = usd(d.to);

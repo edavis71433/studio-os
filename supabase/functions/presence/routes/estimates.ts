@@ -77,7 +77,7 @@ export async function estimateLink(siteId: string, id: string): Promise<string |
 
 /** "Your estimate from <studio>" — to the deal's contact, on the studio's brand.
  *  Best-effort: false when the deal has no contact email. */
-async function emailEstimate(siteId: string, dealId: string, url: string | null, totalCents: number): Promise<boolean> {
+export async function emailEstimate(siteId: string, dealId: string, url: string | null, totalCents: number): Promise<boolean> {
   if (!url) return false;
   try {
     const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];
@@ -207,6 +207,8 @@ export async function handleEstimateDecide(req: Request, id: string, cors: Recor
       if (decision === 'approved' && fromWas === 'declined') await clearNotice(st.client_id, 'deal_followup', `estdeclined:${dealId}:${id}`);   // item 183: the Not now line is over
     }
   } catch { /* the answer stands; the deal history has it */ }
+  // sales item 179: an approved Extra work estimate adds the to-do and the draft invoice, once
+  if (decision === 'approved') await extraWorkApproved(tok.site_id, id).catch(() => {});
   return json({ data: { status: decision } }, 200, cors);
 }
 
@@ -264,6 +266,41 @@ export async function handleEstimateRevise(req: Request, site: SiteRow, principa
   // the new one's trail, so a missed mark can't let the old link be approved
   await svc(`presence_estimates?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ line_items: packLineItems(prior.items, { ...prior.meta, superseded_by: row.id }) }) }).catch(() => {});
   return json({ data: { ...row, total_cents: totalOf(row) }, revised_from: id, version }, 201, cors);
+}
+
+// ═══ EXTRA WORK (sales item 179) ═══
+// A change request past the deal's included rounds becomes an estimate marked "Extra work": a
+// draft on the deal titled for what they asked to change, one line with their words at $0 for
+// the studio to price, the request kept in its notes. One per request (approval_id is unique).
+export async function draftExtraWork(siteId: string, deal: { id: string; title?: string }, projectId: string, approval: { id: string; title?: string }, note: string): Promise<string | null> {
+  const had = rows(await svc(`presence_estimates?approval_id=eq.${approval.id}&site_id=eq.${siteId}&deleted_at=is.null&select=id&limit=1`))[0];
+  if (had) return String(had.id);
+  const title = `Extra work: ${clean(approval.title, 150) || 'the changes they asked for'}`;
+  const ins = await svc('presence_estimates', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ site_id: siteId, deal_id: deal.id, title, line_items: [{ label: clean(note, 200) || 'The changes they asked for', qty: 1, unit_cents: 0 }], subtotal_cents: 0, currency: 'usd',
+      terms: note ? `What they asked for: ${clean(note, 1000)}` : '', status: 'draft', extra_work: true, approval_id: approval.id, project_id: projectId, created_by: 'client-request' }) });
+  const row = rows(ins)[0];
+  if (!ins.ok || !row) return null;   // a second request that raced this one made it (the unique index)
+  await dealEvent(siteId, deal.id, 'note', ANSWER_SYS, { detail: { change: 'extra_work', title, estimate_id: row.id } });
+  try {
+    const st = rows(await svc(`presence_sites?id=eq.${siteId}&select=client_id&limit=1`))[0];
+    if (st?.client_id) await raiseNotice({ siteId, clientId: st.client_id, kind: 'deal_followup', period: `extrawork:${approval.id}`, headline: `Extra work to price — ${deal.title || 'a deal'}`, body: 'They asked for changes beyond the rounds included. An Extra work estimate is drafted on the deal with their words: price it and send it. Nothing reaches them until you do.' });
+  } catch { /* the estimate is on the deal either way */ }
+  return String(row.id);
+}
+/** Once an Extra work estimate is approved: a to-do on the project and a draft invoice (the
+ *  estimate's own Bill it as an invoice, which makes one once and never sends it). */
+export async function extraWorkApproved(siteId: string, estId: string): Promise<void> {
+  const e = rows(await svc(`presence_estimates?id=eq.${estId}&site_id=eq.${siteId}&select=id,deal_id,title,line_items,status,extra_work,project_id&limit=1`))[0];
+  if (!e || !e.extra_work || e.status !== 'approved') return;
+  if (UUID_RE.test(String(e.project_id || ''))) {
+    const source = `extra_work:${estId}`;
+    const has = rows(await svc(`presence_tasks?project_id=eq.${e.project_id}&site_id=eq.${siteId}&source=eq.${encodeURIComponent(source)}&deleted_at=is.null&select=id&limit=1`))[0];
+    if (!has) await svc('presence_tasks', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ site_id: siteId, project_id: e.project_id, title: String(e.title || 'Extra work').slice(0, 200), status: 'todo', priority: 'normal', client_visible: false, source }) }).catch(() => {});
+  }
+  const st = rows(await svc(`presence_sites?id=eq.${siteId}&select=id,client_id&limit=1`))[0];
+  await handleEstimateToInvoice(new Request('https://estimate.local/'), { id: siteId, client_id: st?.client_id || null } as SiteRow, ANSWER_SYS, estId, {}).catch(() => null);
+  if (st?.client_id) await raiseNotice({ siteId, clientId: st.client_id, kind: 'deal_followup', period: `extradone:${estId}`, headline: `Extra work approved — ${String(e.title || '').replace(/^Extra work: /, '')} (${usd(totalOf(e))})`, body: 'They approved it. A to-do is on the project and a draft invoice is ready: press Send on it when the work is done.' }).catch(() => false);
 }
 
 // ═══ REMOVE A DRAFT ═══

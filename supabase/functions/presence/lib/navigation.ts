@@ -268,6 +268,10 @@ export function buildNav(c: NavContext): NavSection[] {
   if (f.hasRelationship) sections.push({ key: 'invoices', label: 'Invoices', items: [
     { key: 'invoices', label: 'Invoices', href: '/invoices.html', desc: 'Every invoice you have sent: what is owed to you, what is overdue, what is paid (billing, money).' },
   ] });
+  // Documents — sales item 180 (Nov 22 2026 review): every proposal, estimate and agreement in one list.
+  if (f.hasRelationship) sections.push({ key: 'documents', label: 'Documents', items: [
+    { key: 'documents', label: 'Documents', href: '/documents.html', desc: 'Every proposal, estimate and agreement: which are still out, opened, accepted, signed or expired, with Remind.' },
+  ] });
 
   // Prospects — the step before the pipeline (Semrush review item 112). Its own
   // section: the bar draws one visible item per section. Studio level only: the

@@ -925,6 +925,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   }
   if (route === '/sales/receivables' && method === 'GET') return handleSalesReceivables(req, site, principal, cors);
   if (route === '/sales/invoices' && method === 'GET') return (await import('./routes/invoices_list.ts')).handleSalesInvoicesList(req, site, cors);   // sales item 85: the Invoices page
+  // sales item 180: the Documents page (every proposal, estimate and agreement) and its Remind, once per document
+  if (route === '/sales/documents' && method === 'GET') return (await import('./routes/documents_list.ts')).handleDocumentsList(req, site, cors);
+  if (route === '/sales/documents/remind' && method === 'POST') return (await import('./routes/documents_list.ts')).handleDocumentRemind(req, site, principal, cors);
   if (route === '/sales/money-home' && method === 'GET') return (await import('./routes/money_home.ts')).handleMoneyHome(req, site, principal, cors);   // sales item 173: the money wall's months and Stripe strip
   if (route === '/sales/deals') return handleSalesDeals(req, site, principal, cors);
   if (route === '/sales/deleted' && method === 'GET') return handleSalesDeleted(site, cors, principal);   // sales item 83: Recently deleted (item 186: your removed logs too)

@@ -205,6 +205,7 @@ const DECIDED = {
     'PATCH /sales/contacts/:id', 'PATCH /sales/deal-tasks/:id', 'PATCH /sales/deals/:id', 'PATCH /support/:id',
     'PATCH /sales/invoices/:id', 'POST /sales/invoices/:id/remind',   // sales items 162, 166: changing an unpaid invoice and a reminder now are everyday bookkeeping, like sending it
     'POST /sales/invoices/:id/not-paid', 'POST /sales/deals/:id/costs', 'PATCH /sales/costs/:id', 'POST /sales/statement/email',   // sales items 172, 176, 171
+    'POST /sales/documents/remind',   // sales item 180: re-sending a client's link, once
     'POST /visibility/check', 'PUT /visibility/follow', 'PUT /visibility/phrases', 'PUT /site/usable', 'PUT /visibility/ai/questions', 'POST /approve/send', 'POST /assets/:id/duplicate', 'POST /assets/:id/remove-background', 'POST /assets/:id/cutout',
     'POST /assets/:id/replace', 'POST /assets/:id/rollback', 'POST /assets/:id/suggest', 'POST /assets/bulk', 'POST /assets/folders/move',
     'POST /assets/:id/put-back',   // builder list item 218: taking a file out of the Trash deletes nothing
@@ -536,6 +537,7 @@ const WRITE_HANDLERS = [
   'handleInvoicePayment', 'handleInvoicePaymentUndo',   // sales review item 77 (see DECIDED.edit and .delete)
   'handleInvoiceEdit', 'handleInvoiceRemindNow', 'handleInvoiceMoneyBack',   // sales items 162, 166, 165 (see DECIDED.edit and .delete)
   'handleInvoiceNotPaid', 'handleDealCosts', 'handleCost', 'handleStatementEmail',   // sales items 172, 176, 171 (handleSaidPaid is public, under the invoice's own token, so it never meets the gate)
+  'handleDocumentRemind',   // sales item 180 (see DECIDED.edit)
   'handleSalesRetainerCardLink', 'handleClientRetainerCard',   // sales item 129 (see DECIDED.edit)
   // sales review item 112: prospects (DELETE and PATCH /sales/prospects/:id share handleProspect)
   'handleProspects', 'handleProspect', 'handleProspectDiscover', 'handleProspectConvert', 'handleProspectDraft', 'handleProspectPack',

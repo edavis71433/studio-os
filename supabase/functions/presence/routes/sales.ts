@@ -69,6 +69,7 @@ import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { teamOf, isMine, mineFilter, ownerToSet, type Team } from '../lib/team_owner.ts';   // item 37: owners and Mine
 import { readCloseDates } from '../lib/deal_closes.ts';
+import { cleanRounds, roundsUsed, roundsLine } from '../lib/revision_rounds.ts';   // sales item 179
 import { reopenEnquiry } from '../lib/enquiry_state.ts';
 import { normEmail, emailMatch, isUniqueViolation } from '../lib/contact_email.ts';   // item 110 (K1): one person, one email, whatever its capitals
 import { contactMoreFrom, cleanTag, CONTACT_MORE_COLS } from '../lib/contact_fields.ts';   // item 89: address, job title, second phone, tags
@@ -142,7 +143,7 @@ export async function verifySalesToken(token: string, secret: string, nowSec: nu
  *  this same URL, so the client only ever holds one link. 30 days, like the
  *  per-document links before it. Null when no signing secret is configured. */
 const FLOW_TTL_SEC = 30 * 86400;
-async function flowLink(siteId: string, dealId: string): Promise<string | null> {
+export async function flowLink(siteId: string, dealId: string): Promise<string | null> {
   const secret = linkSecret();
   if (!secret || !UUID_RE.test(dealId || '')) return null;
   const token = await signSalesToken({ t: 'flow', id: dealId, site_id: siteId, exp: Math.floor(Date.now() / 1000) + FLOW_TTL_SEC }, secret);
@@ -1426,6 +1427,13 @@ export async function moneyStillRunning(siteId: string, dealId: string, retainer
   return `This deal still has money running. ${what.charAt(0).toUpperCase() + what.slice(1)} first, then delete it.`;
 }
 
+/** Sales item 179: the client's change requests on the deal's project, each a round used. */
+export async function projectRoundsUsed(siteId: string, deal: { id?: unknown; created_project_id?: unknown }): Promise<number> {
+  let pid = UUID_RE.test(String(deal?.created_project_id || '')) ? String(deal.created_project_id) : '';
+  if (!pid && UUID_RE.test(String(deal?.id || ''))) pid = String(rows(await svc(`presence_projects?deal_id=eq.${deal.id}&site_id=eq.${siteId}&deleted_at=is.null&select=id&limit=1`).catch(() => ({ json: [] })))[0]?.id || '');
+  if (!UUID_RE.test(pid)) return 0;
+  return roundsUsed(rows(await svc(`presence_approvals?project_id=eq.${pid}&site_id=eq.${siteId}&status=eq.changes_requested&client_visible=is.true&deleted_at=is.null&select=status&limit=200`).catch(() => ({ json: [] }))));
+}
 export async function loadDeal(siteId: string, id: string) {
   const r = await svc(`presence_deals?id=eq.${id}&site_id=eq.${siteId}&deleted_at=is.null&select=*&limit=1`);
   return rows(r)[0] || null;
@@ -1488,7 +1496,10 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     const retainer_paid = (paidEvents as any)?.ok ? retainerPaid(rows(paidEvents as any)) : null;
     // sales item 191: the read holds the newest 80 lines; history_before is where "Show older" starts (GET /sales/deals/:id/history)
     const historyBefore = eventRows.length >= 80 ? String(eventRows[eventRows.length - 1].created_at || '') || null : null;
-    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: proposalRows, contracts: rows(contracts), events: eventRows, timeline, history_before: historyBefore, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows, estimates, recurring, retainer_paid, returns: returned } }, 200, cors);
+    // sales item 179: rounds of changes, counted on the deal's project (null when the deal doesn't count them)
+    const rounds = deal.revision_rounds === null || deal.revision_rounds === undefined ? null : (() => ({ included: Number(deal.revision_rounds), used: 0 }))();
+    if (rounds) { rounds.used = await projectRoundsUsed(site.id, deal); (rounds as any).line = roundsLine(rounds); }
+    return json({ data: { deal, contact: rows(contact)[0] || null, proposals: proposalRows, contracts: rows(contracts), events: eventRows, timeline, history_before: historyBefore, rounds, last_contacted_at: lastContactedAt(eventRows), invoices: invoiceRows, estimates, recurring, retainer_paid, returns: returned } }, 200, cors);
   }
   if (req.method === 'PATCH') {
     let b: any = {}; try { b = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
@@ -1500,6 +1511,11 @@ export async function handleSalesDeal(req: Request, site: SiteRow, principal: Pr
     // item 37: the owner can be changed on the deal, to someone on the team (empty = the business owner)
     if (b.assigned_to !== undefined) { const o = ownerToSet(await teamOf(principal), b.assigned_to); if (!o.ok) return json({ error: 'validation', message: 'That person isn’t on your team.' }, 422, cors); patch.assigned_to = o.value; }
     if (b.found_via !== undefined) patch.found_via = normalizeFoundVia(b.found_via);   // item 69: "How did they find you?"
+    if (b.revision_rounds !== undefined) {   // sales item 179: rounds of changes included (empty = not counted)
+      const rr = cleanRounds(b.revision_rounds);
+      if (!rr.ok) return json({ error: 'validation', message: 'Rounds of changes must be a whole number from 0 to 20, or left empty.' }, 422, cors);
+      patch.revision_rounds = rr.value;
+    }
     // The deal's CONTACT is editable AFTER creation. Both the name and the email
     // are optional on the create form, so a deal can start with contact_id null —
     // and a null contact is exactly why emailSalesDoc/emailInvoice return false,
@@ -1910,7 +1926,7 @@ export async function handleSalesProposalRevise(req: Request, site: SiteRow, pri
  *  the STUDIO's brand (never the platform name — secrecy rule). Best-effort: it
  *  never blocks the send; the link is still returned for manual sharing, and it
  *  no-ops cleanly when the contact has no email or email isn't configured. */
-async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'proposal' | 'contract', url: string | null): Promise<boolean> {
+export async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'proposal' | 'contract', url: string | null): Promise<boolean> {
   if (!url || !dealId) return false;
   try {
     const deal = rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${siteId}&select=contact_id&limit=1`))[0];

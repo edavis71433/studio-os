@@ -3654,6 +3654,9 @@ async function openDeal(id){
           <input id="ed-close" type="date" value="${esc(d.expected_close||'')}" style="padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
           <label class="mut" for="ed-found" style="display:block;margin-top:8px">How did they find you?</label>
           <select id="ed-found" class="dds-pick">${foundOpts(d.found_via)}</select>
+          <label class="mut" for="ed-rounds" style="display:block;margin-top:8px">Rounds of changes included</label>
+          <input id="ed-rounds" type="number" min="0" max="20" step="1" inputmode="numeric" value="${d.revision_rounds!=null?esc(String(d.revision_rounds)):''}" placeholder="Not counted" style="width:160px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
+          <div class="mut" id="ed-rounds-line" style="font-size:12px;margin-top:2px">${data.rounds&&data.rounds.line?esc(data.rounds.line)+'. ':''}Your agreement says how many. Each Request changes in their portal uses one; past the last, a request becomes an Extra work estimate to price.</div>
           <label class="mut" for="ed-next" style="display:block;margin-top:8px">Next step</label>
           <div class="row2"><input type="text" id="ed-next" placeholder="e.g. Call Friday about the proposal" value="${esc(d.next_step||'')}" style="flex:1"><input type="date" id="ed-nextat" value="${esc(d.next_step_at||'')}" style="max-width:160px" aria-label="Next step date"></div>
           <label class="mut" for="ed-notes-${d.id}" style="display:block;margin-top:8px">Notes</label>
@@ -3862,7 +3865,7 @@ async function openDeal(id){
       await link(cid);
       return nc.deduped?dedupeNote(nc.data,cn,ce):null;
     };
-    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const cnote=await saveContactPart();const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),found_via:$('ed-found')?$('ed-found').value:undefined,next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast(cnote||'Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
+    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const cnote=await saveContactPart();const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),found_via:$('ed-found')?$('ed-found').value:undefined,revision_rounds:$('ed-rounds')?($('ed-rounds').value.trim()===''?null:Number($('ed-rounds').value)):undefined,next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast(cnote||'Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
     // first-class deal to-dos (#203)
     loadDealTasks(id);
     wireTodoLists(id);   // sales item 106: saved lists of to-dos
