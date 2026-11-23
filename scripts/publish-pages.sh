@@ -49,7 +49,13 @@ files=$(find "$WORK/dist" -type f | wc -l | tr -d ' ')
 code=$(curl -sS -o "$WORK/deploy.json" -w '%{http_code}' --max-time 300 -X POST \
   -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" -H 'Content-Type: application/zip' \
   --data-binary "@$WORK/site.zip" "$API/sites/$NETLIFY_SITE_ID/deploys") || code=000
-case "$code" in 200|201) ;; *) fail "Netlify refused the upload (HTTP $code). The server is live; the pages are still the previous ones." ;; esac
+case "$code" in
+  200|201) ;;
+  # Netlify answers 404 (or 401, 403) when the token's login can't see the site: Nov 23 2026,
+  # the first try used a token from a second Netlify login.
+  401|403|404) fail "Netlify refused the upload (HTTP $code): the token's Netlify login can't see this site (NETLIFY_SITE_ID). Make NETLIFY_AUTH_TOKEN while signed in to the Netlify login that owns the app's site (docs/RUN-SHEET.md, \"Pages\"). The server is live; the pages are still the previous ones." ;;
+  *) fail "Netlify refused the upload (HTTP $code). The server is live; the pages are still the previous ones." ;;
+esac
 id=$(jq -r '.id // empty' "$WORK/deploy.json")
 [ -n "$id" ] || fail "Netlify's answer named no deploy."
 echo "Pages: uploaded $files files of ${SHA:0:8} as Netlify deploy $id."

@@ -230,6 +230,7 @@ const DECIDED = {
     'POST /sales/customers/:id/restore', 'POST /sales/customers/:id/invite', 'POST /sales/customers/:id/website',   // builder list item 241: a deleted customer back; their portal invite, like a deal's resend-invite; a site they keep elsewhere
     'POST /sales/customers', 'POST /sales/deals', 'POST /sales/deals/:id/activity',
     'POST /sales/tasks', 'POST /sales/people/activity',   // sales items 85 and 106: to-dos and calls for anyone
+    'PATCH /sales/logs/:id',   // sales item 186: correct or remove a call, email, meeting or note you logged
     'POST /sales/email',   // sales item 80: an email from the record, like the reply to an enquiry
     'POST /handover/notify',   // sales item 93: the hand-over pack email (only a studio scoped in gets past the route)
     'POST /sales/ai/draft', 'POST /sales/ai/summary',   // sales item 94: a draft only fills the box; a summary is kept on the record
@@ -560,6 +561,7 @@ const WRITE_HANDLERS = [
   'handleSetupStrip',   // sales item 105: POST hides Home's setup strip (configure)
   'handleHandoverPack',   // sales item 93: POST /handover/notify (edit; the route refuses anyone but the studio)
   'handleGoalAi', 'handleAiDraft', 'handleAiSummary',   // sales item 94: PUT /sales/goal-ai (configure; the switch is the owner's), POST /sales/ai/(draft|summary) (edit)
+  'handleSalesLog',   // sales item 186: PATCH /sales/logs/:id (edit; only the person who logged it can)
 ];
 {
   const idx = read('supabase/functions/presence/index.ts');

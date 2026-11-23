@@ -102,7 +102,7 @@ const world = () => ({
 // ═══ 4. routes, roles, the delete itself ═══
 {
   const idx = read('supabase/functions/presence/index.ts'), pipe = read('pipeline.html');
-  ok('index: GET /sales/deleted and POST /sales/deals/:id/restore are routed', idx.includes("if (route === '/sales/deleted' && method === 'GET') return handleSalesDeleted(site, cors);") && idx.includes("if (m && method === 'POST') return handleSalesRestoreDeal(site, m[1], cors);"));
+  ok('index: GET /sales/deleted and POST /sales/deals/:id/restore are routed', idx.includes("if (route === '/sales/deleted' && method === 'GET') return handleSalesDeleted(site, cors, principal);") && idx.includes("if (m && method === 'POST') return handleSalesRestoreDeal(site, m[1], cors);"));
   const ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   eq('roles: bringing a deal back is an edit, like a contact; deleting one stays delete', [R.memberWriteNeeds(`/sales/deals/${ID}/restore`, 'POST'), R.memberWriteNeeds(`/sales/contacts/${ID}/restore`, 'POST'), R.memberWriteNeeds(`/sales/deals/${ID}`, 'DELETE')], ['edit', 'edit', 'delete']);
   ok('Pipeline: deleting a deal asks in place (not a pop-up) and says it can come back', pipe.includes("k.confirmIn(delDeal,{text:q,yes:'Yes, delete it'})") && pipe.includes('You can bring it back from Recently deleted for 30 days.'));

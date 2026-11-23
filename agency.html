@@ -1242,7 +1242,7 @@ function pipelineStripHtml(s,deals){
 let MYTASKS=null,MYT_ALL=false;
 const MYT_SHOW=6;
 function myTaskDoneReq(t){
-  if(t.kind==='next_step')return['PATCH','/sales/deals/'+encodeURIComponent(t.id),{next_step:'',next_step_at:''}];
+  if(t.kind==='next_step')return['PATCH','/sales/deals/'+encodeURIComponent(t.id),{next_step:'',next_step_at:'',step_done:true}];   // sales item 191: a line in the deal's history
   if(t.kind==='deal_task')return['PATCH','/sales/deal-tasks/'+encodeURIComponent(t.id),{status:'done'}];
   return['PATCH','/projects/'+encodeURIComponent(t.parent_id)+'/tasks/'+encodeURIComponent(t.id),{status:'done'}];
 }
@@ -1482,7 +1482,7 @@ function doneOf(r){
   if(c&&c.kind==='enquiry'&&ids.length)return{title:'Marks it read. It stays in the Inbox.',run:()=>Promise.all(ids.map(id=>apiSend('POST','/forms/inbox/'+encodeURIComponent(id),{status:'read'},c.site_id||'')))};
   if(c&&c.kind==='support'&&ids.length)return{title:'Closes the request. It stays in the Inbox.',run:()=>Promise.all(ids.map(id=>apiSend('PATCH','/support/'+encodeURIComponent(id),{status:'closed'})))};
   let m=/^deal:([0-9a-f-]{36})$/i.exec(r.key||'');
-  if(m)return{title:'Marks the next step done.',run:()=>apiSend('PATCH','/sales/deals/'+encodeURIComponent(m[1]),{next_step:'',next_step_at:''})};
+  if(m)return{title:'Marks the next step done.',run:()=>apiSend('PATCH','/sales/deals/'+encodeURIComponent(m[1]),{next_step:'',next_step_at:'',step_done:true})};
   m=/^notice:([0-9a-f-]{36})$/i.exec(r.key||'');
   if(m)return{title:'Clears it from your list.',run:()=>apiSend('POST','/commerce/notices/dismiss',{id:m[1]})};
   return null;

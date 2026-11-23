@@ -62,7 +62,7 @@ const sales = read('supabase/functions/presence/routes/sales.ts');
 ok('it reads only the signed-in site\'s rows', (sales.match(/export async function loadMyTasks[\s\S]*?\n}\n/) || [''])[0].split('site_id=eq.${siteId}').length - 1 === 6 && /loadMyTasks\(site\.id, principal\.userId \|\| null(, await teamOf\(principal\))?\)/.test(sales));   // item 37: and the caller's team, for Mine
 ok('a failed read says partial, never a false empty list', /if \(!r\.ok\) \{ partial = true; return \[\]; \}/.test(sales) && /items: all\.slice\(0, MY_TASKS_MAX\), total: all\.length, now: all\.filter\(\(t\) => !t\.later\)\.length, partial/.test(sales));
 const home = read('agency.html');
-ok('Done uses the route that owns each kind', /if\(t\.kind==='next_step'\)return\['PATCH','\/sales\/deals\/'\+encodeURIComponent\(t\.id\),\{next_step:'',next_step_at:''\}\];/.test(home)
+ok('Done uses the route that owns each kind', /if\(t\.kind==='next_step'\)return\['PATCH','\/sales\/deals\/'\+encodeURIComponent\(t\.id\),\{next_step:'',next_step_at:'',step_done:true\}\];/.test(home)
   && /if\(t\.kind==='deal_task'\)return\['PATCH','\/sales\/deal-tasks\/'\+encodeURIComponent\(t\.id\),\{status:'done'\}\];/.test(home)
   && /return\['PATCH','\/projects\/'\+encodeURIComponent\(t\.parent_id\)\+'\/tasks\/'\+encodeURIComponent\(t\.id\),\{status:'done'\}\];/.test(home));
 ok('an older server without the route keeps This week', /const todos=MYTASKS\?\[\]:weekTodos\(deals\);/.test(home));
