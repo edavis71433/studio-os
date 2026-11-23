@@ -1286,7 +1286,7 @@ function planCard(c){
   const card = document.createElement('div');
   card.style.cssText = 'max-width:860px;margin:16px auto 0;padding:16px 20px;border:1px solid var(--accent-soft);border-radius:14px;background:var(--card);font-size:14px;color:var(--soft)';
   const own = document.createElement('div');
-  own.innerHTML = '<strong>Your plan: ' + esc(c.edition_name) + '.</strong> Everything you see here is included.';
+  own.innerHTML = '<strong>Your plan: ' + esc(('plan_words' in c && c.plan_words) || c.edition_name) + '.</strong> Everything you see here is included.';   // item 426: Sites' words
   card.appendChild(own);
   if(c.upsell && c.upsell.name){
     const up = document.createElement('div');

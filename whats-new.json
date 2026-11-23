@@ -1,6 +1,46 @@
 {
-  "about": "What's new (builder list item 128). One entry per change, written once: what changed for the reader, not how it was built. `who` says who reads it: studio (a studio, every entry), owner (a business running its own site), client (a client in the portal, in the entry's `client` words, which never name Studio OS or show studio screens). Pictures are taken on sample data, never a client's site, by scripts/whats-new/shoot.spec.ts (WHATS_NEW_SHOOT=1 npx playwright test -c scripts/whats-new/playwright.config.ts). Newest first; the panel groups them by week.",
+  "about": "What's new (builder list item 128). One entry per change, written once: what changed for the reader, not how it was built. `who` says who reads it: studio (a studio, every entry), owner (a business running its own site), client (a client in the portal, in the entry's `client` words, which never name Studio OS or show studio screens). Add the week's entries every Monday (builder item 429); a picture is optional, for the bigger changes. Pictures are taken on sample data, never a client's site, by scripts/whats-new/shoot.spec.ts (WHATS_NEW_SHOOT=1 npx playwright test -c scripts/whats-new/playwright.config.ts). Newest first; the panel groups them by week.",
   "entries": [
+    {
+      "id": "portal-website-first",
+      "date": "2026-11-22",
+      "who": ["studio"],
+      "title": "Your clients’ portal opens on their website",
+      "sentence": "A client’s portal now leads with their own website, and anything waiting for their OK sits in one card just below it.",
+      "show": "/presence.html#clientview"
+    },
+    {
+      "id": "invoices-page",
+      "date": "2026-11-22",
+      "who": ["studio"],
+      "title": "Invoices has a page of its own",
+      "sentence": "What’s owed, what’s late, money in by month and who owes most, on one page. An unpaid invoice can now be changed, and it keeps its number.",
+      "show": "/invoices.html"
+    },
+    {
+      "id": "editor-every-page",
+      "date": "2026-11-22",
+      "who": ["studio", "owner"],
+      "title": "Every page of a site on the editing screen",
+      "sentence": "Move between pages without leaving the canvas, edit list items as cards, add several photos at once, and undo page by page.",
+      "show": "/presence.html#design"
+    },
+    {
+      "id": "site-phone-menu",
+      "date": "2026-11-22",
+      "who": ["studio", "owner"],
+      "title": "A phone menu and photo bands on published sites",
+      "sentence": "On a phone, every template now opens a proper menu, and a section can sit on a photo with its words over it.",
+      "show": "/presence.html#design"
+    },
+    {
+      "id": "faster-pages",
+      "date": "2026-11-22",
+      "who": ["studio"],
+      "title": "Pages open faster",
+      "sentence": "The server does less work for each page, and the fonts load first, so Home, Sites and the busiest lists open sooner.",
+      "show": "/agency.html"
+    },
     {
       "id": "blog",
       "date": "2026-11-12",

@@ -1,8 +1,8 @@
 /* What's new (builder list item 128, Nov 2026).
- * Each week's changes to the tools, a picture and a sentence each, newest first, with
- * Show me to go straight there. The entries live in /whats-new.json: each is written once,
- * with a picture taken on sample data, never a client's site, and says what changed for
- * the reader, not how it was built.
+ * Each week's changes to the tools, a sentence each (and a picture for the bigger ones,
+ * builder item 429), newest first, with Show me to go straight there. The entries live in
+ * /whats-new.json: each is written once, any picture taken on sample data, never a client's
+ * site, and says what changed for the reader, not how it was built.
  *
  * Who sees what: a studio sees every entry; a business that runs its own site sees the
  * entries that touch a website; a client in the portal sees only the entries written for
@@ -44,8 +44,8 @@
 @media (prefers-reduced-motion:no-preference){.wn{animation:wn-in .18s ease-out}@keyframes wn-in{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}}
 `;
   const WORDS = {
-    studio: { title: "What’s new", sub: "Changes to your tools, a picture and a sentence each. New ones every week." },
-    owner: { title: "What’s new", sub: "Changes to your tools, a picture and a sentence each. New ones every week." },
+    studio: { title: "What’s new", sub: "Changes to your tools, newest first. New ones every week." },   // item 429: not every entry has a picture
+    owner: { title: "What’s new", sub: "Changes to your tools, newest first. New ones every week." },
     client: { title: "New in your portal", sub: "What changed lately, a picture and a sentence each." },
   };
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);

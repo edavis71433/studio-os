@@ -27,7 +27,7 @@ import { noticeDismissible } from '../lib/inbox_feed.ts';
 import { resolveSite } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import {
-  PLANS, planByKey, isPlanKey, isTerm, displayPrice, grantFounder, editionFor, FOUNDERS_OPEN,
+  PLANS, planByKey, isPlanKey, isTerm, displayPrice, grantFounder, editionFor, FOUNDERS_OPEN, planWords,
 } from '../commerce/catalog.ts';
 import { supportFor } from '../commerce/support.ts';
 import { sendEmail } from '../commerce/account.ts';
@@ -109,7 +109,7 @@ async function handleSubscription(jwt: string, cors: Record<string, string>) {
   const open = del && del.ok && Array.isArray(del.json) ? (del.json[0] || null) : undefined;
   return json({ data: {
     billing_type: 'saas',   // this is the Studio OS SOFTWARE subscription (distinct from agency service invoices)
-    plan: ent.plan, plan_name: def?.name || ent.plan, status: ent.status, term: ent.term,
+    plan: ent.plan, plan_name: planWords(ent.plan) || def?.name || ent.plan, status: ent.status, term: ent.term,   // item 426: the Sites words ("Website + tools"), never the catalog's "Presence"
     founder: ent.founder === true, trial_ends_at: ent.trial_ends_at, current_period_end: ent.current_period_end,
     cancel_at_period_end: ent.cancel_at_period_end === true, in_grace: !!ent.grace_until, grace_until: ent.grace_until,
     can_manage_billing: !!ent.plan && (def?.selfServe ?? false),

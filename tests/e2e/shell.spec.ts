@@ -261,42 +261,24 @@ test.describe('App shell', () => {
 
 // ── Slice 7 — the Lightning context bar ──────────────────────────────────────
 test.describe('Context bar (slice 7)', () => {
-  test('the sidebar’s Menu opens the full destination list, Escape/outside click close it', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'mobile', 'desktop popover behaviour; mobile covered below');
+  // builder item 428: the sidebar's Menu listed the same places again; beside the sidebar there is none
+  test('beside the sidebar there is no Menu button: the sidebar is the whole list', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'the sidebar shows ≥761px; the phone’s Menu is covered below');
     await installApp(page);
     await page.goto('/today.html');
-    const waffle = page.locator('#dds-waffle');
-    await expect(waffle).toBeVisible();
-    await expect(waffle).toHaveAttribute('aria-expanded', 'false');
-    await waffle.click();
-    const panel = page.locator('#dds-drawer');
-    await expect(panel).toBeVisible();
-    await expect(waffle).toHaveAttribute('aria-expanded', 'true');
-    // EVERY drawn destination is reachable here — primary AND utility — each a
-    // real LINK; the ⌘K-only entries (hidden) follow the menu's lists and stay out
-    await expect(panel.locator('.g a')).toHaveText(['Today', 'Website', 'Customers', 'Pipeline', 'Projects', 'Inbox', 'Files', 'Analytics', 'Settings']);
+    await expect(page.locator('.dds-nav')).toBeVisible();
+    await expect(page.locator('#dds-waffle')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Menu', exact: true })).toHaveCount(0);
+    // every place the Menu listed is right there in the sidebar, each a real link
+    await expect(page.locator('.dds-nav .sec > .it .lbl')).toHaveText(['Today', 'Website', 'Customers', 'Pipeline', 'Projects', 'Inbox', 'Files', 'Analytics', 'Settings']);
     for (const label of ['Today', 'Website', 'Customers', 'Pipeline', 'Projects', 'Inbox', 'Files', 'Analytics', 'Settings']) {
-      await expect(panel.getByRole('link', { name: label, exact: true })).toHaveAttribute('href', /.+/);
+      await expect(page.locator('.dds-nav').getByRole('link', { name: label, exact: true })).toHaveAttribute('href', /.+/);
     }
-    for (const gone of ['Business info', 'Design', 'Publish', 'History', 'Visual Studio', 'Contacts', 'Broadcasts', 'Connections', 'Help']) {
-      await expect(panel).not.toContainText(gone);
-    }
-    await expect(panel.locator('.g .t')).toHaveCount(0);   // one item of the same name needs no heading over it
-    // slice-2 popup contract: Escape closes and returns focus to the trigger
-    await page.keyboard.press('Escape');
-    await expect(panel).toBeHidden();
-    await expect(waffle).toBeFocused();
-    await expect(waffle).toHaveAttribute('aria-expanded', 'false');
-    // outside click closes too (a click anywhere that isn't the panel/trigger)
-    await waffle.click();
-    await expect(panel).toBeVisible();
-    await page.evaluate(() => document.body.click());
-    await expect(panel).toBeHidden();
-    await expect(waffle).toHaveAttribute('aria-expanded', 'false');
   });
 
-  test('waffle panel links carry the operator drill-in scope', async ({ page }, testInfo) => {
+  test('the Menu’s links carry the operator drill-in scope', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile', 'one width is enough for href checks');
+    await page.setViewportSize({ width: 390, height: 844 });   // builder item 428: the Menu is a phone's; beside the sidebar there is none
     const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
     await installApp(page, { api: {
       '/portal/context': { data: {
@@ -307,7 +289,7 @@ test.describe('Context bar (slice 7)', () => {
       } },
     } });
     await page.goto(`/today.html?client=${CLIENT}`);
-    await page.locator('#dds-waffle').click();
+    await page.locator('#dds-mbar-menu').click();
     const inboxLink = page.locator('#dds-drawer a[href^="/inbox.html"]');
     await expect(inboxLink).toHaveAttribute('href', `/inbox.html?client=${CLIENT}`);
   });
@@ -594,26 +576,25 @@ test.describe('Context bar (slice 7)', () => {
     }).toBeNull();
   });
 
-  test('layers are mutually exclusive: opening the bell closes the Menu panel and vice versa', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'mobile', 'desktop layer behaviour');
+  // builder item 428: the Menu is the phone bar's now (beside the sidebar there is none), and its
+  // sheet covers the page while it is open, so the bell can only come first
+  test('layers are mutually exclusive: opening the Menu closes the bell', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'one width is enough');
+    await page.setViewportSize({ width: 390, height: 844 });
     await installApp(page);
     await page.goto('/today.html');
-    const waffle = page.locator('#dds-waffle');
+    const menu = page.locator('#dds-mbar-menu');
     const bell = page.locator('#dds-bell');
     const panel = page.locator('#dds-drawer');
     const bellPop = page.locator('.dds-pop[aria-label="Notifications"]');
-    await waffle.click();
-    await expect(panel).toBeVisible();
-    await bell.click();                                      // opening the bell…
-    await expect(panel).toBeHidden();                        // …closes the waffle panel
-    await expect(waffle).toHaveAttribute('aria-expanded', 'false');
+    await bell.click();
     await expect(bellPop).toBeVisible();
     await expect(bell).toHaveAttribute('aria-expanded', 'true');
-    await waffle.click();                                    // and vice versa
-    await expect(bellPop).toBeHidden();
+    await menu.click();                                      // opening the Menu…
+    await expect(bellPop).toBeHidden();                      // …closes the bell
     await expect(bell).toHaveAttribute('aria-expanded', 'false');
     await expect(panel).toBeVisible();
-    await expect(waffle).toHaveAttribute('aria-expanded', 'true');
+    await expect(menu).toHaveAttribute('aria-expanded', 'true');
   });
 
   test('mobile: the bottom bar is an owner’s Home · Website · Inbox · Menu, and Menu is the mobile nav', async ({ page }, testInfo) => {

@@ -3,7 +3,7 @@
 // Search Console's search-and-page pairs kept as 'query_page' (migration 0220); the
 // searches Google showed a site for at places 8 to 20, each with its page and one thing
 // to fix there, checked against the page's own headline; the likely reason a month's
-// visits fell; and the monthly report's Clicks to contact. No Supabase and no Google
+// visits fell; and the monthly report's phone and email taps (item 381's words). No Supabase and no Google
 // are touched: the reads run against a stubbed database.
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY' })) Deno.env.set(k, v);
 
@@ -109,10 +109,10 @@ const read = (p) => Deno.readTextFileSync(new URL(p, import.meta.url));
   eq('months: last whole month and the one before, over a new year', V.lastWholeMonths('2027-01-15T10:00:00Z'), { month: '2026-12', prior: '2026-11', label: 'December', priorLabel: 'November', startIso: '2026-12-01T00:00:00.000Z', endIso: '2027-01-01T00:00:00.000Z', priorStartIso: '2026-11-01T00:00:00.000Z' });
 }
 
-// ── 4. the monthly report: Clicks to contact, and the reason under Visits ──
+// ── 4. the monthly report: the phone and email taps (item 381: taps, never calls), and the reason under Visits ──
 {
-  eq('contact: calls and emails, with the change', [R.contactWords({ calls: 15, emails: 8, prior: 18 }, 'September'), R.contactWords({ calls: 1, emails: 0, prior: 1 }, 'September'), R.contactWords({ calls: 0, emails: 2, prior: null }, 'September'), R.contactWords({ calls: 0, emails: 0, prior: 4 }, 'September')],
-    ['15 calls and 8 emails from the site, up 5 on September', '1 call from the site, the same as September', '2 emails from the site', 'Nobody pressed a phone number or email address, down 4 on September']);
+  eq('contact: taps on the phone number and the email address, with the change', [R.contactWords({ calls: 15, emails: 8, prior: 18 }, 'September'), R.contactWords({ calls: 1, emails: 0, prior: 1 }, 'September'), R.contactWords({ calls: 0, emails: 2, prior: null }, 'September'), R.contactWords({ calls: 0, emails: 0, prior: 4 }, 'September')],
+    ['15 taps on your phone number and 8 on your email address, up 5 on September', '1 tap on your phone number, the same as September', '2 taps on your email address', 'Nobody pressed a phone number or email address, down 4 on September']);
   eq('contact: nobody this month or the one before says nothing', R.contactWords({ calls: 0, emails: 0, prior: 0 }, 'September'), null);
   const win = { month: '2026-10', label: 'October 2026', startIso: '2026-10-01T00:00:00.000Z', endIso: '2026-11-01T00:00:00.000Z' };
   const rows = [
@@ -125,18 +125,18 @@ const read = (p) => Deno.readTextFileSync(new URL(p, import.meta.url));
   eq('fold: a read that failed has no presses, never zero', R.foldReport({ month: win.month, label: win.label, startMs: 0, endMs: 1, visits: null, enquiries: null, publishes: null, address: '', visitsCap: 5000 }).contacts, null);
   const d = { ...base, priorLabel: 'September', priorVisitors: 2, contacts: { calls: 2, emails: 1, prior: 1 }, drop: { pct: 41, now: 389, was: 660, short: 'Mostly fewer Google searches for <your> name', sentence: 's', parts: [], search: null } };
   const html = R.reportHtml(d, { studioName: 'S', note: '' }).html;
-  ok('report: three tiles share the row, a third each', (html.match(/<td width="33%"/g) || []).length === 3 && /Visits.*Clicks to contact.*Enquiries/s.test(html));
-  ok('report: Clicks to contact in words, with the change', /Clicks to contact<\/div><div[^>]*>3<\/div><div[^>]*>2 calls and 1 email from the site, up 2 on September/.test(html));
+  ok('report: three tiles share the row, a third each', (html.match(/<td width="33%"/g) || []).length === 3 && /Visits.*Phone and email taps.*Enquiries/s.test(html));
+  ok('report: the taps in words, with the change', /Phone and email taps<\/div><div[^>]*>3<\/div><div[^>]*>2 taps on your phone number and 1 on your email address, up 2 on September/.test(html) && !/\bcalls?\b/.test(html));
   ok('report: the reason sits under Visits, in red, escaped', /<span style="color:#bf3535">mostly fewer Google searches for &lt;your&gt; name<\/span>/.test(html));
   const off = R.reportHtml(d, { studioName: 'S', note: '', off: ['enquiries'] }).html;
-  ok('report: it rides the Enquiries switch: off, it leaves with Enquiries, and Visits has the row', !/Clicks to contact/.test(off) && (off.match(/<td width="100%"/g) || []).length === 1);
+  ok('report: it rides the Enquiries switch: off, it leaves with Enquiries, and Visits has the row', !/Phone and email taps/.test(off) && (off.match(/<td width="100%"/g) || []).length === 1);
   const none = R.reportHtml({ ...d, contacts: { calls: 0, emails: 0, prior: 0 }, drop: null }, { studioName: 'S', note: '' }).html;
-  ok('report: nobody pressed, now or before: no tile, two halves as before', !/Clicks to contact/.test(none) && (none.match(/<td width="50%"/g) || []).length === 2);
+  ok('report: nobody pressed, now or before: no tile, two halves as before', !/Phone and email taps/.test(none) && (none.match(/<td width="50%"/g) || []).length === 2);
   const mr = read(`${P}/ops/monthly_report.ts`);
   ok('report: the month before’s presses are counted, calls and emails only', /svcCount\(`presence_visits\?site_id=eq\.\$\{site\.id\}&kind=in\.\(phone,email\)&ts=gte\.\$\{priorWin\.startIso\}&ts=lt\.\$\{win\.startIso\}`\)/.test(mr));
   ok('report: the reason uses the rows already read, unless they were cut short', /sourcesNow: visits && !vq\?\.truncated \? sourcesFromRows\(visits\) : null/.test(mr));
   const pdf = read(`${P}/lib/report_pdf.ts`);
-  ok('pdf: a Clicks to contact box riding Enquiries, and the reason under the boxes', /boxes\.push\(\['Clicks to contact'/.test(pdf) && /if \(c && on\('enquiries'\)/.test(pdf) && /Why visits fell: \$\{d\.drop\.sentence\}/.test(pdf));
+  ok('pdf: a Phone and email taps box riding Enquiries, and the reason under the boxes', /boxes\.push\(\['Phone and email taps'/.test(pdf) && /if \(c && on\('enquiries'\)/.test(pdf) && /Why visits fell: \$\{d\.drop\.sentence\}/.test(pdf));
 }
 
 // ── 5. the reads, against a stubbed database ──

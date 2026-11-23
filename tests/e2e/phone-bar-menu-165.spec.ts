@@ -162,20 +162,15 @@ test.describe('Websites on a phone, without the App Launcher (builder item 165)'
     expect(await barItems(page)).toEqual(['Home', 'dds-mbar-create', 'Inbox', 'dds-mbar-menu']);
   });
 
-  test('on a computer and an iPad, the sidebar’s button is called Menu and opens the same list', { tag: '@layout' }, async ({ page }) => {
+  // builder item 428: the sidebar's Menu button listed these same places again, so beside the sidebar there is none
+  test('on a computer and an iPad there is no Menu button: the sidebar holds the same list', { tag: '@layout' }, async ({ page }) => {
     test.skip(isPhone(page), 'the sidebar shows ≥761px');
     await installApp(page, { api: { ...API, '/portal/context': studio() } });
     await page.goto('/settings.html');
-    const btn = page.locator('#dds-waffle');
-    await expect(btn).toBeVisible();
-    await expect(btn).toHaveAttribute('aria-label', 'Menu');
-    await expect(page.getByRole('button', { name: 'Menu', exact: true })).toHaveCount(1);
-    await btn.click();
-    const panel = page.locator('#dds-drawer');
-    await expect(panel).toBeVisible();
-    await expect(panel.locator('.g a')).toHaveText(['Home', 'Sites', 'Inbox', 'Customers', 'Pipeline', 'Projects', 'Files', 'Your website', 'Settings']);
-    await expect(panel.locator('.dh')).toBeHidden();   // the popover sits under its button; the phone sheet carries the title
-    for (const ic of await panel.locator('.g a svg.nic').all()) expect((await ic.boundingBox())!.width).toBeLessThanOrEqual(20);
+    await expect(page.locator('.dds-nav')).toBeVisible();
+    await expect(page.locator('#dds-waffle')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Menu', exact: true })).toHaveCount(0);
+    await expect(page.locator('.dds-nav .sec > .it .lbl')).toHaveText(['Home', 'Sites', 'Inbox', 'Customers', 'Pipeline', 'Projects', 'Files', 'Your website', 'Settings']);
   });
 
   test('nobody says "App Launcher" any more: the shell, screen readers and the tour say Menu', async ({ page }) => {
@@ -190,8 +185,8 @@ test.describe('Websites on a phone, without the App Launcher (builder item 165)'
       const t = (await card.locator('#dds-tour-t').textContent()) || '';
       titles.push(t);
       if (t === 'Menu') {
-        // the ring sits on the Menu that shows here: the bar's on a phone, the sidebar's elsewhere
-        const target = page.locator(isPhone(page) ? '#dds-mbar-menu' : '#dds-waffle');
+        // the ring sits on the bar's Menu (beside the sidebar there is none, builder item 428)
+        const target = page.locator('#dds-mbar-menu');
         // the ring glides from the last step: measure once it has landed
         await expect.poll(async () => {
           const tb = (await target.boundingBox())!, rb = (await page.locator('.dds-tour-ring').boundingBox())!;
@@ -202,7 +197,8 @@ test.describe('Websites on a phone, without the App Launcher (builder item 165)'
       if ((await card.locator('.next').textContent()) === 'Done') break;
       await card.locator('.next').click();
     }
-    expect(titles).toContain('Menu');
+    // a phone's tour shows its Menu; beside the sidebar there is no Menu to show (builder item 428)
+    if (isPhone(page)) expect(titles).toContain('Menu'); else expect(titles).not.toContain('Menu');
     expect(titles).not.toContain('App Launcher');
     await card.locator('.next').click();
     await expect(card).toBeHidden();

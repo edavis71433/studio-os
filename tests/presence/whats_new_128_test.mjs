@@ -25,12 +25,16 @@ const list = data.entries;
   ok('a studio reads every entry', list.every((e) => e.who.includes('studio')));
   ok('each has a title and one sentence', list.every((e) => e.title && e.sentence && e.title.length <= 70 && e.sentence.length <= 200));
   const pics = new Set();
+  // builder item 429: kept weekly, so a picture is for the bigger changes; one that is named was taken
   for (const e of list) {
-    const m = /^\/thumbs\/whats-new\/([a-z0-9-]+)\.jpg$/.exec(e.picture || '');
-    let there = false; try { there = !!m && Deno.statSync(new URL(e.picture.slice(1), ROOT)).size > 4000; } catch { /* missing */ }
-    ok(`${e.id}: its picture is in thumbs/whats-new and was taken (a real photo, not empty)`, there, e.picture);
-    if (m) pics.add(`${m[1]}.jpg`);
-    ok(`${e.id}: its picture says what it shows`, typeof e.alt === 'string' && e.alt.length > 20);
+    if (!('picture' in e)) ok(`${e.id}: a sentence alone, with no words for a missing picture`, !('alt' in e));
+    else {
+      const m = /^\/thumbs\/whats-new\/([a-z0-9-]+)\.jpg$/.exec(e.picture || '');
+      let there = false; try { there = !!m && Deno.statSync(new URL(e.picture.slice(1), ROOT)).size > 4000; } catch { /* missing */ }
+      ok(`${e.id}: its picture is in thumbs/whats-new and was taken (a real photo, not empty)`, there, e.picture);
+      if (m) pics.add(`${m[1]}.jpg`);
+      ok(`${e.id}: its picture says what it shows`, typeof e.alt === 'string' && e.alt.length > 20);
+    }
     ok(`${e.id}: Show me goes to a page in the app`, typeof e.show === 'string' && /^\/(?!\/)[\w./#?=&%-]*$/.test(e.show));
     if (e.who.includes('client')) {
       const c = e.client || {};

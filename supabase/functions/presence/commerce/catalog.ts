@@ -127,6 +127,19 @@ export function planByKey(key: string): PlanDef | null {
   return PLANS.find((p) => p.key === key) || null;
 }
 
+/** Builder list item 426: each plan in the words Sites puts on a card. The names above
+ *  ("Presence", "Presence Monitor") are the catalog's own; screens use these. Equal to
+ *  agency/sites.ts PLAN_WORDS (pinned by tests/presence/plan_words_426_test.mjs). */
+export const PLAN_WORDS: Record<string, string> = {
+  presence_monitor: 'Watch', cms_only: 'Website', business_os_only: 'Business tools',
+  presence: 'Website + tools', presence_managed: 'Managed', agency: 'Studio', enterprise: 'Enterprise',
+};
+/** A plan key in those words; an unknown key in plain letters, nothing for no key. Pure. */
+export function planWords(key: string | null | undefined): string {
+  const k = String(key || '');
+  return PLAN_WORDS[k] || (k ? k.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : '');
+}
+
 export function selfServePlans(): PlanDef[] {
   return PLANS.filter((p) => p.selfServe);
 }

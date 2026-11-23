@@ -64,7 +64,7 @@ test.describe('What’s new', () => {
     await openPanel(page);
     const p = panel(page);
     await expect(p.locator('h2')).toHaveText('What’s new');
-    await expect(p.locator('.wn-sub')).toHaveText('Changes to your tools, a picture and a sentence each. New ones every week.');
+    await expect(p.locator('.wn-sub')).toHaveText('Changes to your tools, newest first. New ones every week.');   // item 429: a picture only for the bigger ones
     await expect(p.locator('.wn-week')).toHaveText([/^This week · /, /^Last week · /]);
     await expect(p.locator('.wn-card h4')).toHaveText(['Your Search tab is a to-do list', 'Edit site has a new look']);   // not the studio's Sites, not the portal's
     const first = p.locator('.wn-card').first();
@@ -147,12 +147,12 @@ test.describe('New in your portal', () => {
   });
 });
 
-test('the real entries: every picture loads', async ({ page }) => {
+test('the real entries: every picture loads (an entry may have none, builder item 429)', async ({ page }) => {
   await page.goto('/today.html');
   const bad = await page.evaluate(async () => {
     const d = await (await fetch('/whats-new.json')).json();
     const out: string[] = [];
-    for (const e of d.entries) { const r = await fetch(e.picture); if (!r.ok || !/image\/jpeg/.test(r.headers.get('content-type') || '')) out.push(e.picture); }
+    for (const e of d.entries.filter((x: { picture?: string }) => x.picture)) { const r = await fetch(e.picture); if (!r.ok || !/image\/jpeg/.test(r.headers.get('content-type') || '')) out.push(e.picture); }
     return out;
   });
   expect(bad).toEqual([]);

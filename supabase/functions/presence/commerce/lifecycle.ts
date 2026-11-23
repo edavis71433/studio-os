@@ -37,7 +37,7 @@ import { verifyApex, dkimPresent, NETLIFY_APEX_IP, bareDomain } from '../platfor
 import { clearFoundPlans } from '../platform/plan_found.ts';
 import { leadFollowupDue, leadFollowupCopy, renewalReminderWindow, renewalNoticePeriod, renewalReminderCopy } from '../lib/commercial.ts';
 import { supportAgingDue, supportAgingPeriod, SUPPORT_AGING_DAYS } from '../lib/intake.ts';
-import { editionFromPlan, EDITION_DEFS } from './editions.ts';
+import { planWords } from './catalog.ts';   // builder item 426: plans in the words Sites uses
 import { sendEmail } from './account.ts';
 import { emailOperator, emailBridgedCustomer, ownerReplyTo } from '../lib/service_bridge.ts';
 import { ensureLeadContact } from '../lib/lead_contact.ts';   // sales item 142
@@ -484,16 +484,28 @@ async function watchDomainMail(site: DomainCheckSite, registered: string | null,
   if (w.alert && saved) await tellOwnerAndStudio({ id: site.id, client_id: site.client_id }, domainChangeEmail('mail_gone', { domain: bare, mx: saved.mx, recordsAt }), 'domain-mail-gone');
 }
 
-export async function runDomainWatch(limit = 10): Promise<{ checked: number; warned: number; reasked: number }> {
+// Builder list item 365 (Nov 22 review): the round took ten domains in no set order and stopped
+// at the first one that threw, so one bad row could hold up the rest every day. Now the ones
+// never checked go first, then the longest since a check; a check that fails is written down
+// on its own row (checked today, the lookup "failed", so the Domains page says it didn't work,
+// and it waits its turn tomorrow) and the round goes on to the next. Every step after a check's
+// save already keeps its own errors, so a break comes before its findings are written.
+export async function runDomainWatch(limit = 10): Promise<{ checked: number; warned: number; reasked: number; failed: number }> {
   const nowIso = new Date().toISOString();
   const staleBefore = new Date(Date.now() - 24 * 3600_000).toISOString();
-  const q = await svc(`presence_sites?custom_domain=not.is.null&or=(domain_checked_at.is.null,domain_checked_at.lt.${encodeURIComponent(staleBefore)})&select=id,client_id,custom_domain,netlify_site_id,edition,cert_pending_since&limit=${limit}`);
-  let checked = 0, warned = 0, reasked = 0;
+  const q = await svc(`presence_sites?custom_domain=not.is.null&or=(domain_checked_at.is.null,domain_checked_at.lt.${encodeURIComponent(staleBefore)})&select=id,client_id,custom_domain,netlify_site_id,edition,cert_pending_since&order=domain_checked_at.asc.nullsfirst,id.asc&limit=${limit}`);
+  let checked = 0, warned = 0, reasked = 0, failed = 0;
   for (const site of (Array.isArray(q.json) ? q.json : []) as DomainCheckSite[]) {
-    const r = await checkOneDomain(site, nowIso);
-    checked++; if (r.warned) warned++; if (r.reasked) reasked++;
+    try {
+      const r = await checkOneDomain(site, nowIso);
+      checked++; if (r.warned) warned++; if (r.reasked) reasked++;
+    } catch (e) {
+      failed++;
+      console.error('domain watch: one check failed', site.id, String((e as Error)?.message || e).slice(0, 200));
+      await svc(`presence_sites?id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify({ domain_checked_at: nowIso, domain_lookup_status: 'failed' }) }).catch(() => null);
+    }
   }
-  return { checked, warned, reasked };
+  return { checked, warned, reasked, failed };
 }
 
 // ── Phase CRM (FD-CRM1): the un-replied lead follow-up nudge ──────────────────
@@ -1356,7 +1368,7 @@ export async function runRenewalReminders(limit = 50): Promise<{ reminded: numbe
     if (!siteId) continue;
     const pubQ = await svc(`presence_publishes?site_id=eq.${siteId}&status=eq.live&select=id&limit=200`);
     const published = Array.isArray(pubQ.json) ? pubQ.json.length : 0;
-    const planName = EDITION_DEFS[editionFromPlan(e.plan)]?.name || 'your';
+    const planName = planWords(e.plan) || 'your';   // item 426: "Your Website + tools plan renews", the words Sites uses
     const copy = renewalReminderCopy(planName, e.current_period_end, win, published);
     const fresh = await raiseNotice({ siteId, clientId: e.client_id, kind: 'renewal_reminder', period: renewalNoticePeriod(e.current_period_end, win), headline: copy.headline, body: copy.body });
     if (fresh) {
