@@ -179,11 +179,13 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 </tr>
 </tbody>
 </table>
-<div class="holiday">
-<strong>Holiday hours</strong>
+<div class="holiday" data-tz="America/Los_Angeles">
+<strong>Special hours</strong>
 <ul>
-<li>Thanksgiving, <time datetime="2026-11-26">Thu Nov 26</time>: Closed</li>
-<li>Christmas Eve, <time datetime="2026-12-24">Thu Dec 24</time>: 7am–12pm</li>
+<li>
+<time datetime="2026-11-26">Thu Nov 26</time>: Closed<br>Thanksgiving</li>
+<li>
+<time datetime="2026-12-24">Thu Dec 24</time>: 7am–12pm<br>Christmas Eve</li>
 </ul>
 </div>
 </div>
@@ -290,11 +292,13 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 </tr>
 </tbody>
 </table>
-<div class="holiday">
-<strong>Holiday hours</strong>
+<div class="holiday" data-tz="America/Los_Angeles">
+<strong>Special hours</strong>
 <ul>
-<li>Thanksgiving, <time datetime="2026-11-26">Thu Nov 26</time>: Closed</li>
-<li>Christmas Eve, <time datetime="2026-12-24">Thu Dec 24</time>: 7am–12pm</li>
+<li>
+<time datetime="2026-11-26">Thu Nov 26</time>: Closed<br>Thanksgiving</li>
+<li>
+<time datetime="2026-12-24">Thu Dec 24</time>: 7am–12pm<br>Christmas Eve</li>
 </ul>
 </div>
 </div>
@@ -308,6 +312,12 @@ nav.primary a{display:inline-block;padding:9px 2px;text-decoration:none;color:#4
 </div>
 </div>
 </footer>
+<script>(function(){try{document.querySelectorAll('.holiday').forEach(b=>{let t=new Date().toLocaleDateString('sv',{timeZone:b.dataset.tz}
+),k=0;b.querySelectorAll('time').forEach(e=>e.parentNode.hidden=e.dateTime<t||!++k);b.hidden=!k}
+)}
+catch(e){}
+}
+)()</script>
 <script src="/assets/site-a0aa68954c9a71a8.js" defer>
 </script>
 </body>

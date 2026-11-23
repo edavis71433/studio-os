@@ -148,10 +148,10 @@ const heroOf = (html) => (/<section class="hero[^"]*"[\s\S]*?<\/section>/.exec(h
   // the today card: today's hours from the site's own week, the booking button, the ordering link
   const food = await home(opened('food-photo'));
   const card = (/<aside class="hero-card hc-today"[\s\S]*?<\/aside>/.exec(food) || [''])[0];
-  const lines = [...card.matchAll(/<p class="hc-when" data-(day|date)="([^"]+)" hidden>([^<]*)<\/p>/g)].map((m) => [m[2], m[3]]);
+  const lines = [...card.matchAll(/<p class="hc-when" data-(day|date)="([^"]+)" hidden>([\s\S]*?)<\/p>/g)].map((m) => [m[2], m[3]]);
   eq('D9 today: a line for every day of the sample’s week and each of its holidays, all hidden until the page shows today’s', lines, [
     ['mon', 'Closed today'], ['tue', 'Open 5pm to 10pm'], ['wed', 'Open 5pm to 10pm'], ['thu', 'Open 5pm to 11pm'], ['fri', 'Open 12pm to 2:30pm and 5pm to 12am'],
-    ['sat', 'Open 10am to 2:30pm and 5pm to 12am'], ['sun', 'Open 10am to 3pm'], ['2026-11-26', 'Thanksgiving: closed today'], ['2026-12-24', 'Christmas Eve: open 12pm to 8pm']]);
+    ['sat', 'Open 10am to 2:30pm and 5pm to 12am'], ['sun', 'Open 10am to 3pm'], ['2026-11-26', 'Closed today<br>Thanksgiving'], ['2026-12-24', 'Open 12pm to 8pm<br>Christmas Eve']]);   // item 432: the day first, the note on its own line
   ok('D10 …a link to all the hours and Restaurant Classic’s own booking button', card.includes('<a href="/contact/">See all hours</a>') && card.includes('<a class="btn" href="https://resy.example/vermilion-and-vine" rel="noopener">Reserve a table</a>') && !card.includes('Order online'));
   ok('D11 …the hours data and today’s script on the page, after the Open now line’s', food.indexOf('<script id="hours-data"') > 0 && food.indexOf(TODAY_JS) > food.indexOf('<script id="hours-data"'));
   const ordering = await home(opened('food-photo', (c) => { c.identity.ordering_url = 'https://order.example/vv'; }));
@@ -161,7 +161,7 @@ const heroOf = (html) => (/<section class="hero[^"]*"[\s\S]*?<\/section>/.exec(h
   const noHours = await home(opened('food-photo', (c) => { c.locations[0].hours = c.locations[0].hours.map((d) => ({ ...d, closed: true, intervals: [] })); }));
   ok('D14 …a week with no hours: the booking button alone, and no today’s line or script', noHours.includes('hc-today') && !noHours.includes('hc-when') && !noHours.includes('id="hc_today"') && !noHours.includes(TODAY_JS));
   const bad = await home(opened('food-photo', (c) => { c.identity.booking_url = 'javascript:alert(1)'; c.locations[0].holiday_exceptions = [{ date: '2026-12-31', label: '<b>New</b> "Year"', closed: true }]; }));
-  ok('D15 …a booking link that isn’t safe is never a button, and the words are escaped', !/javascript:/.test(heroOf(bad)) && heroOf(bad).includes('&lt;b&gt;New&lt;/b&gt; &quot;Year&quot;: closed today'));
+  ok('D15 …a booking link that isn’t safe is never a button, and the words are escaped', !/javascript:/.test(heroOf(bad)) && heroOf(bad).includes('Closed today<br>&lt;b&gt;New&lt;/b&gt; &quot;Year&quot;'));
   // the script, in a stand-in page: it only ever shows one of the lines the page has
   const run = (iso, html) => {
     const rows = [...html.matchAll(/<p class="hc-when" data-(day|date)="([^"]+)" hidden>/g)].map((m) => ({ kind: m[1], key: m[2], hidden: true }));

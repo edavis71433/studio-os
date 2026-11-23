@@ -25,7 +25,7 @@ export interface DoNextDeps { needs: () => Promise<{ rows?: any[]; rest?: any[] 
 
 /** What the list is made from, for one client site. Each read is best-effort. */
 export async function doNextFacts(site: SiteRow, needs: DoNextDeps['needs']): Promise<DoNextFacts> {
-  const [needsD, healthQ, connQ, extQ, gbpQ, pendQ, aiQ, ideaQ] = await Promise.all([
+  const [needsD, healthQ, connQ, extQ, gbpQ, pendQ, aiQ, ideaQ, locQ] = await Promise.all([
     safe(needs()),
     safe(svc(`presence_health_days?site_id=eq.${site.id}&select=issues&order=day.desc&limit=1`)),
     safe(svc(`presence_connections?site_id=eq.${site.id}&provider_key=in.(google_search_console,google_business_profile)&select=provider_key,status`)),
@@ -34,7 +34,9 @@ export async function doNextFacts(site: SiteRow, needs: DoNextDeps['needs']): Pr
     safe(svc(`presence_reviews?site_id=eq.${site.id}&status=eq.pending&select=id&limit=50`)),
     safe(svc(`presence_ai_checks?site_id=eq.${site.id}&select=results&order=month.desc&limit=1`)),
     safe(svc(`presence_growth_opportunities?site_id=eq.${site.id}&status=eq.open&select=id,opportunity,suggested_next_step,timing_phrase&order=created_at.desc&limit=5`)),
+    safe(svc(`presence_locations?site_id=eq.${site.id}&select=holiday_exceptions&order=created_at.asc&limit=1`)),   // item 432
   ]);
+  const special = locQ && (locQ as { ok?: boolean }).ok ? (Array.isArray(rows(locQ)[0]?.holiday_exceptions) ? rows(locQ)[0].holiday_exceptions : []).map((e: { date?: unknown }) => String(e?.date || '')) : null;
   const conn = new Map(rows(connQ).map((c) => [c.provider_key, c.status]));
   const address = liveAddress(site, rows(extQ)[0]?.domain || null);
   const extras = await safe(searchTabExtras(site, { address, consoleConnected: conn.get('google_search_console') === 'connected', listingConnected: conn.get('google_business_profile') === 'connected', period: null, review: null }));
@@ -48,6 +50,7 @@ export async function doNextFacts(site: SiteRow, needs: DoNextDeps['needs']): Pr
     reviews: { googleUnreplied: Number(gbp?.unreplied_reviews) || 0, pending: rows(pendQ).length },
     ai: rows(aiQ)[0] ? { results: Array.isArray(rows(aiQ)[0].results) ? rows(aiQ)[0].results : [] } : null,
     ideas: rows(ideaQ).map((i) => ({ id: String(i.id), opportunity: String(i.opportunity || ''), suggested_next_step: String(i.suggested_next_step || ''), timing_phrase: i.timing_phrase || null })),
+    special,
   };
 }
 

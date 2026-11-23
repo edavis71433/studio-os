@@ -123,7 +123,7 @@ export function describeChanges(draftC: SnapshotContent, liveC: SnapshotContent 
       const prev = lByDay.get(dd.day);
       if (!jeq(dd, prev)) out.push({ section: 'business', sentence: `${DAY[dd.day] || dd.day} hours change from “${dayText(prev)}” to “${dayText(dd)}”.` });
     }
-    if (!jeq(dl.holiday_exceptions || [], ll.holiday_exceptions || [])) out.push({ section: 'business', sentence: 'Your holiday hours are updated.' });
+    if (!jeq(dl.holiday_exceptions || [], ll.holiday_exceptions || [])) out.push({ section: 'business', sentence: 'Your special dates are updated.' });
     if (!!dl.temporarily_closed !== !!ll.temporarily_closed) {
       out.push({ section: 'business', sentence: dl.temporarily_closed ? 'Your site will show a temporarily-closed notice.' : 'The temporarily-closed notice comes down.' });
     } else if (dl.temporarily_closed && (dl.temporarily_closed_note || '') !== (ll.temporarily_closed_note || '')) {

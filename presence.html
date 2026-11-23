@@ -165,6 +165,21 @@
           <section class="biz-card" aria-labelledby="bizHoursH">
           <h5 class="rune" id="bizHoursH">Hours <span class="whisper" id="save-hours"></span></h5>
           <div class="hoursgrid" id="hoursGrid"></div>
+          <!-- builder item 432: one day closed, or open different hours (presence-core.js renderSpecialDates) -->
+          <div class="sd" id="specialDates">
+          <p class="sd-h" id="sdH">Special dates</p>
+          <p class="hint" id="sdHint">Holidays and other days you close or keep different hours. Each one shows with your hours on your site until the day is over, and online booking follows it.</p>
+          <ul class="sd-list" id="sdList" aria-labelledby="sdH" hidden></ul>
+          <button type="button" class="biz-add" id="btnSdAdd">Add a date</button>
+          <form class="sd-form" id="sdForm" aria-labelledby="sdFormH" novalidate hidden>
+          <p class="sd-h" id="sdFormH">Add a date</p>
+          <div class="sd-line"><label for="sdDate">Date</label><input type="date" id="sdDate"><span class="sd-wd" id="sdWd"></span></div>
+          <div class="sd-times"><label class="closedlab"><input type="checkbox" id="sdClosed" checked> Closed all day</label><span class="sd-span"><input type="time" id="sdOpen" value="09:00" aria-label="Opens that day" disabled><span class="to">to</span><input type="time" id="sdClose" value="17:00" aria-label="Closes that day" disabled></span></div>
+          <div class="field"><label for="sdNote">A short note for customers (optional)</label><input type="text" id="sdNote" maxlength="60" placeholder="e.g. Closed for Thanksgiving"></div>
+          <p class="sd-msg" id="sdMsg" role="alert" hidden></p>
+          <div class="sd-btns"><button type="submit" class="pillbtn inked" id="btnSdSave">Add this date</button><button type="button" class="pillbtn ghost" id="btnSdCancel">Cancel</button></div>
+          </form>
+          </div>
           <label class="closedrow"><input type="checkbox" id="closedSwitch"> Temporarily closed right now</label>
           <div class="field" style="margin-top:10px"><input type="text" id="f-closednote" aria-label="A short note for customers while you’re closed" placeholder="A short note for customers (optional)" maxlength="200" hidden></div>
           <div class="hint biz-hours-hint" data-shows="hours"></div>

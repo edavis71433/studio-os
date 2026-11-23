@@ -3,7 +3,7 @@
 // none, or Off, every page is left exactly as it was. The buttons come from the business
 // details, and each shows only when there's something behind it: a number to call, an address
 // to go to, opening hours to read, an email to write to. Hours opens a small tray with the
-// week. Every page that shows the site's footer gets the bar (a page that hides its footer
+// week, and any special date still to come (builder item 432). Every page that shows the site's footer gets the bar (a page that hides its footer
 // hides this too), drawn after the template, so all eight templates carry it alike. On a
 // wider screen, and on paper, it isn't shown. This file imports nothing, so a browser spec
 // can draw a page with it and reach only this file.
@@ -14,6 +14,7 @@ interface Details {
   locations?: Array<{
     address_line1?: string; address_line2?: string; city?: string; region?: string; postal_code?: string; goes_to_customers?: boolean;
     phone?: string; timezone?: string; hours?: Array<{ day: string; closed?: boolean; intervals?: Interval[] }>;
+    holiday_exceptions?: Array<{ date: string; label?: string; closed?: boolean; intervals?: Interval[] }>;
     temporarily_closed?: boolean; temporarily_closed_note?: string;
   }> | null;
 }
@@ -71,7 +72,18 @@ function fmtTime(t: string): string {
   return `${hr}${m ? ':' + String(m).padStart(2, '0') : ''}${am ? 'am' : 'pm'}`;
 }
 
-// The tray behind Hours: the week, or that the business is closed for now.
+// "Thu Nov 26", the way the templates write a special date (template_kit.ts dayDate); this file imports nothing
+const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function dateWords(ymd: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) return '';
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.getUTCMonth() === Number(m[2]) - 1 ? `${WEEKDAY[d.getUTCDay()]} ${MONTH[d.getUTCMonth()]} ${d.getUTCDate()}` : '';
+}
+
+// The tray behind Hours: the week, or that the business is closed for now. Under the week, each
+// special date still to come (lib/special_dates.ts left out the ones gone by), its note under it.
 function hoursTray(c: Details | null | undefined): string {
   const loc = (c?.locations || [])[0] || {};
   if (loc.temporarily_closed) {
@@ -85,7 +97,15 @@ function hoursTray(c: Details | null | undefined): string {
     return `<tr data-day="${k}"><th scope="row">${name}</th><td>${esc(val)}</td></tr>`;
   }).join('');
   const tz = String(loc.timezone || '').trim();
-  return `<div class="dds-pb-tray"${tz ? ` data-tz="${esc(tz)}"` : ''}><p class="dds-pb-h">Opening hours</p><table><tbody>${rows}</tbody></table></div>`;
+  const special = (loc.holiday_exceptions || []).map((e) => {
+    const when = dateWords(String(e?.date || ''));
+    if (!when) return '';
+    const val = e.closed || !(e.intervals || []).length ? 'Closed' : (e.intervals || []).map((i) => `${fmtTime(i.open)}–${fmtTime(i.close)}`).join(', ');
+    const note = String(e.label || '').trim();
+    return `<tr data-date="${esc(e.date)}"><th scope="row">${when}${note ? `<span class="dds-pb-note">${esc(note)}</span>` : ''}</th><td>${esc(val)}</td></tr>`;
+  }).join('');
+  return `<div class="dds-pb-tray"${tz ? ` data-tz="${esc(tz)}"` : ''}><p class="dds-pb-h">Opening hours</p><table><tbody>${rows}</tbody></table>`
+    + (special ? `<p class="dds-pb-h dds-pb-sh">Special hours</p><table class="dds-pb-sd"><tbody>${special}</tbody></table>` : '') + '</div>';
 }
 
 /** The bar's markup for these details, or '' when there's nothing to put on it. Pure. */
@@ -134,10 +154,11 @@ function css(mode: 'light' | 'dark', icon: string): string {
     + '.dds-phonebar>a:focus-visible,.dds-pb-hours>summary:focus-visible{outline:2px solid currentColor;outline-offset:-6px;border-radius:12px}'
     + `.dds-phonebar svg{width:22px;height:22px;fill:none;stroke:${icon};stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}`
     + `.dds-pb-tray{position:absolute;left:8px;right:8px;bottom:calc(100% + 8px);box-sizing:border-box;padding:14px 16px;border-radius:14px;background:${bg};color:${fg};`
-    + `border:1px solid ${line};box-shadow:0 10px 32px rgba(0,0,0,.18);font-size:14px;line-height:1.5;text-align:left}`
+    + `border:1px solid ${line};box-shadow:0 10px 32px rgba(0,0,0,.18);font-size:14px;line-height:1.5;text-align:left;max-height:calc(100vh - ${BAR_H + 40}px);overflow-y:auto}`
     + '.dds-pb-tray p{margin:0 0 6px}.dds-pb-tray .dds-pb-h{font-weight:700;margin-bottom:8px}'
     + '.dds-pb-tray table{width:100%;border-collapse:collapse}.dds-pb-tray th,.dds-pb-tray td{padding:3px 0;font-weight:400;text-align:left;vertical-align:top}'
     + '.dds-pb-tray td{text-align:right}.dds-pb-tray tr[data-today] th,.dds-pb-tray tr[data-today] td{font-weight:700}'
+    + '.dds-pb-tray .dds-pb-sh{margin:12px 0 6px}.dds-pb-note{display:block;font-size:13px;opacity:.8}'
     // a draft's preview banner and its comments button sit above the bar, not on it
     + `.dds-phonebar~#presence-preview-badge{bottom:calc(${BAR_H}px + ${safe})!important}`
     + `.dds-phonebar~#presence-feedback-panel{bottom:calc(${BAR_H + 60}px + ${safe})}`
@@ -145,7 +166,9 @@ function css(mode: 'light' | 'dark', icon: string): string {
 }
 
 // Closes the tray on a tap elsewhere or Escape, and marks today's row in the business's own time zone.
-const JS = `(function(){var d=document.querySelector('.dds-pb-hours');if(!d)return;document.addEventListener('click',function(e){if(d.open&&!d.contains(e.target))d.open=false});document.addEventListener('keydown',function(e){if(e.key==='Escape'&&d.open){d.open=false;d.querySelector('summary').focus()}});try{var t=d.querySelector('[data-tz]'),z=t&&t.getAttribute('data-tz'),o={weekday:'short'};if(z)o.timeZone=z;var k=new Intl.DateTimeFormat('en-US',o).format(new Date()).slice(0,3).toLowerCase(),r=d.querySelector('tr[data-day="'+k+'"]');if(r)r.setAttribute('data-today','')}catch(e){}})();`;
+// Item 432: a special date gone by there is taken away (the heading with the last one), and a special
+// date that is today is marked in place of its weekday.
+const JS = `(function(){var d=document.querySelector('.dds-pb-hours');if(!d)return;document.addEventListener('click',function(e){if(d.open&&!d.contains(e.target))d.open=false});document.addEventListener('keydown',function(e){if(e.key==='Escape'&&d.open){d.open=false;d.querySelector('summary').focus()}});try{var t=d.querySelector('[data-tz]'),z=t&&t.getAttribute('data-tz'),o={weekday:'short'};if(z)o.timeZone=z;var k=new Intl.DateTimeFormat('en-US',o).format(new Date()).slice(0,3).toLowerCase(),r=d.querySelector('tr[data-day="'+k+'"]');if(r)r.setAttribute('data-today','');var sd=d.querySelectorAll('tr[data-date]');if(sd.length){var n=new Date(z?new Date().toLocaleString('en-US',{timeZone:z}):Date.now()),ds=n.getFullYear()+'-'+('0'+(n.getMonth()+1)).slice(-2)+'-'+('0'+n.getDate()).slice(-2),left=0;for(var i=0;i<sd.length;i++){var v=sd[i].getAttribute('data-date');if(v<ds)sd[i].hidden=true;else{left++;if(v===ds){sd[i].setAttribute('data-today','');if(r)r.removeAttribute('data-today')}}}if(!left){var a=d.querySelector('.dds-pb-sd'),h=d.querySelector('.dds-pb-sh');if(a)a.hidden=true;if(h)h.hidden=true}}}catch(e){}})();`;
 
 /** Every page that shows the site's footer, with the bar, for this choice, these details and
  *  this accent (the site's own, for the light bar's icons). Off, or nothing to put on the bar,

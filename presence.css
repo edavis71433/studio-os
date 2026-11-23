@@ -414,16 +414,53 @@ html:not(.is-studio) #dcModeSeg [data-dcmode="timewarp"]{display:none}
 .biz-p2-lbl{display:block;font-size:12.5px;color:var(--ink-3);font-weight:500;margin-bottom:var(--dds-s1,4px)}
 .biz-rm{background:none;border:0;padding:0;min-height:44px;color:var(--clay);font:600 13px/1 var(--sans);cursor:pointer}
 .biz-rm:hover{text-decoration:underline}
-/* a narrow card (two columns, or a phone) puts each day's times under its name and Closed */
+/* The phone line (found Nov 5, built with item 432): in a narrow card (two columns, or a phone)
+   each day keeps to one line: its name, its times at their own width (a time is never cut
+   short), Closed at the end. In a card under 400px wide inside (any phone) its short name
+   ("Wed") stands in for the long one, which a screen reader still hears. A phone too narrow
+   for all of it moves Closed under the times rather than squeeze them. */
 .biz-card{container-type:inline-size}
+.hrow .day-short{display:none}
 @container (max-width:470px){
-.biz-card .hrow{display:grid;grid-template-columns:auto auto auto minmax(0,1fr);gap:6px 10px;align-items:center}
-.biz-card .hrow .day{grid-column:1/4;grid-row:1;width:auto}
-.biz-card .hrow .closedlab{grid-column:4;grid-row:1;justify-self:end;width:auto;margin-left:0}
-.biz-card .hrow input[type=time]:first-of-type{grid-column:1;grid-row:2}
-.biz-card .hrow .to{grid-column:2;grid-row:2}
-.biz-card .hrow input[type=time]:last-of-type{grid-column:3;grid-row:2}
+.biz-card .hrow{flex-wrap:wrap;gap:6px 8px}
+.biz-card .hrow .day{width:6.2em}
+.biz-card .hrow input[type=time]{flex:none}
+.biz-card .hrow label.closedlab{width:auto;margin:0 0 0 auto;padding:0}   /* its tap stays off the closing time beside it */
 }
+@container (max-width:400px){
+.biz-card .hrow{gap:6px 4px}
+.biz-card .hrow .day{width:2.3em}
+.biz-card .hrow .day-long{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.biz-card .hrow .day-short{display:inline}
+.biz-card .hrow input[type=time]{padding-left:3px;padding-right:3px}
+}
+/* builder item 432: special dates, under the week in the Hours card */
+.sd{margin-top:var(--dds-s5,20px);padding-top:var(--dds-s4,16px);border-top:1px solid var(--hair);max-width:560px}
+.sd-h{margin:0 0 4px;font-size:13.5px;font-weight:600;color:var(--ink)}
+.sd>.hint{margin-bottom:var(--dds-s3,12px)}
+.sd-list{list-style:none;margin:0 0 var(--dds-s3,12px);padding:0}
+.sd-row{display:flex;align-items:center;gap:4px 8px;padding:6px 0;border-bottom:1px solid var(--hair)}
+.sd-row:last-child{border-bottom:0}
+.sd-what{flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;font-size:14px;color:var(--ink)}
+.sd-when{font-weight:500}
+.sd-hours{color:var(--ink-2);font-size:13px}
+.sd-note{flex-basis:100%;font-size:12.5px;color:var(--ink-3);overflow-wrap:anywhere}
+.sd-act{flex:none;background:none;border:0;padding:0 8px;min-height:44px;color:var(--plum);font:600 13px/1 var(--sans);cursor:pointer}
+.sd-act.sd-rm{color:var(--clay)}
+.sd-act:hover{text-decoration:underline}
+.sd-form{margin-top:var(--dds-s3,12px);padding:var(--dds-s3,12px) var(--dds-s4,16px);border:1px solid var(--hair);border-radius:var(--r);background:var(--sheet)}
+.sd-line{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px}
+.sd-line label{font-size:12.5px;color:var(--ink-3);font-weight:500}
+.sd-wd{font-size:13px;color:var(--ink-2)}
+.sd-times{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;margin:var(--dds-s3,12px) 0}
+.sd-times .closedlab{display:flex;align-items:center;gap:8px;min-height:32px;font-size:13px;color:var(--ink-2);cursor:pointer}
+.sd-times input[type=checkbox]{accent-color:var(--plum)}
+.sd-span{display:inline-flex;align-items:center;gap:8px}
+.sd-span .to{color:var(--ink-2);font-size:12px}
+.sd-form input[type=date],.sd-form input[type=time]{border:1px solid var(--hair);border-radius:var(--r-sm);background:var(--sheet);font-family:var(--sans);font-size:13px;color:var(--ink);padding:var(--dds-s1,4px) 6px}
+.sd-form input[type=time]:disabled{color:var(--dds-faint)}
+.sd-msg{margin:0 0 var(--dds-s2,8px);font-size:12.5px;color:var(--clay)}
+.sd-btns{display:flex;flex-wrap:wrap;gap:8px}
 @media(max-width:560px){.biz-card{padding:var(--dds-s4,16px) var(--dds-s4,16px) var(--dds-s1,4px)}.biz-row3{grid-template-columns:1fr 1fr}.biz-row3 .field:first-child{grid-column:1/-1}.biz-seg{grid-template-columns:1fr}}
 .ver-live{display:inline-block;margin-left:var(--dds-s2,8px);padding:1px 8px;border-radius:999px;background:var(--hair);color:var(--ink-2);font-size:12px;font-weight:600;vertical-align:1px}
 .hcompare{flex-basis:100%;margin-top:var(--dds-s2,8px)}
@@ -2582,6 +2619,9 @@ textarea.stk-in{line-height:1.55;resize:vertical}
   .biz-card button{min-height:44px}
   #designCard .ins-heros button{min-height:44px}   /* builder item 330: the front-page layouts */
   .biz-card .hrow .closedlab{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;margin:0 -16px}   /* a day's Closed box: its label takes the tap */
+  .biz-card .sd-times .closedlab{min-height:44px;padding-left:16px;margin-left:-16px}   /* item 432: a special date's Closed all day, its tap all round its box */
+  /* the phone line (item 432): "Closed" then its box, the label's tap running past the row's end, never over the closing time */
+  @container (max-width:470px){.biz-card .hrow label.closedlab{flex-direction:row-reverse;padding:0 16px 0 0;margin:0 -16px 0 auto}}
 }
 /* the editor keeps the sidebar's class on a phone, where the shell's search kept its 150px and its words:
    the header ran 40px off the screen and Account sat outside it (found by item 98's walk) */

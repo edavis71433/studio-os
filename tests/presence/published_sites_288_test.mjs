@@ -187,7 +187,8 @@ for (const slug of TEMPLATES) {
   ok('303: a holiday\'s date reads "Thu Nov 26"', dayDate('2026-11-26') === 'Thu Nov 26' && dayDate('2027-01-01') === 'Fri Jan 1' && dayDate('nonsense') === 'nonsense' && dayDate('2026-02-30') === '2026-02-30');
   const fx = fixture('aurora'); fx.content.locations[0].holiday_exceptions = [{ label: 'Thanksgiving', date: '2026-11-26', closed: true }];
   const files = await renderSnapshot(fx, SITE);
-  ok('303: the footer\'s holiday hours print the date in words', String(files['index.html']).includes('<li>Thanksgiving, <time datetime="2026-11-26">Thu Nov 26</time>: Closed</li>'));
+  // item 432: the date and its hours first, the note on its own line
+  ok('303: the footer\'s holiday hours print the date in words', String(files['index.html']).includes('<li><time datetime="2026-11-26">Thu Nov 26</time>: Closed<br>Thanksgiving</li>'));
 }
 
 // ═══ 304: line icons ═══

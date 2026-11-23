@@ -61,7 +61,7 @@ export function validateSnapshot(snapshot: Snapshot, manifest: TemplateManifest)
       }
       if (days.every((d) => d.closed)) w.push({ field: 'location.hours', message: 'Every day is marked closed — publishing a site that says you’re never open.' });
     }
-    if ((l.holiday_exceptions?.length ?? 0) > 40) b.push({ field: 'location.holiday_exceptions', message: 'At most 40 holiday exceptions.' });
+    if ((l.holiday_exceptions?.length ?? 0) > 40) b.push({ field: 'location.holiday_exceptions', message: 'At most 40 special dates.' });
   }
 
   // collections vs caps
