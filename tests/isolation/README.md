@@ -37,10 +37,18 @@ on that runner.
   nothing reaches production unless the walls held on that commit. If it fails on the
   runner itself (a Docker pull, say) rather than on a check, `gh run rerun <run id>
   --failed` runs it again and the deploy follows. A rollback doesn't wait for it.
-- On a pull request that changes the workflow, the script or this folder.
+- On a pull request that changes the workflow, the script, its helper
+  (`scripts/scratch-stack.sh`) or this folder.
 - By hand: Actions, "Walls between studios (scratch database)", Run workflow.
 
 Locally, with Docker running: `SUPABASE_CLI_VERSION=2.122.0 bash scripts/isolation-scratch.sh`.
+
+The scratch stack listens on 24321 (its API) and 24322 (its database), not the CLI's
+usual 54321 and 54322. Those sit in the range a machine hands its own outgoing
+connections, and on Nov 23 2026 two releases' checks stopped because an image download
+held 54322 when the database started ("address already in use"). `scripts/scratch-stack.sh`
+moves the ports, for the rehearsal's and the publish journey's stacks too, and tries a
+start once more if a port is taken anyway.
 
 ## What runs
 

@@ -17,7 +17,7 @@ ok('switched off: no schedule runs it (the lines are there, commented out)', !/^
 ok('runs only by hand until then', /^on:\n {2}workflow_dispatch:$/m.test(WF) && !/^ {2}(push|pull_request):/m.test(WF));
 ok('refuses without the test team\'s token, before anything else', WF.indexOf('NETLIFY_TEST_TOKEN (a token for a separate Netlify test team)') > 0 && WF.indexOf('NETLIFY_TEST_TOKEN (a token') < WF.indexOf('actions/checkout'));
 ok('reads no production secret: only the test team\'s token', [...WF.matchAll(/secrets\.(\w+)/g)].every((m) => m[1] === 'NETLIFY_TEST_TOKEN') && !/SUPABASE_PROJECT_REF_PROD|SUPABASE_ACCESS_TOKEN|NETLIFY_AUTH_TOKEN: \$\{\{/.test(WF));
-ok('the server it publishes through is a scratch one, from this commit', SCRIPT.includes('supabase start') && SCRIPT.includes('supabase functions serve') && !SCRIPT.includes('qksstlqzbhesadrrofgn'));
+ok('the server it publishes through is a scratch one, from this commit', SCRIPT.includes('scratch_start "$WORK/start.log"') && SCRIPT.includes('supabase functions serve') && !SCRIPT.includes('qksstlqzbhesadrrofgn'));
 ok('every site it makes lands on the test team (the server is handed the test token)', SCRIPT.includes('echo "NETLIFY_AUTH_TOKEN=$NETLIFY_TEST_TOKEN"'));
 ok('it deletes the test site whatever happens', /trap cleanup EXIT/.test(SCRIPT) && /-X DELETE -H "Authorization: Bearer \$NETLIFY_TEST_TOKEN" "\$NETLIFY\/sites\/\$SITE_ID"/.test(SCRIPT));
 ok('the journey: publish, live, the site answers with its own name, offline, the holding page', ['$P/publish', 'status" = live', 'grep -qF "$name"', '$P/site/offline'].every((x) => SCRIPT.includes(x)));

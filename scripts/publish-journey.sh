@@ -21,6 +21,7 @@ DENO="${DENO:-deno}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/publish-journey.XXXXXX")"
 NETLIFY="https://api.netlify.com/api/v1"
 supabase() { (cd "$WORK" && npx --yes "supabase@$CLI_VERSION" "$@"); }
+. "$REPO/scripts/scratch-stack.sh"   # scratch_ports and scratch_start
 say() { printf '\n── %s ──\n' "$*"; }
 note() { echo "$*"; [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "- $*" >> "$GITHUB_STEP_SUMMARY"; return 0; }
 fail() { echo "::error title=Publish journey::$*"; note "Stopped: $*"; exit 1; }
@@ -36,6 +37,7 @@ trap cleanup EXIT
 say "A scratch database with production's migrations"
 supabase init < /dev/null > /dev/null
 sed -i.bak 's/^project_id = .*/project_id = "publish-journey"/' "$WORK/supabase/config.toml" && rm -f "$WORK/supabase/config.toml.bak"
+scratch_ports "$WORK/supabase/config.toml" || fail "Couldn't move the scratch database off the ports the machine's own connections use."
 mkdir -p "$WORK/supabase/migrations"
 for f in "$REPO"/supabase/migrations/[0-9]*.sql; do
   case "$(basename "$f")" in 0003_*|0004_*|0005_*) continue ;; esac
@@ -46,7 +48,7 @@ known="$(supabase start --help 2>&1 || true)"; skip=""
 for name in studio imgproxy mailpit inbucket realtime logflare vector supavisor postgres-meta edge-runtime; do
   if printf '%s' "$known" | grep -qE "[[,]$name[],]"; then skip="$skip${skip:+,}$name"; fi
 done
-supabase start ${skip:+-x "$skip"} > "$WORK/start.log" 2>&1 || { tail -40 "$WORK/start.log"; fail "The scratch database didn't start."; }
+scratch_start "$WORK/start.log" ${skip:+-x "$skip"} || { tail -40 "$WORK/start.log"; fail "The scratch database didn't start."; }
 eval "$(supabase status -o env 2>/dev/null | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
 [ -n "${API_URL:-}" ] && [ -n "${SERVICE_ROLE_KEY:-}" ] || fail "The scratch database didn't say its address and keys."
 {
