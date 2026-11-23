@@ -70,7 +70,9 @@ globalThis.fetch = (input, init = {}) => {
   return reply([]);
 };
 const exp = Math.floor(Date.now() / 1000) + 3600;
-const token = await signApprovalToken({ site_id: CAFE, kind: 'connected', plan_id: WRITE, exp }, SECRET);
+// builder item 394: a one-tap link is signed with the server's own approval key (made from APPROVAL_SECRET)
+const { linkKey } = await import('../../supabase/functions/_shared/link_keys.ts');
+const token = await signApprovalToken({ site_id: CAFE, kind: 'connected', plan_id: WRITE, exp }, linkKey('approval'));
 {
   const g = await handleApproveGet(new Request(`https://db.example/functions/v1/presence/approve?token=${encodeURIComponent(token)}`), {});
   const d = (await g.json()).data || {};

@@ -10,6 +10,7 @@
 import { renderSnapshot, renderForBuilder, listTemplates, FIXED_COLOR_TEMPLATES } from '../../supabase/functions/presence/lib/render.ts';
 import { BLOCK_CSS } from '../../supabase/functions/presence/lib/site_blocks.ts';
 import { BUTTON_SETS, buttonStyle, siteColours, contrast, mixHex, hex6 } from '../../supabase/functions/presence/lib/site_buttons.ts';
+import { STYLE_LOOKS } from '../../supabase/functions/presence/lib/style_looks.ts';   // the ready-made looks: the server's one list
 import { fixture, fullFixture } from './full_fixture.mjs';
 import { editorSource } from './editor_source.mjs';   // builder item 38: the editor is four files now
 
@@ -82,7 +83,7 @@ function drawn(rules, band, box) {
 
 // ── every template, every set, every palette ──
 const pageArray = (name) => new Function(`return ${PAGE.match(new RegExp(`\\nconst ${name} = (\\[[\\s\\S]*?\\n\\]);`))[1]};`)();
-const CHOICES = [{ name: 'its own colours', tokens: {} }, ...[...pageArray('PALETTES'), ...pageArray('STYLE_LOOKS')].filter((p) => p.tokens && Object.keys(p.tokens).length)];
+const CHOICES = [{ name: 'its own colours', tokens: {} }, ...[...pageArray('PALETTES'), ...STYLE_LOOKS].filter((p) => p.tokens && Object.keys(p.tokens).length)];
 const onBand = (list) => (list || []).map((b) => ({ ...b, look: { ...(b.look || {}), background: 'accent' } }));
 for (const { slug } of listTemplates()) {
   const fx = fullFixture(slug);   // one of every section the builder offers, a form among them

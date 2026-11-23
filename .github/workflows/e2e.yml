@@ -59,7 +59,7 @@ jobs:
     steps:
       # Depth 2 gives the next step something to compare with: a pull request is
       # checked out as GitHub's trial merge, whose first parent is the base branch.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 2
       # Run unless every changed file is one the suite cannot reach. The test server
@@ -119,6 +119,13 @@ jobs:
               supabase/functions/presence/lib/site_buttons.ts) run=true ;;
               # new-site-gallery-198.spec.ts imports the gallery's kinds and designs from this (builder item 198).
               supabase/functions/presence/lib/design_gallery.ts) run=true ;;
+              # style-looks-333.spec.ts loads the looks' faces from the library and draws a page with the looks' own layer (builder item 333).
+              supabase/functions/presence/lib/fonts.ts) run=true ;;
+              supabase/functions/presence/lib/site_looks.ts) run=true ;;
+              # style-looks-333.spec.ts sends the editor the looks from this, as the server does.
+              supabase/functions/presence/lib/style_looks.ts) run=true ;;
+              # kind-openings.spec.ts builds + New site's openings from this.
+              supabase/functions/presence/lib/kind_openings.ts) run=true ;;
               # published-sites-nov-22.spec.ts presses the phone menu, the zoom view and the carousel drawn with these (builder items 288, 294, 298).
               supabase/functions/presence/lib/site_shell.ts) run=true ;;
               supabase/functions/presence/lib/site_block_scripts.ts) run=true ;;
@@ -190,8 +197,8 @@ jobs:
           - { project: tablet, shard: 2, shards: 3 }
           - { project: tablet, shard: 3, shards: 3 }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
           cache: npm
@@ -228,7 +235,7 @@ jobs:
         run: node scripts/e2e-summary.mjs test-results/results.json "$PART" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: playwright-report-${{ matrix.project }}-${{ matrix.shard }}-of-${{ matrix.shards }}
           path: playwright-report/

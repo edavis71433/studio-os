@@ -25,7 +25,8 @@ ok('scripts: our own, the consent-gated analytics, the free tools\' human check,
 ok('styles and fonts come only from the site itself (no Google Fonts)',
   (directives.get('style-src') || []).join(' ') === "'self' 'unsafe-inline'" && (directives.get('font-src') || []).join(' ') === "'self'");
 ok('frames: only the human check', (directives.get('frame-src') || []).join(' ') === 'https://challenges.cloudflare.com');
-ok('forms post only to the site and the contact form service', (directives.get('form-action') || []).join(' ') === "'self' https://formspree.io");
+// builder item 397: the contact form service is gone from the rule (the app's /contact forwards to the main site)
+ok('forms post only to the site itself', (directives.get('form-action') || []).join(' ') === "'self'");
 ok('no other site may frame a page (the same as X-Frame-Options: DENY)', (directives.get('frame-ancestors') || []).join(' ') === "'none'" && /X-Frame-Options: DENY/.test(star));
 ok('plugins and <base> stay shut', (directives.get('object-src') || []).join(' ') === "'none'" && (directives.get('base-uri') || []).join(' ') === "'self'");
 ok('anything not named falls back to the site itself', (directives.get('default-src') || []).join(' ') === "'self'");

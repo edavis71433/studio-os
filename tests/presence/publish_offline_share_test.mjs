@@ -524,12 +524,13 @@ let TOK_A = '';
   const alone = leftAlone(SITE_B, m);
   ok('share link: another studio’s preview, token and versions are not read and not changed', rowsOf(SITE_B) === bBefore && db.tables.presence_site_preview.find((p) => p.site_id === SITE_B)?.token === TOKEN_B && slot()?.token !== TOKEN_B && alone.ok, alone.note);
 
-  const saved = Deno.env.get('PREVIEW_LINK_SECRET'), cron = Deno.env.get('SCHEDULER_SECRET');
-  Deno.env.delete('PREVIEW_LINK_SECRET'); Deno.env.delete('SCHEDULER_SECRET');
+  // item 394: with no secret at all (no link secret and no database key) nothing can be signed
+  const saved = Deno.env.get('PREVIEW_LINK_SECRET'), cron = Deno.env.get('SCHEDULER_SECRET'), dbk = Deno.env.get('SERVICE_ROLE_KEY'), dbk2 = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  Deno.env.delete('PREVIEW_LINK_SECRET'); Deno.env.delete('SCHEDULER_SECRET'); Deno.env.delete('SERVICE_ROLE_KEY'); Deno.env.delete('SUPABASE_SERVICE_ROLE_KEY');
   const m2 = mark();
   let off;
   try { off = await run(() => PENV.handlePreviewShareLink(req('POST', '/preview/share-link', { capture: true }), siteOf(SITE_A), OWNER[SITE_A], {})); }
-  finally { Deno.env.set('PREVIEW_LINK_SECRET', saved); Deno.env.set('SCHEDULER_SECRET', cron); }
+  finally { Deno.env.set('PREVIEW_LINK_SECRET', saved); Deno.env.set('SCHEDULER_SECRET', cron); if (dbk) Deno.env.set('SERVICE_ROLE_KEY', dbk); if (dbk2) Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', dbk2); }
   ok('share link: with no signing secret it refuses before capturing anything', off.status === 503 && off.body?.error === 'unavailable' && writesSince(m2).length === 0, `${off.status} ${off.text.slice(0, 120)}`);
 }
 

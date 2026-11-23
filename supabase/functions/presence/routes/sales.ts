@@ -4,6 +4,8 @@
 //   · convert. Every query is site_id-scoped (tenant isolation); send/decide/
 //   sign/convert are idempotent. Convert bridges to the existing, idempotent
 //   provisionForSignup — no second provisioning path, no legacy data.
+import { linkKey, signedWithAny } from '../../_shared/link_keys.ts';   // builder item 394: each kind of link has its own key
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc, svcCount, svcPages } from '../lib/db.ts';
 import { writeChangeEvent } from '../lib/provenance.ts';
@@ -96,20 +98,22 @@ export const isReservedName = (n: unknown) => /^__.*__$/.test(String(n ?? '').tr
 export const CONNECT_INTENT_TAG = '[[connect-on-signup]]';
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const actorOf = (p: Principal) => ({ actor: p.email || p.userId || 'system', actor_kind: p.kind });
-const siteUrl = () => (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+const siteUrl = () => appBase();
 export const fnBase = () => (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
 /** Where a Document of Record OPENS: the doc.html viewer on OUR origin — never
  *  the raw edge-function URL. Supabase's default *.supabase.co domain rewrites
  *  GET text/html responses to text/plain, so a direct link to the server-
  *  rendered /sales/doc/<token> route shows raw HTML source in a browser.
- *  doc.html fetches that same route and renders it. Same SITE_URL env every
- *  emailed absolute link already uses. The GET route itself stays — the viewer
+ *  doc.html fetches that same route and renders it. Same app address every
+ *  emailed absolute link uses (appBase(), builder item 388). The GET route itself stays — the viewer
  *  (and any previously emailed direct link) still hits it. */
 export function docViewerUrl(token: string): string { return `${siteUrl()}/doc.html?t=${encodeURIComponent(token)}`; }
 
 // ── signed accept/sign links (reuse the house HMAC idiom; new sales scope) ──
+// Builder item 394: the key for proposal, agreement, estimate and document links, its own
+// (_shared/link_keys.ts), never the scheduler's secret; links signed before still open.
 export function linkSecret(): string | null {
-  return Deno.env.get('APPROVAL_SECRET') || Deno.env.get('STATE_SIGNING_SECRET') || Deno.env.get('SCHEDULER_SECRET') || null;
+  return linkKey('sales') || null;
 }
 function b64url(s: string): string { return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function unb64url(s: string): string { const pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : ''; return atob(s.replace(/-/g, '+').replace(/_/g, '/') + pad); }
@@ -126,7 +130,7 @@ export async function signSalesToken(payload: { t: SalesTokenKind; id: string; s
 export async function verifySalesToken(token: string, secret: string, nowSec: number): Promise<{ t: SalesTokenKind; id: string; site_id: string; exp: number } | null> {
   const parts = String(token || '').split('.');
   if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
-  if (!timingSafeEqual(parts[1], await hmacHex(secret, parts[0]))) return null;
+  if (!(await signedWithAny('sales', secret, async (k) => timingSafeEqual(parts[1], await hmacHex(k, parts[0]))))) return null;
   let p: any; try { p = JSON.parse(unb64url(parts[0])); } catch { return null; }
   if (!p || (p.t !== 'proposal' && p.t !== 'contract' && p.t !== 'flow' && p.t !== 'estimate') || !UUID_RE.test(p.id || '') || !UUID_RE.test(p.site_id || '') || typeof p.exp !== 'number') return null;
   if (p.exp < nowSec) return null;
@@ -2496,7 +2500,7 @@ export async function handleSalesProposalDecide(req: Request, id: string, cors: 
       const why = declineWords(reason, note);
       const fresh = st?.client_id ? await raiseNotice({ siteId: tok.site_id, clientId: st.client_id, kind: 'deal_followup', period: `declined:${dealId}`, headline: `They passed on the proposal — ${title}`, body: why ? `What would make it a yes — ${why}. An updated proposal can answer it.` : 'The client declined. A quick follow-up note often keeps the door open — or send an updated proposal.' }) : false;
       if (fresh) {
-        const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+        const base = appBase();
         const e = (x: string) => x.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
         await emailOperator(tok.site_id, `They passed on the proposal — ${title}`,
           `<p>The client declined the proposal for <b>${e(String(title))}</b>.</p>${why ? `<p>What would make it a yes: ${e(why)}</p>` : '<p>They didn’t say why.</p>'}<p>Revise sends them an updated one on the same link.</p>`,
@@ -2767,7 +2771,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
     try {
       const dealTitle = String(rows(await svc(`presence_deals?id=eq.${dealId}&site_id=eq.${tok.site_id}&select=title&limit=1`))[0]?.title || 'a deal');
       const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
-      const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+      const base = appBase();
       await emailOperator(tok.site_id,
         `Signed — ${dealTitle}`,
         `<p><b>${esc(signerName)}</b> signed <b>${esc(String(c.title || 'the service agreement'))}</b>.</p>` +
@@ -3387,14 +3391,14 @@ async function linkAgencyPortfolio(principal: Principal, siteId: string | undefi
 export async function sendCustomerInvite(siteId: string, email: string, _isNewLogin: boolean, opts: { firstName?: string } = {}): Promise<boolean> {
   if (!email) return false;
   const first = firstNameOf(opts.firstName || '');   // builder item 348: greeted by name when we know it
-  // App pages (set-password/get-started/portal) ARE served on the primary site —
-  // build-public.sh copies every root .html into dist/ and _redirects blocks only
-  // source/doc dirs, not these pages. So the link MUST use the same origin as the
-  // Supabase project's Site URL (davisdigitalstudio.com), matching workspace.ts /
-  // service_bridge.ts. A different host (e.g. a non-configured subdomain) is not in
-  // GoTrue's redirect allow-list, so the recovery link silently falls back to the
-  // Site URL — i.e. lands on the home page. SITE_URL env should be set to this too.
-  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  // The app's pages (set-password, portal) live on the app's own address, not the main
+  // site: davisdigitalstudio.com is Squarespace now, where these pages answer "not found"
+  // (its forward to the app drops everything after the "?"). So the link uses appBase()
+  // (_shared/app_url.ts): SITE_URL, which production sets to the app's address, else the
+  // app's address itself (builder item 388). Whatever it is must also be on the Supabase
+  // project's list of allowed redirect addresses, or a sign-in link lands on the project's
+  // Site URL instead.
+  const base = appBase();
   const brand = await loadEmailBrand(siteId).catch(() => EMAIL_BRAND_DEFAULT);
   // A studio that never filled its identity card resolves to the platform-default
   // brand name; the subject then stays bare rather than greeting the client from

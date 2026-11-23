@@ -80,6 +80,24 @@
   .kres li.ok::before{content:"✓";color:var(--ok)} .kres li.bad::before{content:"✕";color:var(--attn)} .kres li.unsure::before{content:"?";color:var(--off)}
   .kres li b{color:var(--ink);font-weight:600}
   .kres .kt{margin-top:var(--dds-s3,12px);font-size:12px;color:var(--faint)}
+  /* builder item 398: the outside accounts card, one row per account */
+  .c12{grid-column:1/-1}
+  .acct{list-style:none;padding:0;margin:0}
+  .acct>li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--dds-s2,8px) var(--dds-s4,16px);padding:var(--dds-s3,12px) 0;border-top:1px solid var(--line)}
+  .acct>li:first-child{border-top:0}
+  .acct h4{margin:0;font-size:14.5px;font-weight:600}
+  .acct .why{color:var(--soft);font-size:13px;margin:2px 0 6px}
+  .acct ul{margin:0;padding-left:18px;color:var(--ink);font-size:13px}
+  .acct ul li{padding:2px 0;overflow-wrap:anywhere}
+  .acct .side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right}
+  .acct .when{font-size:12.5px;color:var(--faint);max-width:22ch}
+  .acct .go{color:var(--p);font-size:12.5px;font-weight:600;text-decoration:none}
+  .acct .go:hover{text-decoration:underline}
+  .tick{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 12px;font:600 12.5px var(--sans);cursor:pointer;min-height:32px}
+  .tick:hover{border-color:var(--p);color:var(--p)}
+  .tick[disabled]{color:var(--faint);cursor:default}
+  @media (pointer:coarse){.tick{min-height:44px}}   /* big enough for a finger */
+  @media (max-width:640px){.acct>li{grid-template-columns:1fr}.acct .side{align-items:flex-start;text-align:left}}
   .pill{flex:none;font-size:12px;font-weight:500;padding:var(--dds-s1,4px) var(--dds-s2,8px);border-radius:999px;white-space:nowrap;text-transform:capitalize}
   .pill.ok{color:var(--ok);background:var(--ok-soft)} .pill.attention{color:var(--attn);background:var(--attn-soft)} .pill.off{color:var(--off);background:var(--off-soft)}
 
@@ -259,10 +277,50 @@ function render(hc){
   const rest=orderAreas(areas.filter(a=>!seen[a.key]));
   if(rest.length){ h+='<h2 class="band">More</h2>'; h+=rest.map(areaCard).join(''); }
   h+=crashList(hc.recent_crashes);
+  // builder item 398: the accounts Studio OS depends on, filled in by loadAccounts()
+  h+='<h2 class="band" id="acctH">Accounts Studio OS depends on</h2><section class="card c12" id="acctCard" aria-labelledby="acctH"><div class="cb"><p class="dt">Getting the list…</p></div></section>';
   h+='</div>';
   h+='<p class="foot">Aggregated from what the platform already produces: activation dashboard, cron ledger, domain watch, billing, AI usage, email config, publish/run errors, server crashes, the database change ledger, active notices.</p>';
   $('main').innerHTML=h;
   const kb=$('keyCheck'); if(kb) kb.addEventListener('click',checkKey);
+  loadAccounts();
+}
+
+// ── builder item 398: the settings that keep Studio OS safe live in other companies'
+//    dashboards. Each account lists what to check and where; the owner ticks it after
+//    looking, and it is due again a quarter later. GET /admin/accounts, POST …/checked. ──
+const dayWords=(iso)=>{const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});};
+function acctWhen(a){
+  if(!a.checked_at) return 'Not checked yet';
+  return (a.due?'Due again. Last checked ':'Checked ')+dayWords(a.checked_at)+(a.checked_by?' by '+a.checked_by:'');
+}
+function paintAccounts(d){
+  const card=$('acctCard'); if(!card) return;
+  if(!d||!Array.isArray(d.accounts)){ card.innerHTML='<div class="cb"><p class="dt">The list didn’t load just now. Try ↻ Refresh in a moment.</p></div>'; return; }
+  const due=d.due||0;
+  let h='<div class="ch"><h3 class="t">'+(due?esc(due+' of '+d.accounts.length+' due for a look'):'All looked at this quarter')+'</h3><span class="pill '+(due?'attention':'ok')+'">'+(due?'Due':'OK')+'</span></div>';
+  h+='<div class="cb"><p class="dt">These settings live in each company’s own dashboard, so nothing here can check them for you. Once a quarter, open each one, look, and tick it.'+(d.ready===false?' The ticks can’t be saved until the database change for this card has run.':'')+'</p><ul class="acct">';
+  for(const a of d.accounts){
+    h+='<li><div><h4>'+esc(a.name)+'</h4><p class="why">'+esc(a.why)+'</p><ul>'+a.checks.map((c)=>'<li>'+esc(c)+'</li>').join('')+'</ul></div>'
+      +'<div class="side"><span class="pill '+(a.due?'attention':'ok')+'">'+(a.due?'Due':'Checked')+'</span><span class="when">'+esc(acctWhen(a))+'</span>'
+      +'<a class="go" href="'+esc(a.where)+'" target="_blank" rel="noopener">Open '+esc(a.name)+' →</a>'
+      +(d.can_tick?'<button type="button" class="tick" data-acct="'+esc(a.key)+'">I checked '+esc(a.name)+' today</button>':'')+'</div></li>';
+  }
+  h+='</ul>'+(d.can_tick?'':'<p class="dt" style="margin-top:8px">Only the platform’s owner ticks these.</p>')+'</div>';
+  card.innerHTML=h;
+  card.querySelectorAll('[data-acct]').forEach((b)=>b.addEventListener('click',()=>tickAccount(b)));
+}
+async function loadAccounts(){
+  const r=await api('/admin/accounts');
+  paintAccounts(r.ok&&r.body?r.body.data:null);
+}
+async function tickAccount(b){
+  if(b.disabled) return;
+  const key=b.getAttribute('data-acct'); b.disabled=true; const was=b.textContent; b.textContent='Saving…';
+  const r=await ddsApi('/admin/accounts/'+encodeURIComponent(key)+'/checked',{scope:'',method:'POST',body:{}});
+  if(!r.ok){ b.disabled=false; b.textContent=was; toast((r.body&&r.body.message)||'That didn’t save just now.','err'); return; }
+  paintAccounts(r.body.data);
+  const again=document.querySelector('[data-acct="'+key+'"]'); if(again) again.focus();
 }
 
 function hideChrome(){ $('asof').hidden=true; $('refreshBtn').hidden=true; }

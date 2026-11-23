@@ -28,6 +28,7 @@
 //     keyed by member, so no migration.
 // The pure builders take batched reads, so a page costs a fixed number of queries
 // whatever the client count. The routes are at the end; routes.ts hands them over.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { can, agencySiteIds } from './auth.ts';
@@ -73,8 +74,75 @@ import { ownerReplyTo } from '../lib/service_bridge.ts';
 import { ownerWho, openTransfersFor, transferSummary, ownerFacts, hasOwnerFacts, ownerEmailsOf } from '../lib/site_transfer.ts';
 import type { AttachOwnerError } from '../commerce/account.ts';
 import { provisionCustomerAccount, bridgeCustomerToStudio, ensureConnectContact, linkContactToCustomer, sendCustomerInvite } from '../routes/sales.ts';
+import { openingStartFor, openingSummary, kindOpeningStart } from '../lib/template_openings.ts';
+import type { KindOpeningStart } from '../lib/template_openings.ts';
+import { openingsPayload } from '../lib/kind_openings.ts';
+import { LOOK_KEYS } from '../lib/style_looks.ts';
+import { validateThemeTokens } from '../lib/devmode.ts';
 
 const rowsOf = <T,>(q: { ok?: boolean; json?: unknown } | null | undefined): T[] => (q && q.ok !== false && Array.isArray(q.json) ? (q.json as T[]) : []);
+
+/* ── builder item 330: a new site opens the way its design does, in the design's own fonts ──
+   lib/template_openings.ts names, per design, the front-page layout and the two library fonts
+   (Eric's picks in Figma). + New site calls this once, after the site has its design (the one
+   picked, or the database's default) and any starter kit. It fills only what is still empty: a
+   site that already has a layout keeps it, one that already has fonts keeps them, and no other
+   site is ever reached. The fonts are saved the way Styles saves them, the two style tokens
+   beside the others, the developer's CSS and HTML kept as they are. Nothing here undoes the site:
+   a write that doesn't go through is left out of the answer and the site stays as it was made. */
+export interface OpeningOut { slug: string; layout: string; fonts: [string, string]; applied: { layout: boolean; fonts: boolean } }
+export async function startOpening(siteId: string, principal: Principal): Promise<OpeningOut | null> {
+  const site = rowsOf<{ template_slug?: string | null }>(await svc(`presence_sites?id=eq.${siteId}&select=template_slug&limit=1`).catch(() => null))[0];
+  const start = openingStartFor(site?.template_slug);
+  if (!start) return null;
+  const out: OpeningOut = { slug: start.slug, layout: start.hero_layout, fonts: start.fonts, applied: { layout: false, fonts: false } };
+  const [setQ, devQ] = await Promise.all([
+    svc(`presence_settings?site_id=eq.${siteId}&select=hero_layout&limit=1`).catch(() => null),
+    svc(`presence_dev_customizations?site_id=eq.${siteId}&select=theme_tokens,custom_css,custom_html&limit=1`).catch(() => null),
+  ]);
+  if (!setQ?.ok || !devQ?.ok) return out;   // what the site has couldn't be read, so nothing is written over it
+  if (!String(rowsOf<{ hero_layout?: string | null }>(setQ)[0]?.hero_layout || '')) {
+    const w = await svc('presence_settings?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, hero_layout: start.hero_layout }) }).catch(() => null);
+    out.applied.layout = !!w?.ok;
+  }
+  const dev = rowsOf<{ theme_tokens?: unknown; custom_css?: string | null; custom_html?: string | null }>(devQ)[0];
+  const tokens = dev?.theme_tokens && typeof dev.theme_tokens === 'object' && !Array.isArray(dev.theme_tokens) ? dev.theme_tokens as Record<string, unknown> : {};
+  if (!tokens.font_display && !tokens.font_body) {
+    const w = await svc('presence_dev_customizations?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, theme_tokens: validateThemeTokens({ ...tokens, ...start.tokens }).tokens, custom_css: dev?.custom_css ?? '', custom_html: dev?.custom_html ?? '' }) }).catch(() => null);
+    out.applied.fonts = !!w?.ok;
+  }
+  const summary = openingSummary(start, out.applied.layout, out.applied.fonts);
+  if (summary) await writeChangeEvent({ siteId, entityType: 'settings', entityId: null, action: 'update', summary, principal, provenance: 'human', fields: [...(out.applied.layout ? ['hero_layout'] : []), ...(out.applied.fonts ? ['theme_tokens'] : [])] }).catch(() => {});
+  return out;
+}
+
+/* ── the openings made for a kind of business (lib/kind_openings.ts) ──
+   + New site sends one of a kind's openings; this gives the site just made its layout, the name
+   centred at the top for the centred editorial ones, and its style: a ready-made look whole (or
+   the design's own new-site fonts), and the card on the photo, the panel's photo side or Type
+   only on the page, saved as Styles saves them. It is the last step, after any starter kit, and like a look picked in
+   Styles it replaces what a look sets (a kit's colours and fonts); everything else the site has,
+   the developer's CSS and HTML too, stays. Only this site is reached. A write that doesn't go
+   through is left out of the answer, and the site stays as it was made. */
+export interface KindOpeningOut { key: string; name: string; slug: string; layout: string; applied: { layout: boolean; style: boolean } }
+const OPENING_TOKENS = ['hero_card', 'hero_photo', 'hero_band'];
+export async function applyKindOpening(siteId: string, start: KindOpeningStart, principal: Principal): Promise<KindOpeningOut> {
+  const out: KindOpeningOut = { key: start.key, name: start.name, slug: start.slug, layout: start.hero_layout, applied: { layout: false, style: false } };
+  const devQ = await svc(`presence_dev_customizations?site_id=eq.${siteId}&select=theme_tokens,custom_css,custom_html&limit=1`).catch(() => null);
+  if (!devQ?.ok) return out;   // what the site has couldn't be read, so nothing is written over it
+  const set = await svc('presence_settings?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, hero_layout: start.hero_layout, ...(start.nav_style ? { nav_style: start.nav_style } : {}) }) }).catch(() => null);
+  out.applied.layout = !!set?.ok;
+  const dev = rowsOf<{ theme_tokens?: unknown; custom_css?: string | null; custom_html?: string | null }>(devQ)[0];
+  const had = dev?.theme_tokens && typeof dev.theme_tokens === 'object' && !Array.isArray(dev.theme_tokens) ? dev.theme_tokens as Record<string, unknown> : {};
+  const kept = Object.fromEntries(Object.entries(had).filter(([k]) => !(LOOK_KEYS as readonly string[]).includes(k) && !OPENING_TOKENS.includes(k)));
+  const w = await svc('presence_dev_customizations?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, theme_tokens: validateThemeTokens({ ...kept, ...start.tokens }).tokens, custom_css: dev?.custom_css ?? '', custom_html: dev?.custom_html ?? '' }) }).catch(() => null);
+  out.applied.style = !!w?.ok;
+  if (out.applied.layout || out.applied.style) {
+    const fields = [...(out.applied.layout ? ['hero_layout', ...(start.nav_style ? ['nav_style'] : [])] : []), ...(out.applied.style ? ['theme_tokens'] : [])];
+    await writeChangeEvent({ siteId, entityType: 'settings', entityId: null, action: 'update', summary: `Opens with “${start.name}”`, principal, provenance: 'human', fields }).catch(() => {});
+  }
+  return out;
+}
 
 /* ── plans, in the words a studio uses ── */
 export const PLAN_WORDS: Record<string, string> = {
@@ -682,7 +750,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
   //    kind sees first. The same for every studio, so the page may keep it a while. ──
   if (route === '/agency/designs' && method === 'GET') {
     if (!can(member.role, 'read')) return forbid(cors);
-    return json({ data: galleryPayload(listTemplates()) }, 200, { ...cors, 'Cache-Control': 'private, max-age=300' });
+    return json({ data: galleryPayload(listTemplates(), openingsPayload()) }, 200, { ...cors, 'Cache-Control': 'private, max-age=300' });
   }
 
   // ── + New site (item 135): a site from a business name and, if picked, one of
@@ -692,16 +760,33 @@ export async function handleAgencySites(req: Request, route: string, method: str
   //    the studio's customers when its owner is invited. The account and the site
   //    are made the one way every customer's are (routes/sales.ts
   //    provisionCustomerAccount, no email: "a studio-managed workspace"). ──
+  // ── item 331: "See it full size", a kind's sample site drawn in one design ──
+  const sm = route.match(/^\/agency\/designs\/([a-z0-9-]{1,60})\/sample$/);
+  if (sm && method === 'GET') {
+    if (!can(member.role, 'read')) return forbid(cors);
+    const { samplePage } = await import('../lib/kind_samples.ts');
+    const q = new URL(req.url).searchParams, opening = q.get('opening') || '';
+    const html = await samplePage(q.get('kind'), sm[1], opening);
+    if (!html) return json({ error: 'not_found', message: opening ? 'That opening isn’t one of this design’s.' : 'That design isn’t one of the built-in ones.' }, 404, cors);
+    return json({ data: { html } }, 200, cors);
+  }
+
   if (route === '/agency/sites' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
-    let b: { business_name?: unknown; kit_id?: unknown; template_slug?: unknown; industry_key?: unknown; client_id?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+    let b: { business_name?: unknown; kit_id?: unknown; template_slug?: unknown; industry_key?: unknown; client_id?: unknown; opening?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
     const name = String(b.business_name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
     if (!name) return json({ error: 'bad_request', message: 'Name the business.' }, 400, cors);
     const kitId = b.kit_id == null || b.kit_id === '' ? '' : String(b.kit_id);
     if (kitId && !UUID_RE.test(kitId)) return json({ error: 'not_found', message: 'That starter kit isn’t one of yours.' }, 404, cors);
     // item 198: the look (one of the built-in designs) and the kind of business, both checked
     // before anything is made
-    const look = b.template_slug == null || b.template_slug === '' ? '' : String(b.template_slug);
+    // the openings made for a kind of business: one that is offered, and made with the design sent
+    const openingKey = b.opening == null || b.opening === '' ? '' : String(b.opening);
+    const kindOpen = openingKey ? kindOpeningStart(openingKey) : null;
+    if (openingKey && !kindOpen) return json({ error: 'bad_opening', message: 'That opening isn’t one of the ones offered.' }, 400, cors);
+    const sentLook = b.template_slug == null || b.template_slug === '' ? '' : String(b.template_slug);
+    if (kindOpen && sentLook && sentLook !== kindOpen.slug) return json({ error: 'bad_opening', message: 'That opening is made with another design.' }, 400, cors);
+    const look = kindOpen ? kindOpen.slug : sentLook;
     const lookVersion = look ? latestTemplateVersion(look) : null;
     if (look && !lookVersion) return json({ error: 'bad_template', message: 'That design isn’t one of the built-in ones.' }, 400, cors);
     const industry = b.industry_key == null || b.industry_key === '' ? '' : String(b.industry_key);
@@ -755,7 +840,12 @@ export async function handleAgencySites(req: Request, route: string, method: str
       try { kitOut = { id: kitId, name: kit.name, ...(await applyKitTo(kit.payload, acct.siteId, principal, `Started from the “${kit.name}” ${tpl ? 'template' : 'starter kit'}`, tpl ? { label: `your “${kit.name}” template` } : {})) }; }
       catch { kitOut = { id: kitId, name: kit.name, failed: true }; }
     }
-    return json({ data: { site_id: acct.siteId, client_id: acct.clientId, name, kit: kitOut, look: lookOut, industry: industryOut, for_customer: !!forClient } }, 201, cors);
+    // item 330: the design's own opening and fonts, last, so a starter kit's colours still land
+    // first; a saved template brings its own look, so it gets neither. An opening made for a kind
+    // of business takes the design's place, and its look goes on over the kit's colours.
+    const own = kit && kit.payload.layout;
+    const opening = own ? null : kindOpen ? await applyKindOpening(acct.siteId, kindOpen, principal).catch(() => null) : await startOpening(acct.siteId, principal).catch(() => null);
+    return json({ data: { site_id: acct.siteId, client_id: acct.clientId, name, kit: kitOut, look: lookOut, industry: industryOut, opening, for_customer: !!forClient } }, 201, cors);
   }
 
   // ── every domain: the clients' and the studio's own ──
@@ -816,6 +906,10 @@ export async function handleAgencySites(req: Request, route: string, method: str
         return json({ data: next }, 200, cors);
       }
       if (what === 'check' && method === 'POST') {
+        // builder item 396 (review file 06): a check can send the client's renewal reminder and
+        // the "your site is live" email, so it asks for the manager role, as the notes and Ask for
+        // access do. A view-only seat reads the panel and its last check.
+        if (!can(member.role, 'manage_clients')) return forbid(cors);
         const sq = rowsOf<{ id: string; client_id: string; custom_domain: string | null; netlify_site_id: string | null; edition: string | null; cert_pending_since: string | null; domain_checked_at: string | null }>(
           await svc(`presence_sites?id=eq.${siteId}&select=id,client_id,custom_domain,netlify_site_id,edition,cert_pending_since,domain_checked_at&limit=1`))[0];
         if (!sq || !sq.custom_domain) return json({ error: 'no_domain', message: 'This site has no domain of its own to check.' }, 409, cors);
@@ -823,21 +917,32 @@ export async function handleAgencySites(req: Request, route: string, method: str
         if (since < CHECK_NOW_GAP_MS) return json({ error: 'too_soon', message: 'Checked a moment ago. Give it a minute before checking again.' }, 429, cors);
         await (await import('../commerce/lifecycle.ts')).checkOneDomain({ ...sq, custom_domain: sq.custom_domain }, now);
         const detail = await domainDetail(siteId, now);
-        return detail ? json({ data: { ...detail, access_invite: detail.own ? '' : member.email || '' } }, 200, cors) : notYours(cors);   // item 222: as the panel's read
+        return detail ? json({ data: { ...detail, access_invite: detail.own ? '' : member.email || '', can_manage: true } }, 200, cors) : notYours(cors);   // item 222: as the panel's read
       }
       if (what === 'access') return domainAccessRoute(req, method, siteId, own, member, principal, now, cors);   // item 222
       if (what === '' && method === 'GET') {
         const detail = await domainDetail(siteId, now);
         // item 222: the address Ask for access invites, unless the studio types another
-        return detail ? json({ data: { ...detail, access_invite: detail.own ? '' : member.email || '' } }, 200, { ...cors, 'Cache-Control': 'no-store' }) : notYours(cors);
+        // item 396: whether this seat may press Check now and save notes (the page greys them otherwise)
+        return detail ? json({ data: { ...detail, access_invite: detail.own ? '' : member.email || '', can_manage: can(member.role, 'manage_clients') } }, 200, { ...cors, 'Cache-Control': 'no-store' }) : notYours(cors);
       }
       return null;
     }
   }
 
-  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied|invite|trash|restore)$/);
+  const m = route.match(/^\/agency\/sites\/([0-9a-f-]{36})\/(thumb|pin|duplicate|copied|invite|trash|restore|runs|first-draft)$/);
   if (!m) return null;
   const siteId = m[1], what = m[2];
+
+  // ── + New site's optional first draft (item 332): the starter draft into the site's private draft ──
+  if (what === 'first-draft' && method === 'POST') {
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notYours(cors);
+    const site = rowsOf<SiteRow>(await svc(`presence_sites?id=eq.${siteId}&select=${SITE_COLS}&limit=1`))[0];
+    if (!site || site.edition === 'monitor') return notYours(cors);
+    const { handleFirstDraft } = await import('./first_draft.ts');
+    return handleFirstDraft(req, site, principal, cors);
+  }
 
   // ── a card's live thumbnail ──
   if (what === 'thumb' && method === 'GET') {
@@ -858,6 +963,31 @@ export async function handleAgencySites(req: Request, route: string, method: str
   }
 
   // ── pin a site to the top of YOUR Sites page (item 45) ──
+  // ── Builder item 387: "They can publish and run their website", one switch per client. Off
+  //    (the default), the studio keeps Publish, Take offline, the template, the domain and who
+  //    works on the site; on, the client may do those too (lib/studio_holds.ts). Reading it is
+  //    any seat's; changing it is a manager's, as the client's other settings are. ──
+  if (what === 'runs' && (method === 'GET' || method === 'PUT')) {
+    if (!can(member.role, 'read')) return forbid(cors);
+    if (!(await agencySiteIds(member.agency_id)).includes(siteId)) return notYours(cors);
+    const linkAt = `presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`;
+    const answer = (row: { client_runs_site?: unknown; client_runs_site_at?: unknown; client_runs_site_by?: unknown } | null) => json({ data: {
+      site_id: siteId, on: row?.client_runs_site === true, at: typeof row?.client_runs_site_at === 'string' ? row.client_runs_site_at : null,
+      by: typeof row?.client_runs_site_by === 'string' && row.client_runs_site_by ? row.client_runs_site_by : null, can_change: can(member.role, 'manage_clients'),
+    } }, 200, { ...cors, 'Cache-Control': 'no-store' });
+    if (method === 'GET') {
+      const r = await svc(`${linkAt}&select=client_runs_site,client_runs_site_at,client_runs_site_by&limit=1`);
+      return answer(r.ok && Array.isArray(r.json) ? r.json[0] || null : null);   // before migration 0265: off
+    }
+    if (!can(member.role, 'manage_clients')) return forbid(cors);
+    let b: { on?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+    if (typeof b.on !== 'boolean') return json({ error: 'bad_request', message: 'Say on true or false.' }, 400, cors);
+    const w = await svc(linkAt, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ client_runs_site: b.on, client_runs_site_at: new Date().toISOString(), client_runs_site_by: member.email || '' }) });
+    const row = w.ok && Array.isArray(w.json) ? w.json[0] || null : null;
+    if (!row) return json({ error: 'write_failed', message: 'That didn’t save just now. Try again in a moment.' }, 502, cors);
+    return answer(row);
+  }
+
   if (what === 'pin' && method === 'PUT') {
     if (!can(member.role, 'read')) return forbid(cors);
     let b: { pinned?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
@@ -957,7 +1087,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
     await svc(`presence_agency_clients?site_id=eq.${siteId}&agency_id=eq.${member.agency_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_email: email }) }).catch(() => null);
     const invited = await sendCustomerInvite(own.id, email, true).catch(() => false);
     // builder item 192: the page to share when the email didn't go out (it shows this studio's name)
-    const portal_url = `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/portal.html?studio=${own.id}`;
+    const portal_url = `${appBase()}/portal.html?studio=${own.id}`;
     return json({ data: { site_id: siteId, email, invited, portal_url } }, 200, cors);
   }
 

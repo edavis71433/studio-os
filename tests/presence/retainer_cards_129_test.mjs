@@ -45,7 +45,7 @@ const settle = async () => { for (let i = 0; i < 20; i++) await new Promise((r) 
 const P = '../../supabase/functions/presence';
 const { retainerPortalView, applyRetainerSync, retainerNoticeCopy } = await import(`${P}/commerce/retainers.ts`);
 const { clientRetainers } = await import(`${P}/routes/client_retainers.ts`);
-const { handleClientRetainerCard, handleSalesRetainerCardLink, handleRetainerCardOpen, signCardToken, readCardToken } = await import(`${P}/routes/retainer_card.ts`);
+const { handleClientRetainerCard, handleSalesRetainerCardLink, handleRetainerCardOpen, signCardToken, readCardToken, cardLinkSecret } = await import(`${P}/routes/retainer_card.ts`);
 const { signSalesToken, verifySalesToken } = await import(`${P}/routes/sales.ts`);
 const { readDocToken } = await import(`${P}/lib/documents.ts`);
 const { STRIPE_API_VERSION } = await import(`${P}/commerce/stripe_shape.ts`);
@@ -136,10 +136,10 @@ const nowSec = () => Math.floor(Date.now() / 1000);
   ok('email: a failed charge says so in the subject', m.subject === 'Your retainer payment didn’t go through');
   const url = String(r.body?.data?.url || '');
   ok('email: the link opens card.html on the app, and is the one in the email', url.startsWith('https://app.example/card.html?t=') && m.html.includes(url), url);
-  const tok = await readCardToken(new URL(url).searchParams.get('t'), SECRET, nowSec());
+  const tok = await readCardToken(new URL(url).searchParams.get('t'), cardLinkSecret(), nowSec());   // item 394: the server's own key for card links
   ok('email: the link names this deal on this studio\'s site', tok?.ok === true && tok.id === DEAL && tok.site_id === STUDIO.id, JSON.stringify(tok));
-  const later = await readCardToken(new URL(url).searchParams.get('t'), SECRET, nowSec() + 29 * 86400);
-  const tooLate = await readCardToken(new URL(url).searchParams.get('t'), SECRET, nowSec() + 31 * 86400);
+  const later = await readCardToken(new URL(url).searchParams.get('t'), cardLinkSecret(), nowSec() + 29 * 86400);
+  const tooLate = await readCardToken(new URL(url).searchParams.get('t'), cardLinkSecret(), nowSec() + 31 * 86400);
   ok('email: the link lasts 30 days', later?.ok === true && tooLate?.ok === false && tooLate?.expired === true);
   ok('email: the studio is told where it went, without the whole address', r.body?.data?.to && r.body.data.to !== 'jordan@client.example' && r.body.data.to.endsWith('@client.example'), String(r.body?.data?.to));
   ok('email: the email names the amount and Stripe\'s own page, and greets them by name', m.html.includes('$500.00 a month') && m.html.includes('Stripe’s secure page') && m.html.includes('Hi Jordan,'));
@@ -175,7 +175,7 @@ const nowSec = () => Math.floor(Date.now() / 1000);
 // ═══ 5. opening the emailed link ═══
 {
   seed(live());
-  const token = await signCardToken(DEAL, STUDIO.id, nowSec(), SECRET);
+  const token = await signCardToken(DEAL, STUDIO.id, nowSec(), cardLinkSecret());   // item 394: as the server signs it
   const r = await answer(await handleRetainerCardOpen(post('/retainer-card', { token }), {}));
   const c = world.stripe[0] || { body: {} };
   ok('open: a fresh Stripe page, for this retainer\'s customer', r.status === 200 && r.body?.data?.url === 'https://billing.stripe.com/p/session/test_1' && c.path === '/v1/billing_portal/sessions' && c.body.customer === 'cus_1' && c.body['flow_data[type]'] === 'payment_method_update', JSON.stringify(r));
@@ -184,7 +184,7 @@ const nowSec = () => Math.floor(Date.now() / 1000);
   ok('open: nothing is written, nobody is emailed', db.writes('presence_deals').length === 0 && world.mail.length === 0);
 
   seed(live());
-  const old = await signCardToken(DEAL, STUDIO.id, nowSec() - 31 * 86400, SECRET);
+  const old = await signCardToken(DEAL, STUDIO.id, nowSec() - 31 * 86400, cardLinkSecret());
   const ran = await answer(await handleRetainerCardOpen(post('/retainer-card', { token: old }), {}));
   ok('open: a link past its 30 days says so, and whom to ask', ran.status === 410 && ran.body?.error === 'expired' && /Ask Test Studio/.test(ran.body?.message || '') && world.stripe.length === 0, JSON.stringify(ran));
   ok('open: a made-up link reads as not right', (await answer(await handleRetainerCardOpen(post('/retainer-card', { token: 'abc.def' }), {}))).status === 404 && world.stripe.length === 0);
@@ -239,7 +239,7 @@ const nowSec = () => Math.floor(Date.now() / 1000);
   await import('../../supabase/functions/presence/index.ts');
   const send = (request) => new Promise((resolve) => { const ev = { request, respondWith: async (r) => { resolve(await r); } }; if (wake) { const w = wake; wake = null; w(ev); } else queue.push(ev); });
   seed(live());
-  const token = await signCardToken(DEAL, STUDIO.id, nowSec(), SECRET);
+  const token = await signCardToken(DEAL, STUDIO.id, nowSec(), cardLinkSecret());   // item 394: as the server signs it
   const res = await send(new Request('https://db.test/functions/v1/presence/retainer-card', { method: 'POST', headers: { 'Content-Type': 'application/json', origin: 'https://app.davisdigitalstudio.com' }, body: JSON.stringify({ token }) }));
   const out = { status: res.status, body: await res.json().catch(() => null) };
   ok('router: a client with no sign-in opens the link and gets Stripe\'s page', out.status === 200 && out.body?.data?.url === 'https://billing.stripe.com/p/session/test_1', JSON.stringify(out));

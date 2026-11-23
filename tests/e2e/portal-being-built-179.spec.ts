@@ -40,17 +40,16 @@ const API: Record<string, unknown> = {
   '/client/website-thumb': { data: { html: '<html><body><h1 id="dh">Fresh flowers daily</h1></body></html>', version: 'draft' } },
 };
 const start = (page: Page, api: Record<string, unknown> = {}) => installApp(page, { api: { ...API, ...api } });
-const card = (page: Page) => page.locator('#home-website .wsbuild');
+const card = (page: Page) => page.locator('#hero-site');   // items 247/335 (direction A): the website is the hero, inside the band
 
 test.describe('Client portal while the website is being built (item 179)', () => {
   test('being built: the card leads Home, says what comes next, and has no button', async ({ page }) => {
     await start(page);
     await page.goto('/client.html');
-    await expect(card(page).locator('.pill-build')).toHaveText('Being built');
-    await expect(card(page).locator('h3')).toHaveText('Your website is on its way.');
-    await expect(card(page).locator('.wslead')).toHaveText('It isn’t live yet. Marlow & Co is building it. Next: the 2 things under Needs you.');
-    await expect(card(page).getByRole('button')).toHaveCount(0);
-    await expect(card(page).locator('.wspic.dim iframe')).toHaveCount(1);   // the draft so far, faded
+    await expect(card(page).locator('.hline')).toHaveText('Your website is on its way.');
+    await expect(card(page).locator('.hsub')).toHaveText('Marlow & Co is building it. Next: the 2 things under Needs you.');
+    await expect(card(page).getByRole('button', { name: /See the design|See the draft/ })).toHaveCount(0);
+    await expect(card(page).locator('.hart.dim iframe')).toHaveCount(2);   // the draft so far, faded, in the browser and the phone frame
     // the draft review asks for nothing yet, so only the two real asks are queued
     await expect(page.locator('#needs-h')).toHaveText('Needs you · 2');
     await expect(page.locator('#needs-body').getByRole('heading', { name: 'Review the design draft' })).toHaveCount(0);
@@ -65,20 +64,18 @@ test.describe('Client portal while the website is being built (item 179)', () =>
     await page.route(`**/functions/v1/presence/client/approvals/${AW}/draft*`, (route) => route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({ data: { approval: { id: AW, status: 'pending' }, page: '', pages: [{ slug: '', title: 'Home' }], sections: [], notes: [], html: '<html><body><h1>Fresh flowers daily</h1></body></html>' } }) }));
     await page.goto('/client.html');
-    await expect(card(page).locator('.pill-draft')).toHaveText('Draft ready');
-    await expect(card(page).locator('h3')).toHaveText('Your draft is ready to look at.');
-    await expect(card(page).locator('.wslead')).toContainText('Marlow & Co asked: “Does this feel like your shop?”');
-    await expect(card(page).locator('.wspic.dim')).toHaveCount(0);
-    await card(page).getByRole('button', { name: 'Review the draft' }).click();
+    await expect(card(page).locator('.hline')).toHaveText('Your draft is ready to look at.');
+    await expect(card(page).locator('.hsub')).toContainText('Marlow & Co sent a draft.');
+    await expect(card(page).locator('.hart.dim')).toHaveCount(0);
+    await card(page).getByRole('button', { name: 'See the design' }).click();
     await expect(page.locator('#main h1')).toHaveText('Your website draft');
   });
 
   test('approved: says so and what happens next', async ({ page }) => {
     await start(page, { [`/client/projects/${PID}`]: bundle({ approvals: [ap('approved')] }) });
     await page.goto('/client.html');
-    await expect(card(page).locator('.pill-live')).toHaveText('Approved');
-    await expect(card(page).locator('h3')).toHaveText('You approved your website.');
-    await expect(card(page).locator('.wslead')).toContainText('Marlow & Co is getting it ready to go live.');
+    await expect(card(page).locator('.hline')).toHaveText('You approved your website.');
+    await expect(card(page).locator('.hsub')).toContainText('Marlow & Co is getting it ready to go live.');
     await expect(card(page).getByRole('button', { name: 'See the draft again' })).toBeVisible();
   });
 
@@ -90,16 +87,17 @@ test.describe('Client portal while the website is being built (item 179)', () =>
     await expect(page.locator('#needs-body .qrow').first()).toBeVisible();
     await expect(page.locator('#home-website')).toBeHidden();
     const top = (sel: string) => page.locator(sel).evaluate((e) => Math.round(e.getBoundingClientRect().top));
-    expect(Math.abs(await top('#home-projects') - await top('#home-needs'))).toBeLessThan(4);
+    expect(Math.abs(await top('#home-studio') - await top('#home-needs'))).toBeLessThan(4);   // direction A: the studio's card keeps Needs you company
   });
 
-  test('…and with the card, the website sits beside Needs you', async ({ page }, info) => {
+  test('…and the studio’s card sits beside Needs you, under the hero band', async ({ page }, info) => {
     test.skip(info.project.name !== 'desktop-chromium', 'two columns are the computer’s layout');
     await start(page);
     await page.goto('/client.html');
     await expect(card(page)).toBeVisible();
     const top = (sel: string) => page.locator(sel).evaluate((e) => Math.round(e.getBoundingClientRect().top));
-    expect(Math.abs(await top('#home-website') - await top('#home-needs'))).toBeLessThan(4);
+    expect(Math.abs(await top('#home-studio') - await top('#home-needs'))).toBeLessThan(4);
+    expect(await top('#home-needs')).toBeGreaterThan(await top('#hero-site'));
   });
 
   test('a studio with no name of its own is “your studio”, never the platform', async ({ page }) => {
@@ -109,7 +107,7 @@ test.describe('Client portal while the website is being built (item 179)', () =>
     await expect(card(page)).toBeVisible();
     await expect(page.locator('body')).not.toContainText('Studio OS');
     await expect(page.locator('#footby')).toHaveText('by your studio');
-    await expect(card(page).locator('.wslead')).toContainText('Your studio is building it.');
+    await expect(card(page).locator('.hsub')).toContainText('Your studio is building it.');
     await page.locator('#tabnav [data-tab="messages"]').click();
     await expect(page.locator('#mrows .mrow').first()).toBeVisible();
     await expect(page.locator('body')).not.toContainText('Studio OS');
@@ -196,11 +194,11 @@ test.describe('Client portal while the website is being built (item 179)', () =>
     expect(seen.filter((x) => x === `/client/projects/${PID}`).length).toBe(1);   // the card and Needs you share the one read
   });
 
-  test('the card says Your website and its state on one line, as drawn', async ({ page }) => {
+  test('the hero opens with "Your website" and the one line that says where it stands', async ({ page }) => {
     await start(page);
     await page.goto('/client.html');
-    const top = (sel: string) => card(page).locator(sel).evaluate((e) => Math.round(e.getBoundingClientRect().top));
-    expect(Math.abs(await top('.tag') - await top('.pill-build'))).toBeLessThan(4);
+    await expect(card(page).locator('.hkick')).toHaveText(/^Your website/);
+    await expect(card(page).locator('.hline')).toBeVisible();
   });
 
   test('the questionnaire says what the answers are for', async ({ page }) => {

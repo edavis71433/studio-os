@@ -5,6 +5,9 @@
 // the HTTP handlers stay in presence/routes/email_infra.ts. Self-contained REST
 // access (same pattern as _shared/auth.ts) — no presence/lib imports.
 
+import { linkKey, linkKeysAccepted, type LinkKind } from './link_keys.ts';
+import { timingSafeEqual } from './hmac.ts';
+
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
@@ -16,28 +19,49 @@ export const b64url = (b: ArrayBuffer | Uint8Array): string => {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
-async function hmacB64url(msg: string): Promise<string> {
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(SB_SERVICE) as unknown as BufferSource, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+// Builder item 394: these were signed with the database's master key itself, so changing
+// that key would break every unsubscribe link ever sent. Each now has its own key
+// (_shared/link_keys.ts); a link signed the old way is still good while that key is the same.
+async function hmacB64url(msg: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret) as unknown as BufferSource, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg) as unknown as BufferSource);
   return b64url(sig).slice(0, 32);
+}
+/** Is `token` the signature of `msg` with any key this kind of link may carry? */
+async function signedAs(kind: LinkKind, msg: string, token: string): Promise<boolean> {
+  if (!token) return false;
+  for (const k of linkKeysAccepted(kind)) if (timingSafeEqual(token, await hmacB64url(msg, k))) return true;
+  return false;
 }
 
 /** Token for a recipient's unsubscribe link (used in the List-Unsubscribe header). */
 export async function unsubscribeToken(email: string): Promise<string> {
-  return await hmacB64url(`unsub:${email.trim().toLowerCase()}`);
+  return await hmacB64url(`unsub:${email.trim().toLowerCase()}`, linkKey('email_unsubscribe'));
+}
+/** Is this a good unsubscribe token for this address (any key it may carry)? */
+export async function unsubscribeTokenOk(email: string, token: string): Promise<boolean> {
+  return await signedAs('email_unsubscribe', `unsub:${email.trim().toLowerCase()}`, token);
 }
 
 /** Token for an update's open counter (presence lib/email_engagement.ts): ties the
  *  1×1 image in one emailed update to that send's row, with no address in the link. */
 export async function openToken(sendId: string): Promise<string> {
-  return await hmacB64url(`open:${sendId.trim().toLowerCase()}`);
+  return await hmacB64url(`open:${sendId.trim().toLowerCase()}`, linkKey('email_open'));
+}
+/** Is this a good open-counter signature for this send? */
+export async function openTokenOk(sendId: string, token: string): Promise<boolean> {
+  return await signedAs('email_open', `open:${sendId.trim().toLowerCase()}`, token);
 }
 
 /** Token for a photo in an emailed update (presence lib/update_media.ts): the image
  *  link names the library photo and this signature, so the private library stays
  *  private and only a photo an update names can be fetched. */
 export async function imageToken(mediaId: string): Promise<string> {
-  return await hmacB64url(`img:${mediaId.trim().toLowerCase()}`);
+  return await hmacB64url(`img:${mediaId.trim().toLowerCase()}`, linkKey('email_image'));
+}
+/** Is this a good signature for this photo in an emailed update? */
+export async function imageTokenOk(mediaId: string, token: string): Promise<boolean> {
+  return await signedAs('email_image', `img:${mediaId.trim().toLowerCase()}`, token);
 }
 
 /** The absolute one-click unsubscribe URL for a recipient: the List-Unsubscribe header's
