@@ -32,6 +32,7 @@ test.describe('item 426: the plan in Sites’ words', () => {
     await expect(page.locator('#subline')).toHaveText('Bright Studio · Website + tools');
     await page.locator('#dds-profile').click();
     await expect(page.locator('.dds-pop .who .r')).toHaveText('Owner · Website + tools plan');
+    expect(await page.locator('.dds-pop .who .r').evaluate((el) => getComputedStyle(el).textTransform)).toBe('none');   // shown as written, not "Website + Tools Plan"
     await expect(page.locator('.dds-pop')).not.toContainText('Studio OS plan');
   });
 
@@ -57,6 +58,7 @@ const listFacts = (page: Page) => page.evaluate(() => {
     lastHere: rows.map(here).lastIndexOf(true),
     firstAway: rows.findIndex((a) => !here(a)),
     pictures: rows.map((a) => (a.querySelector('svg') || { innerHTML: '' }).innerHTML),
+    drawn: rows.every((a) => !!a.querySelector('svg > *')),   // every row has a drawing (On every invoice had an empty one)
     titles: rows.map((a) => (a.textContent || '').trim().slice(0, 30)),
   };
 });
@@ -72,11 +74,13 @@ test.describe('item 427: Settings in one order, a picture each', () => {
     expect(inOrder(f.at), `${f.inPage.join(', ')} sit at ${f.at.join(', ')}`).toBe(true);
     expect(f.lastHere).toBeLessThan(f.firstAway);
     expect(new Set(f.pictures).size, f.titles.join(' | ')).toBe(f.pictures.length);
+    expect(f.drawn, f.titles.join(' | ')).toBe(true);
     // a search that finds nearly everything, the website's own settings included
     await page.locator('#setFind').fill('e');
     await expect(page.locator('#cards .setcard', { hasText: 'Who can see your website' })).toBeVisible();
     const s = await listFacts(page);
     expect(new Set(s.pictures).size, s.titles.join(' | ')).toBe(s.pictures.length);
+    expect(s.drawn, s.titles.join(' | ')).toBe(true);
   });
 
   test('inside a client: the same order, and no picture twice', async ({ page }) => {
@@ -88,6 +92,7 @@ test.describe('item 427: Settings in one order, a picture each', () => {
     expect(inOrder(f.at), `${f.inPage.join(', ')} sit at ${f.at.join(', ')}`).toBe(true);
     expect(f.lastHere).toBeLessThan(f.firstAway);
     expect(new Set(f.pictures).size, f.titles.join(' | ')).toBe(f.pictures.length);
+    expect(f.drawn, f.titles.join(' | ')).toBe(true);
   });
 });
 

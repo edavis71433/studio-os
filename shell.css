@@ -228,7 +228,7 @@ html.dds-has-shell.dds-has-ctxbar body{padding-top:calc(var(--dds-shell-h) + var
 .dds-pop .muted{color:var(--dds-soft);font-size:13px;padding:var(--dds-s3) 10px;text-align:center}
 .dds-pop .who{padding:10px;border-bottom:1px solid var(--dds-line);margin-bottom:6px}
 .dds-pop .who .n{font-weight:600;font-size:14px}
-.dds-pop .who .r{color:var(--dds-soft);font-size:12.5px;text-transform:capitalize}
+.dds-pop .who .r{color:var(--dds-soft);font-size:12.5px}   /* builder item 426: the words as written ("Website + tools plan"); capitalize made it "Studio OS Plan" */
 /* the bell grows up (benchmark 8): tabs · priority accent · read state · Mark read / Clear */
 .dds-bell-pop .tabs{display:flex;gap:2px;margin:0 6px 6px;padding:var(--dds-s1);background:var(--dds-bg);border-radius:var(--dds-r)}
 .dds-bell-pop .tabs [role=tab]{flex:1;font:inherit;font-size:12.5px;font-weight:600;padding:6px var(--dds-s2);border:0;border-radius:var(--dds-r);background:transparent;color:var(--dds-soft);cursor:pointer}
