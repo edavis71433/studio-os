@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { mountCanvas, API, SETTINGS } from './helpers/editor';
 import { installApp, settled } from './helpers/app';
+import { pinClock } from './helpers/clock';
 import { SHELL_CSS, SHELL_CRITICAL, menuButtonHtml } from '../../supabase/functions/presence/lib/site_shell';
 
 // Small editor fixes from the Nov 22 review, pressed in the real editor: the dock's Versions lists the
@@ -11,7 +12,7 @@ import { SHELL_CSS, SHELL_CRITICAL, menuButtonHtml } from '../../supabase/functi
 // business name keeps the phone bar near 60px (430).
 
 test.use({ timezoneId: 'America/Los_Angeles' });
-test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date('2026-11-22T18:00:00Z')); });
+test.beforeEach(async ({ page }) => { await pinClock(page); });   // PINNED_NOW, before any page.goto (item 421)
 
 const json = (route: Route, body: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 const phone = (page: Page) => page.viewportSize()!.width <= 720;
