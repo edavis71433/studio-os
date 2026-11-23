@@ -10,15 +10,15 @@
 #      every migration in supabase/migrations in order, as production has them: 0003 to
 #      0005 are fenced and production never applied them, so they're left out here too
 #      (the same rule as scripts/isolation-scratch.sh);
-#   2. runs each apply pack numbered 0260 or later (docs/presence/APPLY-NNNN-prod.sql),
-#      in order, twice: a pack has to be safe to run again, because the SQL editor
-#      makes that easy;
+#   2. runs each apply pack numbered 0260 or later (docs/presence/APPLY-NNNN-prod.sql)
+#      that hasn't run on production yet, in order, twice: a pack has to be safe to run
+#      again, because the SQL editor makes that easy;
 #   3. checks the ledger (presence_change_ledger, migration 0260): every migration from
 #      0260 on wrote its number, every pack wrote its number on each run, and the newest
 #      file in supabase/migrations is in the ledger, the same question the release asks
 #      production before it goes out (deploy.yml, "Database changes are in place").
 #      Changes that predate the ledger (APPLY-0260's backfill list, 0265 to 0267 among
-#      them) don't write themselves, so they are only run, not checked for their row.
+#      them) don't write themselves, and their packs already ran on production.
 #
 # Nothing here reads a repository secret or reaches production. Needs docker, node (npx).
 # Local use, with Docker running:
@@ -77,12 +77,19 @@ psql_() { docker exec -i "$DB" psql -X -q -U postgres -d postgres -v ON_ERROR_ST
 psql_ -c 'select 1' > /dev/null || fail "The scratch database started but doesn't answer."
 
 # ── 2. Every apply pack from the ledger's start, in order, twice ─────────────────
+# The numbers APPLY-0260 backfills ran on production before the ledger existed (0265 to
+# 0267 among them): their packs have run there already, so they aren't rehearsed, and they
+# don't write themselves into the ledger.
+backfilled=" $(sed -nE "s/^  \(([0-9]+), '[a-z0-9_-]*', 'backfill'\),?$/\1/p" "$REPO/docs/presence/APPLY-0260-prod.sql" | tr '\n' ' ')"
+is_backfilled() { case "$backfilled" in *" $1 "*) return 0 ;; esac; return 1; }
 packs=()
 for f in "$REPO"/docs/presence/APPLY-[0-9][0-9][0-9][0-9]-prod.sql; do
-  n=$(basename "$f" | sed -E 's/^APPLY-([0-9]{4})-prod\.sql$/\1/')
-  [ $((10#$n)) -ge "$FIRST_LEDGER" ] && packs+=("$f")
+  n=$((10#$(basename "$f" | sed -E 's/^APPLY-([0-9]{4})-prod\.sql$/\1/')))
+  [ "$n" -ge "$FIRST_LEDGER" ] || continue
+  is_backfilled "$n" && continue
+  packs+=("$f")
 done
-echo "apply packs from $FIRST_LEDGER on: ${#packs[@]}"
+echo "apply packs from $FIRST_LEDGER on, not yet on production: ${#packs[@]}"
 for f in ${packs[@]+"${packs[@]}"}; do
   for run in 1 2; do
     say "$(basename "$f"), run $run of 2"
@@ -95,9 +102,6 @@ done
 
 # ── 3. The ledger says what the release will ask ─────────────────────────────────
 say "The ledger"
-# The numbers APPLY-0260 backfills: on production before the ledger, so they don't write themselves.
-backfilled=" $(sed -nE "s/^  \(([0-9]+), '[a-z0-9_-]*', 'backfill'\),?$/\1/p" "$REPO/docs/presence/APPLY-0260-prod.sql" | tr '\n' ' ')"
-is_backfilled() { case "$backfilled" in *" $1 "*) return 0 ;; esac; return 1; }
 ledger=$(psql_ -At -F ' ' -c "select number, runs from public.presence_change_ledger order by number" 2>&1) \
   || fail "The ledger (presence_change_ledger, migration 0260) isn't on the scratch database."
 echo "$ledger" | sed 's/^/  /'
@@ -110,7 +114,6 @@ for f in "$REPO"/supabase/migrations/[0-9]*.sql; do
 done
 for f in ${packs[@]+"${packs[@]}"}; do
   n=$((10#$(basename "$f" | sed -E 's/^APPLY-([0-9]{4})-prod\.sql$/\1/')))
-  is_backfilled "$n" && continue
   runs=$(printf '%s\n' "$ledger" | awk -v n="$n" '$1 == n {print $2}')
   [ "${runs:-0}" -ge 2 ] || bad="$bad $(basename "$f") didn't write its number on each run (runs: ${runs:-none});"
 done

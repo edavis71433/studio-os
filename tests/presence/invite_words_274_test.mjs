@@ -19,7 +19,7 @@ const customer = sales.slice(sales.indexOf('export async function sendCustomerIn
 
 ok('the team and reviewer invite says the button works once, for a short while', /It works once, for a short while\./.test(team));
 ok('…and names the sign-in page as the door that works any time, with a code', /After that, go to <a href="\$\{door\}"/.test(team) && /we’ll email you a code/.test(team));
-ok('…where the door is the page the button would have opened (studio.html or portal.html)', /const door = `\$\{\(Deno\.env\.get\('SITE_URL'\) \|\| 'https:\/\/davisdigitalstudio\.com'\)\.replace\(\/\\\/\$\/, ''\)\}\$\{opts\.next\}`;/.test(team));
+ok('…where the door is the page the button would have opened (studio.html or portal.html), on the app\'s address (item 388)', /const door = `\$\{appBase\(\)\}\$\{opts\.next\}`;/.test(team));
 ok('the client invite says the same about its button', /It works once, for a short while\./.test(customer));
 ok('…and links to this studio’s own sign-in page (the one with its name and logo)', /open <a href="\$\{base\}\/portal\.html\?studio=\$\{siteId\}"/.test(customer) && /we’ll email you a code/.test(customer));
 ok('neither email claims the link lasts days', !/\b\d+ days?\b/.test(noComments(team)) && !/\b\d+ days?\b/.test(noComments(customer)));

@@ -1,3 +1,5 @@
+> **Retired (builder item 392, Nov 22 2026).** The old server no longer answers `run_scheduled_jobs`; the job is switched off and listed for deletion. Kept as a record only.
+
 > ⚠️ **LEGACY** (clever-api daily scheduler). The LIVE scheduler is the presence 15-min pg_cron tick — see `supabase/ops/schedule-presence-cron.sql` and `docs/presence/OPERATIONS.md`. This document is kept for the clever-api surfaces it still serves; it retires wholesale with clever-api (P2-G).
 
 # Davis Digital Studio — Scheduler Setup

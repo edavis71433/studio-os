@@ -21,6 +21,7 @@
 //     with them (90 days there) or stays on Sites, the studio's choice. Restore
 //     (POST /sales/customers/:id/restore, also from Recently deleted) puts back exactly
 //     that for 30 days; then ops/customer_trash.ts lets the row go.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { validEmail, attachOwnerLogin } from '../commerce/account.ts';
@@ -45,7 +46,7 @@ const one = (r: { ok?: boolean; json?: unknown } | null | undefined): any => row
 const clean = (v: unknown, n: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 const nowIso = () => new Date().toISOString();
 const notYours = (cors: Record<string, string>) => json({ error: 'not_found', message: 'That customer isn’t one of yours.' }, 404, cors);
-const portalUrlFor = (studioSiteId: string) => `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/portal.html?studio=${studioSiteId}`;
+const portalUrlFor = (studioSiteId: string) => `${appBase()}/portal.html?studio=${studioSiteId}`;
 
 type Link = { id: string; project_id: string; customer_site_id: string | null; status: string };
 /** This studio's live links to a customer (the Customers list is made of these). */

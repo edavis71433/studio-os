@@ -132,7 +132,8 @@ const system = read('supabase/functions/presence/routes/system.ts');
 const clever = read('supabase/functions/clever-api/index.ts');
 ok('/system/run reads the body secret (or the x-system-secret header), never the address', /typeof body\.secret === 'string' \? body\.secret : ''/.test(system) && /req\.headers\.get\('x-system-secret'\)/.test(system) && !/searchParams/.test(system));
 ok('/system/run knows the tasks the jobs send', ['gsc_sync', 'ga4_sync'].every((t) => system.includes(`task === '${t}'`)) && /String\(body\?\.task \|\| 'cycle'\)/.test(system));
-ok('clever-api run_scheduled_jobs reads the body secret', /if \(type === 'run_scheduled_jobs'\) \{\s+if \(!SCHEDULER_SECRET \|\| body\.secret !== SCHEDULER_SECRET\)/.test(clever));
+// builder item 392: the old server's nightly job is retired; nothing there takes the scheduler's secret any more
+ok('clever-api no longer answers run_scheduled_jobs (the switched-off nightly job), so no job may call it', !clever.includes('run_scheduled_jobs') && /RETIRED \(builder item 392/.test(sql.legacy));
 
 // ═══ 9. the docs say where the jobs get the secret ═══
 for (const p of ['docs/presence/ENV-AND-SECRETS.md', 'docs/RUN-SHEET.md']) {   // builder item 422: the secrets list and the run sheet

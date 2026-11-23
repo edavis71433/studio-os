@@ -2,8 +2,12 @@
 //   node scripts/thumbnails/shoot.mjs <out-dir>
 // Serves what render.ts wrote and saves small JPEGs the builder shows:
 //   thumbs/templates/<slug>.jpg  — the top of each template's sample home page, 640×440
+//   thumbs/templates/<slug>/<family>.jpg — the same, with each kind of business's sample (item 331)
 //   thumbs/sections/<type>.jpg   — each section type on its own, 440×248
 //   thumbs/pages/<key>.jpg       — the top of each ready-made page in Add a page, 440×460 (item 216)
+//   thumbs/openings/<key>.jpg    — each opening made for a kind of business, as the templates are shot
+// The designs and the openings are shot on a Friday at 5:30pm in Los Angeles (the samples' own time
+// zone), so the Open now line and today's hours are the same every time they are retaken.
 // and, once every picture is taken, tests/presence/golden/pictures.json: each picture's
 // digest beside the digest of the page it shows. thumbnails_test.mjs fails when a page no
 // longer draws what its picture shows. Re-run both steps then, and commit.
@@ -17,7 +21,7 @@ import { chromium } from '@playwright/test';
 const src = process.argv[2];
 if (!src) { console.error('usage: shoot.mjs <out-dir>'); process.exit(2); }
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));   // a decoded path: the folder may hold a space
-const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.js': 'text/javascript', '.json': 'application/json', '.pdf': 'application/pdf' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.js': 'text/javascript', '.json': 'application/json', '.pdf': 'application/pdf' };
 
 const server = createServer(async (req, res) => {
   let p = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname));
@@ -28,6 +32,7 @@ const server = createServer(async (req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch();
+const SHOT_AT = new Date('2026-11-21T01:30:00Z');   // Fri Nov 20, 5:30pm in Los Angeles
 
 // Templates: each is served from its own folder, so /assets and /ph resolve there.
 const templates = await readdir(join(src, 'templates'));
@@ -39,12 +44,59 @@ for (const slug of templates) {
     if (u.origin !== base) return route.abort();
     return route.continue({ url: `${base}/templates/${slug}${u.pathname.replace(`/templates/${slug}`, '')}` });
   });
+  await page.clock.setFixedTime(SHOT_AT);
   await page.goto(`${base}/templates/${slug}/`, { waitUntil: 'networkidle' });
   // the top of the page, however the template scrolls (Harbor's smooth scroll had moved it)
   await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, 0); });
+  await page.evaluate(() => document.fonts.ready);   // the design's own fonts (a new site's)
   await page.waitForTimeout(200);
   await page.screenshot({ path: join(ROOT, `thumbs/templates/${slug}.jpg`), type: 'jpeg', quality: 72 });
   await page.close();
+}
+
+// Item 331: every design with every kind's sample business, the same view as the templates':
+//   thumbs/templates/<slug>/<family>.jpg
+const kinds = [];
+for (const slug of await readdir(join(src, 'kinds')).catch(() => [])) {
+  await mkdir(join(ROOT, `thumbs/templates/${slug}`), { recursive: true });
+  for (const family of await readdir(join(src, 'kinds', slug))) {
+    const dir = `kinds/${slug}/${family}`;
+    const page = await browser.newPage({ viewport: { width: 1280, height: 880 }, deviceScaleFactor: 0.5 });
+    await page.route('**/*', (route) => {
+      const u = new URL(route.request().url());
+      if (u.origin !== base) return route.abort();
+      return route.continue({ url: `${base}/${dir}${u.pathname.replace(`/${dir}`, '')}` });
+    });
+    await page.clock.setFixedTime(SHOT_AT);
+    await page.goto(`${base}/${dir}/`, { waitUntil: 'networkidle' });
+    await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, 0); });
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(150);
+    await page.screenshot({ path: join(ROOT, `thumbs/templates/${slug}/${family}.jpg`), type: 'jpeg', quality: 72 });
+    await page.close();
+    kinds.push(`templates/${slug}/${family}.jpg`);
+  }
+}
+
+// The openings made for a kind of business, the same view as the templates': thumbs/openings/<key>.jpg
+const openings = [];
+await mkdir(join(ROOT, 'thumbs/openings'), { recursive: true });
+for (const key of await readdir(join(src, 'openings')).catch(() => [])) {
+  const dir = `openings/${key}`;
+  const page = await browser.newPage({ viewport: { width: 1280, height: 880 }, deviceScaleFactor: 0.5 });
+  await page.route('**/*', (route) => {
+    const u = new URL(route.request().url());
+    if (u.origin !== base) return route.abort();
+    return route.continue({ url: `${base}/${dir}${u.pathname.replace(`/${dir}`, '')}` });
+  });
+  await page.clock.setFixedTime(SHOT_AT);
+  await page.goto(`${base}/${dir}/`, { waitUntil: 'networkidle' });
+  await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, 0); });
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(150);
+  await page.screenshot({ path: join(ROOT, `thumbs/openings/${key}.jpg`), type: 'jpeg', quality: 72 });
+  await page.close();
+  openings.push(`openings/${key}.jpg`);
 }
 
 // Sections: the section alone, with the site's header and footer out of the picture.
@@ -89,8 +141,8 @@ server.close();
 // The record: what each picture shows (render.ts's digest of its page) and the picture itself.
 const sources = JSON.parse(await readFile(join(src, 'sources.json'), 'utf8'));
 const record = {};
-for (const name of [...templates.map((s) => `templates/${s}.jpg`), ...sections.map((t) => `sections/${t}.jpg`), ...pages.map((k) => `pages/${k}.jpg`)].sort()) {
+for (const name of [...templates.map((s) => `templates/${s}.jpg`), ...kinds, ...openings, ...sections.map((t) => `sections/${t}.jpg`), ...pages.map((k) => `pages/${k}.jpg`)].sort()) {
   record[name] = { page: sources[name], picture: createHash('sha256').update(await readFile(join(ROOT, 'thumbs', name))).digest('hex') };
 }
 await writeFile(join(ROOT, 'tests/presence/golden/pictures.json'), JSON.stringify(record, null, 1) + '\n');
-console.log(`shot ${templates.length} templates, ${sections.length} sections and ${pages.length} pages`);
+console.log(`shot ${templates.length} templates, ${kinds.length} kind pictures, ${openings.length} openings, ${sections.length} sections and ${pages.length} pages`);

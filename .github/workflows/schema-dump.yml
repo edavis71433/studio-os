@@ -99,7 +99,7 @@ jobs:
           rm 00-schema-foundation.sql
 
       - name: Upload the encrypted dump (download from the run page)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: schema-foundation-encrypted
           path: 00-schema-foundation.sql.enc

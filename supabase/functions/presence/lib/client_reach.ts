@@ -64,7 +64,9 @@ export async function studioSiteFor(siteId: string | null | undefined): Promise<
     if (!listed?.agency_id) return null;
     const owner = rowsOf<{ user_id?: string | null; email?: string }>(await svc(`presence_agency_members?agency_id=eq.${listed.agency_id}&role=eq.owner&status=eq.active&select=user_id,email&order=created_at.asc&limit=1`))[0];
     if (!owner) return null;
-    const or = `or=(user_id.eq.${encodeURIComponent(owner.user_id || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent(lower(owner.email))})`;
+    const { seatFilter } = await import('./workspace.ts');   // builder item 397: the address quoted in the filter
+    const or = seatFilter({ userId: owner.user_id || null, email: lower(owner.email) || null });
+    if (!or) return null;
     const seat = rowsOf<{ site_id?: string }>(await svc(`presence_site_members?status=eq.active&${or}&select=site_id&order=created_at.asc&limit=1`))[0];
     return seat?.site_id && String(seat.site_id) !== id ? String(seat.site_id) : null;
   } catch { return null; }

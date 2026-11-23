@@ -81,7 +81,7 @@ jobs:
           echo "live is ${sha:0:8}, the commit the last green release shipped ($at)."
           echo "ref=$sha" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ steps.which.outputs.ref }}
 
@@ -142,12 +142,12 @@ jobs:
       # Builder item 400: the pages go back too, once the release publishes them
       # (scripts/pages-go-live.txt says "release"). The scripts come from main, since an older
       # commit may not have them; the pages are built from the commit being put back.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: main
           path: main-tools
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
       - name: Put the pages back too

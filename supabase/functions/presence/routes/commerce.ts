@@ -20,7 +20,9 @@
 // handleCommerce answers for the CALLER. A signed-in route asked in a client's
 // context (?client=) never reaches it: index.ts sends it through the scope gate to
 // routes/commerce_scoped.ts instead. Only the public routes ignore a scope.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
+import { timingSafeEqual } from '../../_shared/hmac.ts';   // builder item 397: secrets compared the careful way
 import { svc, asUser } from '../lib/db.ts';
 import { raiseNotice, raiseNoticeDetailed } from '../lib/notice.ts';
 import { noticeDismissible } from '../lib/inbox_feed.ts';
@@ -261,7 +263,7 @@ async function businessNameFor(clientId: string): Promise<string> {
 // The body carries an id, never facts: the invoice is re-read from the database,
 // so a leaked secret cannot forge an amount or a payee.
 async function handleInvoicePaidEcho(req: Request, cors: Record<string, string>): Promise<Response> {
-  if (!BILLING_SYNC_SECRET || req.headers.get('x-commerce-secret') !== BILLING_SYNC_SECRET) {
+  if (!BILLING_SYNC_SECRET || !timingSafeEqual(req.headers.get('x-commerce-secret') || '', BILLING_SYNC_SECRET)) {
     return json({ error: 'forbidden' }, 403, cors);
   }
   let body: any = null;
@@ -393,7 +395,7 @@ export async function invoicePaidEcho(invoiceId: string): Promise<Record<string,
   if (fresh) {
     const { emailOperator } = await import('../lib/service_bridge.ts');
     const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
-    const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+    const base = appBase();
     const link = inv.deal_id ? `${base}/pipeline.html?deal=${inv.deal_id}` : `${base}/today.html`;
     // Audit #10 — convert-aware: a deal that has SIGNED AND PAID but was never
     // converted has no portal, no project, no checklist. The money email is the
@@ -506,7 +508,7 @@ export async function invoicePaidEcho(invoiceId: string): Promise<Record<string,
 }
 
 async function handleBillingSync(req: Request, cors: Record<string, string>): Promise<Response> {
-  if (!BILLING_SYNC_SECRET || req.headers.get('x-commerce-secret') !== BILLING_SYNC_SECRET) {
+  if (!BILLING_SYNC_SECRET || !timingSafeEqual(req.headers.get('x-commerce-secret') || '', BILLING_SYNC_SECRET)) {
     return json({ error: 'forbidden' }, 403, cors);
   }
   let body: any = null;

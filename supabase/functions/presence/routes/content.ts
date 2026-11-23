@@ -27,6 +27,7 @@ import { lockedEdits, lockedMessage } from '../lib/section_lock.ts';
 import { publishActorKind } from '../lib/actor_kind.ts';
 import { OPEN_STAGES } from '../lib/sales_lifecycle.ts';
 import { GOOGLE_TAG_RE, META_PIXEL_RE } from '../lib/ad_tags.ts';
+import { isHeroLayout } from '../lib/template_openings.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
@@ -72,7 +73,7 @@ function clean(s: string): string {
   return out.trim();
 }
 
-type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' | 'google_tag' | 'meta_pixel' | 'ref' | 'post_status'; json?: JsonShape; blog?: 'categories' | 'authors'; place?: true };
+type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' | 'google_tag' | 'meta_pixel' | 'ref' | 'post_status' | 'hero_layout'; json?: JsonShape; blog?: 'categories' | 'authors'; place?: true };
 // Item 72: a JSON field's limits. Without them a 40 MB pages list was stored and then re-read
 // on every load, preview, publish, hash and sweep. The size is the saved text's length; the
 // shape checks only what every reader assumes (a list of objects, an object), never a
@@ -149,6 +150,8 @@ const LOCATION_FIELDS: Record<string, FieldRule> = {
   temporarily_closed: { kind: 'bool' }, temporarily_closed_note: { max: 200 },
   // builder list item 127 (0182): a second location, made safe as it's saved; null removes it
   second_location: { kind: 'json', json: { bytes: 8 * KB, shape: 'object' }, place: true },
+  // builder list item 334 (0255): "We go to our customers"; the service area shows instead of the address
+  goes_to_customers: { kind: 'bool' },
 };
 const SETTINGS_FIELDS: Record<string, FieldRule> = {
   category_order: { kind: 'json', json: { bytes: 64 * KB, shape: 'list', items: 200 } }, cover_media_id: { kind: 'uuid' },
@@ -182,7 +185,8 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   stage_stale_days: { kind: 'stage_days' },   // { lead?: 1–365, qualified?: …, proposal?: …, contract?: … } — a shaped map, not free json
   google_site_verification: { max: 100 }, bing_site_verification: { max: 100 },   // Phase Z: Search Console / Bing ownership
   // Phase CP-2 Design Studio: structured layout choices (never raw CSS)
-  hero_layout: { max: 20 }, nav_style: { max: 12 },
+  // builder item 330: one of the front-page layouts (lib/template_openings.ts HERO_LAYOUTS), '' for Classic
+  hero_layout: { kind: 'hero_layout' }, nav_style: { max: 12 },
   sections_hidden: { kind: 'json', json: { bytes: 16 * KB, shape: 'list', items: 200 } }, sections_order: { kind: 'json', json: { bytes: 16 * KB, shape: 'list', items: 200 } },
   footer_hours: { kind: 'bool' }, footer_social: { kind: 'bool' },
   // Phase SD: search visibility as human questions
@@ -258,6 +262,11 @@ function validateFields(payload: Record<string, unknown>, spec: Record<string, F
     if (rule.kind === 'ref') {   // item 40: one of the site's categories or authors by id, or '' for none
       const s = clean(String(v ?? '')).toLowerCase();
       if (s && !(s.length <= 40 && SLUG_RE.test(s))) { errors.push({ field: key, message: 'That isn’t one of your choices.', plain: true }); continue; }
+      cleanBody[key] = s; fields.push(key); continue;
+    }
+    if (rule.kind === 'hero_layout') {   // builder item 330: only a layout the site can draw is saved
+      const s = clean(String(v ?? ''));
+      if (!isHeroLayout(s)) { errors.push({ field: key, message: 'That isn’t one of the front-page layouts.', plain: true }); continue; }
       cleanBody[key] = s; fields.push(key); continue;
     }
     if (rule.kind === 'post_status') {   // item 40: a draft, a post waiting for its time, or a published one
@@ -453,7 +462,7 @@ async function singleton(req: Request, db: SiteDb, site: SiteRow, principal: Pri
 export const handleLocation = (req: Request, db: SiteDb, site: SiteRow, principal: Principal, cors: Record<string, string>) =>
   singleton(req, db, site, principal, cors, {
     table: 'presence_locations', entityType: 'location', noun: 'address & hours', fields: LOCATION_FIELDS,
-    select: 'id,address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note,updated_at,' + PLACE_SETTINGS_COLS,
+    select: 'id,address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note,updated_at,' + PLACE_SETTINGS_COLS + ',' + GOES_SETTINGS_COLS,
     conflict: 'site_id', summary: 'Updated hours & location',
   });
 
@@ -489,9 +498,14 @@ const ICON_SETTINGS_COLS = 'icon_media_id';
 const ASKED_SETTINGS_COLS = 'invoice_reminders_asked';
 // The 0250 columns (sales items 167, 168: the "On every invoice" card and the late fee).
 const INVOICE_SETTINGS_COLS = 'invoice_pay_other,invoice_tax_id,invoice_number_start,late_fee_mode,late_fee_value,late_fee_days';
+// The 0255 column on presence_locations (builder list item 334's "We go to our customers").
+// Business details shows the switch only when a read returns it, so before the pack the
+// switch stays hidden and every other field reads and saves as before.
+const GOES_SETTINGS_COLS = 'goes_to_customers';
 // Newest apply pack first. A database without a pack's columns 400s the widened select,
 // so a read or a save steps down one pack at a time; Settings never goes dark ahead of one.
-const OPTIONAL_SETTINGS_COLS = [ICON_SETTINGS_COLS, INVOICE_SETTINGS_COLS, ASKED_SETTINGS_COLS, PLACE_SETTINGS_COLS, BLOG_SETTINGS_COLS, SIGNER_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
+// (0255's column sits right after 0184's: it is only ever in the location's read, which holds no icon or invoice column, so it steps down first there all the same)
+const OPTIONAL_SETTINGS_COLS = [ICON_SETTINGS_COLS, GOES_SETTINGS_COLS, INVOICE_SETTINGS_COLS, ASKED_SETTINGS_COLS, PLACE_SETTINGS_COLS, BLOG_SETTINGS_COLS, SIGNER_SETTINGS_COLS, RECIPE_SETTINGS_COLS, SEARCH_SETTINGS_COLS, POPUP_SETTINGS_COLS, CRAWLER_SETTINGS_COLS, AD_SETTINGS_COLS, VISIT_SETTINGS_COLS, REVIEW_SETTINGS_COLS, AUTOMATION_SETTINGS_COLS];
 function selectSteps(select: string): string[] {
   const out = [select];
   let s = select;

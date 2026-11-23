@@ -209,7 +209,8 @@ for (const s of db.tables.presence_snapshots) s.created_at = new Date().toISOStr
   db.tables.presence_infra_plans.push({ id: PLAN2, site_id: SITE, kind: 'connect_domain', status: 'proposed', title: 'Turn on email', summary: 'Set up email.' });
   const exp = Math.floor(Date.now() / 1000) + 3600;
   const tap = async (plan, decision, note) => quiet(async () => {
-    const token = await signApprovalToken({ site_id: SITE, kind: 'infrastructure', plan_id: plan, exp }, 'one-tap-test-secret');
+    const { linkKey } = await import('../../supabase/functions/_shared/link_keys.ts');   // item 394: the server's own approval key
+    const token = await signApprovalToken({ site_id: SITE, kind: 'infrastructure', plan_id: plan, exp }, linkKey('approval'));
     const r = await handleApprovePost(new Request('http://x/approve', { method: 'POST', body: JSON.stringify({ token, decision, note }) }), {});
     return { status: r.status, body: await r.json() };
   });

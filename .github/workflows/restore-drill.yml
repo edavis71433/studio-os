@@ -54,7 +54,7 @@ jobs:
           [ -n "$DRILL_DB_URL" ] || { echo "::error title=Restore drill::The repository secret DRILL_DB_URL (the throwaway project's database address) isn't set. Nothing was done. docs/RUN-SHEET.md, \"Restore\"."; exit 1; }
           [ "${#BACKUP_PASSPHRASE}" -ge 32 ] || { echo "::error title=Restore drill::The repository secret BACKUP_PASSPHRASE isn't set, so the copy of the files can't be opened. Nothing was done."; exit 1; }
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Which copy of the files to restore
         id: copy
@@ -71,7 +71,7 @@ jobs:
           echo "Restoring the files from run $run."
           echo "run=$run" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: uploaded-files-encrypted
           run-id: ${{ steps.copy.outputs.run }}

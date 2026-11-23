@@ -11,12 +11,13 @@
 // The private link is signed with the key the time tickets use (lib/form_check.ts) and
 // kept nowhere. It works while the booking is upcoming, the owner lets customers change
 // bookings, and the time is further off than the notice a new booking needs.
+import { linkKey, signedWithAny } from '../../_shared/link_keys.ts';   // builder item 394: each kind of link has its own key
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { icsEscape, foldLine } from './calendar_feed.ts';
 import { svc } from './db.ts';
 import { readReservedJson, RESERVED_NAMES } from './reserved_store.ts';
 
-const signingKey = () => Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
+const signingKey = () => linkKey('booking');   // builder item 394: its own key
 const APP = () => (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '');
 const FN = () => `${(Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '')}/functions/v1/presence`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -32,7 +33,7 @@ export async function manageToken(apptId: string, key = signingKey()): Promise<s
 export async function readManageToken(token: unknown, key = signingKey()): Promise<string | null> {
   const m = /^([0-9a-f-]{36})\.([0-9a-f]{32})$/.exec(String(token ?? '').trim());
   if (!m || !key || !UUID.test(m[1])) return null;
-  return timingSafeEqual(m[2], (await hmacHex(key, `booking-manage|${m[1]}`)).slice(0, 32)) ? m[1] : null;
+  return (await signedWithAny('booking', key, async (k) => timingSafeEqual(m[2], (await hmacHex(k, `booking-manage|${m[1]}`)).slice(0, 32)))) ? m[1] : null;
 }
 
 // ── what the owner allows ──
@@ -100,13 +101,15 @@ export interface BookingBits { name: string; location: string; tel: string; mail
 export async function bookingBits(siteId: string): Promise<{ biz: BookingBits; opts: BookingOptions; leadHours: number }> {
   const [ident, loc, set, opts] = await Promise.all([
     svc(`presence_identity?site_id=eq.${siteId}&select=business_name,email,phone&limit=1`).catch(() => null),
-    svc(`presence_locations?site_id=eq.${siteId}&select=address_line1,address_line2,city,region,postal_code,phone&limit=1`).catch(() => null),
+    // every column (*): reads the same before and after 0255 adds goes_to_customers
+    svc(`presence_locations?site_id=eq.${siteId}&select=*&limit=1`).catch(() => null),
     svc(`presence_booking_settings?site_id=eq.${siteId}&select=lead_time_hours&limit=1`).catch(() => null),
     bookingOptions(siteId),
   ]);
   const i = rows(ident)[0] || {}, l = rows(loc)[0] || {};
   const line = (...xs: unknown[]) => xs.map((x) => String(x ?? '').trim()).filter(Boolean);
-  const location = l.address_line1 ? [line(l.address_line1, l.address_line2).join(' '), line(l.city, line(l.region, l.postal_code).join(' ')).join(', ')].filter(Boolean).join(', ') : '';
+  // builder list item 334: a business that goes to its customers comes to them, so no address to give
+  const location = l.address_line1 && l.goes_to_customers !== true ? [line(l.address_line1, l.address_line2).join(' '), line(l.city, line(l.region, l.postal_code).join(' ')).join(', ')].filter(Boolean).join(', ') : '';
   const tel = String(l.phone || i.phone || '').trim().slice(0, 40), mail = String(i.email || '').trim().slice(0, 254);
   const lead = Number(rows(set)[0]?.lead_time_hours);
   return {

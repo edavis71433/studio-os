@@ -112,7 +112,7 @@ test.describe('Client portal', () => {
     } });
     await page.goto('/client.html');
     await page.getByRole('button', { name: 'Approve' }).click();
-    await expect(page.locator('#toast')).toContainText('Approved — thank you.');
+    await expect(page.locator('#toast')).toContainText('Approved. Thank you.');
   });
 
   test('caught-up state when nothing is pending', async ({ page }) => {
@@ -264,12 +264,14 @@ test.describe('Client portal — Home queue + project record page', () => {
   test('drill-in: the milestone Path shows done ✓ / current ("You’re here") / upcoming', async ({ page }) => {
     await installApp(page, { api: CLIENT_API });
     await page.goto(`/client.html?project=${PID}`);
-    const path = page.locator('#sec-milestones .path');
-    await expect(path.locator('.pstep.done')).toHaveText(/✓ Design/);
-    await expect(path.locator('.pstep.current')).toHaveText(/Build/);
-    await expect(path.locator('.pstep.upcoming')).toHaveText(/Launch/);
-    await expect(page.locator('#sec-milestones .path-meta')).toContainText('You’re here');
-    await expect(page.locator('#sec-milestones .path-meta')).toContainText('Build');
+    // items 247/335: the tracker: each step with its date, what is done, and whose move it is
+    const track = page.locator('#sec-overview .track');
+    await expect(track.locator('li.done .tt')).toHaveText(/Design/);
+    await expect(track.locator('li.done .tm')).toContainText('Done');
+    await expect(track.locator('li.now .tt')).toHaveText(/Build/);
+    await expect(track.locator('li.next .tt')).toHaveText(/Launch/);
+    await expect(page.locator('#sec-overview .tracknow')).toContainText('Now:');
+    await expect(page.locator('#sec-overview .tracknow b')).toHaveText('Build');
   });
 
   test('drill-in: the activity timeline renders bundle events + messages as typed items', async ({ page }) => {
@@ -311,7 +313,7 @@ test.describe('Client portal — Home queue + project record page', () => {
     await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
     expect(bundleGets).toBe(1);
     await page.getByRole('button', { name: 'Approve', exact: true }).click();
-    await expect(page.locator('#toast')).toContainText('Approved — thank you.');
+    await expect(page.locator('#toast')).toContainText('Approved. Thank you.');
     // the decide really triggered a refetch of the bundle (the record reloaded)
     await expect.poll(() => bundleGets).toBe(2);
     await expect(page.getByRole('heading', { name: 'Website redesign' })).toBeVisible();
@@ -944,7 +946,7 @@ test.describe('Client portal — the "Your website" card', () => {
     await expect(dom).toHaveAttribute('href', WS_SITE.url);
     await expect(dom).toHaveAttribute('target', '_blank');
     await expect(card.locator('.wswhen')).toContainText('Published');
-    await expect(card.locator('#wspic')).toBeVisible();   // the picture slot leads the card
+    await expect(page.locator('#hero-site #hpic-b')).toBeVisible();   // items 247/335: the picture leads the hero in the band
     await expect(card.getByRole('link', { name: 'See your site' })).toHaveAttribute('href', WS_SITE.url);
     await expect(card.getByRole('heading', { name: 'People are finding you.' })).toBeVisible();
     // the lead sentence carries the real numbers, bolded
@@ -1087,11 +1089,12 @@ test.describe('Client portal — the "Your website" card', () => {
   test('the picture: the server-drawn home page lands in a sandboxed, script-less frame', async ({ page }) => {
     await installApp(page, { api: WS_API });
     await page.goto('/client.html');
-    const frame = page.locator('#wspic iframe');
+    const frame = page.locator('#hpic-b iframe');   // items 247/335: the hero's browser frame
     await expect(frame).toHaveAttribute('sandbox', 'allow-same-origin');   // no allow-scripts: the picture can't run code
     await expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer');
     await expect(frame).toHaveAttribute('aria-hidden', 'true');
-    await expect(page.frameLocator('#wspic iframe').locator('[data-thumb-proof]')).toHaveText('Maria Floristry');
+    await expect(page.frameLocator('#hpic-b iframe').locator('[data-thumb-proof]')).toHaveText('Maria Floristry');
+    await expect(page.locator('#hpic-p iframe')).toHaveAttribute('sandbox', 'allow-same-origin');   // the phone frame too
   });
 
   test('a failed picture draw keeps the quiet placeholder — the card and its stats still stand', async ({ page }) => {
@@ -1101,8 +1104,8 @@ test.describe('Client portal — the "Your website" card', () => {
     await page.goto('/client.html');
     const card = page.locator('#home-website .wscard');
     await expect(card.getByRole('heading', { name: 'People are finding you.' })).toBeVisible();
-    await expect(card.locator('#wspic iframe')).toHaveCount(0);
-    await expect(card.locator('#wspic .wsini')).toBeVisible();
+    await expect(page.locator('#hpic-b iframe')).toHaveCount(0);
+    await expect(page.locator('#hpic-b .hini')).toBeVisible();   // the quiet placeholder, in the hero
   });
 
   test('a FAILED Search Console read (unavailable) drops the Google tile and section, like not-connected', async ({ page }) => {
@@ -1149,8 +1152,8 @@ test.describe('Client portal — the "Your website" card', () => {
     await installApp(page, { api: { ...CLIENT_API, '/client/website-stats': { data: { published: false, month: null, search: null } } } });
     await page.goto('/client.html');
     await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
-    await expect(page.locator('#home-website .wsbuild h3')).toHaveText('Your website is on its way.');
-    await expect(page.locator('#home-website .pill-live')).toHaveCount(0);
+    await expect(page.locator('#hero-site .hline')).toHaveText('Your website is on its way.');   // items 247/335: the hero says it; no numbers card
+    await expect(page.locator('#home-website')).toBeHidden();
     await expect(page.locator('#home-website .wsmini')).toHaveCount(0);
   });
 
@@ -2630,7 +2633,7 @@ test.describe('PS2 — Invoices on the Documents shelf (B1, item 179 part four)'
     await page.clock.runFor(5_000); await expect.poll(reads).toBe(4);   // this read says paid
     await expect(row().locator('.fst.sig')).toHaveText('Paid');
     await expect(row().locator('.fmeta')).toContainText('paid Jul 11');
-    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Paid — thank you.' }).first()).toBeVisible();
+    await expect(page.locator('.dds-toast, #toast').filter({ hasText: 'Paid. Thank you.' }).first()).toBeVisible();
     await settle(page);
     await page.clock.runFor(60_000); await settle(page);
     expect(reads()).toBe(4);   // settled: the polling stops
@@ -2892,7 +2895,7 @@ test.describe('PS3 — bell chrome + the three numbers (B6 core)', () => {
     await expect(row).toHaveCount(1);
     // the icon derives from the feed's own moment_type (workspace.ts:260),
     // decorative; the neutral "Update" chip + rel(created_at) complete the row
-    await expect(row.locator('.qico')).toHaveText('🎉');
+    await expect(row.locator('.qico svg')).toHaveCount(1);   // items 247/335: a drawn icon, never an emoji
     await expect(row.locator('.qico')).toHaveAttribute('aria-hidden', 'true');
     await expect(row.locator('.kchip')).toHaveText('Update');
     await expect(row.locator('.qwhen')).toHaveText('2 days ago');
@@ -3939,7 +3942,7 @@ test.describe('Client portal — approval on the deliverable row (audit change 8
       page.locator('#sec-files .frow[data-apfile="d1"]').getByRole('button', { name: 'Approve — Homepage mockup' }).click(),
     ]);
     expect(req.postDataJSON()).toEqual({ decision: 'approved', presented_hash: 'h1', note: '' });
-    await expect(page.locator('#toast')).toContainText('Approved — thank you.');
+    await expect(page.locator('#toast')).toContainText('Approved. Thank you.');
     await expect.poll(() => bundleGets).toBe(2);
   });
 

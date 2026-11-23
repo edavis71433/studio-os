@@ -42,8 +42,8 @@ jobs:
           NETLIFY_TEST_TOKEN: ${{ secrets.NETLIFY_TEST_TOKEN }}
         run: |
           [ -n "$NETLIFY_TEST_TOKEN" ] || { echo "::error title=Publish journey::The repository secret NETLIFY_TEST_TOKEN (a token for a separate Netlify test team) isn't set. Nothing was published."; exit 1; }
-      - uses: actions/checkout@v4
-      - uses: denoland/setup-deno@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: "2.9.1"
       - name: Publish a throwaway site, check it is up, take it offline, delete it

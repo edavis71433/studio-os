@@ -140,7 +140,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Database changes are in place
         id: ledger-gate
         env:
@@ -209,7 +209,7 @@ jobs:
 
       # The whole history: the pages check compares this commit with the one the live pages
       # were built from, and the summary lists the commits since the last release.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
@@ -318,7 +318,7 @@ jobs:
       # and the wait passes at once because the live pages are as new or newer. Once it says
       # "release", this builds this commit's pages here and uploads them to Netlify as one
       # deploy (scripts/publish-pages.sh), and Netlify's own builds of merges are skipped.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
           cache: npm
