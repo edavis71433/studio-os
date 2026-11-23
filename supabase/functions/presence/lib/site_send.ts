@@ -128,7 +128,9 @@ document.addEventListener('focusin',function(ev){var f=ev.target&&ev.target.form
 // every site's stylesheet stay as light as before; the date box stays in the page for when
 // the file or the list of days can't be had (an older server, a dropped connection).
 const BAND = (sel: string) => ['.block.block--bg-accent', '.block.block--bg-dark', '.block.block--bg-photo.veil-dark'].map((b) => `${b} ${sel}`).join(',');
-export const BOOKING_MONTH_CSS = '.bk-next{margin:0 0 12px;font-weight:600}'
+// Kept to this file on purpose: a line that exports a string starting with a dot reads as an
+// import path to the local function server, which then stops (tests/workflows/isolation_scope_test.mjs).
+const BOOKING_MONTH_CSS = '.bk-next{margin:0 0 12px;font-weight:600}'
   + '.bk-next-btn{min-height:44px;margin-left:4px;padding:8px 14px;border:1px solid var(--accent);border-radius:999px;background:var(--card,#fff);color:inherit;font:inherit;font-weight:700;cursor:pointer}'
   + '.bk-cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:360px;margin:0 0 6px}.bk-cal-title{margin:0;font-weight:700}'
   + '.bk-mon{min-width:44px;min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--card,#fff);color:inherit;font-size:1.25rem;cursor:pointer}.bk-mon:disabled{opacity:.35;cursor:default}'
