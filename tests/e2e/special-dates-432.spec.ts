@@ -30,6 +30,7 @@ const SITE = (special: unknown[]) => ({ data: {
 type Saved = Array<{ date: string; label: string; closed: boolean; intervals: Array<{ open: string; close: string }> }>;
 async function open(page: Page, hash = '#business', special: unknown[] = [GONE, XMAS_EVE, THANKSGIVING]): Promise<Saved[]> {
   const saves: Saved[] = [];
+  await pinClock(page, NOW);   // before installApp, so the clock's own timer isn't one settled() waits for
   await installApp(page, { api: { ...PAGE_API, '/site': SITE(special) } as never });
   await page.route('**/functions/v1/presence/**', async (route) => {
     const req = route.request(), path = new URL(req.url()).pathname.replace(/^.*\/functions\/v1\/presence/, '');
@@ -40,7 +41,6 @@ async function open(page: Page, hash = '#business', special: unknown[] = [GONE, 
     }
     return route.fallback();
   });
-  await pinClock(page, NOW, { ticking: true });   // ticking: the editor's own short timers still settle
   await page.goto('/presence.html' + hash);
   await expect(page.locator('#view-business')).toBeVisible();
   return saves;
