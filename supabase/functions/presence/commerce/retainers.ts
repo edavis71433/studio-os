@@ -445,7 +445,7 @@ async function emailChargeReceipt(siteId: string, dealId: string, eventId: strin
     emailBand('Receipt · Retainer', 'Payment received. Thank you.') + `<p>${first ? `Hi ${esc(first)},` : 'Hi there,'}</p><p>Your ${per} retainer payment to ${studio} went through${day ? ' on ' + esc(day) : ''}.</p>` +
     emailFacts([['Retainer', esc(String(deal?.title || 'Retainer'))], ['Amount paid', amount]], { big: true, tone: 'good' }) +
     `<p>Nothing else is needed from you. ${pdf ? 'Your receipt is attached as a PDF.' : ''}${link ? ` <a href="${link}" style="color:${brand.accentDark}">View it online →</a>` : ''}</p><p style="color:#666;font-size:.9rem">You can stop the retainer any time from your portal. Have a question? Just reply to this email.</p>`,
-    brand, { critical: true, asBusiness: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('charge', doc), content: pdf }] } : {}) });
+    brand, { critical: true, asBusiness: true, siteId, keep: 'money', ...(pdf ? { attachments: [{ filename: pdfFileName('charge', doc), content: pdf }] } : {}) });
 }
 
 // ── the impure webhook sync (called by commerce/billing-sync, by PURPOSE) ────

@@ -391,6 +391,8 @@ const NOTICE_HREF: Record<string, string> = {
   studio_published: '/presence.html',   // audit change 2: the client's studio published for them → their Website overview
   site_published: '/presence.html',     // builder list item 47: a publish finished → the Website overview (the studio's bell carries ?client=)
   traffic_spike: '/analytics.html',     // builder list item 47: a busy day → Analytics, where the visitors came from
+  auto_reply_ceiling: '/inbox.html#enquiries',   // builder list item 391: the day's automatic replies used up → the enquiries waiting for a reply
+  upload_refused: '/files.html',        // builder list item 395: a file that wasn't what it said it was, taken out of Files
   site_down: '/presence.html#foundations',   // a confirmed outage → the foundations desk (domain/hosting/health)
   domain_expiry: '/presence.html#domain',
   search_setup: '/presence.html#search',
@@ -466,6 +468,7 @@ export async function handlePortalFeed(jwt: string, site: SiteRow, principal: Pr
 export const STUDIO_WEBSITE_NOTICE_KINDS: ReadonlySet<string> = new Set([
   'search_setup', 'domain_expiry', 'publish_failed', 'connection_expired', 'site_down', 'email_auth', 'apex_drift', 'new_review', 'missing_required', 'client_feedback',
   'site_published', 'traffic_spike',   // item 47: the studio's OWN site's news stays on its Website page; client sites' news reaches the bell through /agency/needs-you
+  'auto_reply_ceiling',   // item 391: the same for its automatic replies paused for the day
 ]);
 /** Pure: the feed as the studio sees it at studio level. */
 export function studioLevelFeed<T extends { notices: any[]; moments: any[]; pending_approvals: any[] }>(d: T): T {

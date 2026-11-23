@@ -198,7 +198,7 @@ export async function handleInvoiceRemindNow(req: Request, site: SiteRow, princi
     const copy = invoiceReminderCopy(slot, what, amount, String(inv.title || ''), !inv.due_date);
     const btn = `<a href="${inv.stripe_url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
     const doc = await docLinkFor('invoice', id, site.id).catch(() => null);
-    sent = await sendEmail(who.email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>${invoiceReminderMore(doc, brand.accentDark)}`, brand, { critical: true, asBusiness: true, siteId: site.id }).catch(() => false);
+    sent = await sendEmail(who.email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>${invoiceReminderMore(doc, brand.accentDark)}`, brand, { critical: true, asBusiness: true, siteId: site.id, keep: 'money' }).catch(() => false);
   } catch { sent = false; }
   if (!sent) {
     // the claim comes off, so it can be tried again

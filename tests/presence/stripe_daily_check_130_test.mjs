@@ -296,10 +296,16 @@ const noBareFalse = (r) => Object.values(r).every((v) => v !== false);
   ok('echo: the receipt goes out with the first echo and is marked; a repeat sends nothing', first.receipted === true && second.receipted === false && world.mail.filter((m) => m.to === 'jordan@client.example').length === 1 && !!inv().receipt_sent_at);
   seed({ invoices: [openInvoice({ status: 'paid', paid_at: '2026-11-16T09:00:00.000Z' })] });
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async (input, init) => (new URL(typeof input === 'string' ? input : input.url).hostname === 'api.resend.com' ? jres(500, { message: 'mail down' }) : realFetch(input, init));
+  globalThis.fetch = async (input, init) => (new URL(typeof input === 'string' ? input : input.url).hostname === 'api.resend.com' ? jres(422, { name: 'validation_error', message: 'Invalid `to` field.' }) : realFetch(input, init));
   const failed = await quiet(() => invoicePaidEcho(INV));
   globalThis.fetch = realFetch;
-  ok('echo: a receipt the mail service refused lets go of its mark, so the check sends it later', failed.receipted === false && !inv().receipt_sent_at);
+  ok('echo: a receipt the mail service refused for good lets go of its mark, so the check sends it later', failed.receipted === false && !inv().receipt_sent_at);
+  // builder item 393: a service having a bad hour keeps the receipt in the outbox, so the mark stays and nothing is sent twice
+  seed({ invoices: [openInvoice({ status: 'paid', paid_at: '2026-11-16T09:00:00.000Z' })] });
+  globalThis.fetch = async (input, init) => (new URL(typeof input === 'string' ? input : input.url).hostname === 'api.resend.com' ? jres(500, { message: 'mail down' }) : realFetch(input, init));
+  const later = await quiet(() => invoicePaidEcho(INV));
+  globalThis.fetch = realFetch;
+  ok('echo: a receipt the mail service couldn\'t take just now waits in the outbox, and keeps its mark', later.receipted === true && !!inv().receipt_sent_at && (db.tables.email_outbox || []).some((x) => x.status === 'queued' && x.kind === 'money'));
 }
 
 // ═══ 6. refunds and disputes whose messages were lost (recorded by items 126 and 127) ═══

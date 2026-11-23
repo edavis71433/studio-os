@@ -41,9 +41,10 @@ export const SEND_WAIT_MS = 15000;
  *  in the page so nobody waits for a big upload the server would refuse. */
 export const FILE_MAX_MB = 10;
 /** Item 140: a send waits until its time ticket is this old (the server wants three
- *  seconds; the half second covers its rounding), and asks for a new one after 11 hours. */
+ *  seconds; the half second covers its rounding), and asks for a new one after 20 minutes
+ *  (builder item 391: a ticket is good for 30, lib/form_check.ts TICKET_MAX_AGE_S). */
 export const TICKET_SETTLE_MS = 3500;
-export const TICKET_FRESH_MS = 11 * 3600_000;
+export const TICKET_FRESH_MS = 20 * 60_000;
 
 export interface SiteReach { tel: string; mail: string }
 

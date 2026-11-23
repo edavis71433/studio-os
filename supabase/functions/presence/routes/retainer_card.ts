@@ -129,7 +129,7 @@ export async function handleSalesRetainerCardLink(_req: Request, site: SiteRow, 
     ? `The ${amt} a ${per} charge for your retainer${studio ? ` with ${escH(studio)}` : ''} didn’t go through. Put in a new card on Stripe’s secure page, and Stripe uses it for the next try.`
     : `${studio ? escH(studio) : 'Your studio'} sent you a link to change the card your ${amt} a ${per} retainer uses. It opens Stripe’s secure page.`;
   const html = `${emailBand('Retainer', failed ? 'Your card didn’t go through' : 'Update your card')}<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p><p>${lead}</p><p class="cta">${btn}</p><p style="font-size:13px;color:#6b6478">The link works for ${CARD_LINK_DAYS} days. Saving a card charges nothing by itself; Stripe uses it for the next charge.</p>`;
-  const emailed = await sendEmail(to, failed ? 'Your retainer payment didn’t go through' : 'Update the card for your retainer', html, brand, { critical: true, asBusiness: true, siteId: site.id });
+  const emailed = await sendEmail(to, failed ? 'Your retainer payment didn’t go through' : 'Update the card for your retainer', html, brand, { critical: true, asBusiness: true, siteId: site.id, keep: 'money' });
   const { maskEmail } = await import('./email_infra.ts');
   return json({ data: { emailed, to: maskEmail(to), url } }, 200, cors);
 }

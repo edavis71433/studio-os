@@ -21,6 +21,7 @@
 // the first try answers 403 fresh_code_needed (and, for email, sends the code); the page's
 // sheet (fresh-code.js) asks for it and sends the same request again with it.
 import { svc } from './db.ts';
+import { linkKey } from '../../_shared/link_keys.ts';
 import { json } from '../../_shared/http.ts';
 import { authUser, jwtClaims, type Principal } from '../../_shared/auth.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
@@ -43,7 +44,9 @@ export const FRESH_WORDS: Record<FreshAction, { doing: string; go: string }> = {
   two_step_off: { doing: 'turn off a client’s two-step sign-in', go: 'Confirm and turn it off' },   // item 347
 };
 
-const signingKey = () => Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+// builder item 394, finished in part two: its own key from the link root, never the scheduler's secret
+// (a code lives minutes, so one asked for just before the change is simply asked for again)
+const signingKey = () => linkKey('fresh_code');
 
 /** Six digits, every value equally likely. */
 export function newCode(): string {

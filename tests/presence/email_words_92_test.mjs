@@ -112,12 +112,12 @@ const page = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url)
   ok('the invoice email has no "Your studio" stand-in', !/: 'Your studio';/.test(sales));
 }
 ok('the estimate, the recorded-payment receipt and the paid receipt come from the studio',
-  /\{ critical: true, asBusiness: true, siteId \}/.test(src('routes/estimates.ts')) && /\{ critical: true, asBusiness: true, siteId, \.\.\./.test(src('routes/invoice_payments.ts')) && /\{ critical: true, asBusiness: true, siteId: String\(inv\.site_id\)/.test(src('routes/commerce.ts')));
+  /\{ critical: true, asBusiness: true, siteId(?:, keep: 'money')? \}/.test(src('routes/estimates.ts')) && /\{ critical: true, asBusiness: true, siteId, (?:keep: 'money', )?\.\.\./.test(src('routes/invoice_payments.ts')) && /\{ critical: true, asBusiness: true, siteId: String\(inv\.site_id\)/.test(src('routes/commerce.ts')));
 ok('the paid receipt names the studio ("has been told"), not "Your studio has been notified"', !/Your studio has been notified/.test(src('routes/commerce.ts')) && /has been told/.test(src('routes/commerce.ts')));
 ok('a support reply is "A reply from <the studio>"', !/'A reply from your studio'/.test(src('routes/service_intake.ts')) && /`A reply from \$\{brand\.name\}`/.test(src('routes/service_intake.ts')));
 ok('a project message is "A message from <the studio>"', !/'A message from your studio'/.test(src('routes/project_comms.ts')) && /`A message from \$\{who\}`/.test(src('routes/project_comms.ts')));
 ok('the approval email names the studio and links "See what changes"', /\$\{esc\(sender\.name\)\} has \$\{n\} ready for you/.test(src('routes/commercial.ts')) && /See what changes →/.test(src('routes/commercial.ts')) && !/Your studio has \$\{items\.length\}/.test(src('routes/commercial.ts')));
-ok('the invoice reminder links the invoice, offers a reply and comes from the studio', /const more = invoiceReminderMore\(doc, brand\.accentDark\);/.test(src('commerce/lifecycle.ts')) && /\{ critical: true, asBusiness: true, siteId: inv\.site_id \}/.test(src('commerce/lifecycle.ts')));
+ok('the invoice reminder links the invoice, offers a reply and comes from the studio', /const more = invoiceReminderMore\(doc, brand\.accentDark\);/.test(src('commerce/lifecycle.ts')) && /\{ critical: true, asBusiness: true, siteId: inv\.site_id(?:, keep: 'money')? \}/.test(src('commerce/lifecycle.ts')));
 ok('the proposal nudge offers a reply', /<p class="cta">\$\{btn\}<\/p>\$\{REPLY_LINE\}`, brand, \{ siteId: doc\.site_id, asBusiness: true \}/.test(src('commerce/lifecycle.ts')));
 {
   const ok1 = page('payment-success.html'), ok2 = page('payment-canceled.html'), ap = page('approve.html');

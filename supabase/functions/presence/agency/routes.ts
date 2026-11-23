@@ -1175,7 +1175,8 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
  *  Item 126: repeats fold into one line per site and kind ("3 new bookings on Bacchus
  *  Kitchen", with how many in `count`, the line in `title` and its one link's words in
  *  `link`), and a site the studio turned off (`quiet`) leaves no news at all. */
-export const SITE_NEWS_KINDS: ReadonlySet<string> = new Set(['site_published', 'traffic_spike', 'domain_expiry', 'new_review', 'new_booking']);
+export const SITE_NEWS_KINDS: ReadonlySet<string> = new Set(['site_published', 'traffic_spike', 'domain_expiry', 'new_review', 'new_booking',
+  'auto_reply_ceiling', 'email_not_sent']);   // builder items 391 and 393: a site's automatic replies paused for the day; one of its emails that couldn't be sent
 export function siteNews(notices: Array<{ id?: string; site_id: string; kind: string; period?: string; headline?: string; body?: string; created_at?: string }>, names: Record<string, string>, nowIso: string, cap = 12, quiet: ReadonlySet<string> = new Set()) {
   const since = new Date(Date.parse(nowIso) - 14 * 86_400_000).toISOString();
   const items = notices

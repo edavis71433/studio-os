@@ -86,7 +86,7 @@ export async function tellBounced(invoiceId: string): Promise<Record<string, unk
       const btn = `<a href="${esc(payUrl)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${amount} securely →</a>`;
       emailed = await sendEmail(payerEmail, `Your bank payment didn’t go through: ${what} (${amount})`,
         `<p>${first ? `Hi ${esc(first)},` : 'Hi there,'}</p><p>Your bank wasn’t able to complete the payment of <strong>${amount}</strong> for ${esc(what)}, so nothing was taken and the ${isDeposit ? 'deposit' : 'invoice'} is still open.</p><p>Here is a fresh link to pay it. The earlier one no longer works.</p><p class="cta">${btn}</p><p style="color:#6b6478;font-size:14px;margin-top:14px">Paid another way already, or have a question? Just reply to this email.</p>`,
-        brand, { critical: true, asBusiness: true, siteId: String(inv.site_id) });   // money they owe = transactional; their answer lands in the Inbox
+        brand, { critical: true, asBusiness: true, siteId: String(inv.site_id), keep: 'money' });   // money they owe = transactional; their answer lands in the Inbox
     } catch { emailed = false; }
   }
 
