@@ -6,7 +6,8 @@
 // bookkeeper file's payouts are (routes/accounting_export.ts seesStripeBooks): every pay link
 // is made with the platform's Stripe, so a studio drilled into a client, a seat, or anyone
 // else gets `stripe: null`. A Stripe that can't be read answers stripe: null too, and says
-// so, never a blank strip read as zero. The two Stripe calls (balance transactions, payouts)
+// so, never a blank strip read as zero; stripe_error carries Stripe's own code (its words go to
+// the log, never the page), so a refusal like a missing key permission names itself. The two Stripe calls (balance transactions, payouts)
 // are on the restricted key's list already (commerce/stripe_key.ts KEY_NEEDS).
 import { json } from '../../_shared/http.ts';
 import { svc, svcPages } from '../lib/db.ts';
@@ -16,7 +17,7 @@ import { retainerPayments } from '../lib/invoice_billing.ts';
 import { RETURNED_SELECT, returnedPayments } from '../lib/money_returns.ts';
 import { studioZone, localClock } from '../lib/studio_clock.ts';
 import { homeMonths, stripeStrip } from '../lib/money_home.ts';
-import { stripeConfigured, listPaymentBalanceTransactions, listPayouts } from '../commerce/stripe.ts';
+import { stripeConfigured, listPaymentBalanceTransactions, listPayouts, StripeError } from '../commerce/stripe.ts';
 import { seesStripeBooks } from './accounting_export.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
@@ -41,6 +42,7 @@ export async function handleMoneyHome(req: Request, site: SiteRow, principal: Pr
   // Stripe's side of this month, for the platform's own studio
   let stripe: ReturnType<typeof stripeStrip> | null = null;
   let stripeFailed = false;
+  let stripeError = '';
   if (seesStripeBooks(principal) && stripeConfigured()) {
     const local = localClock(tz || undefined, Date.now());
     const month = local.ymd.slice(0, 7);
@@ -49,8 +51,12 @@ export async function handleMoneyHome(req: Request, site: SiteRow, principal: Pr
     try {
       const [bts, pos] = await Promise.all([listPaymentBalanceTransactions(start, nowSec + DAY, 10), listPayouts(start, nowSec + 45 * DAY, 3)]);
       stripe = stripeStrip(month, bts.data, pos.data, nowSec, bts.more || pos.more);
-    } catch { stripeFailed = true; }
+    } catch (e) {
+      stripeFailed = true;
+      stripeError = e instanceof StripeError ? e.code : 'no_answer';   // e.g. more_permissions_required; stripeReq logged Stripe's words
+      if (!(e instanceof StripeError)) console.warn(`[money-home] Stripe didn't answer: ${String((e as Error)?.name || e)}`);
+    }
   }
-  return json({ data: { today, months, total_12_cents: months.reduce((n, m) => n + m.cents, 0), stripe, stripe_failed: stripeFailed, stripe_books: seesStripeBooks(principal) } }, 200, cors);
+  return json({ data: { today, months, total_12_cents: months.reduce((n, m) => n + m.cents, 0), stripe, stripe_failed: stripeFailed, stripe_error: stripeError || null, stripe_books: seesStripeBooks(principal) } }, 200, cors);
 }
 void rows;
