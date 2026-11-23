@@ -172,7 +172,7 @@ function orderAreas(arr){return arr.slice().sort((a,b)=>(RANK[a.state]==null?3:R
 const BANDS=[
   {label:'Jobs & delivery',keys:['cron','crashes','errors','email']},
   {label:'Reach',keys:['domains','usage']},
-  {label:'Money & usage',keys:['billing','stripe_key','ai']},
+  {label:'Money & usage',keys:['hosting','billing','stripe_key','ai']},   // builder item 358: the host's credits join the money band
   {label:'Notices',keys:['platform','changes','alerts','backups']},
 ];
 // Real navigations to the surface where each area is actually FIXED. Areas with no
@@ -187,6 +187,7 @@ const DEST={
   email:['/broadcasts.html','Open broadcasts'],
   billing:['/admin-growth.html','Open Growth'],
   usage:['/admin-growth.html','Open Growth'],
+  hosting:['/usage.html','Open Usage'],   // builder item 358: what each publish costs, and the plan
 };
 
 function kpiTile(n,label,mod){

@@ -89,6 +89,40 @@ test.describe('Styles is a tab, not Edit mode (builder item 370)', () => {
   });
 });
 
+// Builder item 431 (the Nov 23 live check of PR 507): Styles names a font the browser picks in
+// words, as the editor does (item 327), and the holiday line's "#hours-thu" puts focus on that
+// day's row in the Hours card: its Closed tick when the day is closed (its times are switched off).
+const SITE_DATA = (PAGE_API['/site'] as { data: Record<string, unknown> }).data;
+const open9 = [{ open: '09:00', close: '17:00' }];
+const WEEK = [
+  { day: 'mon', closed: true, intervals: [] }, { day: 'tue', closed: false, intervals: open9 }, { day: 'wed', closed: false, intervals: open9 },
+  { day: 'thu', closed: true, intervals: [] }, { day: 'fri', closed: false, intervals: open9 }, { day: 'sat', closed: true, intervals: [] }, { day: 'sun', closed: true, intervals: [] },
+];
+test.describe('Styles words and the holiday line’s Hours link (builder item 431)', () => {
+  test('a font the browser picks is named in words, never “system-ui”', async ({ page }) => {
+    const errors = await openWebsite(page, '#styles', { '/dev/customization': { data: { theme_tokens: { accent: '#1f6f5c', ink: '#222222', bg: '#fafafa', font_display: 'system-ui, -apple-system, sans-serif', font_body: "'Georgia', serif" } } } });
+    await expect(page.locator('#stLook .st-font').first()).toContainText('Your device’s own font');
+    await expect(page.locator('#stLook .st-font').nth(1)).toContainText('Georgia');
+    await expect(page.locator('#stLook')).not.toContainText('system-ui');
+    expect(errors).toEqual([]);
+  });
+  const withWeek = { '/site': { data: { ...SITE_DATA, location: { timezone: 'America/Los_Angeles', hours: WEEK } } } };
+  test('#hours-thu with Thursday closed: focus on Thursday’s Closed tick, the card in view', async ({ page }) => {
+    const errors = await openWebsite(page, '#hours-thu', withWeek);
+    await expect(page.locator('#view-business')).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Thursday closed' })).toBeFocused();
+    await expect(page.locator('#bizHoursH')).toBeInViewport();
+    expect(errors).toEqual([]);
+  });
+  test('an open day gets its opening time; plain #hours is the first row, Monday, closed here', async ({ page }) => {
+    await openWebsite(page, '#hours-fri', withWeek);
+    await expect(page.getByLabel('Friday opens')).toBeFocused();
+    await page.evaluate(() => { location.hash = 'today'; });
+    await page.evaluate(() => { location.hash = 'hours'; });
+    await expect(page.getByRole('checkbox', { name: 'Monday closed' })).toBeFocused();
+  });
+});
+
 const CLIENT = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
 const scoped = { data: {
   site_role: 'business_owner', edition: 'presence', edition_key: 'agency', edition_name: 'Agency', edition_features: ALL_FEATURES,

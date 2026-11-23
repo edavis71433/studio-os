@@ -339,8 +339,23 @@ jobs:
         run: |
           # Since builder item 138 (PR 264) the page loads Cloudflare's check only when a visitor starts a
           # review, so the script's address lives in site-review.js, not in the page's own HTML.
-          curl -s --fail https://tools.davisdigitalstudio.com/site-review | grep -q 'id="srForm"' || { echo "site-review page smoke FAILED (no form)"; exit 1; }
-          curl -s --fail https://tools.davisdigitalstudio.com/site-review.js | grep -q 'challenges.cloudflare.com/turnstile' || { echo "site-review script smoke FAILED (no Turnstile loader)"; exit 1; }
-          curl -s --fail https://tools.davisdigitalstudio.com/ai-visibility | grep -q 'id="srForm"' || { echo "ai-visibility page smoke FAILED (no form)"; exit 1; }
-          curl -s --fail https://tools.davisdigitalstudio.com/report/00000000-0000-4000-8000-000000000000 | grep -q 'id="trReport"' || { echo "report page smoke FAILED"; exit 1; }
+          # Each address gets 7 tries, 15 seconds apart (90 seconds), before it counts as failed: right
+          # after a release publishes the pages itself, Netlify's edge can still answer from the old
+          # copy for a minute. Nov 23 2026, 10:41 UTC: the report page lacked its marker, and all four
+          # passed by hand four minutes later. The deploy gate test in tests/workflows runs this step.
+          tries="${SMOKE_TRIES:-7}"; pause="${SMOKE_PAUSE_SECONDS:-15}"; out="$(mktemp)"; trap 'rm -f "$out"' EXIT
+          page() {   # the words if it fails, the address, the text the page must hold
+            local n=1 code
+            while :; do
+              code=$(curl -s -o "$out" -w '%{http_code}' --max-time 20 "$2") || code=000
+              [ "$code" = 200 ] && grep -q "$3" "$out" && return 0
+              [ "$n" -ge "$tries" ] && { echo "$1 (HTTP $code, after $tries tries)"; return 1; }
+              echo "Not yet: $2 (HTTP $code); trying again in $pause seconds ($n of $tries)."
+              n=$((n + 1)); sleep "$pause"
+            done
+          }
+          page "site-review page smoke FAILED (no form)" https://tools.davisdigitalstudio.com/site-review 'id="srForm"' || exit 1
+          page "site-review script smoke FAILED (no Turnstile loader)" https://tools.davisdigitalstudio.com/site-review.js 'challenges.cloudflare.com/turnstile' || exit 1
+          page "ai-visibility page smoke FAILED (no form)" https://tools.davisdigitalstudio.com/ai-visibility 'id="srForm"' || exit 1
+          page "report page smoke FAILED" https://tools.davisdigitalstudio.com/report/00000000-0000-4000-8000-000000000000 'id="trReport"' || exit 1
           echo "Free Tools pages smoke passed (site-review, ai-visibility, report shell)."

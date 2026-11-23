@@ -28,7 +28,7 @@ import { moneyState, moneyBuckets, invoiceNotSent, SENT_INVOICE_FILTER } from '.
 import { studioZone } from '../lib/studio_clock.ts';   // sales item 152
 import { ownStripeRefused, OWN_STRIPE_MESSAGE } from '../commerce/own_stripe.ts';   // sales item 149
 import { buildMyTasks, MY_TASKS_MAX } from '../lib/my_tasks.ts';
-import { revenueByMonth, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
+import { revenueByMonth, moneyInMonths, dealsByStage, wonAndLost, enquiriesBySource, overdueInvoices, OPEN_STAGES as REPORT_OPEN_STAGES } from '../lib/sales_reports.ts';
 import { RETURNED_SELECT, returnedPayments } from '../lib/money_returns.ts';   // sales items 126, 127
 import { normalizeViews, normalizeViewList, isViewList } from '../lib/saved_views.ts';
 import { readReservedJsonOrThrow, readReservedJson, writeReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
@@ -949,6 +949,20 @@ export async function handleSalesContact(req: Request, site: SiteRow, principal:
 // (the browser only ever holds a page of ≤100, so it can't total them honestly).
 // The pure summarizePipeline does the math; this just fetches the minimal columns.
 // Site-scoped & studio-gated like every authed /sales/* route.
+// ── Sales item 215: Home's "Money in", read and worked out the way Analytics' is (the reports
+//    route below): paid invoices, retainer payments and money that went back, by the studio's
+//    own day, for this month and last. 70 days back covers last month whatever the zone. ──
+export async function readMoneyIn(site: SiteRow, now: string) {
+  const since = encodeURIComponent(new Date(Date.parse(now) - 70 * 86400_000).toISOString());
+  const [paid, events, back, tz] = await Promise.all([
+    svcPages(`presence_invoices?site_id=eq.${site.id}&deleted_at=is.null&status=eq.paid&paid_at=gte.${since}&select=amount_cents,paid_at`, 'paid_at'),
+    svcPages(`presence_deal_events?site_id=eq.${site.id}&kind=eq.invoice_paid&detail->>retainer=eq.true&created_at=gte.${since}&select=kind,detail,created_at`, 'created_at'),
+    svcPages(`presence_money_returns?site_id=eq.${site.id}&counted_cents=gt.0&counted_at=gte.${since}&select=${RETURNED_SELECT}`, 'counted_at'),
+    studioZone(site.id),
+  ]);
+  if (!paid || !events || !back) return null;   // a read that failed sends no figure, never a wrong one
+  return moneyInMonths(revenueByMonth(paid.rows, now, retainerPayments(events.rows), returnedPayments(back.rows), tz));
+}
 export async function handleSalesSummary(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {
   if (req.method !== 'GET') return json({ error: 'method_not_allowed' }, 405, cors);
   const namesP = loadStageLabels(site.id).catch(() => null);   // item 38 names; batch B: read with the others, not after
@@ -958,6 +972,7 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   // tells the truth if we ever hit it — the totals are then a floor, never a
   // fabricated whole-set sum.
   const CAP = 2000;
+  const moneyInP = readMoneyIn(site, nowIso()).catch(() => null);   // sales item 215: side by side with the reads below; a failed read sends none
   const [r, invR] = await Promise.all([
     svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&select=stage,expected_value_cents,converted_client_id,converted_at,updated_at&limit=${CAP}`),
     // AR rollup — "who owes me money" across every deal, in one place (a Salesforce
@@ -987,7 +1002,7 @@ export async function handleSalesSummary(req: Request, site: SiteRow, principal:
   sum.by_stage = sum.by_stage.map((s) => ({ ...s, chance: chances[s.stage] ?? null, expected_cents: ex.by_stage[s.stage] ?? 0 }));
   // sales item 94: the month's goal against won this month and what open deals should still bring
   const goal = goalProgress(normalizeGoalAi(await goalP).goal_cents, sum.won_month.value_cents, ex.value_cents);
-  return json({ data: { ...sum, ar, expected: { value_cents: ex.value_cents }, goal }, truncated: deals.length >= CAP }, 200, cors);
+  return json({ data: { ...sum, ar, expected: { value_cents: ex.value_cents }, goal, money_in: await moneyInP }, truncated: deals.length >= CAP }, 200, cors);
 }
 
 // ═══ RECEIVABLES — the "who owes me money" list behind the AR strip ═══

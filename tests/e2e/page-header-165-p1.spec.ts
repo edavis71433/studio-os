@@ -129,7 +129,7 @@ const PAGES: Array<{ name: string; open: Open; want: Parameters<typeof expectOne
       await page.goto('/prospects.html'); },
     want: { title: 'Prospects', icon: 'prospects', line: '2 businesses on your list', filled: null } },
   { name: 'To-dos', open: async (page) => { await installApp(page, { api: { '/portal/context': STUDIO, '/sales/tasks': TASKS } }); await page.goto('/todos.html'); },
-    want: { title: 'To-dos', icon: 'todos', line: '3 open · 1 overdue · 1 due today', picker: 'For: Everyone', filled: '+ Add a to-do' } },
+    want: { title: 'To-dos', icon: 'todos', line: '3 open · 1 overdue · 1 due today', picker: 'For: Everyone', filled: null } },   // sales item 204: the add row is the one add control
   { name: 'Invoices', open: async (page) => { await installApp(page, { api: { '/portal/context': STUDIO, '/sales/invoices': INVOICES } }); await page.goto('/invoices.html'); },
     want: { title: 'Invoices', icon: 'invoices', line: '3 invoices sent · $2,450 owed to you · 1 overdue', filled: 'Send an invoice' } },
 ];
@@ -160,11 +160,11 @@ test.describe('One page header, group 1 (builder item 165)', () => {
     });
   }
 
-  test('To-dos: + Add a to-do takes you to the box that adds one', { tag: '@layout' }, async ({ page }) => {
+  test('To-dos: the add row is the one place to add (sales item 204: the header’s jump button is gone)', { tag: '@layout' }, async ({ page }) => {
     await installApp(page, { api: { '/portal/context': STUDIO, '/sales/tasks': TASKS } });
     await page.goto('/todos.html');
-    await page.locator('#addJump').click();
-    await expect(page.locator('#addTitle')).toBeFocused();
+    await expect(page.locator('#addForm #addTitle')).toBeVisible();
+    await expect(page.locator('#addJump')).toHaveCount(0);
   });
 
   for (const p of PAGES) {
