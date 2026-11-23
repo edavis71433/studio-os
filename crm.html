@@ -417,6 +417,16 @@
   /* sales item 94: Where things stand, at the top of the rail (sales-ai.js draws it) */
   #aicard,#aicardMain{margin-bottom:var(--dds-s3,12px)}
   #aicard:empty,#aicardMain:empty{display:none}
+  /* sales item 211: "Good to know about them", the note AI help reads, under "Where things stand" */
+  #gtk,#gtkMain{margin-bottom:var(--dds-s3,12px)} #gtk:empty,#gtkMain:empty{display:none}
+  .gtk{border:1px solid var(--line);border-radius:var(--dds-r-card,16px);background:var(--card);padding:12px 16px}
+  .gtk-h{display:flex;align-items:center;gap:8px} .gtk-h h2{font-family:inherit;font-size:14.5px;font-weight:650;margin:0;flex:1 1 auto;min-width:0}
+  .gtk-ed{font:inherit;font-size:12.5px;font-weight:600;color:var(--p);background:none;border:0;padding:0;cursor:pointer;white-space:nowrap}
+  .gtk-t{margin:6px 0 0;font-size:13.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere} .gtk-t.none{color:var(--soft)}
+  .gtk-foot{margin:6px 0 0;font-size:12px;color:var(--faint)}
+  .gtk textarea{display:block;width:100%;box-sizing:border-box;margin-top:8px;font:inherit;font-size:16px;line-height:1.45;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;resize:vertical;min-height:96px}
+  .gtk-acts{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:10px} .gtk-n{margin-left:auto;font-size:12px;color:var(--faint)}
+  @media (pointer:coarse),(max-width:767px){.gtk-ed{min-height:44px;display:inline-flex;align-items:center}.gtk-acts .abtn{min-height:44px}}
   .sc{padding:14px 16px}
   .sc-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
   .sc-h h2{font-family:var(--sans);font-size:15px;font-weight:650;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -772,10 +782,12 @@ function renderShell(){
     <div class="body">
       <div class="col-main">
         <div id="aicardMain"></div>
+        <div id="gtkMain"></div>
         ${avail.length?`<div class="tabs" role="tablist" aria-label="Record sections">${tabsHtml}</div><div id="tabbody" role="tabpanel" aria-labelledby="tab-${TAB||avail[0]}"><div class="spin" role="status" aria-label="Loading"></div></div>`:'<p class="muted">Nothing to show for this record yet.</p>'}
       </div>
       <aside class="rail" ${showRail?'':'hidden'}>
         <div id="aicard"></div>
+        <div id="gtk"></div>
         <div id="sumcards"></div>
         <div id="dcard"></div>
       </aside>
@@ -2533,6 +2545,73 @@ function renderAiCard(){
   if(!c||!c.value){host.innerHTML='';AI_SUM=null;return;}
   const go=()=>{if(!host.isConnected||!window.ddsSalesAi)return;AI_SUM=window.ddsSalesAi.summary(host,{req:api,subject:c.key+':'+c.value,query:aiRecordQuery,who:aiWho(),dealToo:!!idParams().deal,newSince:(iso)=>{const t=Date.parse(iso);return Number.isFinite(t)?(ACT.items||[]).filter(i=>i&&Date.parse(i.at)>t).length:0;}});};
   if(window.ddsSalesAi)go();else SHELL_READY.then(go);
+  renderGoodToKnow(inRail);
+}
+// ── sales item 211: "Good to know about them" ─────────────────────────────────────
+// One note per person (presence_contacts.good_to_know, 0287) that AI help reads whenever it drafts
+// to them or sums them up, kept here beside "Where things stand". The record names the person it
+// belongs to (identity.person_id: the record's person, or a customer's first person). Before the
+// database update the read answers null and no box shows. Saved by the contact's own PATCH.
+let GTK=null;   // {pid, text|null, editing, busy, draft}
+const GTK_MAX=1000;
+function gtkPid(){const i=REC&&REC.identity;return(i&&(i.person_id||i.contact_id))||'';}
+function renderGoodToKnow(inRail){
+  const host=$(inRail?'gtk':'gtkMain'),other=$(inRail?'gtkMain':'gtk');
+  if(other)other.innerHTML='';
+  if(!host)return;
+  const pid=gtkPid();
+  if(!pid){host.innerHTML='';GTK=null;return;}
+  if(!GTK||GTK.pid!==pid){
+    GTK={pid,text:undefined,editing:false,busy:false,draft:null};
+    // one read of the person, shared with the Details tab (CONTACT_CACHE) when it is the record's own
+    const own=pid===((REC.identity&&REC.identity.contact_id)||'');
+    const pr=(CONTACT_CACHE&&CONTACT_CACHE.cid===pid)?CONTACT_CACHE.promise:apiAg('/sales/contacts/'+encodeURIComponent(pid)).then(r=>r.ok?(r.body.data||{}):null);
+    if(own&&!(CONTACT_CACHE&&CONTACT_CACHE.cid===pid))CONTACT_CACHE={cid:pid,promise:pr};
+    pr.then(d=>{
+      if(!GTK||GTK.pid!==pid)return;
+      const c=d&&d.contact;
+      GTK.text=c&&typeof c.good_to_know==='string'?c.good_to_know:null;
+      drawGoodToKnow();
+    }).catch(()=>{if(GTK&&GTK.pid===pid){GTK.text=null;drawGoodToKnow();}});
+  }
+  drawGoodToKnow();
+}
+function gtkHost(){const rail=document.querySelector('aside.rail'),inRail=!!(rail&&!rail.hidden);return $(inRail?'gtk':'gtkMain');}
+function drawGoodToKnow(focusTa){
+  const host=gtkHost();if(!host)return;
+  if(!GTK||typeof GTK.text!=='string'){host.innerHTML='';return;}   // not read yet, or no box before the update
+  const who=aiWho(),t=GTK.text;
+  if(GTK.editing){
+    host.innerHTML=`<section class="gtk" aria-labelledby="gtkH"><div class="gtk-h"><h2 id="gtkH">Good to know about ${esc(who||'them')}</h2></div>
+      <label class="sr-only" for="gtkTa">Good to know about ${esc(who||'them')}</label>
+      <textarea id="gtkTa" maxlength="${GTK_MAX}" aria-describedby="gtkHow" placeholder="How they like to be reached, who pays the invoices, what matters to them">${esc(GTK.draft!=null?GTK.draft:t)}</textarea>
+      <p class="gtk-foot" id="gtkHow">AI help reads this whenever it drafts to ${esc(who||'them')} or sums them up.</p>
+      <div class="gtk-acts"><button type="button" class="abtn primary" data-gtk="save"${GTK.busy?' disabled':''}>Save</button><button type="button" class="abtn" data-gtk="cancel">Cancel</button><span class="gtk-n" id="gtkN" aria-live="polite"></span></div></section>`;
+    const ta=$('gtkTa'),n=$('gtkN');
+    const count=()=>{if(n)n.textContent=ta.value.length>GTK_MAX*0.8?ta.value.length+' of '+GTK_MAX:'';};
+    ta.addEventListener('input',()=>{GTK.draft=ta.value;count();});count();   // what's typed outlives a redraw of the record
+    if(focusTa){ta.focus();try{ta.setSelectionRange(ta.value.length,ta.value.length);}catch(_){}}
+  }else{
+    host.innerHTML=`<section class="gtk" aria-labelledby="gtkH"><div class="gtk-h"><h2 id="gtkH">Good to know about ${esc(who||'them')}</h2><button type="button" class="gtk-ed" data-gtk="edit">${t?'Edit':'Add a note'}</button></div>
+      ${t?`<p class="gtk-t">${esc(t)}</p>`:`<p class="gtk-t none">Nothing yet. Add what AI help should keep in mind when it writes to them.</p>`}</section>`;
+  }
+  host.querySelectorAll('[data-gtk]').forEach(b=>b.addEventListener('click',()=>gtkAct(b.getAttribute('data-gtk'))));
+}
+async function gtkAct(a){
+  if(!GTK)return;
+  if(a==='edit'){GTK.editing=true;drawGoodToKnow(true);return;}
+  if(a==='cancel'){GTK.editing=false;GTK.draft=null;drawGoodToKnow();const e=gtkHost()&&gtkHost().querySelector('[data-gtk="edit"]');if(e)e.focus();return;}
+  if(a!=='save'||GTK.busy)return;
+  const ta=$('gtkTa');if(!ta)return;
+  const v=ta.value.trim(),pid=GTK.pid;
+  GTK.busy=true;const sb=gtkHost().querySelector('[data-gtk="save"]');if(sb)sb.disabled=true;
+  let r;try{r=await apiAg('/sales/contacts/'+encodeURIComponent(pid),'PATCH',{good_to_know:v});}catch(_){r={ok:false,body:{}};}
+  if(!GTK||GTK.pid!==pid)return;
+  GTK.busy=false;
+  if(!r.ok){if(sb)sb.disabled=false;toast((r.body&&r.body.message)||'That didn’t save just now. Your note is still in the box.','err');return;}
+  GTK.text=(r.body&&r.body.data&&typeof r.body.data.good_to_know==='string')?r.body.data.good_to_know:v;GTK.editing=false;GTK.draft=null;CONTACT_CACHE=null;
+  drawGoodToKnow();toast(GTK.text?'Saved. AI help will keep it in mind.':'Note removed.');
+  const e=gtkHost()&&gtkHost().querySelector('[data-gtk="edit"]');if(e)e.focus();
 }
 function emAiTools(row,k){
   if(!window.ddsSalesAi)return;

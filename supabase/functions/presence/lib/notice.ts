@@ -198,12 +198,31 @@ export function dealFollowupPeriod(dealId: string, nowMs: number): string {
 export function dealFollowupLegacyPeriod(dealId: string): string { return `deal:${dealId}`; }
 
 // ── lead_followup (commerce/lifecycle.runLeadFollowups) — weekly bucket too ──
-// No teardown exists for this kind (a replied lead leaves the SQL window by
-// status), but the bucket keeps the shape consistent and means a lead that is
-// STILL sitting 'new' when the week rolls over gets one more tap before it goes
-// cold, instead of exactly one ping ever.
+// The bucket means a lead that is STILL sitting 'new' when the week rolls over
+// gets one more tap before it goes cold, instead of exactly one ping ever.
+// Acting on the enquiry tears it down: a reply, a status that settles it, Spam
+// or Delete (routes/commercial.ts, through clearLeadFollowup below). Sales item
+// 201's follow-up (Nov 23 2026): those clears read the once-only key `lead:<id>`
+// alone, so the bucketed nudge outlived the reply and stayed in the bell. They
+// now clear every bucket and that legacy key, from these same helpers.
+export function leadFollowupPeriodPrefix(leadId: string): string { return `lead:${leadId}:`; }
 export function leadFollowupPeriod(leadId: string, nowMs: number): string {
-  return `lead:${leadId}:${noticeWeekBucket(nowMs)}`;
+  return `${leadFollowupPeriodPrefix(leadId)}${noticeWeekBucket(nowMs)}`;
+}
+export function leadFollowupLegacyPeriod(leadId: string): string { return `lead:${leadId}`; }
+/** Dismiss one enquiry's day-later nudge on a site: every week's (`lead:<id>:<bucket>`) and the
+ *  once-only key it had before the bucket (`lead:<id>`). Site-keyed, because the Inbox's routes
+ *  know the site (clearNoticePrefix is keyed by client). An id carrying filter grammar is refused,
+ *  never widened. Best-effort. */
+export async function clearLeadFollowup(siteId: string, leadId: string): Promise<void> {
+  const prefix = filterSafe(leadFollowupPeriodPrefix(leadId)), legacy = filterSafe(leadFollowupLegacyPeriod(leadId));
+  if (!siteId || !leadId || prefix === null || legacy === null) {
+    console.error(`[notice] refusing clearLeadFollowup: unsafe lead id ${JSON.stringify(leadId)}`);
+    return;
+  }
+  const scope = `presence_plan_notices?site_id=eq.${encodeURIComponent(siteId)}&kind=eq.lead_followup&status=eq.active`;
+  const dismiss = (filter: string) => svc(`${scope}&${filter}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
+  await Promise.all([dismiss(`period=like.${encodeURIComponent(likeLiteral(prefix))}*`), dismiss(`period=eq.${encodeURIComponent(legacy)}`)]);
 }
 
 /** When a CLIENT REVIEWER decides something (a plan, a connected write, a file,

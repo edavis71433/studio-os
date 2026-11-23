@@ -18,8 +18,19 @@ export const AI_CENTS_SAID = 1;          // what each press is said to cost, in 
 export const AI_IN_PER_M = 2, AI_OUT_PER_M = 10;   // Sonnet 5.5, dollars per million tokens
 export const AI_CONTEXT_CHARS = 12000;   // the facts sent, at most (about 3,000 tokens)
 export const GOAL_MAX_CENTS = 100_000_000;   // $1,000,000 a month
+// Sales item 211 (Nov 22 review): what AI help should know. The studio's "How I write, and my terms"
+// (one box in Settings, kept with the goal) and one note per person, "Good to know about them"
+// (presence_contacts.good_to_know, 0287). Both go into every draft, and the person's into "Where
+// things stand"; the "Drafted by AI from …" line names them. The website writer's "How you sound"
+// (brand_profile) is a different thing: it is how the website reads, and this never changes it.
+export const WRITING_MAX = 1500, GOOD_TO_KNOW_MAX = 1000;
+/** A note as typed: its lines kept (three blank lines become one), no control characters, trimmed,
+ *  at most `max` long. Pure. */
+export function cleanNoteText(v: unknown, max: number): string {
+  return String(v ?? '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, max).trim();
+}
 
-export interface GoalAi { goal_cents: number | null; ai_on: boolean; ai_on_by: string | null; ai_on_at: string | null }
+export interface GoalAi { goal_cents: number | null; ai_on: boolean; ai_on_by: string | null; ai_on_at: string | null; writing: string }
 
 /** The stored setting, cleaned: no goal and AI help off unless said otherwise. Pure. */
 export function normalizeGoalAi(raw: unknown): GoalAi {
@@ -30,6 +41,7 @@ export function normalizeGoalAi(raw: unknown): GoalAi {
     ai_on: r.ai_on === true,
     ai_on_by: typeof r.ai_on_by === 'string' ? r.ai_on_by : null,
     ai_on_at: typeof r.ai_on_at === 'string' ? r.ai_on_at : null,
+    writing: cleanNoteText(typeof r.writing === 'string' ? r.writing : '', WRITING_MAX),   // item 211
   };
 }
 
@@ -47,6 +59,13 @@ export function applyGoalAi(cur: GoalAi, b: any, who: string | null, nowIso: str
       if (c > GOAL_MAX_CENTS) return { error: 'That goal is more than this can keep. Enter up to $1,000,000.' };
       next.goal_cents = c;
     }
+    changed = true;
+  }
+  // item 211: "How I write, and my terms" ('' or null clears it); a studio setting like the goal
+  if (b && typeof b === 'object' && 'writing' in b) {
+    if (b.writing !== null && typeof b.writing !== 'string') return { error: 'Write how you write in words.' };
+    if (String(b.writing ?? '').length > WRITING_MAX * 2) return { error: `That’s longer than this box keeps. Keep it under ${WRITING_MAX.toLocaleString('en-US')} characters.` };
+    next.writing = cleanNoteText(b.writing ?? '', WRITING_MAX);
     changed = true;
   }
   if (b && typeof b === 'object' && 'ai_on' in b) {
@@ -96,6 +115,8 @@ export interface SalesFacts {
   upcoming: Array<{ title: string; due?: string | null; overdue?: boolean }>;
   thread: Array<{ at?: string | null; who: string; text: string }>;   // the conversation, oldest first
   timeline: Array<{ at?: string | null; text: string }>;             // everything else, newest first
+  good_to_know?: string | null;   // item 211: the owner's note on this person ("Good to know about them")
+  writing?: string | null;        // item 211: the studio's "How I write, and my terms" (drafts only)
 }
 
 /** The facts as short lines within the character budget: the business, person, deal,
@@ -106,6 +127,7 @@ export function factsText(f: SalesFacts, budget = AI_CONTEXT_CHARS): string {
   out.push(`The business: ${clip(f.business, 120) || 'a small business'}.`);
   if (f.services.length) out.push(`What it sells: ${f.services.slice(0, 12).map((s) => `${clip(s.name, 60)}${s.price_cents ? ` (${usd(s.price_cents)})` : ''}`).join('; ')}.`);
   if (f.person) out.push(`The person: ${[clip(f.person.name, 80), clip(f.person.company, 80)].filter(Boolean).join(' at ') || 'not named'}${f.person.email ? ` <${clip(f.person.email, 120)}>` : ''}.`);
+  if (f.good_to_know) out.push(`Good to know about them, in the owner's words: ${clip(f.good_to_know, GOOD_TO_KNOW_MAX)}`);   // item 211
   if (f.deal) {
     const bits = [clip(f.deal.title, 120), f.deal.stage ? `stage: ${clip(f.deal.stage, 40)}` : '', f.deal.value_cents ? `worth ${usd(f.deal.value_cents)}` : ''].filter(Boolean);
     out.push(`The deal: ${bits.join(', ') || 'open'}.${f.deal.next_step ? ` Next step: ${clip(f.deal.next_step, 160)}.` : ''}`);
@@ -134,6 +156,8 @@ export function draftMessages(f: SalesFacts, typed: string, subject: string): { 
     'Answer what the person asked or said last, using only the facts given. Never invent prices, dates, availability, discounts or promises; when something is not in the facts, offer to find out or suggest a short call.',
     `End with one clear next step, then sign off with ${biz ? `the business name, ${biz}` : 'a short sign-off'}.`,
     'When the reply box already holds the owner\'s words beyond a greeting, keep what they say and improve them rather than starting again.',
+    // item 211: the owner's own words on how they write and their terms, from Settings (theirs, so not data)
+    ...(f.writing ? [`The owner wrote down how they like to write and their terms. Follow it: where it says how to sound, it comes before the sound described above, and its terms are facts you may use.\n<how_i_write>\n${String(f.writing).slice(0, WRITING_MAX)}\n</how_i_write>`] : []),
     GROUND,
   ].join('\n');
   const own = String(typed || '').replace(/^\s*(hi|hello|hey|dear)\b[^\n]*\n?/i, '').trim();
@@ -187,6 +211,8 @@ export function draftFrom(kind: 'enquiry' | 'support' | 'record', f: SalesFacts,
   else if (f.thread.length) parts.push(`${whose} messages`);
   if (f.deal) parts.push('this deal');
   if (kind === 'enquiry' && f.services.length) parts.push('your services');
+  if (f.good_to_know) parts.push(who ? `your note on ${who}` : 'your note on them');   // item 211: what it read, said beside the draft
+  if (f.writing) parts.push('how you write');
   if (!parts.length) parts.push('this record');
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
 }

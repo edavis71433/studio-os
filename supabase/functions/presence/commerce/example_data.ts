@@ -13,7 +13,7 @@
 // Every write is service-role and best-effort: a seed that fails never costs
 // anyone their account, and a remove that fails says so.
 import { svc } from '../lib/db.ts';
-import { clearNotice } from '../lib/notice.ts';
+import { clearNotice, clearNoticePrefix, leadFollowupLegacyPeriod, leadFollowupPeriodPrefix } from '../lib/notice.ts';
 
 export const EXAMPLE_NAME = 'Example: Marlow’s Kitchen';
 export const EXAMPLE_PERSON = 'Example: Jo Marlow';
@@ -85,7 +85,8 @@ export async function removeExampleData(siteId: string, clientId: string | null)
   const enquiries = await del(`presence_form_submissions?site_id=eq.${siteId}&fields->>example=eq.true`);
   const contacts = await del(`presence_contacts?site_id=eq.${siteId}&email=eq.${encodeURIComponent(EXAMPLE_EMAIL)}`);
   if (clientId) {
-    for (const e of enquiries) { if (e.id) await clearNotice(clientId, 'lead_followup', `lead:${e.id}`).catch(() => {}); }
+    // every week's day-later nudge too (lead:<id>:<week>), not only the once-only lead:<id>
+    for (const e of enquiries) { if (e.id) { await clearNotice(clientId, 'lead_followup', leadFollowupLegacyPeriod(String(e.id))).catch(() => {}); await clearNoticePrefix(clientId, 'lead_followup', leadFollowupPeriodPrefix(String(e.id))).catch(() => {}); } }
   }
   return { contacts: contacts.length, deals: deals.length, enquiries: enquiries.length };
 }
