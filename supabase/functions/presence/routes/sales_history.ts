@@ -14,7 +14,7 @@ import { svc } from '../lib/db.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { loadStageLabels, renameMovedTo } from '../lib/stage_names.ts';
 import {
-  isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt, mergeDealTimeline, markMine,
+  isDealActivityKind, activityNeedsBody, cleanActivityBody, normalizeOccurredAt, mergeDealTimeline, markMine, writtenByStudioOs,
   type DealActivityKind, type DealChange,
 } from '../crm/deal_activity.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -74,7 +74,7 @@ export async function handleSalesLog(req: Request, site: SiteRow, principal: Pri
       const row = await patchDeal(back);
       return row ? json({ data: { ok: true, restored: true, deal_id: row.deal_id } }, 200, cors) : failed();
     }
-    if (!isDealActivityKind(d.activity_kind) || String(d.via || '')) return gone();   // removed already, or written by Studio OS
+    if (!isDealActivityKind(d.activity_kind) || writtenByStudioOs(d)) return gone();   // removed already, or written by Studio OS
     if (b.remove === true) {
       const row = await patchDeal(removedDetail(d, me, now));
       return row ? json({ data: { ok: true, removed: true, deal_id: row.deal_id, keep_days: LOG_KEEP_DAYS } }, 200, cors) : failed();
@@ -89,7 +89,7 @@ export async function handleSalesLog(req: Request, site: SiteRow, principal: Pri
   const pe = rows(await svc(`presence_person_events?id=eq.${id}&site_id=eq.${site.id}&select=id,kind,body,occurred_at,via,actor,deleted_at,contact_id,client_id&limit=1`).catch(() => null))[0];
   if (!pe) return gone();
   if (!sameActor(pe.actor)) return notYours();
-  if (String(pe.via || '')) return gone();
+  if (writtenByStudioOs(pe)) return gone();
   const patchPerson = async (patch: Record<string, unknown>, filter: string) => {
     const up = await svc(`presence_person_events?id=eq.${id}&site_id=eq.${site.id}${filter}&select=id`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
     return up.ok ? !!rows(up)[0] : null;
