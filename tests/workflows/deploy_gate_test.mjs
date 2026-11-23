@@ -244,6 +244,54 @@ const freeTools = (wf) => wf.match(/- name: Smoke test — Free Tools functions 
 ok('rollback smoke-tests the Free Tools exactly as a deploy does', !!freeTools(ROLLBACK) && freeTools(ROLLBACK) === freeTools(DEPLOY.slice(DEPLOY.indexOf('  deploy-production:'))));
 ok('rollback checks presence still refuses a signed-out caller', ROLLBACK.includes('"$base/presence/connections"'));
 
+// ── The free tools' pages after a release: each address gets 7 tries over 90 seconds ──
+// Nov 23 2026, 10:41 UTC: the first release that published its own pages went red here, the
+// report page still answering from the old copy at Netlify's edge; by hand it passed minutes
+// later. The real step runs here against a stand-in curl, so no network.
+const PAGES_STEP = DEPLOY.match(/- name: Smoke test — Free Tools pages on the static host\n {8}run: \|\n((?: {10}.*\n)+)/)?.[1] || '';
+ok('the static-host smoke step is found', PAGES_STEP.includes('page "report page smoke FAILED"'));
+ok('…and gives each address 7 tries, 15 seconds apart: 90 seconds', /tries="\$\{SMOKE_TRIES:-7\}"; pause="\$\{SMOKE_PAUSE_SECONDS:-15\}"/.test(PAGES_STEP));
+const sdir = await Deno.makeTempDir({ prefix: 'pages-smoke-test-' });
+await Deno.writeTextFile(`${sdir}/step.sh`, PAGES_STEP);
+await Deno.writeTextFile(`${sdir}/curl`, `#!/bin/bash
+out=""; url=""
+while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift ;; -w|--max-time) shift ;; -*) ;; *) url="$1" ;; esac; shift; done
+echo "$url" >> "${sdir}/calls"
+n=$(( $(cat "${sdir}/n" 2>/dev/null || echo 0) + 1 )); echo "$n" > "${sdir}/n"
+line=$(sed -n "\${n}p" "${sdir}/answers"); [ -z "$line" ] && line=$(tail -n 1 "${sdir}/answers")
+[ "$line" = DOWN ] && exit 7
+code=\${line%% *}; body=\${line#* }
+printf '%s' "$body" > "$out"
+printf '%s' "$code"
+`);
+await Deno.chmod(`${sdir}/curl`, 0o755);
+async function smoke(answers, env = {}) {
+  await Deno.writeTextFile(`${sdir}/answers`, answers.join('\n') + '\n');
+  for (const f of ['n', 'calls']) await Deno.remove(`${sdir}/${f}`).catch(() => {});
+  const { code, stdout } = await new Deno.Command('bash', {
+    args: ['-e', `${sdir}/step.sh`], stdout: 'piped', stderr: 'null', clearEnv: true,
+    env: { PATH: `${sdir}:${Deno.env.get('PATH')}`, TMPDIR: sdir, SMOKE_PAUSE_SECONDS: '0', ...env },
+  }).output();
+  const calls = (await Deno.readTextFile(`${sdir}/calls`).catch(() => '')).trim().split('\n').filter(Boolean);
+  return { code, log: new TextDecoder().decode(stdout), calls };
+}
+const FORM = '200 <form id="srForm"></form>', LOADER = '200 https://challenges.cloudflare.com/turnstile/v0/api.js', REPORT = '200 <main id="trReport"></main>', OLD = '200 <main>an older copy</main>';
+let sm = await smoke([FORM, LOADER, FORM, REPORT]);
+ok('all four answer on the first try: passed, one call each', sm.code === 0 && sm.calls.length === 4 && sm.log.includes('Free Tools pages smoke passed'), sm.log.trim());
+sm = await smoke([FORM, LOADER, FORM, OLD, OLD, REPORT]);
+ok('the report page is the old copy for two tries, then right: passed on its third try',
+  sm.code === 0 && sm.calls.length === 6 && sm.calls.slice(3).every((u) => u.endsWith('/report/00000000-0000-4000-8000-000000000000')) && sm.log.includes('Not yet'), sm.log.trim());
+sm = await smoke([FORM, 'DOWN', LOADER, FORM, REPORT]);
+ok('a network failure counts as not yet, and is tried again', sm.code === 0 && sm.calls.length === 5 && sm.log.includes('(HTTP 000)'), sm.log.trim());
+sm = await smoke([FORM, LOADER, FORM, OLD]);
+ok('still wrong after 7 tries: the release fails, saying which page, what it answered and how many tries',
+  sm.code === 1 && sm.calls.length === 10 && sm.log.includes('report page smoke FAILED (HTTP 200, after 7 tries)'), sm.log.trim());
+sm = await smoke(['404 Not Found']);
+ok('a page that answers 404 fails the same way, and the first page that fails stops the step',
+  sm.code === 1 && sm.calls.length === 7 && sm.log.includes('site-review page smoke FAILED (no form) (HTTP 404, after 7 tries)'), sm.log.trim());
+ok('the step leaves no answer file behind', [...Deno.readDirSync(sdir)].every((e) => !e.name.startsWith('tmp.')));
+await Deno.remove(sdir, { recursive: true });
+
 const passedN = results.filter((x) => x.p).length;
 console.log(`\n════ DEPLOY GATE: ${passedN}/${results.length} ${passedN === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passedN !== results.length) Deno.exit(1);
