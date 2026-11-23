@@ -59,13 +59,13 @@ test.describe('285: the page’s name comes first', () => {
     await expect(page.locator('#dcPageName')).toHaveText('Home');
     await page.locator('#dcPageSwitch').click();   // the page statuses are read when the card first opens
     await expect(page.locator('#dcPageCount')).toHaveText('Needs something');
-    await expect(page.locator('#dcPageCount')).toHaveAttribute('title', 'Needs something before publishing');
+    await expect(page.locator('#dcPageCount')).toHaveAttribute('title', /^Needs something before publishing: a part this page needs is still empty/);   // item 327: the whole label, then what it means
     const name = page.locator('#dcPageName');
     expect((await name.boundingBox())!.width).toBeGreaterThan(30);   // not "H…"
     const row = page.locator('#pagesCard .pc-row', { hasText: 'Home' }).first();
     await expect(row.locator('.pp-name')).toHaveText('Home');
     await expect(row.locator('.hb-chip')).toHaveText('Needs something');
-    await expect(row.locator('.hb-chip')).toHaveAttribute('title', 'Needs something before publishing');
+    await expect(row.locator('.hb-chip')).toHaveAttribute('title', /^Needs something before publishing: /);
     const nb = (await row.locator('.pc-open').boundingBox())!;
     expect(nb.width).toBeGreaterThanOrEqual(96);
     expect(await row.locator('.pp-name').evaluate((n) => n.scrollWidth <= n.clientWidth + 1)).toBe(true);   // the whole word shows

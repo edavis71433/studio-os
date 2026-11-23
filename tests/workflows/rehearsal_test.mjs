@@ -26,7 +26,7 @@ const pin = (s) => s.match(/^ {2}SUPABASE_CLI_VERSION: "(.+)"$/m)?.[1];
 ok('builds the scratch database with the CLI version production\'s functions go out with', !!pin(WF) && pin(WF) === pin(DEPLOY), `${pin(WF)} / ${pin(DEPLOY)}`);
 const fenced = (s) => s.match(/^\s+(0003_\*\|0004_\*\|0005_\*)\)/m)?.[1];
 ok('leaves out the same fenced migrations production never applied, as the walls test does', fenced(SCRIPT) === '0003_*|0004_*|0005_*' && fenced(ISOLATION) === fenced(SCRIPT));
-ok('every migration, in order: the CLI applies the folder on start, and the run fails if one doesn\'t apply', SCRIPT.includes('supabase start') && SCRIPT.includes("fail \"A migration didn't apply on a fresh database"));
+ok('every migration, in order: the CLI applies the folder on start, and the run fails if one doesn\'t apply', SCRIPT.includes('scratch_start "$WORK/start.log"') && SCRIPT.includes("fail \"A migration didn't apply on a fresh database"));
 ok('each apply pack from 0260 on runs twice, stopping at its first error', /FIRST_LEDGER=260/.test(SCRIPT) && /for run in 1 2; do/.test(SCRIPT) && /ON_ERROR_STOP=1/.test(SCRIPT));
 ok('the ledger must hold every migration from 0260 on, each pack\'s runs, and the newest number', SCRIPT.includes('wrote no ledger row') && SCRIPT.includes("didn't write its number on each run") && SCRIPT.includes("the ledger's newest number is"));
 // The release asks production this; the rehearsal asks the scratch database the same thing first.

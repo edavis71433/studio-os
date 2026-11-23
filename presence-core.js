@@ -375,8 +375,8 @@ async function rtLink(ta) {
   rtFire(ta);
 }
 const RT_BUTTONS = [
-  { html: '<span class="b">H2</span>', label: "Heading", run: (ta) => rtLine(ta, "## ") },
-  { html: '<span class="b">H3</span>', label: "Subheading", run: (ta) => rtLine(ta, "### ") },
+  { html: '<span class="b">Heading</span>', label: "Heading", run: (ta) => rtLine(ta, "## ") },
+  { html: '<span class="b">Smaller heading</span>', label: "Smaller heading", run: (ta) => rtLine(ta, "### ") },
   { html: '<span class="b">B</span>', label: "Bold", run: (ta) => rtWrap(ta, "**", "bold text") },
   { html: '<span class="i">I</span>', label: "Italic", run: (ta) => rtWrap(ta, "*", "italic text") },
   { html: "Link", label: "Add a link", run: (ta) => rtLink(ta) },
@@ -688,6 +688,7 @@ function go(view, early) {
   if (view === "reviews") loadReviews();
   if (view === "search") { loadSearch(); hbLoadBoardExtras("search"); mountSearchCard(); }
   if (view === "business" && !TAB_ASKED.monitor) { TAB_ASKED.monitor = true; renderMonitorCard(); }
+  if (view === "business") voiceLoad();   // item 328
   // CP-2.5: the live proof warms on entry. Item 85: already on a drawn canvas (a section's
   // Edit, its cog, a double-click on a picture) nothing has changed, so nothing is drawn
   // again; that full redraw 350 ms later also left sections below a new one resolving one
@@ -841,7 +842,7 @@ function buildSiteTabs() {
     if (isBusinessTab(view)) b.dataset.needs = "business";
     if (view === "domain") b.title = "Your domain, DNS records, email and the padlock — connect a custom domain here";
     else if (view === "analytics") { b.dataset.link = "analytics"; b.title = "Visitors, where they come from and your busiest pages"; }
-    else if (view === "styles") { b.dataset.link = "styles"; b.title = "Colors, fonts, corners and your template"; }
+    else if (view === "styles") { b.dataset.link = "styles"; b.title = "Colours, fonts, corners and your template"; }
     else if (view === "connections") { b.dataset.link = "connections"; b.title = "The services connected to your site"; }
     else if (view === "sharing") { b.dataset.link = "sharing"; b.dataset.needs = "owner"; b.title = "Who can sign in, and what clients can see"; }
     else if (view === "clientview") { b.dataset.link = "clientview"; b.title = "See what your client sees when they sign in"; }
@@ -1759,6 +1760,7 @@ function openDesk(kind, view) {
   DESK.mode = "write"; DESK.kind = kind; DESK.view = view; DESK.targetId = null;
   $("deskTitle").innerHTML = '<span class="aimark">✦</span> Draft it with help';
   $("deskSub").textContent = DESK_KINDS[kind]?.sub || "";
+  voiceLoad();   // item 328: the box says which voice it writes in
   $("deskInstructions").parentElement.hidden = false;
   $("deskInstructions").value = ""; $("deskResults").innerHTML = "";
   $("deskGo").hidden = false; $("deskGo").disabled = false; $("deskGo").textContent = "Write the drafts";
@@ -1768,6 +1770,7 @@ function openEditDesk(kind, view, targetId, action) {
   DESK.mode = "edit"; DESK.kind = kind; DESK.view = view; DESK.targetId = targetId || null; DESK.action = action || "rewrite";
   $("deskTitle").innerHTML = '<span class="aimark">✦</span> Improve it with help';
   $("deskSub").textContent = DESK_KINDS[kind]?.sub || "";
+  voiceLoad();   // item 328
   $("deskInstructions").parentElement.hidden = false;
   $("deskInstructions").value = ""; $("deskResults").innerHTML = "";
   $("deskGo").hidden = false; $("deskGo").disabled = false; $("deskGo").textContent = "Suggest improvements";
@@ -3859,7 +3862,7 @@ function hbPageChip(pg, changes, live, firstPublish) {
   const chip = el("span", "hb-chip"); chip.appendChild(el("i", "d"));
   const tp = hbTreePage(pg);
   if (tp && HB_TREE_FLAG[tp.status]) {   // the website map's word: something here blocks publishing or deserves a look
-    chip.classList.add(HB_TREE_FLAG[tp.status]); chip.appendChild(document.createTextNode(tp.status_label)); chip.title = tp.issue_count ? `${tp.issue_count} item${tp.issue_count === 1 ? "" : "s"} on this page` : "";
+    chip.classList.add(HB_TREE_FLAG[tp.status]); chip.appendChild(document.createTextNode(tp.status_label)); chip.title = treeHint(tp);   // item 327
     return chip;
   }
   const n = firstPublish ? 0 : changes.filter((ch) => pg.sections.indexOf(ch.section) >= 0).length;
@@ -4058,10 +4061,22 @@ function pcChangeOn(ch, pg) {
 // showed only "Needs something before publishing"). The pill is a dot and two words, the whole
 // sentence in its title, and the name comes first (presence.css gives it a floor).
 function shortStatus(s) { s = String(s == null ? "" : s).trim(); return s.length <= 16 ? s : s.split(/\s+/).slice(0, 2).join(" "); }
+// Builder item 327: a page's flag ("Worth a look", "Needs something…") says what it means and where to look,
+// after its whole label (item 285: the pill is two words, the title the whole of it)
+function treeHint(tp) {
+  if (!tp) return "";
+  const label = String(tp.status_label || "");
+  const parts = (Array.isArray(tp.sections) ? tp.sections : []).filter((x) => x && HB_TREE_FLAG[x.status] && x.label).map((x) => x.label);
+  const where = parts.length ? " Look at: " + parts.slice(0, 3).join(", ") + "." : "";
+  const says = tp.status === "publish_failed" ? "the last publish of this page didn’t finish. Publish again to try once more."
+    : tp.status === "missing_required" ? "a part this page needs is still empty, so it can’t go live yet." + where
+    : tp.status === "needs_review" ? "it can go live as it is, but the check found something to improve, like an empty part or a missing answer." + where : "";
+  return says ? (label ? label + ": " : "") + says : label;
+}
 function pcChip(pg, ctx) {
   const chip = el("span", "hb-chip"); chip.appendChild(el("i", "d"));
   const tp = hbTreePage(pg);
-  if (tp && HB_TREE_FLAG[tp.status]) { chip.classList.add(HB_TREE_FLAG[tp.status]); chip.appendChild(el("span", "t", shortStatus(tp.status_label))); chip.title = tp.status_label; return chip; }
+  if (tp && HB_TREE_FLAG[tp.status]) { chip.classList.add(HB_TREE_FLAG[tp.status]); chip.appendChild(el("span", "t", shortStatus(tp.status_label))); chip.title = treeHint(tp); return chip; }
   if (!ctx.siteLive || ctx.firstPublish) { chip.appendChild(el("span", "t", "Not live yet")); chip.title = "Your site goes live the first time you publish"; return chip; }
   const n = ctx.changes.filter((ch) => pcChangeOn(ch, pg)).length;
   if (!n) return null;   // live and nothing waiting: nothing to say
@@ -8740,9 +8755,9 @@ const BLOCK_DEFS = [
   { type: "video", name: "Video", mediaKind: "video", hint: "A poster image that links out to your video — nothing external loads on your site." },
   { type: "partners", name: "Trusted by (logo strip)", mediaKind: "gallery", hint: "Logos of brands you work with — instant credibility. Pick them from your files." },
   { type: "reviews", name: "Review rating badge", reviewsSimple: true, hint: "" },
-  { type: "reviews_wall", name: "Reviews wall (native)", reviewsWallSimple: true, hint: "Show the real reviews customers leave on your site — with honest star ratings that help you show up in search. Collect + approve them in the Reviews tab." },
+  { type: "reviews_wall", name: "Reviews wall", reviewsWallSimple: true, hint: "Show the real reviews customers leave on your site — with honest star ratings that help you show up in search. Collect + approve them in the Reviews tab." },
   { type: "appointment", name: "Booking button", apptSimple: true, hint: "" },
-  { type: "booking", name: "Online booking (native)", bookingSimple: true, hint: "Take real appointments right on your site. Set up your services + hours in the Bookings tab; this section shows the booking widget." },
+  { type: "booking", name: "Online booking", bookingSimple: true, hint: "Take real appointments right on your site. Set up your services + hours in the Bookings tab; this section shows the booking widget." },
   // Growth blocks (r2) — every one links OUT; nothing external ever loads on the site.
   { type: "newsletter", name: "Newsletter sign-up", newsletterSimple: true, hint: "" },
   { type: "social", name: "Social links", field: "links", hint: "One per line:  network | link   (e.g.  instagram | https://instagram.com/yourbusiness — icons appear automatically)",
@@ -8755,7 +8770,7 @@ const BLOCK_DEFS = [
   { type: "richtext", name: "Text box", proseSimple: true, hint: "" },
   { type: "image", name: "Image", imageSimple: true, hint: "" },
   { type: "image_text", name: "Image + text", imageTextSimple: true, hint: "" },
-  { type: "accordion", name: "Accordion (expandable)", structured: "accordion", hint: "Add each expandable panel — a short label and the details inside." },
+  { type: "accordion", name: "Accordion", structured: "accordion", hint: "Add each expandable panel — a short label and the details inside." },
   { type: "tabs", name: "Tabs", structured: "tabs", hint: "Tabbed sections — a row of tabs, each revealing its own text and optional image. Great for services, plans, or FAQs by category. Keyboard-friendly and stacks on phones." },
   { type: "carousel", name: "Carousel", structured: "carousel", hint: "A swipeable slideshow of images with optional captions. Scrolls smoothly on phones and by keyboard — no code, no plugins." },
   { type: "progress", name: "Progress bars", structured: "progress", hint: "Labeled bars that fill to a percentage — great for skills, capacity, or “how it’s going”. Add each label and its level." },
@@ -9502,6 +9517,52 @@ $("f-industry").addEventListener("change", async () => {
     scheduleChangesRefresh();
   } catch (err) { toast(nice(err), true); }
 });
+// Builder item 328: how the business sounds, one row in Business details. It is kept where the AI
+// writer reads a voice (the brand profile's voice_characteristics: writer/facts.ts, routes/brand.ts),
+// so every draft and rewrite follows it, and the writer's box says which voice it writes in.
+const VOICE_CHOICES = ["Warm and friendly", "Calm and professional", "Upbeat and fun", "Simple and to the point", "Polished and upscale"];
+let VOICE = null;   // null until read, "" when none is chosen
+// PURE: which choice the stored words are (a choice, "own" for words of their own, "" for none)
+function voicePick(v) { v = String(v || "").trim(); return !v ? "" : VOICE_CHOICES.indexOf(v) >= 0 ? v : "own"; }
+function voicePaint() {
+  const sel = $("f-voice"), own = $("f-voice-own");
+  if (sel && own) {
+    const pick = voicePick(VOICE);
+    if (document.activeElement !== sel) sel.value = pick;
+    own.hidden = sel.value !== "own";
+    if (pick === "own" && document.activeElement !== own) own.value = VOICE;
+  }
+  deskVoiceLine();
+}
+let VOICE_READ = null;
+function voiceLoad() {
+  if (VOICE !== null) { voicePaint(); return Promise.resolve(); }
+  if (!VOICE_READ) VOICE_READ = api("GET", "/brand/profile")
+    .then((r) => { VOICE = String((r && r.data && r.data.voice_characteristics) || "").trim(); })
+    .catch(() => {}).then(() => { VOICE_READ = null; voicePaint(); });
+  return VOICE_READ;
+}
+async function voiceSave(v) {
+  v = String(v || "").trim().slice(0, 600);
+  if (VOICE === null || v === VOICE) return;
+  try {
+    await api("PUT", "/brand/profile", { voice_characteristics: v });
+    VOICE = v; voicePaint();
+    toast(v ? "Saved. The AI writer writes in this voice" : "Saved. The AI writer keeps to plain, warm words");
+  } catch (err) { toast(nice(err), true); voicePaint(); }
+}
+$("f-voice").addEventListener("change", () => {
+  const sel = $("f-voice"), own = $("f-voice-own");
+  own.hidden = sel.value !== "own";
+  if (sel.value === "own") { if (voicePick(VOICE) !== "own") own.value = ""; own.focus(); return; }   // their own words save once written
+  voiceSave(sel.value);
+});
+$("f-voice-own").addEventListener("change", () => { const v = $("f-voice-own").value.trim(); if (v) voiceSave(v); });
+function voiceWords() { return VOICE === null ? "" : VOICE ? "Written in your voice: " + VOICE + ". Change it in Business details, under How you sound." : "Choose How you sound in Business details, and the writer follows it."; }
+function deskVoiceLine() {
+  const p = $("deskVoice"); if (!p) return;
+  p.textContent = voiceWords(); p.hidden = !p.textContent;
+}
 // ── Phase V (FD-N4): the announcement bar — a simple site-wide notice, no code ──
 function mountAnnouncementCard() {
   // Only for plans that HAVE a website to announce on (and that can publish).

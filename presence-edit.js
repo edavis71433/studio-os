@@ -768,8 +768,8 @@ async function mountBrandKitCard() {
   const typeAndCorners = () => { const t = DESIGN_TOKENS || {}; return { heading_font: t.font_display || undefined, body_font: t.font_body || undefined, corner: t.radius || "" }; };
   const miniBtn = "font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
   const card = el("div", "field"); card.id = "brandKitCard"; card.style.marginTop = "18px"; card.dataset.stab = "colours";
-  card.appendChild(el("label", null, "Logo and brand color"));
-  card.appendChild(el("div", "hint", "Set your logo and color once. Buttons, links and forms follow."));
+  card.appendChild(el("label", null, "Logo and brand colour"));
+  card.appendChild(el("div", "hint", "Set your logo and colour once. Buttons, links and forms follow."));
   // logo
   const logoRow = el("div"); logoRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:8px";
   const logoWrap = el("span"); const paintLogo = () => { logoWrap.textContent = ""; if (st.logo_media_id) logoWrap.appendChild(mediaThumb(st.logo_media_id)); };
@@ -792,7 +792,7 @@ async function mountBrandKitCard() {
   logoRow.append(logoWrap, logoBtn); card.appendChild(logoRow);
   // brand colour
   const colorRow = el("div"); colorRow.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:10px";
-  colorRow.appendChild(Object.assign(el("span", null, "Brand color"), { style: "font-size:12px;font-weight:600" }));
+  colorRow.appendChild(Object.assign(el("span", null, "Brand colour"), { style: "font-size:12px;font-weight:600" }));
   const colorInput = el("input"); colorInput.type = "color"; colorInput.value = st.primary; colorInput.style.cssText = "width:44px;height:32px;border:1px solid var(--line,#ddd);border-radius:8px;background:none;cursor:pointer";
   const hexInput = el("input"); hexInput.type = "text"; hexInput.value = st.primary; hexInput.style.cssText = "width:110px;padding:7px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px";
   colorInput.addEventListener("input", () => { hexInput.value = colorInput.value; st.primary = colorInput.value; });
@@ -822,7 +822,7 @@ async function mountBrandKitCard() {
     });
   });
   fromLogo.append(lb, out); card.appendChild(fromLogo);
-  card.appendChild(el("div", "hint", "Type and corners are set under Colors and fonts. The kit keeps whatever they are when you apply it."));
+  card.appendChild(el("div", "hint", "Type and corners are set under Colours and fonts. The kit keeps whatever they are when you apply it."));
   // apply
   const apply = el("button", null, "Build & apply brand kit"); apply.type = "button";
   apply.style.cssText = "font:inherit;font-size:13px;font-weight:600;margin-top:14px;padding:8px 16px;border-radius:999px;border:2px solid var(--plum,#5b3fa0);background:var(--plum-tint,#faf7ff);color:var(--plum-deep,#3a2470);cursor:pointer";
@@ -845,7 +845,7 @@ async function mountBrandKitCard() {
     const row2 = el("div"); row2.style.cssText = "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px";
     const applySaved = el("button", null, "Apply my brand"); applySaved.type = "button";
     applySaved.style.cssText = "font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:999px;border:1px solid var(--plum,#5b3fa0);background:var(--plum,#5b3fa0);color:var(--fill-ink,#fff);cursor:pointer";
-    applySaved.title = "One tap: re-apply your saved logo and color to the whole site, with the type and corners you have now";
+    applySaved.title = "One tap: re-apply your saved logo and colour to the whole site, with the type and corners you have now";
     row2.appendChild(applySaved);
     row2.appendChild(el("span", "hint", "Re-applies your saved brand to the whole site in one tap."));
     const report = el("div"); report.style.cssText = "margin-top:8px";
@@ -1033,7 +1033,7 @@ function fontRows(card, T) {
     const v = T[tok]; if (!v) return "Original";
     const lib = (DESIGN_FONTS || []).find((f) => firstOf(v).toLowerCase() === String(f.css).toLowerCase()); if (lib) return lib.family;
     const pre = TYPE_PRESETS.find((p) => p.tokens && p.tokens[tok] === v); if (pre) return pre.name;
-    return firstOf(v) || "Original";
+    return fontWords(firstOf(v)) || "Original";
   };
   [["font_display", "Headings"], ["font_body", "Text"]].forEach(([tok, k]) => {
     const b = el("button", "st-fontrow"); b.type = "button"; b.title = "Change the " + k.toLowerCase() + " font";
@@ -1049,6 +1049,10 @@ function fontRows(card, T) {
   });
   card.appendChild(wrap);
 }
+// Builder item 327: a font the browser picks (system-ui and the like) is named in words, never by its code name
+const FONT_GENERIC = { "system-ui": "Your device’s own font", "-apple-system": "Your device’s own font", "blinkmacsystemfont": "Your device’s own font", "ui-sans-serif": "Your device’s own font", "sans-serif": "Your device’s own font",
+  "serif": "Your device’s serif font", "ui-serif": "Your device’s serif font", "monospace": "Your device’s typewriter font", "ui-monospace": "Your device’s typewriter font", "cursive": "Your device’s handwriting font" };
+function fontWords(name) { const n = String(name || "").trim(); return FONT_GENERIC[n.toLowerCase()] || n; }
 function mountFontLibrary(card, T) {
   if (!DESIGN_FONTS.length) return;
   const firstOf = (v) => String(v || "").split(",")[0].replace(/['"]/g, "").trim().toLowerCase();
@@ -1095,7 +1099,7 @@ async function mountDesignCard(fresh = true) {
  
   await mountBrandKitCard();   // FD-T9: brand kit is the source of truth, above the granular controls
   const card = el("div", "field"); card.id = "designCard"; card.style.marginTop = "18px";
-  card.appendChild(el("label", null, "Colors and fonts"));
+  card.appendChild(el("label", null, "Colours and fonts"));
   const T = DESIGN_TOKENS;
   // FD-T3: complete looks — a coordinated one-tap starting point (then fine-tune below).
   // This is the front door the owner reaches for first, so it leads the card and
@@ -1106,15 +1110,15 @@ async function mountDesignCard(fresh = true) {
     looksWrap.appendChild(el("div", "hint", "One tap restyles your whole site: colours, fonts and buttons together, always readable. Nothing reaches your live site until you publish."));
   }
   const fixedColors = FIXED_COLOR_TEMPLATES.has((S.site && S.site.template_slug) || "");
-  if (fixedColors) card.appendChild(el("div", "hint", "This template keeps its own dark colors, so the color and background choices don't change it. Fonts, text size, corners and spacing do.")).dataset.stab = "colours";
+  if (fixedColors) card.appendChild(el("div", "hint", "This template keeps its own dark colours, so the colour and background choices don't change it. Fonts, text size, corners and spacing do.")).dataset.stab = "colours";
   else if (T.scheme) card.appendChild(el("div", "hint", "This look has a dark page. A colour or background picked here goes back to a light page.")).dataset.stab = "colours";   // item 333 (saveTokens)
   // item 118: which colour themes this page's sections wear (the canvas tags each one while this tab is open)
   const nowRow = el("div", "ins-field"); nowRow.id = "stThemesNow"; nowRow.dataset.stab = "colours";
   nowRow.append(el("div", "ins-lbl", "Colour themes on this page"), el("p", "ins-says"));
   card.appendChild(nowRow);
   // colors
-  if (!fixedColors) stab(pillRow(card, "Colors", PALETTES, (p) => (p.accent ? String(T.accent || "").toLowerCase() === p.accent : !T.accent),
-    (p) => saveTokens(p.key ? { ...p.tokens } : { accent: "", accent_dark: "", ink: "", soft: "" }, p.key ? p.name : "Original colors"), "swatch"), "colours");
+  if (!fixedColors) stab(pillRow(card, "Colours", PALETTES, (p) => (p.accent ? String(T.accent || "").toLowerCase() === p.accent : !T.accent),
+    (p) => saveTokens(p.key ? { ...p.tokens } : { accent: "", accent_dark: "", ink: "", soft: "" }, p.key ? p.name : "Original colours"), "swatch"), "colours");
   // type
   fontRows(card, T);
   stab(pillRow(card, "Type", TYPE_PRESETS, (t) => (t.key ? T.font_display === t.tokens.font_display : !T.font_display),
@@ -1166,7 +1170,7 @@ async function mountDesignCard(fresh = true) {
   }
   card.appendChild(el("div", "hint", "Designed, readable combinations: contrast is checked so your site always stays easy to read. You can restore any earlier version.")).dataset.stab = "looks";
   if (DESIGN_TOKENS && Object.keys(DESIGN_TOKENS).length && !PALETTES.some((p) => p.accent && String(DESIGN_TOKENS.accent || "").toLowerCase() === p.accent) && DESIGN_TOKENS.accent) {
-    card.appendChild(el("div", "hint", "A developer set custom colors — picking a palette replaces them.")).dataset.stab = "colours";
+    card.appendChild(el("div", "hint", "A developer set custom colours. Picking a palette replaces them.")).dataset.stab = "colours";
   }
   host.appendChild(card);
   mountSectionsCard();
@@ -1256,6 +1260,32 @@ const SECTION_ALIAS = {
   columns: "columns / grid", cards: "feature cards / tiles", download: "file / PDF", toc: "on this page / jump links",
   title: "heading / section title", link_list: "links / resources", table: "data table / grid", spotlight: "highlight / feature banner",
 };
+// Builder item 324: the words an owner types into the search, for the tiles that answer them.
+// Searched, never shown: the line under a tile stays short.
+const SECTION_FINDS = {
+  accordion: "faq faqs questions answers", tabs: "faq questions", toc: "jump links",
+  reviews_wall: "testimonial testimonials reviews what customers say", reviews: "testimonial testimonials stars",
+  partners: "clients brands", cta: "contact call hero", spotlight: "hero welcome", title: "headline",
+  image_text: "about story", image: "picture", gallery: "pictures portfolio",
+  newsletter: "form subscribe mailing list", booking: "form reservations reserve contact", appointment: "contact reservations reserve",
+  map: "contact address directions location find us", social: "contact instagram facebook follow",
+  pricing: "menu prices price list", richtext: "blog article story about", link_list: "blog articles", events: "calendar classes",
+  team: "about us people", stats: "numbers", service_areas: "where we work locations",
+};
+// The things an owner looks for that aren't a section to add: a tile each, in its group, that opens
+// where it is made (the Forms card adds a contact form; the rest are edited beside the page).
+const SECTION_ROUTES = [
+  { key: "contact_form", group: "Get customers to act", icon: "mail", name: () => "Contact form", alias: "message / enquiry form", finds: "form forms contact enquiry inquiry message get in touch email us",
+    says: "Add a contact form to this page; its answers come to your Inbox", go: () => trayAddContactForm() },
+  { key: "opening_photo", group: "Show your work", icon: "image", name: () => "Opening with a photo", alias: "hero / welcome", finds: "hero opening welcome banner cover top header photo",
+    says: "Choose how your home page opens: words over your photo, or beside it", go: () => trayOpenHeroLayouts() },
+  { key: "hours", group: "Info & updates", icon: "clock", name: () => "Hours", alias: "opening times", finds: "hours opening times open closed when schedule",
+    says: "Your opening hours, in Business details beside the page", go: () => trayOpenBusiness("bizHoursH", "#hoursGrid input, #hoursGrid button") },
+  { key: "menu", group: "Info & updates", icon: "list", name: () => vocabCap((typeof VOCAB === "object" && VOCAB && VOCAB.label) || "Menu"), alias: "price list", finds: "menu services food drinks dishes price list prices offerings",
+    says: "What you offer and its prices, beside the page", go: () => eeEditCore("offerings") },
+  { key: "updates", group: "Info & updates", icon: "text", name: () => "Updates", alias: "blog / news", finds: "blog posts news articles updates",
+    says: "Your Updates page, your site’s blog, beside the page", go: () => eeEditCore("updates") },
+];
 // The CORE sections aren't blocks — they're edited in their own tabs. We surface
 // them read-only so an owner hunting for "hero / FAQ" sees they already have them.
 // Each chip routes via go() to the view that edits it.
@@ -2434,7 +2464,7 @@ function blockStyleRow(idx, blk, sub, flat) {
     if (pairs.some((p) => p.siteBg)) det.appendChild(Object.assign(el("div", "hint", "Text is checked against your page background."), { style: "margin-top:4px" }));
   }
   if (flat) typeRows();
-  det.appendChild(el("div", "hint", flat ? "Only this section changes. Everything else keeps your site’s overall design." : "Optional — give just this section its own colors, face, size or alignment. Everything else keeps your site's overall design."));
+  det.appendChild(el("div", "hint", flat ? "Only this section changes. Everything else keeps your site’s overall design." : "Optional: give just this section its own colours, face, size or alignment. Everything else keeps your site's overall design."));
   sub.appendChild(det);
 }
 // Phase EXP: auto-expiring content — an optional "Show this from / until" window on
@@ -3054,6 +3084,9 @@ function aiField(inputEl, opts) {
   function menu() {
     panel.innerHTML = "";
     const has = curText().length > 0;
+    // item 328: the voice the writer writes in, from Business details
+    const vl = el("div", "hint ai-voice", voiceWords()); vl.hidden = !vl.textContent; panel.appendChild(vl);
+    voiceLoad().then(() => { vl.textContent = voiceWords(); vl.hidden = !vl.textContent; });
     panel.appendChild(Object.assign(el("div", "hint", has ? "Pick one — you’ll see a draft before anything changes." : "Tell me what this should say — I’ll draft it from your business’s own facts."), { style: "margin:0 0 8px" }));
     if (has) {
       const row = el("div"); row.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center";
@@ -3993,16 +4026,18 @@ function renderFormsCard() {
   addWrap.appendChild(el("span", "hint", "Add a form:"));
   FORM_PRESETS_UI.forEach((p) => {
     const b = el("button", null, p.name); b.type = "button"; b.style.cssText = FF_BTN;
-    b.addEventListener("click", () => {
-      const taken = allFormIds();
-      const copy = JSON.parse(JSON.stringify(p.def)); copy.id = ffUniqueId(copy.id, taken); copy.rules = copy.rules || [];
-      FORMS_WORK.push(copy); renderFormsCard();
-    });
+    b.addEventListener("click", () => ffAddPreset(p));
     addWrap.appendChild(b);
   });
   card.appendChild(addWrap);
 
   formsSaveSoon();
+}
+// a form from a preset, at the end of the page the card is on (also the section search's Contact form tile, item 324)
+function ffAddPreset(p) {
+  const taken = allFormIds();
+  const copy = JSON.parse(JSON.stringify(p.def)); copy.id = ffUniqueId(copy.id, taken); copy.rules = copy.rules || [];
+  FORMS_WORK.push(copy); renderFormsCard();
 }
 // ── Phase CP-2 (DS-2): your home page — section visibility + order ──
 const HOME_SECTION_DEFS = [ ["hero", "Welcome"], ["about", "About"], ["offerings", "What you offer"], ["testimonials", "Testimonials"], ["faqs", "Questions"] ];
@@ -4122,7 +4157,7 @@ async function mountLookCard() {
   const card = el("div", "field"); card.id = "lookCard"; card.style.marginTop = "18px"; card.dataset.stab = "looks";
   card.appendChild(el("label", null, "Template"));
   const cur = looks.templates.find((t) => t.slug === looks.current.slug);
-  card.appendChild(el("div", "hint", "Your template sets your whole layout. Colors and fonts are just below. You're on the “" + ((cur && cur.name) || looks.current.slug) + "” template — try another safely and preview it with your real content before deciding."));
+  card.appendChild(el("div", "hint", "Your template sets your whole layout. Colours and fonts are just below. You're on the “" + ((cur && cur.name) || looks.current.slug) + "” template. Try another safely and preview it with your real content before deciding."));
   const b = el("button", null, "Try another template →");
   b.type = "button";
   b.style.cssText = "font:inherit;font-size:12.5px;margin-top:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--line,#ddd);background:transparent;cursor:pointer";
@@ -4176,7 +4211,7 @@ async function dcSetMode(mode) {
   const twWasLoaded = prev === "timewarp" && DC_TW_LOADED;   // captured before the reset just below
   if (prev === "comments" && CM_ON) cmToggle();   // the exact G11 OFF path (sync branch)
   if (prev === "timewarp") {
-    DC_TW_LOADED = false; DC_TW_SEQ++;   // a lookup still in flight must not land after we leave
+    DC_TW_LOADED = false; DC_TW_SEQ++; DC_TW_SHOWN = null;   // a lookup still in flight must not land after we leave
     const dt = $("dcTwDate"); if (dt) dt.value = "";
     const msg = $("dcTwMsg"); if (msg) msg.textContent = "";
   }
@@ -4190,6 +4225,7 @@ async function dcSetMode(mode) {
   const wasView = prev === "timewarp";
   const isView = DC_MODE === "timewarp";
   if (isView) closeDesignPanels();   // view modes read like a visitor — no editing panels over them
+  if (isView && !wasView) dcTwList();   // builder item 322: the saved versions, above the page
   // Reload the frame only when crossing the editing/viewing boundary (the load
   // handler injects chrome in Edit/Comments, withholds it in Preview/Timewarp) —
   // or when leaving a landed Timewarp, whose past render must give way to the draft.
@@ -4251,6 +4287,7 @@ async function dcTimewarpGo() {
   const dt = $("dcTwDate"); if (!dt || DC_MODE !== "timewarp") return;
   const msg = $("dcTwMsg");
   const seq = ++DC_TW_SEQ;   // a newer pick (or leaving the mode) orphans this lookup
+  DC_TW_SHOWN = null; dcTwPressed();   // a date, not one of the listed versions
   if (!dt.value) {   // date cleared — stay in Timewarp but hand the canvas back to the draft
     DC_TW_LOADED = false; if (msg) msg.textContent = ""; refreshDesignPreview(); return;
   }
@@ -4276,6 +4313,70 @@ async function dcTimewarpGo() {
     DC_TW_LOADED = false; dt.value = "";   // cleared, so the SAME date can be re-picked (change wouldn't re-fire)
     if (msg) msg.textContent = "Couldn’t look back just now — this is today’s draft.";
     refreshDesignPreview();   // never leave a stale past render sitting under a failed lookup
+    toast(nice(err), true);
+  }
+}
+
+// Builder item 322: the dock's Versions lists the saved versions, newest first, above the page:
+// the publishes and the checkpoints the Versions list under Site settings shows. A press draws
+// that version on the canvas through the same /preview the Versions list's View uses (a publish
+// by publish_id, a checkpoint by launch_id); a date still finds the version live that day.
+let DC_TW_VERS = [], DC_TW_SHOWN = null, DC_TW_LIST_SEQ = 0;
+async function dcTwList() {
+  const host = $("dcTwList"); if (!host) return;
+  const seq = ++DC_TW_LIST_SEQ;
+  host.textContent = ""; host.appendChild(el("span", "dc-twnone", "Finding your versions…"));
+  let pubs = [], cps = [], failed = false;
+  try {
+    const [p, c] = await Promise.all([api("GET", "/publishes"), api("GET", "/publishes/checkpoints").catch(() => ({ data: [] }))]);
+    pubs = Array.isArray(p && p.data) ? p.data : []; cps = Array.isArray(c && c.data) ? c.data : [];
+  } catch (_) { failed = true; }
+  if (seq !== DC_TW_LIST_SEQ || DC_MODE !== "timewarp") return;
+  DC_TW_VERS = dcTwVersions(pubs, cps);
+  dcTwPaint(failed);
+}
+// PURE: the versions the dock lists, newest first: no failed publish (there is nothing to draw), at most VERSIONS_SHOWN
+function dcTwVersions(pubs, cps) {
+  const list = (x) => (Array.isArray(x) ? x : []);
+  return [...list(pubs).filter((v) => v && v.id && v.at && v.status !== "failed").map((v) => ({ id: v.id, at: v.at, live: v.status === "live", name: v.label || "", says: v.summary || "" })),
+    ...list(cps).filter((c) => c && c.id && (c.at || c.created_at)).map((c) => ({ id: c.id, at: c.at || c.created_at, saved: true, name: c.name || "", says: "" }))]
+    .sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, VERSIONS_SHOWN);
+}
+function dcTwPaint(failed) {
+  const host = $("dcTwList"); if (!host) return;
+  host.textContent = "";
+  if (!DC_TW_VERS.length) { host.appendChild(el("span", "dc-twnone", failed ? "Your versions couldn’t load just now. Pick a date instead." : "No saved versions yet. Each time you publish, one is kept here.")); return; }
+  DC_TW_VERS.forEach((v) => {
+    const b = el("button", "dc-tw-v"); b.type = "button"; b.dataset.twVer = v.id;
+    b.appendChild(document.createTextNode(verWhen(v.at)));
+    b.appendChild(el("small", null, v.live ? "Live now" : v.saved ? "Saved, never live" : "Published"));
+    b.title = (v.name ? "“" + v.name + "”: " : "") + (v.saved ? "a checkpoint of your draft" : v.says || "a version you published");
+    b.addEventListener("click", () => dcTwShow(v));
+    host.appendChild(b);
+  });
+  dcTwPressed();
+}
+function dcTwPressed() { const host = $("dcTwList"); if (host) host.querySelectorAll(".dc-tw-v").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.twVer === DC_TW_SHOWN))); }
+async function dcTwShow(v) {
+  if (DC_MODE !== "timewarp") return;
+  const msg = $("dcTwMsg"), dt = $("dcTwDate");
+  const seq = ++DC_TW_SEQ;   // a newer press, a date, or leaving the mode orphans this one
+  if (dt) dt.value = "";
+  DC_TW_SHOWN = v.id; dcTwPressed();
+  if (msg) msg.textContent = "Looking back…";
+  try {
+    const html = await apiHtml(`/preview?${v.saved ? "launch_id" : "publish_id"}=${encodeURIComponent(v.id)}&page=${encodeURIComponent(dcPagePath())}`);
+    if (seq !== DC_TW_SEQ || DC_MODE !== "timewarp") return;
+    const frame = $("designPreview");
+    if (frame) { DP_PAINT_OPEN = DC_PAGE_OPENS; frame.srcdoc = frameWall(html); }   // item 190
+    DC_TW_LOADED = true;
+    const d = new Date(v.at), when = d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) + " at " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    if (msg) msg.textContent = v.saved ? "Your draft as you saved it on " + when + "." : "Your site as you published it on " + when + (v.live ? ". It’s what’s live now." : ".");
+  } catch (err) {
+    if (seq !== DC_TW_SEQ || DC_MODE !== "timewarp") return;
+    DC_TW_LOADED = false; DC_TW_SHOWN = null; dcTwPressed();
+    if (msg) msg.textContent = "Couldn’t show that version just now. This is today’s draft.";
+    refreshDesignPreview();   // never leave a stale past render under a failed lookup
     toast(nice(err), true);
   }
 }
@@ -5233,7 +5334,7 @@ function dcPageStatus(chip) {
   let word = "Live", tone = "good", says = "Nothing on this page is waiting: your live site shows it as it is here";
   const tp = pg ? hbTreePage(pg) : null;
   const acc = (pg && pg.slug && (dcPageObj(pg.slug) || {}).access) || "";   // item 196: a private or password page isn't plainly "Live"
-  if (tp && HB_TREE_FLAG[tp.status]) { word = shortStatus(tp.status_label); tone = HB_TREE_FLAG[tp.status]; says = tp.status_label; }   // item 285: two words; the whole in the title
+  if (tp && HB_TREE_FLAG[tp.status]) { word = shortStatus(tp.status_label); tone = HB_TREE_FLAG[tp.status]; says = treeHint(tp); }   // item 285: two words; item 327: what they mean in the title
   else if (acc === "private") { word = "Private"; tone = ""; says = "Kept in your draft: it isn’t on your live site or in its menu"; }
   else if (!ctx.siteLive || ctx.firstPublish) { word = "Not live yet"; tone = ""; says = "Your site goes live the first time you publish"; }
   else {
@@ -5461,7 +5562,6 @@ function closeDesignPanels() {
   const find = $("pcFind"); if (find) find.addEventListener("input", pcFilter);
   on("dkPhotos", () => toggleTray("files"));
   on("dkLayers", () => { dcDockMore(false); toggleTray("contents"); });   // item 57
-  on("dkFind", () => { dcDockMore(false); openTrayPanel("add", true); });   // opens the library with its search box focused
   on("dkPreview", () => { dcDockMore(false); dcOpenPreview(); });
   on("dkMore", () => dcDockMore());
   // item 171 (E4): on a phone More closes by itself: on a press anywhere outside it, and once any other
@@ -5702,13 +5802,18 @@ function renderBlockTray() {
     const defs = grp.types.filter((ty) => ty !== "stack")
       .map((ty) => BLOCK_DEFS.find((d) => d.type === ty))
       .filter((d) => d && !(BLOCK_SINGLETON.has(d.type) && present.has(d.type)))
-      .filter((d) => trayItemMatches(d.name, SECTION_ALIAS[d.type], d.type, TRAY_QUERY));
-    if (!defs.length) return;
+      .filter((d) => trayItemMatches(d.name, (SECTION_ALIAS[d.type] || "") + " " + (SECTION_FINDS[d.type] || ""), d.type, TRAY_QUERY));
+    const routes = SECTION_ROUTES.filter((r) => r.group === grp.label && (r.key !== "contact_form" || $("formsCard")) && trayItemMatches(r.name(), r.alias + " " + r.finds, "", TRAY_QUERY));
+    if (!defs.length && !routes.length) return;
     const wrap = el("div", "tray-grp shots");
     const grpH = el("div", "tray-grp-h", grp.label);
     if (TRAY_GROUP_ICON[grp.label]) grpH.insertAdjacentHTML("afterbegin", uiIcon(TRAY_GROUP_ICON[grp.label], 14));
     wrap.appendChild(grpH);
+    // item 324: a tile that answers the words typed leads its group; with nothing typed, the sections lead
+    const lead = TRAY_QUERY.trim() ? routes : [], rest = TRAY_QUERY.trim() ? [] : routes;
+    lead.forEach((r) => { wrap.appendChild(trayRouteItem(r)); shown++; });
     defs.forEach((d) => { wrap.appendChild(trayItem(d)); shown++; });
+    rest.forEach((r) => { wrap.appendChild(trayRouteItem(r)); shown++; });
     host.appendChild(wrap);
   });
   if (!shown) host.appendChild(el("div", "tray-empty", TRAY_QUERY ? "No sections match “" + TRAY_QUERY + "”." : "Every section type is already on your page. Reorder or edit them in the middle."));
@@ -5747,6 +5852,36 @@ function trayItem(d) {
   b.addEventListener("click", () => { if (pdConsumeClick()) return; addBlockAt(d, BLOCKS_WORK.length); });
   b.addEventListener("pointerdown", (e) => pdStart(e, { kind: "new", type: d.type, label: d.name, icon: trayIcon(d.type) }, b));
   return b;
+}
+
+// Builder item 324: a tile that opens where the thing is made, the section tile's look without a picture
+function trayRouteItem(r) {
+  const b = el("button", "tray-item tray-route"); b.type = "button"; b.dataset.route = r.key; b.title = r.says;
+  b.appendChild(Object.assign(el("span", "ti-ico"), { innerHTML: uiIcon(r.icon) }));
+  const txt = el("span", "ti-txt");
+  txt.appendChild(el("span", "ti-name", r.name()));
+  txt.appendChild(el("span", "ti-alias", r.alias));
+  b.appendChild(txt);
+  b.addEventListener("click", () => { closeTrayPanel(); r.go(); });
+  return b;
+}
+function trayAddContactForm() {
+  openSettingsPanel("forms");
+  const p = FORM_PRESETS_UI.find((x) => x.key === "contact");
+  if (!p || !Array.isArray(FORMS_WORK)) return;
+  ffAddPreset(p);
+  toast("A contact form is at the end of this page. Change its fields here.");
+}
+function trayOpenHeroLayouts() {
+  openSettingsPanel("styles"); stylesTab("looks");
+  const pill = [...document.querySelectorAll("#settingsPanel .ins-heros button")].find((b) => b.textContent.trim() === "Words over the photo");
+  if (pill) { pill.scrollIntoView({ block: "center" }); pill.focus({ preventScroll: true }); }
+}
+function trayOpenBusiness(headId, firstSel) {
+  eeEditCore("business");
+  const h = $(headId); if (!h) return;
+  h.scrollIntoView({ block: "start" });
+  const f = h.parentNode && h.parentNode.querySelector(firstSel); if (f) f.focus({ preventScroll: true });
 }
 
 // ── Slice C (AC-2): the Files tab — a compact asset browser IN the panel ───────
@@ -9233,12 +9368,14 @@ function dcBuildTree(main) {
   // and the pointerup could never land (PDRAG wedged shut): cancel that drag first.
   if (PDRAG && (PDRAG.zone === "tree" || PDRAG.zone === "treecol")) pdFinish(false);
   host.textContent = "";
-  host.appendChild(el("div", "dc-tree-hd", "Pages · click one to edit it"));
-  dcPageList().forEach((pg) => {
-    const cur = pg.slug === DC_PAGE;
-    host.appendChild(dcPageTreeRow(pg, cur));
-    if (cur) dcTreeSectionRows(host, main);   // the OPEN page expands to its sections
-  });
+  // builder item 326: Layers is this page's sections, so it says so; the other pages follow it
+  host.appendChild(el("div", "dc-tree-hd", "Sections on this page"));
+  const pages = dcPageList(), open = pages.find((pg) => pg.slug === DC_PAGE);
+  if (open) { host.appendChild(dcPageTreeRow(open, true)); dcTreeSectionRows(host, main); }   // the OPEN page expands to its sections
+  else host.appendChild(el("div", "dc-tree-empty", "This page has no sections of its own. Press its words on the page to change them."));
+  const rest = pages.filter((pg) => pg !== open);
+  if (rest.length) host.appendChild(el("div", "dc-tree-hd dc-tree-hd-more", "Your other pages"));
+  rest.forEach((pg) => host.appendChild(dcPageTreeRow(pg, false)));
   const add = el("button", "dc-tree-addpage", "＋ Add a page"); add.type = "button";
   add.addEventListener("click", dcAddPage);
   if (!CM_ON) host.appendChild(add);   // item 99: adding a page is editing, so Comments mode leaves it out

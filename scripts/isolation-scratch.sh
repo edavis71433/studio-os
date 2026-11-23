@@ -30,6 +30,7 @@ DENO="${DENO:-deno}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/isolation-scratch.XXXXXX")"
 LOG="$WORK/functions.log"
 supabase() { (cd "$WORK" && npx --yes "supabase@$CLI_VERSION" "$@"); }
+. "$REPO/scripts/scratch-stack.sh"   # scratch_ports and scratch_start
 
 say() { printf '\n── %s ──\n' "$*"; }
 fail() {
@@ -42,6 +43,8 @@ fail() {
 say "Setting up a scratch project in $WORK"
 supabase init < /dev/null > /dev/null
 sed -i.bak 's/^project_id = .*/project_id = "isolation-scratch"/' "$WORK/supabase/config.toml" && rm -f "$WORK/supabase/config.toml.bak"
+# Off the ports the machine's own outgoing connections can be given (scripts/scratch-stack.sh).
+scratch_ports "$WORK/supabase/config.toml" || fail "Couldn't move the scratch database off the ports the machine's own connections use (above)."
 mkdir -p "$WORK/supabase/migrations"
 copied=0
 for f in "$REPO"/supabase/migrations/[0-9]*.sql; do
@@ -65,7 +68,7 @@ for name in studio imgproxy mailpit inbucket realtime logflare vector supavisor 
   if printf '%s' "$known" | grep -qE "[[,]$name[],]"; then skip="$skip${skip:+,}$name"; fi
 done
 echo "left off: ${skip:-nothing}"
-if ! supabase start ${skip:+-x "$skip"} > "$WORK/start.log" 2>&1; then
+if ! scratch_start "$WORK/start.log" ${skip:+-x "$skip"}; then
   tail -60 "$WORK/start.log"
   fail "The scratch database didn't start: a migration or a service failed (log above)."
 fi
@@ -80,7 +83,7 @@ echo "scratch API: $API_URL"
 # Email goes to a stand-in on this machine that answers the way Resend does, so a
 # step that reports "the email went" is checked too; nothing leaves the runner. The
 # servers run inside Docker and reach this machine through the network's gateway.
-MAIL_PORT=54399
+MAIL_PORT=24399   # below the ports outgoing connections are given, like the stack's
 "$DENO" run --allow-net - > "$WORK/mail.log" 2>&1 <<EOF &
 let n = 0;
 Deno.serve({ hostname: '0.0.0.0', port: $MAIL_PORT, onListen() { console.log('mail stand-in listening'); } }, async (req) => {

@@ -23,6 +23,7 @@ on:
     paths:
       - .github/workflows/isolation.yml
       - scripts/isolation-scratch.sh
+      - scripts/scratch-stack.sh
       - tests/isolation/**
 
 permissions:

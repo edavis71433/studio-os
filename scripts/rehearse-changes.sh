@@ -30,6 +30,7 @@ CLI_VERSION="${SUPABASE_CLI_VERSION:?set SUPABASE_CLI_VERSION (deploy.yml pins i
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/rehearse-changes.XXXXXX")"
 PROJECT=rehearse-changes
 supabase() { (cd "$WORK" && npx --yes "supabase@$CLI_VERSION" "$@"); }
+. "$REPO/scripts/scratch-stack.sh"   # scratch_ports and scratch_start
 FIRST_LEDGER=260
 
 say() { printf '\n── %s ──\n' "$*"; }
@@ -45,6 +46,8 @@ trap cleanup EXIT
 say "Setting up a scratch project in $WORK"
 supabase init < /dev/null > /dev/null
 sed -i.bak "s/^project_id = .*/project_id = \"$PROJECT\"/" "$WORK/supabase/config.toml" && rm -f "$WORK/supabase/config.toml.bak"
+# Off the ports the machine's own outgoing connections can be given (scripts/scratch-stack.sh).
+scratch_ports "$WORK/supabase/config.toml" || fail "Couldn't move the scratch database off the ports the machine's own connections use (above)."
 mkdir -p "$WORK/supabase/migrations"
 copied=0
 for f in "$REPO"/supabase/migrations/[0-9]*.sql; do
@@ -65,8 +68,9 @@ skip=""
 for name in studio imgproxy mailpit inbucket realtime logflare vector supavisor postgres-meta edge-runtime; do
   if printf '%s' "$known" | grep -qE "[[,]$name[],]"; then skip="$skip${skip:+,}$name"; fi
 done
-if ! supabase start ${skip:+-x "$skip"} > "$WORK/start.log" 2>&1; then
+if ! scratch_start "$WORK/start.log" ${skip:+-x "$skip"}; then
   grep -nE 'ERROR|error|failed|Applying migration' "$WORK/start.log" | tail -40
+  grep -q 'address already in use' "$WORK/start.log" && fail "The scratch database couldn't get its port, twice (above): the machine, not a migration. Run the check again."
   fail "A migration didn't apply on a fresh database (the lines above name it). Production can't be rebuilt from the repository until it does."
 fi
 applied=$(grep -c 'Applying migration' "$WORK/start.log" || true)
