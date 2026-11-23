@@ -11,6 +11,7 @@ import { pinClock } from './clock.mjs';
 import { hostPace, hostPaceWords, hostingNeed, HOST_CREDITS_WARN } from '../../supabase/functions/presence/lib/host_credits.ts';
 import { hostingArea } from '../../supabase/functions/presence/lib/health_center.ts';
 import { buildNeedsYou } from '../../supabase/functions/presence/agency/needs_you.ts';
+import { revenueByMonth, moneyInMonths } from '../../supabase/functions/presence/lib/sales_reports.ts';
 
 const restoreClock = pinClock('2026-11-23T00:00:00Z');   // the suite holds dates; the Needs you list reads the clock
 let pass = 0, fail = 0;
@@ -48,6 +49,20 @@ const eq = (name, got, want) => { const g = JSON.stringify(got), w = JSON.string
   eq('358: paused comes first: nothing publishes', keys(plan(5000, { exceeded: true })), ['hosting:2026-11-11:paused', 'account:n1']);
   const row = buildNeedsYou({ ...base, hosting: plan(3900) }).find((r) => r.key.startsWith('hosting:'));
   ok('358: the row names the hosting account and opens the Health Center', row.name === 'The hosting account' && row.verb === 'Open' && row.href === '/admin-health.html' && row.kind === 'account');
+}
+
+// ═══ sales 215: Home's Money in is Analytics' figure ═══
+{
+  // two paid invoices this month, one last month, a retainer payment, and a refund this month;
+  // one paid at 11pm on Oct 31 in Los Angeles (Nov 1 in UTC) belongs to October there
+  const paid = [{ amount_cents: 150000, paid_at: '2026-11-05T18:00:00Z' }, { amount_cents: 50000, paid_at: '2026-11-20T18:00:00Z' }, { amount_cents: 300000, paid_at: '2026-10-10T18:00:00Z' }, { amount_cents: 20000, paid_at: '2026-11-01T06:00:00Z' }];
+  const retainer = [{ amount_cents: 60000, paid_at: '2026-11-02T18:00:00Z' }];
+  const back = [{ amount_cents: 30000, paid_at: '2026-11-12T18:00:00Z', retainer: false }];
+  const rev = revenueByMonth(paid, '2026-11-23T00:00:00Z', retainer, back, 'America/Los_Angeles');
+  const mi = moneyInMonths(rev);
+  eq('215: this month and last, as Analytics’ months say (paid + retainer − money back, on the studio’s day)', mi,
+    { month: '2026-11', label: 'Nov 2026', cents: 230000, last_month: '2026-10', last_label: 'Oct 2026', last_cents: 320000 });
+  ok('215: the same numbers Analytics draws from (its last two months)', mi.cents === rev.months[11].this_year && mi.last_cents === rev.months[10].this_year);
 }
 
 restoreClock();
