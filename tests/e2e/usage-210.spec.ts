@@ -1,6 +1,8 @@
 import { test, expect, Page, Route } from '@playwright/test';
+import { expectOneHeader } from './helpers/page-header';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Builder list item 210 (Nov 2026; review file 03, findings 1, 6 and 11): the Usage tab on
 // Sites, as drawn in Figma (page 310:2, option A) and approved. The month in one band: the
@@ -49,7 +51,7 @@ async function openUsage(page: Page, o: { usage?: unknown; status?: number } = {
   const ctl = { status: o.status ?? 200, usage: o.usage ?? (USAGE as unknown) };   // a test may change the answer later
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.clock.setFixedTime(new Date(NOW));
+  await pinClock(page, NOW);
   await installApp(page, { api: { '/portal/context': studioContext, '/agency/sites': { data: SITES, partial: false, can_open: true, can_create: true, trash: [], trash_days: 90 } } as never });
   await page.route(/\/functions\/v1\/presence\/agency\/usage(\?.*)?$/, (route: Route) => {
     const m = new URL(route.request().url()).searchParams.get('month') || '';
@@ -114,9 +116,9 @@ test.describe('Usage (builder list item 210)', () => {
     await expect(harbor.locator('.c-pub')).toContainText('Their own host puts it live. No cost to you.');
     await expect(harbor.locator('.c-vis')).toContainText('No counter');
     await expect(page.locator('.unote')).toContainText('Publishes and storage: November 1 to 12. Visits: October, compared with September. A drop is red.');
-    // the tab line, on this page and the three beside it
+    // builder item 425: the one page header the other tabs under Sites wear, with its own title
+    await expectOneHeader(page, { title: 'Usage', icon: 'analytics', line: /^5 sites · What each client uses this month · Updated just now$/, filled: null, tabs: ['Sites', 'Domains', 'Templates', 'Usage', 'Changes'] });
     const tabs = page.getByRole('navigation', { name: 'Sites, domains, templates, usage and changes' });
-    await expect(tabs.getByRole('link')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage', 'Changes']);
     await expect(tabs.getByRole('link', { name: 'Usage' })).toHaveAttribute('aria-current', 'page');
   });
 

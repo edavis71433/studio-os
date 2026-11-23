@@ -36,7 +36,7 @@ const checklist = [
   ['Schema rebuildable from migrations (ordered, no dupes)', dupes.length === 0],
   ['M4 migration 0073 present in history', files.some((f) => /^0073_/.test(f))],
   ['Edge function is code-deployable (git-tracked, no build step)', true],
-  ['Recovery runbook documented (DISASTER-RECOVERY.md)', true],
+  ['Recovery steps documented (docs/RUN-SHEET.md, Backups and Restore)', true],
   ['Backups enabled on prod (owner-verified in dashboard)', null],
   ['PITR enabled on prod (owner prerequisite)', null],
   ['Live restore drill executed against staging (owner)', null],
@@ -48,5 +48,5 @@ for (const [label, state] of checklist) {
 }
 const engineeringOk = checklist.filter(([, s]) => s !== null).every(([, s]) => s === true);
 console.log(`\nEngineering-side DR readiness: ${engineeringOk ? '✅ complete' : '❌ attention needed'}`);
-console.log('Live restore drill + PITR + backup confirmation: ⏳ OWNER (see DISASTER-RECOVERY.md)\n');
+console.log('Live restore drill + PITR + backup confirmation: ⏳ OWNER (see docs/RUN-SHEET.md, Restore)\n');
 if (!engineeringOk || dupes.length) Deno.exit(1);

@@ -133,14 +133,15 @@ ok('reads the list /system/health shows, and the other names it accepts', LISTED
 
 // ── the two secrets documents ──
 {
-  const docs = read('docs/presence/ENV-AND-SECRETS.md') + '\n' + read('docs/SECRETS-INVENTORY.md');
+  // builder item 422: one list of the server's secrets (the old inventory is in docs/archive/)
+  const docs = read('docs/presence/ENV-AND-SECRETS.md');
   const named = new Set([...docs.matchAll(/`([A-Z][A-Z0-9_]*)`/g)].map((m) => m[1]));
   // "`X_CLIENT_ID` / `_SECRET`" names X_CLIENT_SECRET too
   for (const m of docs.matchAll(/`([A-Z][A-Z0-9_]*)`\s*\/\s*`(_[A-Z0-9_]+)`/g)) named.add(m[1].slice(0, m[1].lastIndexOf('_')) + m[2]);
   const families = docs.includes('`CONNECTED_<PROVIDER_KEY>_CLIENT_ID` / `_SECRET`') && docs.includes('`CONNECTED_<KEY>_WRITE');
   ok('the documents describe the connection families', families);
   const undescribed = [...LISTED].filter((n) => !named.has(n) && !(FAMILY.test(n) && families));
-  ok('every secret and switch on the list is described in docs/presence/ENV-AND-SECRETS.md or docs/SECRETS-INVENTORY.md', LISTED.size > 0 && !undescribed.length, undescribed.join(', '));
+  ok('every secret and switch on the list is described in docs/presence/ENV-AND-SECRETS.md', LISTED.size > 0 && !undescribed.length, undescribed.join(', '));
 }
 
 const failed = results.filter((r) => !r.p);

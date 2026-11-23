@@ -172,6 +172,18 @@ test.describe('Getting in (builder item 192)', () => {
     expect(await page.evaluate(() => localStorage.getItem('dds-studio-return'))).toBeNull();
   });
 
+  test('builder item 357: signed out, the studio’s Home goes straight to the sign-in page, which brings them back to Home', async ({ page }) => {
+    await installApp(page, { session: null, api: { '/portal/context': OWNER_CTX } });
+    await page.goto('/agency.html#add');
+    await expect(page).toHaveURL(/\/studio(\.html)?$/);
+    await expect(page.locator('#em')).toBeVisible();
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('dds-studio-return') || 'null')?.path)).toBe('/agency.html#add');
+    // never twice in half a minute: sent straight back, Home says so, with the way in
+    await page.goto('/agency.html');
+    await expect(page.getByRole('heading', { name: 'Sign in to your studio.' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Sign in →' })).toHaveAttribute('href', '/studio.html');
+  });
+
   test('an old breadcrumb, another site’s address or a sign-in page is ignored; a client keeps their own landing', async ({ page }) => {
     test.slow();   // six sign-ins in a row
     await installApp(page, { session: null, api: { '/portal/context': OWNER_CTX } });

@@ -31,10 +31,6 @@
   .lmeta{margin-top:6px;font-size:12px;color:var(--faint)}
   .trail{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--soft);margin:0 0 8px}
   .trail a{color:var(--p);font-weight:600;text-decoration:none}.trail a:hover{text-decoration:underline}
-  .tabs{display:flex;gap:var(--dds-s1,4px);margin-top:10px;border-top:1px solid var(--line);padding-top:var(--dds-s2,8px);flex-wrap:wrap}
-  .tabs a{font-size:13.5px;font-weight:600;color:var(--soft);text-decoration:none;padding:6px var(--dds-s3,12px);border-radius:var(--dds-r,8px)}
-  .tabs a:hover{color:var(--p);background:var(--p-soft)}
-  .tabs a[aria-current="page"]{color:var(--p);background:var(--p-soft)}
   .sbtn{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);padding:6px var(--dds-s3,12px);text-decoration:none;min-height:36px;display:inline-flex;align-items:center;cursor:pointer}
   .sbtn:hover{border-color:var(--p);color:var(--p)}
   .btn{font:inherit;font-size:13.5px;font-weight:500;border:none;border-radius:var(--dds-r,8px);padding:var(--dds-s2,8px) var(--dds-s4,16px);background:var(--p);color:#fff;cursor:pointer;min-height:36px;text-decoration:none;display:inline-flex;align-items:center}
@@ -315,12 +311,12 @@ function rolesHtml(){
 function headHtml(){
   if(MODE==='studio'){
     const n=SITES.length;
-    return`<header class="lhead"><div class="lrow1"><span class="obj-ic" aria-hidden="true">🌐</span><h1 id="pagehead" tabindex="-1">Sites</h1>
-      <a class="sbtn" href="/week.html">Plan my week</a>
-      <button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻</button>
-      ${META.can_create?'<a class="btn" href="/sites.html#new">+ New site</a>':''}</div>
-      <div class="lmeta">${esc(plural(n,'site'))} · Who changed what on every client’s site, newest first · Updated just now</div>
-      <nav class="tabs" aria-label="Sites, domains, templates, usage and changes"><a href="/sites.html">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html">Templates</a><a href="/usage.html">Usage</a><a href="/changes.html" aria-current="page">Changes</a></nav></header>`;
+    // builder item 425: the one page header (shell.css .dds-ph), as the other tabs under Sites wear it
+    return`<header class="dds-ph"><div class="dds-ph-row"><span class="dds-ph-ic" data-ic="overview" aria-hidden="true"></span>
+      <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Changes</h1></div><p class="dds-ph-line" id="phLine">${esc(plural(n,'site'))} · Who changed what on every client’s site, newest first · Updated just now</p></div>
+      <div class="dds-ph-acts"><button type="button" class="dds-ph-dots" popovertarget="phMore" aria-label="More actions" title="More actions">⋯</button>
+        <div class="dds-ph-more" id="phMore" popover><button type="button" class="lbtn" id="refreshBtn" aria-label="Refresh" title="Refresh">↻<span class="dds-ph-say" aria-hidden="true">Refresh</span></button></div></div></div>
+      <nav class="dds-ph-tabs" aria-label="Sites, domains, templates, usage and changes"><a href="/sites.html">Sites</a><a href="/domains.html">Domains</a><a href="/templates.html">Templates</a><a href="/usage.html">Usage</a><a href="/changes.html" aria-current="page">Changes</a></nav></header>`;
   }
   const web=scope()?'/presence.html?client='+encodeURIComponent(scope()):'/presence.html';
   return`<nav class="trail" aria-label="Where you are"><a href="${esc(web)}">Website</a><span aria-hidden="true">›</span><span>Changes</span></nav>

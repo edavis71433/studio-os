@@ -2,6 +2,7 @@ import { test, expect, Page, Route } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
 import { settled } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Builder list items 43, 45 and 52 (Nov 2026): the studio's Sites page (every client
 // site as a card with a live picture, or a table), Pin and Duplicate on each site's
@@ -105,7 +106,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Sites' })).toBeVisible();
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('.scard')).toHaveCount(3);
-    await expect(page.locator('.lmeta')).toContainText('3 sites · Pinned first, then the ones you opened last');
+    await expect(page.locator('.lmeta')).toContainText('Pinned first, then the ones you opened last');   // builder item 367: the count is the header's, not said again here
     await expect(page.locator('.dds-ph-tabs a[aria-current="page"]')).toHaveText('Sites');
     await expect(page.locator('.dds-ph-tabs a[href="/domains.html"]')).toHaveText('Domains');
     const isMobile = (page.viewportSize()?.width || 1280) < 761;
@@ -265,7 +266,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   });
 
   test('a card: address, status, plan and renewal, domain renewal, what you are on it, and the three doors into that client', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed (the domain renews Nov 20, the plan Dec 1), so the clock is too
+    await pinClock(page, '2026-11-15T18:00:00Z');   // the fixtures' dates are fixed (the domain renews Nov 20, the plan Dec 1), so the clock is too
     await openSites(page);
     const card = page.locator('.scard[data-site="s1"]');
     await expect(card.locator('.sname')).toHaveText('Bistro Nine');
@@ -452,10 +453,22 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   const NEEDS_ROW = { key: 'broken:1', kind: 'broken', site_id: 's1', client_id: 'c1', name: 'Bistro Nine', what: 'bistro.example expires in 12 days', when: '', verb: 'Fix', href: '/presence.html?client=s1#domain' };
   const NEXT = { s1: { what: 'bistro.example expires in 12 days', verb: 'Fix', href: '/presence.html?client=s1#domain', kind: 'broken' } };
 
+  test('builder item 367: one count, said in full: the plan line in the header, nothing repeated under it', async ({ page }) => {
+    await openSites(page, [BISTRO, GARAGE, CAFE], { body: { room: { used: 4, limit: 25, full: false } } });
+    await expect(page.locator('#phLine')).toHaveText('You’ve used 4 of your 25 sites: 3 here, 1 archived');
+    await expect(page.locator('#phLine #roomLine')).not.toHaveClass(/full/);
+    await expect(page.locator('#lmeta')).not.toContainText('of 25');
+    await expect(page.locator('#lmeta')).not.toContainText('3 sites');
+    await expect(page.locator('.sband')).not.toContainText('sites you look after');
+  });
+
   test('the band counts what the server already knows across every site, and a number filters the cards', async ({ page }) => {
     await openSites(page, [BISTRO, GARAGE, CAFE], { needs: NEXT, needsRows: [NEEDS_ROW] });
     const band = page.locator('.sband');
-    await expect(band).toContainText('3 sites you look after');
+    // builder item 367: the header's line says how many; the band doesn't say it again
+    await expect(page.locator('#phLine')).toHaveText('3 sites you look after · 1 needs you');
+    await expect(band).not.toContainText('sites you look after');
+    await expect(band.locator('h2')).toHaveCount(0);
     await expect(band).toContainText('1 live · 1 needs you · all answering');
     await expect(band.locator('[data-filter="live"] .v')).toHaveText('1');
     await expect(band.locator('[data-filter="needs"] .v')).toHaveText('1');
@@ -492,7 +505,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   });
 
   test('like Squarespace’s dashboard, the name and the picture open the site’s own home; the status sits on the picture', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed (the domain renews Nov 20, the plan Dec 1), so the clock is too
+    await pinClock(page, '2026-11-15T18:00:00Z');   // the fixtures' dates are fixed (the domain renews Nov 20, the plan Dec 1), so the clock is too
     await openSites(page);
     const card = page.locator('.scard[data-site="s1"]');
     await expect(card.locator('.sname a')).toHaveAttribute('href', '/today.html?client=s1');
@@ -577,7 +590,7 @@ test.describe('Sites: the trash (item 154)', () => {
   });
 
   test('the Trash at the foot of the page: newest first, the day each goes, and Restore', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
+    await pinClock(page, '2026-11-15T18:00:00Z');   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 108)
     const t = await openSites(page, [BISTRO], { body: { trash: TRASHED } });
     const trash = page.locator('section.trash');
     await expect(trash.locator('h2')).toHaveText('Trash');
@@ -869,7 +882,7 @@ test.describe('Domains: the page does things (item 162)', () => {
   test('each row says who runs the DNS, a lock that’s off, what the registry’s words mean, and when it was last checked', async ({ page }) => {
     // gone.example was checked Nov 8 at midnight: two days back on the calendar, the shell's words (builder item 101;
     // a 24-hour count said "3 days ago" here)
-    await page.clock.setFixedTime(new Date('2026-11-10T18:00:00Z'));
+    await pinClock(page, '2026-11-10T18:00:00Z');
     await openDomains(page);
     const row = (d: string) => page.locator(`table[aria-label="Domains"] tbody tr[data-domain="${d}"]`);
     await expect(row('bistro.example').locator('td').nth(3)).toContainText('DNS at Cloudflare');

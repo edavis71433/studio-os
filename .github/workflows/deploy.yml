@@ -17,6 +17,13 @@ on:
       confirm:
         description: "Type deploy-production to deploy main to PRODUCTION"
         required: true
+      # Builder item 418: for a fix to a live fault while the browser check is slow or
+      # jammed. Everything else still has to pass: the fast checks, the walls between
+      # studios, the database changes. Watch main's browser check finish afterwards.
+      urgent:
+        description: "Urgent fix: don't wait for the browser check (the fast checks, the walls test and the database check still run)"
+        type: boolean
+        default: false
 
 env:
   # Pinned, not latest: CLI 3.0.0 (2026-11-02) refuses to deploy without a
@@ -64,7 +71,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
+          URGENT: ${{ inputs.urgent }}
         run: |
+          # Builder item 418: an urgent fix goes out without waiting, and says so where it's seen.
+          if [ "$URGENT" = true ]; then
+            echo "::warning title=Urgent fix::Released without waiting for the browser check on this commit. Watch main's browser check finish, and use the rollback if it fails."
+            [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "**Urgent fix:** released without waiting for the browser check. The fast checks, the walls between studios and the database check still had to pass." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           poll="${POLL_SECONDS:-30}"
           start_by=$(( $(date +%s) + ${START_MINUTES:-15} * 60 ))
           give_up=$(( $(date +%s) + ${WAIT_MINUTES:-80} * 60 ))
@@ -175,6 +189,10 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: [test, browser-gate, isolation, ledger-gate]
     runs-on: ubuntu-latest
+    # actions: read finds the last release, to list what this one carries (builder item 418).
+    permissions:
+      contents: read
+      actions: read
     steps:
       # The typed phrase and the branch arrive as data, never pasted into the script.
       - name: Confirmation gate
@@ -189,7 +207,32 @@ jobs:
             echo "Production deploys only from main. Aborting."; exit 1
           fi
 
+      # The whole history: the pages check compares this commit with the one the live pages
+      # were built from, and the summary lists the commits since the last release.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      # Builder item 418: releases go out in batches, a few times a day, so the summary says
+      # what this one carries: every commit since the last release that went out.
+      - name: What this release carries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          prev=$(gh api "repos/$REPO/actions/workflows/deploy.yml/runs?status=success&per_page=1" --jq '.workflow_runs[0].head_sha // empty' 2>/dev/null || true)
+          {
+            if [ -n "$prev" ] && git merge-base --is-ancestor "$prev" "$SHA" 2>/dev/null; then
+              n=$(git rev-list --count "$prev..$SHA")
+              echo "### This release: ${SHA:0:8}, $n commit(s) since the last release (${prev:0:8})"
+              echo
+              git log --format='- %s' "$prev..$SHA" | head -60
+            else
+              echo "### This release: ${SHA:0:8} (the last release couldn't be found to compare with)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Guard — canonical clever-api file must exist
         run: test -f supabase/functions/clever-api/index.ts || { echo "clever-api/index.ts missing — see docs/runbooks/BYTE-CHECK.md item 1"; exit 1; }
 
@@ -269,10 +312,29 @@ jobs:
           [ "$code" = "403" ] || { echo "ai-visibility expected 403 without a Turnstile token, got $code"; exit 1; }
           echo "Free Tools smoke passed (tool-report 404, send-lead-alert 401, site-review and ai-visibility 403 without Turnstile)."
 
-      # The static site deploys from Netlify on every push, on its own clock.
-      # Rule of thumb when a page needs a new function field: ship the function
-      # (this workflow) first, the page second. This step checks the pages a
-      # visitor actually loads are up and still carry what the scan needs.
+      # Builder item 400: the pages go live with the release, once, after the functions above:
+      # the server first, the pages second. scripts/pages-go-live.txt says who publishes. While
+      # it says "merge", Netlify still publishes main on every merge, this publishes nothing,
+      # and the wait passes at once because the live pages are as new or newer. Once it says
+      # "release", this builds this commit's pages here and uploads them to Netlify as one
+      # deploy (scripts/publish-pages.sh), and Netlify's own builds of merges are skipped.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Publish the pages with this release
+        env:
+          SHA: ${{ github.sha }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
+        run: bash scripts/publish-pages.sh "$SHA"
+      - name: Wait for the pages to go live
+        env:
+          SHA: ${{ github.sha }}
+        run: bash scripts/pages-live.sh "$SHA" release
+
+      # This step checks the pages a visitor actually loads are up and still carry what the
+      # scan needs.
       - name: Smoke test — Free Tools pages on the static host
         run: |
           # Since builder item 138 (PR 264) the page loads Cloudflare's check only when a visitor starts a

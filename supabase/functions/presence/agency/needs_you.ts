@@ -25,6 +25,22 @@
 // Pure: no DB, no network, no clock (nowIso is an input). routes.ts gathers the
 // rows (fixed query count) and calls needsYouPayload().
 import { OPEN_DEAL_STAGES } from '../lib/deal_stages.ts';   // sales item 146: the one list of open stages
+import { hostOutOfCredits, OUT_OF_CREDITS_ROW } from '../lib/host_credits.ts';   // builder item 358
+
+// Builder item 358: why a publish failed, in plain words, by the stage it stopped at. The host's
+// raw error stays on the publish row for whoever looks into it; Home never shows it.
+const FAIL_WORDS: Array<[RegExp, string]> = [
+  [/^config:/, 'Hosting isn’t set up for this site'],
+  [/^render:/, 'Its pages couldn’t be built'],
+  [/^images:/, 'A photo couldn’t be prepared'],
+  [/^deploy:/, 'The host didn’t take it'],
+  [/^interrupted\b/, 'It stopped before reaching the host'],
+];
+export function publishFailWords(error: string | null | undefined): string {
+  const e = String(error || '').trim();
+  const hit = FAIL_WORDS.find(([re]) => re.test(e));
+  return hit ? hit[1] : '';
+}
 
 export type NeedsKind = 'money' | 'enquiry' | 'support' | 'message' | 'deal' | 'broken' | 'plan' | 'publish' | 'account' | 'notice';
 
@@ -330,9 +346,11 @@ export function buildNeedsYou(i: NeedsInput): NeedsRow[] {
     for (const s of sites) {
       const p = latestPublish.get(s.id);
       if (p && p.status === 'failed') {
-        const err = String(p.error_text || '').replace(/\s+/g, ' ').trim();
+        // builder item 358: plain words, never the host's raw error; out of credits says what to do
+        const credits = hostOutOfCredits(p.error_text);
         push({ key: `broken:publish:${s.id}`, kind: 'broken', site_id: s.id, client_id: null, name: nameOf(s.id, null),
-          what: 'the last publish failed', when: [ago(p.created_at, today) ? `Failed ${ago(p.created_at, today)}` : 'Failed', err ? err.slice(0, 80) : ''].filter(Boolean).join(' · '),
+          what: credits ? OUT_OF_CREDITS_ROW.what : 'the last publish failed',
+          when: [ago(p.created_at, today) ? `Failed ${ago(p.created_at, today)}` : 'Failed', credits ? OUT_OF_CREDITS_ROW.when : publishFailWords(p.error_text)].filter(Boolean).join(' · '),
           verb: 'Fix', href: `/presence.html${sc(s.id)}#publish`, since: p.created_at || null });
       }
       // item 162 (review domains finding 6): the registry says the domain itself is in trouble

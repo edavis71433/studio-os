@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Nov 10 bug hunt, Customers and Contacts (B3 and three small ones):
 //   B3  Customers picks up the renewed sign-in pass (it kept the first one and said
@@ -87,7 +88,7 @@ test.describe('the Customers preview and picks (B21)', () => {
 
 test.describe('Contacts — "Updated" counts calendar days (B21)', () => {
   test('last night at 11pm is "yesterday" at 9am, not "today"', async ({ page }) => {
-    await page.clock.install({ time: new Date('2026-11-10T09:00:00Z') });   // the suite's browsers run on UTC
+    await pinClock(page, '2026-11-10T09:00:00Z', { ticking: true });   // the suite's browsers run on UTC
     await installApp(page, { api: { '/sales/contacts': { data: [] } } });
     await page.goto('/contacts.html');
     const got = await page.evaluate(() => { const f = (window as unknown as { relWhen: (s: string) => string }).relWhen; return [f('2026-11-09T23:00:00Z'), f('2026-11-10T00:30:00Z'), f('2026-11-08T09:30:00Z'), f('2026-11-03T08:00:00Z')]; });

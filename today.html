@@ -278,7 +278,7 @@
     <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="greeting">Today</h1></div>
       <p class="dds-ph-line" id="sub">A calm look at what, if anything, needs you.</p></div></div></header>
   <!-- inside a client this page is the client's Overview, as the menu says -->
-  <script>(function(){try{if(new URLSearchParams(location.search).get('client')){document.getElementById('greeting').textContent='Overview';document.getElementById('phIc').setAttribute('data-ic','overview');}}catch(_){}})();</script>
+  <script>(function(){try{if(new URLSearchParams(location.search).get('client')){document.getElementById('greeting').textContent='Overview';document.title='Overview — Studio OS';document.getElementById('phIc').setAttribute('data-ic','overview');}}catch(_){}})();</script>
   <div id="main"><div class="spin" role="status" aria-label="Loading"></div></div>
 </div>
 <!-- PT-5: one-time contextual tip, taught where it's relevant, then gone forever -->
@@ -788,6 +788,10 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
   // PP-5: the empty-state speaks in the language of what this edition actually is.
   const edFeats = (ctx && ctx.edition_features) || null;
   const hasWebsite = !edFeats || edFeats.indexOf('website') >= 0;
+  // Builder item 369: the studio looking at a client's Overview reads the app's words about the
+  // client ("Their website is ready when they are"), not the words written to the client.
+  const studioLooks = studioInClient(ctx);
+  const voice = studioLooks && window.ddsTheirVoice ? window.ddsTheirVoice : (t) => t;
   // ── needs you now: the SAME items the top-bar bell counts (notices + pending
   //    approvals) so the home page and the bell tell one story — each taps
   //    straight through to the page that resolves it. ──────────────────────────
@@ -868,12 +872,12 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
       : [['/customers.html','Open Customers'],['/connections.html','Connections']]
     ).map(([h,l]) => _lnk(h,l)).join(_sep);
     main += `<div class="moment calm"><span class="tag">All clear</span>
-      <h2>${hasWebsite ? 'Everything we watch looks good.' : 'Everything’s quiet across your business.'}</h2>
-      <p>${clearBody}</p>
+      <h2>${voice(hasWebsite ? 'Everything we watch looks good.' : 'Everything’s quiet across your business.')}</h2>
+      <p>${voice(clearBody)}</p>
       <div class="row">${clearLinks}</div></div>`;
   } else if(!items.length){
     // needs exist but nothing more is worth a look — one calm green line, not silence
-    main += `<div class="moment calm slim"><h2>Everything else looks good.</h2><p>Beyond the list above, nothing is waiting on you — anything new lands here first.</p></div>`;
+    main += `<div class="moment calm slim"><h2>Everything else looks good.</h2><p>${voice('Beyond the list above, nothing is waiting on you — anything new lands here first.')}</p></div>`;
   } else {
     let momentsHtml = '';
     for(const m of items){
@@ -881,8 +885,8 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
       const celebrate = cls === 'good';
       momentsHtml += `<article class="moment ${cls}">
         ${celebrate ? '<span class="tag">Good news</span>' : ''}
-        <h2>${esc(m.headline)}</h2>
-        <p>${esc(m.summary)}</p>
+        <h2>${esc(voice(m.headline))}</h2>
+        <p>${esc(voice(m.summary))}</p>
         <div class="row">
           ${celebrate ? '' : `<button class="primary" data-explain="${esc(m.id)}">Walk me through it</button>`}
           ${m.dismissable ? `<button class="ghost" data-dismiss="${esc(m.id)}">Not now</button>` : ''}
@@ -902,8 +906,8 @@ function render(moments, features, feed, ctx, dash, appts, deals, summary, rcv, 
 
   // the Concierge — a knowledgeable partner, not a chatbot. Stays in the main
   // column (right under the day) — asking a question is a primary action.
-  main += `<div class="ask"><h3>Have a question about your website?</h3>
-    <p>Ask in your own words. It only speaks to what’s actually true of your business.</p>
+  main += `<div class="ask"><h3>Have a question about ${studioLooks?'their':'your'} website?</h3>
+    <p>Ask in your own words. It only speaks to what’s actually true of ${studioLooks?'their':'your'} business.</p>
     <div class="askbox"><input id="q" type="text" placeholder="e.g. what should I do first?" aria-label="Ask a question"><button class="ghost" id="askBtn" style="border-color:var(--line);color:var(--ink);padding-left:16px;padding-right:16px">Ask</button></div>
     <div class="answer" id="askAns" aria-live="polite"></div></div>`;
 
@@ -1171,7 +1175,7 @@ const SHELL_READY = document.readyState === 'loading' ? new Promise((r)=>documen
     if(feedFailed){ const h=document.getElementById('main'); if(h){ const n=document.createElement('div'); n.style.cssText='margin:0 0 14px;padding:11px 16px;border-radius:12px;background:var(--warn-soft,#f3ead9);color:var(--warn,#775d31);font-size:13.5px'; n.textContent='We couldn’t load what needs you just now — refresh to try again.'; h.insertBefore(n,h.firstChild);} }
     studioProjectCard(bridged && bridged.data, inC);
     if(c0 && (c0.is_agency || c0.is_operator) && inC) mountSiteDeck().finally(mountDoNext);   // item 184: the Do next list under their website
-    orientationCard(ctx && ctx.data);
+    orientationCard(ctx && ctx.data, inC);
     planCard(ctx && ctx.data);
     healthLine();
     journeyStrip();
@@ -1211,7 +1215,8 @@ const FEATURE_LABEL = {
   relationship:'Customers', reports:'Analytics', client_portal:'client sharing',
   managed_service:'managed service', agency:'the agency portfolio', enterprise:'enterprise controls',
 };
-function orientationCard(c){
+function orientationCard(c, inC){
+  if(inC) return;   // builder item 369: the client's welcome note is never shown to the studio looking in
   if(!c || !c.edition_features || !c.edition_name) return;
   const KEY='dds-oriented'; let prev=null;
   try{ prev=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(_){}

@@ -6,6 +6,7 @@
 // sends, and what a page gets back when there is no connection or the sign-in has run
 // out). The page parts (the toast, the confirm, the sign-in bar) are tested in a browser:
 // tests/e2e/shell-kit-101.spec.ts.
+import { pinClock } from './clock.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, note = '') => { if (cond) pass++; else fail++; console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${note ? `  (${note})` : ''}`); };
@@ -14,11 +15,8 @@ const ok = (name, cond, note = '') => { if (cond) pass++; else fail++; console.l
 globalThis.window = globalThis;
 const RealDate = Date;
 let NOW = new RealDate(2026, 10, 16, 23, 30).getTime();   // Nov 16 2026, 11:30 pm here
-class FixedDate extends RealDate {
-  constructor(...a) { if (a.length) super(...a); else super(NOW); }
-  static now() { return NOW; }
-}
-globalThis.Date = FixedDate;
+let unpin = pinClock(NOW);
+const setNow = (ms) => { unpin(); NOW = ms; unpin = pinClock(NOW); };   // the clock moves only when a check says so
 await import('../../shell-kit.js');
 const { ddsMoney, ddsDate, ddsApi, ddsKit } = globalThis;
 
@@ -51,7 +49,7 @@ ok('the kit puts its helpers on the page', !!(ddsKit && ddsMoney && ddsDate && d
   ok('another year carries its year', ddsDate.short(new RealDate(2025, 10, 3)) === 'Nov 3, 2025' && ddsDate.short(at(3)) === 'Nov 3');
   ok('days counts calendar days, not 24-hour blocks', ddsDate.days(at(15, 23, 59)) === -1 && ddsDate.days(at(16, 0, 1)) === 0);
   // the Nov 12 review (file 06, finding 101): a 10pm enquiry read "today" in the Inbox the next morning
-  NOW = at(17, 8).getTime();
+  setNow(at(17, 8).getTime());
   ok('a 10pm enquiry is "yesterday" the next morning, on every page', ddsDate.ago(at(16, 22).toISOString()) === 'yesterday');
   ok('ago in days', ddsDate.ago(at(17, 1)) === 'today' && ddsDate.ago(at(14, 12)) === '3 days ago' && ddsDate.ago(at(9, 12)) === 'last week' && ddsDate.ago(at(1, 12)) === '2 weeks ago');
   ok('ago in months past 60 days', ddsDate.ago(new RealDate(2026, 7, 1)) === '3 months ago');
@@ -60,7 +58,7 @@ ok('the kit puts its helpers on the page', !!(ddsKit && ddsMoney && ddsDate && d
   ok('since: then the day words, then the date', ddsDate.since(at(16, 7)) === 'yesterday' && ddsDate.since(at(15, 7)) === '2 days ago' && ddsDate.since(at(13, 7)) === '4 days ago' && ddsDate.since(at(2, 7)) === 'Nov 2');
   ok('time', ddsDate.time(at(16, 15, 5)) === '3:05 PM' && ddsDate.time(at(16, 0, 0)) === '12:00 AM' && ddsDate.time(at(16, 12, 30)) === '12:30 PM');
   ok('not a date is empty everywhere', ddsDate.day('nope') === '' && ddsDate.ago(null) === '' && ddsDate.short('') === '' && ddsDate.since(undefined) === '' && ddsDate.days('x') === null && ddsDate.ymd(null) === '');
-  NOW = at(16, 23, 30).getTime();
+  setNow(at(16, 23, 30).getTime());
 }
 
 // ═══ 3. the API helper ═══
@@ -89,7 +87,7 @@ ok('the kit puts its helpers on the page', !!(ddsKit && ddsMoney && ddsDate && d
 
   session = { access_token: 'tok-2', expires_at: Math.floor(NOW / 1000) + 30 };
   await ddsApi('/y');   // the kept one still has an hour
-  NOW += 3600 * 1000 - 20000;   // …and now it runs out in 20 s
+  setNow(NOW + 3600 * 1000 - 20000);   // …and now it runs out in 20 s
   await ddsApi('/z');
   ok('a sign-in about to run out is read again from the client (which refreshes it)', reads === 2 && sent[3].init.headers['x-dds-user-jwt'] === 'tok-2');
 
@@ -112,6 +110,23 @@ ok('the kit puts its helpers on the page', !!(ddsKit && ddsMoney && ddsDate && d
   const bad = await ddsApi('/boom');
   ok('an answer that isn\'t JSON is an empty body, never a throw', bad.ok === false && bad.status === 500 && typeof bad.body === 'object');
   ok('say(): the server\'s words, else the page\'s', ddsApi.say({ status: 400, body: { message: 'Give it a name.' } }, 'x') === 'Give it a name.' && ddsApi.say(bad, 'That didn’t save.') === 'That didn’t save.');
+}
+
+// ═══ builder item 369: the studio's voice ═══
+{
+  const v = globalThis.ddsTheirVoice;
+  ok('369: the kit puts the voice on the page', typeof v === 'function' && ddsKit.theirVoice === v);
+  ok('369: "your" and "you are" become "their" and "they are"', v('Your website is ready when you are.') === 'Their website is ready when they are.');
+  ok('369: "you" doing something is "they"; "you" after a word that takes it is "them"',
+    v('Everything you’ve written is waiting in your draft. One look, one button, and customers can start finding you.') === 'Everything they’ve written is waiting in their draft. One look, one button, and customers can start finding them.');
+  ok('369: "if you", "you uploaded", "you’re", a sentence that opens with "You"', v('If you take them, it’s worth adding.') === 'If they take them, it’s worth adding.'
+    && v('Something you uploaded doesn’t match.') === 'Something they uploaded doesn’t match.' && v('Show customers you’re listening.') === 'Show customers they’re listening.'
+    && v('You now have a few more things.') === 'They now have a few more things.');
+  ok('369: yours and yourself', v('A sentence of your own words makes it yours.') === 'A sentence of their own words makes it theirs.' && v('Do it yourself.') === 'Do it themselves.');
+  ok('369: "thank you" stays, and so does anything quoted (what someone typed)', v('A simple thank-you is enough.') === 'A simple thank-you is enough.' && v('Thank you for waiting.') === 'Thank you for waiting.'
+    && v('New answer to “Can you deliver?” on your FAQ page.') === 'New answer to “Can you deliver?” on their FAQ page.' && v('"You and me" is renamed "Yours truly".') === '"You and me" is renamed "Yours truly".');
+  ok('369: the publish summary’s first line, and words with no "you" in them, as they were', v('Your website goes live for the first time.') === 'Their website goes live for the first time.'
+    && v('Menu sections are reordered.') === 'Menu sections are reordered.' && v('') === '' && v(null) === '' && v('Youth league, layout, bayou') === 'Youth league, layout, bayou');
 }
 
 console.log(`\n════ SHELL KIT: ${pass}/${pass + fail} ${fail ? 'FAILED' : 'PASSED'} ════`);

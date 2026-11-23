@@ -8,6 +8,7 @@
 //      its end date kept and shown; Home asks after a day stuck or inside 14 days.
 // The pure rules first, then the real job against a stubbed registry, DNS, Netlify,
 // database and email. No outside call leaves.
+import { pinClock } from './clock.mjs';
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL: 'https://app.example', RESEND_KEY: 're_test_unused', NETLIFY_AUTH_TOKEN: 'nf-test' })) Deno.env.set(k, v);
 
 const results = [];
@@ -126,10 +127,7 @@ const { runDomainWatch } = await import(`${P}/commerce/lifecycle.ts`);
 const quiet = async (fn) => { const e = console.error, w = console.warn, l = console.log; console.error = () => {}; console.warn = () => {}; try { return await fn(); } finally { console.error = e; console.warn = w; } };
 
 // a "www." name, 7 days out, padlock pending with the records right
-const realNow = Date.now;
-Date.now = () => Date.parse('2026-11-11T12:00:00.000Z');
-const RealDate = Date;
-globalThis.Date = class extends RealDate { constructor(...a) { if (!a.length) super(RealDate.now()); else super(...a); } static now() { return RealDate.parse('2026-11-11T12:00:00.000Z'); } };
+const restoreClock = pinClock('2026-11-11T12:00:00.000Z');
 reset();
 {
   const r = await quiet(() => runDomainWatch(10));
@@ -186,7 +184,7 @@ ok('a client without an email: the studio still hears, and is told the client wa
   ok('365: …and the broken one is written down on its own row: checked today, its lookup failed', bp.length === 1 && bp[0].domain_lookup_status === 'failed' && bp[0].domain_checked_at === '2026-11-11T12:00:00.000Z' && Object.keys(bp[0]).length === 3, JSON.stringify(bp));
   ok('365: the run counts it apart', r.checked === 2 && r.failed === 1, JSON.stringify(r));
 }
-globalThis.Date = RealDate; Date.now = realNow;
+restoreClock();
 
 const passed = results.filter((r) => r.p).length;
 console.log(`${passed}/${results.length} passed`);

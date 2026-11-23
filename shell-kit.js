@@ -389,8 +389,38 @@
         }, function () { return false; });
       });
   }
+  // ── Builder item 369: the studio's voice ────────────────────────────────────
+  //   ddsTheirVoice(text): the app's words to a business owner ("Your website is ready when you
+  //   are.") as the studio reads them on that owner's behalf ("Their website is ready when they
+  //   are."). Only for the app's own sentences (moments, the publish summary), never for what a
+  //   person typed. "you" after a word that takes an object, or with no doing word after it, is
+  //   "them"; "you" doing something, after "if", "when" and the like, or opening a sentence, is
+  //   "they". "Thank you" stays as it is, and so does anything in quotes: a summary quotes what
+  //   someone typed (“Can you deliver?”), and that is theirs.
+  var TAKES = 'lets?|let’s|helps?|makes?|gives?|shows?|tells?|asks?|reminds?|sends?|keeps?|finding|find|reach|reaches|for|to|with|from|about|than|of|at|by|on|around';
+  var DOES = 'are|were|have|had|can|could|will|would|should|may|might|must|need|want|do|did|don’t|didn’t|haven’t|aren’t|can’t|won’t|get|go|add|open|publish|set|see|know|make|run|use|look|start|keep|choose|pick|write|wrote|press|decide|ask|try|take|already|still|now|just|only|also|[a-z]+ed';
+  var LEADS = 'if|when|whenever|once|until|unless|before|after|while|because|whether|though|although|since|so|and|or|but|that|what|where|how';
+  function theirVoice(text) {
+    return String(text == null ? '' : text).split(/(“[^”]*”|"[^"]*")/).map(function (part, i) { return i % 2 ? part : unquotedVoice(part); }).join('');
+  }
+  function unquotedVoice(text) {
+    var cap = function (w, rep) { return /^[A-Z]/.test(w) ? rep.charAt(0).toUpperCase() + rep.slice(1) : rep; };
+    return text
+      .replace(/\b(thank[\s-])you\b/gi, '$1\u0000')
+      .replace(/\byoursel(?:f|ves)\b/gi, function (w) { return cap(w, 'themselves'); })
+      .replace(/\byours\b/gi, function (w) { return cap(w, 'theirs'); })
+      .replace(/\byour\b/gi, function (w) { return cap(w, 'their'); })
+      .replace(new RegExp('\\b(' + TAKES + ')\\s+you\\b', 'gi'), function (m, w) { return w + ' them'; })
+      .replace(/\byou(?=[’'](?:re|ve|ll|d)\b)/gi, function (w) { return cap(w, 'they'); })
+      .replace(new RegExp('\\b(' + LEADS + ')\\s+you\\b', 'gi'), function (m, w) { return w + ' they'; })
+      .replace(new RegExp('\\byou(?=\\s+(?:' + DOES + ')\\b)', 'gi'), function (w) { return cap(w, 'they'); })
+      .replace(/(^|[.!?:]\s+)you\b/gi, function (m, pre) { return pre + 'They'; })
+      .replace(/\byou\b/gi, function (w) { return cap(w, 'them'); })
+      .replace(/\u0000/g, 'you');
+  }
+  window.ddsTheirVoice = theirVoice;
   window.ddsAskReminders = askReminders;
-  window.ddsKit = { api: api, toast: toast, confirm: confirmBox, ask: askBox, money: money, date: DATE, askReminders: askReminders };
+  window.ddsKit = { api: api, toast: toast, confirm: confirmBox, ask: askBox, money: money, date: DATE, askReminders: askReminders, theirVoice: theirVoice };
   window.ddsApi = api;
   window.ddsToast = toast;
   window.ddsConfirm = confirmBox;

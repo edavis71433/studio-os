@@ -111,9 +111,9 @@ ok('prod: the verify also counts run history still holding the secret (expect 0)
 
 // ═══ 6. the repo's schedule matches the live names ═══
 const ops = byName('ops');
-// builder item 404: presence-keep-awake (every 4 minutes, task 'ping', asking for Oregon) joins the schedule; docs/presence/APPLY-keep-awake-prod.sql adds it to production
+// builder item 404: presence-keep-awake (every minute since Nov 22: at */4 every ping met a new worker; task 'ping', asking for Oregon) joins the schedule; docs/presence/APPLY-keep-awake-prod.sql adds it to production
 ok('ops: the live job names, not presence_ops_*', JSON.stringify(Object.keys(ops).sort()) === JSON.stringify(['presence-cycle', 'presence-keep-awake', 'presence_ga4_sync', 'presence_gsc_sync']));
-ok('ops: the keep-awake job every 4 minutes, a ping that asks for Oregon', ops['presence-keep-awake']?.schedule === '*/4 * * * *' && /'task', 'ping'/.test(ops['presence-keep-awake'].cmd) && /"x-region":"us-west-2"/.test(ops['presence-keep-awake'].cmd));
+ok('ops: the keep-awake job every minute, a ping that asks for Oregon', ops['presence-keep-awake']?.schedule === '* * * * *' && /'task', 'ping'/.test(ops['presence-keep-awake'].cmd) && /"x-region":"us-west-2"/.test(ops['presence-keep-awake'].cmd));
 ok('ops: same timing as production', ['presence-cycle', 'presence_gsc_sync', 'presence_ga4_sync'].every((n) => ops[n]?.schedule === prod[n]?.schedule));
 ok('ops: same command as production, apart from the project ref', ['presence-cycle', 'presence_gsc_sync', 'presence_ga4_sync'].every((n) => ops[n]?.cmd.replaceAll('<PROJECT_REF>', PROD) === prod[n]?.cmd));
 ok('ops: stops if <PROJECT_REF> was not replaced (the template trap behind dds_product_intelligence)', /if position\('<' in 'https:\/\/<PROJECT_REF>\.supabase\.co'\) > 0 then\s+raise exception/.test(code.ops));
@@ -136,7 +136,7 @@ ok('/system/run knows the tasks the jobs send', ['gsc_sync', 'ga4_sync'].every((
 ok('clever-api no longer answers run_scheduled_jobs (the switched-off nightly job), so no job may call it', !clever.includes('run_scheduled_jobs') && /RETIRED \(builder item 392/.test(sql.legacy));
 
 // ═══ 9. the docs say where the jobs get the secret ═══
-for (const p of ['docs/presence/ENV-AND-SECRETS.md', 'docs/SECRETS-INVENTORY.md']) {
+for (const p of ['docs/presence/ENV-AND-SECRETS.md', 'docs/RUN-SHEET.md']) {   // builder item 422: the secrets list and the run sheet
   const d = read(p);
   ok(`${p}: names the Vault entry, no longer "embedded in the pg_cron job body"`, d.includes('presence_scheduler_secret') && !/embedded in the pg_cron job body/.test(d));
 }

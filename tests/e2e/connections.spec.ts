@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // ── connections.html + connections-callback.html ─────────────────────────────
 // The "Search Console circle": Eric pressed Connect Search Console and came
@@ -51,10 +52,35 @@ test.describe('Connections — the Connect button exists at all', () => {
     await expect(connect).toHaveText('Connect');
     await expect(page.locator('#svc-google_search_console .chip.status')).toHaveText('Not connected');
 
-    // and a genuinely-unshipped provider still tells the truth rather than
-    // offering a button that would dead-end
-    await expect(page.locator('#svc-bing_webmaster button[data-connect]')).toHaveCount(0);
-    await expect(page.locator('#svc-bing_webmaster')).toContainText('Nothing to connect yet.');
+    // and a genuinely-unshipped provider never offers a button that would dead-end. Builder item
+    // 372: it isn't a row at all; every such service folds into one line, under Calendar, Email
+    // and Ad tags, that asks which service to connect next
+    await expect(page.locator('#svc-bing_webmaster')).toHaveCount(0);
+    await expect(page.getByText('Not available yet')).toHaveCount(0);
+    const more = page.locator('#moreSvc');
+    await expect(more).toHaveText('Want another service connected? Tell us which.');
+    await expect(more.getByRole('link', { name: 'Tell us which' })).toHaveAttribute('href', /^mailto:support@davisdigitalstudio\.com\?subject=A%20service%20to%20connect$/);
+    expect(await page.evaluate(() => !!(document.getElementById('adSec')!.compareDocumentPosition(document.getElementById('moreSvc')!) & Node.DOCUMENT_POSITION_FOLLOWING)), 'the line comes after the sections that work').toBe(true);
+  });
+
+  test('builder item 372: a group whose services are all on the way isn’t drawn', async ({ page }) => {
+    const s = SURFACE();
+    const [live, planned] = s.data.groups['Being found'];
+    s.data.groups = { 'Being found': [live], 'Reviews': [{ ...planned, key: 'yelp', label: 'your Yelp reviews' }] };
+    await installApp(page, { api: { '/connections': s } });
+    await page.goto('/connections.html');
+    await expect(page.locator('#svc-google_search_console')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Reviews' })).toHaveCount(0);
+    await expect(page.locator('#moreSvc')).toBeVisible();
+  });
+
+  test('builder item 372: with nothing on the way there is no line', async ({ page }) => {
+    const s = SURFACE();
+    s.data.groups = { 'Being found': [s.data.groups['Being found'][0]] };
+    await installApp(page, { api: { '/connections': s } });
+    await page.goto('/connections.html');
+    await expect(page.locator('#svc-google_search_console')).toBeVisible();
+    await expect(page.locator('#moreSvc')).toHaveCount(0);
   });
 
   test('an attention badge carries the REASON it needs attention', async ({ page }) => {
@@ -506,7 +532,7 @@ test.describe('Connections — ask the client to connect their Google', () => {
 // Item 95: the date ran into the last number ("4 from searchas of 2026-11-08"), as a raw date.
 // Builder item 101: the date is the shell's one date format, so a day in another year says its year.
 test('a connection’s numbers end with a separated, plain-words date', async ({ page }) => {
-  await page.clock.setFixedTime(new Date('2026-11-16T12:00:00Z'));   // "Mar 2" is this year's
+  await pinClock(page, '2026-11-16T12:00:00Z');   // "Mar 2" is this year's
   await installApp(page);
   await page.goto('/connections.html');
   const words = await page.evaluate(() => {

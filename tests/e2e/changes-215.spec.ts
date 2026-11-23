@@ -1,6 +1,8 @@
 import { test, expect, Page, Route } from '@playwright/test';
+import { expectOneHeader } from './helpers/page-header';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, CLIENT_NAV, ALL_FEATURES } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Builder list item 215 (Nov 2026; review file 03, finding 4): Changes, who changed what and
 // when, as drawn in Figma (page 410:2) and approved. At the studio's level, a tab beside
@@ -36,7 +38,7 @@ async function openChanges(page: Page, o: { url?: string; status?: number; site?
   const asked: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.clock.setFixedTime(new Date(NOW));
+  await pinClock(page, NOW);
   await installApp(page, { api: { '/portal/context': o.url && o.url.includes('client=') ? clientContext : studioContext, '/agency/sites': { data: [], partial: false, can_open: true, can_create: true, trash: [], trash_days: 90 } } as never });
   await page.route(/\/functions\/v1\/presence\/(agency\/)?change-log(\/went-live)?(\?.*)?$/, (route: Route) => {
     const u = new URL(route.request().url());
@@ -52,9 +54,9 @@ async function openChanges(page: Page, o: { url?: string; status?: number; site?
 test.describe('Changes (builder list item 215)', () => {
   test('at the studio’s level: the tab, the week by who made the changes, and each change in a sentence', async ({ page }) => {
     const { errors, asked } = await openChanges(page);
-    await expect(page.getByRole('heading', { level: 1, name: 'Sites' })).toBeVisible();
+    // builder item 425: the one page header the other tabs under Sites wear, with its own title
+    await expectOneHeader(page, { title: 'Changes', icon: 'overview', line: /^\d+ sites? · Who changed what on every client’s site, newest first · Updated just now$/, filled: null, tabs: ['Sites', 'Domains', 'Templates', 'Usage', 'Changes'] });
     const tabs = page.getByRole('navigation', { name: 'Sites, domains, templates, usage and changes' });
-    await expect(tabs.getByRole('link')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage', 'Changes']);
     await expect(tabs.getByRole('link', { name: 'Changes' })).toHaveAttribute('aria-current', 'page');
     const band = page.getByRole('region', { name: 'This week in changes' });
     await expect(band.locator('.big')).toHaveText('64 changes');

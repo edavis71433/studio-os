@@ -292,3 +292,39 @@ test('the page and the shell share one auth client', async ({ page }) => {
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => (window as any).__clients)).toBe(1);
 });
+
+// Builder items 369 and 358 (Nov 22 2026 review): the publish page in the studio's words when the
+// studio publishes for a client, and a host out of credits said in plain words.
+test.describe('the publish page: the studio’s words, and a host out of credits (builder items 369, 358)', () => {
+  const FIRST = { '/changes': { data: { count: 1, first_publish: true, changes: [{ section: 'site', sentence: 'Your website goes live for the first time.' }], blockers: 0, warnings: 0, draft_hash: 'h' } } };
+  const STUDIO_CTX = { data: { ...API['/portal/context'].data, is_agency: true, scope: { site_id: 's1', name: 'Maple Street Studio' } } };
+
+  test('the studio publishing for a client reads “their website”, beside the title that names them', async ({ page }) => {
+    await installApp(page, { api: { ...API, ...FIRST, '/portal/context': STUDIO_CTX } });
+    await page.goto('/presence.html?client=s1#publish');
+    await expect(page.locator('#ritTitle')).toHaveText('This is the moment Maple Street Studio’s website goes live.');
+    await expect(page.locator('#ritBody .journal')).toContainText('Their website goes live for the first time.');
+  });
+
+  test('the client publishing their own site reads it as written to them', async ({ page }) => {
+    await installApp(page, { api: { ...API, ...FIRST } });
+    await page.goto('/presence.html#publish');
+    await expect(page.locator('#ritTitle')).toHaveText('This is the moment your website goes live.');
+    await expect(page.locator('#ritBody .journal')).toContainText('Your website goes live for the first time.');
+  });
+
+  test('a host out of credits: Publish says so and what to do, and offers no Try again', async ({ page }) => {
+    await installApp(page, { api: { ...API, ...FIRST, '/portal/context': STUDIO_CTX } });
+    const message = 'Publishing is paused: the hosting account has run out of credits. Add credits at the host, or turn on auto recharge there, then publish again.';
+    await page.route('**/functions/v1/presence/publish', (r) => r.request().method() === 'POST'
+      ? r.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'host_out_of_credits', message }) })
+      : r.fallback());
+    await page.goto('/presence.html?client=s1#publish');
+    await page.getByRole('button', { name: 'Publish my site' }).click();
+    await expect(page.locator('#ritTitle')).toHaveText('That didn’t go through.');
+    await expect(page.locator('#ritSub')).toHaveText(message + ' Your live site is unchanged.');
+    await expect(page.locator('#ritActions').getByRole('button', { name: 'Try again' })).toHaveCount(0);
+    await expect(page.locator('#ritActions').getByRole('button', { name: 'Back to your website' })).toBeVisible();
+    await expect(page.getByText('We hit a snag')).toHaveCount(0);
+  });
+});

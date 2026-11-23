@@ -7,6 +7,7 @@
 // stand-in database holds 1,500 visitors this month and hands back 1,000 rows a read, as
 // production does. The pages must say 1,500: from the database's count (migration 0194),
 // and, before that migration, from reading every page of rows. No Supabase is touched.
+import { pinClock } from './clock.mjs';
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY' })) Deno.env.set(k, v);
 
 const results = [];
@@ -17,11 +18,10 @@ const read = (p) => Deno.readTextFileSync(new URL(p, import.meta.url));
 
 const SITE = '11111111-1111-4111-8111-111111111111', OTHER = '22222222-2222-4222-8222-222222222222';
 const DAY = 86_400_000;
-const realNow = Date.now, realFetch = globalThis.fetch;
+const realFetch = globalThis.fetch;
 const NOW = Date.parse('2026-11-20T12:00:00Z');
-Date.now = () => NOW;
 const RealDate = Date;
-globalThis.Date = class extends RealDate { constructor(...a) { super(...(a.length ? a : [NOW])); } static now() { return NOW; } };
+const restoreClock = pinClock(NOW);
 
 // ── the rows: 1,500 people this month (one page view each, 300 came back for a second
 //    page), 400 in the same span before it, and 100 a week in the weeks before that ──
@@ -173,7 +173,7 @@ world.hasFunction = true;
   ok('the server names only arguments the functions have', named.length >= 9 && named.every((a) => new RegExp(`\\b${a}\\b`).test(migration)), named.join(','));
 }
 
-globalThis.Date = RealDate; Date.now = realNow; globalThis.fetch = realFetch;
+restoreClock(); globalThis.fetch = realFetch;
 const failed = results.filter((r) => !r.p).length;
 console.log(`visit_counts_207: ${results.length - failed} passed, ${failed} failed`);
 if (failed) Deno.exit(1);

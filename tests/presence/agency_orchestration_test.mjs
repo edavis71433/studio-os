@@ -1,49 +1,18 @@
 // ── L5.7 Agency Expansion & Enterprise Operations suite ─────────────────────
 // Proves the agency ORCHESTRATES the whole platform through one experience:
-// permissions compose (role × scope), cross-org/cross-client rollups + a unified
-// approval queue drawn ENTIRELY from the Approved-Plan tables, no duplicated
-// engine/store/table, and scaling to 100 orgs / 10,000 locations.
+// cross-org/cross-client rollups + a unified approval queue drawn ENTIRELY from the
+// Approved-Plan tables, no duplicated engine/store/table, and scaling to 100 orgs /
+// 10,000 locations. (Its first sections checked agency/permissions.ts, a role-and-scope
+// table that was never wired into production; builder item 423 removed it, Nov 22 2026.
+// The agency routes' real gates are agency/auth.ts's, which member_capabilities and the
+// designer-role suites drive.)
 //
 //   deno run --allow-read --allow-net --allow-env tests/presence/agency_orchestration_test.mjs
-import { authorize, memberForRole, permissionMatrix, ACTION_CAP, FULL_SCOPE, scopeOrg, scopeSite } from '../../supabase/functions/presence/agency/permissions.ts';
 import { crossOrgRollup, approvalQueue, crossClientSummary } from '../../supabase/functions/presence/agency/orchestrate.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
 const src = (rel) => Deno.readTextFileSync(new URL(`../../supabase/functions/presence/${rel}`, import.meta.url));
-
-// ═══ 1. PERMISSIONS COMPOSE — role capability × scope ═══
-{
-  const owner = memberForRole('agency_owner');
-  ok('perm: an owner can do everything across the whole portfolio', ['org_manage', 'pack_approve', 'connected_approve', 'org_rollout_approve', 'publish', 'manage_members'].every((a) => authorize(owner, a)));
-  const readonly = memberForRole('read_only');
-  ok('perm: read-only can view but not change anything', authorize(readonly, 'view') && !authorize(readonly, 'org_manage') && !authorize(readonly, 'pack_approve') && !authorize(readonly, 'publish'));
-  const editor = memberForRole('editor');
-  ok('perm: an editor can PREPARE a connected write but not APPROVE it (separation of duties)', authorize(editor, 'connected_prepare') && !authorize(editor, 'connected_approve'));
-  const developer = memberForRole('agency_admin'); // (admin) vs a scoped dev below
-  ok('perm: an admin can approve plans; the sign-off capability is real', authorize(developer, 'pack_approve') && authorize(developer, 'org_rollout_approve'));
-}
-
-// ═══ 2. SCOPE FENCING — scoped admins can't escape their scope ═══
-{
-  const orgAdmin = memberForRole('organization_admin', { orgId: 'org-1', orgSites: ['s1', 's2'] });
-  ok('scope: an org admin manages their own org', authorize(orgAdmin, 'org_manage', { orgId: 'org-1' }));
-  ok('scope: an org admin CANNOT touch another org (composition denies it)', !authorize(orgAdmin, 'org_manage', { orgId: 'org-2' }));
-  const locAdmin = memberForRole('location_admin', { siteId: 's1' });
-  ok('scope: a location admin is bounded to their site', authorize(locAdmin, 'connected_prepare', { siteId: 's1' }) && !authorize(locAdmin, 'connected_prepare', { siteId: 's2' }));
-  // a full-scope manager reaches any org/site in the portfolio
-  const manager = memberForRole('manager');
-  ok('scope: a full-portfolio manager reaches any org', authorize(manager, 'org_rollout_prepare', { orgId: 'anything' }));
-}
-
-// ═══ 3. THE PERMISSION MATRIX — nine named roles ═══
-{
-  const M = permissionMatrix();
-  const roles = Object.keys(M);
-  ok('matrix: all nine named roles are defined', roles.length === 9 && roles.includes('agency_owner') && roles.includes('organization_admin') && roles.includes('location_admin'));
-  ok('matrix: owner ⊇ manager ⊇ analyst (capabilities are monotone by seniority)', M.agency_owner.length >= M.manager.length && M.manager.length >= M.analyst.length);
-  ok('matrix: every action maps to a real capability', Object.values(ACTION_CAP).every((c) => typeof c === 'string'));
-}
 
 // ═══ 4. ORCHESTRATION BUILDERS — rollups + the unified approval queue ═══
 {
@@ -72,8 +41,6 @@ const src = (rel) => Deno.readTextFileSync(new URL(`../../supabase/functions/pre
     /from '\.\.\/enterprise\/store\.ts'/.test(routes) && /saveOrgOperation/.test(routes) && /decideOrgOperation/.test(routes));
   ok('no-dup: the approval queue is drawn from the Approved-Plan tables (every change is a plan)',
     /presence_connection_writes/.test(routes) && /presence_infra_plans/.test(routes) && /presence_org_operations/.test(routes));
-  ok('no-dup: permissions COMPOSE over the existing capability table (no second role system)',
-    /from '\.\/auth\.ts'/.test(src('agency/permissions.ts')) && /can\(/.test(src('agency/permissions.ts')));
 }
 
 // ═══ 6. APPROVED-PLAN SPINE — every agency state change goes through it ═══
@@ -85,14 +52,6 @@ const src = (rel) => Deno.readTextFileSync(new URL(`../../supabase/functions/pre
     /approve_plans/.test(routes) && /decideOrgOperation/.test(routes));
   // the enterprise store (which the agency calls) reuses the frozen spine
   ok('spine: the store the agency calls reuses claimApprovedPlan', /claimApprovedPlan/.test(src('enterprise/store.ts')));
-}
-
-// ═══ 7. SECURITY — deny by default + no scope escape ═══
-{
-  const nobody = { role: 'readonly', scope: FULL_SCOPE };
-  ok('security: deny by default — read-only cannot approve, manage, or publish', !authorize(nobody, 'org_manage') && !authorize(nobody, 'pack_approve') && !authorize(nobody, 'publish'));
-  const scoped = { role: 'admin', scope: scopeOrg('org-1') };  // even an admin, scoped, is bounded
-  ok('security: a scoped admin cannot act outside its scope, even with a powerful role', authorize(scoped, 'org_manage', { orgId: 'org-1' }) && !authorize(scoped, 'org_manage', { orgId: 'org-2' }));
 }
 
 // ═══ 8. PERFORMANCE — 100 orgs / 10,000 locations ═══

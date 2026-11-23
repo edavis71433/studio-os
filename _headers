@@ -37,6 +37,11 @@
 /*.css
   Cache-Control: public, max-age=86400
 
+# Builder item 400: which commit the live pages were built from (scripts/build-public.sh
+# writes it, the release reads it). Never kept, so a release reads the pages as they are.
+/version.json
+  Cache-Control: no-store
+
 # Updated Sun Jun 21 14:58:53 UTC 2026
 
 /studio.html

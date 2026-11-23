@@ -70,6 +70,13 @@ for d in life case-studies vendor fonts thumbs; do
   [ -d "$d" ] && cp -r "$d" "$OUT"/
 done
 
+# Builder item 400: which commit these pages were built from. The release reads it to know
+# its pages went live (scripts/pages-live.sh); _headers keeps it from being cached. Netlify
+# names the commit in COMMIT_REF; a local build asks git.
+commit="${COMMIT_REF:-$(git rev-parse HEAD 2>/dev/null || true)}"
+case "$commit" in *[!0-9a-f]*|'') commit=unknown ;; esac
+printf '{"commit":"%s"}\n' "$commit" > "$OUT/version.json"
+
 echo "build-public: $(find "$OUT" -type f | wc -l) files staged"
 
 # Builder item 142 (review file 06, finding 3): pack the code down and give the app's scripts

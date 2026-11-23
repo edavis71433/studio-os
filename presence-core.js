@@ -5895,7 +5895,7 @@ async function loadRitual(toSchedule) {
       c.changes.forEach((ch) => {
         const row = el("div", "jrow");
         row.appendChild(el("span", "jsec", hbCap(sectionWord(ch.section))));
-        row.appendChild(el("span", null, ch.sentence));
+        row.appendChild(el("span", null, forClient && window.ddsTheirVoice ? window.ddsTheirVoice(ch.sentence) : ch.sentence));   // item 369: "Their website goes live", beside the studio's title
         j.appendChild(row);
       });
       body.appendChild(j);
@@ -5962,7 +5962,7 @@ async function runPublish(btn, firstPublish) {
       $("ritBlockers").innerHTML = `<p class="blockprose">${(err.body.fields || []).map((f) => esc(typeof f === "string" ? f : f.message || "")).join("<br>")}</p>`;
     }
     $("ritActions").innerHTML = "";
-    if (code !== "site_paused" && code !== "lifecycle_blocked") {
+    if (code !== "site_paused" && code !== "lifecycle_blocked" && code !== "host_out_of_credits") {   // item 358: credits come first
       const retry = el("button", "pubbtn", code === "stale_draft" ? "Take another look" : "Try again");
       retry.addEventListener("click", () => loadRitual());
       const wait = code === "cooldown" ? Math.min(120, Math.max(1, Number(err.body.retry_after) || 60)) : 0;

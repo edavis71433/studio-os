@@ -1,0 +1,52 @@
+name: Publish journey (nightly, switched off)
+
+# Builder item 421: the journeys that publish, take offline and clean up a site never run
+# against anything real; every other test talks to a pretend server or a scratch database
+# with no hosting. This one publishes a throwaway site for real, to a SEPARATE Netlify
+# test team (never the studio's own team, never a client's site), checks the site
+# answers with its own words, takes it offline, checks the holding page, and deletes the
+# test site again (scripts/publish-journey.sh says each step).
+#
+# SWITCHED OFF until Eric agrees to its cost. Each run is one production deploy on the
+# test team (two with the offline page), 15 credits each: nightly that is about 900
+# credits a month, more than a free team's 300, so it needs a paid team or a weekly
+# schedule. To switch it on (Eric):
+#   1. Netlify: make a team just for tests, and a personal access token that can reach it.
+#   2. GitHub, Settings, Secrets and variables, Actions: the secret NETLIFY_TEST_TOKEN.
+#   3. Here: remove the # in front of the two schedule lines below (weekly: "47 10 * * 0").
+# Until then it runs only by hand, and refuses without the secret. Not yet run: its first
+# run is its own test.
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: "47 10 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-journey
+  cancel-in-progress: false
+
+env:
+  SUPABASE_CLI_VERSION: "2.122.0"
+
+jobs:
+  journey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Refuse without the test team's token
+        env:
+          NETLIFY_TEST_TOKEN: ${{ secrets.NETLIFY_TEST_TOKEN }}
+        run: |
+          [ -n "$NETLIFY_TEST_TOKEN" ] || { echo "::error title=Publish journey::The repository secret NETLIFY_TEST_TOKEN (a token for a separate Netlify test team) isn't set. Nothing was published."; exit 1; }
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: "2.9.1"
+      - name: Publish a throwaway site, check it is up, take it offline, delete it
+        env:
+          NETLIFY_TEST_TOKEN: ${{ secrets.NETLIFY_TEST_TOKEN }}
+        run: bash scripts/publish-journey.sh

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, ALL_FEATURES, STUDIO_LEVEL_NAV } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Sales item 83 (Nov 2026): a deleted deal can be brought back. Deleting it asks in place (never
 // a pop-up) and offers Undo, which brings it straight back.
@@ -75,7 +76,7 @@ const DELETED = { data: {
 test.describe('The Recently deleted page (item 83)', () => {
   test('lists what was deleted, newest first; the chips narrow it; Restore brings each back and says where', async ({ page }) => {
     const sent: Sent[] = [];
-    await page.clock.setFixedTime(new Date(NOW));
+    await pinClock(page, NOW);
     await installApp(page, { api: { '/portal/context': STUDIO_CTX, '/sales/deleted': DELETED } });
     await page.route((u) => /\/sales\/(deals\/[^/]+\/restore|contacts\/[^/]+\/restore|deal-tasks\/[^/]+)$/.test(u.pathname), (route) => {
       const r = route.request();

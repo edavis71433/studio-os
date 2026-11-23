@@ -27,9 +27,11 @@
 --     the Google app; each site without a connection is skipped)
 --   presence_ga4_sync   30 7 * * *     GA4, daily, offset from the Search
 --     Console job; owner-gated the same way
---   presence-keep-awake */4 * * * *    builder item 404: a tiny call that touches
+--   presence-keep-awake * * * * *      builder item 404: a tiny call that touches
 --     nothing (task 'ping'), asking for Oregon, so the worker the next person meets
---     is awake. About 10,800 calls a month against the 2 million the plan includes.
+--     is awake. Every minute since Nov 22 2026 (at */4 every ping met a new worker; at
+--     one minute the same worker answers 3 to 5 pings running). About 43,000 calls a
+--     month against the 2 million the plan includes.
 -- Not scheduled (Eric, Nov 8 2026): the hourly failure retry (task 'retry')
 -- and the weekly coach sweep (task 'coach'). /system/run still accepts both,
 -- and the next 15-minute tick runs a failed site again anyway.
@@ -78,7 +80,7 @@ begin
   $job$);
 
   -- builder item 404: keep a worker awake beside the database; the call touches nothing
-  perform cron.schedule('presence-keep-awake', '*/4 * * * *', $job$
+  perform cron.schedule('presence-keep-awake', '* * * * *', $job$
     select net.http_post(
       url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/presence/system/run',
       headers := '{"Content-Type":"application/json","x-region":"us-west-2"}'::jsonb,

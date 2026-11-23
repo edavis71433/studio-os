@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp } from './helpers/app';
+import { pinClock } from './helpers/clock';
 import { headerAction } from './helpers/page-header';
 
 // Builder list item 175 (Nov 2026), borrowed from Squarespace. Analytics keeps its four
@@ -30,7 +31,7 @@ const MONTH = dash('this_month', { start: '2026-07-01T00:00:00.000Z', end: NOW, 
 const LAST_MONTH = dash('last_month', { start: '2026-06-01T00:00:00.000Z', end: '2026-07-01T00:00:00.000Z', closed: true }, 999);
 
 async function open(page: Page, seen: URL[] = []) {
-  await page.clock.setFixedTime(new Date(NOW));
+  await pinClock(page, NOW);
   await installApp(page, { api: { '/analytics/dashboard': MONTH } });
   await page.route('**/functions/v1/presence/analytics/dashboard**', (route) => {
     const u = new URL(route.request().url());

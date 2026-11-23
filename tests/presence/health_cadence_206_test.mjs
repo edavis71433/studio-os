@@ -6,6 +6,7 @@
 // ticks is played against a stand-in database: one check a site a day, another after a
 // publish, a failed check tried again in an hour, and the sweep clearing 30-day-old
 // history in bites. Also finding 82: the batch reads name the site. No Supabase is touched.
+import { pinClock } from './clock.mjs';
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY' })) Deno.env.set(k, v);
 
 const results = [];
@@ -19,8 +20,9 @@ const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-2
 const CLIENT = '44444444-4444-4444-8444-444444444444';
 const MIN = 60_000, HOUR = 60 * MIN, DAY = 24 * HOUR;
 let now = Date.parse('2026-11-12T03:15:00Z');
-const realNow = Date.now, realFetch = globalThis.fetch;
-Date.now = () => now;
+const realFetch = globalThis.fetch;
+let unpin = pinClock(now);
+const later = (ms) => { unpin(); now += ms; unpin = pinClock(now); };   // the clock moves only when a check says so
 const world = { sites: [], checks: [], failEvidenceFor: new Set(), seen: [], rpc: {} };
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 globalThis.fetch = async (input, init = {}) => {
@@ -65,12 +67,12 @@ const checksOf = (id) => world.checks.filter((c) => c.site === id).length;
 // ── 1. a day of 15-minute ticks: one check a site ──
 {
   world.sites = [site(A), site(B), site(C)];
-  for (let t = 0; t < 96; t++) { await S.runOperationsCycle({}); now += 15 * MIN; }
+  for (let t = 0; t < 96; t++) { await S.runOperationsCycle({}); later(15 * MIN); }
   eq('a day of ticks: each site is checked once, not 96 times', [checksOf(A), checksOf(B), checksOf(C)], [1, 1, 1]);
   const first = world.checks.find((c) => c.site === A).at;
   await S.runOperationsCycle({});   // the same time the next day
   eq('the next day: checked again, at the same tick as the day before', [checksOf(A), world.checks.filter((c) => c.site === A)[1].at - first], [2, DAY]);
-  for (let t = 0; t < 96 * 6; t++) { now += 15 * MIN; await S.runOperationsCycle({}); }
+  for (let t = 0; t < 96 * 6; t++) { later(15 * MIN); await S.runOperationsCycle({}); }
   eq('a week of ticks: one check a site a day', [checksOf(A), checksOf(B), checksOf(C)], [8, 8, 8]);
   const days = new Set(world.checks.filter((c) => c.site === A).map((c) => new Date(c.at).toISOString().slice(0, 10)));
   eq('every day has its check, so the trend line has a point for every day', days.size, 8);
@@ -79,14 +81,14 @@ const checksOf = (id) => world.checks.filter((c) => c.site === id).length;
 // ── 2. a publish: checked again at the next tick ──
 {
   const before = checksOf(B);
-  now += 3 * HOUR;
+  later(3 * HOUR);
   await S.runOperationsCycle({});
   eq('three hours after its check, nothing is due', checksOf(B), before);
   await K.checkSoon(B);
   eq('a publish empties the site\'s mark', world.sites.find((s) => s.id === B).last_observed_at, null);
-  now += 15 * MIN; await S.runOperationsCycle({});
+  later(15 * MIN); await S.runOperationsCycle({});
   eq('the next tick checks the published site, and only that one', [checksOf(B), checksOf(A), checksOf(C)], [before + 1, 8, 8]);
-  now += 15 * MIN; await S.runOperationsCycle({});
+  later(15 * MIN); await S.runOperationsCycle({});
   eq('and not again on the tick after', checksOf(B), before + 1);
   const pub = read(`${P}/routes/publish.ts`);
   ok('a publish that goes live asks for the check', /if \(live\) await checkSoon\(site\.id\);/.test(pub));
@@ -96,7 +98,7 @@ const checksOf = (id) => world.checks.filter((c) => c.site === id).length;
 // ── 3. a failed check is tried again in an hour, not a day later and not every tick ──
 {
   world.sites = [site(A)]; world.checks = []; world.failEvidenceFor = new Set([A]);
-  for (let t = 0; t < 8; t++) { await S.runOperationsCycle({}); now += 15 * MIN; }   // two hours
+  for (let t = 0; t < 8; t++) { await S.runOperationsCycle({}); later(15 * MIN); }   // two hours
   eq('a failing site: tried once an hour', checksOf(A), 2);
   world.failEvidenceFor = new Set();
   const before = checksOf(A);
@@ -146,7 +148,7 @@ const checksOf = (id) => world.checks.filter((c) => c.site === id).length;
   ok('no read of either table by batch alone is left', ![rec, mom, adm].some((s) => /presence_(judgments|recommendations)\?batch_id=/.test(s)));
 }
 
-Date.now = realNow; globalThis.fetch = realFetch;
+unpin(); globalThis.fetch = realFetch;
 const failed = results.filter((r) => !r.p).length;
 console.log(`health_cadence_206: ${results.length - failed} passed, ${failed} failed`);
 if (failed) Deno.exit(1);
