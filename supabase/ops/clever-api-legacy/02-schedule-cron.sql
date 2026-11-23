@@ -1,3 +1,8 @@
+-- RETIRED (builder item 392, Nov 22 2026): the old server no longer answers
+-- run_scheduled_jobs, so a job made from this file would only be refused. On production
+-- the job (cron job 5, nightly-data-sync) is switched off and listed for deletion:
+--   select cron.unschedule('nightly-data-sync');
+-- Kept as a record of what the job did. Don't run it.
 -- LEGACY (clever-api daily scheduler). The LIVE scheduler is the presence
 -- 15-min pg_cron tick: see supabase/ops/schedule-presence-cron.sql and
 -- docs/presence/OPERATIONS.md. Kept for the clever-api surfaces it still

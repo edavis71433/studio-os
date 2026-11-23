@@ -14,6 +14,7 @@
 // retention sweep clears the old days. An enquiry's acknowledgement and a list's
 // confirmation are optional, so when the count can't be read nothing is sent; a
 // booking's confirmation is the customer's own appointment, so it goes (failOpen).
+import { linkKey } from '../../_shared/link_keys.ts';
 import { svc } from './db.ts';
 import { suppressionOf } from '../../_shared/email_infra.ts';
 import { normEmail } from './contact_email.ts';
@@ -32,7 +33,7 @@ export function dayWindow(nowMs: number): string {
   return new Date(Math.floor(nowMs / DAY_MS) * DAY_MS).toISOString();
 }
 
-const saltKey = () => Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'salt';
+const saltKey = () => linkKey('address_hash') || 'salt';   // builder item 394: its own key, never the scheduler's secret
 
 /** The count's key for one kind of reply to one address on one site: a salted hash, never the address. */
 export async function autoReplyBucket(kind: AutoReplyKind, siteId: string, email: string, salt = saltKey()): Promise<string> {

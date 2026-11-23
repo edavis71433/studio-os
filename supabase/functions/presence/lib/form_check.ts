@@ -16,6 +16,7 @@
 // Nothing is thrown away: the Inbox's enquiries have a Spam filter with Not spam.
 // The ticket check starts for a site at its first publish with this code, since only
 // then do its pages carry the sender that asks for tickets: older live pages lose nothing.
+import { linkKey, signedWithAny } from '../../_shared/link_keys.ts';   // builder item 394: each kind of link has its own key
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { readReservedJson, updateReservedJson, RESERVED_NAMES } from './reserved_store.ts';
 
@@ -23,7 +24,9 @@ import { readReservedJson, updateReservedJson, RESERVED_NAMES } from './reserved
 export const TICKET_MIN_AGE_S = 3;
 /** And one older than this is stale: the page asks again after 11 hours. */
 export const TICKET_MAX_AGE_S = 24 * 3600;
-const signingKey = () => Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
+// builder item 394: a ticket and a "This was spam" link each have their own key
+const signingKey = () => linkKey('form_ticket');
+const spamKey = () => linkKey('spam_link');
 /** Without a signing key no ticket can be issued, so none is asked for. */
 export const ticketsOn = (): boolean => !!signingKey();
 
@@ -40,7 +43,7 @@ export async function readTicket(ticket: unknown, siteId: string, nowSec: number
   const m = /^(\d{9,11})\.([0-9a-f]{32})$/.exec(t);
   if (!m || !key) return 'bad';
   const issued = Number(m[1]);
-  if (!timingSafeEqual(m[2], (await hmacHex(key, `form-ticket|${siteId}|${issued}`)).slice(0, 32))) return 'bad';
+  if (!(await signedWithAny('form_ticket', key, async (k) => timingSafeEqual(m[2], (await hmacHex(k, `form-ticket|${siteId}|${issued}`)).slice(0, 32))))) return 'bad';
   const age = nowSec - issued;
   if (age < TICKET_MIN_AGE_S) return 'too_fast';
   return age > TICKET_MAX_AGE_S ? 'stale' : 'ok';
@@ -125,14 +128,14 @@ export async function judgeSend(siteId: string, s: { trap: boolean; ticket: unkn
 export const SPAM_LINK_DAYS = 60;
 const b64u = (s: string) => btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64u = (s: string) => { try { return atob(s.replace(/-/g, '+').replace(/_/g, '/')); } catch { return ''; } };
-export async function spamLinkToken(siteId: string, submissionId: string, nowSec = Math.floor(Date.now() / 1000), key = signingKey()): Promise<string> {
+export async function spamLinkToken(siteId: string, submissionId: string, nowSec = Math.floor(Date.now() / 1000), key = spamKey()): Promise<string> {
   if (!key) return '';
   const body = b64u(JSON.stringify({ s: siteId, f: submissionId, e: nowSec + SPAM_LINK_DAYS * 86400 }));
   return `${body}.${(await hmacHex(key, `spam-link|${body}`)).slice(0, 40)}`;
 }
-export async function readSpamLinkToken(token: unknown, nowSec = Math.floor(Date.now() / 1000), key = signingKey()): Promise<{ siteId: string; submissionId: string } | 'expired' | null> {
+export async function readSpamLinkToken(token: unknown, nowSec = Math.floor(Date.now() / 1000), key = spamKey()): Promise<{ siteId: string; submissionId: string } | 'expired' | null> {
   const m = /^([A-Za-z0-9_-]{10,400})\.([0-9a-f]{40})$/.exec(String(token ?? '').trim());
-  if (!m || !key || !timingSafeEqual(m[2], (await hmacHex(key, `spam-link|${m[1]}`)).slice(0, 40))) return null;
+  if (!m || !key || !(await signedWithAny('spam_link', key, async (k) => timingSafeEqual(m[2], (await hmacHex(k, `spam-link|${m[1]}`)).slice(0, 40))))) return null;
   let p: { s?: unknown; f?: unknown; e?: unknown };
   try { p = JSON.parse(unb64u(m[1])); } catch { return null; }
   const uuid = /^[0-9a-f-]{36}$/;

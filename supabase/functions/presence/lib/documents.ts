@@ -16,6 +16,7 @@
 // the same lib/email_brand.ts path the emails use (name + contrast-safe accent);
 // line-item math reuses lib/sales_lifecycle.ts so the document can never disagree
 // with the proposal it renders. Escaping reuses lib/markdown.ts `esc`.
+import { signedWithAny } from '../../_shared/link_keys.ts';   // builder item 394: links signed before still open
 import { esc } from './markdown.ts';
 import { splitLineItems, computeProposalTotals, subtotalOf, type LineItem } from './sales_lifecycle.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
@@ -48,7 +49,7 @@ export async function signDocToken(payload: DocTokenPayload, secret: string): Pr
 export async function readDocToken(token: string, secret: string): Promise<DocTokenPayload | null> {
   const parts = String(token || '').split('.');
   if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
-  if (!timingSafeEqual(parts[1], await hmacHex(secret, parts[0]))) return null;
+  if (!(await signedWithAny('sales', secret, async (k) => timingSafeEqual(parts[1], await hmacHex(k, parts[0]))))) return null;   // item 394
   let p: any; try { p = JSON.parse(unb64url(parts[0])); } catch { return null; }
   if (!p || p.t !== 'doc' || !isKind(p.k) || !UUID_RE.test(p.id || '') || !UUID_RE.test(p.site_id || '') || typeof p.exp !== 'number') return null;
   return p as DocTokenPayload;

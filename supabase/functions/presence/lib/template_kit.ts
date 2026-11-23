@@ -24,6 +24,8 @@ import { searchBoxHtml, searchPageBody, searchClientScript, searchIndexJson, nor
 import { postListBody, postPageBody, postLd, postCategories, categoryPath, postPageCount, postListPath, POST_CSS, type PostDraw } from './post_render.ts';
 import { contactPlace, footerPlace, ldPlaces, PLACE_CSS } from './place_render.ts';
 import { SHELL_CSS, SHELL_CRITICAL, SHELL_NOSCRIPT, MENU_JS, menuButtonHtml } from './site_shell.ts';
+import { isNewOpening, openingCss, PANEL_LEFT_CSS, type OpeningKind } from './template_openings.ts';
+import { HERO_CARD_CSS, TODAY_JS } from './hero_cards.ts';
 
 /** The site's script file: the phone menu (lib/site_shell.ts) and the gallery and carousel (lib/site_blocks.ts). */
 export const SITE_JS = `${MENU_JS}\n${BLOCK_JS}`;
@@ -329,8 +331,9 @@ ${o.body}
   </div>
   <div class="credit"><span>© ${esc(i.business_name)}</span><span>${legalFooterLinks()}</span>${credit}</div>
 </div></footer>
-${o.body.includes('id="open-now"') ? `<script id="hours-data" type="application/json">${loc0(c) ? hoursData(c).replaceAll('<', '\\u003c') : '{}'}</script>
+${o.body.includes('id="open-now"') || o.body.includes('id="hc_today"') ? `<script id="hours-data" type="application/json">${loc0(c) ? hoursData(c).replaceAll('<', '\\u003c') : '{}'}</script>
 <script>${OPEN_NOW_JS}</script>
+` : ''}${o.body.includes('id="hc_today"') ? `<script>${TODAY_JS}</script>
 ` : ''}<script src="${attr(jsPath)}" defer></script>
 </body>
 </html>`;
@@ -411,6 +414,168 @@ function heroPanel(c: SnapshotContent, v: IndustryVocab): string {
   return rows ? `<aside class="hero-panel" aria-label="At a glance"><p class="hp-title">At a glance</p>${rows}</aside>` : '';
 }
 
+/** The welcome photo: the owner's cover first, then the first offering or update photo. A logo
+ *  never stands in for it. */
+const welcomePhoto = (c: SnapshotContent): MediaRef | null =>
+  c.settings?.cover || bySort(c.offerings).find((o) => o.media)?.media || c.posts.find((p) => p.hero)?.hero || null;
+
+// ═════════ a card on the welcome photo (lib/hero_cards.ts), for the openings per kind of business ═════════
+// The style setting hero_card: 'estimate', a short form that asks for an estimate, or 'today',
+// today's hours with the booking button and the ordering link. Drawn only over a welcome photo the
+// home page shows ("Words over the photo", dark or light), and a 'today' card only with hours, a
+// booking link or an ordering link to show. Its ids carry an underscore, which no section's link
+// name or heading id can (lib/section_links.ts), so nothing on the page shares them.
+export type HeroCardKind = 'estimate' | 'today';
+/** The card a site asked for, as it can be drawn, or null. Pure. */
+export function heroCardOf(c: SnapshotContent, tokens: Record<string, string> | null | undefined): HeroCardKind | null {
+  const want = tokens?.hero_card;
+  if (want !== 'estimate' && want !== 'today') return null;
+  const layout = c.settings?.hero_layout;
+  if ((layout !== 'photo' && layout !== 'photo-light') || !welcomePhoto(c)?.variants) return null;
+  if (new Set(c.settings?.sections?.hidden || []).has('hero')) return null;
+  if (want === 'today' && !todayHours(c) && !safeHref(c.identity.booking_url || '') && !safeHref(c.identity.ordering_url || '')) return null;
+  return want;
+}
+/** Each day's line and each holiday's, every one hidden until the page's script shows today's
+ *  (lib/hero_cards.ts TODAY_JS); '' for a site with no opening hours. */
+function todayHours(c: SnapshotContent): string {
+  const l = loc0(c);
+  if (!l || !(l.hours || []).some((d) => !d.closed && (d.intervals || []).length > 0)) return '';
+  const span = (iv: Array<{ open: string; close: string }> | undefined) => (iv || []).map((i) => `${fmtTime(i.open)} to ${fmtTime(i.close)}`).join(' and ');
+  const byDay = new Map(l.hours.map((d) => [d.day, d]));
+  const days = ORDER.map((k) => {
+    const d = byDay.get(k) as HoursDay | undefined;
+    return `<p class="hc-when" data-day="${k}" hidden>${!d || d.closed || !d.intervals?.length ? 'Closed today' : `Open ${esc(span(d.intervals))}`}</p>`;
+  }).join('');
+  const holidays = (l.holiday_exceptions || []).map((e: HolidayException) =>
+    `<p class="hc-when" data-date="${attr(e.date)}" hidden>${e.label ? `${esc(e.label)}: ` : ''}${e.closed || !(e.intervals || []).length ? 'closed today' : `open ${esc(span(e.intervals))}`}</p>`).join('');
+  return days + holidays;
+}
+function heroCard(kind: HeroCardKind, c: SnapshotContent, v: IndustryVocab, site: SiteConfig): string {
+  if (kind === 'estimate') {
+    // the Contact page's form address, spam check and inbox; a quote request, with one box for a phone or an email
+    const action = site.formEndpoint ? ` action="${attr(site.formEndpoint)}"` : '';
+    return `<aside class="hero-card hc-estimate" aria-labelledby="hc_h"><h2 class="hc-h" id="hc_h">Get an estimate</h2>`
+      + '<p class="hc-sub">Tell us what you need and we’ll get back to you.</p>'
+      + `<form class="hc-form" method="post"${action}><input type="hidden" name="form_kind" value="quote"><input type="hidden" name="source_page" value="/">`
+      + '<p class="hp" aria-hidden="true"><label for="hc_hp">Leave this field empty</label><input id="hc_hp" name="_hp" tabindex="-1" autocomplete="off"></p>'
+      + '<p><label for="hc_name">Your name</label><input id="hc_name" name="name" required maxlength="120" autocomplete="name"></p>'
+      + '<p><label for="hc_contact">Phone or email</label><input id="hc_contact" name="contact" required maxlength="254"></p>'
+      + '<p><label for="hc_msg">What do you need done?</label><textarea id="hc_msg" name="message" rows="3" maxlength="2000"></textarea></p>'
+      + '<button class="btn" type="submit">Send</button><noscript><p class="hc-note">Please call or email us; this form needs scripts turned on.</p></noscript></form></aside>';
+  }
+  const hours = todayHours(c), book = safeHref(c.identity.booking_url || ''), order = safeHref(c.identity.ordering_url || '');
+  return `<aside class="hero-card hc-today" aria-labelledby="hc_h"><h2 class="hc-h" id="hc_h">Today</h2>`
+    + (hours ? `<div class="hc-days" id="hc_today">${hours}</div><p class="hc-all"><a href="/contact/">See all hours</a></p>` : '')
+    + (book ? `<p class="hc-go"><a class="btn" href="${attr(book)}" rel="noopener">${esc(v.primaryAction)}</a></p>` : '')
+    + (order ? `<p class="hc-go"><a class="hc-link" href="${attr(order)}" rel="noopener">Order online <span aria-hidden="true">→</span></a></p>` : '')
+    + '</aside>';
+}
+
+// ═════════ the three openings builder item 330 adds (lib/template_openings.ts) ═════════
+// 'panel': two halves, the words on a soft tint of the accent, the photo running to the
+// page's edge (a phone shows the words first, then the photo). 'editorial': a big centred
+// headline and line, the buttons, then up to three photos in a row. 'type': big words on a
+// band of the accent with a row of facts. In all three the headline is the tagline when there
+// is one (the business name stays in the header and the page title), else the name; the line
+// under it is the short description. 'panel' and 'editorial' need a photo: without one they
+// open as 'type', so no empty photo box is ever drawn. Every fact is one the site really has:
+// the places it serves, its phone, today's open-or-closed line (the strip's own script fills
+// it) and, when the home page shows its reviews, their average and count. Nothing is made up.
+
+export interface Opening { kind: OpeningKind; photos: MediaRef[] }
+/** How an opening sits (two style settings): the colour panel's photo on the left, Type only on the page. */
+interface OpeningSides { left: boolean; page: boolean }
+const NO_SIDES: OpeningSides = { left: false, page: false };
+const drawable = (m: MediaRef | null | undefined): m is MediaRef =>
+  !!m && !!m.variants && !!(m.variants.w800 || m.variants.w400 || Object.values(m.variants)[0]);
+
+/** The opening a site asked for, as it can be drawn: its photos (the cover, then the offerings'
+ *  and the updates' photos, each once, three at most). Null for every other layout. Pure. */
+export function openingOf(c: SnapshotContent): Opening | null {
+  const want = c.settings?.hero_layout;
+  if (!isNewOpening(want)) return null;
+  const photos: MediaRef[] = [], seen = new Set<string>();
+  for (const m of [c.settings?.cover, ...bySort(c.offerings).map((o) => o.media), ...c.posts.map((p) => p.hero)]) {
+    if (!drawable(m)) continue;
+    const key = String(m.variants.w800 || m.variants.w400 || Object.values(m.variants)[0]);
+    if (seen.has(key)) continue;
+    seen.add(key); photos.push(m);
+    if (photos.length === 3) break;
+  }
+  if (want === 'panel' && photos.length) return { kind: 'panel', photos: photos.slice(0, 1) };
+  if (want === 'editorial' && photos.length) return { kind: 'editorial', photos };
+  return { kind: 'type', photos: [] };
+}
+
+/** The welcome section of a new opening, and the strip under it (which leaves out what the
+ *  opening already shows: the open-or-closed line, and the phone in 'type'). */
+function openingWelcome(op: Opening, c: SnapshotContent, v: IndustryVocab, words: Words, blocks: RenderedBlock[], strip: string, showMail: boolean, sides: OpeningSides = NO_SIDES): { welcome: string; strip: string } {
+  const i = c.identity, l = loc0(c);
+  const { tel, mail } = contactBits(c);
+  const maps = mapsHref(c);
+  const tagline = (i.tagline || '').trim();
+  const headline = tagline || i.business_name;
+  const h1 = `<h1${[...headline].length > 60 ? ' class="op-long"' : ''}${pr(tagline ? 'identity.tagline' : 'identity.business_name')}>${esc(headline)}</h1>`;
+  const short = (i.short_description || '').trim();
+  const line = short ? `<p class="op-line"${pr('identity.short_description')}>${esc(short)}</p>` : '';
+  const area = (i.service_area || '').trim();
+  const kicker = area ? `<p class="kicker"${pr('identity.service_area')}>${esc(area)}</p>` : '';
+  const book = safeHref(i.booking_url || ''), order = safeHref(i.ordering_url || '');
+  const ctas = `<div class="cta-row">${[
+    book ? `<a class="btn" href="${attr(book)}" rel="noopener">${esc(v.primaryAction)}</a>` : '',
+    order ? `<a class="btn${book ? ' ghost' : ''}" href="${attr(order)}" rel="noopener">Order online</a>` : '',
+    !book && !order ? `<a class="btn" href="${attr(v.offeringPath)}">${esc(words.seeOfferings(v.offeringLabel))}</a>` : '',
+    book || order ? '<a class="btn ghost" href="/contact/">Contact us</a>' : '',
+  ].join('')}</div>`;
+  // today's open-or-closed line: only for a site with opening hours, and only in one place on the page
+  const hours = !!l && (l.hours || []).some((d) => !d.closed && (d.intervals || []).length > 0);
+  const openNow = '<span id="open-now" class="open-now" aria-live="polite"></span>';
+  // the reviews: only when the home page shows its reviews wall, the honest average and count of the approved ones
+  const wall = blocks.find((b) => b.type === 'reviews_wall');
+  const agg = wall && homeSectionOrder(c, blocks.map((b) => b.key)).includes(wall.key)
+    ? ((c.settings?.blocks || []).find((b) => b.type === 'reviews_wall') as { aggregate?: { count?: unknown; average?: unknown } } | undefined)?.aggregate : undefined;
+  const count = Math.trunc(Number(agg?.count)), average = Number(agg?.average);
+  const rated = count >= 1 && Number.isFinite(average) && average > 0 && average <= 5;
+  const avg = rated ? (average % 1 === 0 ? String(average) : average.toFixed(1)) : '';
+  const fromReviews = `out of 5 from ${count} review${count === 1 ? '' : 's'}`;
+  const stripOf = (withTel: boolean) => {
+    const items = [
+      l && !goesOut(c) && l.address_line1 ? `<span${pr('location.address')}>${esc(l.address_line1)}${l.city ? `, ${esc(l.city)}` : ''}</span>` : '',
+      withTel && tel ? `<span>${tel}</span>` : '',
+      showMail && mail ? `<span>${mail}</span>` : '',
+      maps ? `<span><a href="${attr(maps)}" rel="noopener">Get directions</a></span>` : '',
+    ].filter(Boolean);
+    return items.length ? `<div class="strip"><div class="wrap">${items.join('')}</div></div>` : '';
+  };
+  const core = 'data-dds-core="hero" data-dds-movable';
+  if (op.kind === 'panel') {
+    const proof = [rated ? `<span><span aria-hidden="true">★ </span>${esc(avg)} ${fromReviews}</span>` : '', hours ? openNow : ''].join('');
+    return {
+      welcome: `<section class="hero op op-panel${sides.left ? ' op-left' : ''}" ${core}><div class="op-words"><div class="op-in">${kicker}${h1}${line}${ctas}${proof ? `<p class="op-proof">${proof}</p>` : ''}</div></div><div class="op-photo">${img(op.photos[0], '(max-width:760px) 100vw, 50vw', false, '', true)}</div></section>`,
+      strip: stripOf(true),
+    };
+  }
+  if (op.kind === 'editorial') {
+    const n = op.photos.length;
+    const sizes = (k: number) => n === 1 ? '(max-width:1100px) 100vw, 1080px' : n === 2 ? '(max-width:640px) 50vw, 540px' : k === 0 ? '(max-width:640px) 100vw, 360px' : '(max-width:640px) 50vw, 360px';
+    const photos = op.photos.map((m, k) => `<div class="op-ph">${img(m, sizes(k), k > 0, '', true)}</div>`).join('');
+    return { welcome: `<section class="hero op op-editorial" ${core}><div class="wrap op-words">${kicker}${h1}${line}${ctas}</div><div class="wrap op-photos n${n}">${photos}</div></section>`, strip };
+  }
+  // 'type': the places it serves sit in the facts, so there is no line above the headline
+  const fact = (big: string, label: string, region = '', small = false) => `<li class="op-fact"${region}><span class="op-big${small ? ' op-s' : ''}">${big}</span><span class="op-lb">${label}</span></li>`;
+  const facts = [
+    rated ? fact(esc(avg), fromReviews) : '',
+    hours ? fact(openNow, '<a href="/contact/">See all hours</a>') : '',
+    tel ? fact(tel, 'Call us') : '',
+    area ? fact(esc(area), 'Places we serve', pr('identity.service_area'), [...area].length > 22) : '',
+  ].join('');
+  return {
+    welcome: `<section class="hero op op-type${sides.page ? ' op-page' : ''}" ${core}><div class="wrap op-words">${h1}${line}${ctas}${facts ? `<ul class="op-facts">${facts}</ul>` : ''}</div></section>`,
+    strip: stripOf(false),
+  };
+}
+
 // Phase CP-2 (DS-2): home sections — owner-chosen order + visibility, structured.
 // Phase T-BLOCKS: enabled structured blocks (block_<type>) join the same order/
 // visibility machinery — they default after the core sections, reorderable/hideable.
@@ -427,12 +592,12 @@ export function homeSectionOrder(c: SnapshotContent, blockKeys: string[] = []): 
   return [...lead, ...chosen, ...rest].filter((k) => !hidden.has(k));
 }
 
-function homeBody(look: TemplateLook, c: SnapshotContent, v: IndustryVocab, words: Words, blocks: RenderedBlock[] = []): string {
+function homeBody(look: TemplateLook, c: SnapshotContent, v: IndustryVocab, words: Words, blocks: RenderedBlock[] = [], op: Opening | null = null, card = '', sides: OpeningSides = NO_SIDES): string {
   const i = c.identity;
   const panel = look.hero === 'panel', plain = !!look.classic?.plainWelcome;
   // The welcome photo: the owner's cover first, then the first offering or update photo.
   // A logo never stands in for it.
-  const hero = c.settings?.cover || bySort(c.offerings).find((o) => o.media)?.media || c.posts.find((p) => p.hero)?.hero || null;
+  const hero = welcomePhoto(c);
   const featured = bySort(c.offerings).slice(0, 6);
   const tst = bySort(c.testimonials).slice(0, 3);
   const faqs = bySort(c.faqs).slice(0, 4);
@@ -472,8 +637,13 @@ function homeBody(look: TemplateLook, c: SnapshotContent, v: IndustryVocab, word
 </div></div>` : '';
   const photoSizes = look.classic?.heroPhotoSizes || '(max-width: 1000px) 100vw, 960px';
   let welcome: string;
-  if (usePhoto) {
-    welcome = `<section class="hero hero-photo ${photoVeil}" data-dds-core="hero" data-dds-movable><div class="hero-bg" aria-hidden="true">${img(hero, '100vw', false, '', true)}</div><div class="wrap hero-copy">${heroText}</div>
+  let heroStrip = strip;   // item 330: a new opening keeps what it shows itself out of the strip under it
+  if (op) {
+    ({ welcome, strip: heroStrip } = openingWelcome(op, c, v, words, blocks, strip, showMail, sides));
+  } else if (usePhoto) {
+    // the openings per kind of business: a card beside the words (heroCard); without one, as before
+    const copy = card ? `<div class="wrap hero-copy hc-with"><div class="hc-words">${heroText}</div>${card}</div>` : `<div class="wrap hero-copy">${heroText}</div>`;
+    welcome = `<section class="hero hero-photo ${photoVeil}" data-dds-core="hero" data-dds-movable><div class="hero-bg" aria-hidden="true">${img(hero, '100vw', false, '', true)}</div>${copy}
 </section>`;
   } else if (panel) {
     const right = useSplit ? splitImg : heroPanel(c, v);
@@ -490,7 +660,7 @@ ${(() => {
   const parts: Record<string, string> = {
     hero: `
 ${welcome}
-${strip}`,
+${heroStrip}`,
     about: i.description ? `<section class="block wrap" data-dds-core="about"><h2>About us</h2><p${pr('identity.description')}>${esc(i.description)}</p></section>` : '',   // no description, no lone "About us" heading
     offerings: featured.length ? `<section class="block alt" data-dds-core="offerings"><div class="wrap">${featuredOfferings(look, featured, v)}</div></section>` : '',
     testimonials: tst.length ? `<section class="block wrap" data-dds-core="testimonials"><h2>${esc(words.reviews)}</h2><div class="cards">${tst.map((t) => `
@@ -573,7 +743,16 @@ export function makeRender(look: TemplateLook): RenderFn {
 
     // Append the dropdown-nav CSS only when the owner set a custom nav → sites without
     // one keep the exact same stylesheet + hash (byte-identical).
-    const effCss = look.css + POST_CSS + PLACE_CSS + SHELL_CSS + (c.settings?.nav?.length ? '\n' + NAV_DROPDOWN_CSS : '');
+    // Item 330: the same for the three new openings: their rules ride only on a site drawn with one.
+    const op = openingOf(c);
+    // The openings per kind of business (lib/kind_openings.ts): a card on the welcome photo, the
+    // colour panel's photo on the left, Type only on the page. Style settings; the first two's
+    // rules ride only on a site drawn with them (the page's are Type only's own).
+    const styleTokens: Record<string, string> = { ...((snapshot.dev_customization?.theme_tokens as Record<string, string> | undefined) || {}) };
+    const cardKind = heroCardOf(c, styleTokens), left = op?.kind === 'panel' && styleTokens.hero_photo === 'left';
+    const sides: OpeningSides = { left, page: op?.kind === 'type' && styleTokens.hero_band === 'off' };
+    const effCss = look.css + POST_CSS + PLACE_CSS + SHELL_CSS + (c.settings?.nav?.length ? '\n' + NAV_DROPDOWN_CSS : '') + (op ? '\n' + openingCss(op.kind) : '')
+      + (left ? PANEL_LEFT_CSS : '') + (cardKind ? HERO_CARD_CSS : '');
     const cssPath = `/assets/site-${fnv(effCss)}.css`;
     files[`assets/site-${fnv(effCss)}.css`] = effCss;
     // Items 288 and 298: the site's one script file (the phone menu and the header's height, the
@@ -612,8 +791,7 @@ export function makeRender(look: TemplateLook): RenderFn {
     // Multi-page: the owner's own pages join the main nav (after Contact), unless hidden.
     for (const cp of (c.settings?.pages || [])) { if (!cp.hideNav) nav.push([`/${cp.slug}/`, cp.title, `page:${cp.slug}`]); }
     // Items 295 and 296: the header's own choices live with the style settings (lib/devmode.ts)
-    const tokens: Record<string, string> = { ...((snapshot.dev_customization?.theme_tokens as Record<string, string> | undefined) || {}) };
-    const extras: Extras = { announce, icon, nav, tokens };
+    const extras: Extras = { announce, icon, nav, tokens: styleTokens };
 
     // Phase SD: "Show this page on Google?" — noindex + sitemap exclusion per page,
     // and per-page search headline/description overrides. Plain choices, our plumbing.
@@ -649,7 +827,7 @@ export function makeRender(look: TemplateLook): RenderFn {
     // only) onto the ONE business node — home only, where the reviews_wall is visible.
     const rSchema = reviewsSchema(c.settings?.blocks, snapshot.created_at);
     const ldBizHome = rSchema ? { ...ldBiz, ...rSchema } : ldBiz;
-    page('/', { title: siteTitle, description: siteDesc, ...(i.short_description ? { shareDescription: i.short_description } : {}), ld: [ldBizHome, ...ldPlaces(c, site, v.schemaType), ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(look, c, v, words, blocks) });
+    page('/', { title: siteTitle, description: siteDesc, ...(i.short_description ? { shareDescription: i.short_description } : {}), ld: [ldBizHome, ...ldPlaces(c, site, v.schemaType), ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(look, c, v, words, blocks, op, cardKind ? heroCard(cardKind, c, v, site) : '', sides) });
     page(v.offeringPath, { ...seoOv('offerings', `${v.offeringLabel} — ${i.business_name}`, words.offeringsDescription(v.offeringLabel, i.business_name)), ld: [ldOfferings(c, site, v)], ogImage: ogImg, active: 'offerings', body: offeringsBody(look, c, v) });
     if (noidx.has('offerings')) markNoindex(`${v.offeringPath.replace(/^\/|\/$/g, '')}/index.html`);
     page('/about/', { ...seoOv('about', `About — ${i.business_name}`, siteDesc), ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c, words) });

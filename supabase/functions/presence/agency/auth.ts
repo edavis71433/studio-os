@@ -72,13 +72,16 @@ export const STUDIO_ROLE_WORDS: Record<AgencyRole, { name: string; sees: string;
 export async function resolveAgencyMember(jwt: string): Promise<AgencyMember | null> {
   if (!jwt) return null;
   // shared memoized resolver — the auth boundary already validated this JWT
-  const { authUser } = await import('../../_shared/auth.ts');
-  const user: { id?: string; email?: string } | null = await authUser(jwt);
+  const { authUser, provenEmail, orValue } = await import('../../_shared/auth.ts');
+  const user: { id?: string; email?: string; email_confirmed_at?: string } | null = await authUser(jwt);
   if (!user?.id) return null;
-  const email = (user.email || '').toLowerCase();
+  // builder item 389: an invited member is found by their email only once they've proved it
+  // (the invite's link does); after that first sight their user id finds them
+  const email = provenEmail(user);
   // Item 87: user_id is read too. Without it the "first sight" write below ran on every
   // request, an extra database write each time a studio worked inside a client.
-  const m = await svc(`presence_agency_members?status=eq.active&or=(user_id.eq.${user.id},email.eq.${encodeURIComponent(email)})&select=id,agency_id,email,role,user_id&limit=1`);
+  const by = email ? `or=(user_id.eq.${encodeURIComponent(user.id)},email.eq.${orValue(email)})` : `user_id=eq.${encodeURIComponent(user.id)}`;
+  const m = await svc(`presence_agency_members?status=eq.active&${by}&select=id,agency_id,email,role,user_id&limit=1`);
   const row = m.json?.[0];
   if (!row) return null;
   const a = await svc(`presence_agencies?id=eq.${row.agency_id}&status=eq.active&select=id,name,seat_limit,client_limit,plan,branding&limit=1`);

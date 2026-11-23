@@ -233,7 +233,7 @@ let MADE;
   MAIL_DOWN = false;
   ok('invite, email refused: the email was tried before the answer came back', outside.some((o) => o.to === 'resend'));
   ok('invite, email refused: 200, and it does not say invited', r.status === 200 && r.body.data.invited === false, JSON.stringify(r.body));
-  ok('invite, email refused: the studio gets the sign-in page to share, under its own name', r.body.data.portal_url === `https://davisdigitalstudio.com/portal.html?studio=${OWN}`, r.body.data.portal_url);
+  ok('invite, email refused: the studio gets the sign-in page to share, under its own name', r.body.data.portal_url === `https://app.davisdigitalstudio.com/portal.html?studio=${OWN}`, r.body.data.portal_url);   // item 388: the app's address
   ok('invite, email refused: the owner still has their sign-in and is a customer', outside.some((o) => o.to === 'auth' && o.path === '/auth/v1/admin/users' && o.method === 'POST') && (T.presence_projects || []).some((p) => p.site_id === OWN && p.client_id === made.client_id));
 }
 
@@ -277,7 +277,8 @@ let MADE;
   ok('page: + New site opens the New site box (it used to send you to Home\'s Add a customer)', !/href="\/agency\.html#add"/.test(page) && /id="newDlg"/.test(page) && /\['newSiteBtn','newSiteEmpty'\]\.forEach\(id=>\{const b=\$\(id\);if\(b\)b\.addEventListener\('click',openNewSite\);\}\)/.test(page));
   const box = page.slice(page.indexOf('<dialog id="newDlg"'), page.indexOf('</dialog>', page.indexOf('<dialog id="newDlg"')));
   ok('page: the New site box asks for a business name and nothing else — no email', /id="new-biz"/.test(box) && !/type="email"/.test(box) && /Nobody is emailed until you invite the owner/.test(box));
-  ok('page: it makes the site with POST /agency/sites, and invites with /agency/sites/:id/invite', /apiSend\('POST','\/agency\/sites',\{business_name,kit_id:kit_id\|\|undefined,template_slug:template_slug\|\|undefined,industry_key:industry_key\|\|undefined,client_id:\(NEW_FOR&&NEW_FOR\.client_id\)\|\|undefined\}\)/.test(page) && /'\/agency\/sites\/'\+encodeURIComponent\(s\.site_id\)\+'\/invite'/.test(page));
+  // the openings made for a kind of business (Nov 22 2026) ride on the same call, as opening: <key>
+  ok('page: it makes the site with POST /agency/sites, and invites with /agency/sites/:id/invite', /apiSend\('POST','\/agency\/sites',\{business_name,kit_id:kit_id\|\|undefined,template_slug:template_slug\|\|undefined,industry_key:industry_key\|\|undefined,client_id:\(NEW_FOR&&NEW_FOR\.client_id\)\|\|undefined,opening:opening\|\|undefined\}\)/.test(page) && /'\/agency\/sites\/'\+encodeURIComponent\(s\.site_id\)\+'\/invite'/.test(page));
   ok('page: the card, the ⋯ menu and the table each say No owner yet', /<b>No owner yet<\/b>Nobody has been emailed\./.test(page) && /data-invite="\$\{esc\(s\.site_id\)\}">Invite the owner<\/button>`:''\}/.test(page) && /\$\{s\.no_owner\?' · No owner yet':''\}/.test(page));
   ok('page: #new (and #new=<design>, item 198) opens the box once the page knows you may make one', /function openNewFromHash\(\)\{\s*const m=\/\^#new\(\?:=\(\[a-z0-9-\]\{1,60\}\)\)\?\$\/\.exec\(location\.hash\);if\(!m\)return;/.test(page) && /render\(\);\s*openNewFromHash\(\);/.test(page));
   const nav = read('supabase/functions/presence/lib/navigation.ts');

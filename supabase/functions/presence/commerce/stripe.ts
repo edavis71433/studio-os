@@ -13,30 +13,65 @@
 // Every call names the Stripe version this code reads (sales item 128): without
 // it a call gets the account's default of the day, and one press of "Upgrade" in
 // Stripe's Workbench would change the shape of every answer with nobody told.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { STRIPE_API_VERSION } from './stripe_shape.ts';
 import { stripeKeyKind } from './stripe_key.ts';
 
 const STRIPE_SECRET = Deno.env.get('STRIPE_SECRET') || '';
-const SITE_URL = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+const SITE_URL = appBase();
 
 export function stripeConfigured(): boolean { return !!STRIPE_SECRET; }
 /** Restricted or full-power, live or test, read from the key's prefix (sales item 131).
  *  The key itself stays in this file. */
 export const heldKeyKind = () => stripeKeyKind(STRIPE_SECRET);
 
+/** No call to Stripe waits longer than this (builder item 397). Without a limit a stalled
+ *  answer held the request until the platform cut it. Stripe answers in a second or two;
+ *  a call that ran out is an error the caller already handles (a network failure). Every
+ *  write here is either kept safe by its Idempotency-Key or is harmless to make again. */
+export const STRIPE_TIMEOUT_MS = 20_000;
+
 /** The one place this file talks to Stripe, so every call names the version (sales
- *  item 128). Answers the status and Stripe's JSON; a network failure throws. */
-async function stripeFetch(path: string, params: Record<string, string>, method: 'POST' | 'GET' | 'DELETE', idem?: string, timeoutMs?: number): Promise<{ status: number; body: any }> {
+ *  item 128) and has a time limit (builder item 397). Answers the status and Stripe's
+ *  JSON; a network failure or a call that ran out of time throws. */
+async function stripeFetch(path: string, params: Record<string, string>, method: 'POST' | 'GET' | 'DELETE', idem?: string, timeoutMs: number = STRIPE_TIMEOUT_MS): Promise<{ status: number; body: any }> {
   const h: Record<string, string> = { Authorization: `Bearer ${STRIPE_SECRET}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Stripe-Version': STRIPE_API_VERSION };
   if (idem) h['Idempotency-Key'] = idem;
   const qs = (method === 'GET' || method === 'DELETE') && Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
-  const r = await fetch(`https://api.stripe.com/v1/${path}${qs}`, { method, headers: h, body: method === 'POST' ? new URLSearchParams(params).toString() : undefined, ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}) });
+  const r = await fetch(`https://api.stripe.com/v1/${path}${qs}`, { method, headers: h, body: method === 'POST' ? new URLSearchParams(params).toString() : undefined, signal: AbortSignal.timeout(timeoutMs) });
   return { status: r.status, body: await r.json().catch(() => null) };
+}
+
+/** Stripe's own words for an answer that isn't a success: its error code and its message,
+ *  with anything that could be part of the key, the account or an email taken out (a 403
+ *  quotes part of the key and the account). Pure. */
+export function stripeSaid(status: number, body: any): { code: string; message: string } {
+  const e = (body && typeof body === 'object' && body.error) || {};
+  const code = String(e.code || e.type || '').replace(/[^a-z0-9_]/gi, '').slice(0, 60) || `http_${status}`;
+  const message = String(e.message || '')
+    .replace(/\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9*]+/g, '[key]')
+    .replace(/\bacct_[A-Za-z0-9]+/g, '[account]')
+    .replace(/[^\s'"@]+@[^\s'"@]+\.[A-Za-z]{2,}/g, '[email]')
+    .slice(0, 400);
+  return { code, message };
+}
+
+/** Stripe said no: its code (e.g. more_permissions_required) rides along, so a caller can
+ *  show which refusal it was without Stripe's message. */
+export class StripeError extends Error {
+  status: number;
+  code: string;
+  constructor(status: number, code: string, message: string) { super(message); this.name = 'StripeError'; this.status = status; this.code = code; }
 }
 
 async function stripeReq(path: string, params: Record<string, string>, idem?: string, method: 'POST' | 'GET' | 'DELETE' = 'POST'): Promise<any> {
   const { status, body: j } = await stripeFetch(path, params, method, idem);
-  if (status < 200 || status >= 300) throw new Error((j && j.error && j.error.message) || `stripe ${status}`);
+  if (status < 200 || status >= 300) {
+    const said = stripeSaid(status, j);
+    // the log keeps Stripe's own code and words (never the key), so the next refusal names itself
+    console.warn(`[stripe] ${method} ${path} answered ${status} ${said.code}: ${said.message}`);
+    throw new StripeError(status, said.code, said.message || `stripe ${status}`);
+  }
   if (!j) throw new Error(`stripe ${status}: an answer that couldn’t be read`);
   return j;
 }

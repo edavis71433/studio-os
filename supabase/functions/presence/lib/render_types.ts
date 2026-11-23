@@ -186,7 +186,8 @@ export interface SiteBlockFeatures { type: 'features'; title?: string; items: Ar
 export interface SiteBlockStats { type: 'stats'; title?: string; items: Array<{ value: string; label: string }> }
 export interface SiteBlockTeam { type: 'team'; title?: string; members: Array<{ name: string; role?: string; bio?: string; media?: MediaRef | null }> }
 export interface SiteBlockProcess { type: 'process'; title?: string; steps: Array<{ step: string; detail?: string }> }
-export interface SiteBlockPricing { type: 'pricing'; title?: string; tiers: Array<{ name: string; price_text?: string; features: string[] }> }
+// Item 329: `featured` is the plan the 'plans' design raises, counted from 1 (0 = none; absent = the middle of three).
+export interface SiteBlockPricing { type: 'pricing'; title?: string; tiers: Array<{ name: string; price_text?: string; features: string[] }>; featured?: number }
 export interface SiteBlockCertifications { type: 'certifications'; title?: string; items: Array<{ name: string; issuer?: string }> }
 export interface SiteBlockServiceAreas { type: 'service_areas'; title?: string; areas: string[] }
 export interface SiteBlockCtaBanner { type: 'cta'; text: string; button?: string; url?: string }
@@ -231,8 +232,10 @@ export interface SiteBlockRichText { type: 'richtext'; title?: string; body: str
 // `decorative`: an explicit a11y choice — a purely decorative image renders alt=""
 // + role="presentation" (announced by nothing), instead of carrying its media alt.
 export interface SiteBlockImage { type: 'image'; title?: string; image?: MediaRef | null; caption?: string; alt?: string; link?: string; decorative?: boolean }
-export interface SiteBlockImageText { type: 'image_text'; title?: string; image?: MediaRef | null; body: string; side: 'left' | 'right'; button?: { label: string; url: string } }
-export interface SiteBlockAccordion { type: 'accordion'; title?: string; items: Array<{ summary: string; body: string }> }
+// Item 329: `number` + `number_label`, the big number beside the photo in the 'frame' design (both filled to show).
+export interface SiteBlockImageText { type: 'image_text'; title?: string; image?: MediaRef | null; body: string; side: 'left' | 'right'; button?: { label: string; url: string }; number?: string; number_label?: string }
+// Item 329: `intro`, the short line under the heading in the 'side' design.
+export interface SiteBlockAccordion { type: 'accordion'; title?: string; items: Array<{ summary: string; body: string }>; intro?: string }
 export interface SiteBlockTabs { type: 'tabs'; title?: string; tabs: Array<{ label: string; body: string; image?: MediaRef | null }> }
 export interface SiteBlockCarousel { type: 'carousel'; title?: string; slides: Array<{ image: MediaRef | null; caption?: string }> }
 export interface SiteBlockProgress { type: 'progress'; title?: string; items: Array<{ label: string; percent: number }> }

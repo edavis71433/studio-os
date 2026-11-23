@@ -4,6 +4,7 @@
 // per-site engines / read EXISTING rows. Nothing here has a power that a
 // single-site route lacks; nothing bypasses client ownership (drafts and
 // plans still wait on the client; publishing runs the one frozen pipeline).
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc, svcPages } from '../lib/db.ts';
 /** Builder item 411: every row, paged, in the shape of one svc() answer ([] when a page failed). */
@@ -206,8 +207,9 @@ export function forgetAgencyReads(agencyId: string): void {
 
 // builder list items 236 and 232: the portal's address (the one the invite email carries), the
 // clients a studio looks after in name order, and when each last got a sign-in link (two minutes apart)
-// builder item 350: the short address when the studio chose a name (lib/portal_slug.ts), else the long one
-const portalAddress = (studioSiteId: string, slug?: string | null) => portalAddressOf(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com', studioSiteId, slug);
+// builder item 350: the short address when the studio chose a name (lib/portal_slug.ts), else the long one;
+// on the app's own address (item 388)
+const portalAddress = (studioSiteId: string, slug?: string | null) => portalAddressOf(appBase(), studioSiteId, slug);
 async function portalSlugOf(siteId: string): Promise<string | null> {
   const r = await svc(`presence_sites?id=eq.${siteId}&select=portal_slug&limit=1`).catch(() => ({ ok: false, json: null }));
   return r.ok && Array.isArray(r.json) ? (r.json[0]?.portal_slug ?? null) : null;   // pre-0254: no column, no name
@@ -1189,8 +1191,9 @@ async function ownSiteOf(jwt: string, principal: Principal): Promise<SiteRow | n
   try {
     const s = await resolveSite(jwt);
     if (s) return s;
-    if (!principal.userId && !principal.email) return null;
-    const or = `or=(user_id.eq.${encodeURIComponent(principal.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((principal.email || '').toLowerCase())})`;
+    const { seatFilter } = await import('../lib/workspace.ts');   // builder items 389 + 397
+    const or = seatFilter(principal);
+    if (!or) return null;
     const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id&order=created_at.asc&limit=1`);
     const siteId = Array.isArray(m.json) && (m.json as Array<{ site_id: string }>)[0]?.site_id;
     if (!siteId) return null;

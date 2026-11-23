@@ -4,6 +4,7 @@
 // reaches only their linked, client-visible delivery through this bridge. Used by
 // the convert handoff (create project + bridge, idempotent) and the /client/*
 // endpoints (resolve which projects a customer may see).
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { svc } from './db.ts';
 import { siteOrigin } from './site.ts';
 import { UUID_RE, UUID_RE as SUPPORT_UUID_RE, UUID_RE as UUID } from './uuid.ts';
@@ -272,7 +273,7 @@ export async function emailBridgedCustomer(agencySiteId: string, projectId: stri
     // Builder list item 179: an ask for an OK opens that approval itself (the portal
     // falls back to the project when it can't), so the button says what it opens.
     const approval = open?.approval && /^[0-9a-f-]{36}$/i.test(open.approval) ? open.approval : '';
-    const btn = `<a href="${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html?project=${encodeURIComponent(projectId)}${approval ? `&approval=${approval}` : ''}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${approval ? 'Take a look →' : 'Open your project →'}</a>`;
+    const btn = `<a href="${appBase()}/client.html?project=${encodeURIComponent(projectId)}${approval ? `&approval=${approval}` : ''}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${approval ? 'Take a look →' : 'Open your project →'}</a>`;
     // critical: this is the "your project needs you" nudge — an opted-out client's
     // approval/message must still reach them (bounces still suppress).
     const sent = await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId: agencySiteId });
@@ -295,7 +296,7 @@ export async function accountPeople(customerSiteId: string, ownerEmail: string):
  *  holds, routes/push.ts). Best-effort, never awaited by a caller. */
 export function pushAccount(customerSiteId: string, title: string, body: string, path: string): void {
   try {
-    const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+    const base = appBase();   // item 388
     import('../routes/push.ts').then((m) => m.pushToSite(customerSiteId, { title: String(title).slice(0, 80), body, url: `${base}${path}`, tag: 'portal:needs-you' })).catch(() => {});
   } catch { /* best-effort */ }
 }
@@ -320,7 +321,7 @@ export async function emailCustomerByClient(agencySiteId: string, customerClient
     // builder item 344: a reply opens THAT conversation (client.html?support=<id>) and the
     // button says what it does; without one it is still the portal's door
     const support = open?.support && /^[0-9a-f-]{36}$/i.test(open.support) ? open.support : '';
-    const href = `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com')}/client.html${support ? `?support=${encodeURIComponent(support)}` : ''}`;
+    const href = `${appBase()}/client.html${support ? `?support=${encodeURIComponent(support)}` : ''}`;   // item 388: the app's address
     const btn = `<a href="${href}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${support ? 'Read and reply →' : 'Open your client portal →'}</a>`;
     if (customerSite) pushAccount(customerSite, subject, String(bodyHtml).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140), support ? `/client.html?support=${encodeURIComponent(support)}` : '/client.html');
     const sent = await sendEmail(email, subject, `${bodyHtml}<p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId: agencySiteId });
@@ -389,7 +390,7 @@ export async function emailCustomerSiteLive(customerSiteId: string): Promise<boo
  *  also a `presence_plan_notices.kind` — widened by migration 0116. */
 export type ClientActionKind = 'client_message' | 'client_upload' | 'client_request' | 'client_approval';
 
-const SITE_BASE = () => (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+const SITE_BASE = () => appBase();
 const escHtml = (s: string) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
 
 /** THROTTLE WINDOW. The notice model's unique key is (client_id, kind, period),

@@ -380,7 +380,7 @@ function render(){
       <label for="subj">Subject</label>
       <input type="text" id="subj" maxlength="200" placeholder="A quick update from us" value="${esc(DRAFT&&DRAFT.subject||'')}">
       <label for="bodytx">Message</label>
-      <textarea id="bodytx" placeholder="Hi {{first_name}},&#10;&#10;Write your update here…">${esc(DRAFT&&DRAFT.body||'')}</textarea>
+      <textarea id="bodytx" placeholder="Hi there,&#10;&#10;Write your update here. + First name below greets each person by name.">${esc(DRAFT&&DRAFT.body||'')}</textarea>
       <div class="fmt" role="toolbar" aria-label="Formatting">
         <button type="button" data-fmt="bold" aria-label="Bold" title="Bold">B</button>
         <button type="button" data-fmt="italic" aria-label="Italic" title="Italic"><i>I</i></button>

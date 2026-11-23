@@ -392,8 +392,8 @@ function paintPanel(){
   const recs=(d.records||[]).length?`<table class="dp-rec" aria-label="Records"><tbody>${d.records.map(x=>`<tr><td>${esc(x.name)}</td><td class="t">${esc(x.type)}</td><td>${esc(x.value)}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">No records answered just now.</p>';
   const nt=d.notes||{};
   const sel=(v)=>['yes','no','unknown'].map(o=>`<option value="${o}"${(nt.renews||'unknown')===o?' selected':''}>${o==='yes'?'Yes':o==='no'?'No':'Don’t know'}</option>`).join('');
-  $('dpBody').innerHTML=`<div class="dp-h"><h2 id="dpTitle">${esc(d.domain)}</h2><span class="pill ${esc(d.tone)}">${esc(d.status_words)}</span><button type="button" class="rowact" id="dpCheck">Check now</button><button type="button" class="rowact" id="dpClose">Close</button></div>
-    <p class="muted" id="dpMsg" role="status" style="margin:6px 0 0;font-size:13px"></p>
+  $('dpBody').innerHTML=`<div class="dp-h"><h2 id="dpTitle">${esc(d.domain)}</h2><span class="pill ${esc(d.tone)}">${esc(d.status_words)}</span><button type="button" class="rowact" id="dpCheck"${d.can_manage===false?' disabled aria-describedby="dpMsg"':''}>Check now</button><button type="button" class="rowact" id="dpClose">Close</button></div>
+    <p class="muted" id="dpMsg" role="status" style="margin:6px 0 0;font-size:13px">${d.can_manage===false?'Checking a domain can email the client, so it’s for a manager. Your role reads the last check.':''}</p>
     ${accessHtml(d)}
     <section class="dp-sec" aria-labelledby="dpChecksH"><h3 id="dpChecksH">What we checked</h3>${checks.length?`<ul class="dp-list">${checks.join('')}</ul>`:'<p class="muted">Checked once a day. Press Check now to look again.</p>'}
       <div class="dp-acts">${d.hosted?`<a class="rowact" href="${esc(where(d,'#domain'))}">Open the client’s domain steps</a>`:''}<a class="rowact" href="${esc(where(d,''))}">Open ${esc(d.name||'the site')}</a><a class="rowact" href="https://${esc(d.domain)}" target="_blank" rel="noopener">Visit ${esc(d.domain)} ↗</a></div></section>
