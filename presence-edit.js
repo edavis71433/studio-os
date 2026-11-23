@@ -1049,10 +1049,7 @@ function fontRows(card, T) {
   });
   card.appendChild(wrap);
 }
-// Builder item 327: a font the browser picks (system-ui and the like) is named in words, never by its code name
-const FONT_GENERIC = { "system-ui": "Your device’s own font", "-apple-system": "Your device’s own font", "blinkmacsystemfont": "Your device’s own font", "ui-sans-serif": "Your device’s own font", "sans-serif": "Your device’s own font",
-  "serif": "Your device’s serif font", "ui-serif": "Your device’s serif font", "monospace": "Your device’s typewriter font", "ui-monospace": "Your device’s typewriter font", "cursive": "Your device’s handwriting font" };
-function fontWords(name) { const n = String(name || "").trim(); return FONT_GENERIC[n.toLowerCase()] || n; }
+// Builder item 327: fontWords() (a font the browser picks, named in words) lives in presence-core.js: the Styles tab uses it too (item 431)
 function mountFontLibrary(card, T) {
   if (!DESIGN_FONTS.length) return;
   const firstOf = (v) => String(v || "").split(",")[0].replace(/['"]/g, "").trim().toLowerCase();

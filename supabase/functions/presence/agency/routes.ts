@@ -34,6 +34,7 @@ import { handleUpdateTemplates } from './update_templates.ts';   // builder list
 import { handleClientTools } from './client_tools.ts';
 import { handleSiteNumbers } from './site_numbers.ts';
 import { handleUsage } from './usage.ts';
+import { readHostPlan, netlifyConfigured, type HostPlan } from '../lib/netlify.ts';   // builder item 358: the hosting account on platform staff's list
 import { handleAgencyChangeLog } from '../routes/change_log.ts';
 import { handleDoNext } from './do_next.ts';
 import { HIDEABLE_SECTIONS, normalizeHidden } from '../lib/navigation.ts';
@@ -1078,7 +1079,17 @@ export function computeStudioNeeds(member: AgencyMember, principal: Principal, j
   p.catch(() => { if (needsRuns.get(key)?.p === p) needsRuns.delete(key); });
   return p;
 }
+/** Builder item 358: the host's answer is kept six hours in the process; a cold read slower than
+ *  this waits for the next list rather than holding Home up. */
+export const HOSTING_WAIT_MS = 1500;
+function hostingForList(principal: Principal, now: string): Promise<HostPlan | null> {
+  // platform staff only: the hosting account is the platform's, never a studio's to see
+  if (principal.kind !== 'staff' || !netlifyConfigured()) return Promise.resolve(null);
+  let t: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([readHostPlan(now).catch(() => null), new Promise<null>((r) => { t = setTimeout(() => r(null), HOSTING_WAIT_MS); })]).finally(() => clearTimeout(t));
+}
 async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: string, now: string, today?: string) {
+    const hostingP = hostingForList(principal, now);   // side by side with the reads below
     const [input, own] = await Promise.all([sharedGather(member.agency_id, now), ownSiteOf(jwt, principal)]);
     // item 11: the studio site's own Inbox rows (the SAME builder the Inbox and the
     // bell read), so the list, the bell and the Inbox name one set of things
@@ -1155,6 +1166,7 @@ async function runStudioNeeds(member: AgencyMember, principal: Principal, jwt: s
       snoozed: Object.fromEntries(rowsOf<{ row_key: string; until: string }>(snQ).map((x) => [String(x.row_key), String(x.until)])),
       snoozedAt: Object.fromEntries(rowsOf<{ row_key: string; created_at?: string | null }>(snQ).filter((x) => x.created_at).map((x) => [String(x.row_key), String(x.created_at)])),   // bug hunt A2: news after the snooze wakes the row
       quiet: [...quietSites(notify)],   // item 126
+      hosting: await hostingP,   // builder item 358
     });
     // partial = a slot could not be read (the list may be missing rows, never wrong ones); own_site=false = no studio site to read money/support/deals from
     const partial = !own || !recv || !ownFeed || [supQ, slinkQ, dealsQ, pubQ, connQ, remQ].some((q) => !q.ok);
