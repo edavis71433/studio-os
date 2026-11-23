@@ -245,7 +245,7 @@ test.describe('Domains: Ask for access (item 222)', () => {
 // ── Builder item 396: Check now can email the client, so it is a manager's ──
 test.describe('Domains: Check now asks for the manager role (item 396)', () => {
   test('a view-only seat: Check now is greyed with the reason, and nothing is sent', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));
+    await pinClock(page, '2026-11-15T18:00:00Z');
     const t = await openDomains(page, { detailOver: { can_manage: false } });
     await openPanel(page, 'brightbakery.com');
     await expect(page.locator('#dpCheck')).toBeDisabled();
@@ -254,7 +254,7 @@ test.describe('Domains: Check now asks for the manager role (item 396)', () => {
   });
 
   test('a manager: Check now is there as before (and an older server, which says nothing, keeps it too)', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));
+    await pinClock(page, '2026-11-15T18:00:00Z');
     await openDomains(page, { detailOver: { can_manage: true } });
     await openPanel(page, 'brightbakery.com');
     await expect(page.locator('#dpCheck')).toBeEnabled();
