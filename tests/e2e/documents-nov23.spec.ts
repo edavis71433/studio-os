@@ -92,11 +92,21 @@ test.describe('Deals: the documents job (items 181, 182, 183, 185)', () => {
     await billing(page);
     const fold = page.locator('#lostFold');
     await expect(fold).toContainText('Closed as Not a fit');
+    await expect(fold).toContainText('What was still out was withdrawn');   // sales item 217: true here
     await expect(fold.getByRole('button', { name: 'Reopen this deal' })).toBeVisible();
     for (const name of ['+ Estimate', '+ Proposal', '+ Agreement', 'Send an invoice', 'Set up a retainer']) await expect(page.getByRole('button', { name, exact: true })).toBeHidden();
     await expect(page.locator('#dpanel-billing')).toContainText('Withdrawn');
     await expect(page.getByRole('button', { name: 'Revise →' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Copy link' })).toHaveCount(0);
+  });
+
+  test('217: a Not a fit deal with nothing withdrawn doesn\'t claim it was', async ({ page }) => {
+    await pinClock(page);
+    await installApp(page, { api: dealApi({ stage: 'lost', proposals: [{ id: PROP, title: 'Website', line_items: LINES, subtotal_cents: 25000, total_cents: 25000, status: 'declined', version: 1, sent_at: at(-5) }] }) });
+    await billing(page);
+    const fold = page.locator('#lostFold');
+    await expect(fold).toContainText('The client’s links say it’s closed.');
+    await expect(fold).not.toContainText('withdrawn');
   });
 
   test('183, 185: Edit a draft estimate keeps 2.5 and saves in place; a sent one offers Revise', async ({ page }) => {

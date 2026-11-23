@@ -457,6 +457,7 @@
   .co-rcpt{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;font-size:13.5px}
   .co-rcpt .rc-name{flex:1 1 100%;color:var(--soft)}
   .co-rcpt .rc-name b{color:var(--ink);font-weight:600}
+  .co-rcpt [hidden]{display:none}   /* sales item 217: the buttons' own display beat their hidden attribute */
   #rcptDlg{margin:auto;border:none;border-radius:20px;padding:20px 20px 16px;width:min(520px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto;background:var(--card);color:var(--ink);box-shadow:0 24px 60px rgba(26,13,64,.25)}
   #rcptDlg::backdrop{background:rgba(23,21,34,.42)}
   #rcptDlg h2{margin:0 0 10px;font-size:18px;font-weight:700}
