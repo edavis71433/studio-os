@@ -577,10 +577,23 @@ document.addEventListener('dds:context',()=>{if(PAINTED_IN!==null&&PAINTED_IN!==
 const api=(path,method,body)=>ddsApi(path,{method,body,scope:scope()});
 const toast=(m,kind,action)=>ddsToast(m,kind,action);   // the shell's one toast: 'err' shows a failure as one
 
+// sales item 192: the box finds what the server's search finds (contactSearchFilter): a name, email,
+// company, job title or town holding the words, a whole tag, or a phone number by its digits in
+// either number, whatever was written between them ("(555) 010-4410" for "5550104410")
+const qDigits=(q)=>{const t=String(q||'').trim();if(!/^[\d\s().+\-]+$/.test(t))return'';const d=t.replace(/\D/g,'');return d.length>=4?d.slice(0,15):'';};
+function findsQ(c,q){
+  if(!q)return true;
+  const city=c.address&&typeof c.address==='object'?(c.address.city||''):'';
+  if(((c.name||'')+' '+(c.email||'')+' '+(c.company||'')+' '+(c.job_title||'')+' '+city).toLowerCase().includes(q))return true;
+  const tag=q.replace(/[,;#]/g,' ').replace(/\s+/g,' ').trim();
+  if(tag&&Array.isArray(c.tags)&&c.tags.includes(tag))return true;
+  const d=qDigits(q);
+  return !!d&&[c.phone,c.phone2].some(p=>String(p||'').replace(/\D/g,'').includes(d));
+}
 function sortedRows(){
   const q=Q.trim().toLowerCase();
   const s=srchNow();   // item 66: past the loaded pages, the server's matches answer the search
-  const list=(s?s.rows:ALL).filter(viewMatch).filter(c=>!TAG||(Array.isArray(c.tags)&&c.tags.includes(TAG))).filter(c=>!q||((c.name||'')+' '+(c.email||'')+' '+(c.company||'')+' '+(c.job_title||'')).toLowerCase().includes(q));
+  const list=(s?s.rows:ALL).filter(viewMatch).filter(c=>!TAG||(Array.isArray(c.tags)&&c.tags.includes(TAG))).filter(c=>findsQ(c,q));
   const col=COLS.find(x=>x[0]===SORT.key)||COLS[0];
   list.sort((a,b)=>{const av=col[2](a),bv=col[2](b);return av<bv?-SORT.dir:av>bv?SORT.dir:0;});
   return list;
@@ -770,7 +783,7 @@ function render(){
   PAINTED_IN=inClient();
   const rows=sortedRows();
   let h=headerHtml(rows.length)
-    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, or company…" value="${esc(Q)}"></div><div id="fchips"></div><div id="csvZone"></div><div id="importStrip"></div>`
+    +`<div class="bar"><input class="search" id="q" type="search" aria-label="Search contacts" placeholder="Search name, email, phone, tag or town…" value="${esc(Q)}"></div><div id="fchips"></div><div id="csvZone"></div><div id="importStrip"></div>`
     +`<section class="dds-charts" id="charts" aria-label="Charts" hidden></section><div id="listZone">${listHtml(rows)}</div>`;
   // Any re-render (sort, view, display, refresh) must not destroy an open — or
   // in-flight — CSV import panel: carry the LIVE #csvZone node (its handlers,

@@ -15,7 +15,7 @@ import { serializeDraft } from '../lib/serializer.ts';
 import { insertSnapshot } from '../lib/draft_settings.ts';
 import { sendEmail, platformSenderName } from '../commerce/account.ts';
 import { loadEmailBrand } from '../lib/email_brand.ts';
-import { ownerReplyTo } from '../lib/service_bridge.ts';
+import { ownerReplyTo, studioRecipient } from '../lib/service_bridge.ts';
 import { ensureLeadContact } from '../lib/lead_contact.ts';   // sales item 142: one helper, shared with the automatic emails
 import { isStudioSide, studioDenied } from './projects.ts';
 import { buildActivityDetail } from '../crm/deal_activity.ts';
@@ -37,7 +37,7 @@ import { judgeSend, issueTicket, TICKET_MIN_AGE_S, markSender, spamLinkToken, re
 import { storeFormFiles, cleanFileName, filesOf, filePath, fileLink, formFileBytes, filePathsOf, removeFormFiles, SPAM_KEEP_DAYS, type StoredFile } from '../lib/form_files.ts';
 import { autoReplyVerdict } from '../lib/auto_reply.ts';   // item 203
 import { JOINED, JOIN_CHECK_EMAIL, joinLinkToken, readJoinLinkToken, joinEmailSubject, joinEmailHtml } from '../lib/join_confirm.ts';
-import { afterResponseOrNow } from '../lib/after_response.ts';   // item 221
+import { afterResponseOrNow, runAfterResponse } from '../lib/after_response.ts';   // item 221; sales item 201: the alert finishes after the answer
 import { approvalDetail, cleanNote } from '../lib/approval_page.ts';   // sales item 92
 import { wordsHtml, quoteBlock, followupPlan } from '../lib/follow_ups.ts';   // sales item 87
 import { readVisitStats } from '../lib/visit_stats.ts';
@@ -248,7 +248,8 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
       if (toPage && siteOrigin) return await notSent('try_again');
       return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
     }
-    if (!spam) { notifyOwnerOfLead(siteId, { id: String(ins2.json?.[0]?.id || ''), form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, files: keptFiles.length }).catch(() => {}); acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message }).catch(() => {}); }
+    // sales item 201: the edge runtime is told to finish the alert and the reply after the answer goes
+    if (!spam) { runAfterResponse(notifyOwnerOfLead(siteId, { id: String(ins2.json?.[0]?.id || ''), form_kind: def.kind, name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message, files: keptFiles.length }).catch(() => {})); runAfterResponse(acknowledgeEnquiry(siteId, { name: fv.sub.name, email: fv.sub.email, phone: fv.sub.phone, message: fv.sub.message }).catch(() => {})); }
     if (toPage && siteOrigin) return redirectTo(def.redirect_url || '/thanks/');
     // the page's sender goes on to the owner's own thank-you address when the form has one
     return ok200(def.confirmation_text || FORM_THANKS, def.redirect_url ? { redirect: def.redirect_url } : {});
@@ -272,7 +273,7 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
     if (toPage && siteOrigin) return await notSent('try_again');
     return json({ error: 'write_failed', message: 'That didn’t send — please try again.' }, 502, cors);
   }
-  if (!why) { notifyOwnerOfLead(siteId, { ...v.sub, id: String(ins.json?.[0]?.id || '') }).catch(() => {}); acknowledgeEnquiry(siteId, v.sub).catch(() => {}); } // best-effort, non-blocking
+  if (!why) { runAfterResponse(notifyOwnerOfLead(siteId, { ...v.sub, id: String(ins.json?.[0]?.id || '') }).catch(() => {})); runAfterResponse(acknowledgeEnquiry(siteId, v.sub).catch(() => {})); } // best-effort, non-blocking (sales item 201: finished after the answer)
   if (toPage && siteOrigin) return redirectTo('/thanks/');       // spam included — bots see success
   return ok200(FORM_THANKS);
 }
@@ -720,10 +721,38 @@ async function acknowledgeEnquiry(siteId: string, sub: { name: string; email: st
   return await sendEmail(sub.email, copy.subject, `${wordsHtml(copy.sentence)}${quoteBlock(sub.message)}${copy.footer ? `<p style="color:#6b6478;font-size:13px">${esc(copy.footer)}</p>` : ''}`, brand, { critical: true, asBusiness: true, siteId });
 }
 
+/** Sales item 201: where the alert's button and the phone's notice open: that enquiry, picked in
+ *  the Inbox (the address the main search and the day-later nudge use), never an empty record. */
+export function enquiryHref(id: string | undefined): string {
+  return id && /^[0-9a-f-]{36}$/i.test(id) ? `/inbox.html#enquiries?sel=lead:${id}` : '/inbox.html#enquiries';
+}
+/** Sales item 201: the notice that makes the owner's phone buzz the moment an enquiry lands: who
+ *  wrote, and the start of what they said. Pure. */
+export function enquiryNoticeCopy(sub: { form_kind?: string; name?: string; email?: string; phone?: string; message?: string }): { headline: string; body: string } {
+  const who = String(sub.name || sub.email || sub.phone || 'Someone').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const words = String(sub.message || '').replace(/\s+/g, ' ').trim();
+  const kind = String(sub.form_kind || '').toLowerCase();
+  return {
+    headline: `New ${kind && kind !== 'contact' && kind.length <= 30 ? kind : 'enquiry'} from ${who}`,
+    body: words ? `“${words.length > 110 ? words.slice(0, 109).trimEnd() + '…' : words}”` : 'They left their details through your website.',
+  };
+}
 async function notifyOwnerOfLead(siteId: string, sub: { id?: string; form_kind: string; name: string; email: string; phone: string; message: string; files?: number }) {
-  const ident = await svc(`presence_identity?site_id=eq.${siteId}&select=business_name,email&limit=1`);
-  const to = ident.json?.[0]?.email;
-  if (!to) return;
+  // Sales item 201 (Nov 22 review): the owner heard nothing on their phone until a day later (and
+  // only if the enquiry still sat unanswered), the email's button opened an empty record page, and
+  // with no email in Business details no email went at all. Now: (1) a notice is raised the moment
+  // it lands, which pushes to the owner's phone and opens this enquiry. It is written already
+  // dismissed (a send-once ledger row, like booking_reminder), because the bell and the Inbox
+  // already show every new enquiry live (the "A new enquiry came in" row), and a second bell row
+  // for the same enquiry would count it twice; the day-later nudge stays as it was. (2) The email
+  // goes to the owner the way every other alert does (studioRecipient: Business details' email,
+  // else the owner's own sign-in email), and (3) its button opens the enquiry itself.
+  const { to, ownerClientId } = await studioRecipient(siteId);
+  if (sub.id && ownerClientId) {
+    const { raiseNotice } = await import('../lib/notice.ts');
+    await raiseNotice({ siteId, clientId: ownerClientId, kind: 'website_enquiry', period: `lead:${sub.id}`, status: 'dismissed', push: true, ...enquiryNoticeCopy(sub) }).catch(() => false);
+  }
+  if (!to) { console.warn(`[lead-alert] no owner address for site ${siteId} (Business details' email and the owner's sign-in email are both empty) (non-fatal)`); return; }
   const who = [sub.name, sub.email, sub.phone].filter(Boolean).join(' · ');
   const brand = await loadEmailBrand(siteId);   // BR-1: on the owner's brand
   // item 140: one tap from the email files it as spam, and more from that address goes there too
@@ -734,7 +763,7 @@ async function notifyOwnerOfLead(siteId: string, sub: { id?: string; form_kind: 
   // Sales item 74: a new enquiry is the business's own news, so it always arrives (critical);
   // an unsubscribe from some other email must never cost the owner a customer.
   await sendEmail(String(to), `New ${sub.form_kind} from your website`,
-    `<p>Someone reached out through your website.</p><p><b>${esc(who)}</b></p><p>${esc(sub.message)}</p>${filesLine}<p class="cta"><a href="${siteBase()}/crm.html" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See it in your workspace →</a></p>${spamLine}`, brand, { critical: true });
+    `<p>Someone reached out through your website.</p><p><b>${esc(who)}</b></p><p>${esc(sub.message)}</p>${filesLine}<p class="cta"><a href="${siteBase()}${enquiryHref(sub.id)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Open the enquiry →</a></p>${spamLine}`, brand, { critical: true });
 }
 
 // ═══ FD-3 · Approval → notify → one-tap approve ══════════════════════════════

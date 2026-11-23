@@ -29,7 +29,8 @@ import { resolveSite } from '../lib/site.ts';
 import { resolveMemberSite } from '../lib/workspace.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { CONTACT_MORE_COLS, addressLine } from '../lib/contact_fields.ts';
-import { cleanSearch, phoneDigits, phonePattern, phoneHas, snippet, arrangeResults, shortDate, invoiceNumberQuery, type SearchResult } from '../lib/record_search.ts';
+import { cleanSearch, phoneDigits, phonePattern, phoneHas, snippet, arrangeResults, shortDate, invoiceNumberQuery, personFoundBy, LOGGED_WORD, type SearchResult } from '../lib/record_search.ts';
+import { cleanTag } from '../lib/contact_fields.ts';
 import { invoiceNo } from '../lib/documents.ts';
 import { CONNECT_INTENT_TAG } from './sales.ts';
 
@@ -92,7 +93,6 @@ const DOC_WORD: Record<string, Record<string, string>> = {
   estimate: { draft: 'Draft', sent: 'Sent', approved: 'Approved', declined: 'Declined' },
   agreement: { draft: 'Draft', sent: 'Sent', signed: 'Signed', voided: 'Voided' },
 };
-const LOGGED_WORD: Record<string, string> = { call: 'Logged call', email: 'Logged email', meeting: 'Logged meeting', note: 'Note' };
 const quoteOf = (t: string) => `“${t}”`;
 /** The studio's client websites (its portfolio) with their names and domains, and
  *  its own site. Read only for a studio member; platform staff search without them. */
@@ -146,9 +146,13 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
   };
   const none = Promise.resolve([] as any[]);
   const sitesP = member ? (asked++, searchSites(String(member.agency_id), site).then((x) => { if (!x.ok) failed++; return x.sites; }, () => { failed++; return [] as Awaited<ReturnType<typeof searchSites>>['sites']; })) : Promise.resolve([] as Awaited<ReturnType<typeof searchSites>>['sites']);
-  const [contacts, phoneContacts, deals, projects, links, invoices, enquiries, phoneEnquiries, proposals, estimates, agreements, dealTasks, projectTasks, support, supportReplies, projectMsgs, logged, sites, stageLabels] = await Promise.all([
+  // sales item 192: a whole tag ("restaurant"), as the list's tag filter reads one
+  const tag = cleanTag(q), tagQ = tag ? `,tags.cs.${encodeURIComponent(`{"${tag}"}`)}` : '';
+  const [contacts, phoneContacts, moreContacts, deals, projects, links, invoices, enquiries, phoneEnquiries, proposals, estimates, agreements, dealTasks, projectTasks, support, supportReplies, projectMsgs, logged, personLogged, sites, stageLabels] = await Promise.all([
     read(`presence_contacts?site_id=eq.${S}&deleted_at=is.null&or=(name.${like},email.${like},company.${like}${deep ? `,notes.${like}` : ''})&select=id,name,email,phone,company,notes&order=updated_at.desc&limit=10`),
     phone ? read(`presence_contacts?site_id=eq.${S}&deleted_at=is.null&phone=ilike.${pat}&select=id,name,email,phone,company&order=updated_at.desc&limit=25`) : none,
+    // sales item 192: a job title, a town, a tag, and a second phone by its digits (APPLY-0166's columns)
+    read(`presence_contacts?site_id=eq.${S}&deleted_at=is.null&or=(job_title.${like},address->>city.${like}${tagQ}${phone ? `,phone2.ilike.${pat}` : ''})&select=id,name,email,phone,phone2,company,job_title,address,tags&order=updated_at.desc&limit=25`),
     read(`presence_deals?site_id=eq.${S}&deleted_at=is.null&or=(title.${like}${deep ? `,notes.${like}` : ''})&select=id,title,stage,notes,converted_client_id&order=updated_at.desc&limit=10`),
     read(`presence_projects?site_id=eq.${S}&deleted_at=is.null&name=${like}&select=id,name,status&limit=6`),
     read(`presence_service_links?agency_site_id=eq.${S}&status=eq.active&select=customer_client_id,customer_site_id&limit=200`),
@@ -169,6 +173,8 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
     deep ? read(`presence_support_messages?site_id=eq.${S}&deleted_at=is.null&body=${like}&select=id,request_id,body,created_at&order=created_at.desc&limit=4`) : none,
     deep ? read(`presence_project_messages?site_id=eq.${S}&deleted_at=is.null&body=${like}&select=id,project_id,body,created_at&order=created_at.desc&limit=4`) : none,
     deep ? read(`presence_deal_events?site_id=eq.${S}&kind=eq.note&detail->>body=${like}&select=id,deal_id,detail,created_at&order=created_at.desc&limit=4`) : none,
+    // sales item 192: a call, email, meeting or note logged on a person or a customer with no deal (0173)
+    deep ? read(`presence_person_events?site_id=eq.${S}&deleted_at=is.null&or=(body.${like},subject.${like})&select=id,kind,body,subject,via,occurred_at,created_at,contact_id,client_id&order=occurred_at.desc&limit=4`) : none,
     sitesP,
     loadStageLabels(S).catch(() => DEFAULT_STAGE_LABEL),
   ]);
@@ -194,6 +200,11 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
   }
   // a phone number by its digits, whatever way it was written down
   for (const c of phoneContacts) if (phoneHas(c.phone, phone)) add({ kind: 'contact', group: 'people', label: String(c.name || c.email || 'Contact'), sub: [String(c.phone), c.company ? String(c.company) : ''].filter(Boolean).join(' · '), href: `/crm.html?contact=${c.id}&tab=details` });
+  // sales item 192: found by their job title, their town, a tag or their second phone, which the line says
+  for (const c of moreContacts) {
+    const why = personFoundBy(c, ql, tag, phone);
+    if (why) add({ kind: 'contact', group: 'people', label: String(c.name || c.email || 'Contact'), sub: ['Contact', why].join(' · '), href: `/crm.html?contact=${c.id}&tab=details` });
+  }
   for (const w of sites) {
     if (!(hit(w.name) || hit(w.domain))) continue;
     // the row opens the site in Studio OS; "Open website" beside it opens the site itself
@@ -223,6 +234,23 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
   for (const m of supportReplies) add({ kind: 'message', group: 'messages', label: quoteOf(snippet(m.body, q, 80)), sub: ['Support reply', shortDate(m.created_at)].filter(Boolean).join(' · '), href: `/inbox.html#support?sel=sup:${m.request_id}` });
   for (const m of projectMsgs) add({ kind: 'message', group: 'messages', label: quoteOf(snippet(m.body, q, 80)), sub: ['Project message', shortDate(m.created_at)].filter(Boolean).join(' · '), href: `/crm.html?project=${m.project_id}&tab=activity` });
   for (const e of logged) { const d = e.detail || {}; add({ kind: 'note', group: 'notes', label: quoteOf(snippet(d.body, q, 80)), sub: [LOGGED_WORD[String(d.activity_kind)] || 'Note', shortDate(d.occurred_at || e.created_at)].filter(Boolean).join(' · '), href: dealHref(e.deal_id, 'activity') }); }
+  // sales item 192: the logs on a person or a customer with no deal open their record's history, named
+  if (personLogged.length) {
+    const cids = [...new Set(personLogged.map((e: any) => String(e.contact_id || '')).filter((x) => UUID_RE.test(x)))];
+    const kids = [...new Set(personLogged.map((e: any) => String(e.client_id || '')).filter((x) => UUID_RE.test(x)))];
+    const [ppl, cus] = await Promise.all([
+      cids.length ? read(`presence_contacts?site_id=eq.${S}&id=in.(${cids.join(',')})&select=id,name,email&limit=10`) : none,
+      kids.length ? read(`clients?id=in.(${kids.join(',')})&select=id,name,email&limit=10`) : none,
+    ]);
+    const nameOf: Record<string, string> = {};
+    for (const x of [...ppl, ...cus]) nameOf[String(x.id)] = String(x.name || x.email || '');
+    for (const e of personLogged) {
+      const said = hit(e.body) ? e.body : e.subject, who = nameOf[String(e.contact_id || e.client_id || '')];
+      const word = e.via === 'app' && e.kind === 'email' ? 'Email you sent' : LOGGED_WORD[String(e.kind)] || 'Note';
+      add({ kind: 'note', group: 'notes', label: quoteOf(snippet(said, q, 80)), sub: [who ? `${word} with ${who}` : word, shortDate(e.occurred_at || e.created_at)].filter(Boolean).join(' · '),
+        href: e.contact_id ? `/crm.html?contact=${e.contact_id}&tab=activity` : `/crm.html?client_id=${e.client_id}&tab=activity` });
+    }
+  }
   // the relationship notes kept on each client's record
   if (deep && sites.length) {
     const ids = sites.filter((w) => !w.own).map((w) => w.id);
@@ -720,7 +748,13 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
           .map((d) => ({ id: String(d.id), title: String(d.title || 'Deal'), stage: String(d.stage || 'lead'), value_cents: Number(d.expected_value_cents) || 0 }));
       } catch { return []; }
     })();
-    const [header, highlights, related_projects, related_deals] = await Promise.all([headerP, highlightsP, relatedProjectsP, relatedDealsP]);
+    // sales item 211: the person a "Good to know about them" note belongs to: the record's own person,
+    // else a customer's first person (Add a customer makes one), so a customer's record has the box too
+    const personP = (async (): Promise<string> => {
+      if (contactId || !clientId || !AS) return contactId;
+      try { return String(one(await svc(`presence_contacts?site_id=eq.${AS}&client_id=eq.${clientId}&deleted_at=is.null&select=id&order=created_at.asc&limit=1`))?.id || ''); } catch { return ''; }
+    })();
+    const [header, highlights, related_projects, related_deals, personId] = await Promise.all([headerP, highlightsP, relatedProjectsP, relatedDealsP, personP]);
 
     const sections = { overview: !!customerSiteId, messages: !!(projectId || clientId), deal: !!dealId, delivery: !!projectId, details: !!contactId };
     const default_tab = projectId ? 'delivery' : (dealId ? 'deal' : (customerSiteId ? 'overview' : 'details'));
@@ -728,7 +762,7 @@ export async function handleCrmRecord(req: Request, jwt: string, site: SiteRow, 
     const canonical = customerSiteId ? { key: 'client', value: customerSiteId } : (dealId ? { key: 'deal', value: dealId } : { key: 'contact', value: contactId });
 
     return json({ data: {
-      identity: { contact_id: contactId || null, deal_id: dealId || null, client_id: clientId || null, customer_site_id: customerSiteId || null, project_id: projectId || null },
+      identity: { contact_id: contactId || null, deal_id: dealId || null, client_id: clientId || null, customer_site_id: customerSiteId || null, project_id: projectId || null, person_id: personId || null },
       header, highlights, sections, default_tab, canonical, related_projects, related_deals,
     } }, 200, cors);
   } catch (_e) {

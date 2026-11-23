@@ -164,7 +164,7 @@ ok('helper: arrangeResults orders groups, caps them and shows a link once', (() 
   const r = await search('harbor');
   ok('one place failing: the rest answer, and it says partial', r.status === 200 && r.body?.data?.partial === true && (r.body?.data?.results || []).some((x) => x.label === 'Marcus Bell'));
   db.reset(world());
-  for (const t of ['presence_contacts', 'presence_deals', 'presence_projects', 'presence_service_links', 'presence_invoices', 'presence_form_submissions', 'presence_proposals', 'presence_estimates', 'presence_contracts', 'presence_deal_tasks', 'presence_tasks', 'presence_support_requests', 'presence_support_messages', 'presence_project_messages', 'presence_deal_events', 'presence_agency_clients']) db.fail.add(t);
+  for (const t of ['presence_contacts', 'presence_deals', 'presence_projects', 'presence_service_links', 'presence_invoices', 'presence_form_submissions', 'presence_proposals', 'presence_estimates', 'presence_contracts', 'presence_deal_tasks', 'presence_tasks', 'presence_support_requests', 'presence_support_messages', 'presence_project_messages', 'presence_deal_events', 'presence_person_events', 'presence_agency_clients']) db.fail.add(t);   // sales item 192: a person's own logs are a place too
   const all = await search('harbor');
   ok('every place failing: 502 with a sentence, never "nothing matches"', all.status === 502 && all.body?.error === 'read_failed' && /couldn’t load/.test(all.body?.message || ''));
   db.reset(world());

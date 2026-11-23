@@ -111,3 +111,20 @@ export function shortDate(iso: unknown): string {
   if (!Number.isFinite(t)) return '';
   return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
+
+/** What a logged line is called in the results (a deal's log, or one on a person or a customer). */
+export const LOGGED_WORD: Record<string, string> = { call: 'Logged call', email: 'Logged email', meeting: 'Logged meeting', note: 'Note' };
+
+/** Sales item 192: why a person was found when it wasn't by their name, email or company: their
+ *  job title, their town, a tag (the whole tag, as the list's filter reads one), or their second
+ *  phone by its digits. '' when none of those holds (the database's loose match is checked again
+ *  here). `ql` is the words in lower case, `tag` the words as a tag, `digits` a phone's. Pure. */
+export function personFoundBy(c: { job_title?: unknown; address?: unknown; tags?: unknown; phone2?: unknown }, ql: string, tag: string, digits: string): string {
+  const has = (v: unknown) => !!ql && String(v ?? '').toLowerCase().includes(ql);
+  const town = c.address && typeof c.address === 'object' ? (c.address as Record<string, unknown>).city : '';
+  if (has(c.job_title)) return String(c.job_title);
+  if (has(town)) return String(town);
+  if (tag && Array.isArray(c.tags) && c.tags.map(String).includes(tag)) return `tagged ${tag}`;
+  if (digits && phoneHas(c.phone2, digits)) return String(c.phone2);
+  return '';
+}
