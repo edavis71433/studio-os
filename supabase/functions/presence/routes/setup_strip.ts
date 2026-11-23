@@ -6,7 +6,7 @@
 import { json } from '../../_shared/http.ts';
 import { svc, svcCount } from '../lib/db.ts';
 import { readReservedJsonOrThrow, writeReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
-import { setupSteps, setupShows, setupHidden } from '../lib/setup_strip.ts';
+import { setupSteps, setupShows, setupHidden, businessDetailsDone } from '../lib/setup_strip.ts';
 import { normalizeGoalAi } from '../lib/sales_ai.ts';
 import { normalizePortal } from '../lib/portal_settings.ts';   // builder item 342
 import type { SiteRow } from '../lib/site.ts';
@@ -24,10 +24,9 @@ export async function handleSetupStrip(req: Request, site: SiteRow, principal: P
     return ok ? json({ data: { hidden: b.hidden } }, 200, cors) : json({ error: 'write_failed', message: 'That didn’t save just now. Try again.' }, 502, cors);
   }
   const S = site.id;
-  const [ident, loc, settings, services, contacts, deals, stored, goal, portal, clients] = await Promise.all([
-    first(`presence_identity?site_id=eq.${S}&select=business_name&limit=1`),
-    first(`presence_locations?site_id=eq.${S}&select=address_line1,city&limit=1`),
-    first(`presence_settings?site_id=eq.${S}&select=brand_kit,logo_media_id&limit=1`),
+  const [ident, settings, services, contacts, deals, stored, goal, portal, clients] = await Promise.all([
+    first(`presence_identity?site_id=eq.${S}&select=business_name,email,service_area&limit=1`),   // sales item 195: the Studio profile's boxes
+    first(`presence_settings?site_id=eq.${S}&select=brand_kit,logo_media_id,signs_as_name&limit=1`),
     first(`presence_sales_templates?site_id=eq.${S}&kind=eq.proposal&name=eq.__services_catalog__&deleted_at=is.null&select=line_items&order=updated_at.desc&limit=1`),
     svcCount(`presence_contacts?site_id=eq.${S}&deleted_at=is.null`),
     svcCount(`presence_deals?site_id=eq.${S}&deleted_at=is.null`),
@@ -38,7 +37,7 @@ export async function handleSetupStrip(req: Request, site: SiteRow, principal: P
     svcCount(`presence_service_links?agency_site_id=eq.${S}&status=eq.active`),
   ]);
   const steps = setupSteps({
-    business: ident && loc ? !!String(ident.row?.business_name || '').trim() && !!String(loc.row?.address_line1 || loc.row?.city || '').trim() : null,
+    business: businessDetailsDone(ident?.row, settings?.row, !!(ident && settings)),
     logo: settings ? !!(settings.row?.logo_media_id || settings.row?.brand_kit?.logo_media_id) : null,
     services: services ? Array.isArray(services.row?.line_items) && services.row.line_items.length > 0 : null,
     contact: contacts === null ? null : contacts > 0,

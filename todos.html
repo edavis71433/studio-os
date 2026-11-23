@@ -182,7 +182,10 @@ const ymd=(ms)=>ddsDate.ymd(ms==null?undefined:ms);   // the shell's local day; 
 const dayDiff=(a,b)=>Math.round((Date.UTC(+a.slice(0,4),+a.slice(5,7)-1,+a.slice(8,10))-Date.UTC(+b.slice(0,4),+b.slice(5,7)-1,+b.slice(8,10)))/86400000);
 // a day this week says its weekday ("Tue, Nov 18"); else the shell's day words: "Nov 3", with the year when it isn't this one
 const niceDay=(s,long)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return !m?'':long?new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}):ddsDate.short(m[0]);};
-function groupOf(t,today){if(!t.due)return'nodate';const d=dayDiff(t.due,today);return d<0?'over':d===0?'today':d<=6?'week':'later';}
+// sales items 158 + 204: a project step behind its project's next one (`later`, undated) waits in its own
+// group and counts nowhere, the way Home's My to-dos counts what is up now
+const upNow=(t)=>!t.later;
+function groupOf(t,today){if(t.later)return'wait';if(!t.due)return'nodate';const d=dayDiff(t.due,today);return d<0?'over':d===0?'today':d<=6?'week':'later';}
 function dueChip(t,today){
   if(!t.due)return'';const d=dayDiff(t.due,today);
   if(d<0)return`<span class="due over">${d===-1?'Yesterday':(-d)+' days late'}</span>`;
@@ -194,24 +197,25 @@ const KIND_TAG={next_step:'Next step',project_task:'Project step'};
 const forIcon=(t)=>t.kind==='project_task'?'project':t.for==='deal'||t.kind==='next_step'?'deal':'person';
 const whoChip=(t)=>t.for==='me'?'':`<a class="who" href="${esc(t.href)}" data-noscope="1">${svg(forIcon(t))}<span>${esc(t.context)}</span></a>`;
 const keyOf=(t)=>t.kind+':'+t.id;
-const GROUPS=[['over','Overdue'],['today','Today'],['week','This week'],['later','Later'],['nodate','No date']];
+const GROUPS=[['over','Overdue'],['today','Today'],['week','This week'],['later','Later'],['nodate','No date'],['wait','Waiting on an earlier step']];
 const SHOW_AT=5;   // a group shows its first five; the rest wait behind "Show N more"
 function whoKey(t){return t.for==='me'?'me':(t.kind==='project_task'?'project':t.for||'deal')+':'+t.parent_id;}
 function visible(){let items=(DATA&&DATA.items)||[];if(MINE&&teamOn())items=items.filter(mineItem);return WHO?items.filter(t=>whoKey(t)===WHO):items;}
-// the header's line: the whole open list (whoever it is for), what is late and what is due today
+// the header's line: the whole open list (whoever it is for), what is late and what is due today. Sales item 158:
+// it counts what Home's My to-dos counts (what is up now), and with a team how many are yours, Home's number
 function headLine(today){
-  const all=(DATA&&DATA.items)||[];if(!all.length)return'Nothing open right now';
+  const all=((DATA&&DATA.items)||[]).filter(upNow);if(!all.length)return'Nothing open right now';
   const over=all.filter(t=>groupOf(t,today)==='over').length,tod=all.filter(t=>groupOf(t,today)==='today').length;
-  return `${all.length} open${over?` · ${over} overdue`:''}${tod?` · ${tod} due today`:''}`;
+  return `${all.length} open${teamOn()?` · ${all.filter(mineItem).length} yours`:''}${over?` · ${over} overdue`:''}${tod?` · ${tod} due today`:''}`;
 }
 function render(focusSel){
   const today=ymd(),items=visible(),whoName=WHO&&WHO!=='me'?((DATA.items||[]).find(t=>whoKey(t)===WHO)||{}).context:'';
   const done=(DATA.done||[]).filter(t=>(!MINE||mineItem(t))&&(!WHO||(WHO==='me'?t.for==='me':t.context===whoName)));
   const by={};for(const [g] of GROUPS)by[g]=[];for(const t of items)by[groupOf(t,today)].push(t);
-  const counts={open:items.length,over:by.over.length,today:by.today.length,week:by.week.length,later:by.later.length+by.nodate.length,done:done.length};
+  const counts={open:items.filter(upNow).length,over:by.over.length,today:by.today.length,week:by.week.length,later:by.later.length+by.nodate.length,done:done.length};
   // who the list can be narrowed to: everyone it names
   const whos=[...new Map(((DATA&&DATA.items)||[]).filter(t=>t.for!=='me').map(t=>[whoKey(t),t.context])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
-  const all=(DATA&&DATA.items)||[];
+  const all=((DATA&&DATA.items)||[]).filter(upNow);
   const tog=teamOn()?`<div class="owntog" role="group" aria-label="Whose to-dos"><button type="button" data-own="mine" aria-pressed="${MINE?'true':'false'}">Mine <span class="n">${all.filter(mineItem).length}</span></button><button type="button" data-own="all" aria-pressed="${MINE?'false':'true'}">Everyone <span class="n">${all.length}</span></button></div>`:'';
   // builder item 165: the one page header (shell.css .dds-ph). Who the list is for sits beside the title;
   // the line counts the whole list; Print waits behind ⋯ on a phone; + Add a to-do takes you to the box below.
@@ -232,7 +236,7 @@ function render(focusSel){
     let any=false;
     for(const [g,label] of groups){
       const list=by[g];if(!list.length)continue;any=true;
-      const shut=g==='later'&&SHOW==='open'&&!OPENED.has(g);   // Later waits behind Show on the whole list
+      const shut=(g==='later'||g==='wait')&&SHOW==='open'&&!OPENED.has(g);   // Later (and the waiting steps) wait behind Show on the whole list
       const cut=OPENED.has(g)?list:list.slice(0,SHOW_AT);
       h+=`<div class="ghead ${g==='over'?'over':g==='today'?'today':''}"><span>${label} · ${list.length}</span>${shut?`<button type="button" class="glink" data-open="${g}" aria-expanded="false">Show ▾</button>`:''}</div>`;
       if(shut)continue;
@@ -262,21 +266,41 @@ function forOptions(){
   const o=(v,l)=>`<option value="${esc(v)}"${DRAFT.for===v?' selected':''}>${esc(l)}</option>`;
   let h=o('','For anyone');
   if(PICK){
-    if(PICK.people.length)h+=`<optgroup label="People">${PICK.people.map(c=>o('contact:'+c.id,c.name)).join('')}</optgroup>`;
-    if(PICK.customers.length)h+=`<optgroup label="Customers">${PICK.customers.map(c=>o('client:'+c.id,c.name)).join('')}</optgroup>`;
+    if(PICK.people.length)h+=`<optgroup label="People">${PICK.people.map(c=>o('contact:'+c.id,c.label||c.name)).join('')}</optgroup>`;
+    if(PICK.customers.length)h+=`<optgroup label="Customers">${PICK.customers.map(c=>o('client:'+c.id,c.label||c.name)).join('')}</optgroup>`;
     if(PICK.deals.length)h+=`<optgroup label="Open deals">${PICK.deals.map(d=>o('deal:'+d.id,d.title)).join('')}</optgroup>`;
   }
   return h;
+}
+// sales item 204: everyone, not the first 100. A read gives 100 at most, so the reads go page by page
+// until a short page (or `most`); a failed page keeps what came before it
+async function readAll(path,most){
+  const out=[];
+  for(let off=0;off<most;off+=100){
+    const r=await api(path+(path.includes('?')?'&':'?')+'limit=100&offset='+off);
+    const page=r&&r.ok&&r.body&&Array.isArray(r.body.data)?r.body.data:null;
+    if(!page)break;
+    out.push(...page);if(page.length<100)break;
+  }
+  return out;
+}
+// sales item 204: a name in both lists says which is which ("(person)", "(customer)"), and two of one name
+// in a list add the email, so no two choices read the same
+function pickLabels(list,kind,other){
+  const k=(s)=>String(s||'').trim().toLowerCase(),inOther=new Set(other.map(x=>k(x.name))),n=new Map();
+  for(const x of list)n.set(k(x.name),(n.get(k(x.name))||0)+1);
+  return list.map(x=>({...x,label:x.name+(n.get(k(x.name))>1&&x.email&&k(x.email)!==k(x.name)?' · '+x.email:'')+(inOther.has(k(x.name))?' ('+kind+')':'')}));
 }
 // the people, customers and open deals a new to-do can be for (read once, on first use)
 let PICK_P=null;
 function loadPick(){
   if(PICK_P)return PICK_P;
-  PICK_P=Promise.all([api('/sales/contacts?limit=100&sort=name'),api('/studio/customers'),api('/sales/deals?limit=100')]).then(([c,k,d])=>{
+  PICK_P=Promise.all([readAll('/sales/contacts?sort=name',5000),api('/studio/customers'),readAll('/sales/deals?open=1',2000)]).then(([c,k,d])=>{
     const rows=(r)=>r.ok&&r.body&&Array.isArray(r.body.data)?r.body.data:[];
-    PICK={people:rows(c).filter(x=>x&&x.id).map(x=>({id:x.id,name:x.name||x.email||'Someone'})),
-      customers:rows(k).filter(x=>x&&x.client_id).map(x=>({id:x.client_id,name:x.name||x.email||'A customer'})),
-      deals:rows(d).filter(x=>x&&x.id&&['lead','qualified','proposal','contract'].includes(x.stage)&&!x.converted_client_id).map(x=>({id:x.id,title:x.title||'A deal'}))};
+    const people=c.filter(x=>x&&x.id).map(x=>({id:x.id,name:x.name||x.email||'Someone',email:x.email||''}));
+    const customers=rows(k).filter(x=>x&&x.client_id).map(x=>({id:x.client_id,name:x.name||x.email||'A customer',email:x.email||''}));
+    PICK={people:pickLabels(people,'person',customers),customers:pickLabels(customers,'customer',people),
+      deals:d.filter(x=>x&&x.id&&['lead','qualified','proposal','contract'].includes(x.stage)&&!x.converted_client_id).map(x=>({id:x.id,title:x.title||'A deal'}))};
     const sel=$('addFor');if(sel&&document.activeElement!==sel){sel.innerHTML=forOptions();}
   }).catch(()=>{PICK_P=null;});
   return PICK_P;
@@ -346,7 +370,7 @@ async function add(e){
 function printTodos(){
   const k=window.ddsListKit;if(!k||!k.printList)return;
   const today=ymd(),items=visible();
-  k.printList({title:'To-dos',sub:[items.length+' open','printed '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})].join(' · '),
+  k.printList({title:'To-dos',sub:[items.filter(upNow).length+' open','printed '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})].join(' · '),
     cols:[{label:'To-do'},{label:'For'},{label:'Due'}],
     rows:items.map(t=>[t.title,t.for==='me'?'You':t.context,t.due?(dayDiff(t.due,today)<0?'Overdue, ':'')+niceDay(t.due):''])});
 }

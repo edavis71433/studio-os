@@ -969,7 +969,8 @@
     invoices: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',   // …and Invoices
     note: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
     money: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',
-    phone: '<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>'
+    phone: '<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/>',
+    prospects: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.5"/>'   // builder item 428: local businesses to pitch, a pin (it fell back to the small dot)
   };
   function icon(key, cls) { return '<svg class="' + (cls || 'nic') + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (ICON[key] || ICON.dot) + '</svg>'; }
   // ── What's new (builder list item 128) ─────────────────────────────────────
@@ -2351,7 +2352,10 @@
     // Item 96: the role and the plan in words, not their codes ("business owner · presence")
     var ROLE_WORDS = { business_owner: 'Owner', business_staff: 'Team member', client_reviewer: 'Client', developer: 'Developer' };
     var roleWord = ROLE_WORDS[role] || (role ? role.replace(/_/g, ' ').replace(/^\w/, function (c) { return c.toUpperCase(); }) : '');
-    var plan = (CTX && CTX.edition_name && role !== 'client_reviewer') ? CTX.edition_name + ' plan' : '';
+    // builder item 426: the plan in the words Sites uses ("Website + tools plan"), none with no plan on
+    // file; only a server from before it (no plan_words) still sends just the edition's name
+    var planW = CTX ? ('plan_words' in CTX ? CTX.plan_words : CTX.edition_name) : '';
+    var plan = (planW && role !== 'client_reviewer') ? planW + ' plan' : '';
     // builder item 201: Help first. A phone (under 420px) has no room for the ? button, and the
     // first-day tour has always said help lives in this menu.
     var rows = '<a class="row" href="/help.html" id="dds-help-row">Help<span class="sub">Ask how to do something, or open Help</span></a>';

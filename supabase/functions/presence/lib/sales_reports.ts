@@ -77,7 +77,9 @@ export const LOST_REASONS = ['Price', 'Timing', 'Went with someone else', 'No re
 // Final pass (Nov 8, batch C): "Not a fit for us" read like the stage itself. Deals already
 // marked with the old words count with the new ones.
 const REASON_ALIAS: Record<string, string> = { 'not a fit for us': 'Outside what we do' };
-export const SOURCE_LABEL: Record<string, string> = { website_form: 'Website enquiry', manual: 'Added by hand', import: 'Imported', referral: 'Referral', email: 'Email' };
+// sales item 196: the same words as Pipeline's list and the record (pipeline.html SOURCE_WORDS), so a deal
+// "Added by you" there is "Added by you" in Analytics too (it said "Added by hand")
+export const SOURCE_LABEL: Record<string, string> = { manual: 'Added by you', enquiry: 'From your website', form: 'From your website', website_form: 'From your website', import: 'Imported', referral: 'From a referral', prospecting: 'From Prospects', free_tools: 'From a free tool', example: 'Example deal', email: 'From an email' };
 export const sourceLabel = (s: unknown) => { const k = String(s || '').trim(); return SOURCE_LABEL[k] || (k ? k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' ') : 'Not recorded'); };
 /** One spelling per reason: the five offered reasons match whatever the case; anything else groups by its own words. */
 export function reasonLabel(r: unknown): string {

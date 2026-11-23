@@ -20,7 +20,7 @@ import { buildNav, landingFor, normalizeHidden } from '../lib/navigation.ts';
 import { readReservedJson, updateReservedJson, RESERVED_NAMES } from '../lib/reserved_store.ts';
 import { runAfterResponse } from '../lib/after_response.ts';
 import { editionFromPlan, editionFromSite, featuresOf, editionFlags, featureDelta, EDITION_DEFS, type EditionKey } from '../commerce/editions.ts';
-import { nextPlanUp } from '../commerce/catalog.ts';
+import { nextPlanUp, planWords } from '../commerce/catalog.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { filterForRole, visibleTo } from '../lib/visibility.ts';
 import { svc, svcCount } from '../lib/db.ts';
@@ -321,6 +321,7 @@ export async function handlePortalContext(jwt: string, site: SiteRow, principal:
     site_live: !!siteLive,               // sales review item 24: the client Overview's Website tile (hosted elsewhere · live · not live yet)
     edition_key: editionKey,             // Phase D: the FEATURE edition (cms_only … enterprise)
     edition_name: EDITION_DEFS[editionKey]?.name || '',
+    plan_words: planWords(planKey),     // builder item 426: the plan as Sites says it ("Website + tools"); '' with no plan on file
     edition_features: featuresOf(editionKey),
     edition_flags: editionFlags(editionKey),
     plan_key: planKey,                   // Phase P: what they own, by name
