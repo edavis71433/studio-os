@@ -40,6 +40,10 @@ export interface LocationContent {
   /** Builder list item 127 (0182): a second location's name for itself ("Glendale"), and
    *  true when it keeps the main location's hours. Only ever on locations[1]. */
   label?: string; same_hours?: true;
+  /** Builder list item 334 (0255): the business goes to its customers. Only ever on
+   *  locations[0], and only when true, so every other site is unchanged. The site then shows
+   *  identity.service_area where the address was and offers no directions. */
+  goes_to_customers?: true;
 }
 
 export interface SnapshotContent {

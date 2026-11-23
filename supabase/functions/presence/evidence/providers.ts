@@ -184,8 +184,13 @@ export const PROVIDERS: Provider[] = [
       const missing = DAY_KEYS.filter((d) => { const e = set.get(d); return !e || (!e.closed && !(e.intervals || []).length); });
       if (missing.length) emit('business_info.hours_incomplete', 'draft', 'hours', { days: missing.join(', ') });
       if (!(loc.holiday_exceptions || []).length) emit('business_info.holiday_hours_missing', 'draft', 'holiday_exceptions');
-      for (const f of ['address_line1', 'city', 'postal_code'] as const) {
-        if (!String(loc[f] || '').trim()) emit('business_info.address_incomplete', 'draft', f, { field: f.replace(/_/g, ' ') });
+      // builder list item 334: a business that goes to its customers names its areas, not a street
+      if (loc.goes_to_customers === true) {
+        if (!String(id.service_area || '').trim()) emit('business_info.address_incomplete', 'draft', 'service_area', { field: 'service area' });
+      } else {
+        for (const f of ['address_line1', 'city', 'postal_code'] as const) {
+          if (!String(loc[f] || '').trim()) emit('business_info.address_incomplete', 'draft', f, { field: f.replace(/_/g, ' ') });
+        }
       }
       if (loc.temporarily_closed && i.lastLocationChangeAt) {
         const d = daysBetween(i.now, i.lastLocationChangeAt);
@@ -239,7 +244,7 @@ export const PROVIDERS: Provider[] = [
       const missing: string[] = [];
       if (!/tel:/i.test(home.html)) missing.push('tappable phone');
       const loc = i.draft.locations?.[0];
-      if (loc?.address_line1 && !home.html.includes(loc.address_line1)) missing.push('street address');
+      if (loc?.address_line1 && loc.goes_to_customers !== true && !home.html.includes(loc.address_line1)) missing.push('street address');
       if (missing.length) emit('local_presence.map_signal_missing', 'render', '/', { missing: missing.join(', ') });
     }
   } },

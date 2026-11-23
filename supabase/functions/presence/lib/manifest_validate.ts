@@ -8,6 +8,7 @@ import type { SiteBlock, SnapshotContent } from './render_types.ts';
 import { sectionIdsFor } from './site_blocks.ts';
 import { jumpTarget, sectionLinks } from './section_links.ts';
 import { sampleWordWarnings } from './sample_words_check.ts';
+import { isStandIn } from './stand_in.ts';
 
 export interface ValidationResult {
   ok: boolean;
@@ -37,7 +38,11 @@ export function validateSnapshot(snapshot: Snapshot, manifest: TemplateManifest)
   const l = c.locations?.[0] ?? null;
   if (!l) b.push({ field: 'location', message: 'Your address and hours are required before publishing.' });
   else {
-    for (const [f, label] of [['address_line1', 'street address'], ['city', 'city'], ['region', 'state'], ['postal_code', 'ZIP code'], ['timezone', 'timezone']] as const) {
+    // Builder list item 334: a business that goes to its customers has no shopfront to show,
+    // so it names the places it serves instead of a street, city, state and ZIP.
+    const goes = l.goes_to_customers === true;
+    if (goes && !i?.service_area?.trim()) b.push({ field: 'identity.service_area', message: 'Say where you work, the towns or areas you serve. It shows where an address would.' });
+    for (const [f, label] of (goes ? [['timezone', 'timezone']] : [['address_line1', 'street address'], ['city', 'city'], ['region', 'state'], ['postal_code', 'ZIP code'], ['timezone', 'timezone']]) as ReadonlyArray<readonly [string, string]>) {
       if (!(l as any)[f]?.trim?.()) b.push({ field: `location.${f}`, message: `Your ${label} is required before publishing.` });
     }
     const days = Array.isArray(l.hours) ? l.hours : [];
@@ -98,6 +103,8 @@ export function validateSnapshot(snapshot: Snapshot, manifest: TemplateManifest)
   for (const message of deadJumps(c)) w.push({ field: 'links', message });
   // item 275: sections still carrying the sample words a new section arrives with (a warning, never a block)
   for (const warn of sampleWordWarnings(c)) w.push(warn);
+  // item 332: a first draft opens with a stand-in picture until a real photo is swapped in (a warning, never a block)
+  if (isStandIn(c.settings?.cover?.alt)) w.push({ field: 'settings.cover', message: 'The photo at the top of your home page is a stand-in picture. Swap it for a photo of the business before people see it.' });
 
   // contract/template compatibility
   if (snapshot.content_contract_version !== manifest.content_contract_version) {

@@ -8,6 +8,8 @@ import { composeBlocks } from '../../supabase/functions/presence/lib/serializer.
 import type { Snapshot, FileMap } from '../../supabase/functions/presence/lib/render_types.ts';
 import { SAMPLE_BLOCKS, FILE_ID } from './samples.ts';
 import { listReadyPages } from '../../supabase/functions/presence/lib/page_layouts.ts';
+import { FAMILIES, familyOf } from '../../supabase/functions/presence/lib/design_gallery.ts';
+import { sampleSnapshot } from '../../supabase/functions/presence/lib/kind_samples.ts';
 
 const ROOT = new URL('../../', import.meta.url);
 const SITE = { baseUrl: 'https://example.com' };
@@ -58,11 +60,28 @@ const reviews = { items: [
 // A divider alone is a line on an empty page, so it gets text after it to divide.
 const COMPANY: Record<string, string[]> = { toc: ['title', 'features', 'process'], divider: ['richtext', 'features'] };
 
-/** Each template's sample site. */
+/** Each template's sample site. Item 331: its photos are the stand-in picture for its own kind
+ *  of business (thumbs/stand-ins), not the soft placeholder; the placeholders are still numbered
+ *  as before, so the section pictures keep theirs. */
 export async function templatePages(): Promise<Record<string, FileMap>> {
   const out: Record<string, FileMap> = {};
-  for (const slug of TEMPLATES) out[slug] = await renderSnapshot(fixture(slug), SITE);
+  for (const slug of TEMPLATES) {
+    const fx = fixture(slug);
+    const own = familyOf(fx.content.settings?.industry);
+    out[slug] = await renderSnapshot(JSON.parse(JSON.stringify(fx).replace(/\/ph\/\d+\.svg/g, `/thumbs/stand-ins/${own}.jpg`)), SITE);
+  }
   return out;
+}
+/** Item 331: every design drawn with every kind's sample business, so a salon owner sees
+ *  eight salons. Keyed "<template>/<family>". */
+export async function kindPages(): Promise<Record<string, FileMap>> {
+  const out: Record<string, FileMap> = {};
+  for (const slug of TEMPLATES) for (const f of FAMILIES) out[`${slug}/${f}`] = await renderSnapshot(sampleSnapshot(f, slug)!, SITE);
+  return out;
+}
+/** The stand-in pictures the pages load, from the app's own copies. */
+export function standInFiles(): Record<string, Uint8Array> {
+  return Object.fromEntries(FAMILIES.map((f) => [`thumbs/stand-ins/${f}.jpg`, Deno.readFileSync(new URL(`thumbs/stand-ins/${f}.jpg`, ROOT))]));
 }
 /** One page per section type, on Business Classic with the built-in sections hidden. */
 export async function sectionPages(): Promise<Record<string, FileMap>> {
@@ -113,24 +132,27 @@ export function placeholderFiles(): Record<string, string> {
 export async function allPages() {
   media.clear();
   // the ready-made pages come last, so the pictures before them keep their placeholder numbers
-  const templates = await templatePages(), sections = await sectionPages(), pages = await readyPages();
-  return { templates, sections, pages, ph: placeholderFiles() };
+  const templates = await templatePages(), sections = await sectionPages(), pages = await readyPages(), kinds = await kindPages();
+  return { templates, sections, pages, kinds, ph: { ...placeholderFiles(), ...standInFiles() } };
 }
 
 /** What each picture shows, as a digest: its page, the stylesheet and the placeholders the
  *  page loads. shoot.mjs records it beside the picture; the test compares it with today's. */
 export async function pictureSources(): Promise<Record<string, string>> {
-  const { templates, sections, pages, ph } = await allPages();
-  const sha = async (s: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const { templates, sections, pages, kinds, ph } = await allPages();
+  const hex = async (b: Uint8Array) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', b))].map((x) => x.toString(16).padStart(2, '0')).join('');
+  const sha = (s: string) => hex(new TextEncoder().encode(s));
   const shown = async (files: FileMap) => {
     const page = String(files['index.html']);
     const used = Object.keys(files).filter((k) => k.startsWith('assets/')).sort().map((k) => [k, String(files[k])]);
-    for (const n of new Set([...page.matchAll(/\/ph\/(\d+)\.svg/g)].map((m) => m[1]))) used.push([`ph/${n}.svg`, ph[`ph/${n}.svg`]]);
+    for (const n of new Set([...page.matchAll(/\/ph\/(\d+)\.svg/g)].map((m) => m[1]))) used.push([`ph/${n}.svg`, String(ph[`ph/${n}.svg`])]);
+    for (const f of new Set([...page.matchAll(/\/thumbs\/stand-ins\/(\w+)\.jpg/g)].map((m) => m[1]))) used.push([`thumbs/stand-ins/${f}.jpg`, await hex(ph[`thumbs/stand-ins/${f}.jpg`] as Uint8Array)]);
     return sha(JSON.stringify([['index.html', page], ...used]));
   };
   const out: Record<string, string> = {};
   for (const [slug, files] of Object.entries(templates)) out[`templates/${slug}.jpg`] = await shown(files);
   for (const [type, files] of Object.entries(sections)) out[`sections/${type}.jpg`] = await shown(files);
   for (const [key, files] of Object.entries(pages)) out[`pages/${key}.jpg`] = await shown(files);
+  for (const [key, files] of Object.entries(kinds)) out[`templates/${key}.jpg`] = await shown(files);
   return out;
 }
