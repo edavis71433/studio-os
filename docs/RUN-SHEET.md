@@ -25,6 +25,8 @@ Release in batches, a few times a day (morning, early afternoon, evening Pacific
 
 Releases wait their turn: a second one waits for the first. A waiting run that GitHub cancels was replaced by a newer one carrying the same code: don't rerun it.
 
+- Every Monday: add a short entry to `whats-new.json` for each change that went live the week before, newest first, in words for the studio (an entry gets `client` words only when it changes the portal, and never names a client). Builder item 429.
+
 ## Undo a release
 
 Actions, "Rollback Functions", Run workflow: the commit to go back to, and type `rollback-production`. Or: `gh workflow run rollback.yml --repo edavis71433/studio-os -f ref=<commit> -f confirm=rollback-production`.
