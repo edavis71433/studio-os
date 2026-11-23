@@ -221,7 +221,10 @@ function hoursTable(c: SnapshotContent, caption: string): string {
 // that shows the list carries it (lib/page_weight.ts): 'sv' writes a day as 2026-11-26, the way each
 // date's <time datetime> holds it, and a date still to come counts itself in k. It opens like the
 // renderer's other scripts, "(function(){", which render_test.mjs's hostile-words check knows as ours.
-export const SPECIAL_JS = `(function(){try{document.querySelectorAll('.holiday').forEach(b=>{let t=new Date().toLocaleDateString('sv',{timeZone:b.dataset.tz}),k=0;b.querySelectorAll('time').forEach(e=>e.parentNode.hidden=e.dateTime<t||!++k);b.hidden=!k})}catch(e){}})()`;
+// (The string starts on its own line: `supabase functions serve` reads a quoted '.holiday' on an
+// export line as a file to load; tests/workflows/isolation_scope_test.mjs holds that.)
+export const SPECIAL_JS =
+  `(function(){try{document.querySelectorAll('.holiday').forEach(b=>{let t=new Date().toLocaleDateString('sv',{timeZone:b.dataset.tz}),k=0;b.querySelectorAll('time').forEach(e=>e.parentNode.hidden=e.dateTime<t||!++k);b.hidden=!k})}catch(e){}})()`;
 
 function contactBits(c: SnapshotContent): { addr: string; tel: string; mail: string } {
   const l = loc0(c); const i = c.identity;

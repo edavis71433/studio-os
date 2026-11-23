@@ -2619,7 +2619,9 @@ textarea.stk-in{line-height:1.55;resize:vertical}
   .biz-card button{min-height:44px}
   #designCard .ins-heros button{min-height:44px}   /* builder item 330: the front-page layouts */
   .biz-card .hrow .closedlab{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;margin:0 -16px}   /* a day's Closed box: its label takes the tap */
-  .biz-card .sd-times .closedlab{min-height:44px}   /* item 432: a special date's Closed all day */
+  .biz-card .sd-times .closedlab{min-height:44px;padding-left:16px;margin-left:-16px}   /* item 432: a special date's Closed all day, its tap all round its box */
+  /* the phone line (item 432): "Closed" then its box, the label's tap running past the row's end, never over the closing time */
+  @container (max-width:470px){.biz-card .hrow label.closedlab{flex-direction:row-reverse;padding:0 16px 0 0;margin:0 -16px 0 auto}}
 }
 /* the editor keeps the sidebar's class on a phone, where the shell's search kept its 150px and its words:
    the header ran 40px off the screen and Account sat outside it (found by item 98's walk) */
