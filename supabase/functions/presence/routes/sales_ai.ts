@@ -27,6 +27,7 @@ import { resolveMemberSite } from '../lib/workspace.ts';
 import { resolveAgencyMember } from '../agency/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { DEFAULT_STAGE_LABEL } from '../lib/stage_names.ts';
+import { emailMatch } from '../lib/contact_email.ts';
 import {
   AI_DAY_LIMIT, AI_CENTS_SAID, normalizeGoalAi, applyGoalAi, costCents, monthStartIso, draftMessages, summaryMessages,
   cleanDraft, parseSummary, draftFrom, type GoalAi, type SalesFacts,
@@ -94,7 +95,7 @@ export async function handleGoalAi(req: Request, jwt: string, site: SiteRow, pri
       return 'value' in r ? r.value : normalizeGoalAi(stored);
     }, who(principal) || 'system');
     if (!saved) return say(502, 'write_failed', 'That didn’t save just now. Try again.', cors);
-    return json({ data: { goal_cents: saved.goal_cents, ai_on: saved.ai_on, ai_on_at: saved.ai_on_at } }, 200, cors);
+    return json({ data: { goal_cents: saved.goal_cents, ai_on: saved.ai_on, ai_on_at: saved.ai_on_at, writing: saved.writing } }, 200, cors);
   }
   const payer = await payerOf(jwt, site, principal);
   const nowMs = Date.now();
@@ -109,6 +110,7 @@ export async function handleGoalAi(req: Request, jwt: string, site: SiteRow, pri
   return json({ data: {
     goal_cents: goal.goal_cents,
     ai_on: !!ai?.ai_on, ai_on_at: ai?.ai_on_at || null, can_switch: switchable, from_studio: !!principal.scope,
+    writing: (ai || goal).writing,   // item 211: "How I write, and my terms", the studio's own
     ready: ready && !!claudeKey(),
     usage: usage ? { ...usage, day_limit: AI_DAY_LIMIT, cents_each: AI_CENTS_SAID } : null,
   } }, 200, cors);
@@ -159,7 +161,7 @@ export async function askClaude(system: string, user: string, maxTokens: number,
 }
 
 // ── what a press may do: on, ready, under the day's limit, under the spend cap ──────────
-async function gate(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<{ payer: string; used: number } | Response> {
+async function gate(jwt: string, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<{ payer: string; used: number; writing: string } | Response> {
   const payer = await payerOf(jwt, site, principal);
   if (!payer) return say(409, 'ai_off', 'AI help is off. Ask the studio’s owner to switch it on.', cors, { can_switch: false });
   let st: GoalAi;
@@ -173,7 +175,7 @@ async function gate(jwt: string, site: SiteRow, principal: Principal, cors: Reco
   if (used === null) return say(502, 'read_failed', 'Couldn’t check today’s count just now. Try again.', cors);
   if (used >= AI_DAY_LIMIT) return say(429, 'day_limit', `That’s ${AI_DAY_LIMIT} AI helps today (about ${AI_DAY_LIMIT * AI_CENTS_SAID}¢). It starts again tomorrow.`, cors);
   if (await spendCapReached()) return say(503, 'resting', 'AI help is resting until tomorrow. Everything else works as usual.', cors);
-  return { payer, used };
+  return { payer, used, writing: st.writing };
 }
 
 /** Every call is written down, worked or not: it counts toward the day's 50 and the month's
@@ -199,6 +201,22 @@ async function businessOf(siteId: string): Promise<{ business: string; services:
   };
 }
 
+/** Sales item 211: the owner's "Good to know about them" for a person, found the way each press
+ *  knows them: the record's person, else a customer's first person, else the person with that
+ *  email (an enquiry, a request). '' when there is none, or before APPLY-0287 (the read is refused
+ *  and the press goes on without it). */
+export async function goodToKnowFor(siteId: string, who: { contactId?: string | null; clientId?: string | null; email?: string | null }): Promise<string> {
+  if (!UUID_RE.test(String(siteId || ''))) return '';
+  const base = `presence_contacts?site_id=eq.${siteId}&deleted_at=is.null`;
+  const path = UUID_RE.test(String(who.contactId || '')) ? `${base}&id=eq.${who.contactId}`
+    : UUID_RE.test(String(who.clientId || '')) ? `${base}&client_id=eq.${who.clientId}&order=created_at.asc`
+    : /@/.test(String(who.email || '')) ? `${base}&${emailMatch(String(who.email))}`
+    : '';
+  if (!path) return '';
+  const row = rows(await svc(`${path}&select=good_to_know&limit=1`).catch(() => null))[0];
+  return String(row?.good_to_know || '').trim();
+}
+
 // the keys the record page reads its history with (crm.html loadActivity); inside a client the scope alone names them
 const RECORD_KEYS = ['contact', 'deal', 'project', 'client_id'] as const;
 type Gathered = { facts: SalesFacts; subject: string; lastCallAt: string | null } | { status: number; error: string; message: string };
@@ -215,6 +233,7 @@ async function recordFacts(jwt: string, site: SiteRow, principal: Principal, pay
     handleCrmActivity(new Request(`https://presence.local/crm/activity?${q}`), jwt, site, principal, {}),
     businessOf(payer),
   ]);
+
   if (rr.status === 403) return { status: 403, error: 'forbidden', message: 'Only your studio can use AI help on a record.' };
   const rec = (await rr.json().catch(() => null))?.data, act = (await ar.json().catch(() => null))?.data;
   if (!rr.ok || !rec?.canonical?.value) return { status: rr.status === 404 ? 404 : 502, error: 'read_failed', message: 'Couldn’t read this record just now. Try again.' };
@@ -233,6 +252,8 @@ async function recordFacts(jwt: string, site: SiteRow, principal: Principal, pay
     upcoming: (Array.isArray(act.upcoming) ? act.upcoming : []).map((x: any) => ({ title: String(x?.title || ''), due: x?.due || null, overdue: !!x?.overdue })).filter((x: any) => x.title),
     thread: said.slice(0, 12).reverse().map((i) => ({ at: i.at, who: String(i.title || ''), text: String(i.body || '') })),
     timeline: rest.slice(0, 40).map((i) => ({ at: i.at, text: `${i.title || ''}${i.body ? `: ${i.body}` : ''}` })),
+    // item 211: the person's note, read on the studio's book (where the record's people live)
+    good_to_know: await goodToKnowFor(payer, { contactId: rec.identity?.person_id || rec.identity?.contact_id, clientId: rec.identity?.client_id }),
   };
   return { facts, subject: `${rec.canonical.key}:${rec.canonical.value}`, lastCallAt: rest.find((i) => i.type === 'call')?.at || null };
 }
@@ -247,8 +268,9 @@ async function enquiryFacts(site: SiteRow, id: string): Promise<Gathered> {
   const s = rows(r)[0];
   if (!s) return { status: 404, error: 'not_found', message: 'That enquiry isn’t here any more.' };
   const name = String(s.name || s.email || 'They');
+  const good = await goodToKnowFor(site.id, { email: s.email });   // item 211: someone you already know
   return {
-    facts: { ...biz, person: { name: s.name || '', email: s.email || '' }, deal: null, upcoming: [], timeline: [],
+    facts: { ...biz, person: { name: s.name || '', email: s.email || '' }, deal: null, upcoming: [], timeline: [], good_to_know: good,
       thread: [{ at: s.created_at, who: `${name} wrote through the website${s.source_page ? ` (from ${s.source_page})` : ''}`, text: String(s.message || 'They left their details without a message.') }] },
     subject: `enquiry:${id}`, lastCallAt: null,
   };
@@ -266,8 +288,9 @@ async function supportFacts(jwt: string, site: SiteRow, principal: Principal, id
   const email = /@/.test(String(q.requester || '')) ? String(q.requester) : '';
   const named = String(msgs.find((m) => m && m.author_kind === 'client' && m.author)?.author || '');
   const asker = named || email || 'The client';
+  const good = await goodToKnowFor(site.id, { email });   // item 211
   return {
-    facts: { ...biz, person: { name: named, email }, deal: null, upcoming: [], timeline: [],
+    facts: { ...biz, person: { name: named, email }, deal: null, upcoming: [], timeline: [], good_to_know: good,
       thread: [
         { at: q.created_at, who: `${asker} asked for help: ${String(q.subject || 'a request')}`, text: String(q.body || '') },
         ...msgs.map((m) => ({ at: m.created_at, who: m.author_kind === 'client' ? asker : 'You', text: String(m.body || '') })),
@@ -288,6 +311,7 @@ export async function handleAiDraft(req: Request, jwt: string, site: SiteRow, pr
     : kind === 'support' ? await supportFacts(jwt, site, principal, String(b.id))
     : await recordFacts(jwt, site, principal, g.payer, b);
   if ('status' in got) return say(got.status, got.error, got.message, cors);
+  got.facts.writing = g.writing;   // item 211: "How I write, and my terms", the studio's (the payer's) own
   const m = draftMessages(got.facts, String(b?.typed || '').slice(0, 4000), String(b?.subject || '').slice(0, 200));
   const asked = await askClaude(m.system, m.user, 1200);
   const text = asked.ok ? cleanDraft(asked.text) : '';

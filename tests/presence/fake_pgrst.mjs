@@ -9,7 +9,7 @@
 //   db.writes('presence_sales_templates')      // what it wrote
 //
 // It understands the filters the presence function uses: eq / neq / is /
-// in.(…) / like / ilike / gte / lte / gt / lt / cs.{…} (array contains), not.<op>, or=(…) with quoted
+// in.(…) / like / ilike / match / imatch / gte / lte / gt / lt / cs.{…} (array contains), not.<op>, or=(…) with quoted
 // values, and a jsonb path column (detail->>key); select is ignored (whole rows
 // come back); order (every key, in turn), offset and limit apply. POST honours on_conflict + Prefer resolution=ignore|merge-
 // duplicates, and the `unique` keys (with an optional row predicate, for a
@@ -53,7 +53,7 @@ export function installFakePostgrest(opts = {}) {
   // and a backslash makes the next character itself ("jane\\_doe" is a literal underscore)
   const likeRe = (p, flags) => { let re = ''; const t = String(p); for (let i = 0; i < t.length; i++) { const ch = t[i]; if (ch === '\\' && i + 1 < t.length) { re += t[++i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); continue; } if (ch === '%' || ch === '*') re += '.*'; else if (ch === '_') re += '.'; else re += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); } return new RegExp('^' + re + '$', flags); };
   const test = (row, col, expr) => {
-    const m = /^(not\.)?(eq|neq|is|in|like|ilike|gte|lte|gt|lt|cs)\.(.*)$/s.exec(expr);
+    const m = /^(not\.)?(eq|neq|is|in|like|ilike|match|imatch|gte|lte|gt|lt|cs)\.(.*)$/s.exec(expr);
     if (!m) return true;
     // a JSON path (detail->>message_id) reads inside a jsonb column, as text, like PostgREST
     const [, not, op, raw] = m; const jp = /^(\w+)->>(\w+)$/.exec(col); const v = jp ? (row[jp[1]] && typeof row[jp[1]] === 'object' && row[jp[1]][jp[2]] != null ? String(row[jp[1]][jp[2]]) : null) : row[col]; let r;
@@ -63,6 +63,8 @@ export function installFakePostgrest(opts = {}) {
     else if (op === 'in') r = splitTop(raw.replace(/^\(|\)$/g, '')).map(unq).includes(String(v));
     else if (op === 'like') r = v != null && likeRe(unq(raw), 's').test(String(v));
     else if (op === 'ilike') r = v != null && likeRe(unq(raw), 'is').test(String(v));
+    // match / imatch: a POSIX regular expression (~ / ~*), read here as a JavaScript one (sales item 192)
+    else if (op === 'match' || op === 'imatch') r = v != null && new RegExp(unq(raw), op === 'imatch' ? 'si' : 's').test(String(v));
     // cs.{a,"b c"}: an array column holding every one of those values (tags @> '{a,b c}')
     else if (op === 'cs') { const want = splitTop(raw.replace(/^\{|\}$/g, '')).map(unq).filter((x) => x !== ''); r = Array.isArray(v) && want.every((w) => v.map(String).includes(w)); }
     else if (op === 'gte') r = String(v ?? '') >= unq(raw); else if (op === 'lte') r = String(v ?? '') <= unq(raw);
@@ -89,6 +91,17 @@ export function installFakePostgrest(opts = {}) {
     return null;
   };
 
+  // db.honourSelect (a Set of table names, or true for every table): a read gives back only the
+  // columns its select= names, as PostgREST does. Off by default: most suites seed whole rows and
+  // read them back. Sales item 201's follow-up: the day-later sweep's guard read `status`, which its
+  // select left out, so on the real database it never fired, while here it always did.
+  // A select with anything but plain column names (an embed, an alias, a JSON path, *) is left whole.
+  const picked = (table, sel, r) => {
+    const on = db.honourSelect === true || (db.honourSelect instanceof Set && db.honourSelect.has(table));
+    const cols = on && sel && sel !== '*' ? splitTop(sel).map((c) => c.trim()) : null;
+    if (!cols || !cols.every((c) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(c))) return { ...r };
+    return Object.fromEntries(cols.filter((c) => c in r).map((c) => [c, r[c]]));
+  };
   globalThis.fetch = async (url, init = {}) => {
     const u = new URL(String(url));
     const method = (init.method || 'GET').toUpperCase();
@@ -120,7 +133,7 @@ export function installFakePostgrest(opts = {}) {
       if (keys.length) out = [...out].sort((a, b) => { for (const [col, dir] of keys) { const x = String(a[col] ?? ''), y = String(b[col] ?? ''); if (x !== y) return (x < y ? -1 : 1) * (dir === 'desc' ? -1 : 1); } return 0; });
       const off = Math.max(0, Number(u.searchParams.get('offset') || 0)); if (off) out = out.slice(off);
       const lim = Number(u.searchParams.get('limit') || 0); if (lim) out = out.slice(0, lim);
-      return method === 'HEAD' ? new Response(null, { status: 200, headers: { 'content-range': `*/${out.length}` } }) : reply(out.map((r) => ({ ...r })));
+      return method === 'HEAD' ? new Response(null, { status: 200, headers: { 'content-range': `*/${out.length}` } }) : reply(out.map((r) => picked(table, u.searchParams.get('select'), r)));
     }
     const prefer = h.get('Prefer') || ''; const rep = prefer.includes('return=representation');
     if (method === 'POST') {
