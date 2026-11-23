@@ -44,11 +44,12 @@ ${contact ? `<p style="font-size:14px;line-height:1.7;margin:18px 0 0">In the me
  *  (root + 404 fallback), a full-disallow robots.txt, and the SAME response-level
  *  security headers every tenant deploy carries, plus X-Robots-Tag noindex
  *  (defense-in-depth with the <meta>). Pure + deterministic. */
-export function offlineFileMap(html: string): Record<string, string> {
+export function offlineFileMap(html: string, opts: { strongHsts?: boolean } = {}): Record<string, string> {
   return {
     'index.html': html,
     '404.html': html,                                     // any deep link shows the same honest page
     'robots.txt': 'User-agent: *\nDisallow: /\n',
-    '_headers': mergeSecurityHeaders('/*\n  X-Robots-Tag: noindex, nofollow\n'),
+    // builder item 390: the same "HTTPS only" the site's own pages send (one year, its own name)
+    '_headers': mergeSecurityHeaders('/*\n  X-Robots-Tag: noindex, nofollow\n', undefined, opts),
   };
 }
