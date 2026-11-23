@@ -86,7 +86,7 @@ const inbox = read('inbox.html');
 ok('the Inbox says how many waiting ones are over a month old', /waiting for a reply\$\{oldN\?`, \$\{oldN\} over a month old`:''\}/.test(inbox) && /\$\{newN\} new\$\{oldN\?`, \$\{oldN\} over a month old`:''\}/.test(inbox));
 
 const shell = read('shell.js');
-ok('the account menu names the role and the plan in words', /business_owner: 'Owner', business_staff: 'Team member', client_reviewer: 'Client'/.test(shell) && /CTX\.edition_name \+ ' plan'/.test(shell) && !/role\.replace\(\/_\/g, ' '\), edition\]/.test(shell));
+ok('the account menu names the role and the plan in words (item 426: the plan as Sites says it)', /business_owner: 'Owner', business_staff: 'Team member', client_reviewer: 'Client'/.test(shell) && /'plan_words' in CTX \? CTX\.plan_words : CTX\.edition_name/.test(shell) && /planW \+ ' plan'/.test(shell) && !/role\.replace\(\/_\/g, ' '\), edition\]/.test(shell));
 ok('the client card has one way back', />Back to studio<\/a>/.test(shell) && !/>Switch client<\/a>/.test(shell) && !/>Exit to studio<\/a>/.test(shell));
 
 const help = read('help.html');

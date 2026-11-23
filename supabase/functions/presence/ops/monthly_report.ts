@@ -408,13 +408,18 @@ export function foldExtras(i: {
 }
 
 const n1 = (n: number) => n.toLocaleString('en-US');
-/** Builder list item 219: "15 calls and 8 emails from the site, up 5 on September", or null
- *  when nobody pressed either, this month or the one before. Pure. */
+/** Builder list item 219, worded by item 381: "15 taps on your phone number and 8 on your email
+ *  address, up 5 on September", or null when nobody pressed either, this month or the one before.
+ *  They are taps (on a computer a tap on a number calls nobody), never "calls", which is the word
+ *  Google's listing uses for calls it counts itself. Pure. */
 export function contactWords(c: { calls: number; emails: number; prior: number | null }, priorLabel: string): string | null {
   const total = c.calls + c.emails;
   if (!total && !c.prior) return null;
-  const bits = [c.calls ? `${n1(c.calls)} call${c.calls === 1 ? '' : 's'}` : '', c.emails ? `${n1(c.emails)} email${c.emails === 1 ? '' : 's'}` : ''].filter(Boolean);
-  const what = bits.length ? `${bits.join(' and ')} from the site` : 'Nobody pressed a phone number or email address';
+  const taps = (n: number) => `${n1(n)} tap${n === 1 ? '' : 's'}`;
+  const what = c.calls && c.emails ? `${taps(c.calls)} on your phone number and ${n1(c.emails)} on your email address`
+    : c.calls ? `${taps(c.calls)} on your phone number`
+    : c.emails ? `${taps(c.emails)} on your email address`
+    : 'Nobody pressed a phone number or email address';
   const was = priorLabel || 'the month before';
   const change = c.prior === null ? '' : total === c.prior ? `, the same as ${was}` : `, ${total > c.prior ? 'up' : 'down'} ${n1(Math.abs(total - c.prior))} on ${was}`;
   return what + change;
@@ -431,7 +436,7 @@ export function reportHtml(d: ReportData, o: { studioName: string; note: string;
   parts.push(`<p style="margin:0 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#6b6478">Your website in ${esc(d.monthLabel)}</p>`);
   parts.push(`<h1 style="margin:0 0 14px;font-family:'Iowan Old Style',Palatino,Georgia,serif;font-size:24px;line-height:1.2">${who ? `${esc(who)}, here’s` : 'Here’s'} how your website did${d.address ? ` at <a href="${esc(d.address)}" style="text-decoration:none">${esc(d.address.replace(/^https?:\/\//, ''))}</a>` : ''}.</h1>`);
   if (o.note.trim()) parts.push(`<blockquote style="margin:0 0 18px;padding:12px 16px;border-left:3px solid #d6d4e2;background:#f7f6fb;border-radius:0 10px 10px 0;color:#2b2540">${esc(o.note.trim()).replace(/\n/g, '<br>')}<br><span style="font-size:13px;color:#6b6478">${esc(o.studioName)}</span></blockquote>`);
-  // builder list item 219: three tiles share the row (a third for Clicks to contact)
+  // builder list item 219: three tiles share the row (a third for the phone and email taps, item 381's words)
   const tileSpecs: Array<[string, string, string]> = [];
   const tile = (label: string, value: string, sub: string, width: number) => `<td width="${width}%" style="padding:0 6px 12px 0;vertical-align:top"><div style="background:#f7f6fb;border-radius:12px;padding:14px 16px"><div style="font-size:12px;color:#6b6478">${label}</div><div style="font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:4px 0 2px">${value}</div><div style="font-size:12px;color:#6b6478">${sub}</div></div></td>`;
   // bug hunt H5: the counter knows a person for one day only, so a month's count is visits
@@ -440,7 +445,7 @@ export function reportHtml(d: ReportData, o: { studioName: string; note: string;
   else tileSpecs.push(['Visits', n1(d.visitors), `${n1(d.pageviews || 0)} page${(d.pageviews || 0) === 1 ? '' : 's'} viewed${d.truncated ? ', from recent activity' : ''}${changeOn(d.visitors, d.priorVisitors, d.priorLabel) ? `, ${changeOn(d.visitors, d.priorVisitors, d.priorLabel)}` : ''}${d.drop && d.drop.short ? `, <span style="color:#bf3535">${esc(d.drop.short.charAt(0).toLowerCase() + d.drop.short.slice(1))}</span>` : ''}`]);
   // item 219: rides the Enquiries switch, as both are people reaching out; a month with none, and none before, says nothing
   const contacts = d.contacts && on('enquiries') ? contactWords(d.contacts, d.priorLabel) : null;
-  if (contacts) tileSpecs.push(['Clicks to contact', n1(d.contacts!.calls + d.contacts!.emails), contacts]);
+  if (contacts) tileSpecs.push(['Phone and email taps', n1(d.contacts!.calls + d.contacts!.emails), contacts]);
   if (!on('enquiries')) { /* left out */ }
   else if (d.enquiries === null) tileSpecs.push(['Enquiries', '—', 'We couldn’t read the enquiries this time.']);
   else tileSpecs.push(['Enquiries', n1(d.enquiries), d.enquiries === 0 ? 'No one wrote in through the site' : `${d.enquiries === 1 ? 'Someone' : 'People'} wrote in through your site`]);

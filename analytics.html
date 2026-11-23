@@ -1184,7 +1184,7 @@ function insightCard(i){
     ${(i.number!=null&&i.number!=='')?`<p class="kn">${esc(i.number)}</p>`:''}<p class="isent">${esc(i.sentence)}</p>${i.detail?`<p class="kd">${esc(i.detail)}</p>`:''}${links}</section>`;
 }
 function portfolioRollup(roster,ws,vTrunc){
-  // roster: /agency/portfolio rows (site_id · name · edition · status ·
+  // roster: /agency/portfolio rows (site_id · name · plan_words (item 426: the plan in Sites' words, never edition · status) ·
   // attention · leads_waiting). null = that read FAILED — say so, never a
   // blank or an implied all-clear (failure ≠ empty).
   // SS7 item 3: visitors joined from the ENRICHED /analytics/portfolio
@@ -1209,7 +1209,7 @@ function portfolioRollup(roster,ws,vTrunc){
     const att=Number(c.attention||0),lw=Number(c.leads_waiting||0);
     const v=vs?vs.get(c.site_id):undefined;
     const vcell=vs?`<td class="r">${(vTrunc||v==null)?'<span class="muted">—</span>':num(Number(v)||0)}</td>`:'';
-    return `<tr data-drill="${esc(drill)}"><td><a href="${esc(drill)}">${esc(c.name||'(unnamed)')}</a></td><td>${esc(c.edition||'presence')}${c.status?' · '+esc(c.status):''}</td><td>${att?`<span class="pill wait">${num(att)} waiting</span>`:'<span class="pill ok">all clear</span>'}</td><td class="r">${num(lw)}</td>${vcell}</tr>`;
+    return `<tr data-drill="${esc(drill)}"><td><a href="${esc(drill)}">${esc(c.name||'(unnamed)')}</a></td><td>${c.plan_words?esc(c.plan_words):'<span class="muted">—</span>'}</td><td>${att?`<span class="pill wait">${num(att)} waiting</span>`:'<span class="pill ok">all clear</span>'}</td><td class="r">${num(lw)}</td>${vcell}</tr>`;
   }).join('');
   h+=`<div class="tscroll"><table><caption>Customers — plan, what’s waiting, enquiries${vs?', visits':''}. Open a row for that customer’s Business dashboard.</caption><thead><tr><th scope="col">Customer</th><th scope="col">Plan</th><th scope="col">Waiting</th><th class="r" scope="col">Enquiries waiting</th>${vs?'<th class="r" scope="col" title="'+VISIT_WORDS+'">Visits (7 days)</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>`;
   // the one honest line for the — column: a partial count per client would be
