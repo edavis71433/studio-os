@@ -18,6 +18,9 @@ export interface HealthCenterInputs {
   aiConfigured: boolean;
   aiOpsThisMonth: number;
   emailConfigured: boolean;
+  /** builder list item 393: kept emails waiting to be tried again, and those given up on in the
+   *  last 7 days (email_outbox); null when they couldn't be counted. Left out, not shown. */
+  outbox?: { waiting: number | null; gaveUp7d: number | null };
   sitesLive: number;
   failedPublishes: number;
   failedRuns: number;
@@ -46,6 +49,17 @@ export function crashesArea(c: NonNullable<HealthCenterInputs['crashes']>): { st
   if (c.lastHour > c.alarmAbove) return { state: 'attention', detail: `${n(c.lastHour)} in the last hour: something is broken for someone, and the alarm is sounding. The newest are listed below.` };
   if (c.lastDay > 0) return { state: 'attention', detail: `${n(c.lastDay)} in the last day${c.lastHour ? `, ${c.lastHour} of them in the last hour` : ''}. The newest are listed below.` };
   return { state: 'ok', detail: 'No crashes in the last day.' };
+}
+/** Pure: the Email delivery area (builder list item 393), with what the outbox holds. */
+export function emailArea(configured: boolean, outbox?: HealthCenterInputs['outbox']): { state: AreaState; detail: string } {
+  if (!configured) return { state: 'off', detail: 'Not configured: no email can be sent.' };
+  if (!outbox) return { state: 'ok', detail: 'Configured: notices and receipts can send.' };
+  if (outbox.waiting === null || outbox.gaveUp7d === null) return { state: 'attention', detail: 'Configured, but the emails waiting to be sent again couldn’t be counted just now.' };
+  const n = (x: number) => `${x} important email${x === 1 ? '' : 's'}`;
+  const parts: string[] = [];
+  if (outbox.waiting > 0) parts.push(`${n(outbox.waiting)} (money, sign-in or agreements) ${outbox.waiting === 1 ? 'is' : 'are'} waiting: the email service didn’t take ${outbox.waiting === 1 ? 'it' : 'them'}, and ${outbox.waiting === 1 ? 'it is' : 'each is'} tried again every 15 minutes for a day.`);
+  if (outbox.gaveUp7d > 0) parts.push(`${n(outbox.gaveUp7d)} couldn’t be sent in the last 7 days; the site that sent each one was told.`);
+  return parts.length ? { state: 'attention', detail: parts.join(' ') } : { state: 'ok', detail: 'Configured: nothing waiting, every important email went out.' };
 }
 export interface HostingRead { ok: boolean; team: string | null; plan: string | null; credits_included: number | null; credits_used: number | null; period_start: string | null; next_period_start: string | null; exceeded: boolean; read_at: string; why: string | null }
 
@@ -113,9 +127,8 @@ export function summarizeHealthCenter(i: HealthCenterInputs): { overall: AreaSta
   add('ai', 'AI', i.aiConfigured ? 'ok' : 'off',
     i.aiConfigured ? `Configured — ${i.aiOpsThisMonth} operation${i.aiOpsThisMonth === 1 ? '' : 's'} this month.` : 'Not configured (AI features degrade gracefully).');
 
-  // email
-  add('email', 'Email delivery', i.emailConfigured ? 'ok' : 'off',
-    i.emailConfigured ? 'Configured — notices and receipts can send.' : 'Not configured — email silently no-ops.');
+  // email (builder list item 393: what the outbox holds)
+  { const e = emailArea(i.emailConfigured, i.outbox); add('email', 'Email delivery', e.state, e.detail); }
 
   // usage
   add('usage', 'Usage', 'ok', `${i.sitesLive} site${i.sitesLive === 1 ? '' : 's'} live.`);

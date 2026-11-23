@@ -6,8 +6,8 @@
 // routes/publish.ts merges into EVERY tenant deploy — additive, so static
 // assets and the custom-domain/SSL flow are unaffected.
 //
-// Directives mirrored verbatim from the proven marketing-site `_headers` (/*):
-//   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+// Directives mirrored from the proven marketing-site `_headers` (/*):
+//   Strict-Transport-Security: see below (builder item 390)
 //   X-Frame-Options: DENY
 //   X-Content-Type-Options: nosniff
 //   Referrer-Policy: strict-origin-when-cross-origin
@@ -23,10 +23,34 @@ import { PUBLISHED_CSP } from './render.ts';
  *  sites already ship via <meta>, hardened with frame-ancestors 'none'. */
 export const PUBLISHED_CSP_RESPONSE = `${PUBLISHED_CSP}; frame-ancestors 'none'`;
 
+// ── "HTTPS only", per domain (builder item 390) ─────────────────────────────
+// Every published site used to send the marketing site's two years, every sub-name, and an
+// invitation onto the browsers' built-in list. On a client's own domain that binds every
+// other sub-name they have (old webmail, a shop or a booking tool on another host, a
+// device) to HTTPS for two years in each visitor's browser, and the built-in list takes
+// months to leave; it follows a client who moves away (Nov 22 2026 review, files 02 and 07,
+// OWASP's HSTS cheat sheet). So a published site sends one year for its own name only.
+// The strong form stays where Davis Digital Studio owns the whole domain and every name on
+// it: its own addresses (the app and marketing deploys keep it in the repository's _headers),
+// and a site published on one of those domains. Every other domain is a customer's, a
+// studio's own included: Studio OS can't promise for names it doesn't run. A site with no
+// domain of its own gets the one-year form too, so a domain connected later never inherits more.
+export const HSTS_ONE_YEAR = 'max-age=31536000';
+export const HSTS_STRONG = 'max-age=63072000; includeSubDomains; preload';
+/** The domains Davis Digital Studio owns outright. */
+export const STUDIO_OWN_DOMAINS: readonly string[] = ['davisdigitalstudio.com'];
+/** Is this one of the studio's own domains, or a name under one? Pure. */
+export function isStudioOwnDomain(domain: string | null | undefined): boolean {
+  const d = String(domain || '').trim().toLowerCase().replace(/\.$/, '');
+  return !!d && STUDIO_OWN_DOMAINS.some((own) => d === own || d.endsWith(`.${own}`));
+}
+
 /** Ordered, byte-stable response headers applied to `/*` on every tenant deploy.
- *  Order is fixed so publishing stays reproducible (same input → same bytes). */
+ *  Order is fixed so publishing stays reproducible (same input → same bytes). The HSTS
+ *  value here is the one-year form; mergeSecurityHeaders swaps in the strong one for the
+ *  studio's own domains. */
 export const SECURITY_RESPONSE_HEADERS: ReadonlyArray<readonly [string, string]> = [
-  ['Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload'],
+  ['Strict-Transport-Security', HSTS_ONE_YEAR],
   ['X-Frame-Options', 'DENY'],
   ['X-Content-Type-Options', 'nosniff'],
   ['Referrer-Policy', 'strict-origin-when-cross-origin'],
@@ -80,12 +104,14 @@ export function mergeAssetCaching(existing?: string): string {
   return blocks.map((b) => `${b.path}\n${b.headers.map(([k, v]) => `  ${k}: ${v}`).join('\n')}`).join('\n') + '\n';
 }
 
-export function mergeSecurityHeaders(existing?: string, csp?: string): string {
+export function mergeSecurityHeaders(existing?: string, csp?: string, opts: { strongHsts?: boolean } = {}): string {
   const owned = new Set(SECURITY_RESPONSE_HEADERS.map(([k]) => k.toLowerCase()));
   const blocks = parseHeaders(existing ?? '');
   let star = blocks.find((b) => b.path === '/*');
   if (!star) { star = { path: '/*', headers: [] }; blocks.push(star); }
   star.headers = star.headers.filter(([k]) => !owned.has(k.toLowerCase()));
-  for (const [k, v] of SECURITY_RESPONSE_HEADERS) star.headers.push([k, k === 'Content-Security-Policy' && csp ? csp : v]);
+  for (const [k, v] of SECURITY_RESPONSE_HEADERS) {
+    star.headers.push([k, k === 'Content-Security-Policy' && csp ? csp : k === 'Strict-Transport-Security' && opts.strongHsts ? HSTS_STRONG : v]);
+  }
   return blocks.map((b) => `${b.path}\n${b.headers.map(([k, v]) => `  ${k}: ${v}`).join('\n')}`).join('\n') + '\n';
 }

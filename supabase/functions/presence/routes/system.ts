@@ -18,6 +18,8 @@ import { reapMedia } from '../lib/media_gc.ts';
 import { reapSnapshots } from '../lib/snapshot_gc.ts';
 import { runRecurringInvoices } from './recurring_invoices.ts';   // sales review item 47: a fresh invoice on a schedule
 import { runTrafficSpikes } from '../ops/traffic_spikes.ts';
+import { runEmailOutbox } from '../lib/email_outbox.ts';
+import { runUploadChecks } from '../lib/upload_check.ts';
 import { runMonthlyReports } from '../ops/monthly_report.ts';
 import { runAiChecks } from '../ops/ai_checks.ts';
 import { runRankGridScans } from '../ops/rank_grid_scans.ts';
@@ -213,6 +215,8 @@ export interface HealthCounts {
   crashes_1h: number | null; crashes_24h: number | null;
   // builder item 420: the newest database change this database has (presence_change_ledger, 0260); null before 0260
   ledger_newest: number | null; ledger_rows: number | null;
+  // builder item 393: kept emails waiting to be tried again, and those given up on in 7 days; null before 0268
+  outbox_waiting?: number | null; outbox_failed_7d?: number | null;
 }
 type CrashesAndLedger = Pick<HealthCounts, 'crashes_1h' | 'crashes_24h' | 'ledger_newest' | 'ledger_rows'>;
 // Before migration 0261 the one trip (0247's function) doesn't carry these, so they come in
@@ -243,6 +247,8 @@ export async function readHealthCounts(now = Date.now()): Promise<HealthCounts |
       ...('crashes_1h' in j
         ? { crashes_1h: numOrNull(j.crashes_1h), crashes_24h: numOrNull(j.crashes_24h), ledger_newest: numOrNull(j.ledger_newest), ledger_rows: numOrNull(j.ledger_rows) }
         : await readCrashesAndLedger(now)),
+      // builder item 393: in the same trip from 0268 on; before it the Health page leaves them out
+      ...('outbox_waiting' in j ? { outbox_waiting: numOrNull(j.outbox_waiting), outbox_failed_7d: numOrNull(j.outbox_failed_7d) } : {}),
     };
   }
   if (r && !r.ok && r.status !== 404) return null;
@@ -372,6 +378,7 @@ export async function computeHealthCenter(counts?: HealthCounts | null): Promise
     aiConfigured: envPresent('ANTHROPIC_KEY'),
     aiOpsThisMonth: aiOps,
     emailConfigured: envPresent('RESEND_KEY'),
+    ...(c && c.outbox_waiting !== undefined ? { outbox: { waiting: c.outbox_waiting ?? null, gaveUp7d: c.outbox_failed_7d ?? null } } : {}),   // builder item 393
     sitesLive: live ?? 0,
     failedPublishes: failPub ?? 0,
     failedRuns: failedRuns ?? 0,
@@ -478,6 +485,8 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'deletion') return json({ data: await runDeletionSweep(limit) }, 200, cors);   // P2-E W2: execute eligible account deletions
       if (task === 'reconcile_billing') return json({ data: await runBillingReconcile(limit) }, 200, cors);   // P2-E W7: correct entitlement drift vs Stripe
       if (task === 'stripe_check') return json({ data: await runStripeCheck(limit ? { invoices: limit, retainers: limit, receipts: limit } : {}) }, 200, cors);   // sales item 130
+      if (task === 'email_outbox') return json({ data: await runEmailOutbox(limit) }, 200, cors);   // builder item 393: kept emails tried again
+      if (task === 'upload_checks') return json({ data: await runUploadChecks(limit) }, 200, cors);   // builder item 395: new uploads read back
       if (task === 'gsc_sync') {
         // Ledgered like the tick groups: the daily pg_cron job's response is
         // discarded by pg_net, so without a ledger row a persistently failing
@@ -522,6 +531,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['heartbeat', () => runUptimeHeartbeat(limit ?? 25)],   // uptime: probe live hosted sites, alert on confirmed outage
           ],
           revenue: [
+            ['email_outbox', () => runEmailOutbox()],   // builder item 393: money, sign-in and agreement emails the sending service didn't take, tried again (first, before new mail joins them)
             ['reconcile_billing', () => runBillingReconcile(30)],
             ['stripe_check', () => runStripeCheck()],   // sales item 130: a few invoices and retainers asked about each tick, each once a day, before the reminders
             ['lifecycle', () => runLifecycleSweep(limit)],
@@ -556,6 +566,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['email_auth', () => runEmailAuthNudges(20)],   // DNS #5: escalate persistent SPF/DMARC/DKIM gaps to one owner nudge
             ['apex_drift', () => runApexDriftWatch(10)],    // DNS: verify the apex still points home; surface drift as a finding
             ['retention', () => runRetentionSweep()],
+            ['upload_checks', () => runUploadChecks()],   // builder list item 395: each new upload read back: its real kind and size (before media_gc, which reaps the never-uploaded)
             ['media_gc', () => reapMedia(100)],
             ['snapshot_gc', () => reapSnapshots(200)],
             ['ai_checks', () => runAiChecks(1)],   // builder list item 182: one client's monthly AI check at most (it takes up to a minute), last
@@ -614,6 +625,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       // P2-E: reconcile billing BEFORE the lifecycle sweep so grace-clock
       // enforcement (W9) acts on Stripe-fresh state (a recovered customer already
       // had grace_until cleared) rather than possibly-stale data.
+      await step('email_outbox', () => runEmailOutbox());                          // builder item 393: money, sign-in and agreement emails the sending service didn't take, tried again
       const reconcile_billing = await step('reconcile_billing', () => runBillingReconcile(30));
       await step('stripe_check', () => runStripeCheck());                           // sales item 130: what a lost Stripe message missed, before the invoice reminders ask a client who paid
       const lifecycle = await step('lifecycle', () => runLifecycleSweep(limit));   // Phase RL: the revenue lifecycle
@@ -645,6 +657,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       await step('nurture', () => runProspectNurture(10));                        // CRO: day-7 free-review follow-up (owner-gated NURTURE_DRIP=1)
       await step('broadcasts', () => runScheduledBroadcasts(25));                 // BROADCASTS: dispatch owner-approved scheduled sends at their due time
       const retention = await step('retention', () => runRetentionSweep());        // bounded detail tables (visits/terms/ledgers/evidence)
+      await step('upload_checks', () => runUploadChecks());                        // builder list item 395: each new upload read back: its real kind and size
       const media_gc = await step('media_gc', () => reapMedia(100));               // M6: reap soft-deleted + orphan media
       const snapshot_gc = await step('snapshot_gc', () => reapSnapshots(200));     // M7: prune old unreferenced snapshots
       await step('ai_checks', () => runAiChecks(1));                               // builder list item 182: one client's monthly AI check at most, last (it takes up to a minute)

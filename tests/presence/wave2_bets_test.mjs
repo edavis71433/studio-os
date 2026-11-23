@@ -109,7 +109,7 @@ const bell = (notices) => F.studioBellCount({ notices, newEnquiries: 0, proposed
 eq('8: the badge counts needs-you notices', bell([{ kind: 'publish_failed' }, { kind: 'domain_expiry' }]), 2);
 eq('8: an update notice renders but never rings the badge', bell([{ kind: 'publish_failed' }, { kind: 'invoice_paid' }, { kind: 'studio_published' }]), 1);
 eq('8: the client_* throttle rows stay out of the count', bell([{ kind: 'client_message' }, { kind: 'invoice_paid' }]), 0);
-ok('8: the update kinds are exactly these nine', [...F.UPDATE_NOTICE_KINDS].sort().join() === ['invoice_paid', 'studio_published', 'welcome_back', 'win_back', 'approval_decided', 'booking_reminder', 'invoice_upcoming', 'site_published', 'traffic_spike'].sort().join());   // item 47 added the last two; invoice_upcoming is sales review item 47
+ok('8: the update kinds are exactly these ten', [...F.UPDATE_NOTICE_KINDS].sort().join() === ['invoice_paid', 'studio_published', 'welcome_back', 'win_back', 'approval_decided', 'booking_reminder', 'invoice_upcoming', 'site_published', 'traffic_spike', 'auto_reply_ceiling'].sort().join());   // builder item 391 added the last   // item 47 added the last two; invoice_upcoming is sales review item 47
 
 // GET /portal/feed, the one read the bell, Today and the Inbox share
 const N = { PAY: uuid('e', 1), PAID: uuid('e', 2), INVREM: uuid('e', 3), DEALNUDGE: uuid('e', 4), LEAD: uuid('e', 5), PUBLISHED: uuid('e', 6), B_PAY: uuid('e', 7) };

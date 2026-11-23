@@ -209,7 +209,7 @@ const hoursAgo = (h) => new Date(Date.now() - h * 3600_000).toISOString();
 {
   const s = senderTag(EP);
   ok('the sender asks for a ticket when a visitor starts on a form, and sends it', s.includes("EP.replace(/\\/submit$/,'/ticket')") && s.includes("addEventListener('focusin'") && s.includes("fd.append('_tk',TK)"));
-  ok('…it waits until the ticket is old enough, and asks again after 11 hours', TICKET_SETTLE_MS === 3500 && s.includes(`TKAT+${TICKET_SETTLE_MS}-Date.now()`) && s.includes(`Date.now()-TKAT<${11 * 3600_000}`));
+  ok('…it waits until the ticket is old enough, and asks again after 20 minutes (builder item 391)', TICKET_SETTLE_MS === 3500 && s.includes(`TKAT+${TICKET_SETTLE_MS}-Date.now()`) && s.includes(`Date.now()-TKAT<${20 * 60_000}`));
   ok('…and a ticket it can’t get is a send that didn’t go through', s.includes("if(!r.ok)throw new Error('ticket '+r.status)"));
   const b = bookingScript();
   ok('the booking widget sends its ticket and, refused, asks for a new one and tries once more', b.includes('_tk:TK') && b.includes("o.j.error==='check'&&!second){TK='';return send(true);}"));

@@ -18,7 +18,7 @@ import { putBackUsed, putBackWhatTheDraftUses } from '../lib/media_trash.ts';
 import { deployFileMap, netlifyConfigured, setSitePassword, getSite, digestFiles, sameFiles, listDeploys } from '../lib/netlify.ts';
 import type { DeployFile, NetlifySiteInfo } from '../lib/netlify.ts';
 import { withForwarding } from '../lib/domain_notify.ts';
-import { mergeSecurityHeaders, mergeAssetCaching } from '../lib/security_headers.ts';
+import { mergeSecurityHeaders, mergeAssetCaching, isStudioOwnDomain } from '../lib/security_headers.ts';
 import { writeChangeEvent, draftChangesOnly } from '../lib/provenance.ts';
 import type { Snapshot } from '../lib/render_types.ts';
 import { PUBLISH_BLOCKED_STATES, publishRefusal } from '../lib/lifecycle.ts';
@@ -277,7 +277,8 @@ export async function runPipeline(site: SiteRow, principal: Principal, kind: 'pu
   // referrer, permissions, and a real CSP header. Merged into (never clobbering)
   // the template's asset-cache `_headers`. One source of truth: lib/security_headers.ts.
   // Item 144: the CSP is the one this site's own pages need (publishedCspFor, above).
-  files['_headers'] = mergeSecurityHeaders(mergeAssetCaching(typeof files['_headers'] === 'string' ? files['_headers'] as string : undefined), csp);
+  // Builder item 390: "HTTPS only" for one year on the site's own name; the strong form only on the studio's own domains.
+  files['_headers'] = mergeSecurityHeaders(mergeAssetCaching(typeof files['_headers'] === 'string' ? files['_headers'] as string : undefined), csp, { strongHsts: isStudioOwnDomain(site.custom_domain) });
   // Item 163 (review domains finding 12): an old domain kept on the site when the domain changed
   // forwards to the current one, path and all. Netlify serves an extra name as-is; only a rule at
   // the top of _redirects makes it a permanent move. Netlify's own list of names is the record.
@@ -779,7 +780,7 @@ export async function takeSiteOffline(site: SiteRow, principal: Principal): Prom
   ]);
   const id0 = ident.json?.[0] || {};
   const html = renderOfflinePage({ businessName: id0.business_name, accent: brand.accent, email: id0.email, phone: id0.phone });
-  const dep = await deployFileMap(site.netlify_site_id, offlineFileMap(html), { title: OFFLINE_PAGE_TITLE });
+  const dep = await deployFileMap(site.netlify_site_id, offlineFileMap(html, { strongHsts: isStudioOwnDomain(site.custom_domain) }), { title: OFFLINE_PAGE_TITLE });
   if (!dep.ok) return { ok: false, error: 'deploy_failed', message: 'That didn’t go through — your live site is unchanged.', status: 502 };
   // The host hadn't finished the page when the wait ran out: it is on its way, so the site is
   // marked now, publishes wait for it (holdingPageOnItsWay), and if the host gives up on it,
@@ -871,7 +872,7 @@ export async function handleComingSoon(req: Request, site: SiteRow, principal: P
     phone: cs.phone ? id0.phone : '', email: cs.email ? id0.email : '',
     list: cs.list, formEndpoint: fnBase ? `${fnBase}/functions/v1/presence/forms/${site.id}/submit` : null,
   });
-  const dep = await deployFileMap(site.netlify_site_id, comingSoonFileMap(html), { title: 'coming soon page' });
+  const dep = await deployFileMap(site.netlify_site_id, comingSoonFileMap(html, { strongHsts: isStudioOwnDomain(site.custom_domain) }), { title: 'coming soon page' });
   if (!dep.ok) return json({ error: 'deploy_failed', message: 'That didn’t go through, and nothing changed. Please try again.' }, 502, cors);
   const upAt = new Date().toISOString();
   const saved = await updateReservedJson(site.id, RESERVED_NAMES.comingSoon, (cur) => ({ ...cs, up_at: normalizeComingSoon(cur).up_at || upAt }), principal.email || principal.userId || 'member');

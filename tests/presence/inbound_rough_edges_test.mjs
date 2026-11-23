@@ -132,11 +132,11 @@ ok('Project messages and support threads fold the quote (all three lists)', (pro
 // ═══ (e) customers' answers to studio emails land in the Inbox ═══
 {
   // sales item 82: the invoice and signed-copy emails add their PDF after the site; item 92: each comes from the studio (asBusiness)
-  const withSite = (sales.match(/brand, \{ critical: true, asBusiness: true, siteId(: tok\.site_id)?(?: \}\)|, \.\.\.\()/g) || []).length;
+  const withSite = (sales.match(/brand, \{ critical: true, asBusiness: true, siteId(: tok\.site_id)?(?:, keep: '[a-z_]+')?(?: \}\)|, \.\.\.\()/g) || []).length;   // item 393: kept until it goes
   ok('sales: all six studio→customer emails (proposal, the one-link send, invoice, retainer, signed copy, portal invite) carry the studio site', withSite === 6, `found ${withSite}`);
   ok('sales: no studio→customer send is left on the human reply-to', !/brand, \{ critical: true \}\)/.test(sales));
   // sales item 74: the invoice reminder always arrives now (critical), and still carries the site
-  ok('lifecycle: the invoice reminder and the proposal/agreement reminder carry the site', /brand, \{ critical: true, asBusiness: true, siteId: inv\.site_id \}\)\.catch/.test(lifecycle) && /brand, \{ siteId: doc\.site_id, asBusiness: true \}\)\.catch/.test(lifecycle));
+  ok('lifecycle: the invoice reminder and the proposal/agreement reminder carry the site', /brand, \{ critical: true, asBusiness: true, siteId: inv\.site_id(?:, keep: 'money')? \}\)\.catch/.test(lifecycle) && /brand, \{ siteId: doc\.site_id, asBusiness: true \}\)\.catch/.test(lifecycle));
   ok('operator alerts still never carry siteId (Eric replying to his own alert must not post into a client thread)',
     /return await sendEmail\(to, `\$\{headline\}`\.slice\(0, 180\), html, brand, \{ critical: true \}\);/.test(bridge));
 }

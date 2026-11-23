@@ -107,6 +107,6 @@ ${list ? senderTag(String(input.formEndpoint)) : ''}
 
 /** The files a Coming soon deploy ships: Take offline's set (the page at every path, robots
  *  shut, the security headers plus noindex), so search engines leave it out. */
-export function comingSoonFileMap(html: string): Record<string, string> {
-  return offlineFileMap(html);
+export function comingSoonFileMap(html: string, opts: { strongHsts?: boolean } = {}): Record<string, string> {
+  return offlineFileMap(html, opts);
 }

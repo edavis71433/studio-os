@@ -277,7 +277,47 @@ export function unsubscribable(opts?: { critical?: boolean }): boolean {
   return !opts?.critical;
 }
 
-export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; asBusiness?: boolean; siteId?: string; replyTo?: string; headers?: Record<string, string>; attachments?: Array<{ filename: string; content: Uint8Array }> }): Promise<boolean> {
+/** What the sending service said: taken (ok), its status (0: no answer), and its words when not. */
+export interface ResendAnswer { ok: boolean; status: number; said: string }
+/** Builder item 393: a send gets an answer within this long, or counts as unanswered (an
+ *  outbox email is then tried again with the same key; see lib/email_outbox.ts). */
+export const RESEND_TIMEOUT_MS = 10_000;
+/** The message as text, its keys in one fixed order at every depth. An outbox email is kept
+ *  in a jsonb column, which stores keys in an order of its own, and the sending service
+ *  answers a repeated key with its first answer only when the message is the same: written
+ *  this way, a try from the outbox is the first try's message, character for character. Pure. */
+export function stableJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map((x) => (x === undefined ? 'null' : stableJson(x))).join(',')}]`;
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    return `{${Object.keys(o).filter((k) => o[k] !== undefined).sort().map((k) => `${JSON.stringify(k)}:${stableJson(o[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(v ?? null);
+}
+/** The one call to the sending service. `idempotencyKey` (an outbox row's) makes a repeat of
+ *  the same message a no-op there, so a lost answer can never make a second copy. */
+export async function postToResend(payload: Record<string, unknown>, idempotencyKey?: string): Promise<ResendAnswer> {
+  try {
+    const r = await fetch(RESEND_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
+      body: stableJson(payload),
+      signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
+    });
+    const text = await r.text().catch(() => '');
+    return { ok: r.ok, status: r.status, said: r.ok ? '' : text.replace(/\s+/g, ' ').slice(0, 300) };
+  } catch (e) {
+    const err = e as Error;
+    return { ok: false, status: 0, said: err?.name === 'TimeoutError' ? `no answer in ${RESEND_TIMEOUT_MS / 1000} seconds` : String(err?.message || e).slice(0, 300) };
+  }
+}
+
+/** `keep` (builder item 393): a money, sign-in or agreement email goes through the outbox
+ *  (lib/email_outbox.ts): written before the send, tried again every 15 minutes for a day
+ *  when the sending service fails, never twice. For a kept email `true` means taken, or
+ *  waiting to be tried again; `false` means refused for good (or suppressed, as always). */
+export type EmailKeep = 'money' | 'sign_in' | 'agreement';
+export async function sendEmail(to: string, subject: string, html: string, brand?: EmailBrand, opts?: { critical?: boolean; asBusiness?: boolean; siteId?: string; replyTo?: string; headers?: Record<string, string>; attachments?: Array<{ filename: string; content: Uint8Array }>; keep?: EmailKeep }): Promise<boolean> {
   if (!RESEND_KEY) { console.warn('[commerce] RESEND_KEY unset — skipping email'); return false; }
   try {
     // Honor the suppression list at the ONE send point. critical:true =
@@ -301,9 +341,7 @@ export async function sendEmail(to: string, subject: string, html: string, brand
     // text-only clients — derived from the body HTML (see htmlToPlainText: cell
     // and block boundaries survive the tag strip, so a table still reads).
     const text = htmlToPlainText(html) + (pageUrl ? `\n\nUnsubscribe: ${pageUrl}` : '');
-    const r = await fetch(RESEND_URL, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+    const payload: Record<string, unknown> = {
       // List-Unsubscribe: RFC 8058 one-click HTTPS endpoint (what Gmail/Yahoo
       // bulk-sender rules actually honor) + mailto fallback, on mail an unsubscribe
       // stops. The POST lands on /unsubscribe which writes the ONE suppression store
@@ -316,22 +354,26 @@ export async function sendEmail(to: string, subject: string, html: string, brand
       // human platform reply-to. Item 72: opts.replyTo (the business owner's own
       // email) comes before both — see replyToFor. opts.headers are spread AFTER
       // the List-Unsubscribe headers (e.g. the inbound ack's Auto-Submitted:auto-replied).
-      body: JSON.stringify({
-        from: asBusiness ? fromFor(EMAIL_FROM, brand?.name) : EMAIL_FROM, to, subject, html: wrapped, text,
-        reply_to: replyToFor(opts),
-        // sales item 82: an invoice, receipt or signed agreement goes with its PDF (Resend takes base64)
-        ...(opts?.attachments?.length ? { attachments: opts.attachments.map((a) => ({ filename: a.filename, content: base64Of(a.content) })) } : {}),
-        headers: {
-          ...(optional ? {
-            'List-Unsubscribe': `<${unsubUrl}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
-            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-          } : {}),
-          ...(opts?.headers || {}),
-        },
-      }),
-    });
+      from: asBusiness ? fromFor(EMAIL_FROM, brand?.name) : EMAIL_FROM, to, subject, html: wrapped, text,
+      reply_to: replyToFor(opts),
+      // sales item 82: an invoice, receipt or signed agreement goes with its PDF (Resend takes base64)
+      ...(opts?.attachments?.length ? { attachments: opts.attachments.map((a) => ({ filename: a.filename, content: base64Of(a.content) })) } : {}),
+      headers: {
+        ...(optional ? {
+          'List-Unsubscribe': `<${unsubUrl}>, <mailto:support@davisdigitalstudio.com?subject=unsubscribe>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        } : {}),
+        ...(opts?.headers || {}),
+      },
+    };
+    // Builder item 393: money, sign-in and agreement mail is kept until the sending service takes it
+    if (opts?.keep) {
+      const { sendKept, OUTBOX_KINDS } = await import('../lib/email_outbox.ts');
+      if (OUTBOX_KINDS.has(opts.keep)) return await sendKept(opts.keep, payload, { to, subject, siteId: opts.siteId || null });
+    }
+    const r = await postToResend(payload);
     // Log failures (mirrors clever-api) so a Resend outage isn't invisible.
-    if (!r.ok) { try { const { maskEmail } = await import('../routes/email_infra.ts'); console.error(`[email] Resend ${r.status} to ${maskEmail(to)}: ${(await r.text()).slice(0, 300)}`); } catch { /* */ } }
+    if (!r.ok) console.error(`[email] Resend ${r.status || 'gave no answer'} to ${maskEmail(to)}: ${r.said}`);
     return r.ok;
   } catch (e) { console.error(`[email] send threw: ${String((e as Error)?.message || e)}`); return false; }
 }

@@ -1841,7 +1841,7 @@ async function emailSalesDoc(siteId: string, dealId: string | null, kind: 'propo
       : `${who} prepared a proposal for you. Take a look whenever you’re ready — nothing is final until you accept.`;
     const label = kind === 'contract' ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), subject, `${emailBand(kind === 'contract' ? 'Agreement' : 'Proposal', subject)}<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
+    return await sendEmail(String(email), subject, `${emailBand(kind === 'contract' ? 'Agreement' : 'Proposal', subject)}<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId, keep: 'agreement' });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1865,7 +1865,7 @@ async function emailSalesFlow(siteId: string, dealId: string, url: string | null
         : `${who} has prepared your proposal. Take a look whenever you’re ready — nothing is final until you accept.`;
     const label = has.contract ? 'Review &amp; sign →' : 'Review the proposal →';
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">${label}</a>`;
-    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `${emailBand(what, has.contract ? 'Ready for you to review and sign' : 'Ready for you to review')}<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
+    return await sendEmail(String(email), `Your ${what} from ${brand.name}`, `${emailBand(what, has.contract ? 'Ready for you to review and sign' : 'Ready for you to review')}<p>${line}</p><p class="cta">${btn}</p>`, brand, { critical: true, asBusiness: true, siteId, keep: 'agreement' });   // a doc THEY are waiting to sign = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -1904,7 +1904,7 @@ export async function emailInvoice(siteId: string, dealId: string, title: string
     const pdf = row ? (() => { try { const { deal_id: _d, ...data } = row; return documentPdf('invoice', data, brand, ctx); } catch { return null; } })() : null;
     return await sendEmail(String(email), `${title}${no ? ' ' + no : ''} — ${amount}`,
       `${emailBand(`${isDeposit ? 'Deposit request' : 'Invoice'}${no ? ' ' + no : ''}`, title)}<p>${first ? `Hi ${escH(first)},` : 'Hi there,'}</p><p>${who ? `${who} has sent you` : 'Here is'} ${what} for <strong>${amount}</strong>, ${due}. You can pay securely here — nothing else needed.</p>${noteLine}${emailFacts([['Due', row?.due_date ? dayLabel(row.due_date, ctx?.tz) : 'On receipt'], ['Amount due', amount]], { big: true })}<p class="cta">${btn}</p>${otherLine}${docLine}`,
-      brand, { critical: true, asBusiness: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // a payment link = transactional; their answer lands in the Inbox
+      brand, { critical: true, asBusiness: true, siteId, keep: 'money', ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // a payment link = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 /** The first name a greeting uses: the first word of the name, if it reads as one. Pure. */
@@ -2270,7 +2270,7 @@ async function emailRetainerLink(siteId: string, dealId: string, url: string, am
     const btn = `<a href="${url}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Set up your ${amount}/${per} retainer →</a>`;
     return await sendEmail(String(email), `Your retainer — ${amount} every ${per}`,
       `<p>${brand.name !== EMAIL_BRAND_DEFAULT.name ? brand.name.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string)) + ' has' : 'We have'} set up an ongoing retainer of <strong>${amount} every ${per}</strong>. You authorize it securely through Stripe — you’re always in control, and you can cancel any time.</p><p class="cta">${btn}</p>`,
-      brand, { critical: true, asBusiness: true, siteId });   // a payment authorization the client is expecting = transactional; their answer lands in the Inbox
+      brand, { critical: true, asBusiness: true, siteId, keep: 'money' });   // a payment authorization the client is expecting = transactional; their answer lands in the Inbox
   } catch { return false; }
 }
 
@@ -2931,7 +2931,7 @@ export async function handleSalesContractSign(req: Request, id: string, cors: Re
         `Signed at: ${signedAt.slice(0, 19).replace('T', ' ')} UTC<br>` +
         `Document fingerprint: <span style="font-family:ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere">${String(c.content_hash || '')}</span></div>` +
         docLine + (signedPdf ? `<p style="font-size:13px;color:#6b6478;margin:8px 0 0">The signed agreement is attached as a PDF.</p>` : ''),
-        brand, { critical: true, asBusiness: true, siteId: tok.site_id, ...(signedPdf ? { attachments: [signedPdf] } : {}) }).catch(() => false);   // their signed legal record = transactional; their answer lands in the Inbox
+        brand, { critical: true, asBusiness: true, siteId: tok.site_id, keep: 'agreement', ...(signedPdf ? { attachments: [signedPdf] } : {}) }).catch(() => false);   // their signed legal record = transactional; their answer lands in the Inbox
     }
   } catch { /* the signature stands; the copy email is best-effort */ }
 
@@ -3529,7 +3529,7 @@ export async function sendCustomerInvite(siteId: string, email: string, _isNewLo
     `</ul>` +
     cta +
     `<p style="font-size:13px;color:#6b6478">You can sign in any time at <a href="${base}/portal.html?studio=${siteId}">your portal</a>. If anything looks off, just reply to this email.</p>`,   // builder list item 59: the sign-in page shows the studio's name and logo
-  brand, { critical: true, asBusiness: true, siteId }).catch(() => false);   // login access = transactional; a message to the studio — their answer lands in the Inbox
+  brand, { critical: true, asBusiness: true, siteId, keep: 'sign_in' }).catch(() => false);   // login access = transactional; a message to the studio — their answer lands in the Inbox
   return left === true;
 }
 

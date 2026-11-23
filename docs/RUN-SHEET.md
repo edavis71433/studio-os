@@ -55,10 +55,10 @@ Builder item 400. A merge that changes no published file (server code, tests, do
 
 Who publishes the pages is one word in `scripts/pages-go-live.txt`:
 
-- `merge` (today): Netlify builds main on every merge, as before. Pages go live at merge; the server goes live at release.
-- `release`: the release builds this commit's pages on GitHub's machine and uploads them to Netlify as one deploy, right after the functions (`scripts/publish-pages.sh`), and Netlify's own builds of merges are skipped. Pages and server go live together, once per release, and the host's cache is emptied once per release instead of every merge.
+- `merge` (until Nov 23 2026): Netlify builds main on every merge. Pages go live at merge; the server goes live at release.
+- `release` (since Nov 23 2026): the release builds this commit's pages on GitHub's machine and uploads them to Netlify as one deploy, right after the functions (`scripts/publish-pages.sh`), and Netlify's own builds of merges are skipped. Pages and server go live together, once per release, and the host's cache is emptied once per release instead of every merge.
 
-Switching to `release` (Eric, about 5 minutes, then one small pull request):
+Eric did these steps on Nov 23 2026 and the switch says `release`. They are here for a replaced token, or to switch back: a pull request that changes the word to `merge`, and Netlify builds main on the next merge again.
 1. Netlify, User settings, Applications, Personal access tokens, New access token (name it "Studio OS releases"). Copy it.
 2. GitHub, the repository's Settings, Secrets and variables, Actions: add the secret `NETLIFY_AUTH_TOKEN` (the token) and the variable `NETLIFY_SITE_ID` (Netlify, site `studio-os-dds`, Site configuration, General, Site ID).
 3. A pull request that changes `scripts/pages-go-live.txt` to `release`. The next release publishes the pages; check `https://app.davisdigitalstudio.com/version.json` names its commit.

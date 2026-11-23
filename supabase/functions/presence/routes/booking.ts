@@ -48,7 +48,7 @@ import {
 } from '../lib/booking.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { normEmail, emailMatch } from '../lib/contact_email.ts';
-import { ticketsOn, siteChecksSends, readTicket } from '../lib/form_check.ts';
+import { ticketsOn, sendCheck, readTicket } from '../lib/form_check.ts';
 import { utcToWall, wallToUtc, wallString } from '../lib/zoned_time.ts';
 import { readManageToken, manageState, bookingOptions, bookingBits, bookingLinks, bookingMail, bookingIcs, type BookingOptions, type BookingLinks, type ManageState } from '../lib/booking_links.ts';
 import { calendarUrl, readBusyTimes, busyOnDate, type BusyRange } from '../lib/busy_calendar.ts';
@@ -278,8 +278,9 @@ export async function handleBookingCreate(req: Request, siteId: string, cors: Re
   // Item 140: once the site's pages ask for a time ticket, a booking without a good one
   // didn't come from a person on the page, and no robot may hold a time. Refused out
   // loud: the widget asks for a fresh ticket and tries once more on its own.
-  if (ticketsOn() && await siteChecksSends(siteId).catch(() => false)) {
-    const t = await readTicket(b?._tk, siteId, Math.floor(Date.now() / 1000));
+  const check = ticketsOn() ? await sendCheck(siteId).catch(() => null) : null;
+  if (check && check.checking) {
+    const t = await readTicket(b?._tk, siteId, Math.floor(Date.now() / 1000), undefined, check.maxAgeS);   // item 391: 30 minutes on pages that ask every 20
     if (t !== 'ok') return json({ error: 'check', message: 'That didn’t go through. Please try again.' }, 400, cors);
   }
 
@@ -361,9 +362,11 @@ export async function handleBookingCreate(req: Request, siteId: string, cors: Re
   // Item 203: the confirmation is a site's automatic reply, so one a day to an address and
   // none to the do-not-send list; the page shows the booking's links either way. It is the
   // customer's own appointment, so it still goes when the day's count can't be read.
-  const mailed = !!appt.customer_email && await autoReplyVerdict('booking', siteId, String(appt.customer_email), { failOpen: true }) === 'send';
+  // Item 391: past the site's day of automatic replies the booking still lands, and the owner is told no confirmation went.
+  const verdict = appt.customer_email ? await autoReplyVerdict('booking', siteId, String(appt.customer_email), { failOpen: true }) : 'unchecked';
+  const mailed = !!appt.customer_email && verdict === 'send';
   if (mailed) notifyCustomer(siteId, appt, status).catch(() => {});
-  notifyOwnerOfBooking(siteId, appt, status).catch(() => {});
+  notifyOwnerOfBooking(siteId, appt, status, verdict === 'site_ceiling').catch(() => {});
 
   const when = humanSlot(v.booking.slot_start) || v.booking.slot_start;
   return calmOk(bookedMessage(status, type.name, v.booking.slot_start, mailed), { status, when, service: type.name, links: await linksForPage(appt) });
@@ -439,7 +442,9 @@ async function notifyCustomer(siteId: string, appt: any, status: string, moved =
   await sendEmail(to, `${head} — ${appt.type_name}`, body, brand, { critical: true, asBusiness: true, replyTo, attachments: mail.attachments });
 }
 
-async function notifyOwnerOfBooking(siteId: string, appt: any, status: string): Promise<void> {
+export async function notifyOwnerOfBooking(siteId: string, appt: any, status: string, unconfirmed = false): Promise<void> {
+  // item 391: the site's automatic replies for the day are used up, so the customer got no email
+  const noMail = unconfirmed ? ' We didn’t email them a confirmation: your website has sent the most automatic emails it sends in a day. Please confirm with them yourself.' : '';
   const site = rows(await svc(`presence_sites?id=eq.${siteId}&select=client_id&limit=1`))[0];
   const clientId = site?.client_id || '';
   const when = humanSlot(String(appt.slot_start_local || '')) || String(appt.slot_start_local || '');
@@ -449,7 +454,7 @@ async function notifyOwnerOfBooking(siteId: string, appt: any, status: string): 
     await raiseNotice({
       siteId, clientId, kind: 'new_booking', period: `appt:${appt.id}`,
       headline: `New booking: ${String(appt.type_name).slice(0, 60)} — ${when}`,
-      body: `${who || 'Someone'} booked online${status === 'confirmed' ? '' : ' — waiting for your confirmation'}.`,
+      body: `${who || 'Someone'} booked online${status === 'confirmed' ? '' : ' — waiting for your confirmation'}.${noMail}`,
     }).catch(() => {});
   }
   // Owner email (best-effort; mirrors notifyOwnerOfLead).
@@ -463,6 +468,7 @@ async function notifyOwnerOfBooking(siteId: string, appt: any, status: string): 
     `<p>You have a new booking${status === 'confirmed' ? '' : ' request'} from your website.</p>` +
     `<p><b>${esc(appt.type_name)}</b> — ${esc(when)}${price ? ` · ${esc(price)}` : ''}</p>` +
     `<p>${esc(who)}</p>${appt.note ? `<p style="color:#666">“${esc(String(appt.note).slice(0, 400))}”</p>` : ''}` +
+    (noMail ? `<p><b>${esc(noMail.trim())}</b></p>` : '') +
     `<p class="cta"><a href="${siteBase()}/presence.html#bookings" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See it in your workspace →</a></p>`, brand, { critical: true });
 }
 

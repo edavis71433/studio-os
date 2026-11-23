@@ -77,12 +77,13 @@ if (before) {
 // sales item 163 (money polish, Nov 22) added a chore, retainer_notes, right after invoice_nudges:
 // the week-before note for a yearly retainer, which reads the deals with a retainer on the daily Stripe
 // check's own path (commerce/retainers.ts retainerDealsPath), so this run's shared reads answer it.
-// Builder item 336 (portal, Nov 22) added client_reminders: 41 chores in all.
-ok('41 chores, as listed: retainer_notes (sales item 163) runs right after invoice_nudges, and client_reminders (builder item 336) is in', afterOrder.length === 41 && afterOrder.indexOf('retainer_notes') === afterOrder.indexOf('invoice_nudges') + 1 && afterOrder.includes('client_reminders'), `${afterOrder.length}: ${afterOrder.join(',')}`);
-ok('the progress note is written a bounded number of times (at most 6 of the 43)', after.noteWrites <= 6 && after.noteWrites >= 1, String(after.noteWrites));
+// Builder item 336 (portal, Nov 22) added client_reminders: 41 chores in all. Builder items 393 and 395
+// (safety part two) added email_outbox, before the billing chores, and upload_checks, before media_gc: 43.
+ok('43 chores, as listed: retainer_notes (sales item 163) runs right after invoice_nudges, client_reminders (builder item 336) is in, and the outbox and the upload check (items 393, 395) too', afterOrder.length === 43 && afterOrder.indexOf('retainer_notes') === afterOrder.indexOf('invoice_nudges') + 1 && afterOrder.includes('client_reminders') && afterOrder.indexOf('email_outbox') === afterOrder.indexOf('reconcile_billing') - 1 && afterOrder.indexOf('upload_checks') === afterOrder.indexOf('media_gc') - 1, `${afterOrder.length}: ${afterOrder.join(',')}`);
+ok('the progress note is written a bounded number of times (at most 6 of the 45)', after.noteWrites <= 6 && after.noteWrites >= 1, String(after.noteWrites));
 {
   const row = db.tables.presence_scheduled_runs.find((x) => x.run_type === 'tick');
-  ok('…and the finished note carries every chore', row && row.status === 'done' && Object.keys(row.result?.progress || {}).length === 41 && row.finished_at, row ? Object.keys(row.result?.progress || {}).length : 'no row');
+  ok('…and the finished note carries every chore', row && row.status === 'done' && Object.keys(row.result?.progress || {}).length === 43 && row.finished_at, row ? Object.keys(row.result?.progress || {}).length : 'no row');
 }
 console.log(`\nCALLS per idle tick, 9 sites: before ${before ? before.calls : '?'} (${before ? before.reads : '?'} reads), after ${after.calls} (${after.reads} reads); progress notes ${before ? before.noteWrites : '?'} → ${after.noteWrites}`);
 

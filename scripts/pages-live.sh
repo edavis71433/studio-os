@@ -9,7 +9,9 @@
 # The live pages match when any of these is true:
 #   - /version.json names the commit;
 #   - it names another commit, and between the two nothing published changed (Netlify
-#     skipped the build, scripts/netlify-ignore.sh: the same rule decides both);
+#     skipped the build, scripts/netlify-ignore.sh: the same rule decides both, asked with
+#     PAGES_CHANGES_ONLY=1 so that "release" in scripts/pages-go-live.txt, which skips every
+#     Netlify build, can't make any older live commit look like a match);
 #   - release only: it names a newer commit of main. That is how it looks while Netlify
 #     still publishes main on every merge (scripts/pages-go-live.txt says "merge"), and the
 #     pages are then ahead of the release, as before item 400.
@@ -31,7 +33,7 @@ matches() {   # the live commit, the commit released: 0 when the live pages are 
   local live="$1"
   [ "$live" = "$SHA" ] && { echo "The live pages are this commit's."; return 0; }
   git cat-file -e "$live^{commit}" 2>/dev/null || return 1
-  if CONTEXT=production CACHED_COMMIT_REF="$live" COMMIT_REF="$SHA" bash "$here/netlify-ignore.sh" > /dev/null 2>&1; then
+  if PAGES_CHANGES_ONLY=1 CONTEXT=production CACHED_COMMIT_REF="$live" COMMIT_REF="$SHA" bash "$here/netlify-ignore.sh" > /dev/null 2>&1; then
     echo "The live pages are from ${live:0:8}, and nothing published changed since: they are this commit's pages."
     return 0
   fi

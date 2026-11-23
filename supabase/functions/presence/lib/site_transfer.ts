@@ -290,7 +290,7 @@ export async function emailNextStep(t: TransferRow, words: { business: string; s
   const body = step === 'agree'
     ? `<p>${escHtml(words.studio || 'Your studio')} asks to make <strong>${escHtml(t.to_email)}</strong> the owner of <strong>${biz}</strong>.</p><p>They would sign in as the owner and decide who else gets in. The website, its pages and its plan stay as they are. ${keep}</p><p>Only you can agree, because you own ${biz}. If you didn’t expect this, say no and call your studio.</p><p class="cta"><a href="${href}" style="${btn}">See it and answer →</a></p>`
     : `<p>${escHtml(words.ownerName || 'The owner')} wants you to be the owner of <strong>${biz}</strong>.</p><p>Accepting makes you the owner of the website and its account. Nothing changes until you accept, and the request lapses on its own after ${TRANSFER_DAYS} days.</p><p class="cta"><a href="${href}" style="${btn}">See it and answer →</a></p>`;
-  return sendEmail(to, subject, body + `<p style="color:#938ba3;font-size:13px;margin-top:10px">This link signs you in, so there’s no password to type.</p>`, brand, { critical: true }).catch(() => false);
+  return sendEmail(to, subject, body + `<p style="color:#938ba3;font-size:13px;margin-top:10px">This link signs you in, so there’s no password to type.</p>`, brand, { critical: true, keep: 'sign_in' }).catch(() => false);   // builder item 393: a sign-in link, kept until it goes
 }
 
 /** A short note to someone when the request ends: done, stopped or turned down. */

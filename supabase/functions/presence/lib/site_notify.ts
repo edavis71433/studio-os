@@ -121,6 +121,7 @@ export interface NewsLine extends NewsItem { count: number; title: string; sub: 
 const LINK_WORDS: Record<string, string> = {
   site_published: 'See the website', traffic_spike: 'View analytics', domain_expiry: 'Open the domain',
   new_review: 'Read the review', new_booking: 'Open bookings',
+  auto_reply_ceiling: 'Open the enquiries', email_not_sent: 'See what to do',   // builder items 391 and 393
 };
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 

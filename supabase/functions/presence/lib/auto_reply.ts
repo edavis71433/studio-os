@@ -9,6 +9,13 @@
 // counts on its own, so someone who writes in and then books the same day still gets
 // their booking's confirmation.
 //
+// Builder list item 391 (Nov 22 2026 review, file 07 finding 10): one a day to an address
+// still let a script send thousands a day, each to a different address. So a site also
+// sends at most SITE_AUTO_REPLIES_PER_DAY automatic replies in a UTC day, all three kinds
+// together. The 201st waits for the next day (the enquiry or booking itself still lands,
+// only its email doesn't go), and the site's people and its studio hear it once that day
+// (an `auto_reply_ceiling` notice: on the site's bell, and in the studio's news for the site).
+//
 // The day's count lives in the rate limiter's own table (rate_hit, migration 0008),
 // under a salted hash of the address, so no address is stored for it, and the
 // retention sweep clears the old days. An enquiry's acknowledgement and a list's
@@ -20,13 +27,16 @@ import { suppressionOf } from '../../_shared/email_infra.ts';
 import { normEmail } from './contact_email.ts';
 
 export const AUTO_REPLIES_PER_DAY = 1;
+/** Builder item 391: every automatic reply a site sends in a UTC day, all kinds together. */
+export const SITE_AUTO_REPLIES_PER_DAY = 200;
 /** The automatic replies a visitor can set off, each counted on its own. */
 export type AutoReplyKind = 'enquiry' | 'booking' | 'join';
 const DAY_MS = 86_400_000;
 
-/** send · unsubscribed (on the do-not-send list) · sent_today · unchecked (the count
- *  couldn't be read, or there is no address). Only `send` sends. */
-export type AutoReplyVerdict = 'send' | 'unsubscribed' | 'sent_today' | 'unchecked';
+/** send · unsubscribed (on the do-not-send list) · sent_today · site_ceiling (the site sent
+ *  its day's SITE_AUTO_REPLIES_PER_DAY) · unchecked (the count couldn't be read, or there is
+ *  no address). Only `send` sends. */
+export type AutoReplyVerdict = 'send' | 'unsubscribed' | 'sent_today' | 'site_ceiling' | 'unchecked';
 
 /** The start of the UTC day `nowMs` falls in: the count's window. Pure. */
 export function dayWindow(nowMs: number): string {
@@ -54,7 +64,30 @@ export const autoReplyDeps = {
     } catch { return null; }
   },
   now: () => Date.now(),
+  /** Item 391: tell the site and its studio, once a UTC day (the notice's period is the day). */
+  ceilingNotice: async (siteId: string, day: string): Promise<void> => {
+    const r = await svc(`presence_sites?id=eq.${siteId}&select=id,client_id&limit=1`).catch(() => null);
+    const clientId = r && r.ok && Array.isArray(r.json) ? r.json[0]?.client_id : null;
+    if (!clientId) return;
+    const { raiseNotice } = await import('./notice.ts');
+    const w = ceilingWords(SITE_AUTO_REPLIES_PER_DAY);
+    await raiseNotice({ siteId, clientId: String(clientId), kind: 'auto_reply_ceiling', period: `day:${day}`, headline: w.headline, body: w.body, push: false });
+  },
 };
+
+const TOLD = new Set<string>();
+/** Tests: forget which sites were told today. */
+export function forgetCeilingNotices(): void { TOLD.clear(); }
+/** The site's count for the day, all kinds together (item 391). Pure. */
+export const siteCeilingBucket = (siteId: string) => `autoreply-site:${siteId}`;
+
+/** The notice's words (item 391). Pure. */
+export function ceilingWords(max: number): { headline: string; body: string } {
+  return {
+    headline: `Automatic replies paused for today: ${max} sent`,
+    body: `Your website sent ${max} automatic emails today (thank-you notes, booking confirmations and list confirmations), the most it sends in a day, so no more go out today. Enquiries and bookings still arrive as usual; reply to anyone waiting yourself. This many in a day often means someone is sending your forms on purpose: look in Spam.`,
+  };
+}
 
 /** May this site send this kind of automatic reply to `email` now? Counts the send when the
  *  answer is `send`, so ask only right before sending. */
@@ -63,7 +96,18 @@ export async function autoReplyVerdict(kind: AutoReplyKind, siteId: string, emai
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) return 'unchecked';
   // the do-not-send list first, so a refused address doesn't use up the day's reply
   if (await autoReplyDeps.suppression(addr).catch(() => null)) return 'unsubscribed';
-  const within = await autoReplyDeps.hit(await autoReplyBucket(kind, siteId, addr), dayWindow(autoReplyDeps.now()), AUTO_REPLIES_PER_DAY).catch(() => null);
+  const window = dayWindow(autoReplyDeps.now());
+  const within = await autoReplyDeps.hit(await autoReplyBucket(kind, siteId, addr), window, AUTO_REPLIES_PER_DAY).catch(() => null);
   if (within === null) return opts.failOpen ? 'send' : 'unchecked';
-  return within ? 'send' : 'sent_today';
+  if (!within) return 'sent_today';
+  // item 391: then the site's own ceiling for the day, counted only for a reply that would go
+  const siteWithin = await autoReplyDeps.hit(siteCeilingBucket(siteId), window, SITE_AUTO_REPLIES_PER_DAY).catch(() => null);
+  if (siteWithin === null) return opts.failOpen ? 'send' : 'unchecked';
+  if (!siteWithin) {
+    // once a day per site from this worker: the notice dedupes on its own, this saves the writes
+    const told = `${siteId}|${window}`;
+    if (!TOLD.has(told)) { TOLD.add(told); await autoReplyDeps.ceilingNotice(siteId, window.slice(0, 10)).catch(() => {}); }
+    return 'site_ceiling';
+  }
+  return 'send';
 }
