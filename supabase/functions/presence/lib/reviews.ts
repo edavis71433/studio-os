@@ -76,6 +76,9 @@ export function aggregateApproved(reviews: ReadonlyArray<{ rating: number; statu
 // and shapes each into the render-facing item. `date` (if present) is passed straight
 // through for datePublished in the Review JSON-LD.
 export interface DisplayReview { author: string; rating: number; body: string; reply?: string; date?: string }
+/** What the wall shows for a reviewer who left no name. It is not a name, so the business data
+ *  Google reads leaves such a review out of its list (builder item 383: nothing invented). */
+export const UNNAMED_REVIEWER = 'A customer';
 export interface ReviewRow {
   reviewer_name?: string; rating?: number; body?: string; status?: string;
   owner_reply?: string; approved_at?: string | null; created_at?: string | null;
@@ -88,7 +91,7 @@ export function shapeReviewsForDisplay(rows: ReadonlyArray<ReviewRow>, max = 24)
   approved.sort((a, b) => String(b.approved_at || b.created_at || '').localeCompare(String(a.approved_at || a.created_at || '')));
   const limit = Math.min(Math.max(1, Math.trunc(max) || 24), 50);
   return approved.slice(0, limit).map((r) => {
-    const item: DisplayReview = { author: s(r.reviewer_name, CAP.name) || 'A customer', rating: Math.trunc(Number(r.rating)), body: s(r.body, CAP.body) };
+    const item: DisplayReview = { author: s(r.reviewer_name, CAP.name) || UNNAMED_REVIEWER, rating: Math.trunc(Number(r.rating)), body: s(r.body, CAP.body) };
     const reply = s(r.owner_reply, CAP.reply); if (reply) item.reply = reply;
     const date = String(r.approved_at || r.created_at || '').slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}$/.test(date)) item.date = date;

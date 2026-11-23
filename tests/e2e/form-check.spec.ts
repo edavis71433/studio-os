@@ -69,6 +69,7 @@ test.describe('the time ticket', () => {
     await page.route(`${BK}/ticket`, (route) => { tickets++; return answer(route, 200, { data: { ticket: TK(tickets), wait_s: 3 } }); });
     await page.route(`${BK}/types`, (route) => answer(route, 200, { data: { enabled: true, max_days_ahead: 60, types: [{ id: '7e000000-0000-4000-8000-000000000001', name: 'Haircut', duration_min: 30, price_text: '$40', description: '' }] } }));
     await page.route(`${BK}/slots?**`, (route) => answer(route, 200, { data: { slots: [`${day}T10:00`] } }));
+    await page.route(`${BK}/days?**`, (route) => route.abort('connectionrefused'));   // item 291: the date box, as on a server with no list of days
     await page.route(BK, (route) => {
       if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, accept', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' } });
       posted.push(route.request().postDataJSON() || {});

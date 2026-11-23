@@ -116,6 +116,7 @@ test('the widget’s “you’re booked” offers the calendar and the change-or
   await page.route(`${BK}/ticket`, (route) => answer(route, 200, { data: { ticket: '', wait_s: 0 } }));
   await page.route(`${BK}/types`, (route) => answer(route, 200, { data: { enabled: true, intro: '', timezone: 'America/Los_Angeles', max_days_ahead: 60, types: [{ id: 'a1000000-0000-4000-8000-000000000149', name: 'Haircut', duration_min: 60, price_text: '$40', description: '' }] } }));
   await page.route(`${BK}/slots?**`, (route) => answer(route, 200, { data: { slots: ['2026-11-18T09:00'] } }));
+  await page.route(`${BK}/days?**`, (route) => route.abort('connectionrefused'));   // item 291: the date box, as on a server with no list of days
   const links = { ...CAL, manage: `https://app.davisdigitalstudio.com/booking.html?t=${T}` };
   await page.route(BK, (route) => answer(route, 200, { data: { ok: true, message: 'You’re booked for Haircut. A confirmation is on its way.', status: 'confirmed', links } }));
   await page.goto(`${SITE}/book/`);

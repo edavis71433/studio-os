@@ -26,6 +26,9 @@ import { contactPlace, footerPlace, ldPlaces, PLACE_CSS } from './place_render.t
 import { SHELL_CSS, SHELL_CRITICAL, SHELL_NOSCRIPT, MENU_JS, menuButtonHtml } from './site_shell.ts';
 import { isNewOpening, openingCss, PANEL_LEFT_CSS, type OpeningKind } from './template_openings.ts';
 import { HERO_CARD_CSS, TODAY_JS } from './hero_cards.ts';
+import { shareCard, CARD_W, CARD_H, SHARE_CARD_VERSION } from './share_card.ts';
+import { BOOKING_MONTH_JS, BOOKING_MONTH_PATH } from './site_send.ts';
+import { normHex } from './brand_kit.ts';
 
 /** The site's script file: the phone menu (lib/site_shell.ts) and the gallery and carousel (lib/site_blocks.ts). */
 export const SITE_JS = `${MENU_JS}\n${BLOCK_JS}`;
@@ -229,7 +232,40 @@ function mapsHref(c: SnapshotContent): string | null {
 
 // ═════════ JSON-LD (industry-correct: the business's own schema.org type) ═════════
 
-function ldBusiness(c: SnapshotContent, site: SiteConfig, v: IndustryVocab, reservations: boolean): object {
+/** Item 379: the town a default title and the share card name ("Burbank, CA"), from the main location. */
+export const townOf = (c: SnapshotContent): string => { const l = loc0(c); return l?.city ? [l.city, l.region].filter(Boolean).join(', ') : ''; };
+
+/** Item 383: the business's map point, from the owner's own Google Maps link (on the site's links
+ *  or a Map section): the place's pin, or the middle of a place page's map. A business that goes to
+ *  its customers gives none, as its base may be a home. Pure. */
+export function mapPoint(c: SnapshotContent): { '@type': 'GeoCoordinates'; latitude: number; longitude: number } | undefined {
+  if (!loc0(c) || goesOut(c)) return undefined;
+  const maps = (c.settings?.blocks || []).filter((b) => b.type === 'map').map((b) => String((b as { directions_url?: string }).directions_url || ''));
+  for (const u of [String(c.identity.social?.google_maps || ''), ...maps]) {
+    if (!/^https:\/\/(?:www\.)?google\.[a-z.]{2,6}\/maps\//i.test(u)) continue;
+    const m = /!3d(-?\d{1,2}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)/.exec(u) || (/\/maps\/place\//.test(u) ? /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/.exec(u) : null);
+    if (!m) continue;
+    const lat = Number(m[1]), lng = Number(m[2]);
+    if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && (lat || lng)) return { '@type': 'GeoCoordinates', latitude: Math.round(lat * 1e6) / 1e6, longitude: Math.round(lng * 1e6) / 1e6 };
+  }
+  return undefined;
+}
+
+/** Item 383: the range of the prices the site lists ("$45-$120"), from prices written with a
+ *  currency sign, all in one currency. None listed, none told. Pure. */
+export function priceRange(c: SnapshotContent): string | undefined {
+  const found: Array<{ sign: string; n: number; t: string }> = [];
+  for (const o of c.offerings || []) {
+    const m = /([$£€])\s?(\d{1,3}(?:,\d{3})+|\d+)(\.\d{1,2})?/.exec(String(o.price_text || ''));
+    if (m) found.push({ sign: m[1], n: Number((m[2] + (m[3] || '')).replace(/,/g, '')), t: m[2] + (m[3] || '') });
+  }
+  if (!found.length || found.some((f) => f.sign !== found[0].sign)) return undefined;
+  found.sort((a, b) => a.n - b.n);
+  const lo = found[0], hi = found[found.length - 1];
+  return lo.n === hi.n ? `${lo.sign}${lo.t}` : `${lo.sign}${lo.t}-${hi.sign}${hi.t}`;
+}
+
+function ldBusiness(c: SnapshotContent, site: SiteConfig, v: IndustryVocab, reservations: boolean, picture = ''): object {
   const l = loc0(c);   // may be null on a brand-new/empty draft — must not crash the render
   const spec = (l?.hours || []).filter((d) => !d.closed && d.intervals?.length).flatMap((d) =>
     d.intervals.map((i) => ({ '@type': 'OpeningHoursSpecification', dayOfWeek: DAY_LABEL[d.day], opens: i.open, closes: i.close })));
@@ -239,10 +275,13 @@ function ldBusiness(c: SnapshotContent, site: SiteConfig, v: IndustryVocab, rese
   return {
     '@context': 'https://schema.org', '@type': v.schemaType,
     name: c.identity.business_name, description: c.identity.short_description || c.identity.description, url: site.baseUrl,
+    image: picture ? site.baseUrl + picture : undefined,   // item 383: the site's own photo (or logo), never the plain card
     telephone: l?.phone || c.identity.phone || undefined, email: c.identity.email || undefined,
     // item 334: a business that goes to its customers shows no street; its town and state, when kept, still place it
     address: l && !goesOut(c) ? { '@type': 'PostalAddress', streetAddress: [l.address_line1, l.address_line2].filter(Boolean).join(', '), addressLocality: l.city, addressRegion: l.region, postalCode: l.postal_code, addressCountry: l.country }
       : l && (l.city || l.region) ? { '@type': 'PostalAddress', addressLocality: l.city || undefined, addressRegion: l.region || undefined, addressCountry: l.country } : undefined,
+    geo: mapPoint(c),
+    priceRange: priceRange(c),
     openingHoursSpecification: spec, specialOpeningHoursSpecification: special.length ? special : undefined,
     areaServed: reservations ? undefined : c.identity.service_area || undefined,
     menu: v.isMenu ? `${site.baseUrl}${v.offeringPath}` : undefined,
@@ -280,9 +319,41 @@ const ldCrumbs = (site: SiteConfig, trail: Array<[string, string]>) => ({
 });
 const ldSite = (c: SnapshotContent, site: SiteConfig) => ({ '@context': 'https://schema.org', '@type': 'WebSite', name: c.identity.business_name, url: site.baseUrl });
 
+// ═════════ item 379: words and pictures a page shares ═════════
+const ENTITY: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", '#x27': "'", nbsp: ' ' };
+/** Plain words from the owner's text (written with formatting or not), cut at a word near 155 characters. */
+export function plainWords(md: string | undefined, max = 155): string {
+  const text = renderMarkdown(String(md || '')).replace(/<[^>]+>/g, ' ').replace(/&(amp|lt|gt|quot|#39|#x27|nbsp);/g, (_m, e: string) => ENTITY[e])
+    .replace(/&#(\d+);/g, (_m, n: string) => String.fromCharCode(Number(n))).replace(/\s+/g, ' ').trim();
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max + 1), sp = cut.lastIndexOf(' ');
+  return `${(sp > max / 2 ? cut.slice(0, sp) : text.slice(0, max)).replace(/[\s,;:.!?-]+$/, '')}…`;
+}
+const WORD_KEYS = ['body', 'text', 'intro', 'subtitle', 'subtext', 'description', 'content', 'answer'];
+/** An owner's page's own words: the first text of 20 characters or more in its sections. */
+export function pageWords(v: unknown, depth = 0): string {
+  if (!v || typeof v !== 'object' || depth > 5) return '';
+  if (Array.isArray(v)) { for (const x of v) { const w = pageWords(x, depth + 1); if (w) return w; } return ''; }
+  const o = v as Record<string, unknown>;
+  for (const k of WORD_KEYS) { const w = typeof o[k] === 'string' ? plainWords(o[k] as string) : ''; if (w.length >= 20) return w; }
+  for (const x of Object.values(o)) { const w = pageWords(x, depth + 1); if (w) return w; }
+  return '';
+}
+/** The first photo on an owner's page, for its share picture: never a partner's logo or a map. */
+export function firstPhoto(v: unknown, depth = 0): string {
+  if (!v || typeof v !== 'object' || depth > 6) return '';
+  if (Array.isArray(v)) { for (const x of v) { const f = firstPhoto(x, depth + 1); if (f) return f; } return ''; }
+  const o = v as Record<string, unknown>;
+  if (depth <= 1 && (o.type === 'partners' || o.type === 'map')) return '';
+  const w = (o.variants as Record<string, unknown> | undefined)?.w1600;
+  if (typeof w === 'string' && w) return w;
+  for (const x of Object.values(o)) { const f = firstPhoto(x, depth + 1); if (f) return f; }
+  return '';
+}
+
 // ═════════ the page shell ═════════
 
-interface PageOpts { path: string; title: string; description: string; ld: object[]; ogImage?: string; shareTitle?: string; shareDescription?: string; shareImage?: string; active: string; body: string; ogType?: 'article'; published?: string; feed?: boolean }
+interface PageOpts { path: string; title: string; description: string; ld: object[]; ogImage?: string; ogImageSize?: [number, number]; shareTitle?: string; shareDescription?: string; shareImage?: string; active: string; body: string; ogType?: 'article'; published?: string; feed?: boolean }
 interface Extras { announce: string; icon: string; nav: Array<[string, string, string]>; tokens: Record<string, string> }
 
 function shell(look: TemplateLook, c: SnapshotContent, site: SiteConfig, cssPath: string, o: PageOpts, x: Extras, jsPath = SITE_JS_PATH): string {
@@ -759,7 +830,9 @@ export function makeRender(look: TemplateLook): RenderFn {
     // gallery's zoom view and the carousel's arrows), named by its hash like the stylesheet
     files[SITE_JS_PATH.slice(1)] = SITE_JS;
 
-    const siteTitle = i.seo_title || i.business_name;
+    // Item 379: a default title names the town, and a page describes itself in its own words
+    const town = townOf(c);
+    const siteTitle = i.seo_title || (town ? `${i.business_name} | ${town}` : i.business_name);
     const siteDesc = i.seo_description || i.short_description || i.description;   // item 127
     // The owner's chosen share image wins; then the cover (item 67), offerings, posts; then the logo
     const ogImg = c.settings?.og_image?.variants?.w1600
@@ -767,6 +840,16 @@ export function makeRender(look: TemplateLook): RenderFn {
       || (bySort(c.offerings).find((o) => o.media)?.media?.variants?.w1600)
       || (c.posts.find((p) => p.hero)?.hero?.variants?.w1600)
       || c.settings?.logo?.variants?.w1600;
+    // Item 379: every page carries a share picture: a page's own photo (a post's cover, the first
+    // photo on an owner's page), else the site's above, else, for a site with no photo or logo at
+    // all, a plain card in its colours with its name and town (lib/share_card.ts), named by what it
+    // shows, so a new name is a new file. Slate keeps its own colours (render.ts FIXED_COLOR_TEMPLATES).
+    let shareImg = ogImg || '';
+    if (!shareImg) {
+      const accent = (snapshot.template_slug !== 'slate' && normHex(styleTokens.accent)) || normHex(/--accent:\s*(#[0-9a-fA-F]{3,6})\b/.exec(look.critical + look.css)?.[1]);
+      shareImg = `/assets/share-${fnv(`${SHARE_CARD_VERSION}|${i.business_name}|${town}|${accent}`)}.png`;
+      files[shareImg.slice(1)] = shareCard({ name: i.business_name, town, accent });
+    }
 
     // The announcement bar, with its expiry read against the snapshot's own time
     const ann = c.settings?.announcement;
@@ -811,7 +894,8 @@ export function makeRender(look: TemplateLook): RenderFn {
     const page = (path: string, opts: Omit<PageOpts, 'path'>) => {
       // Item 308: the first photo on a page is the main thing it paints, so the page asks for it at
       // once (a preload in the head; the welcome photo already loads first and needs none).
-      const html = shell(look, c, site, cssPath, { path, ...opts }, extras).replace('</head>', `${firstPhotoPreload(opts.body)}</head>`);
+      const og = opts.ogImage || shareImg;   // item 379
+      const html = shell(look, c, site, cssPath, { path, ...opts, ogImage: og, ...(!ogImg && og === shareImg ? { ogImageSize: [CARD_W, CARD_H] as [number, number] } : {}) }, extras).replace('</head>', `${firstPhotoPreload(opts.body)}</head>`);
       const file = path === '/' ? 'index.html' : `${path.replace(/^\/|\/$/g, '')}/index.html`;
       files[file] = html;
     };
@@ -822,15 +906,15 @@ export function makeRender(look: TemplateLook): RenderFn {
     // item 334: a business that goes to its customers lends no address to an event that has no place of its own
     const place = l0 && l0.address_line1 && !goesOut(c) ? { name: i.business_name, address: [l0.address_line1, l0.address_line2, l0.city, [l0.region, l0.postal_code].filter(Boolean).join(' ')].map((x) => String(x || '').trim()).filter(Boolean).join(', ') } : undefined;
     const blocks = renderSiteBlocks(c.settings?.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at, src: c.settings?.blocks_src, place });   // Phase T-BLOCKS (+ FB form blocks + BK booking + EXP window)
-    const ldBiz = ldBusiness(c, site, v, !!classic?.reservations);
+    const ldBiz = ldBusiness(c, site, v, !!classic?.reservations, ogImg || '');
     // Phase RV: fold the HONEST reviews schema (AggregateRating + Review, approved rows
     // only) onto the ONE business node — home only, where the reviews_wall is visible.
     const rSchema = reviewsSchema(c.settings?.blocks, snapshot.created_at);
     const ldBizHome = rSchema ? { ...ldBiz, ...rSchema } : ldBiz;
     page('/', { title: siteTitle, description: siteDesc, ...(i.short_description ? { shareDescription: i.short_description } : {}), ld: [ldBizHome, ...ldPlaces(c, site, v.schemaType), ldSite(c, site), ...blocks.flatMap((b) => (b.ld ? [b.ld] : []))], ogImage: ogImg, active: 'home', body: homeBody(look, c, v, words, blocks, op, cardKind ? heroCard(cardKind, c, v, site) : '', sides) });
-    page(v.offeringPath, { ...seoOv('offerings', `${v.offeringLabel} — ${i.business_name}`, words.offeringsDescription(v.offeringLabel, i.business_name)), ld: [ldOfferings(c, site, v)], ogImage: ogImg, active: 'offerings', body: offeringsBody(look, c, v) });
+    page(v.offeringPath, { ...seoOv('offerings', `${v.offeringLabel} — ${i.business_name}${town ? `, ${town}` : ''}`, words.offeringsDescription(v.offeringLabel, i.business_name)), ld: [ldOfferings(c, site, v)], ogImage: ogImg, active: 'offerings', body: offeringsBody(look, c, v) });
     if (noidx.has('offerings')) markNoindex(`${v.offeringPath.replace(/^\/|\/$/g, '')}/index.html`);
-    page('/about/', { ...seoOv('about', `About — ${i.business_name}`, siteDesc), ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c, words) });
+    page('/about/', { ...seoOv('about', `About — ${i.business_name}`, plainWords(i.story) || plainWords(`${i.business_name}${town ? ` in ${town}` : ''}. ${i.description || ''}`)), ld: [ldCrumbs(site, [[i.business_name, '/'], ['About', '/about/']])], active: 'about', body: aboutBody(c, words) });
     if (noidx.has('about')) markNoindex('about/index.html');
     if (hasFaq) {
       page('/faq/', { ...seoOv('faq', `FAQ — ${i.business_name}`, `Answers to common questions about ${i.business_name}.`), ld: [ldFaq(c)], active: 'faq', body: faqBody(c) });
@@ -882,7 +966,8 @@ export function makeRender(look: TemplateLook): RenderFn {
     for (const cp of (c.settings?.pages || [])) {
       const cblocks = renderSiteBlocks(cp.blocks, { esc, attr, safeHref, formEndpoint: site.formEndpoint, bookEndpoint: site.bookEndpoint, now: snapshot.created_at, src: cp.blocks_src, place });
       page(`/${cp.slug}/`, {
-        ...seoOv(`page:${cp.slug}`, `${cp.title} — ${i.business_name}`, siteDesc),
+        ...seoOv(`page:${cp.slug}`, `${cp.title} — ${i.business_name}`, pageWords(cp.blocks) || `${cp.title} at ${i.business_name}${town ? ` in ${town}` : ''}.`),
+        ogImage: firstPhoto(cp.blocks),
         ld: [ldCrumbs(site, [[i.business_name, '/'], [cp.title, `/${cp.slug}/`]]), ...cblocks.flatMap((b) => (b.ld ? [b.ld] : []))],
         active: `page:${cp.slug}`,
         body: `${band(look, `<h1>${esc(cp.title)}</h1>`)}${cblocks.map((b) => b.html).join('')}`,
@@ -902,6 +987,9 @@ export function makeRender(look: TemplateLook): RenderFn {
       path: '/404.html', title: `Page not found — ${i.business_name}`, description: siteDesc, ld: [], active: '',
       body: band(look, `<h1>That page isn’t here</h1><p class="tagline">The page you’re after may have moved.</p><div class="cta-row"><a class="btn" href="/">Back to ${esc(i.business_name)}</a><a class="btn ghost" href="${attr(v.offeringPath)}">${esc(words.seeOfferings(v.offeringLabel))}</a></div>`),
     }, extras);
+
+    // Item 291: a site that takes bookings ships the month its widget loads at the "pick a day" step
+    if (Object.values(files).some((h) => typeof h === 'string' && h.includes('<div class="booking-widget" data-book='))) files[BOOKING_MONTH_PATH.slice(1)] = BOOKING_MONTH_JS;
 
     const initial = classic?.files.initial || 'B';
     const letter = (i.business_name || initial).trim()[0]?.toUpperCase() || initial;

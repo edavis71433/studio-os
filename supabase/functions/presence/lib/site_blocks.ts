@@ -38,6 +38,7 @@ import { hasSampleWords } from './sample_words_check.ts';
 import { parseWindow, isVisibleNow } from './content_window.ts';
 import { normHex, darken, contrastRatio } from './brand_kit.ts';
 import { UUID_RE } from './uuid.ts';
+import { UNNAMED_REVIEWER } from './reviews.ts';
 import { bookingScript, signupForm } from './site_send.ts';
 import { isAnchor, anchorOf, siteLink } from './section_links.ts';
 
@@ -1231,20 +1232,26 @@ function blockImg(m: MediaRef, esc: (s: string) => string, attr: (s: string) => 
 //    real business — the correct rich-results shape. Counts only approved rows (the
 //    resolved block already carries approved-only data). Returns null when there is
 //    nothing approved to show, so a template with no reviews_wall is byte-identical. ──
-export function reviewsSchema(blocks: SiteBlock[] | undefined, now?: string): { aggregateRating: object; review: object[] } | null {
+// Builder item 383: Google reads these reviews but shows no stars in its results for reviews a
+// business collects on its own site, so nothing here (or in the builder's words) promises any.
+// What is told is only what the wall shows: the reviews on it, each with the name its writer gave
+// (one with no name is left out of the list, never given one), and the average and count the
+// wall prints.
+export function reviewsSchema(blocks: SiteBlock[] | undefined, now?: string): { aggregateRating: object; review?: object[] } | null {
   const rw = (blocks || []).find((b) => b.type === 'reviews_wall'
     // Phase EXP: a reviews wall outside its window isn't shown, so it emits no schema either.
     && (!now || isVisibleNow(b as { show_from?: string; show_until?: string }, now))) as SiteBlockReviewsWall | undefined;
   if (!rw || !rw.aggregate || rw.aggregate.count < 1 || !rw.reviews.length) return null;
+  const named = rw.reviews.slice(0, 20).filter((r) => r.author && r.author !== UNNAMED_REVIEWER);
   return {
     aggregateRating: { '@type': 'AggregateRating', ratingValue: rw.aggregate.average, reviewCount: rw.aggregate.count, bestRating: 5, worstRating: 1 },
-    review: rw.reviews.slice(0, 20).map((r) => ({
+    ...(named.length ? { review: named.map((r) => ({
       '@type': 'Review',
       reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5, worstRating: 1 },
       author: { '@type': 'Person', name: r.author },
       reviewBody: r.body,
       ...(r.date ? { datePublished: r.date } : {}),
-    })),
+    })) } : {}),
   };
 }
 

@@ -69,7 +69,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     id: 'reviews',
     q: 'How do I show customer reviews?',
     kw: ['review', 'testimonial', 'rating', 'star rating', 'show reviews', 'collect reviews', 'feedback'],
-    a: 'Collect and approve reviews in the Reviews tab, and add a Reviews section to a page. Only reviews you approve appear, with honest star ratings for search — nothing shows until you approve one and publish.',
+    a: 'Collect and approve reviews in the Reviews tab, and add a Reviews section to a page. Only reviews you approve appear, with their stars, and nothing shows until you approve one and publish. Google reads them, but it shows no stars in its results for reviews a business collects on its own site.',
     links: [{ href: '/presence.html#reviews', label: 'Collect & approve reviews' }],
   },
   {

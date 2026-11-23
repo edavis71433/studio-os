@@ -2648,7 +2648,7 @@ function renderBlocksCard() {
       const go = el("button", null, "Collect & approve reviews →"); go.type = "button"; go.style.cssText = miniBtn;
       go.addEventListener("click", () => { location.hash = "#reviews"; });
       sub.appendChild(go);
-      sub.appendChild(el("div", "hint", "Shows the real, owner-approved reviews from your Reviews tab — with honest star ratings for search. Nothing appears until you approve a review and publish. (If there are none yet, this section stays hidden.)"));
+      sub.appendChild(el("div", "hint", "Shows the real, owner-approved reviews from your Reviews tab, with their stars. Google shows no stars in its results for reviews you collect on your own site. Nothing appears until you approve a review and publish. (If there are none yet, this section stays hidden.)"));
     } else if (def.apptSimple) {
       const t = el("input"), bt = el("input"), u = el("input");
       t.placeholder = "A short line (optional) — e.g. Ready when you are."; t.value = blk.text || "";
