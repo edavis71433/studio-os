@@ -1020,10 +1020,12 @@ document.querySelectorAll("[data-sing]").forEach((inp) => {
 function bizShows() {
   const rc = (S.site && S.site.template_slug) === "restaurant-classic", bar = !!pbNow();
   const footHours = !(S.settings && S.settings.footer_hours === false);   // Edit site's footer switch
+  // item 330: the three newer front-page layouts make the tagline the headline and show the short description under it
+  const opens = ["panel", "editorial", "type"].includes(String((S.settings && S.settings.hero_layout) || ""));
   return {
     business_name: "Shows at the top of every page, in the browser tab, in Google results and on the emails you send.",
-    tagline: "Shows under your name at the top of your home page.",
-    short_description: "What Google, AI assistants and directories quote about you, and the line under your link when someone shares your site. One sentence: what you are, where, and what you’re known for.",
+    tagline: opens ? "Shows as the big headline at the top of your home page." : "Shows under your name at the top of your home page.",
+    short_description: (opens ? "Shows under the headline at the top of your home page. " : "") + "What Google, AI assistants and directories quote about you, and the line under your link when someone shares your site. One sentence: what you are, where, and what you’re known for.",
     description: "Shows on your home page and your About page. Google uses it when you have no short description or search description.",
     story: "Shows on your About page.",
     phone: bar ? "Shows in your footer and on your Contact page, on the Call button of the phone bar, and to Google." : "Shows in your footer and on your Contact page, and to Google.",

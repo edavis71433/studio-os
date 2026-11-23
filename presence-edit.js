@@ -531,15 +531,18 @@ const TYPE_PRESETS = [
 // FD-T3: complete "looks" — one tap sets a coordinated palette + type + shape
 // (all through the SAME token layer; every palette is contrast-checked). A look is
 // a variant of the one engine, not a new template (constitution Part 4).
-const STYLE_LOOKS = [
-  { key: "", name: "Original", tokens: {} },
-  { name: "Warm & inviting", tokens: { accent: "#8c3b2e", accent_dark: "#6f2e24", ink: "#241d1a", soft: "#6b5f58", font_display: "Georgia, 'Iowan Old Style', serif", font_body: "system-ui, -apple-system, 'Segoe UI', sans-serif", radius: "18px", bg: "#faf6ee" } },
-  { name: "Clean & modern", tokens: { accent: "#2f5d8a", accent_dark: "#224566", ink: "#1b2530", soft: "#5a6570", font_display: "system-ui, -apple-system, 'Segoe UI', sans-serif", font_body: "system-ui, -apple-system, 'Segoe UI', sans-serif", radius: "2px", bg: "#f3f5f7" } },
-  { name: "Bold & confident", tokens: { accent: "#37474f", accent_dark: "#263238", ink: "#1e262a", soft: "#5c686e", font_display: "Georgia, 'Times New Roman', serif", font_body: "system-ui, sans-serif", spacing_scale: "1.18" } },
-  { name: "Fresh & natural", tokens: { accent: "#23635a", accent_dark: "#17453f", ink: "#1c2430", soft: "#5b6572", font_display: "Georgia, 'Iowan Old Style', serif", font_body: "system-ui, -apple-system, sans-serif", bg: "#faf6ee" } },
-  { name: "Refined & elegant", tokens: { accent: "#5b3fa0", accent_dark: "#463079", ink: "#221e2c", soft: "#635d70", font_display: "Georgia, 'Iowan Old Style', serif", font_body: "system-ui, -apple-system, 'Segoe UI', sans-serif", radius: "18px" } },
-];
-const LOOK_CLEAR = { accent: "", accent_dark: "", ink: "", soft: "", font_display: "", font_body: "", radius: "", bg: "", spacing_scale: "" };
+// Item 333: the twelve Eric picked in Figma (section D), grouped by mood, Original first, and what a
+// look clears so the next one leaves nothing of the last behind, are the server's one list
+// (lib/style_looks.ts), sent with /dev/customization beside the font library; + New site's openings
+// for a kind of business start a site in the same looks. Each sets its colours, its two library
+// fonts, its button set and corners, and names itself (look), which brings its own small layer of
+// rules so every word reads on every template (lib/site_looks.ts). tests/presence/style_looks_333_test.mjs
+// reads every word of every template under each; tests/e2e/style-looks-333.spec.ts draws the tiles.
+let STYLE_LOOKS = [];
+let LOOK_CLEAR = {};
+// A dark look's colours only read together: a colour, background or brand colour picked over one
+// starts again from the template's own, on a light page (routes/dev.ts does the same for the kit).
+const DARK_LOOK_CLEAR = { scheme: "", bg: "", ink: "", soft: "", accent: "", accent_dark: "", card: "", line: "", wash: "", accent_band: "", look: "" };
 const SIZE_OPTS = [ ["Cozy","0.95"], ["Standard",""], ["Larger","1.08"] ];
 const CORNER_OPTS = [ ["Sharp","2px"], ["Soft",""], ["Round","18px"] ];
 const BG_OPTS = [ ["Bright",""], ["Warm","#faf6ee"], ["Cool","#f3f5f7"] ];
@@ -585,24 +588,45 @@ function dcPatchTokens(tokens) {
 // A pick shows at once and saves behind. The next pick builds on it before it has saved,
 // so two quick picks keep both; a failed save puts the page back if nothing came after.
 let TOKENS_SEQ = 0;
+// Item 333: what a ready-made look sets that the server draws (lib/site_looks.ts), so the canvas is drawn again;
+// and the openings' own settings, which change what the welcome section draws (lib/template_kit.ts).
+const LOOK_DRAWN = ["look", "scheme", "heading_case", "heading_weight", "button_radius", "button_shadow", "hero_card", "hero_photo", "hero_band"];
 async function saveTokens(change, msg) {
+  if (DESIGN_TOKENS && DESIGN_TOKENS.scheme && !("scheme" in change) && ["accent", "accent_dark", "ink", "soft", "bg"].some((k) => k in change)) change = { ...DARK_LOOK_CLEAR, ...change };   // item 333
   const before = DESIGN_TOKENS, next = { ...DESIGN_TOKENS };
   const redraw = "buttons" in change || "forms" in change;   // item 217: the server draws a set's own style (lib/site_buttons.ts)
+  const lookDrawn = LOOK_DRAWN.some((k) => k in change);
   for (const [k, v] of Object.entries(change)) { if (v === "" || v == null) delete next[k]; else next[k] = v; }
   const seq = ++TOKENS_SEQ;
   const put = api("PUT", "/dev/customization", { theme_tokens: next });   // Undo reads the tokens from before, here
   DESIGN_TOKENS = next;
-  const shown = dcPatchTokens(next);
-  const remount = () => { const card = $("designCard"); if (card) card.remove(); mountDesignCard(false); };
+  // a page going dark or light waits for the server's drawing: its cards and bands change with it
+  const shown = String((before && before.scheme) || "") === String(next.scheme || "") && dcPatchTokens(next);
   try {
     await put;
-    if (seq === TOKENS_SEQ) remount();
-    toast(msg + " — publish to see it live"); scheduleChangesRefresh(); stageStale();
-    if (!shown || redraw) refreshDesignPreview();
+    if (seq === TOKENS_SEQ) designCardRedraw();
+    toast(msg + ". Publish to see it live."); scheduleChangesRefresh(); stageStale();
+    if (!shown || redraw || lookDrawn) refreshDesignPreview();
   } catch (err) {
-    if (seq === TOKENS_SEQ) { DESIGN_TOKENS = before; if (shown) dcPatchTokens(before); remount(); }
+    if (seq === TOKENS_SEQ) { DESIGN_TOKENS = before; if (shown) dcPatchTokens(before); designCardRedraw(); }
     toast(nice(err), true);
   }
+}
+// Item 333: the card is drawn again where it stands, so a pick never moves the panel. The panel
+// keeps its scroll, and the choice that had the keyboard keeps it: a look's tile by its look, any
+// other control by its place among the card's controls.
+function designCardRedraw() {
+  const old = $("designCard"); if (!old) return mountDesignCard(false);
+  const sc = old.closest(".dc-panel-scroll"), top = sc ? sc.scrollTop : 0;
+  const controls = (root) => [...root.querySelectorAll("button, input, select, textarea, summary, a[href]")];
+  const ae = document.activeElement, had = ae && ae !== old && old.contains(ae);
+  const look = had && ae.classList.contains("st-look") ? ae.dataset.look : null, at = had ? controls(old).indexOf(ae) : -1;
+  return remountInPlace("designCard", () => mountDesignCard(false), true).then(() => {
+    if (sc) sc.scrollTop = top;
+    const nu = $("designCard"); if (!nu || !had) return;
+    const t = look !== null ? [...nu.querySelectorAll(".st-look")].find((x) => x.dataset.look === look) : controls(nu)[at];
+    if (t) t.focus({ preventScroll: true });
+  });
 }
 // the tab a Styles row belongs to (the floating studio's Styles card hides the others)
 function stab(rowEl, tab) { const w = rowEl && (rowEl.classList && rowEl.classList.contains("ins-field") ? rowEl : rowEl.parentNode); if (w && w.dataset) w.dataset.stab = tab; return rowEl; }
@@ -648,6 +672,28 @@ function navStyleRow(host, after, label) {
   return pillRow(host, label || "Header", [["Standard", ""], ["Centered", "centered"]], (o) => String((S.settings && S.settings.nav_style) || "") === o[1],
     async (o) => { try { await settingsPut({ nav_style: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Header: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); if (after) after(); } catch (err) { toast(nice(err), true); } });
 }
+// Item 330: what the picked front-page layout does, in a line, for the three new ones. 'panel' and
+// 'editorial' need a photo (the cover, a service's or a published update's); without one the site
+// opens as Type only, and the line says so.
+function heroLayoutSays(v) {
+  const st = S.settings || {};
+  const photo = !!st.cover_media_id || (S.offerings || []).some((o) => o.media_id && o.is_visible !== false) || (S.posts || []).some((p) => p.status === "published" && p.hero_media_id);
+  const noPhoto = photo ? "" : " Until your site has a photo, it opens as Type only.";
+  if (v === "panel") return "Your tagline as the headline, on a soft tint of your colour, with your photo running to the edge." + noPhoto;
+  if (v === "editorial") return "Your tagline as a big centred headline, then up to three of your photos in a row. It reads best with the Centered header." + noPhoto;
+  if (v === "type") return "Your tagline in big words " + ((DESIGN_TOKENS || {}).hero_band === "off" ? "on the page itself" : "on a band of your colour") + ", then the facts your site has: reviews, today’s hours, your phone and the places you serve.";
+  return "";
+}
+// The openings made for a kind of business (lib/kind_openings.ts) start a site with one more choice
+// beside its layout; each is a style setting the server draws, and each can be changed here: a card
+// on the welcome photo, the colour panel's photo side, Type only on the page or on its band.
+const CARD_OPTS = [["Nothing", ""], ["A form asking for an estimate", "estimate"], ["Today’s hours and booking", "today"]];
+const HERO_SIDES = {
+  photo: { key: "hero_card", label: "On the photo", opts: CARD_OPTS },
+  "photo-light": { key: "hero_card", label: "On the photo", opts: CARD_OPTS },
+  panel: { key: "hero_photo", label: "Where the photo sits", opts: [["On the right", ""], ["On the left", "left"]] },
+  type: { key: "hero_band", label: "Behind the words", opts: [["A band of your colour", ""], ["The page itself", "off"]] },
+};
 function pillRow(host, label, opts, isOn, onPick, style) {
   const wrapEl = el("div"); wrapEl.style.cssText = "margin-top:12px";
   wrapEl.appendChild(Object.assign(el("div", null, label), { style: "font-size:12px;font-weight:600;margin-bottom:6px" }));
@@ -874,28 +920,65 @@ function lookIsOn(l) {
   if (!Object.keys(t).length) return keys.every((k) => !T[k]);
   return keys.every((k) => String(T[k] || "") === String(t[k] || ""));
 }
-// Ready-made looks as small pictures of themselves: the page colour, a heading, two lines, a button.
+// Item 333: each ready-made look drawn small in its own fonts, colours and button, two across:
+// its mood, its name as a heading, a line of words and a button. The one in use is ringed and says
+// On. A tap marks it at once and saves behind; the card is then drawn again where it stands
+// (designCardRedraw), so the panel keeps its place and the tile keeps the keyboard.
 function lookTiles(host, label, looks, isOn, onPick) {
   const wrap = el("div", "ins-field"); wrap.dataset.stab = "looks"; wrap.style.marginTop = "4px";
   wrap.appendChild(el("div", "ins-lbl", label));
-  const grid = el("div", "st-looks");
+  wrap.appendChild(el("p", "ins-says", "Tap one to try it on the page. The panel stays where it is."));
+  lookFaces(looks);
+  const grid = el("div", "st-looks"); grid.setAttribute("role", "group"); grid.setAttribute("aria-label", label);
+  const mark = (b, on) => { b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); b.querySelector(".st-look-on").hidden = !on; };
   looks.forEach((l) => {
-    const t = l.tokens || {}; const on = isOn(l);
-    const b = el("button", "st-look" + (on ? " on" : "")); b.type = "button"; b.setAttribute("aria-pressed", String(on));
-    const pic = el("div", "st-look-pic"); pic.style.background = t.bg || "#ffffff";
-    const ink = t.ink || "#1d1b22", acc = t.accent || ink;
-    const h = el("i", "h"); h.style.background = ink;
-    const l1 = el("i"); l1.style.background = ink; l1.style.opacity = ".45";
-    const l2 = el("i"); l2.style.background = ink; l2.style.opacity = ".45"; l2.style.width = "60%";
-    const bt = el("i", "b"); bt.style.background = acc; bt.style.borderRadius = t.radius === "2px" ? "1px" : "4px";
-    pic.append(h, l1, l2, bt); b.appendChild(pic);
-    b.appendChild(el("span", "st-look-l", (on ? "✓ " : "") + (l.name || "Original")));
-    b.title = (l.name || "Original") + (on ? " — in use" : "");
-    b.addEventListener("click", () => onPick(l));
+    const b = el("button", "st-look"); b.type = "button"; b.dataset.look = l.key || "";
+    b.setAttribute("aria-label", l.name); b.title = l.name + " · " + l.mood;
+    Object.entries(lookDrawing(l)).forEach(([k, v]) => b.style.setProperty(k, v));
+    const pic = el("span", "st-look-pic"); pic.setAttribute("aria-hidden", "true");
+    pic.append(el("span", "st-look-mood", l.mood), el("span", "st-look-h", l.name), el("span", "st-look-t", "Open until six."), el("span", "st-look-b", "Book now"), el("span", "st-look-on", "On"));
+    b.appendChild(pic);
+    mark(b, isOn(l));
+    b.addEventListener("click", () => {
+      if (b.classList.contains("on")) return;   // already this look: nothing to save
+      grid.querySelectorAll(".st-look").forEach((x) => mark(x, x === b));
+      onPick(l);
+    });
     grid.appendChild(b);
   });
   wrap.appendChild(grid); host.appendChild(wrap);
   return wrap;
+}
+// A look's tile colours, faces and button, as CSS variables (presence.css .st-look). The button is
+// filled the way the site fills it (lib/site_buttons.ts buttonChoice): white words on the accent,
+// or on its darker shade, or else the darkest words that read on the accent.
+function lookDrawing(l) {
+  const t = l.tokens || {}, sans = "system-ui, -apple-system, 'Segoe UI', sans-serif";
+  const ink = t.ink || "#1d1b22", acc = t.accent || ink, dark = t.accent_dark || acc;
+  let fill = acc, on = "#ffffff";
+  if (ovContrast("#ffffff", acc) < 4.5) {
+    if (ovContrast("#ffffff", dark) >= 4.5) fill = dark;
+    else on = [ink, "#111111", "#000000"].find((x) => ovContrast(x, acc) >= 4.5) || "#000000";
+  }
+  const display = t.font_display || sans, set = t.buttons || "";
+  const size = 17 * (t.font_scale ? 1.18 : 1) * (/^Caveat\b/.test(display) ? 1.35 : 1);
+  return {
+    "--lk-bg": t.bg || "#ffffff", "--lk-ink": ink, "--lk-soft": t.soft || "#5b5866", "--lk-mood": t.accent_dark || ink,
+    "--lk-fill": fill, "--lk-on": on, "--lk-display": display, "--lk-body": t.font_body || sans,
+    "--lk-hw": t.heading_weight === "400" ? "400" : "700", "--lk-hs": size.toFixed(1) + "px", "--lk-hcase": t.heading_case === "upper" ? "uppercase" : "none",
+    "--lk-br": set === "pill" ? "999px" : set === "square" ? "0" : t.button_radius ? Math.round(parseInt(t.button_radius, 10) / 2) + "px" : "6px",
+    "--lk-bcase": set === "square" ? "uppercase" : "none", "--lk-bls": set === "square" ? ".08em" : "0",
+    "--lk-bsh": t.button_shadow === "offset" ? "2px 2px 0 " + ink : "none",
+  };
+}
+// The looks' faces, so each tile shows its real type: dcFontFaces' rules for every library family
+// a look names, once for the page. A face loads when a tile first draws words in it.
+function lookFaces(looks) {
+  if ($("lookFaces") || !DESIGN_FONTS.length) return;
+  const rules = new Set(looks.flatMap((l) => dcFontFaces(l.tokens).match(/@font-face\{[^}]*\}/g) || []));
+  if (!rules.size) return;
+  const st = document.createElement("style"); st.id = "lookFaces"; st.textContent = [...rules].join("");
+  document.head.appendChild(st);
 }
 // ── Item 217: Styles › Buttons. One set restyles every button on the site, the main one and the
 // second beside it, and one form style every box people type into (lib/site_buttons.ts draws
@@ -933,7 +1016,7 @@ function buttonSetRows(card, T) {
     wrap.appendChild(grid); card.appendChild(wrap);
   };
   tiles("Button set", "Every button on the site at once: the main one and the second one beside it, on every page and section.",
-    BUTTON_SET_OPTS, "bs", String(T.buttons || ""), (o) => saveTokens({ buttons: o[1] }, o[1] ? "Buttons: " + o[0] : "Buttons: your template’s own"),
+    BUTTON_SET_OPTS, "bs", String(T.buttons || ""), (o) => saveTokens({ buttons: o[1], button_radius: "", button_shadow: "" }, o[1] ? "Buttons: " + o[0] : "Buttons: your template’s own"),   // item 333: the set's own corners, no look's shadow
     (pic) => pic.append(el("i", "bs-main", "Book"), el("i", "bs-second", "See menu")));
   tiles("Forms", "The boxes people type into, on every form, sign-up and booking.",
     FORM_STYLE_OPTS, "fs", String(T.forms || ""), (o) => saveTokens({ forms: o[1] }, o[1] ? "Forms: " + o[0] : "Forms: your template’s own"),
@@ -1003,7 +1086,10 @@ let FONT_LIB_OPEN = false;   // stays open across the card's remount after a pic
 async function mountDesignCard(fresh = true) {
   const host = $("designHost") || $("view-business"); if (!host || $("designCard")) return;
   if (fresh) {   // a remount right after this page's own save already holds the tokens
-    try { const r = await api("GET", "/dev/customization"); DESIGN_DEV = r.data || null; DESIGN_TOKENS = (r.data && r.data.theme_tokens) || {}; DESIGN_FONTS = (r.data && r.data.font_library) || []; }
+    try {
+      const r = await api("GET", "/dev/customization"); DESIGN_DEV = r.data || null; DESIGN_TOKENS = (r.data && r.data.theme_tokens) || {}; DESIGN_FONTS = (r.data && r.data.font_library) || [];
+      STYLE_LOOKS = (r.data && Array.isArray(r.data.looks)) ? r.data.looks : []; LOOK_CLEAR = (r.data && r.data.look_clear) || {};
+    }
     catch (_) { return; } // not an owner/developer on this site → no card
   }
  
@@ -1015,10 +1101,13 @@ async function mountDesignCard(fresh = true) {
   // This is the front door the owner reaches for first, so it leads the card and
   // explains itself (a look restyles the whole site; publishing stays approval-first).
   // The floating studio: each look is a small picture of itself, the one in use ticked.
-  const looksWrap = lookTiles(card, "Ready-made looks", STYLE_LOOKS, lookIsOn, (l) => saveTokens({ ...LOOK_CLEAR, ...(l.tokens || {}) }, (l.name || "Original") + " style"));
-  looksWrap.appendChild(el("div", "hint", "One tap restyles your whole site — colors, type and corners together, always readable. Nothing reaches your live site until you publish."));
+  if (STYLE_LOOKS.length) {   // a server from before the one list sends none: the card leaves the tiles out
+    const looksWrap = lookTiles(card, "Ready-made looks", STYLE_LOOKS, lookIsOn, (l) => saveTokens({ ...LOOK_CLEAR, ...(l.tokens || {}) }, (l.name || "Original") + " style"));
+    looksWrap.appendChild(el("div", "hint", "One tap restyles your whole site: colours, fonts and buttons together, always readable. Nothing reaches your live site until you publish."));
+  }
   const fixedColors = FIXED_COLOR_TEMPLATES.has((S.site && S.site.template_slug) || "");
   if (fixedColors) card.appendChild(el("div", "hint", "This template keeps its own dark colors, so the color and background choices don't change it. Fonts, text size, corners and spacing do.")).dataset.stab = "colours";
+  else if (T.scheme) card.appendChild(el("div", "hint", "This look has a dark page. A colour or background picked here goes back to a light page.")).dataset.stab = "colours";   // item 333 (saveTokens)
   // item 118: which colour themes this page's sections wear (the canvas tags each one while this tab is open)
   const nowRow = el("div", "ins-field"); nowRow.id = "stThemesNow"; nowRow.dataset.stab = "colours";
   nowRow.append(el("div", "ins-lbl", "Colour themes on this page"), el("p", "ins-says"));
@@ -1039,9 +1128,20 @@ async function mountDesignCard(fresh = true) {
   // DS-6/DS-7: layout choices — every template family renders both variants,
   // each in its own visual voice, so the controls show for all templates (G2).
   // item 292: words over the welcome photo, under a dark veil or a light one
-  const heroRow = [["Classic", ""], ["Photo beside text", "split"], ["Words over the photo", "photo"], ["Words over a light photo", "photo-light"]];
-  stab(pillRow(card, "Front-page layout", heroRow, (o) => String((S.settings && S.settings.hero_layout) || "") === o[1],
-    async (o) => { try { await settingsPut({ hero_layout: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + " — publish to apply"); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } }), "looks");
+  // item 330: three more, each its own layout (lib/template_openings.ts HERO_LAYOUTS has the same names)
+  const heroRow = [["Classic", ""], ["Photo beside text", "split"], ["Words over the photo", "photo"], ["Words over a light photo", "photo-light"],
+    ["Split: words on a colour panel", "panel"], ["Centred editorial", "editorial"], ["Type only", "type"]];
+  const heroNow = String((S.settings && S.settings.hero_layout) || "");
+  const heroPills = stab(pillRow(card, "Front-page layout", heroRow, (o) => heroNow === o[1],
+    async (o) => { try { await settingsPut({ hero_layout: o[1] }); const c2 = $("designCard"); if (c2) c2.remove(); mountDesignCard(); toast("Layout: " + o[0] + ". Publish to apply."); scheduleChangesRefresh(); refreshDesignPreview(); } catch (err) { toast(nice(err), true); } }), "looks");
+  heroPills.classList.add("ins-heros");   // a full 44px tap on a touch screen (presence.css)
+  const heroSays = heroLayoutSays(heroNow);
+  if (heroSays) heroPills.parentNode.appendChild(Object.assign(el("p", "hint", heroSays), { id: "heroSays" }));
+  const side = HERO_SIDES[heroNow];
+  if (side) {
+    const sideRow = stab(pillRow(card, side.label, side.opts, (o) => String(T[side.key] || "") === o[1], (o) => saveTokens({ [side.key]: o[1] }, side.label + ": " + o[0])), "looks");
+    sideRow.classList.add("ins-heros"); sideRow.id = "heroSide";   // a full 44px tap on a touch screen, as the layouts
+  }
   stab(navStyleRow(card), "looks");
   // item 158: a gentle "appear on scroll" (lib/site_motion.ts), and the site's own small icon (lib/site_icon.ts)
   stab(motionRow(card, T), "looks");   // item 302: four choices, each shown moving
@@ -1064,7 +1164,7 @@ async function mountDesignCard(fresh = true) {
       card.appendChild(rowEl);
     }
   }
-  card.appendChild(el("div", "hint", "Designed, readable combinations — contrast is checked so your site always stays easy to read. You can restore any earlier version.")).dataset.stab = "looks";
+  card.appendChild(el("div", "hint", "Designed, readable combinations: contrast is checked so your site always stays easy to read. You can restore any earlier version.")).dataset.stab = "looks";
   if (DESIGN_TOKENS && Object.keys(DESIGN_TOKENS).length && !PALETTES.some((p) => p.accent && String(DESIGN_TOKENS.accent || "").toLowerCase() === p.accent) && DESIGN_TOKENS.accent) {
     card.appendChild(el("div", "hint", "A developer set custom colors — picking a palette replaces them.")).dataset.stab = "colours";
   }
@@ -2083,17 +2183,20 @@ function mountBlocksCard() {
 // from their own fields, so carry the chosen look across every rebuild.
 // Builder item 253: the lock rides along too, so a change to any field of a locked section keeps
 // it locked (the client's save was refused and their words lost; the studio's quietly unlocked it).
-function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.style) o.style = p.style; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p.anchor) o.anchor = p.anchor; if (p && p._clEdit) o._clEdit = p._clEdit; if (p && p.lock) o.lock = p.lock; return o; }
+function wLook(idx, o) { const p = BLOCKS_WORK[idx]; if (p && p.look) o.look = p.look; if (p && p.style) o.style = p.style; if (p && p.show_from) o.show_from = p.show_from; if (p && p.show_until) o.show_until = p.show_until; if (p && p.variant) o.variant = p.variant; if (p && p.anchor) o.anchor = p.anchor; if (p && p._clEdit) o._clEdit = p._clEdit; if (p && p.lock) o.lock = p.lock; if (p && typeof p.featured === "number") o.featured = p.featured; return o; }   // item 329: and the raised plan
 // Wave-1 G4: per-block STYLE VARIANTS — 2–3 curated looks per section type, rendered
 // by the shared block engine (mirrors site_blocks.ts BLOCK_VARIANTS; the server
 // re-validates, unknown values fall back to the default). The default is stored as
 // NO `variant` key, so untouched sections stay byte-identical.
 const BLOCK_VARIANT_OPTS = {
   reviews_wall: [["Cards", ""], ["Big quotes", "quotes"], ["Compact strip", "strip"]],
-  accordion: [["Accordion", ""], ["Open, in two columns", "two-column"]],
+  accordion: [["Accordion", ""], ["Open, in two columns", "two-column"], ["Questions beside the heading", "side"], ["Numbered questions", "numbered"]],
   cta: [["Banner", ""], ["Card", "card"]],
-  pricing: [["Cards", ""], ["Price list", "list"]],
+  pricing: [["Cards", ""], ["Price list", "list"], ["Printed price list", "menu"], ["Three plans", "plans"]],
   gallery: [["Grid", ""], ["Mosaic", "masonry"], ["Filmstrip", "filmstrip"]],
+  // item 329: the bold designs picked in Figma (the Layout tab draws each one live)
+  features: [["Grid", ""], ["Numbered", "numbered"], ["Icon tiles on a dark band", "tiles"]],
+  image_text: [["Photo beside the words", ""], ["Photo off the edge", "overlap"], ["Photo in a colour frame", "frame"]],
 };
 // A "Style" pill row inside the block editor (reuses the Design Studio pillRow).
 // Writes block.variant into the working copy — saved by the existing "Save sections".
@@ -2103,6 +2206,34 @@ function blockVariantRow(idx, blk, sub) {
   const isOn = (o) => String((BLOCKS_WORK[idx] && BLOCKS_WORK[idx].variant) || "") === o[1];
   const pick = (o) => { const b = { ...BLOCKS_WORK[idx] }; if (o[1]) b.variant = o[1]; else delete b.variant; BLOCKS_WORK[idx] = b; renderBlocksCard(); dcLiveFromPanel(); };
   pillRow(sub, "Style", opts, isOn, pick);
+  designExtras(sub, idx, blk, false);
+}
+// Item 329: what a bold design adds under its section's layout choice: which side the photo sits on
+// (Photo off the edge, Photo in a colour frame), which plan is raised (Three plans), and a word on a
+// printed price list holding more prices than the other designs show. `inPane`: the inspector's
+// Layout tab (the classic panel keeps its own "Image on the" choice).
+function designExtras(host, idx, blk, inPane) {
+  if (!blk) return;
+  const set = (patch) => { BLOCKS_WORK[idx] = { ...BLOCKS_WORK[idx], ...patch }; renderBlocksCard(); dcLiveFromPanel(); };
+  if (inPane && blk.type === "image_text" && (blk.variant === "overlap" || blk.variant === "frame")) {
+    insTiles(host, "Photo side", [["On the left", "left"], ["On the right", "right"]], (o) => (blk.side === "right" ? "right" : "left") === o[1], (o) => set({ side: o[1] }), (o) => "image_text:" + o[1]).parentNode.dataset.group = "photo-side";
+  }
+  const tiers = blk.type === "pricing" && Array.isArray(blk.tiers) ? blk.tiers : null;
+  if (tiers && blk.variant === "plans") {
+    const f = el("div", "ins-field"); f.dataset.group = "featured";
+    const id = "dsFeatured" + idx, lab = el("label", "ins-lbl", "Most popular plan"); lab.htmlFor = id;
+    const sel = el("select"); sel.id = id;
+    const now = typeof blk.featured === "number" ? blk.featured : (tiers.length === 3 ? 2 : 0);   // the server's default: the middle one of three
+    [[0, "None"]].concat(tiers.map((t, i) => [i + 1, (t && t.name) || "Plan " + (i + 1)])).forEach(([v, l]) => { const o = el("option", null, l); o.value = String(v); if (v === now) o.selected = true; sel.appendChild(o); });
+    sel.addEventListener("change", () => set({ featured: Number(sel.value) }));
+    f.append(lab, sel, el("p", "ins-says", "It stands taller, in your accent colour, with a “Most popular” badge."));
+    host.appendChild(f);
+  }
+  if (tiers && blk.variant === "menu" && tiers.length > 4) {
+    const n = el("p", "ins-says"); n.dataset.group = "menu-note";
+    n.textContent = "The printed price list shows up to 16 prices, in two columns. Cards, Price list and Three plans show the first four, so switching to one of them leaves the rest out.";
+    host.appendChild(n);
+  }
 }
 // A calm, collapsed "Look of this section" control row — plain words, smart defaults,
 // no CSS. Lives INSIDE the block you're already editing (no separate panel). The
@@ -2581,13 +2712,26 @@ function renderBlocksCard() {
       bl.placeholder = "Button label (optional)"; bl.value = (blk.button && blk.button.label) || "";
       bu.placeholder = "Button link (optional)"; bu.value = (blk.button && blk.button.url) || "";
       [bl, bu].forEach((inp) => { inp.type = "text"; inp.style.cssText = inputCss; });
-      const commit = () => { const o = { type: "image_text", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, body: ta.value.trim(), side: side.value === "right" ? "right" : "left" }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U }; BLOCKS_WORK[idx] = wLook(idx, o); };
-      [ta, side, bl, bu].forEach((inp) => inp.addEventListener("change", commit));
+      // item 329: Photo in a colour frame leads its words with a big number and a short line, shown
+      // when both are filled; the two labelled fields appear while that design is in use
+      const numField = (label, key, max, ph) => {
+        const f = el("div", "ins-field"), id = "itNum-" + key + "-" + idx, l = el("label", "ins-lbl", label); l.htmlFor = id;
+        const i = el("input"); i.type = "text"; i.id = id; i.maxLength = max; i.placeholder = ph; i.value = blk[key] || ""; i.style.cssText = inputCss;
+        f.append(l, i); f.input = i; return f;
+      };
+      const nums = blk.variant === "frame" ? [numField("Big number (optional)", "number", 12, "15"), numField("What the number counts (optional)", "number_label", 60, "years planting gardens")] : [];
+      const commit = () => {
+        const o = { type: "image_text", title: ti.value.trim(), image_id: BLOCKS_WORK[idx].image_id || undefined, body: ta.value.trim(), side: side.value === "right" ? "right" : "left" }; const L = bl.value.trim(), U = bu.value.trim(); if (L && U) o.button = { label: L, url: U };
+        const was = BLOCKS_WORK[idx] || {};
+        ["number", "number_label"].forEach((k, n) => { const v = nums.length ? nums[n].input.value.trim() : String(was[k] || ""); if (v) o[k] = v; });
+        BLOCKS_WORK[idx] = wLook(idx, o);
+      };
+      [ta, side, bl, bu, ...nums.map((f) => f.input)].forEach((inp) => inp.addEventListener("change", commit));
       pick.addEventListener("click", () => { commit(); openPicker((id) => { BLOCKS_WORK[idx].image_id = id || undefined; renderBlocksCard(); }); });
       // item 224: in the inspector the photo's side is an arrangement on the Layout tab; the
       // select stays behind the scenes so a Content edit keeps the side that was picked there
       const inPane = sub.classList && sub.classList.contains("ins-pane");
-      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(ta, aiField(ta, {}), ...(inPane ? [] : [sideWrap]), bl, bu); linkPick(bu);
+      picRow.appendChild(pick); sub.appendChild(picRow); sub.append(...nums, ta, aiField(ta, {}), ...(inPane ? [] : [sideWrap]), bl, bu); linkPick(bu);
       sub.appendChild(el("div", "hint", inPane ? "Which side the photo sits on is under Layout. On phones the image and text stack automatically." : "On phones the image and text stack automatically."));
     } else if (def.dividerSimple) {
       const styWrap = el("label", "hint", "Style "); const sty = el("select");
@@ -3269,6 +3413,12 @@ function renderAccordionBlockBody(blk, idx, sub, ti) {
   const inputCss = "width:100%;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit;font-size:13px;margin-bottom:6px;box-sizing:border-box";
   const commitTitle = () => { BLOCKS_WORK[idx].title = ti.value.trim(); };
   const cur = () => BLOCKS_WORK[idx];   // item 77: the section as it stands, not the copy this panel was drawn from
+  if (blk.variant === "side") {   // item 329: Questions beside the heading has a short line under its heading
+    const f = el("div", "ins-field"), id = "accIntro-" + idx, l = el("label", "ins-lbl", "A short line under the heading (optional)"); l.htmlFor = id;
+    const i = el("input"); i.type = "text"; i.id = id; i.maxLength = 200; i.placeholder = "Still not sure? Ask us anything."; i.value = blk.intro || ""; i.style.cssText = inputCss;
+    i.addEventListener("change", () => { const v = i.value.trim(); if (v) cur().intro = v; else delete cur().intro; });
+    f.append(l, i); sub.appendChild(f);
+  }
   const items = Array.isArray(blk.items) ? blk.items : [];
   items.forEach((it, k) => {
     const row = el("div"); row.style.cssText = "border:1px dashed var(--line,#ddd);border-radius:10px;padding:8px;margin-bottom:8px";
@@ -4630,6 +4780,11 @@ const INS_PIC_PARTS = {
   "cta:default": ["", "k"], "cta:card": ["", "", "k"],
   "pricing:default": 3, "pricing:list": 3,
   "image_text:left": ["p", "h", "", ""], "image_text:right": ["p", "h", "", ""],
+  // item 329: the bold designs
+  "image_text:overlap": ["p", "k", "h", ""], "image_text:frame": ["b", "p", "h", "", ""],
+  "features:default": 3, "features:numbered": ["h", "h", "h", "", "", ""], "features:tiles": 4,
+  "pricing:menu": 6, "pricing:plans": ["", "k", ""],
+  "accordion:side": ["h", "", "", "", ""], "accordion:numbered": ["k", "", "k", "", "k", "", "k", ""],
   "width:normal": 1, "width:full": 1,
 };
 function insPic(key) {
@@ -4647,18 +4802,29 @@ function insPic(key) {
 // (offline, a server from before the route), the tile keeps its sketch. Pictures are kept by what
 // they show, so the card's next redraw or a tab switch finds them at once.
 const IMAGE_TEXT_SIDES = [["Photo on the left", "left"], ["Photo on the right", "right"]];
+// item 329: and the two bold designs, which keep the side picked (Photo side, under them)
+const IMAGE_TEXT_WAYS = IMAGE_TEXT_SIDES.concat([["Photo off the edge", "overlap"], ["Photo in a colour frame", "frame"]]);
 const LIVE_PIC_W = 800;              // each arrangement is drawn this wide, then shrunk to its tile
 const LIVE_PIC_AGE = 10 * 60e3;      // a drawing's photos have signed addresses: draw it again after a while
 const LIVE_PICS = new Map();         // what a picture shows → { html, at }, or the promise of one on its way
 let LIVE_PIC_RUNNING = 0;
 const LIVE_PIC_QUEUE = [];           // a few asks at a time; the rest wait their turn
 const LIVE_PIC_RO = typeof ResizeObserver === "function" ? new ResizeObserver((es) => es.forEach((e) => livePicFit(e.target))) : null;
-const LIVE_PIC_WHAT = { reviews_wall: "reviews", gallery: "photos", pricing: "prices", accordion: "questions", cta: "words", image_text: "photo and words" };
+const LIVE_PIC_WHAT = { reviews_wall: "reviews", gallery: "photos", pricing: "prices", accordion: "questions", cta: "words", image_text: "photo and words", features: "highlights" };
 // the same JSON whatever order a block's keys were written in, so one picture has one name
 const stableJson = (v) => JSON.stringify(v, (k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, kk) => { o[kk] = x[kk]; return o; }, {}) : x));
 // the ways one section can be arranged: the choices, which one it has, and the section each way
 function insArrangements(blk) {
-  if (blk && blk.type === "image_text") return { opts: IMAGE_TEXT_SIDES, isOn: (o) => (blk.side === "right" ? "right" : "left") === o[1], with: (o) => ({ ...blk, side: o[1] }), pic: (o) => "image_text:" + o[1] };
+  if (blk && blk.type === "image_text") {
+    const isSide = (o) => o[1] === "left" || o[1] === "right";
+    const design = blk.variant === "overlap" || blk.variant === "frame" ? blk.variant : "";
+    return {
+      opts: IMAGE_TEXT_WAYS,
+      isOn: (o) => (isSide(o) ? !design && (blk.side === "right" ? "right" : "left") === o[1] : design === o[1]),
+      with: (o) => { const b = { ...blk }; if (isSide(o)) { b.side = o[1]; delete b.variant; } else b.variant = o[1]; return b; },
+      pic: (o) => "image_text:" + o[1],
+    };
+  }
   const opts = blk && BLOCK_VARIANT_OPTS[blk.type]; if (!opts) return null;
   return { opts, isOn: (o) => String(blk.variant || "") === o[1], with: (o) => { const b = { ...blk }; if (o[1]) b.variant = o[1]; else delete b.variant; return b; }, pic: (o) => blk.type + ":" + (o[1] || "default") };
 }
@@ -4757,6 +4923,7 @@ function insLiveLayouts(host, idx, blk) {
     item.append(win, b);
     list.appendChild(item);
   });
+  designExtras(wrap, idx, blk, true);   // item 329
   host.insertBefore(wrap, host.firstChild);   // the arrangement leads the tab, as drawn
   if (INS_TAB === "layout") insLiveStart(list);
 }
@@ -6772,8 +6939,8 @@ const IPE_CAPS = {
   map: { address: 200 },
   richtext: { body: 4000 },
   image: { caption: 200 },
-  image_text: { body: 2000, 'button.label': 40 },
-  accordion: { 'items.N.summary': 120, 'items.N.body': 1500 },
+  image_text: { body: 2000, 'button.label': 40, number: 12, number_label: 60 },   // item 329: the frame design's big number
+  accordion: { 'items.N.summary': 120, 'items.N.body': 1500, intro: 200 },        // item 329: the side design's short line
   tabs: { 'tabs.N.label': 40, 'tabs.N.body': 1500 },
   carousel: { 'slides.N.caption': 160 },
   progress: { 'items.N.label': 60 },
@@ -7509,6 +7676,7 @@ const IDE_FIELDS = {
   "identity.tagline": { input: "f-tagline", max: 140, label: "your tagline" },
   "identity.service_area": { input: "f-service_area", max: 200, label: "where you work" },
   "identity.description": { input: "f-description", max: 600, label: "your description" },
+  "identity.short_description": { input: "f-short_description", max: 150, label: "your short description" },   // item 330: the line under a new opening's headline
 };
 // Builder item 314: the rows a built-in page or Home's built-in sections draw from the tabs' lists
 // (a menu item, a question and its answer, a review) are typed on the page too. The row's stamp

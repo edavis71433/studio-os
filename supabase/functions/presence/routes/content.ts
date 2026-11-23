@@ -27,6 +27,7 @@ import { lockedEdits, lockedMessage } from '../lib/section_lock.ts';
 import { publishActorKind } from '../lib/actor_kind.ts';
 import { OPEN_STAGES } from '../lib/sales_lifecycle.ts';
 import { GOOGLE_TAG_RE, META_PIXEL_RE } from '../lib/ad_tags.ts';
+import { isHeroLayout } from '../lib/template_openings.ts';
 import type { SiteRow } from '../lib/site.ts';
 import type { Principal } from '../../_shared/auth.ts';
 import { UUID_LOWER_RE as UUID_RE } from '../lib/uuid.ts';
@@ -72,7 +73,7 @@ function clean(s: string): string {
   return out.trim();
 }
 
-type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' | 'google_tag' | 'meta_pixel' | 'ref' | 'post_status'; json?: JsonShape; blog?: 'categories' | 'authors'; place?: true };
+type FieldRule = { max?: number; min?: number; required?: boolean; kind?: 'text' | 'bool' | 'int' | 'uuid' | 'date' | 'slug' | 'json' | 'tags' | 'stage_days' | 'google_tag' | 'meta_pixel' | 'ref' | 'post_status' | 'hero_layout'; json?: JsonShape; blog?: 'categories' | 'authors'; place?: true };
 // Item 72: a JSON field's limits. Without them a 40 MB pages list was stored and then re-read
 // on every load, preview, publish, hash and sweep. The size is the saved text's length; the
 // shape checks only what every reader assumes (a list of objects, an object), never a
@@ -184,7 +185,8 @@ const SETTINGS_FIELDS: Record<string, FieldRule> = {
   stage_stale_days: { kind: 'stage_days' },   // { lead?: 1–365, qualified?: …, proposal?: …, contract?: … } — a shaped map, not free json
   google_site_verification: { max: 100 }, bing_site_verification: { max: 100 },   // Phase Z: Search Console / Bing ownership
   // Phase CP-2 Design Studio: structured layout choices (never raw CSS)
-  hero_layout: { max: 20 }, nav_style: { max: 12 },
+  // builder item 330: one of the front-page layouts (lib/template_openings.ts HERO_LAYOUTS), '' for Classic
+  hero_layout: { kind: 'hero_layout' }, nav_style: { max: 12 },
   sections_hidden: { kind: 'json', json: { bytes: 16 * KB, shape: 'list', items: 200 } }, sections_order: { kind: 'json', json: { bytes: 16 * KB, shape: 'list', items: 200 } },
   footer_hours: { kind: 'bool' }, footer_social: { kind: 'bool' },
   // Phase SD: search visibility as human questions
@@ -260,6 +262,11 @@ function validateFields(payload: Record<string, unknown>, spec: Record<string, F
     if (rule.kind === 'ref') {   // item 40: one of the site's categories or authors by id, or '' for none
       const s = clean(String(v ?? '')).toLowerCase();
       if (s && !(s.length <= 40 && SLUG_RE.test(s))) { errors.push({ field: key, message: 'That isn’t one of your choices.', plain: true }); continue; }
+      cleanBody[key] = s; fields.push(key); continue;
+    }
+    if (rule.kind === 'hero_layout') {   // builder item 330: only a layout the site can draw is saved
+      const s = clean(String(v ?? ''));
+      if (!isHeroLayout(s)) { errors.push({ field: key, message: 'That isn’t one of the front-page layouts.', plain: true }); continue; }
       cleanBody[key] = s; fields.push(key); continue;
     }
     if (rule.kind === 'post_status') {   // item 40: a draft, a post waiting for its time, or a published one

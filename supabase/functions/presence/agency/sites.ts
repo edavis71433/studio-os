@@ -73,8 +73,75 @@ import { ownerReplyTo } from '../lib/service_bridge.ts';
 import { ownerWho, openTransfersFor, transferSummary, ownerFacts, hasOwnerFacts, ownerEmailsOf } from '../lib/site_transfer.ts';
 import type { AttachOwnerError } from '../commerce/account.ts';
 import { provisionCustomerAccount, bridgeCustomerToStudio, ensureConnectContact, linkContactToCustomer, sendCustomerInvite } from '../routes/sales.ts';
+import { openingStartFor, openingSummary, kindOpeningStart } from '../lib/template_openings.ts';
+import type { KindOpeningStart } from '../lib/template_openings.ts';
+import { openingsPayload } from '../lib/kind_openings.ts';
+import { LOOK_KEYS } from '../lib/style_looks.ts';
+import { validateThemeTokens } from '../lib/devmode.ts';
 
 const rowsOf = <T,>(q: { ok?: boolean; json?: unknown } | null | undefined): T[] => (q && q.ok !== false && Array.isArray(q.json) ? (q.json as T[]) : []);
+
+/* ── builder item 330: a new site opens the way its design does, in the design's own fonts ──
+   lib/template_openings.ts names, per design, the front-page layout and the two library fonts
+   (Eric's picks in Figma). + New site calls this once, after the site has its design (the one
+   picked, or the database's default) and any starter kit. It fills only what is still empty: a
+   site that already has a layout keeps it, one that already has fonts keeps them, and no other
+   site is ever reached. The fonts are saved the way Styles saves them, the two style tokens
+   beside the others, the developer's CSS and HTML kept as they are. Nothing here undoes the site:
+   a write that doesn't go through is left out of the answer and the site stays as it was made. */
+export interface OpeningOut { slug: string; layout: string; fonts: [string, string]; applied: { layout: boolean; fonts: boolean } }
+export async function startOpening(siteId: string, principal: Principal): Promise<OpeningOut | null> {
+  const site = rowsOf<{ template_slug?: string | null }>(await svc(`presence_sites?id=eq.${siteId}&select=template_slug&limit=1`).catch(() => null))[0];
+  const start = openingStartFor(site?.template_slug);
+  if (!start) return null;
+  const out: OpeningOut = { slug: start.slug, layout: start.hero_layout, fonts: start.fonts, applied: { layout: false, fonts: false } };
+  const [setQ, devQ] = await Promise.all([
+    svc(`presence_settings?site_id=eq.${siteId}&select=hero_layout&limit=1`).catch(() => null),
+    svc(`presence_dev_customizations?site_id=eq.${siteId}&select=theme_tokens,custom_css,custom_html&limit=1`).catch(() => null),
+  ]);
+  if (!setQ?.ok || !devQ?.ok) return out;   // what the site has couldn't be read, so nothing is written over it
+  if (!String(rowsOf<{ hero_layout?: string | null }>(setQ)[0]?.hero_layout || '')) {
+    const w = await svc('presence_settings?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, hero_layout: start.hero_layout }) }).catch(() => null);
+    out.applied.layout = !!w?.ok;
+  }
+  const dev = rowsOf<{ theme_tokens?: unknown; custom_css?: string | null; custom_html?: string | null }>(devQ)[0];
+  const tokens = dev?.theme_tokens && typeof dev.theme_tokens === 'object' && !Array.isArray(dev.theme_tokens) ? dev.theme_tokens as Record<string, unknown> : {};
+  if (!tokens.font_display && !tokens.font_body) {
+    const w = await svc('presence_dev_customizations?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, theme_tokens: validateThemeTokens({ ...tokens, ...start.tokens }).tokens, custom_css: dev?.custom_css ?? '', custom_html: dev?.custom_html ?? '' }) }).catch(() => null);
+    out.applied.fonts = !!w?.ok;
+  }
+  const summary = openingSummary(start, out.applied.layout, out.applied.fonts);
+  if (summary) await writeChangeEvent({ siteId, entityType: 'settings', entityId: null, action: 'update', summary, principal, provenance: 'human', fields: [...(out.applied.layout ? ['hero_layout'] : []), ...(out.applied.fonts ? ['theme_tokens'] : [])] }).catch(() => {});
+  return out;
+}
+
+/* ── the openings made for a kind of business (lib/kind_openings.ts) ──
+   + New site sends one of a kind's openings; this gives the site just made its layout, the name
+   centred at the top for the centred editorial ones, and its style: a ready-made look whole (or
+   the design's own new-site fonts), and the card on the photo, the panel's photo side or Type
+   only on the page, saved as Styles saves them. It is the last step, after any starter kit, and like a look picked in
+   Styles it replaces what a look sets (a kit's colours and fonts); everything else the site has,
+   the developer's CSS and HTML too, stays. Only this site is reached. A write that doesn't go
+   through is left out of the answer, and the site stays as it was made. */
+export interface KindOpeningOut { key: string; name: string; slug: string; layout: string; applied: { layout: boolean; style: boolean } }
+const OPENING_TOKENS = ['hero_card', 'hero_photo', 'hero_band'];
+export async function applyKindOpening(siteId: string, start: KindOpeningStart, principal: Principal): Promise<KindOpeningOut> {
+  const out: KindOpeningOut = { key: start.key, name: start.name, slug: start.slug, layout: start.hero_layout, applied: { layout: false, style: false } };
+  const devQ = await svc(`presence_dev_customizations?site_id=eq.${siteId}&select=theme_tokens,custom_css,custom_html&limit=1`).catch(() => null);
+  if (!devQ?.ok) return out;   // what the site has couldn't be read, so nothing is written over it
+  const set = await svc('presence_settings?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, hero_layout: start.hero_layout, ...(start.nav_style ? { nav_style: start.nav_style } : {}) }) }).catch(() => null);
+  out.applied.layout = !!set?.ok;
+  const dev = rowsOf<{ theme_tokens?: unknown; custom_css?: string | null; custom_html?: string | null }>(devQ)[0];
+  const had = dev?.theme_tokens && typeof dev.theme_tokens === 'object' && !Array.isArray(dev.theme_tokens) ? dev.theme_tokens as Record<string, unknown> : {};
+  const kept = Object.fromEntries(Object.entries(had).filter(([k]) => !(LOOK_KEYS as readonly string[]).includes(k) && !OPENING_TOKENS.includes(k)));
+  const w = await svc('presence_dev_customizations?on_conflict=site_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ site_id: siteId, theme_tokens: validateThemeTokens({ ...kept, ...start.tokens }).tokens, custom_css: dev?.custom_css ?? '', custom_html: dev?.custom_html ?? '' }) }).catch(() => null);
+  out.applied.style = !!w?.ok;
+  if (out.applied.layout || out.applied.style) {
+    const fields = [...(out.applied.layout ? ['hero_layout', ...(start.nav_style ? ['nav_style'] : [])] : []), ...(out.applied.style ? ['theme_tokens'] : [])];
+    await writeChangeEvent({ siteId, entityType: 'settings', entityId: null, action: 'update', summary: `Opens with “${start.name}”`, principal, provenance: 'human', fields }).catch(() => {});
+  }
+  return out;
+}
 
 /* ── plans, in the words a studio uses ── */
 export const PLAN_WORDS: Record<string, string> = {
@@ -682,7 +749,7 @@ export async function handleAgencySites(req: Request, route: string, method: str
   //    kind sees first. The same for every studio, so the page may keep it a while. ──
   if (route === '/agency/designs' && method === 'GET') {
     if (!can(member.role, 'read')) return forbid(cors);
-    return json({ data: galleryPayload(listTemplates()) }, 200, { ...cors, 'Cache-Control': 'private, max-age=300' });
+    return json({ data: galleryPayload(listTemplates(), openingsPayload()) }, 200, { ...cors, 'Cache-Control': 'private, max-age=300' });
   }
 
   // ── + New site (item 135): a site from a business name and, if picked, one of
@@ -697,21 +764,28 @@ export async function handleAgencySites(req: Request, route: string, method: str
   if (sm && method === 'GET') {
     if (!can(member.role, 'read')) return forbid(cors);
     const { samplePage } = await import('../lib/kind_samples.ts');
-    const html = await samplePage(new URL(req.url).searchParams.get('kind'), sm[1]);
-    if (!html) return json({ error: 'not_found', message: 'That design isn’t one of the built-in ones.' }, 404, cors);
+    const q = new URL(req.url).searchParams, opening = q.get('opening') || '';
+    const html = await samplePage(q.get('kind'), sm[1], opening);
+    if (!html) return json({ error: 'not_found', message: opening ? 'That opening isn’t one of this design’s.' : 'That design isn’t one of the built-in ones.' }, 404, cors);
     return json({ data: { html } }, 200, cors);
   }
 
   if (route === '/agency/sites' && method === 'POST') {
     if (!can(member.role, 'manage_clients')) return forbid(cors);
-    let b: { business_name?: unknown; kit_id?: unknown; template_slug?: unknown; industry_key?: unknown; client_id?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
+    let b: { business_name?: unknown; kit_id?: unknown; template_slug?: unknown; industry_key?: unknown; client_id?: unknown; opening?: unknown } = {}; try { b = await req.json(); } catch { /* answered below */ }
     const name = String(b.business_name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
     if (!name) return json({ error: 'bad_request', message: 'Name the business.' }, 400, cors);
     const kitId = b.kit_id == null || b.kit_id === '' ? '' : String(b.kit_id);
     if (kitId && !UUID_RE.test(kitId)) return json({ error: 'not_found', message: 'That starter kit isn’t one of yours.' }, 404, cors);
     // item 198: the look (one of the built-in designs) and the kind of business, both checked
     // before anything is made
-    const look = b.template_slug == null || b.template_slug === '' ? '' : String(b.template_slug);
+    // the openings made for a kind of business: one that is offered, and made with the design sent
+    const openingKey = b.opening == null || b.opening === '' ? '' : String(b.opening);
+    const kindOpen = openingKey ? kindOpeningStart(openingKey) : null;
+    if (openingKey && !kindOpen) return json({ error: 'bad_opening', message: 'That opening isn’t one of the ones offered.' }, 400, cors);
+    const sentLook = b.template_slug == null || b.template_slug === '' ? '' : String(b.template_slug);
+    if (kindOpen && sentLook && sentLook !== kindOpen.slug) return json({ error: 'bad_opening', message: 'That opening is made with another design.' }, 400, cors);
+    const look = kindOpen ? kindOpen.slug : sentLook;
     const lookVersion = look ? latestTemplateVersion(look) : null;
     if (look && !lookVersion) return json({ error: 'bad_template', message: 'That design isn’t one of the built-in ones.' }, 400, cors);
     const industry = b.industry_key == null || b.industry_key === '' ? '' : String(b.industry_key);
@@ -765,7 +839,12 @@ export async function handleAgencySites(req: Request, route: string, method: str
       try { kitOut = { id: kitId, name: kit.name, ...(await applyKitTo(kit.payload, acct.siteId, principal, `Started from the “${kit.name}” ${tpl ? 'template' : 'starter kit'}`, tpl ? { label: `your “${kit.name}” template` } : {})) }; }
       catch { kitOut = { id: kitId, name: kit.name, failed: true }; }
     }
-    return json({ data: { site_id: acct.siteId, client_id: acct.clientId, name, kit: kitOut, look: lookOut, industry: industryOut, for_customer: !!forClient } }, 201, cors);
+    // item 330: the design's own opening and fonts, last, so a starter kit's colours still land
+    // first; a saved template brings its own look, so it gets neither. An opening made for a kind
+    // of business takes the design's place, and its look goes on over the kit's colours.
+    const own = kit && kit.payload.layout;
+    const opening = own ? null : kindOpen ? await applyKindOpening(acct.siteId, kindOpen, principal).catch(() => null) : await startOpening(acct.siteId, principal).catch(() => null);
+    return json({ data: { site_id: acct.siteId, client_id: acct.clientId, name, kit: kitOut, look: lookOut, industry: industryOut, opening, for_customer: !!forClient } }, 201, cors);
   }
 
   // ── every domain: the clients' and the studio's own ──
