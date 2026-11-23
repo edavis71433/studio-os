@@ -22,6 +22,7 @@ import { listStarterLayouts, starterKeyFor } from '../lib/starter_layouts.ts';
 import { normalizeTags } from '../lib/search_index.ts';
 import { normalizeAuthors, normalizeCategories, scheduleProblem } from '../lib/blog.ts';
 import { normalizeSecondLocation } from '../lib/second_location.ts';
+import { cleanSpecialDates, todayIn } from '../lib/special_dates.ts';
 import { detectPageRenames, duplicatePageInSettings, pageRefs, PAGE_SLUG_RE, type PageRename } from '../lib/page_ops.ts';
 import { lockedEdits, lockedMessage } from '../lib/section_lock.ts';
 import { publishActorKind } from '../lib/actor_kind.ts';
@@ -442,6 +443,12 @@ async function singleton(req: Request, db: SiteDb, site: SiteRow, principal: Pri
       const base = cur.json?.[0] || { address_line1: '', city: '', region: '', postal_code: '' };
       const { id: _i, created_at: _c, updated_at: _u, ...baseFields } = base;
       body = { ...baseFields, site_id: site.id, ...v.cleanBody };
+      // builder item 432: special dates are kept from today on, today in the site's own time zone
+      if ('holiday_exceptions' in v.cleanBody) {
+        const sd = cleanSpecialDates(v.cleanBody.holiday_exceptions, todayIn(new Date().toISOString(), String(body.timezone || '')));
+        if (!sd.ok) return json({ error: 'validation_failed', message: sd.message, fields: [{ field: 'holiday_exceptions', message: sd.message }] }, 422, cors);
+        body.holiday_exceptions = sd.list;
+      }
     }
     const upsert = (select: string) => db(`${cfg.table}?on_conflict=${cfg.conflict}&select=${select}`, {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(body),

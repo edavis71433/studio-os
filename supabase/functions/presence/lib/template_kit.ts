@@ -207,13 +207,18 @@ function hoursTable(c: SnapshotContent, caption: string): string {
       : d.intervals.map((i) => `${fmtTime(i.open)}–${fmtTime(i.close)}`).join(', ');
     return `<tr data-day="${k}"><th scope="row">${DAY_LABEL[k]}</th><td>${esc(val)}</td></tr>`;
   }).join('');
-  const holidays = (loc.holiday_exceptions || []).map((e: HolidayException) => {
-    const val = e.closed ? 'Closed' : (e.intervals || []).map((i) => `${fmtTime(i.open)}–${fmtTime(i.close)}`).join(', ');
-    return `<li>${esc(e.label)}, <time datetime="${attr(e.date)}">${esc(dayDate(e.date))}</time>: ${esc(val)}</li>`;
+  // Item 432: each special date still to come (lib/special_dates.ts left out the ones gone by), the
+  // date and its hours first and the owner's note on its own line; SPECIAL_JS takes one away once it's over
+  const special = (loc.holiday_exceptions || []).map((e: HolidayException) => {
+    const val = e.closed || !(e.intervals || []).length ? 'Closed' : (e.intervals || []).map((i) => `${fmtTime(i.open)}–${fmtTime(i.close)}`).join(', ');
+    return `<li data-date="${attr(e.date)}"><time datetime="${attr(e.date)}">${esc(dayDate(e.date))}</time>: ${esc(val)}${e.label ? `<br>${esc(e.label)}` : ''}</li>`;
   }).join('');
   return `<table class="hours"${pr('location.hours')}><caption>${esc(caption)}</caption><tbody>${rows}</tbody></table>` +
-    (holidays ? `<div class="holiday"><strong>Holiday hours</strong><ul>${holidays}</ul></div>` : '');
+    (special ? `<div class="holiday" data-tz="${attr(loc.timezone || 'America/Los_Angeles')}"><strong>Special hours</strong><ul>${special}</ul></div>` : '');
 }
+// Item 432: a special date on a page published before it was over goes away when the day is over,
+// in the business's own time zone; the list goes with its last date.
+const SPECIAL_JS = `(function(){try{var bs=document.querySelectorAll('.holiday[data-tz]');for(var i=0;i<bs.length;i++){var b=bs[i],n=new Date(new Date().toLocaleString('en-US',{timeZone:b.getAttribute('data-tz')})),t=n.getFullYear()+'-'+('0'+(n.getMonth()+1)).slice(-2)+'-'+('0'+n.getDate()).slice(-2),li=b.querySelectorAll('li[data-date]'),left=0;for(var j=0;j<li.length;j++){if(li[j].getAttribute('data-date')<t)li[j].hidden=true;else left++}if(!left)b.hidden=true}}catch(e){}})();`;
 
 function contactBits(c: SnapshotContent): { addr: string; tel: string; mail: string } {
   const l = loc0(c); const i = c.identity;
@@ -376,6 +381,8 @@ function shell(look: TemplateLook, c: SnapshotContent, site: SiteConfig, cssPath
   const logoImg = hasLogo && brandMode !== 'name'
     ? `<img src="${attr(logo!.variants!.w400)}" alt="${brandMode === 'logo' ? attr(i.business_name) : ''}" class="brandlogo"${logo!.width && logo!.height ? ` width="${logo!.width}" height="${logo!.height}"` : ''}>` : '';
   const brand = `<a class="brand${brandMode === 'logo' ? ' brand-logo-only' : ''}" href="/"${logoH ? ` style="--logo-h:${logoH}px"` : ''}>${logoImg}${brandMode === 'logo' ? '' : `<span class="brand-name">${esc(i.business_name)}</span>`}</a>`;   // item 430: the name has its own box, so a phone can hold it to two lines
+  const footHours = (c.settings?.footer?.hours !== false) && loc0(c) ? hoursTable(c, 'Hours') : '';
+  const special = (footHours + o.body).includes('<div class="holiday" data-tz=');   // item 432
 
   return `${seoHead(o, site, c, x, look.critical + SHELL_CRITICAL, cssPath).replace('</head>', `${SHELL_NOSCRIPT}\n</head>`)}
 <body>
@@ -398,13 +405,14 @@ ${o.body}
 <footer class="site"><div class="wrap">
   <div class="cols">
     <div><h2>${esc(i.business_name)}</h2>${addr ? `<address>${addr}</address>` : ''}${areaBlock(c, 'We come to you')}<p>${[tel, mail].filter(Boolean).join('<br>')}</p>${footerPlace(c)}${(c.settings?.footer?.social !== false) && social ? `<p>${social}</p>` : ''}</div>
-    <div>${(c.settings?.footer?.hours !== false) && loc0(c) ? hoursTable(c, 'Hours') : ''}</div>
+    <div>${footHours}</div>
   </div>
   <div class="credit"><span>© ${esc(i.business_name)}</span><span>${legalFooterLinks()}</span>${credit}</div>
 </div></footer>
 ${o.body.includes('id="open-now"') || o.body.includes('id="hc_today"') ? `<script id="hours-data" type="application/json">${loc0(c) ? hoursData(c).replaceAll('<', '\\u003c') : '{}'}</script>
 <script>${OPEN_NOW_JS}</script>
 ` : ''}${o.body.includes('id="hc_today"') ? `<script>${TODAY_JS}</script>
+` : ''}${special ? `<script>${SPECIAL_JS}</script>
 ` : ''}<script src="${attr(jsPath)}" defer></script>
 </body>
 </html>`;
@@ -518,8 +526,9 @@ function todayHours(c: SnapshotContent): string {
     const d = byDay.get(k) as HoursDay | undefined;
     return `<p class="hc-when" data-day="${k}" hidden>${!d || d.closed || !d.intervals?.length ? 'Closed today' : `Open ${esc(span(d.intervals))}`}</p>`;
   }).join('');
+  // item 432: the day's state first, then the owner's note ("Closed for Thanksgiving") on its own line
   const holidays = (l.holiday_exceptions || []).map((e: HolidayException) =>
-    `<p class="hc-when" data-date="${attr(e.date)}" hidden>${e.label ? `${esc(e.label)}: ` : ''}${e.closed || !(e.intervals || []).length ? 'closed today' : `open ${esc(span(e.intervals))}`}</p>`).join('');
+    `<p class="hc-when" data-date="${attr(e.date)}" hidden>${e.closed || !(e.intervals || []).length ? 'Closed today' : `Open ${esc(span(e.intervals))}`}${e.label ? `<br>${esc(e.label)}` : ''}</p>`).join('');
   return days + holidays;
 }
 function heroCard(kind: HeroCardKind, c: SnapshotContent, v: IndustryVocab, site: SiteConfig): string {
