@@ -14,7 +14,9 @@
 // Secret-gated like /commerce/invoice-paid, and the body is an id only: the invoice
 // is re-read here, and nothing happens unless it is open, not settling, and holds
 // no link (which is exactly how the webhook leaves a bounced one).
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
+import { timingSafeEqual } from '../../_shared/hmac.ts';   // builder item 397: secrets compared the careful way
 import { svc } from '../lib/db.ts';
 import { raiseNoticeDetailed } from '../lib/notice.ts';
 import { mintPayLink } from '../lib/pay_link.ts';
@@ -38,7 +40,7 @@ export function bouncedNoticeCopy(p: { what: string; amount: string; who: string
 }
 
 export async function handleInvoiceBounced(req: Request, secret: string, cors: Record<string, string>): Promise<Response> {
-  if (!secret || req.headers.get('x-commerce-secret') !== secret) return json({ error: 'forbidden' }, 403, cors);
+  if (!secret || !timingSafeEqual(req.headers.get('x-commerce-secret') || '', secret)) return json({ error: 'forbidden' }, 403, cors);
   let body: any = null;
   try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400, cors); }
   const invoiceId = String(body?.invoice_id || '');
@@ -95,7 +97,7 @@ export async function tellBounced(invoiceId: string): Promise<Record<string, unk
   if (outcome === 'created') {
     try {
       const { emailOperator } = await import('../lib/service_bridge.ts');
-      const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+      const base = appBase();
       await emailOperator(String(inv.site_id), copy.headline, `<p>${esc(copy.body)}</p>`, 'invoice_bounced', { label: 'Open the deal', href: inv.deal_id ? `${base}/pipeline.html?deal=${inv.deal_id}` : `${base}/today.html` });
     } catch { /* the notice carries it */ }
   }

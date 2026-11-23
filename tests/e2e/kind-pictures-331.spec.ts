@@ -65,7 +65,8 @@ test.describe('Each kind its own pictures, and See it full size (builder item 33
     await expect(big).toBeVisible();
     await expect(big.locator('#bigHead')).toHaveText('Harbor');
     await expect(big.locator('#bigSub')).toHaveText('A sample salon in this design. The site’s own words and photos replace it.');
-    await expect(page.frameLocator('#bigFrame').locator('#who')).toHaveText('harbor · salon');
+    // read from the frame's own srcdoc: WebKit can't always be read inside a frame with no scripts and no origin
+    await expect(big.locator('#bigFrame')).toHaveAttribute('srcdoc', /<h1 id="who">harbor · salon<\/h1>/);
     expect(samples).toEqual(['harbor?salon']);
     await expect(big.locator('#bigFrame')).not.toHaveAttribute('sandbox', /allow-scripts/);
     if ((page.viewportSize()?.width || 1280) >= 761) {
@@ -101,7 +102,7 @@ test.describe('Each kind its own pictures, and See it full size (builder item 33
     await page.locator('.dgrid [data-full="atelier"]').click();
     await expect(page.locator('#bigDlg')).toBeVisible();
     await expect(page.locator('#bigSub')).toHaveText('A sample salon in this design. A site’s own words and photos replace it.');
-    await expect(page.frameLocator('#bigFrame').locator('#who')).toHaveText('atelier · beauty');
+    await expect(page.locator('#bigFrame')).toHaveAttribute('srcdoc', /<h1 id="who">atelier · beauty<\/h1>/);
     expect(samples).toEqual(['atelier?beauty']);
     await page.keyboard.press('Escape');
     await expect(page.locator('#bigDlg')).toBeHidden();

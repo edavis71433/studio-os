@@ -2,6 +2,8 @@
 // FD-1 scheduled publish/expiry · FD-2 lead capture · FD-3 one-tap approve.
 // Reuses existing spines: the ONE publish pipeline, the CRM timeline, the
 // approval decide logic. No new architecture.
+import { linkKey } from '../../_shared/link_keys.ts';   // builder item 394: each kind of link has its own key
+import { appBase as linkBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
@@ -42,8 +44,9 @@ import { readVisitStats } from '../lib/visit_stats.ts';
 import { guardedFetch } from '../../_shared/tools/url_guard.ts';   // builder item 204
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
-const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
-const siteBase = () => (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
+// builder item 394: one-tap approval links have their own key (never the scheduler's secret)
+const approvalKey = () => linkKey('approval');
+const siteBase = () => linkBase();
 // the app's own address, where pages that answer an email's link live (spam.html, like unsubscribe.html)
 const appBase = () => (Deno.env.get('APP_URL') || 'https://app.davisdigitalstudio.com').replace(/\/$/, '');
 
@@ -675,9 +678,9 @@ export async function handleFormDelete(site: SiteRow, id: string, cors: Record<s
 export async function hashIp(req: Request): Promise<string> {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
   if (!ip) return '';
-  // salt fallback chain: never a guessable literal (an unset APPROVAL_SECRET
-  // would have made IPv4 pre-images enumerable)
-  const data = new TextEncoder().encode(ip + '|' + (APPROVAL_SECRET || Deno.env.get('SCHEDULER_SECRET') || Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'salt'));
+  // the salt is a key of its own (builder item 394), never a guessable literal: a plain
+  // one would make every IPv4 address's hash easy to work back
+  const data = new TextEncoder().encode(ip + '|' + (linkKey('ip_hash') || 'salt'));
   const buf = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(buf)).slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -734,7 +737,7 @@ async function notifyOwnerOfLead(siteId: string, sub: { id?: string; form_kind: 
 /** AUTHED (owner/operator) — email the client a one-tap approve link for every
  *  pending approval on this site. */
 export async function handleApproveSend(site: SiteRow, principal: Principal, cors: Record<string, string>) {
-  if (!APPROVAL_SECRET) return json({ error: 'unavailable', message: 'One-tap approval isn’t configured on this environment yet.' }, 503, cors);
+  if (!approvalKey()) return json({ error: 'unavailable', message: 'One-tap approval isn’t configured on this environment yet.' }, 503, cors);
   const ident = await svc(`presence_identity?site_id=eq.${site.id}&select=business_name,email&limit=1`);
   const to = ident.json?.[0]?.email;
   if (!to) return json({ error: 'no_recipient', message: 'Add a business email first so we know where to send it.' }, 400, cors);
@@ -756,7 +759,7 @@ export async function handleApproveSend(site: SiteRow, principal: Principal, cor
   const exp = Math.floor(Date.now() / 1000) + 7 * 86400; // one week
   let rows = '';
   for (const it of items) {
-    const tok = await signApprovalToken({ site_id: site.id, kind: it.kind, plan_id: it.id, exp }, APPROVAL_SECRET);
+    const tok = await signApprovalToken({ site_id: site.id, kind: it.kind, plan_id: it.id, exp }, approvalKey());
     const link = `${siteBase()}/approve.html?token=${encodeURIComponent(tok)}`;
     rows += `<div style="margin:14px 0;padding:14px;border:1px solid #eee9e0;border-radius:10px"><b>${esc(it.title || 'A change is ready')}</b><br>${esc(it.summary || '')}<br><span class="cta"><a href="${link}" style="display:inline-block;margin-top:8px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">See what changes →</a></span></div>`;
   }
@@ -773,7 +776,7 @@ export async function handleApproveGet(req: Request, cors: Record<string, string
   // Phase S / FD-M2: throttle the public token endpoint (guards against token-guessing).
   if (!(await rateAllow(`approve:ip:${clientIp(req)}`, 20, 60))) return tooMany(cors);
   const token = new URL(req.url).searchParams.get('token') || '';
-  const v = await verifyApprovalToken(token, APPROVAL_SECRET, Math.floor(Date.now() / 1000));
+  const v = await verifyApprovalToken(token, approvalKey(), Math.floor(Date.now() / 1000));
   if (!v.ok) return json({ error: v.error, message: linkMsg(v.error) }, 400, cors);
   const p = v.payload;
   const item = await loadPending(p);
@@ -787,7 +790,7 @@ export async function handleApproveGet(req: Request, cors: Record<string, string
 export async function handleApprovePost(req: Request, cors: Record<string, string>) {
   if (!(await rateAllow(`approve:ip:${clientIp(req)}`, 20, 60))) return tooMany(cors);
   let b: any = {}; try { b = await req.json(); } catch { /* */ }
-  const v = await verifyApprovalToken(String(b?.token || ''), APPROVAL_SECRET, Math.floor(Date.now() / 1000));
+  const v = await verifyApprovalToken(String(b?.token || ''), approvalKey(), Math.floor(Date.now() / 1000));
   if (!v.ok) return json({ error: v.error, message: linkMsg(v.error) }, 400, cors);
   const decision = b?.decision === 'approve' ? 'approve' : b?.decision === 'reject' ? 'abandon' : null;
   if (!decision) return json({ error: 'bad_request', message: 'Choose approve or not yet.' }, 400, cors);

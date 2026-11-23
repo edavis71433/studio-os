@@ -64,7 +64,7 @@ globalThis.fetch = (input, init = {}) => {
   return reply([]);
 };
 const open = async (k, id, exp) => {
-  const tok = await signDocToken({ t: 'doc', k, id, site_id: SITE, exp, e: 1 }, SECRET);
+  const tok = await signDocToken({ t: 'doc', k, id, site_id: SITE, exp, e: 1 }, (await import('../../supabase/functions/presence/routes/sales.ts')).linkSecret());   // item 394: the server's own key
   const r = await handleSalesDocument(new Request(`https://db.example/functions/v1/presence/sales/doc/${tok}`), tok, {});
   return { status: r.status, html: await r.text(), type: r.headers.get('content-type') || '' };
 };
@@ -73,7 +73,7 @@ const open = async (k, id, exp) => {
   ok('a seven-month-old link to a signed agreement opens it', a.status === 200 && /Service agreement/.test(a.html) && /this link keeps working/.test(a.html), `${a.status} ${a.html.slice(0, 160)}`);
   const r = await open('invoice', INV, old);
   ok('a seven-month-old link to a receipt opens it', r.status === 200 && /Receipt/.test(r.html), `${r.status}`);
-  const pdfTok = await signDocToken({ t: 'doc', k: 'contract', id: CON, site_id: SITE, exp: old, e: 1 }, SECRET);
+  const pdfTok = await signDocToken({ t: 'doc', k: 'contract', id: CON, site_id: SITE, exp: old, e: 1 }, (await import('../../supabase/functions/presence/routes/sales.ts')).linkSecret());
   const pdf = await handleSalesDocument(new Request(`https://db.example/functions/v1/presence/sales/doc/${pdfTok}?format=pdf`), pdfTok, {});
   ok('…and so does its PDF', pdf.status === 200 && /application\/pdf/.test(pdf.headers.get('content-type') || ''));
   const p = await open('proposal', PROP, old);

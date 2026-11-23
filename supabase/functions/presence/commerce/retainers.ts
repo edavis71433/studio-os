@@ -16,6 +16,7 @@
 //     reminder, or entitlement read (all product=eq.presence) can ever see it.
 //
 // Pure cores up top (exhaustively unit-tested); the impure webhook sync below.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { svc } from '../lib/db.ts';
 import { stripeMetaOf, stripeSubscriptionIdOf, subscriptionPeriodEnd, invoicePaidCents, invoicePaidAt, subscriptionAmount } from './stripe_shape.ts';
 import { stripeConfigured, retrieveSubscription } from './stripe.ts';
@@ -533,7 +534,7 @@ export async function applyRetainerSync(type: string, obj: any, opts: { live?: a
         if (fresh) {
           const { emailOperator } = await import('../lib/service_bridge.ts');
           const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
-          const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+          const base = appBase();
           emailOperator(siteId, copy.headline, `<p>${esc(copy.body)}</p>`, 'retainer_approved', { label: 'Open the deal', href: `${base}/pipeline.html?deal=${dealId}&dtab=billing` }).catch(() => {});
         }
       }
@@ -572,7 +573,7 @@ export async function applyRetainerSync(type: string, obj: any, opts: { live?: a
           if (fresh) {
             const { emailOperator } = await import('../lib/service_bridge.ts');
             // the fix is on the deal now (Email the card link, or set it up again), not in Stripe
-            const href = `${(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '')}/pipeline.html?deal=${dealId}&dtab=billing`;
+            const href = `${appBase()}/pipeline.html?deal=${dealId}&dtab=billing`;
             emailOperator(siteId, copy.subject, copy.html, 'retainer_status', { label: 'Open the deal', href }).catch(() => {});
           }
         }

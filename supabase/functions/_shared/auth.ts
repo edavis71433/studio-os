@@ -5,6 +5,8 @@
 // the gate itself, opsLog and auditWrite stay in the owning function — this
 // module is identity/roles only.
 
+import { timingSafeEqual } from './hmac.ts';
+
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const SCHEDULER_SECRET = Deno.env.get('SCHEDULER_SECRET') || '';
@@ -71,6 +73,28 @@ export function jwtClaims(jwt: string): Record<string, unknown> | null {
 export function secondStepMissing(user: { factors?: unknown } | null | undefined, jwt: string): boolean {
   const verified = (Array.isArray(user?.factors) ? user!.factors as Array<{ status?: unknown }> : []).some((f) => f?.status === 'verified');
   return verified && jwtClaims(jwt)?.aal !== 'aal2';
+}
+
+/** Builder list item 389 (Nov 22 2026 review, file 07 finding 6): has this person proved
+ *  they own their email address? Supabase stamps email_confirmed_at when they use an
+ *  emailed link or code: an invite, a sign-in code, a sign-up confirmation, a reset.
+ *  Studio OS matches people to a client, a site seat or a studio seat by email address, so
+ *  an address nobody proved is never matched to anything (their own user id still is).
+ *  Pure. */
+export function emailConfirmed(user: { email_confirmed_at?: unknown } | null | undefined): boolean {
+  const at = user?.email_confirmed_at;
+  return typeof at === 'string' && at.trim() !== '' && !Number.isNaN(Date.parse(at));
+}
+
+/** The address a person may be matched by: lower-case, and only once they've proved it. Pure. */
+export function provenEmail(user: { email?: unknown; email_confirmed_at?: unknown } | null | undefined): string {
+  return user && emailConfirmed(user) && user.email ? String(user.email).trim().toLowerCase() : '';
+}
+
+/** A value for a PostgREST or=() list, double-quoted so a comma, a dot or a bracket in it
+ *  can't end the filter early, then made safe for the address (builder item 397). Pure. */
+export function orValue(v: string): string {
+  return encodeURIComponent('"' + String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"');
 }
 
 export async function authUser(jwt: string): Promise<any | null> {
@@ -247,7 +271,8 @@ async function lookupIdentity(req: Request, jwt: string): Promise<Identity> {
     if (!user || !user.id) return { ...pub, jwt };
 
     const uid = String(user.id);
-    const email = (user.email ? String(user.email) : '').toLowerCase();
+    // item 389: matched by email only once they've proved the address is theirs
+    const email = provenEmail(user);
     const svc = { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` };
     try {
       // client linkage: a contact carrying this auth_user_id, or a client row by email.
@@ -261,7 +286,7 @@ async function lookupIdentity(req: Request, jwt: string): Promise<Identity> {
         if (Array.isArray(cls) && cls.length) tenantId = cls[0].tenant_id ? String(cls[0].tenant_id) : null;
       }
       if (tenantId === null && email) {
-        const clr = await fetch(`${SB_URL}/rest/v1/clients?or=(email.eq.${encodeURIComponent(email)},contact_email.eq.${encodeURIComponent(email)})&select=tenant_id&limit=1`, { headers: svc, signal: limited() });
+        const clr = await fetch(`${SB_URL}/rest/v1/clients?or=(email.eq.${orValue(email)},contact_email.eq.${orValue(email)})&select=tenant_id&limit=1`, { headers: svc, signal: limited() });
         const cls = clr.ok ? await clr.json() : [];
         if (Array.isArray(cls) && cls.length) { tenantId = cls[0].tenant_id ? String(cls[0].tenant_id) : TENANT_ID; }
       }
@@ -273,7 +298,8 @@ async function lookupIdentity(req: Request, jwt: string): Promise<Identity> {
       // linkage is presence_site_members. Without this they 401 at the door and
       // the whole share-with-a-reviewer feature is unreachable. Their in-site
       // powers stay fail-closed (resolveSiteRole + the reviewer boundary).
-      const mm = await fetch(`${SB_URL}/rest/v1/presence_site_members?status=eq.active&or=(user_id.eq.${encodeURIComponent(uid)},email.eq.${encodeURIComponent(email)})&select=id&limit=1`, { headers: svc, signal: limited() });
+      const seatBy = email ? `or=(user_id.eq.${encodeURIComponent(uid)},email.eq.${orValue(email)})` : `user_id=eq.${encodeURIComponent(uid)}`;
+      const mm = await fetch(`${SB_URL}/rest/v1/presence_site_members?status=eq.active&${seatBy}&select=id&limit=1`, { headers: svc, signal: limited() });
       const members = mm.ok ? await mm.json() : [];
       if (Array.isArray(members) && members.length) {
         return { kind: 'client', userId: uid, tenantId: TENANT_ID, role: 'client', email: email || null, jwt };
@@ -292,7 +318,7 @@ export async function resolvePrincipal(req: Request, body: any): Promise<Princip
   const pub: Principal = { kind: 'public', userId: null, tenantId: null, role: null, email: null, jwt: null, requestId };
   try {
     // system: a valid scheduler/webhook shared secret in the body (run_scheduled_jobs, gsc_ingest, pi_weekly)
-    if (body && typeof body.secret === 'string' && body.secret && SCHEDULER_SECRET && body.secret === SCHEDULER_SECRET) {
+    if (body && typeof body.secret === 'string' && body.secret && SCHEDULER_SECRET && timingSafeEqual(body.secret, SCHEDULER_SECRET)) {   // item 397: the careful compare
       return { ...pub, kind: 'system' };
     }
     // operator (P5): a dedicated programmatic operator credential via header —
@@ -301,7 +327,7 @@ export async function resolvePrincipal(req: Request, body: any): Promise<Princip
     // accept) but tagged role 'operator' so the audit actor is honest. Distinct
     // from the cron secret; fail-closed — with no OPERATOR_SECRET set, no bypass.
     const opSecret = req.headers.get('x-operator-secret') || '';
-    if (opSecret && OPERATOR_SECRET && opSecret === OPERATOR_SECRET) {
+    if (opSecret && OPERATOR_SECRET && timingSafeEqual(opSecret, OPERATOR_SECRET)) {   // item 397: the careful compare
       return { ...pub, kind: 'system', role: 'operator' };
     }
     const jwt = req.headers.get('x-dds-user-jwt') || '';

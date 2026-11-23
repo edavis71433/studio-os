@@ -10,6 +10,7 @@
 // (presence_deals.converted_client_id). Nothing from Stripe's side (subscription,
 // customer or link ids) leaves the server; the one address that does is the
 // approval link of a retainer still waiting for them.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { cancelSubscription } from '../commerce/stripe.ts';
@@ -84,7 +85,7 @@ export async function handleClientRetainerCancel(_req: Request, site: SiteRow, p
       const fresh = await raiseNotice({ siteId: String(deal.site_id), clientId: studioClient, kind: 'retainer_status', period: `${retainerNoticePeriodPrefix(dealId)}clientcancel:${now.slice(0, 10)}`, headline, body });
       if (fresh) {
         const { emailOperator } = await import('../lib/service_bridge.ts');
-        const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+        const base = appBase();
         await emailOperator(String(deal.site_id), headline, `<p>${body.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string))}</p>`, 'retainer_status', { label: 'Open the deal', href: `${base}/pipeline.html?deal=${dealId}` }).catch(() => false);
       }
     }

@@ -58,6 +58,11 @@ export const KEY_NEEDS: readonly KeyPermission[] = [
     calls: ['GET /v1/invoices/{id}', 'GET /v1/invoices', 'GET /v1/invoice_payments'], probe: { method: 'GET', path: 'invoices', params: { limit: '1' } } },
   { id: 'balance_read', resource: 'Balance', level: 'Read', why: 'Stripe’s fee on each payment, for the bookkeeper file',
     calls: ['GET /v1/balance_transactions', 'GET /v1/balance_transactions/{id}'], probe: { method: 'GET', path: 'balance_transactions', params: { limit: '1' } } },
+  // Nov 22 2026: Stripe checks a balance transaction's source apart from Balance. The bookkeeper
+  // file and the Invoices page's Stripe card ask for it (expand[]=data.source); a key without this
+  // row was refused both (403 more_permissions_required), so its probe asks with the same expand.
+  { id: 'balance_transaction_source_read', resource: 'Balance Transaction Sources', level: 'Read', why: 'the payment behind each of Stripe’s fees, for the bookkeeper file and the Stripe card on the Invoices page',
+    calls: ['GET /v1/balance_transactions?expand[]=data.source'], probe: { method: 'GET', path: 'balance_transactions', params: { limit: '1', 'expand[]': 'data.source' } } },
   { id: 'payout_read', resource: 'Payouts', level: 'Read', why: 'the list of what Stripe sent to your bank, for the bookkeeper file',
     calls: ['GET /v1/payouts', 'GET /v1/payouts/{id}'], probe: { method: 'GET', path: 'payouts', params: { limit: '1' } } },
 ];

@@ -82,7 +82,7 @@ globalThis.fetch = async (url, init = {}) => {
   const headers = new Headers(init.headers);
   const reply = (body, status = 200) => new Response(body === null ? '' : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
   const token = (headers.get('Authorization') || '').replace(/^Bearer /, '');
-  if (u.pathname === '/auth/v1/user') return token === 'jwt-owner' ? reply(OWNER) : reply({}, 401);
+  if (u.pathname === '/auth/v1/user') return token === 'jwt-owner' ? reply({ email_confirmed_at: '2026-01-01T00:00:00Z', ...OWNER }) : reply({}, 401);   // item 389: a sign-in has proved its email
   if (!u.pathname.startsWith('/rest/v1/')) return new Response('', { status: 404 });
   const table = u.pathname.replace('/rest/v1/', '');
   const method = (init.method || 'GET').toUpperCase();

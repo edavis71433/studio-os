@@ -171,22 +171,23 @@
     };
 
     // One request: the server saves the answers (survey_responses) and emails them on.
+    // Builder item 392: the main server takes it. Until its door is live, it answers "sign in"
+    // (401) or "no such page" (404), and the old server takes it as before.
     var jr = null, reached = false;
     try {
-      var resp = await fetch(SB_URL + "/functions/v1/clever-api", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY },
-        body: JSON.stringify({
-          type: "survey_response",
-          clientName: clientName,
-          clientEmail: "",
-          subject: "New project survey: " + rating + "★",
-          message: "Rating: " + rating + "/5\n\nWhat worked: " + payload.what_worked +
-                   "\n\nImprove: " + payload.improve + "\n\nQuote: " + payload.quote +
-                   "\n\nTestimonial consent: " + (payload.testimonial_consent ? "YES" : "no"),
-          meta: payload
-        })
+      var sent = JSON.stringify({
+        type: "survey_response",
+        clientName: clientName,
+        clientEmail: "",
+        subject: "New project survey: " + rating + "★",
+        message: "Rating: " + rating + "/5\n\nWhat worked: " + payload.what_worked +
+                 "\n\nImprove: " + payload.improve + "\n\nQuote: " + payload.quote +
+                 "\n\nTestimonial consent: " + (payload.testimonial_consent ? "YES" : "no"),
+        meta: payload
       });
+      var sh = { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY };
+      var resp = await fetch(SB_URL + "/functions/v1/presence/survey", { method: "POST", headers: sh, body: sent });
+      if (resp.status === 401 || resp.status === 404) resp = await fetch(SB_URL + "/functions/v1/clever-api", { method: "POST", headers: sh, body: sent });
       try { jr = await resp.json(); } catch(e){}
       reached = !!(resp.ok && jr && jr.ok && (jr.saved === true || jr.emailed === true));
     } catch (e) { reached = false; }

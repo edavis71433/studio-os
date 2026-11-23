@@ -30,6 +30,8 @@
 // routes below, which booking.html calls), and the owner's own calendar's busy times are
 // kept off the booking page (lib/busy_calendar.ts; readCalendar and busyFor below).
 
+import { linkKey } from '../../_shared/link_keys.ts';
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc } from '../lib/db.ts';
 import { rateAllow, clientIp, tooMany } from '../lib/ratelimit.ts';
@@ -60,8 +62,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_DT_RE = /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/;
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any).json) ? (r as any).json : []) as any[];
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
-const APPROVAL_SECRET = Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
-const siteBase = () => (Deno.env.get('SITE_URL') || 'https://presence.davisdigitalstudio.com').replace(/\/$/, '');
+const siteBase = () => appBase();
 const DAY = 86_400_000;
 
 // ═════════ timezone bridge (lib/zoned_time.ts does the zone rules) ═════════
@@ -206,7 +207,7 @@ async function takenOn(siteId: string, date: string, cfg: BookingConfig, except 
 async function hashIp(req: Request): Promise<string> {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
   if (!ip) return '';
-  const salt = APPROVAL_SECRET || Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'salt';
+  const salt = linkKey('ip_hash') || 'salt';   // builder item 394: its own key, never the scheduler's secret
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip + '|' + salt));
   return Array.from(new Uint8Array(buf)).slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('');
 }

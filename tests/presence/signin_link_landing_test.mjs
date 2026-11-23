@@ -78,7 +78,7 @@ const quiet = (fn) => async (...a) => { const e = console.error, w = console.war
   reset();
   Deno.env.delete('SITE_URL');
   await mintSignInLink('x@example.com', '/portal.html');
-  ok('mint: with no SITE_URL it uses the production host, which forwards to the app', minted[0].redirect_to === 'https://davisdigitalstudio.com/portal.html');
+  ok('mint: with no SITE_URL it uses the app\'s own address (builder item 388: never the main site)', minted[0].redirect_to === 'https://app.davisdigitalstudio.com/portal.html');
   Deno.env.set('SITE_URL', SITE_URL);
 }
 

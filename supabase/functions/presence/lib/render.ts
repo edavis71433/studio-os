@@ -20,13 +20,14 @@ import { withAiCrawlerChoice } from './ai_crawlers.ts';
 import { withSearchChoices } from './search_tools.ts';
 import { injectAdTags } from './ad_tags.ts';
 import { sanitizeDevHtml, sanitizeDevCss } from './devmode.ts';
-import { BLOCK_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
+import { BLOCK_CSS, DESIGN_CSS, sectionStyles, pageClasses } from './site_blocks.ts';
 import { applyPageChrome, applyNotFoundPage } from './page_access.ts';
 import { applyHeaderScroll } from './site_header.ts';
 import { applyPhoneBar } from './phone_bar.ts';
 import { applyMotion } from './site_motion.ts';
 import { applySiteIcon } from './site_icon.ts';
 import { applyButtonStyles } from './site_buttons.ts';
+import { applyLookLayer, LOOK_COLOUR_TOKENS } from './site_looks.ts';
 
 // ── FD-T2: indexed template registry; each template's code loads on first use ──
 // slug → version → { manifest, code loader }. Render resolution goes through this
@@ -201,6 +202,14 @@ export function injectDevLayer(fileMap: FileMap, dev: Snapshot['dev_customizatio
   return out;
 }
 
+/** Item 333: a template that keeps its own colours (Slate) never takes a look's dark-page colours.
+ *  The customization comes back untouched when it sets none of them. */
+function withoutLookColours(dev: Snapshot['dev_customization']): Snapshot['dev_customization'] {
+  const t = dev?.theme_tokens;
+  if (!dev || !t || !LOOK_COLOUR_TOKENS.some((k) => k in t)) return dev;
+  return { ...dev, theme_tokens: Object.fromEntries(Object.entries(t).filter(([k]) => !(LOOK_COLOUR_TOKENS as readonly string[]).includes(k))) };
+}
+
 /** Render a snapshot with its PINNED template version, then apply the developer
  *  layer from the SAME snapshot. This is the ONE render entry — publish, preview,
  *  and restore all call it, so a developer edit is indistinguishable from any
@@ -227,7 +236,10 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   const moved = applySiteIcon(opts.allSectionStyles ? drawn : applyMotion(drawn, tokens?.motion), (snapshot.content as SnapshotContent)?.settings?.icon);
   // item 217: the button set and form style, when one is picked, in the canvas too; before the
   // developer layer, so a developer's own CSS still has the last word
-  const buttoned = applyButtonStyles(moved, tokens, FIXED_COLOR_TEMPLATES.has(snapshot.template_slug));
+  const fixedColours = FIXED_COLOR_TEMPLATES.has(snapshot.template_slug);
+  // item 333: a ready-made look's own rules (lib/site_looks.ts), after the set's so its button
+  // corners win, before the developer layer
+  const buttoned = applyLookLayer(applyButtonStyles(moved, tokens, fixedColours), tokens, { fixed: fixedColours, template: snapshot.template_slug });
   // List item 124: hidden from search, every page says noindex; the owner's llms.txt is written.
   const searched = withSearchChoices(buttoned, (snapshot.content as SnapshotContent)?.settings);
   // item 122: Call, Directions, Hours and Email along the bottom of every page on a phone, when turned on
@@ -238,9 +250,9 @@ export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts:
   // item 148: the pop-up and any form a "#form-<id>" link opens (lib/popup.ts), then item 131:
   // pages with the site's forms send them from the page (lib/site_send.ts)
   const content = snapshot.content as SnapshotContent;
-  const dressed = injectSender(injectPopup(injectDevLayer(found, snapshot.dev_customization), content, site), content, site);
+  const dressed = injectSender(injectPopup(injectDevLayer(found, fixedColours ? withoutLookColours(snapshot.dev_customization) : snapshot.dev_customization), content, site), content, site);
   // List item 152: the Google tag and the Meta Pixel, behind a cookie notice, on a site that has them.
-  const tagged = injectAdTags(opts.allSectionStyles ? dressed : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
+  const tagged = injectAdTags(opts.allSectionStyles ? keepAllSectionStyles(dressed) : trimSectionStyles(dressed), (snapshot.content as SnapshotContent)?.settings);
   return injectCsp(injectAnalytics(tagged, counting ? site.siteId : undefined));
 }
 
@@ -272,16 +284,29 @@ function fnv(s: string): string {
 // own name and every page links to that: a site that adds a gallery can never be served a
 // cached stylesheet without the gallery's rules.
 export function trimSectionStyles(fileMap: FileMap): FileMap {
+  return swapSectionStyles(fileMap, () => {
+    const classes = new Set<string>();
+    for (const [k, v] of Object.entries(fileMap)) if (k.endsWith('.html') && typeof v === 'string') pageClasses(v, classes);
+    return sectionStyles(classes);
+  });
+}
+/** Item 329: the builder's canvas keeps every section style, the bold designs' (DESIGN_CSS) too,
+ *  right after BLOCK_CSS: a section the canvas swaps in may take a design nothing on the page has
+ *  yet, and the Layout tab draws each design with the canvas's own styles. */
+export function keepAllSectionStyles(fileMap: FileMap): FileMap {
+  return swapSectionStyles(fileMap, () => `${BLOCK_CSS}\n${DESIGN_CSS}`);
+}
+/** The site's stylesheet with its section styles (BLOCK_CSS, whole in every template's) swapped for
+ *  `styles()`, under a new name of its own, and every page pointed at it. */
+function swapSectionStyles(fileMap: FileMap, styles: () => string): FileMap {
   const cssKey = Object.keys(fileMap).find((k) => /^assets\/site-[0-9a-f]+\.css$/.test(k));
   const css = cssKey ? fileMap[cssKey] : undefined;
   if (typeof css !== 'string' || !css.includes(BLOCK_CSS)) return fileMap;
-  const classes = new Set<string>();
-  for (const [k, v] of Object.entries(fileMap)) if (k.endsWith('.html') && typeof v === 'string') pageClasses(v, classes);
-  const trimmed = css.replace(BLOCK_CSS, () => sectionStyles(classes));
-  const key = `assets/site-${fnv(trimmed)}.css`;
+  const swapped = css.replace(BLOCK_CSS, styles);
+  const key = `assets/site-${fnv(swapped)}.css`;
   const out: FileMap = {};
   for (const [k, v] of Object.entries(fileMap)) {
-    if (k === cssKey) out[key] = trimmed;
+    if (k === cssKey) out[key] = swapped;
     else out[k] = typeof v === 'string' && k.endsWith('.html') ? v.split(`/${cssKey}`).join(`/${key}`) : v;
   }
   return out;

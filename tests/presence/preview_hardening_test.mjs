@@ -122,10 +122,14 @@ ok('ttl-clamp: in range → honored', clampTtlSeconds(3600) === 3600);
   for (const n of ['PREVIEW_LINK_SECRET', 'APPROVAL_SECRET', 'STATE_SIGNING_SECRET', 'SCHEDULER_SECRET']) Deno.env.delete(n);
   ok('secret: none configured → null (mint/verify fail closed)', previewLinkSecret() === null);
   Deno.env.set('SCHEDULER_SECRET', 'x');
-  ok('secret: falls back to SCHEDULER_SECRET (reuses existing config)', previewLinkSecret() === 'x');
+  // builder item 394: a shared draft link has a key of its own, never the scheduler's secret
+  ok('secret: the scheduler\'s secret alone is never used', previewLinkSecret() === null);
   Deno.env.set('APPROVAL_SECRET', 'y');
-  ok('secret: prefers APPROVAL_SECRET over SCHEDULER_SECRET', previewLinkSecret() === 'y');
-  Deno.env.delete('APPROVAL_SECRET'); Deno.env.delete('SCHEDULER_SECRET');
+  const { deriveLinkKey } = await import('../../supabase/functions/_shared/link_keys.ts');
+  ok('secret: with APPROVAL_SECRET, a key of its own made from it (not the root itself)', previewLinkSecret() === deriveLinkKey('y', 'preview') && previewLinkSecret() !== 'y');
+  Deno.env.set('PREVIEW_LINK_SECRET', 'z');
+  ok('secret: PREVIEW_LINK_SECRET, when set, is used as it is', previewLinkSecret() === 'z');
+  Deno.env.delete('PREVIEW_LINK_SECRET'); Deno.env.delete('APPROVAL_SECRET'); Deno.env.delete('SCHEDULER_SECRET');
 }
 
 // ── structural wiring ──

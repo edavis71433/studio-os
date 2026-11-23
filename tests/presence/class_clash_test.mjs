@@ -1,6 +1,7 @@
 // ── Which side owns each class name the templates and the sections share ─────────
 //   deno run --allow-read --allow-env tests/presence/class_clash_test.mjs
-// The sections' shared stylesheet (site_blocks BLOCK_CSS) is appended to every template's,
+// The sections' shared stylesheet (site_blocks BLOCK_CSS, and the bold designs' DESIGN_CSS after it,
+// item 329) is appended to every template's,
 // so its rules reach template markup too, and a template's rules reach the sections. (A
 // published site keeps only the rules its pages use; these checks read them all.) From
 // July to November 2026 Harbor's "at a glance" labels used `lb`, the class the gallery's
@@ -15,9 +16,9 @@
 // A name that becomes shared fails here until someone decides who owns it. Both sides' markup
 // comes from the full sample (full_fixture.mjs): every section, the owner's page, the dropdown.
 import { renderSnapshot } from '../../supabase/functions/presence/lib/render.ts';
-import { BLOCK_CSS, renderSiteBlocks } from '../../supabase/functions/presence/lib/site_blocks.ts';
+import { BLOCK_CSS, DESIGN_CSS, renderSiteBlocks } from '../../supabase/functions/presence/lib/site_blocks.ts';
 import { esc, attr, safeHref } from '../../supabase/functions/presence/lib/markdown.ts';
-import { TEMPLATES, fixture, fullFixture } from './full_fixture.mjs';
+import { TEMPLATES, fixture, fullFixture, variantPages } from './full_fixture.mjs';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -113,7 +114,8 @@ const html = (files) => Object.entries(files).filter(([k]) => k.endsWith('.html'
 async function sides(slug) {
   const full = fullFixture(slug);
   const { blocks, pages } = full.content.settings;
-  const sectionHtml = [...renderSiteBlocks(blocks, ctx), ...renderSiteBlocks(pages[0].blocks, ctx), ...renderSiteBlocks(blocks, { esc, attr, safeHref })].map((b) => b.html).join('\n');
+  // item 329: and every other look a section can take (its style variants), the bold designs among them
+  const sectionHtml = [...renderSiteBlocks(blocks, ctx), ...renderSiteBlocks(pages[0].blocks, ctx), ...renderSiteBlocks(blocks, { esc, attr, safeHref }), ...variantPages().flatMap((p) => renderSiteBlocks(p.blocks, ctx))].map((b) => b.html).join('\n');
   // the template's own markup: its own sample, and the full sample with the sections taken out
   // (the owner's page and the dropdown stay)
   const bare = structuredClone(full);
@@ -122,12 +124,12 @@ async function sides(slug) {
   const css = String(drawn[Object.keys(drawn).find((k) => k.startsWith('assets/'))]);
   return {
     markup: html(await renderSnapshot(fixture(slug), SITE)) + '\n' + html(drawn),
-    css: css.replace(BLOCK_CSS, ''),
+    css: css.replace(BLOCK_CSS, '').replace(DESIGN_CSS, ''),
     hadSectionStyles: css.includes(BLOCK_CSS),
     sectionHtml,
   };
 }
-const sectionSelectors = selectors(BLOCK_CSS);
+const sectionSelectors = selectors(`${BLOCK_CSS}\n${DESIGN_CSS}`);
 function shared(t) {
   const mine = new Set([...elements(t.markup).flatMap((e) => [...e.classes]), ...named(selectors(t.css).join(' '))]);
   const theirs = new Set([...elements(t.sectionHtml).flatMap((e) => [...e.classes]), ...named(sectionSelectors.join(' '))]);

@@ -28,7 +28,12 @@ export const PREFLIGHT_MAX_AGE = '86400';
 // regional invocation), and the browser may only send a header this list allows.
 // An address setting (?forceFunctionRegion=) would need no change here, but it alters
 // every address the pages call. Allowing a header grants nothing by itself.
-const ALLOWED_HEADERS = 'authorization, x-client-info, apikey, content-type, x-dds-admin, x-dds-user-jwt, x-dds-scope-site, if-match, x-operator-secret, x-system-secret, x-region, x-dds-preview';   // builder list item 232: a studio's preview of a client's portal (read-only, refused writes)
+// Builder item 397 (review file 07, finding 20): the operator's and the scheduler's secret
+// headers (x-operator-secret, x-system-secret) and the old admin header (x-dds-admin, whose
+// check was deleted) are no longer on the list. No page sends them, and only a browser asks
+// this list: the watchdog and the jobs call server to server, so a browser that holds either
+// secret now can't use it from a page.
+const ALLOWED_HEADERS = 'authorization, x-client-info, apikey, content-type, x-dds-user-jwt, x-dds-scope-site, if-match, x-region, x-dds-preview';   // builder list item 232: a studio's preview of a client's portal (read-only, refused writes)
 
 export function corsFor(req: Request) {
   const origin = req.headers.get('origin') || '';

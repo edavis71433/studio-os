@@ -40,6 +40,7 @@
 //                 cleared when it closes; won is an update, lost is a Needs you line
 // The money lines ride the money kind (invoice_void_paid, 0119) and the updates the
 // paid kind (invoice_paid), each under its own period, so no kind list changes.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { svc } from '../lib/db.ts';
 import { raiseNoticeDetailed, clearNotice } from '../lib/notice.ts';
 import { UUID_RE } from '../lib/uuid.ts';
@@ -232,7 +233,7 @@ const numberOf = (m: Match): string => { const v = Math.trunc(Number(m.inv?.numb
 export const returnPeriod = (what: 'refund' | 'refundfailed' | 'dispute' | 'disputewon' | 'disputelost', dealId: string | null, stripeId: string, again = false): string =>
   `${what}:${dealId && UUID_RE.test(dealId) ? dealId : 'nodeal'}:${stripeId}${again ? ':again' : ''}`;
 const dealHref = (dealId: string | null) => {
-  const base = (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  const base = appBase();
   return dealId ? `${base}/pipeline.html?deal=${dealId}&dtab=billing` : `${base}/invoices.html`;
 };
 

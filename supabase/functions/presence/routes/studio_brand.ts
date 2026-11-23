@@ -5,6 +5,7 @@
 // sign-in page before anyone is signed in: it gives away only what the studio's
 // own website already shows (its name and logo), keyed by a site id nobody can
 // guess, and is cached so a busy sign-in page costs one read an hour.
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { loadEmailBrand, EMAIL_BRAND_DEFAULT } from '../lib/email_brand.ts';
 import type { SiteRow } from '../lib/site.ts';
@@ -136,7 +137,7 @@ export async function handlePublicStudioBySlug(slug: string, cors: Record<string
  *  in for every studio (a home-screen icon must be a square PNG, which a logo seldom is). */
 export async function handlePublicStudioManifest(siteId: string, cors: Record<string, string>): Promise<Response> {
   const b = await studioBrandOf(siteId);
-  const base = String(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+  const base = appBase();   // item 388: the app's address
   const name = b.is_default ? 'Client portal' : b.name;
   const short = name.length <= 12 ? name : name.split(/\s+/)[0].slice(0, 12);
   const manifest = {
