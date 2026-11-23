@@ -30,7 +30,8 @@
 
 export type LinkKind =
   | 'sales' | 'retainer_card' | 'preview' | 'approval' | 'booking' | 'form_ticket' | 'spam_link' | 'join'
-  | 'email_unsubscribe' | 'email_open' | 'email_image' | 'address_hash' | 'ip_hash';
+  | 'email_unsubscribe' | 'email_open' | 'email_image' | 'address_hash' | 'ip_hash'
+  | 'fresh_code';   // the six-digit codes' hashes (lib/fresh_code.ts): they live minutes, so no old key is kept
 
 /** Until this moment a link signed the old way is still accepted (90 days after Nov 23 2026). */
 export const LEGACY_LINKS_UNTIL = '2027-02-21T00:00:00Z';
