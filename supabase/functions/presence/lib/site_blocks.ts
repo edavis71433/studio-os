@@ -38,6 +38,7 @@ import { hasSampleWords } from './sample_words_check.ts';
 import { parseWindow, isVisibleNow } from './content_window.ts';
 import { normHex, darken, contrastRatio } from './brand_kit.ts';
 import { UUID_RE } from './uuid.ts';
+import { UNNAMED_REVIEWER } from './reviews.ts';
 import { bookingScript, signupForm } from './site_send.ts';
 import { isAnchor, anchorOf, siteLink } from './section_links.ts';
 
@@ -1231,20 +1232,26 @@ function blockImg(m: MediaRef, esc: (s: string) => string, attr: (s: string) => 
 //    real business — the correct rich-results shape. Counts only approved rows (the
 //    resolved block already carries approved-only data). Returns null when there is
 //    nothing approved to show, so a template with no reviews_wall is byte-identical. ──
-export function reviewsSchema(blocks: SiteBlock[] | undefined, now?: string): { aggregateRating: object; review: object[] } | null {
+// Builder item 383: Google reads these reviews but shows no stars in its results for reviews a
+// business collects on its own site, so nothing here (or in the builder's words) promises any.
+// What is told is only what the wall shows: the reviews on it, each with the name its writer gave
+// (one with no name is left out of the list, never given one), and the average and count the
+// wall prints.
+export function reviewsSchema(blocks: SiteBlock[] | undefined, now?: string): { aggregateRating: object; review?: object[] } | null {
   const rw = (blocks || []).find((b) => b.type === 'reviews_wall'
     // Phase EXP: a reviews wall outside its window isn't shown, so it emits no schema either.
     && (!now || isVisibleNow(b as { show_from?: string; show_until?: string }, now))) as SiteBlockReviewsWall | undefined;
   if (!rw || !rw.aggregate || rw.aggregate.count < 1 || !rw.reviews.length) return null;
+  const named = rw.reviews.slice(0, 20).filter((r) => r.author && r.author !== UNNAMED_REVIEWER);
   return {
     aggregateRating: { '@type': 'AggregateRating', ratingValue: rw.aggregate.average, reviewCount: rw.aggregate.count, bestRating: 5, worstRating: 1 },
-    review: rw.reviews.slice(0, 20).map((r) => ({
+    ...(named.length ? { review: named.map((r) => ({
       '@type': 'Review',
       reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5, worstRating: 1 },
       author: { '@type': 'Person', name: r.author },
       reviewBody: r.body,
       ...(r.date ? { datePublished: r.date } : {}),
-    })),
+    })) } : {}),
   };
 }
 
@@ -2542,6 +2549,20 @@ input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{fo
 .bk-slot{border:1px solid var(--line);border-radius:10px;background:var(--card,#fff);color:inherit;padding:10px 8px;cursor:pointer;font-weight:600}
 .bk-slot:hover{border-color:var(--accent)}
 .bk-slot:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bk-next{margin:0 0 12px;font-weight:600}
+.bk-next-btn{min-height:44px;margin-left:4px;padding:8px 14px;border:1px solid var(--accent);border-radius:999px;background:var(--card,#fff);color:inherit;font:inherit;font-weight:700;cursor:pointer}
+.bk-cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:360px;margin:0 0 6px}
+.bk-cal-title{margin:0;font-weight:700}
+.bk-mon{min-width:44px;min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--card,#fff);color:inherit;font-size:1.25rem;cursor:pointer}
+.bk-mon:disabled{opacity:.35;cursor:default}
+.bk-cal{display:grid;grid-template-columns:repeat(7,minmax(44px,1fr));gap:4px;max-width:360px}
+.bk-wd{padding:4px 0;text-align:center;font-size:.8rem;color:var(--soft)}
+.bk-day{min-height:44px;border:1px solid transparent;border-radius:10px;background:none;color:inherit;font:inherit;opacity:.5}
+.bk-day.open{border-color:var(--accent);background:var(--card,#fff);font-weight:700;opacity:1;cursor:pointer}
+.bk-day.open:hover{border-width:2px}
+.bk-day.today{text-decoration:underline;text-underline-offset:3px}
+.bk-day:focus-visible,.bk-mon:focus-visible,.bk-next-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bk-cal-key{margin:10px 0 0;font-size:.85rem;color:var(--soft)}
 .bk-form{display:grid;gap:12px}
 .bk-field{display:flex;flex-direction:column;gap:4px;font-weight:600}
 .bk-field input,.bk-field textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit}
@@ -2584,7 +2605,8 @@ ${onBands('a.teaser-card')}{text-decoration:none}
 .block.block--bg-accent ol.process li::before,.block.block--bg-accent .bk-done-ic{background:#fff;color:${BAND}}
 .block.block--bg-dark ol.process li::before,.block.block--bg-dark .bk-done-ic{background:${BAND};color:#fff}
 ${onBands('.card')}{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)}
-${onBands(':is(.rw-card,.sp-inner,.teaser-card,.bk-service,.bk-slot)')}{background:var(--band-box,rgba(0,0,0,.08));border-color:rgba(255,255,255,.22)}
+${onBands(':is(.rw-card,.sp-inner,.teaser-card,.bk-service,.bk-slot,.bk-mon,.bk-next-btn)')}{background:var(--band-box,rgba(0,0,0,.08));border-color:rgba(255,255,255,.22)}
+${onBands('.bk-day.open')}{background:var(--band-box,rgba(0,0,0,.08));border-color:rgba(255,255,255,.6)}
 ${onBands('ul.areas li')},${onBands('.bk-summary')}{background:var(--band-box,rgba(0,0,0,.08));box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
 .block.block-cta.v-card.block--bg-accent .cta-inner{background:var(--band-box,${BAND});border-color:transparent}
 .block.block-cta.v-card.block--bg-dark .cta-inner{background:var(--band-box,#1a1622);border-color:transparent}

@@ -77,7 +77,7 @@ import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review
 const { handleBroadcastsList, handleBroadcastCreate, handleBroadcastListCreate, handleBroadcastListDelete, handleBroadcastSegments, handleBroadcastGet, handleBroadcastUpdate, handleBroadcastSend, handleBroadcastCancel, handleBroadcastDraftAssist, handleBroadcastTest } = lazyRoutes(() => import('./routes/broadcasts.ts'));
 const { handleWelcomeGet, handleWelcomePut, handleWelcomeTest } = lazyRoutes(() => import('./routes/list_welcome.ts'));   // builder list item 221
 import { handleScheduleCreate, handleScheduleList, handleScheduleCancel, handleFormSubmit, handleFormInbox, handleFormStatus, handleFormReply, handleApproveSend, handleApproveGet, handleApprovePost, handleSendTicket, handleSpamLinkGet, handleSpamLinkPost, handleFormFile, handleFormAnswers, handleFormDelete, handleJoinGet, handleJoinPost } from './routes/commercial.ts';
-const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleManageGet, handleManagePost, handleManageSlots, handleManageIcs, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
+const { handleBookingTypes, handleBookingSlots, handleBookingDays, handleBookingCreate, handleManageGet, handleManagePost, handleManageSlots, handleManageIcs, handleBookingSettingsGet, handleBookingSettingsPut, handleBookingTypesList, handleBookingTypeCreate, handleBookingTypeUpdate, handleBookingTypeDelete, handleBookingAppointments, handleBookingConfirm, handleBookingCancel, handleBookingMark } = lazyRoutes(() => import('./routes/booking.ts'));
 const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest, handleReviewGoogleLink } = lazyRoutes(() => import('./routes/reviews.ts'));
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
 import { resolveSiteRoleCached, seedSiteRole } from './lib/workspace.ts';
@@ -232,6 +232,8 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'GET') return handleBookingTypes(req, m[1], cors);
     m = route.match(/^\/book\/([0-9a-f-]{36})\/slots$/);
     if (m && method === 'GET') return handleBookingSlots(req, m[1], cors);
+    m = route.match(/^\/book\/([0-9a-f-]{36})\/days$/);   // builder item 291: the month's open days
+    if (m && method === 'GET') return handleBookingDays(req, m[1], cors);
     m = route.match(/^\/book\/([0-9a-f-]{36})$/);
     if (m && method === 'POST') return handleBookingCreate(req, m[1], cors);
     // builder list item 149: the customer's own change-or-cancel link (booking.html reads, then acts)

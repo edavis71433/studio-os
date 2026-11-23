@@ -33,7 +33,7 @@ const attr = esc;
 /** The routes a client's site calls from its visitors' browsers: the form send,
  *  booking, and (item 140) the time ticket for either. index.ts answers them with
  *  visitorCors (the site has its own address). */
-export const VISITOR_ROUTE = /^\/(?:forms\/[0-9a-f-]{36}\/(?:submit|ticket)|book\/[0-9a-f-]{36}(?:\/types|\/slots|\/ticket)?)$/;
+export const VISITOR_ROUTE = /^\/(?:forms\/[0-9a-f-]{36}\/(?:submit|ticket)|book\/[0-9a-f-]{36}(?:\/types|\/slots|\/days|\/ticket)?)$/;
 
 /** How long the page waits for an answer before it says the message didn't send. */
 export const SEND_WAIT_MS = 15000;
@@ -125,6 +125,7 @@ var W=document.querySelector('.booking-widget[data-book]');if(!W)return;
 var EP=W.getAttribute('data-book');var stage=W.querySelector('.bk-stage');
 var S={types:[],type:null,date:'',slot:'',cfg:{}},WAIT=${SEND_WAIT_MS};
 var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var MON=['January','February','March','April','May','June','July','August','September','October','November','December'],WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],WDL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 var NOT_BOOKED='Your booking didn’t go through, so nothing is booked yet. Please try again.';
 var TK='',TKAT=0;
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
@@ -145,8 +146,27 @@ function fdate(d){var p=d.split('-');return MO[(+p[1])-1]+' '+(+p[2]);}
 function back(fn){var b=el('button','bk-back','← Back');b.type='button';b.addEventListener('click',fn);return b;}
 msg('Loading…');
 getj(EP+'/types').then(function(res){var d=(res&&res.data)||{};if(!d.enabled||!d.types||!d.types.length){reach(msg('Online booking isn’t available right now.'),'To book,');return;}S.types=d.types;S.cfg=d;services();}).catch(function(){reach(msg('Online booking isn’t loading right now.'),'To book,');});
-function services(){clr();stage.appendChild(el('p','bk-step','1. Choose a service'));var list=el('div','bk-services');S.types.forEach(function(t){var b=el('button','bk-service');b.type='button';b.appendChild(el('span','bk-svc-name',t.name));b.appendChild(el('span','bk-svc-meta',t.duration_min+' min'+(t.price_text?(' · '+t.price_text):'')));if(t.description)b.appendChild(el('span','bk-svc-desc',t.description));b.addEventListener('click',function(){S.type=t;pickDate();});list.appendChild(b);});stage.appendChild(list);}
-function pickDate(){clr();stage.appendChild(back(services));stage.appendChild(el('p','bk-step','2. Pick a day for '+S.type.name));var inp=el('input','bk-date');inp.type='date';var now=new Date();inp.min=now.toISOString().slice(0,10);if(S.cfg.max_days_ahead){inp.max=new Date(now.getTime()+S.cfg.max_days_ahead*86400000).toISOString().slice(0,10);}inp.addEventListener('change',function(){S.date=inp.value;if(S.date)slots();});stage.appendChild(inp);}
+function services(){clr();stage.appendChild(el('p','bk-step','1. Choose a service'));var list=el('div','bk-services');S.types.forEach(function(t){var b=el('button','bk-service');b.type='button';b.appendChild(el('span','bk-svc-name',t.name));b.appendChild(el('span','bk-svc-meta',t.duration_min+' min'+(t.price_text?(' · '+t.price_text):'')));if(t.description)b.appendChild(el('span','bk-svc-desc',t.description));b.addEventListener('click',function(){S.type=t;S.month='';pickDate();});list.appendChild(b);});stage.appendChild(list);}
+function pad(n){return (n<10?'0':'')+n;}
+function ymd(y,m,d){var t=new Date(Date.UTC(y,m-1,d));return t.getUTCFullYear()+'-'+pad(t.getUTCMonth()+1)+'-'+pad(t.getUTCDate());}
+function plus(t,n){var p=t.split('-');return ymd(+p[0],+p[1],+p[2]+n);}
+function localToday(){var d=new Date();return ymd(d.getFullYear(),d.getMonth()+1,d.getDate());}
+function wday(t){var p=t.split('-');return new Date(Date.UTC(+p[0],+p[1]-1,+p[2])).getUTCDay();}
+function head(){clr();stage.appendChild(back(services));stage.appendChild(el('p','bk-step','2. Pick a day for '+S.type.name));}
+function pickDate(){head();stage.appendChild(el('p','bk-msg','Finding open days…'));month(S.month||(S.cfg.today||localToday()).slice(0,7));}
+function month(ym){var y=+ym.slice(0,4),m=+ym.slice(5,7),n=new Date(Date.UTC(y,m,0)).getUTCDate();var ty=S.type;
+getj(EP+'/days?type='+encodeURIComponent(ty.id)+'&from='+ym+'-01&to='+ym+'-'+pad(n)).then(function(res){var d=(res&&res.data)||{};if(S.type!==ty)return;if(!d.today||!d.open)throw new Error('days');S.month=ym;cal(ym,n,d);}).catch(function(){if(S.type===ty)dateBox();});}
+function when(t){return WD[wday(t.slice(0,10))]+', '+fdate(t.slice(0,10))+' at '+ftime(t.split('T')[1]);}
+function cal(ym,n,d){head();var y=+ym.slice(0,4),m=+ym.slice(5,7),open={};d.open.forEach(function(x){open[x]=1;});
+var nx=el('p','bk-next');if(d.next){nx.appendChild(document.createTextNode('Next opening: '));var nb=el('button','bk-next-btn',when(d.next));nb.type='button';nb.addEventListener('click',function(){S.date=d.next.slice(0,10);S.month=d.next.slice(0,7);slots();});nx.appendChild(nb);}else{nx.textContent='No open times right now.';reach(nx,'To book,');}stage.appendChild(nx);
+var hd=el('div','bk-cal-head');var pv=el('button','bk-mon','‹');pv.type='button';pv.setAttribute('aria-label','Previous month');pv.disabled=ym<=d.today.slice(0,7);var nm=el('button','bk-mon','›');nm.type='button';nm.setAttribute('aria-label','Next month');nm.disabled=ym>=String(d.last||d.today).slice(0,7);
+var ttl=el('p','bk-cal-title',MON[m-1]+' '+y);pv.addEventListener('click',function(){month(plus(ym+'-01',-1).slice(0,7));});nm.addEventListener('click',function(){month(plus(ym+'-'+pad(n),1).slice(0,7));});hd.appendChild(pv);hd.appendChild(ttl);hd.appendChild(nm);stage.appendChild(hd);
+var g=el('div','bk-cal');g.setAttribute('role','group');g.setAttribute('aria-label',MON[m-1]+' '+y);WD.forEach(function(w){var h=el('span','bk-wd',w.slice(0,2));h.setAttribute('aria-hidden','true');g.appendChild(h);});
+for(var i=0;i<wday(ym+'-01');i++)g.appendChild(el('span','bk-gap'));
+for(var k=1;k<=n;k++){(function(t){var on=!!open[t],b=el('button','bk-day'+(on?' open':'')+(t===d.today?' today':''),String(+t.slice(8)));b.type='button';b.disabled=!on;
+b.setAttribute('aria-label',WDL[wday(t)]+', '+MON[+t.slice(5,7)-1]+' '+(+t.slice(8))+(t===d.today?', today':'')+(on?', open':', no times'));if(on)b.addEventListener('click',function(){S.date=t;slots();});g.appendChild(b);})(ym+'-'+pad(k));}
+stage.appendChild(g);stage.appendChild(el('p','bk-cal-key','Days with open times are marked.'));}
+function dateBox(){head();var inp=el('input','bk-date');inp.type='date';var t=S.cfg.today||localToday();inp.min=t;if(S.cfg.max_days_ahead){inp.max=plus(t,S.cfg.max_days_ahead);}inp.addEventListener('change',function(){S.date=inp.value;if(S.date)slots();});stage.appendChild(inp);}
 function slots(){clr();stage.appendChild(back(pickDate));stage.appendChild(el('p','bk-step','3. Choose a time'));var load=el('p','bk-msg','Finding open times…');stage.appendChild(load);getj(EP+'/slots?type='+encodeURIComponent(S.type.id)+'&date='+encodeURIComponent(S.date)).then(function(res){var sl=((res&&res.data)||{}).slots||[];if(load.parentNode)stage.removeChild(load);if(!sl.length){stage.appendChild(el('p','bk-msg','No open times that day — try another.'));return;}var grid=el('div','bk-slots');sl.forEach(function(s){var b=el('button','bk-slot',ftime(s.split('T')[1]));b.type='button';b.addEventListener('click',function(){S.slot=s;details();});grid.appendChild(b);});stage.appendChild(grid);}).catch(function(){if(load.parentNode)stage.removeChild(load);stage.appendChild(reach(el('p','bk-msg','We couldn’t load the times for that day. Go back and pick the day again, or try another.'),'You can also'));});}
 function field(lb,nm,ty,req){var w=el('label','bk-field');w.appendChild(el('span',null,lb+(req?' *':'')));var i=el(ty==='textarea'?'textarea':'input');if(ty!=='textarea')i.type=ty;i.name=nm;if(req)i.required=true;w.appendChild(i);return {w:w,i:i};}
 function details(){clr();stage.appendChild(back(slots));stage.appendChild(el('p','bk-step','4. Your details'));var f=el('form','bk-form');var nm=field('Your name','name','text',true),em=field('Email','email','email',false),ph=field('Phone','phone','tel',false),nt=field('Anything we should know?','note','textarea',false);f.appendChild(nm.w);f.appendChild(em.w);f.appendChild(ph.w);f.appendChild(nt.w);var hp=el('div','bk-hp');var hpi=el('input');hpi.name='_hp';hpi.tabIndex=-1;hpi.setAttribute('autocomplete','off');hp.appendChild(hpi);f.appendChild(hp);f.appendChild(el('p','bk-summary',S.type.name+' — '+fdate(S.date)+' at '+ftime(S.slot.split('T')[1])));var btn=el('button','bk-submit btn','Confirm booking');btn.type='submit';f.appendChild(btn);var err=el('p','bk-err');f.appendChild(err);

@@ -233,6 +233,7 @@
  "settings_limits_test.mjs": 1,
  "settings_reads_test.mjs": 3,
  "setup_strip_105_test.mjs": 3,
+ "share_google_booking_test.mjs": 1,
  "signin_link_landing_test.mjs": 5,
  "site_controls_test.mjs": 4,
  "site_csp_test.mjs": 2,

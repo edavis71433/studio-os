@@ -16,7 +16,7 @@ import type { SiteConfig, SnapshotContent } from './render_types.ts';
  *  share_title / share_description / share_image) — they change only the og:/
  *  twitter: tags, never the <title>/description Google reads. Absent = the exact
  *  same bytes as before. */
-export interface SeoHeadPage { title: string; description: string; path: string; ogImage?: string; ld: object[]; shareTitle?: string; shareDescription?: string; shareImage?: string; ogType?: 'article'; published?: string; feed?: boolean }   // item 300: a post shares as an article; the Updates pages name the feed
+export interface SeoHeadPage { title: string; description: string; path: string; ogImage?: string; ld: object[]; shareTitle?: string; shareDescription?: string; shareImage?: string; ogType?: 'article'; published?: string; feed?: boolean; ogImageSize?: [number, number] }   // item 300: a post shares as an article; the Updates pages name the feed; item 379: the plain card's known size
 
 /** The full `<!DOCTYPE html> … </head>` for one page — byte-identical to what the
  *  templates emitted inline. `critical` is the template's above-the-fold CSS and
@@ -44,7 +44,7 @@ ${c.settings?.verification?.google ? `<meta name="google-site-verification" cont
 <meta property="og:title" content="${attr(ogTitle)}">
 <meta property="og:description" content="${attr(ogDesc)}">
 <meta property="og:url" content="${attr(canonical)}">
-${ogImg ? `<meta property="og:image" content="${attr(site.baseUrl + ogImg)}">` : ''}
+${ogImg ? `<meta property="og:image" content="${attr(site.baseUrl + ogImg)}">` : ''}${ogImg && !o.shareImage && o.ogImageSize ? `\n<meta property="og:image:width" content="${o.ogImageSize[0]}">\n<meta property="og:image:height" content="${o.ogImageSize[1]}">` : ''}
 <meta name="twitter:card" content="${ogImg ? 'summary_large_image' : 'summary'}">
 <meta name="twitter:title" content="${attr(ogTitle)}">
 <meta name="twitter:description" content="${attr(ogDesc)}">
