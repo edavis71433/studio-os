@@ -148,6 +148,34 @@ eq('201: the notice opens the enquiry, as the day-later nudge does', [W.noticeHr
   ok('201: the same send again (a retry) raises nothing more', again.status === 200 && (db.tables.presence_plan_notices || []).filter((x) => x.kind === 'website_enquiry').length === 1);
 }
 
+// ═══ 201's follow-up · acting on an enquiry clears its day-later nudge, whatever week it was raised ═══
+{
+  const N = await import('../../supabase/functions/presence/lib/notice.ts');
+  const L2 = id('f2f2f2f2', 1), L3 = id('f2f2f2f2', 2);
+  const w = world();
+  w.presence_form_submissions.push(
+    { id: L2, site_id: S, form_kind: 'contact', name: 'Gus Vale', email: 'gus@vale.example', phone: '', message: 'A quote for a menu page?', source_page: '/', status: 'new', spam: false, created_at: ago(2), fields: {} },
+    { id: L3, site_id: S, form_kind: 'quote', name: 'Hana Ito', email: 'hana@ito.example', phone: '', message: 'A logo and a site?', source_page: '/', status: 'new', spam: false, created_at: ago(2), fields: {} });
+  // an older nudge kept the once-only key it had before the weekly bucket
+  w.presence_plan_notices = [{ id: id('9a9a9a9a', 1), site_id: S, client_id: CLIENT, kind: 'lead_followup', period: N.leadFollowupLegacyPeriod(L2), status: 'active', headline: 'Gus is waiting', body: '', created_at: ago(30) }];
+  db.reset(w); mail.length = 0;
+  // raised the way the day-later sweep raises them (commerce/lifecycle.ts runLeadFollowups): this week's bucket
+  for (const lead of [L2, L3]) await N.raiseNotice({ siteId: S, clientId: CLIENT, kind: 'lead_followup', period: N.leadFollowupPeriod(lead, Date.now()), headline: 'Still waiting', body: 'They reached out a day ago.', push: false });
+  const nudge = (period) => (db.tables.presence_plan_notices || []).find((n) => n.kind === 'lead_followup' && n.period === period);
+  const week = (lead) => nudge(N.leadFollowupPeriod(lead, Date.now()));
+  ok('201 follow-up: each quiet enquiry\'s nudge is in the bell, in this week\'s bucket', week(L2)?.status === 'active' && week(L3)?.status === 'active' && /^lead:f2f2f2f2-0000-4000-8000-000000000001:w\d+$/.test(week(L2)?.period || ''));
+  const reply = await Com.handleFormReply(new Request(`https://fn.test/functions/v1/presence/forms/inbox/${L2}/reply`, { method: 'POST', body: JSON.stringify({ body: 'Happy to help, Gus. Are you free Tuesday?' }) }), 'jwt-owner', site, owner, L2, cors);
+  ok('201 follow-up: a reply clears that enquiry\'s nudge: this week\'s, and the older once-only one',
+    reply.status === 200 && week(L2)?.status === 'dismissed' && nudge(N.leadFollowupLegacyPeriod(L2))?.status === 'dismissed', JSON.stringify([reply.status, db.tables.presence_plan_notices]));
+  ok('201 follow-up: …and nobody else\'s', week(L3)?.status === 'active');
+  const st = await Com.handleFormStatus(new Request(`https://fn.test/functions/v1/presence/forms/inbox/${L3}`, { method: 'PATCH', body: JSON.stringify({ status: 'read' }) }), site, L3, cors);
+  ok('201 follow-up: settling an enquiry (Mark read) clears its nudge too', st.status === 200 && week(L3)?.status === 'dismissed');
+  const L4 = id('f2f2f2f2', 4);
+  await N.raiseNotice({ siteId: S, clientId: CLIENT, kind: 'lead_followup', period: N.leadFollowupPeriod(L4, Date.now()), headline: 'Still waiting', body: '', push: false });
+  await N.clearLeadFollowup(S, '*');
+  ok('201 follow-up: an id carrying filter grammar is refused, never widened to other enquiries', week(L4)?.status === 'active');
+}
+
 // ═══ 211 · what AI help knows ═══
 eq('211: "How I write" is kept with the goal, cleaned, and cleared by empty', [
   L.applyGoalAi(L.normalizeGoalAi(null), { writing: '  Friendly, first names.\r\n\r\n\r\n50% deposit.  ' }, 'o@s.test', PINNED_NOW).value.writing,

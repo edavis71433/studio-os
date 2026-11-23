@@ -24,7 +24,7 @@ import { writeChangeEvent } from '../lib/provenance.ts';
 import {
   validateScheduleTime, isScheduleKind, validateSubmission, formParamsToSubmission,
   signApprovalToken, verifyApprovalToken, type ApprovalTokenPayload,
-  leadFollowupResolvesOn, leadFollowupNoticeKey, enquiryAckCopy,
+  leadFollowupResolvesOn, enquiryAckCopy,
 } from '../lib/commercial.ts';
 import { validateBlocks } from '../lib/site_blocks.ts';
 import { SIGNUP_CONSENT } from '../lib/site_send.ts';
@@ -38,6 +38,7 @@ import { storeFormFiles, cleanFileName, filesOf, filePath, fileLink, formFileByt
 import { autoReplyVerdict } from '../lib/auto_reply.ts';   // item 203
 import { JOINED, JOIN_CHECK_EMAIL, joinLinkToken, readJoinLinkToken, joinEmailSubject, joinEmailHtml } from '../lib/join_confirm.ts';
 import { afterResponseOrNow, runAfterResponse } from '../lib/after_response.ts';   // item 221; sales item 201: the alert finishes after the answer
+import { clearLeadFollowup } from '../lib/notice.ts';   // sales item 201's follow-up: a reply clears every week's nudge
 import { approvalDetail, cleanNote } from '../lib/approval_page.ts';   // sales item 92
 import { wordsHtml, quoteBlock, followupPlan } from '../lib/follow_ups.ts';   // sales item 87
 import { readVisitStats } from '../lib/visit_stats.ts';
@@ -537,10 +538,7 @@ async function setSpam(siteId: string, row: { id: string; email?: string; fields
   const w = await svc(`presence_form_submissions?id=eq.${row.id}&site_id=eq.${siteId}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ spam: on, fields }) });
   if (!(w.ok && w.json?.[0])) return false;
   if (row.email) await markSender(siteId, row.email, on).catch(() => {});
-  if (on) {
-    const k = leadFollowupNoticeKey(String(row.id));
-    await svc(`presence_plan_notices?site_id=eq.${siteId}&kind=eq.${k.kind}&period=eq.${k.period}&status=eq.active`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
-  }
+  if (on) await clearLeadFollowup(siteId, String(row.id));   // every week's nudge, and the once-only one
   return true;
 }
 
@@ -598,10 +596,7 @@ export async function handleFormReply(req: Request, jwt: string, site: SiteRow, 
   const patch: Record<string, unknown> = { fields: { ...fields, __studio_replies: replies } };
   if (sub.status === 'new' || sub.status === 'read') patch.status = 'replied';
   await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}`, { method: 'PATCH', body: JSON.stringify(patch) }).catch(() => {});
-  if (leadFollowupResolvesOn('replied')) {
-    const k = leadFollowupNoticeKey(id);
-    await svc(`presence_plan_notices?site_id=eq.${site.id}&kind=eq.${k.kind}&period=eq.${k.period}&status=eq.active`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
-  }
+  if (leadFollowupResolvesOn('replied')) await clearLeadFollowup(site.id, id);   // sales item 201's follow-up: every week's nudge
   // the enquiry became a deal → the answer shows on the customer record's timeline
   try {
     const dq = await svc(`presence_deals?site_id=eq.${site.id}&deleted_at=is.null&source_submission_id=eq.${id}&select=id&limit=1`);
@@ -653,13 +648,9 @@ export async function handleFormStatus(req: Request, site: SiteRow, id: string, 
   if (spamFlag !== null && email) await markSender(site.id, email, spamFlag).catch(() => {});
   // PP-1: acting on the lead resolves its follow-up nudge — so Today's card, the
   // bell, and the attention badge (all reading active notices) drop it at once.
-  // Keyed period=lead:<id>, this touches exactly this lead's notice, nothing else.
-  if ((status && leadFollowupResolvesOn(status)) || spamFlag === true) {
-    const k = leadFollowupNoticeKey(id);
-    await svc(`presence_plan_notices?site_id=eq.${site.id}&kind=eq.${k.kind}&period=eq.${k.period}&status=eq.active`, {
-      method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }),
-    }).catch(() => {});
-  }
+  // Keyed by this lead's periods (lead:<id>:<week>, and the once-only lead:<id>), this touches
+  // exactly this lead's nudges, nothing else (sales item 201's follow-up: every week's, not one).
+  if ((status && leadFollowupResolvesOn(status)) || spamFlag === true) await clearLeadFollowup(site.id, id);
   return json({ data: { ok: true } }, 200, cors);
 }
 
@@ -675,8 +666,7 @@ export async function handleFormDelete(site: SiteRow, id: string, cors: Record<s
   if (!(await removeFormFiles(filePathsOf(row.fields)))) return json({ error: 'files_kept', message: 'Its files couldn’t be removed just now, so the message stays. Try again in a moment.' }, 502, cors);
   const d = await svc(`presence_form_submissions?id=eq.${id}&site_id=eq.${site.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
   if (!d.ok) return json({ error: 'write_failed', message: 'That didn’t go through. Try again in a moment.' }, 502, cors);
-  const k = leadFollowupNoticeKey(id);
-  await svc(`presence_plan_notices?site_id=eq.${site.id}&kind=eq.${k.kind}&period=eq.${k.period}&status=eq.active`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).catch(() => {});
+  await clearLeadFollowup(site.id, id);
   return json({ data: { ok: true, deleted: true } }, 200, cors);
 }
 
