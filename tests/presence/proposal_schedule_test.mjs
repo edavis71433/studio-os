@@ -76,7 +76,7 @@ const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PA
   ok('pipeline.html mirrors the amounts and the words', cases.every((c) => JSON.stringify(mirror.schedAmounts(c, 123457)) === JSON.stringify(scheduleAmounts(c, 123457)) && c.every((p) => mirror.partWhen(p) === partWhen(p))));
   const presets = pipe.match(/const PAY_PRESETS=(\{.*?\});/);
   ok('pipeline.html: the ready-made splits are the same', !!presets && JSON.stringify(Function('return ' + presets[1])()) === JSON.stringify({ half: presetSchedule('half'), thirds: presetSchedule('thirds') }));
-  ok('pipeline.html: Save sends the parts, checked first; a template fills the editor', /if\(PARTS&&partsSum\(\)!==100\)\{toast\('The parts add up to '/.test(pipe) && /body\.schedule=collectSchedule\(\);if\(TPL_ID&&!rev\)body\.template_id=TPL_ID;/.test(pipe) && /data-tpl-fill=/.test(pipe));
+  ok('pipeline.html: Save sends the parts, checked first; a template fills the editor', /if\(PARTS&&partsSum\(\)!==100\)\{toast\('The parts add up to '/.test(pipe) && /body\.schedule=collectSchedule\(\);if\(TPL_ID&&!rev&&!edit\)body\.template_id=TPL_ID;/.test(pipe) && /data-tpl-fill=/.test(pipe));
 }
 
 // ═══ 5. project templates ═══

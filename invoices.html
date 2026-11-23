@@ -564,8 +564,8 @@ async function undoPayment(i,btn){
 }
 // ── sales item 162: change an unpaid invoice (the number is kept) ──
 let EDITING=null;
-const lineRow=(l)=>`<div class="eline"><input type="text" class="el-label" maxlength="200" placeholder="What for" value="${esc(l.label||'')}" aria-label="Line"><input type="number" class="el-qty" min="1" max="999" step="1" value="${Number(l.qty)||1}" aria-label="Quantity"><input type="text" class="el-amt" inputmode="decimal" value="${((Number(l.amount_cents)||0)/100).toFixed(2)}" aria-label="Amount"><button type="button" class="x" aria-label="Remove this line">×</button></div>`;
-function editLines(){return [...document.querySelectorAll('#editLines .eline')].map(r=>({label:r.querySelector('.el-label').value.trim(),qty:Math.max(1,Math.trunc(Number(r.querySelector('.el-qty').value)||1)),amount_cents:Math.round(parseFloat(String(r.querySelector('.el-amt').value).replace(/[^0-9.\-]/g,'')||'0')*100)}));}
+const lineRow=(l)=>`<div class="eline"><input type="text" class="el-label" maxlength="200" placeholder="What for" value="${esc(l.label||'')}" aria-label="Line"><input type="number" class="el-qty" min="0.25" max="999" step="0.25" value="${Number(l.qty)||1}" aria-label="Quantity"><input type="text" class="el-amt" inputmode="decimal" value="${((Number(l.amount_cents)||0)/100).toFixed(2)}" aria-label="Amount"><button type="button" class="x" aria-label="Remove this line">×</button></div>`;
+function editLines(){return [...document.querySelectorAll('#editLines .eline')].map(r=>({label:r.querySelector('.el-label').value.trim(),qty:Number(r.querySelector('.el-qty').value)||1,amount_cents:Math.round(parseFloat(String(r.querySelector('.el-amt').value).replace(/[^0-9.\-]/g,'')||'0')*100)}));}
 function editSum(){const a=$('editAmt');if(!$('editLinesWrap').hidden){const sum=editLines().reduce((n,l)=>n+(Number.isFinite(l.amount_cents)?l.amount_cents:0),0);a.value=(sum/100).toFixed(2);}}
 function openEdit(i,back){
   EDITING={i,back};

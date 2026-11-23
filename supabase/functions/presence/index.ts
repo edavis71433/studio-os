@@ -38,7 +38,7 @@ import { handleGetIdentity, handlePutIdentity } from './routes/identity.ts';
 import { handlePreview, handlePreviewSection } from './routes/preview.ts';
 import { handlePreviewStatus, handlePreviewPublish, handlePreviewPromote, handlePreviewSettings, handlePublicPreview, handlePublicPreviewOpen, handleSignedPreview, handlePreviewShareLink } from './routes/preview_env.ts';
 import { handleDealTasksList, handleDealTaskCreate, handleDealTaskUpdate, handleSalesDeleted, handleSalesRestoreDeal, handlePeopleCheck } from './routes/sales.ts';
-import { handleSalesSummary, handleSalesMyTasks, handleSalesReports, handleSalesViews, handleSalesStages, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactRestore, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesDealSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesInvoiceVoid, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
+import { handleSalesSummary, handleSalesMyTasks, handleSalesReports, handleSalesViews, handleSalesStages, handleSalesReceivables, handleSalesContacts, handleSalesContact, handleSalesContactRestore, handleSalesContactFields, handleSalesDeals, handleSalesDeal, handleSalesDealStage, handleSalesDealActivity, handleSalesProposalCreate, handleSalesProposalSend, handleSalesDealSend, handleSalesProposalRevise, handleSalesProposalDecide, handleSalesProposalDelete, handleSalesContractCreate, handleSalesContractSend, handleSalesContractSign, handleSalesContractDelete, handleSalesContractWithdraw, handleSalesProposalEdit, handleSalesConvert, handleSalesResendInvite, handleSalesAddCustomer, handleSalesInvoice, handleSalesSchedule, handleSalesInvoiceSend, handleSalesInvoiceVoid, handleSalesRetainer, handleSalesRetainerCancel, handleSalesContractTerm, handleSalesTemplates, handleSalesTemplateDelete, handleSalesServices, handleSalesPublicView, handleSalesDocument, handleSalesDocumentLink } from './routes/sales.ts';
 import { handleProjects, handleProject, handleProjectReport, handleProjectsProgress, handleProjectStatus, handleTasksCreate, handleTask, handleProjectChecklist, handleMilestonesCreate, handleMilestone, handleProjectTemplates } from './routes/projects.ts';
 import { handleDeliverableUploadUrl, handleDeliverablesCreate, handleDeliverable, handleDeliverableDownload, handleApprovalsCreate, handleApprovalDecide } from './routes/project_delivery.ts';
 import { handleMessages, handleNotifications, handleNotificationsRead, handleProjectClientMessages, handleThreadRead } from './routes/project_comms.ts';
@@ -70,7 +70,7 @@ const { handleReadyPages, handlePageFromSaved } = lazyRoutes(() => import('./rou
 import { handleCrmRecord, handleCrmMessages, handleCrmActivity, handleCrmSearch, handleCrmProfile, handleCrmTimeline, handleCrmNotesList, handleCrmNoteAdd, handleCrmNoteDelete, handleCrmNotePin } from './routes/crm.ts';
 const { handleEmailSending } = lazyRoutes(() => import('./routes/email_sending.ts'));
 import { handleSalesExport } from './routes/sales_export.ts';   // sales review item 69: Download my data
-import { handleEstimateCreate, handleEstimateSend, handleEstimateDecide, handleEstimateDelete, handleEstimateToProposal, handleEstimateToInvoice } from './routes/estimates.ts';   // sales review item 47
+import { handleEstimateCreate, handleEstimateSend, handleEstimateDecide, handleEstimateDelete, handleEstimateToProposal, handleEstimateToInvoice, handleEstimateEdit, handleEstimateRevise } from './routes/estimates.ts';   // sales review item 47
 import { handleRecurringStart, handleRecurringChange, handleRecurringAction } from './routes/recurring_invoices.ts';   // sales review item 47
 import { handleInvoicePayment, handleInvoicePaymentUndo } from './routes/invoice_payments.ts';   // sales review item 77
 import { handleEmailLogAddress } from './routes/email_log.ts';   // sales review item 69: the log-this-email address   // sales review item 69: the sending-domain line
@@ -925,6 +925,9 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   }
   if (route === '/sales/receivables' && method === 'GET') return handleSalesReceivables(req, site, principal, cors);
   if (route === '/sales/invoices' && method === 'GET') return (await import('./routes/invoices_list.ts')).handleSalesInvoicesList(req, site, cors);   // sales item 85: the Invoices page
+  // sales item 180: the Documents page (every proposal, estimate and agreement) and its Remind, once per document
+  if (route === '/sales/documents' && method === 'GET') return (await import('./routes/documents_list.ts')).handleDocumentsList(req, site, cors);
+  if (route === '/sales/documents/remind' && method === 'POST') return (await import('./routes/documents_list.ts')).handleDocumentRemind(req, site, principal, cors);
   if (route === '/sales/money-home' && method === 'GET') return (await import('./routes/money_home.ts')).handleMoneyHome(req, site, principal, cors);   // sales item 173: the money wall's months and Stripe strip
   if (route === '/sales/deals') return handleSalesDeals(req, site, principal, cors);
   if (route === '/sales/deleted' && method === 'GET') return handleSalesDeleted(site, cors, principal);   // sales item 83: Recently deleted (item 186: your removed logs too)
@@ -1035,12 +1038,16 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (m && method === 'POST') return handleSalesProposalRevise(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/send$/);
     if (m && method === 'POST') return handleSalesContractSend(req, site, principal, m[1], cors);
+    // sales item 181: take back a sent agreement nobody has signed (it reads Withdrawn; the link refuses)
+    m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})\/withdraw$/);
+    if (m && method === 'POST') return handleSalesContractWithdraw(site, principal, m[1], cors);
     // Remove a draft that was never sent — the mistaken duplicate. A SOFT delete,
     // and only ever on status='draft': once something is sent, decided or signed
     // it is the record between studio and client and the handler refuses (409).
     // Studio-gated & site-scoped like every authed /sales/* route above.
     m = route.match(/^\/sales\/proposals\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleSalesProposalDelete(site, principal, m[1], cors);
+    if (m && method === 'PATCH') return handleSalesProposalEdit(req, site, principal, m[1], cors);   // sales item 183: change a draft in place
     m = route.match(/^\/sales\/contracts\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleSalesContractDelete(site, principal, m[1], cors);
     // Mint the printable Document-of-Record URL for the deal drawer (proposal /
@@ -1052,10 +1059,11 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     //    every authed /sales/* route; the client's answer is pre-auth above. ──
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/estimates$/);
     if (m && method === 'POST') return handleEstimateCreate(req, site, principal, m[1], cors);
-    m = route.match(/^\/sales\/estimates\/([0-9a-f-]{36})\/(send|proposal|invoice)$/);
-    if (m && method === 'POST') return m[2] === 'send' ? handleEstimateSend(req, site, principal, m[1], cors) : m[2] === 'proposal' ? handleEstimateToProposal(req, site, principal, m[1], cors) : handleEstimateToInvoice(req, site, principal, m[1], cors);
+    m = route.match(/^\/sales\/estimates\/([0-9a-f-]{36})\/(send|proposal|invoice|revise)$/);
+    if (m && method === 'POST') return m[2] === 'send' ? handleEstimateSend(req, site, principal, m[1], cors) : m[2] === 'proposal' ? handleEstimateToProposal(req, site, principal, m[1], cors) : m[2] === 'revise' ? handleEstimateRevise(req, site, principal, m[1], cors) : handleEstimateToInvoice(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/estimates\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') return handleEstimateDelete(site, principal, m[1], cors);
+    if (m && method === 'PATCH') return handleEstimateEdit(req, site, principal, m[1], cors);   // sales item 183: change a draft in place
     m = route.match(/^\/sales\/deals\/([0-9a-f-]{36})\/recurring$/);
     if (m && method === 'POST') return handleRecurringStart(req, site, principal, m[1], cors);
     m = route.match(/^\/sales\/recurring\/([0-9a-f-]{36})$/);

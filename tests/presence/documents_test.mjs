@@ -47,7 +47,10 @@ const XSS = '<script>alert(1)</script>';
   ok('signed contract renders a certificate of record', con.includes('Certificate of record') && con.includes('Signed agreement'));
   ok('certificate shows the typed signer + UTC timestamp', con.includes('Dana Lee') && con.includes('2026-07-11 14:03:22 UTC'));
   ok('certificate shows the content_hash fingerprint', con.includes(HASH));
-  ok('certificate shows the stored signing evidence (hashed IP)', con.includes('a1b2c3d4'));
+  // sales item 184: the scrambled address helped no one; a signature from before the real one was kept says so
+  ok('certificate says where it was signed from: an older signature says it was not kept, never the scrambled address', con.includes('Not kept: this was signed before Studio OS kept the internet address and browser') && !con.includes('a1b2c3d4'));
+  const kept = renderContractDocument({ title: 'Service agreement', body: 'x', status: 'signed', signer_name: 'Dana Lee', signed_at: '2026-07-11T14:03:22.511Z', content_hash: HASH, signed_evidence: {}, sign_evidence: { ip: '203.0.113.9', user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15' } }, brand);
+  ok('certificate prints the internet address and browser kept with the signature', kept.includes('203.0.113.9') && kept.includes('Safari on Mac'));
   ok('renders the exact executed body', con.includes('The whole agreement text.'));
   // an UNSIGNED contract must NOT read as an executed record
   const draft = renderContractDocument({ title: 'x', body: 'draft body', status: 'sent', content_hash: HASH }, brand);

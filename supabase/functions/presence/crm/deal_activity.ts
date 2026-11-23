@@ -126,6 +126,9 @@ export function dealChanges(before: Record<string, unknown>, patch: Record<strin
 }
 /** One change line in words. `year` is the line's own year, so a date in it reads "Nov 3". Pure. */
 export function dealChangeLine(d: any, year?: string): string {
+  // sales items 180, 179: what Studio OS did with the deal's documents
+  if (d?.change === 'reminded') return `Reminder sent for the ${d.what === 'contract' ? 'agreement' : String(d.what || 'document')}`;
+  if (d?.change === 'extra_work') return 'Extra work estimate drafted' + (d.title ? ': ' + String(d.title) : '');
   if (d?.change === 'step_done') return 'Done: ' + String(d.step || 'the next step');
   if (d?.change === 'value') {
     const from = usd(d.from), to = usd(d.to);
@@ -136,6 +139,16 @@ export function dealChangeLine(d: any, year?: string): string {
     return from && to ? `Close date moved from ${from} to ${to}` : to ? `Close date set to ${to}` : from ? `Close date cleared (it was ${from})` : 'Close date changed';
   }
   if (d?.change === 'owner') return 'Owner changed';   // the page names them: only it knows the team's names
+  // sales items 181, 182: what Studio OS did with the deal's documents
+  if (d?.change === 'withdrawn' && d.what === 'agreement') return 'Agreement taken back to update it' + (d.title ? ': ' + String(d.title) : '');
+  if (d?.change === 'withdrawn' || d?.change === 'restored') {
+    const many = (k: unknown, w: string) => { const x = Math.trunc(Number(k) || 0); return x <= 0 ? '' : x === 1 ? `the ${w}` : `${x} ${w}s`; };
+    const parts = [many(d.proposals, 'proposal'), many(d.estimates, 'estimate'), many(d.agreements, 'agreement')].filter(Boolean);
+    const count = (Number(d.proposals) || 0) + (Number(d.estimates) || 0) + (Number(d.agreements) || 0);
+    const list = parts.length > 1 ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1] : (parts[0] || 'its open documents');
+    const said = list.charAt(0).toUpperCase() + list.slice(1) + (count === 1 ? ' was' : ' were');
+    return d.change === 'restored' ? `${said} put back out, with the deal` : `${said} withdrawn: the deal closed as Not a fit`;
+  }
   return 'Deal changed';
 }
 

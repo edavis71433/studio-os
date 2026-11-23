@@ -9,7 +9,7 @@
 //
 // Pure: no I/O and no clock (callers pass the time). routes/estimates.ts does the rest.
 
-export type EstimateStatus = 'draft' | 'sent' | 'approved' | 'declined';
+export type EstimateStatus = 'draft' | 'sent' | 'approved' | 'declined' | 'withdrawn';
 export type EstimateDecision = 'approved' | 'declined';
 
 export const ESTIMATE_TTL_DAYS = 30;
@@ -18,9 +18,17 @@ export const ESTIMATE_DEFAULT_TITLE = 'Estimate';
 export function isEstimateDecision(d: unknown): d is EstimateDecision {
   return d === 'approved' || d === 'declined';
 }
-/** Only a sent estimate can be answered, and only once. */
+/** Only a sent estimate can be answered. Sales item 183: a "Not now" can still become a yes
+ *  (approve from declined), never the other way round. */
 export function canDecideEstimate(status: unknown, decision: unknown): boolean {
-  return status === 'sent' && isEstimateDecision(decision);
+  if (decision === 'approved') return status === 'sent' || status === 'declined';
+  return status === 'sent' && decision === 'declined';
+}
+/** Sales item 183: which estimates Revise can make the next version of: one sent (also past its
+ *  date), one they said Not now to, or one withdrawn when its deal closed. Not a draft (Edit it)
+ *  and not an approved one (it becomes a proposal or an invoice). Pure. */
+export function canReviseEstimate(status: unknown): boolean {
+  return status === 'sent' || status === 'declined' || status === 'withdrawn';
 }
 /** An estimate past its 30 days can't be approved (Not now still works). */
 export function estimateExpired(e: { expires_at?: unknown } | null | undefined, nowIso: string): boolean {
@@ -30,9 +38,9 @@ export function estimateExpiresAt(nowMs: number): string {
   return new Date(nowMs + ESTIMATE_TTL_DAYS * 86400_000).toISOString();
 }
 /** Where it stands, in one word the deal page and the client page both use. */
-export function estimateState(e: { status?: unknown; expires_at?: unknown } | null | undefined, nowIso: string): 'draft' | 'open' | 'expired' | 'approved' | 'declined' {
+export function estimateState(e: { status?: unknown; expires_at?: unknown } | null | undefined, nowIso: string): 'draft' | 'open' | 'expired' | 'approved' | 'declined' | 'withdrawn' {
   const s = String(e?.status || 'draft');
-  if (s === 'approved' || s === 'declined' || s === 'draft') return s;
+  if (s === 'approved' || s === 'declined' || s === 'draft' || s === 'withdrawn') return s;
   return estimateExpired(e, nowIso) ? 'expired' : 'open';
 }
 /** The deal history line. Mirrored by hand in pipeline.html's evtLabel. */

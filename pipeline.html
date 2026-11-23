@@ -304,6 +304,7 @@ html.dds-embed #detailWrap{padding-top:0}
   .dbody{padding:var(--dds-s5,20px) var(--dds-s5,20px);max-height:64vh;overflow:auto}
   .sec{margin-top:var(--dds-s4,16px)}.sec h3{font-size:12px;color:var(--faint);margin-bottom:var(--dds-s2,8px)}
   .row2{display:flex;gap:var(--dds-s2,8px);flex-wrap:wrap;align-items:center;margin-top:var(--dds-s2,8px)}
+  .row2[hidden]{display:none}   /* sales item 182: a Not a fit deal's makers fold away */
   /* the "More ▾" beside the one send button (same shape as crm.html's action bar menu) */
   .more{position:relative;display:inline-block}
   .more-menu{position:absolute;top:calc(100% + 4px);left:0;z-index:5;min-width:220px;background:var(--card,var(--bg));border:1px solid var(--line);border-radius:var(--dds-r-lg,10px);box-shadow:var(--dds-shadow-pop,0 8px 28px rgba(21,20,26,.12));padding:var(--dds-s1,4px);display:flex;flex-direction:column;gap:2px}
@@ -721,7 +722,10 @@ const money0=(c)=>ddsMoney(c||0);
 // client's public view exactly (subtotal − discount + tax, never negative).
 const PROP_META='__meta__';
 const splitPropLI=(raw)=>{const a=Array.isArray(raw)?raw:[];const items=a.filter(el=>!(el&&typeof el==='object'&&PROP_META in el));const me=a.find(el=>el&&typeof el==='object'&&PROP_META in el);return{items,meta:(me&&me[PROP_META])||{}};};
-const propTotals=(raw)=>{const {items,meta}=splitPropLI(raw);const sub=items.reduce((n,i)=>n+Math.max(0,Math.trunc(i.qty)||0)*Math.max(0,Math.trunc(i.unit_cents)||0),0);let disc=0;if(meta.discount){disc=meta.discount.mode==='percent'?Math.round(sub*Math.min(100,Math.max(0,meta.discount.value))/100):Math.trunc(meta.discount.value);}disc=Math.max(0,Math.min(disc,sub));const post=sub-disc;const tp=(meta.tax_pct!=null&&isFinite(+meta.tax_pct))?Math.min(100,Math.max(0,+meta.tax_pct)):0;const tax=Math.round(post*tp/100);return{items,meta,subtotal:sub,discount:disc,tax:tax,total:Math.max(0,post+tax)};};
+// sales item 185 (mirrors lib/sales_lifecycle.ts quarterQty and lineCents): halves and quarters, each line rounded to the cent once
+const qtyQ=(v)=>{if(v===''||v==null)return null;const n=Number(v);if(!isFinite(n))return null;const q=Math.round(n*4);return Math.abs(n*4-q)>1e-6?null:q/4;};
+const lineC=(q,u)=>Math.max(0,Math.round(Math.max(0,qtyQ(q)??(Math.round((Number(q)||0)*4)/4))*Math.max(0,Math.trunc(Number(u))||0)));
+const propTotals=(raw)=>{const {items,meta}=splitPropLI(raw);const sub=items.reduce((n,i)=>n+lineC(i.qty,i.unit_cents),0);let disc=0;if(meta.discount){disc=meta.discount.mode==='percent'?Math.round(sub*Math.min(100,Math.max(0,meta.discount.value))/100):Math.trunc(meta.discount.value);}disc=Math.max(0,Math.min(disc,sub));const post=sub-disc;const tp=(meta.tax_pct!=null&&isFinite(+meta.tax_pct))?Math.min(100,Math.max(0,+meta.tax_pct)):0;const tax=Math.round(post*tp/100);return{items,meta,subtotal:sub,discount:disc,tax:tax,total:Math.max(0,post+tax)};};
 // sales item 106: a proposal paid in parts (mirrors lib/proposal_schedule.ts scheduleAmounts and partWhen by hand;
 // tests/presence/proposal_schedule_test.mjs runs both against each other)
 function schedAmounts(parts,total){const t=Math.max(0,Math.trunc(Number(total))||0);const out=parts.map(p=>Math.floor(t*p.pct/100));if(out.length)out[out.length-1]=t-out.slice(0,-1).reduce((n,x)=>n+x,0);return out;}
@@ -3456,10 +3460,10 @@ async function openDeal(id){
       const T=propTotals(p.line_items);
       const superseded=!!(T.meta&&T.meta.superseded_by);
       const ver=(p.version&&p.version>1)?` <span class="mut">v${p.version}</span>`:'';
-      const chip=superseded?`<span class="stage lost">Superseded</span>`:p.status==='accepted'?`<span class="stage won">Accepted ✓</span>`:p.status==='declined'?`<span class="stage lost">Declined</span>`:p.status==='sent'?`<span class="stage">Sent — awaiting decision</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
+      const chip=superseded?`<span class="stage lost">Superseded</span>`:p.status==='accepted'?`<span class="stage won">Accepted ✓</span>`:p.status==='declined'?`<span class="stage lost">Declined</span>`:p.status==='withdrawn'?`<span class="stage lost">Withdrawn</span>`:p.status==='sent'?`<span class="stage">Sent — awaiting decision</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
       // A sent/declined proposal that hasn't already been replaced can be revised
       // into a fresh vN+1 (renegotiation), which supersedes this one.
-      const canRevise=!superseded&&(p.status==='sent'||p.status==='declined');
+      const canRevise=!superseded&&d.stage!=='lost'&&(p.status==='sent'||p.status==='declined'||p.status==='withdrawn');   // sales item 182: a withdrawn one once the deal is reopened
       // Phase 3 (stage-aware): a won or lost deal never pushes an unsent draft —
       // the draft stays viewable, the Send button goes.
       const closed=d.stage==='won'||d.stage==='lost'||!!d.converted_client_id;
@@ -3469,6 +3473,7 @@ async function openDeal(id){
       // meant to overwrite) can simply go. The moment it IS sent it becomes part
       // of the record and this control disappears — the SAME condition DELETE
       // /sales/proposals/:id enforces, so the page never offers a refused action.
+      const editP=p.status==='draft'&&dealOpen?`<button class="btn ghost" data-edit-prop="${p.id}" title="Change this draft before it goes out">Edit</button>`:'';   // sales item 183
       const del=p.status==='draft'?`<button class="btn ghost" data-needs="delete" data-del-prop="${p.id}" title="Remove this draft — it was never sent, so nothing the client saw changes" aria-label="Delete draft proposal ${esc(p.title||'Proposal')}">Delete</button>`:'';
       // viewed-tracking + expiry (#205): tell the operator whether the prospect opened
       // it and when it lapses. first_viewed_at/expires_at are null before migration 0107.
@@ -3477,9 +3482,11 @@ async function openDeal(id){
       if(p.expires_at){const exp=new Date(p.expires_at);vbits.push(exp.getTime()<Date.now()?svgi('hourglass')+' Expired':'Expires '+exp.toLocaleDateString('en-US',exp.getFullYear()===new Date().getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'}));}   // sales item 194: "Dec 8", like the rest of the page
       // sales item 88: a decline says what would make it a yes (the client's own words, from their page)
       if(p.status==='declined'&&declineWords(p.decided_reason,p.decided_note))vbits.push('Why: '+esc(declineWords(p.decided_reason,p.decided_note)));
+      if(p.status==='accepted'&&p.decided_name)vbits.push('Accepted by '+esc(p.decided_name));   // sales item 184
+      if(p.status==='withdrawn'&&p.withdrawn_at)vbits.push('Withdrawn '+esc(niceDay(p.withdrawn_at))+(p.withdrawn_why==='not_a_fit'?' when the deal closed as Not a fit':''));
       {const sch=splitPropLI(p.line_items).meta.schedule;if(Array.isArray(sch)&&sch.length)vbits.push('Paid in '+sch.length+' parts');}   // sales item 106
-      const vnote=(vbits.length&&(p.status==='sent'||p.status==='declined'||p.status==='accepted'||p.status==='draft'))?`<div class="mut" style="font-size:12px;margin-top:2px">${vbits.join(' · ')}</div>`:'';
-      return `<div class="row2 lr"><span class="mut">${esc(p.title||'Proposal')}${ver} — ${money0(T.total)} ${chip}</span><span>${act}${revise}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button>${del}</span>${vnote}${(p.status==='sent'&&!superseded)?linkNote('proposal',p.id,'link'):''}</div>`;
+      const vnote=(vbits.length&&(p.status==='sent'||p.status==='declined'||p.status==='accepted'||p.status==='draft'||p.status==='withdrawn'))?`<div class="mut" style="font-size:12px;margin-top:2px">${vbits.join(' · ')}</div>`:'';
+      return `<div class="row2 lr"><span class="mut">${esc(p.title||'Proposal')}${ver} — ${money0(T.total)} ${chip}</span><span>${act}${revise}<button class="btn ghost" data-doc-prop="${p.id}" title="Open a branded, printable copy (save as PDF)">View / print</button><button class="btn ghost" data-tpl-prop="${p.id}" title="Save these line items to reuse on future deals">Save as template</button>${editP}${del}</span>${vnote}${(p.status==='sent'&&!superseded)?linkNote('proposal',p.id,'link'):''}</div>`;
     }).join('')||'<div class="mut">No proposals yet.</div>';
     // item 47: estimates — a price before anything is agreed. Approve or Not now on
     // the client's own page; Turn into a proposal / Bill it as an invoice make
@@ -3489,17 +3496,22 @@ async function openDeal(id){
     const ests=(data.estimates||[]).map(e=>{
       const T=propTotals(e.line_items);
       const expired=e.status==='sent'&&e.expires_at&&new Date(e.expires_at).getTime()<Date.now();
-      const chip=e.status==='approved'?`<span class="stage won">Approved ✓</span>`:e.status==='declined'?`<span class="stage lost">Not now</span>`:expired?`<span class="stage lost">Expired</span>`:e.status==='sent'?`<span class="stage">Sent — waiting for their answer</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
+      const eReplaced=!!(propTotals(e.line_items).meta||{}).superseded_by;   // sales item 183: a newer version replaced it
+      const chip=eReplaced?`<span class="stage lost">Replaced</span>`:e.status==='approved'?`<span class="stage won">Approved ✓</span>`:e.status==='declined'?`<span class="stage lost">Not now</span>`:e.status==='withdrawn'?`<span class="stage lost">Withdrawn</span>`:expired?`<span class="stage lost">Expired</span>`:e.status==='sent'?`<span class="stage">Sent — waiting for their answer</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
       const send=e.status==='draft'?`<button class="btn ghost" data-send-est="${e.id}">Send${forWhom} →</button> `:(e.status==='sent'&&!expired)?`<button class="btn ghost" data-link-est="${e.id}">Copy link</button> `:'';
-      const turn=(e.status==='draft'||e.proposal_id||e.invoice_id)?'':`<button class="${fillIf(BILL_PRIMARY==='est:'+e.id)}" data-est-prop="${e.id}">Turn into a proposal</button> <button class="btn ghost" data-est-inv="${e.id}">Bill it as an invoice</button> `;
+      // sales item 183: Edit a draft, Revise one sent, past its date, said Not now to, or withdrawn (once the deal is reopened)
+      const eEdit=(e.status==='draft'&&dealOpen)?`<button class="btn ghost" data-edit-est="${e.id}" title="Change this draft before it goes out">Edit</button> `:'';
+      const eRev=(!eReplaced&&d.stage!=='lost'&&(e.status==='sent'||e.status==='declined'||e.status==='withdrawn'))?`<button class="btn ghost" data-revise-est="${e.id}" title="Make a new version to send; this one is kept and marked replaced">Revise →</button> `:'';
+      const turn=(e.status==='draft'||e.status==='withdrawn'||eReplaced||e.proposal_id||e.invoice_id)?eEdit+eRev:eRev+`<button class="${fillIf(BILL_PRIMARY==='est:'+e.id)}" data-est-prop="${e.id}">Turn into a proposal</button> <button class="btn ghost" data-est-inv="${e.id}">Bill it as an invoice</button> `;
       const del=e.status==='draft'?`<button class="btn ghost" data-needs="delete" data-del-est="${e.id}" title="Remove this draft — it was never sent" aria-label="Delete draft estimate ${esc(e.title||'Estimate')}">Delete</button>`:'';
       const bits=[];
       if(e.first_viewed_at)bits.push(svgi('eye')+' Opened '+ago(e.first_viewed_at));else if(e.status==='sent')bits.push('Not opened yet');
       if(e.status==='sent'&&e.expires_at&&!expired)bits.push('Good until '+esc(niceDay(e.expires_at)));
+      if(e.status==='approved'&&e.decided_name)bits.push('Approved by '+esc(e.decided_name));   // sales item 183
       if(e.decided_note)bits.push('Their note: “'+esc(e.decided_note)+'”');
       if(e.proposal_id)bits.push('Turned into a proposal');else if(e.invoice_id)bits.push('Billed as an invoice');
       const sub=bits.length?`<div class="mut" style="font-size:12px;margin-top:2px;flex-basis:100%">${bits.join(' · ')}</div>`:'';
-      return `<div class="row2 lr" data-est="${e.id}"><span class="mut">${esc(e.title||'Estimate')} — ${money0(T.total)} ${chip}</span><span>${send}${turn}<button class="btn ghost" data-doc-est="${e.id}" title="Open a branded, printable copy (save as PDF)">View / print</button>${del}</span>${sub}${(e.status==='sent'&&!expired)?linkNote('estimate',e.id,'link'):''}</div>`;
+      return `<div class="row2 lr" data-est="${e.id}"><span class="mut">${esc(e.title||'Estimate')}${Number(e.version)>1?` <span class="mut">v${Number(e.version)}</span>`:''} — ${money0(T.total)} ${chip}</span><span>${send}${turn}<button class="btn ghost" data-doc-est="${e.id}" title="Open a branded, printable copy (save as PDF)">View / print</button>${del}</span>${sub}${(e.status==='sent'&&!expired)?linkNote('estimate',e.id,'link'):''}</div>`;
     }).join('')||'<div class="mut">A price before anything is agreed. They can approve it or say not now — nothing is charged.</div>';
     // item 47: recurring invoices — a fresh bill on a schedule that the client
     // pays themselves (the retainer above charges their card for them)
@@ -3516,9 +3528,9 @@ async function openDeal(id){
     const propTplBtns=propTpls.map(t=>`<button class="btn ghost" data-use-ptpl="${t.id}" title="Draft a proposal from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-needs="delete" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
     const cons=(data.contracts||[]).map(k=>{
       const signed=k.status==='signed';
-      const chip=signed?`<span class="stage won">Signed ✓</span>`:k.status==='sent'?`<span class="stage">Sent — awaiting signature</span>`:`<span class="stage lost">Draft — not sent yet</span>`;
+      const chip=signed?`<span class="stage won">Signed ✓</span>`:k.status==='sent'?`<span class="stage">Sent — awaiting signature</span>`:k.status==='voided'?`<span class="stage lost">Withdrawn</span>`:`<span class="stage lost">Draft — not sent yet</span>`;   // sales item 181
       const meta=signed&&k.signer_name?` — signed by ${esc(k.signer_name)}${k.countersigned_name?' and by '+esc(k.countersigned_name)+' for you':''}${k.signed_at?(' on '+esc(new Date(k.signed_at).toLocaleDateString())):''}`:'';   // sales item 88: both signatures
-      const act=k.status==='draft'?(SEND_BOTH?'':`<button class="${fillIf(BILL_PRIMARY==='con:'+k.id)}" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `):k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> `:'';
+      const act=k.status==='draft'?(SEND_BOTH?'':`<button class="${fillIf(BILL_PRIMARY==='con:'+k.id)}" data-send-contract="${k.id}">Send${forWhom} for signature →</button> `):k.status==='sent'?`<button class="btn ghost" data-link-contract="${k.id}">Copy signing link</button> <button class="btn ghost" data-needs="delete" data-withdraw-con="${k.id}" title="Take it back to change it: the client’s link says you’re updating it and it can’t be signed">Take it back</button> `:'';
       const docBtn=`<button class="btn ghost" data-doc-con="${k.id}" title="Open a branded, printable copy (save as PDF)">${signed?'View / print signed copy':'View / print'}</button>`;
       // Same rule as the proposal, and it matters more here: sent means someone
       // holds a signing link, and a signature is permanent. Draft only.
@@ -3537,7 +3549,8 @@ async function openDeal(id){
       }
       const termHint=(signed&&!termEnd)?`<div class="mut" style="font-size:12px;margin-top:6px;color:var(--warn,#775d31)">${svgi('clock')} No renewal date — the renewal reminder can’t arm.${termDefault?` This agreement reads as a ${termMonths}-month term, so ${esc(termDefault)} is filled in below — press Save to confirm it (nothing is set until you do).`:' Add one below and we’ll nudge you before it ends.'}</div>`:'';
       const renewRow=signed?`${termHint}<div class="row2" style="margin-top:6px;align-items:center"><label class="mut" for="con-term-${k.id}" style="margin:0">Renewal date (optional)</label><input type="date" id="con-term-${k.id}" value="${esc(termEnd||termDefault)}" style="max-width:170px"><button class="btn ghost" data-set-term="${k.id}">Save</button></div><div class="mut" style="font-size:12px;margin-top:2px">We’ll remind you ~30 and ~7 days before it ends — nothing auto-renews.</div>`:'';
-      return `<div class="row2 lr"><span class="mut">${esc(k.title||'Agreement')} ${chip}${meta}</span><span>${act}${docBtn}<button class="btn ghost" data-tpl-con="${k.id}" title="Save this agreement text to reuse on future deals">Save as template</button>${del}</span>${k.status==='sent'?linkNote('contract',k.id,'signing link'):''}</div>${renewRow}`;
+      const back=k.status==='voided'&&k.withdrawn_at?` <span class="mut" style="font-size:12px">· taken back ${esc(niceDay(k.withdrawn_at))}${k.withdrawn_why==='not_a_fit'?' when the deal closed as Not a fit':' to update it'}</span>`:'';
+      return `<div class="row2 lr"><span class="mut">${esc(k.title||'Agreement')} ${chip}${meta}${back}</span><span>${act}${docBtn}<button class="btn ghost" data-tpl-con="${k.id}" title="Save this agreement text to reuse on future deals">Save as template</button>${del}</span>${k.status==='sent'?linkNote('contract',k.id,'signing link'):''}</div>${renewRow}`;
     }).join('')||'<div class="mut">No agreement yet.</div>';
     const conTplBtns=conTpls.map(t=>`<button class="btn ghost" data-use-ctpl="${t.id}" title="Draft an agreement from this saved template">Use “${esc(t.name)}”</button><button class="btn ghost" data-needs="delete" data-del-tpl="${t.id}" title="Remove this saved template" aria-label="Remove saved template ${esc(t.name)}" style="padding-left:8px;padding-right:8px">✕</button>`).join('');
     const draftContract=(data.contracts||[]).find(k=>k.status==='draft'); // saved but not sent
@@ -3641,6 +3654,9 @@ async function openDeal(id){
           <input id="ed-close" type="date" value="${esc(d.expected_close||'')}" style="padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
           <label class="mut" for="ed-found" style="display:block;margin-top:8px">How did they find you?</label>
           <select id="ed-found" class="dds-pick">${foundOpts(d.found_via)}</select>
+          <label class="mut" for="ed-rounds" style="display:block;margin-top:8px">Rounds of changes included</label>
+          <input id="ed-rounds" type="number" min="0" max="20" step="1" inputmode="numeric" value="${d.revision_rounds!=null?esc(String(d.revision_rounds)):''}" placeholder="Not counted" style="width:160px;padding:8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit">
+          <div class="mut" id="ed-rounds-line" style="font-size:12px;margin-top:2px">${data.rounds&&data.rounds.line?esc(data.rounds.line)+'. ':''}Your agreement says how many. Each Request changes in their portal uses one; past the last, a request becomes an Extra work estimate to price.</div>
           <label class="mut" for="ed-next" style="display:block;margin-top:8px">Next step</label>
           <div class="row2"><input type="text" id="ed-next" placeholder="e.g. Call Friday about the proposal" value="${esc(d.next_step||'')}" style="flex:1"><input type="date" id="ed-nextat" value="${esc(d.next_step_at||'')}" style="max-width:160px" aria-label="Next step date"></div>
           <label class="mut" for="ed-notes-${d.id}" style="display:block;margin-top:8px">Notes</label>
@@ -3662,11 +3678,12 @@ async function openDeal(id){
           <div class="sec"><h3>Latest<button type="button" class="hlink" data-goto-tab="activity">Activity →</button></h3>${latestHtml}</div>
         </aside></div></div>
         ${dpanel('billing')}
+        ${d.stage==='lost'?`<div class="sec" id="lostFold"><h3>Closed as Not a fit</h3><div class="mut">What was still out was withdrawn, so the client’s links say it’s closed. To send anything new, reopen the deal first.</div><div class="row2" style="margin-top:8px"><button class="btn" data-stage="lead">Reopen this deal</button></div></div>`:''}
         ${SEND_BOTH?`<div class="sec" id="sendBoth"><h3>Ready to send</h3><div class="mut">The proposal and the agreement go out together — one email, one link. ${whoName} accepts, signs, then pays the deposit on one page.</div>
           <div class="row2" style="margin-top:8px"><button class="${fillIf(BILL_PRIMARY==='both')}" id="sendBothBtn" data-prop="${draftProp.id}" data-con="${draftCon.id}">Send proposal &amp; agreement${forWhom} →</button><span class="more"><button class="btn ghost" id="sendMore" aria-haspopup="true" aria-expanded="false" aria-controls="sendMoreMenu">More ▾</button><div class="more-menu" id="sendMoreMenu" hidden><button class="btn" data-send-proposal="${draftProp.id}">Send the proposal only</button><button class="btn" data-send-contract="${draftCon.id}">Send the agreement only</button><button class="btn" id="moreDeposit">Request a deposit</button></div></span></div></div>`:''}
-        ${Array.isArray(data.estimates)?`<div class="sec" id="estSec"><h3>Estimates</h3><div class="lrows">${ests}</div><div class="row2"><button class="btn ghost" id="addEst">+ Estimate</button></div><div id="estForm"></div></div>`:''}
-        <div class="sec"><h3>Proposals</h3><div class="lrows">${props}</div><div class="row2"><button class="${fillIf(BILL_PRIMARY==='addProp')}" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
-        <div class="sec"><h3>Agreement</h3><div class="lrows">${cons}</div><div class="row2"><button class="${fillIf(BILL_PRIMARY==='addCon')}" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
+        ${Array.isArray(data.estimates)?`<div class="sec" id="estSec"><h3>Estimates</h3><div class="lrows">${ests}</div><div class="row2"${d.stage==='lost'?' hidden':''}><button class="btn ghost" id="addEst">+ Estimate</button></div><div id="estForm"></div></div>`:''}
+        <div class="sec"><h3>Proposals</h3><div class="lrows">${props}</div><div class="row2"${d.stage==='lost'?' hidden':''}><button class="${fillIf(BILL_PRIMARY==='addProp')}" id="addProp">+ Proposal</button>${propTplBtns}<span style="flex:1"></span><button class="btn ghost" id="mngServices" title="Your services and prices — used to fill proposals fast">Manage services</button></div><div id="propForm"></div></div>
+        <div class="sec"><h3>Agreement</h3><div class="lrows">${cons}</div><div class="row2"${d.stage==='lost'?' hidden':''}><button class="${fillIf(BILL_PRIMARY==='addCon')}" id="addCon">+ Agreement</button>${conTplBtns}</div><div id="conForm"></div></div>
         <div class="sec"><h3>Invoice &amp; deposit</h3>
           <div class="lrows">${(data.invoices||[]).map(v=>{
             // Oct 2026 (item 2): the row's word is the money state — Paid · Processing ·
@@ -3690,14 +3707,14 @@ async function openDeal(id){
             return `<div class="row2 lr"><span class="mut">${name} — ${money(v.amount_cents)}${when}${backTxt}</span><span>${moneyChip(v)}${backBtns}${acts} <button class="btn ghost" data-doc-inv="${v.id}" title="Open a branded, printable copy (save as PDF)">View / print</button></span></div>`;}).join('')}</div>
           ${(()=>{const inv=(data.invoices||[]).filter(v=>v.status!=='void');const stages=inv.filter(v=>!v.payment_for).length;if(stages<2)return '';const sum=inv.reduce((a,b)=>a+(b.amount_cents||0),0);const paid=inv.filter(v=>invState(v)==='paid'||invState(v)==='refunded').reduce((a,b)=>a+Math.max(0,(b.amount_cents||0)-(b.refunded_cents||0)),0);return `<div class="mut" style="margin-top:4px">Payment plan: ${stages} stages · ${money(sum)} total${paid?' · '+money(paid)+' paid':''}</div>`;})()}
           <div class="mut" style="margin-top:6px">Send the client a secure payment link, or set up a plan — a deposit now with the balance on completion, or milestone installments.</div>
-          <div class="row2" style="margin-top:8px"><button class="btn ghost" id="sendInvoice">Send an invoice</button><button class="btn ghost" id="sendDeposit">Request a deposit</button><button class="btn ghost" id="setupPlan">Set up a payment schedule</button></div><div id="invForm"></div></div>
+          <div class="row2" style="margin-top:8px"${d.stage==='lost'?' hidden':''}><button class="btn ghost" id="sendInvoice">Send an invoice</button><button class="btn ghost" id="sendDeposit">Request a deposit</button><button class="btn ghost" id="setupPlan">Set up a payment schedule</button></div><div id="invForm"></div></div>
         <div class="sec"><h3>Retainer</h3>
-          ${(()=>{const r=d.retainer;if(r&&r.status&&r.status!=='canceled'){const per=r.interval==='year'?'year':'month';const st=r.status==='active'?'<span style="color:var(--good,#33664b);font-weight:700">Active</span>':r.status==='past_due'?'<span style="color:var(--bad,#a3423a);font-weight:700">Payment overdue</span>':'<span style="color:var(--warn,#775d31);font-weight:600">Awaiting the client’s authorization</span>';const copyLink=(r.status==='pending'&&r.checkout_url)?` <button class="btn ghost" data-copy-pay="${esc(r.checkout_url)}">Copy authorization link</button>`:'';const cardLink=((r.status==='active'||r.status==='past_due')&&r.stripe_customer_id)?`<button class="btn ghost" id="retCardLink" title="Email the client a link to Stripe’s page for a new card">Email the card link</button> `:'';const failed=r.status==='past_due'?`<div class="mut" style="margin-top:6px">The last charge didn’t go through. Stripe tries the card again over the next few days. ${cardLink?'Email the card link so the client can put in a new card on Stripe’s own page; they can also do it from their portal.':'The client can put in a new card once Stripe names their customer.'}</div>`:'';return `<div class="row2"><span class="mut"><strong>${money(r.amount_cents)}</strong> every ${per} · ${st}</span><span>${copyLink}${cardLink}<button class="btn ghost" id="cancelRetainer" data-needs="delete">Cancel retainer</button></span></div>${failed}`;}return `<div class="mut" style="margin-top:2px">Bill this client automatically for ongoing work — the same amount every month or year. They authorize it once with Stripe; nothing is charged until they do, and either of you can stop it any time.</div><div class="row2" style="margin-top:8px"><button class="btn ghost" id="setupRetainer">Set up a retainer</button></div><div id="retForm"></div>`;})()}
+          ${(()=>{const r=d.retainer;if(r&&r.status&&r.status!=='canceled'){const per=r.interval==='year'?'year':'month';const st=r.status==='active'?'<span style="color:var(--good,#33664b);font-weight:700">Active</span>':r.status==='past_due'?'<span style="color:var(--bad,#a3423a);font-weight:700">Payment overdue</span>':'<span style="color:var(--warn,#775d31);font-weight:600">Awaiting the client’s authorization</span>';const copyLink=(r.status==='pending'&&r.checkout_url)?` <button class="btn ghost" data-copy-pay="${esc(r.checkout_url)}">Copy authorization link</button>`:'';const cardLink=((r.status==='active'||r.status==='past_due')&&r.stripe_customer_id)?`<button class="btn ghost" id="retCardLink" title="Email the client a link to Stripe’s page for a new card">Email the card link</button> `:'';const failed=r.status==='past_due'?`<div class="mut" style="margin-top:6px">The last charge didn’t go through. Stripe tries the card again over the next few days. ${cardLink?'Email the card link so the client can put in a new card on Stripe’s own page; they can also do it from their portal.':'The client can put in a new card once Stripe names their customer.'}</div>`:'';return `<div class="row2"><span class="mut"><strong>${money(r.amount_cents)}</strong> every ${per} · ${st}</span><span>${copyLink}${cardLink}<button class="btn ghost" id="cancelRetainer" data-needs="delete">Cancel retainer</button></span></div>${failed}`;}return `<div class="mut" style="margin-top:2px">Bill this client automatically for ongoing work — the same amount every month or year. They authorize it once with Stripe; nothing is charged until they do, and either of you can stop it any time.</div><div class="row2" style="margin-top:8px"${d.stage==='lost'?' hidden':''}><button class="btn ghost" id="setupRetainer">Set up a retainer</button></div><div id="retForm"></div>`;})()}
         </div>
         ${Array.isArray(data.recurring)?`<div class="sec" id="recSec"><h3>Recurring invoice</h3>
           <div class="mut" style="margin-top:2px">Send them a fresh invoice on a schedule — they pay each one themselves, and nothing is charged automatically. Each goes out around 9 am your time and is due 14 days later.</div>
           ${recRows?`<div class="lrows" style="margin-top:6px">${recRows}</div>`:''}
-          <div class="row2" style="margin-top:8px"><button class="btn ghost" id="setupRecurring">Set up a recurring invoice</button></div><div id="recForm"></div>
+          <div class="row2" style="margin-top:8px"${d.stage==='lost'?' hidden':''}><button class="btn ghost" id="setupRecurring">Set up a recurring invoice</button></div><div id="recForm"></div>
         </div>`:''}
         <div class="sec"><h3>Convert to customer</h3>
           ${d.converted_client_id?`<div class="mut">${c&&c.email?`Workspace created — a sign-in invitation went to ${esc(c.email)}.`:'Workspace created — there was no client email on this deal, so no sign-in invitation was sent.'}</div><div class="row2" style="margin-top:8px">${d.created_project_id?`<a class="btn ghost" href="/projects.html?project=${esc(d.created_project_id)}${scope()?'&client='+scope():''}">Open their project →</a>`:''}<a class="btn ghost" href="/sharing.html${customerSite(d)?'?client='+esc(encodeURIComponent(customerSite(d))):''}">Manage their access →</a>${c&&c.email?`<button class="btn ghost" id="resendInvite" title="Send ${esc(c.email)} the welcome email again, with a fresh link to set their password and sign in">Resend welcome email</button>`:''}</div>${c&&c.email?`<div class="mut" style="font-size:12px;margin-top:6px">Didn’t arrive, or the link expired? Resend it — same email, fresh sign-in link.</div>`:''}`:
@@ -3790,7 +3807,8 @@ async function openDeal(id){
     $('detailInner').querySelectorAll('[data-stage]').forEach(b=>b.onclick=async()=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:b.dataset.stage});PENDING_BACK='';toast('Moved to '+stageLabel(b.dataset.stage));openDeal(id);load();}catch(e){toast(nice(e),true);}});
     // Lost is gentle but deliberate: an optional one-line reason (stored on the
     // deal via the stage route's `reason` → lost_reason) so "why" survives.
-    const markLost=$('markLost'); if(markLost) markLost.onclick=()=>miniForm($('lostForm'),[{name:'reason',label:'Reason (optional) — pick one or write your own',placeholder:'e.g. Price',list:{id:'lostReasons',options:LOST_REASONS}}],async(v)=>{try{await api('/sales/deals/'+id+'/stage','POST',{to:'lost',reason:v.reason||undefined});PENDING_BACK='';toast('Marked as not a fit');openDeal(id);load();}catch(e){toast(nice(e),true);}});
+    // sales item 182: the server withdraws what was still out; an unpaid deposit is asked about, then voided by the usual route
+    const markLost=$('markLost'); if(markLost) markLost.onclick=()=>miniForm($('lostForm'),[{name:'reason',label:'Reason (optional) — pick one or write your own',placeholder:'e.g. Price',list:{id:'lostReasons',options:LOST_REASONS}}],async(v)=>{try{const r=await api('/sales/deals/'+id+'/stage','POST',{to:'lost',reason:v.reason||undefined});PENDING_BACK='';const w=r.withdrawn||{};const n=(w.proposals||0)+(w.estimates||0)+(w.agreements||0);toast(n?'Marked as not a fit. What was still out is withdrawn, so their links say it’s closed.':'Marked as not a fit');await askVoidDeposit(r.open_deposit,'The deal is closed, but its');openDeal(id);load();}catch(e){toast(nice(e),true);}});
     // sales item 83: it asks in place, and Undo (or Recently deleted, for 30 days) brings the deal back
     const delDeal=$('delDeal'); if(delDeal) delDeal.onclick=async()=>{
       const k=KIT(),q='Delete this deal? It leaves your pipeline. You can bring it back from Recently deleted for 30 days.';
@@ -3847,7 +3865,7 @@ async function openDeal(id){
       await link(cid);
       return nc.deduped?dedupeNote(nc.data,cn,ce):null;
     };
-    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const cnote=await saveContactPart();const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),found_via:$('ed-found')?$('ed-found').value:undefined,next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast(cnote||'Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
+    const eds=$('ed-save'); if(eds) eds.onclick=async()=>{eds.disabled=true;try{const cnote=await saveContactPart();const v=$('ed-value').value.trim();await api('/sales/deals/'+id,'PATCH',{expected_value_cents:v?Math.round(parseFloat(v)*100):null,expected_close:$('ed-close').value||null,notes:edNotes.value.trim(),found_via:$('ed-found')?$('ed-found').value:undefined,revision_rounds:$('ed-rounds')?($('ed-rounds').value.trim()===''?null:Number($('ed-rounds').value)):undefined,next_step:$('ed-next')?$('ed-next').value.trim():undefined,next_step_at:$('ed-nextat')?($('ed-nextat').value||null):undefined});if(window.ddsDraftClear)window.ddsDraftClear(edNotes);toast(cnote||'Saved');openDeal(id);load();}catch(e){toast(nice(e),true);eds.disabled=false;}};
     // first-class deal to-dos (#203)
     loadDealTasks(id);
     wireTodoLists(id);   // sales item 106: saved lists of to-dos
@@ -3955,6 +3973,13 @@ async function openDeal(id){
       const md=$('moreDeposit'); if(md)md.onclick=()=>{close();const b=$('sendDeposit');if(b){b.scrollIntoView({block:'center',behavior:'smooth'});b.click();}};}
     $('detailInner').querySelectorAll('[data-link-proposal]').forEach(b=>b.onclick=()=>copyDocLink('proposal',b.dataset.linkProposal));
     $('detailInner').querySelectorAll('[data-link-contract]').forEach(b=>b.onclick=()=>copyDocLink('contract',b.dataset.linkContract));
+    // sales item 181: take back a sent agreement; its unpaid deposit is voided only if they say so
+    const askVoidDeposit=async(dep,lead)=>{if(!dep||!dep.id)return;if(!(await ddsConfirm(lead+' unpaid '+money(dep.amount_cents)+' deposit request is still open. Void it too? Its payment link stops working. Keep it if a corrected agreement asks for the same deposit: it carries over.',null,'Void the deposit',{danger:true})))return;try{await api('/sales/invoices/'+dep.id+'/void','POST',{});toast('Deposit request voided. Use Request a deposit when you need a new one.');}catch(e){toast('The deposit request wasn’t voided: '+nice(e),true);}};
+    $('detailInner').querySelectorAll('[data-withdraw-con]').forEach(b=>b.onclick=async()=>{
+      if(!(await ddsConfirm('Take this agreement back? Its link will tell '+((c&&c.name)||'the client')+' you’re updating it, and it can’t be signed. You can send a corrected one after.',null,'Take it back',{danger:true})))return;
+      b.disabled=true;
+      try{const r=await api('/sales/contracts/'+b.dataset.withdrawCon+'/withdraw','POST',{});toast('Agreement taken back. Its link now says you’re updating it.');await askVoidDeposit(r.open_deposit,'Its');openDeal(id);}
+      catch(e){toast(nice(e),true);b.disabled=false;}});
     $('detailInner').querySelectorAll('[data-doc-prop]').forEach(b=>b.onclick=()=>openDoc('proposals',b.dataset.docProp,b));
     $('detailInner').querySelectorAll('[data-doc-con]').forEach(b=>b.onclick=()=>openDoc('contracts',b.dataset.docCon,b));
     $('detailInner').querySelectorAll('[data-doc-inv]').forEach(b=>b.onclick=()=>openDoc('invoices',b.dataset.docInv,b));
@@ -3966,7 +3991,7 @@ async function openDeal(id){
     // revise mode (the prior IS the saved state).
     const openPropEditor=(opts)=>{
       opts=opts||{};
-      const rev=opts.reviseOf||null, pf=opts.prefill||null;
+      const rev=opts.reviseOf||null, pf=opts.prefill||null, edit=opts.editOf||null;   // sales item 183: editOf changes a draft in place
       // item 47: an estimate is drafted in this same editor (same lines, discount,
       // tax and totals); only where it saves and what Send does differ. One editor
       // open at a time — they share their control ids.
@@ -3978,11 +4003,11 @@ async function openDeal(id){
       const hasCat=SERVICES.length>0;
       const optsHtml=SERVICES.map((s,i)=>`<option value="${i}">${esc(s.name)} — ${esc(money(s.price_cents)||'$0')}</option>`).join('');
       let ln=0; // per-deal, per-line draft keys — typed line items survive an accidental Esc
-      const draftAttr=(kind,n)=>rev?'':` data-dds-draft="${est?'est':'prop'}-${id}-${kind}-${n}"`;   // no drafts while revising
+      const draftAttr=(kind,n)=>(rev||edit)?'':` data-dds-draft="${est?'est':'prop'}-${id}-${kind}-${n}"`;   // no drafts while revising
       const rowHtml=()=>{ln++;
         const pick=hasCat?`<select class="pl-pick" aria-label="Choose a service"><option value="">Pick a service…</option>${optsHtml}<option value="__custom__">Custom…</option></select>`:'';
         const hide=hasCat?' style="display:none"':'';
-        return `<div class="prop-line" style="margin-top:6px">${pick}<div class="pl-custom row2"${hide}><input type="text" class="pl-label"${draftAttr('label',ln)} placeholder="Line item, e.g. Website design" aria-label="Line item"><input type="number" min="1" step="1" class="pl-qty" value="1" placeholder="Qty" aria-label="Quantity" title="Quantity" style="max-width:64px"><input type="number" step="0.01" class="pl-price"${draftAttr('price',ln)} placeholder="Price each (USD)" aria-label="Price each in dollars" style="max-width:140px"></div></div>`;};
+        return `<div class="prop-line" style="margin-top:6px">${pick}<div class="pl-custom row2"${hide}><input type="text" class="pl-label"${draftAttr('label',ln)} placeholder="Line item, e.g. Website design" aria-label="Line item"><input type="number" min="0.25" step="0.25" class="pl-qty" value="1" placeholder="Qty" aria-label="Quantity" title="Quantity: whole numbers, halves or quarters" style="max-width:72px"><input type="number" step="0.01" class="pl-price"${draftAttr('price',ln)} placeholder="Price each (USD)" aria-label="Price each in dollars" style="max-width:140px"></div></div>`;};
       const hint=hasCat?'':`<div class="mut" style="margin-top:8px"><a href="#" id="plManageHint">Add your services</a> to pick them from a list here.</div>`;
       // Bold redesign (Nov 2026): a proposal is one screen — your services as
       // chips to tap (a second tap takes it off), the lines below, and beside
@@ -3996,8 +4021,8 @@ async function openDeal(id){
       const seedRows=(pf&&pf.items&&pf.items.length)?pf.items.map(()=>rowHtml()).join(''):rowHtml();
       // sales item 106: start from a saved proposal — its lines, discount, tax and parts fill the
       // editor to adjust before saving (the deal's one-tap Use buttons still draft one as it is)
-      const tplStrip=(!est&&!rev&&propTpls.length)?`<p class="pb-l">Start from a saved proposal</p><div class="tpl-cards" role="group" aria-label="Saved proposals">${propTpls.map(t=>{const T2=propTotals(t.line_items||[]);const sp=splitPropLI(t.line_items||[]);const np=Array.isArray(sp.meta.schedule)?sp.meta.schedule.length:0;return `<button type="button" class="tpl-card" data-tpl-fill="${esc(t.id)}" aria-pressed="false"><b>${esc(t.name)}</b><span>${esc(money0(T2.total))} · ${sp.items.length} line${sp.items.length===1?'':'s'}${np?' · paid in '+np+' parts':''}</span></button>`;}).join('')}</div>`:'';
-      const headNote=rev?`<div class="mut" style="margin-top:8px">Revising${opts.versionLabel?' — new '+esc(opts.versionLabel):''}. The original is kept and marked superseded.</div>`:est?`<div class="mut" style="margin-top:8px">They’ll see each line and the total, with Approve or Not now. Nothing is charged.</div>`:'';
+      const tplStrip=(!est&&!rev&&!edit&&propTpls.length)?`<p class="pb-l">Start from a saved proposal</p><div class="tpl-cards" role="group" aria-label="Saved proposals">${propTpls.map(t=>{const T2=propTotals(t.line_items||[]);const sp=splitPropLI(t.line_items||[]);const np=Array.isArray(sp.meta.schedule)?sp.meta.schedule.length:0;return `<button type="button" class="tpl-card" data-tpl-fill="${esc(t.id)}" aria-pressed="false"><b>${esc(t.name)}</b><span>${esc(money0(T2.total))} · ${sp.items.length} line${sp.items.length===1?'':'s'}${np?' · paid in '+np+' parts':''}</span></button>`;}).join('')}</div>`:'';
+      const headNote=edit?`<div class="mut" style="margin-top:8px">Changing the draft. Nothing has gone to them yet.</div>`:rev?`<div class="mut" style="margin-top:8px">Revising${opts.versionLabel?' — new '+esc(opts.versionLabel):''}. The original is kept and marked ${est?'replaced':'superseded'}.</div>`:est?`<div class="mut" style="margin-top:8px">They’ll see each line and the total, with Approve or Not now. Nothing is charged.</div>`:'';
       // Discount + tax: optional, plainly labelled, with a live breakdown so the
       // owner always sees subtotal → discount → tax → total before sending.
       const pricingHtml=`<div style="margin-top:12px;border-top:1px solid var(--line,#e9e4dc);padding-top:10px">
@@ -4010,7 +4035,7 @@ async function openDeal(id){
         ${est?'':`<div class="row2" style="margin-top:12px"><label class="mut" style="min-width:120px" for="plPay">How they’ll pay</label>
           <select id="plPay"><option value="">In one payment</option><option value="half">Half when they sign, half when it’s done</option><option value="thirds">Three parts: a third now, in 30 days, and when it’s done</option><option value="custom">My own parts…</option></select></div>
         <div id="plParts" class="pp" hidden></div>`}</div>`;
-      host.innerHTML=`<div class="pb"><div class="pb-edit">${headNote}${tplStrip}${hint}${svcChips}${seedRows}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button></div>${pricingHtml}<div class="row2" style="margin-top:10px"><span style="flex:1"></span><button type="button" class="btn ghost" id="plSave">${rev?'Save revision':'Save draft'}</button><button type="button" class="btn" id="plSaveSend">${rev||!first?'Save & send →':'Send to '+esc(first)+' →'}</button></div></div><aside class="pb-view" aria-label="${esc(sees)}"><p class="pb-l">${esc(sees)}</p><div class="pb-card" id="plPreview"></div><p class="mut pb-foot">${est?'They can approve it or say not now. Nothing is charged.':'One link: they read it and accept it there.'}</p></aside></div>`;
+      host.innerHTML=`<div class="pb"><div class="pb-edit">${headNote}${tplStrip}${hint}${svcChips}${seedRows}<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" id="plMore">＋ another line</button></div>${pricingHtml}<div class="row2" style="margin-top:10px"><span style="flex:1"></span><button type="button" class="btn ghost" id="plSave">${rev?'Save revision':edit?'Save changes':'Save draft'}</button><button type="button" class="btn" id="plSaveSend">${rev||!first?'Save & send →':'Send to '+esc(first)+' →'}</button></div></div><aside class="pb-view" aria-label="${esc(sees)}"><p class="pb-l">${esc(sees)}</p><div class="pb-card" id="plPreview"></div><p class="mut pb-foot">${est?'They can approve it or say not now. Nothing is charged.':'One link: they read it and accept it there.'}</p></aside></div>`;
       const hintLink=$('plManageHint'); if(hintLink) hintLink.onclick=(e)=>{e.preventDefault();openManageServices();};
       const wirePick=(sel)=>{ if(!sel) return; const row=sel.closest('.prop-line'); const box=row.querySelector('.pl-custom'); const lab=row.querySelector('.pl-label'); const pr=row.querySelector('.pl-price');
         sel.onchange=()=>{ const v=sel.value;
@@ -4021,7 +4046,7 @@ async function openDeal(id){
         };
       };
       const wireRow=(row)=>{wirePick(row&&row.querySelector('.pl-pick'));if(row){row.querySelectorAll('.pl-label,.pl-price,.pl-qty').forEach(el=>el.addEventListener('input',recalc));}};
-      const restoreDrafts=()=>{if(!rev&&window.ddsDraftRestore)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftRestore(el));};
+      const restoreDrafts=()=>{if(!rev&&!edit&&window.ddsDraftRestore)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftRestore(el));};
       const revealFilled=()=>host.querySelectorAll('.prop-line').forEach(row=>{const lab=row.querySelector('.pl-label');const box=row.querySelector('.pl-custom');const sel=row.querySelector('.pl-pick');if(lab&&lab.value&&box){box.style.display='';if(sel)sel.value='__custom__';}});
       // Live breakdown — mirrors the server's computeProposalTotals exactly.
       const collectPricing=()=>{const mode=$('plDiscMode').value;const dv=parseFloat($('plDiscVal').value||'0');let discount=null;if(mode==='percent'&&dv>0)discount={mode:'percent',value:dv};else if(mode==='fixed'&&dv>0)discount={mode:'fixed',value:Math.round(dv*100)};const tv=parseFloat($('plTaxPct').value||'0');const tax_pct=(tv>0)?tv:null;return{discount,tax_pct};};
@@ -4030,7 +4055,7 @@ async function openDeal(id){
       restoreDrafts();
       // Prefill (revise/clone): fill each row from the prior's items, and the
       // discount/tax controls from its meta. Else seed the FIRST row from the deal.
-      if(pf&&pf.items&&pf.items.length){const rowsEls=host.querySelectorAll('.prop-line');pf.items.forEach((it,i)=>{const r=rowsEls[i];if(!r)return;r.querySelector('.pl-label').value=it.label||'';r.querySelector('.pl-price').value=((it.unit_cents||0)/100);const q=r.querySelector('.pl-qty');if(q)q.value=Math.max(1,Math.trunc(it.qty)||1);});
+      if(pf&&pf.items&&pf.items.length){const rowsEls=host.querySelectorAll('.prop-line');pf.items.forEach((it,i)=>{const r=rowsEls[i];if(!r)return;r.querySelector('.pl-label').value=it.label||'';r.querySelector('.pl-price').value=((it.unit_cents||0)/100);const q=r.querySelector('.pl-qty');if(q)q.value=qtyQ(it.qty)||1;});
         if(pf.discount){$('plDiscMode').value=pf.discount.mode;$('plDiscVal').style.display='';$('plDiscVal').value=pf.discount.mode==='percent'?pf.discount.value:((pf.discount.value||0)/100);}
         if(pf.tax_pct!=null)$('plTaxPct').value=pf.tax_pct;
       } else { const l1=host.querySelector('.pl-label'), p1=host.querySelector('.pl-price'); if(l1&&!l1.value&&d.title){ l1.value=d.title; if(p1&&!p1.value&&d.expected_value_cents)p1.value=(d.expected_value_cents/100);
@@ -4075,7 +4100,7 @@ async function openDeal(id){
         const first=host.querySelector('.prop-line');
         sp.items.forEach((it,i)=>{let row=first;if(i>0){$('plMore').click();const all=host.querySelectorAll('.prop-line');row=all[all.length-1];}
           const sel=row.querySelector('.pl-pick');if(sel)sel.value='__custom__';row.querySelector('.pl-custom').style.display='';
-          row.querySelector('.pl-label').value=it.label||'';row.querySelector('.pl-price').value=((it.unit_cents||0)/100);const q=row.querySelector('.pl-qty');if(q)q.value=Math.max(1,Math.trunc(it.qty)||1);delete row.dataset.seeded;});
+          row.querySelector('.pl-label').value=it.label||'';row.querySelector('.pl-price').value=((it.unit_cents||0)/100);const q=row.querySelector('.pl-qty');if(q)q.value=qtyQ(it.qty)||1;delete row.dataset.seeded;});
         const dm=sp.meta.discount;$('plDiscMode').value=dm?dm.mode:'';$('plDiscVal').style.display=dm?'':'none';$('plDiscVal').value=dm?(dm.mode==='percent'?dm.value:((dm.value||0)/100)):'';
         $('plTaxPct').value=sp.meta.tax_pct!=null?sp.meta.tax_pct:'';
         PARTS=Array.isArray(sp.meta.schedule)&&sp.meta.schedule.length?sp.meta.schedule.map(p=>({...p})):null;
@@ -4090,7 +4115,7 @@ async function openDeal(id){
       var bizN='';
       function paintPreview(items,T){
         const pv=$('plPreview');if(!pv)return;
-        const rows=items.map(it=>`<div class="pb-row"><span>${esc(it.label)}${it.qty>1?' × '+it.qty:''}</span><b>${esc(money(it.unit_cents*it.qty)||'$0')}</b></div>`).join('');
+        const rows=items.map(it=>`<div class="pb-row"><span>${esc(it.label)}${it.qty!==1?' × '+it.qty:''}</span><b>${esc(money(lineC(it.qty,it.unit_cents))||'$0')}</b></div>`).join('');
         pv.innerHTML=`<div class="pb-biz"><span class="pb-mark" aria-hidden="true"></span><span>${esc(bizN||'Your studio')}</span></div><div class="pb-title">${est?'Estimate':'Proposal'}${forWho?' for '+esc(forWho):''}</div>${rows||'<p class="mut">Add a line and it shows here.</p>'}${T.discount>0?`<div class="pb-row mut"><span>Discount</span><b>−${esc(money(T.discount))}</b></div>`:''}${T.tax>0?`<div class="pb-row mut"><span>Tax</span><b>${esc(money(T.tax))}</b></div>`:''}<div class="pb-row pb-total"><span>Total</span><b>${esc(money(T.total)||'$0')}</b></div>${partsPreview(T.total)}<div class="pb-cta" aria-hidden="true">${est?'Approve':'Accept proposal'}</div>`;
         const lines=[...host.querySelectorAll('.prop-line')];
         host.querySelectorAll('[data-svc]').forEach(b=>{const i=b.getAttribute('data-svc'),sv=SERVICES[+i];const on=lines.some(r=>{const sel=r.querySelector('.pl-pick'),lab=r.querySelector('.pl-label');return (sel&&sel.value===i)||(!!sv&&!!lab&&lab.value.trim()===sv.name);});b.setAttribute('aria-pressed',on?'true':'false');});
@@ -4111,15 +4136,16 @@ async function openDeal(id){
         if(sel){sel.value=i;sel.onchange();}else{row.querySelector('.pl-label').value=sv.name;row.querySelector('.pl-price').value=sv.price_cents/100;recalc();}
         b.focus();
       }));
-      const clearPropDrafts=()=>{if(!rev&&window.ddsDraftClear)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));};
-      const collectItems=()=>[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:Math.max(1,Math.trunc(parseFloat((r.querySelector('.pl-qty')||{}).value||'1'))||1),unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
+      const clearPropDrafts=()=>{if(!rev&&!edit&&window.ddsDraftClear)host.querySelectorAll('[data-dds-draft]').forEach(el=>window.ddsDraftClear(el));};
+      const collectItems=()=>[...host.querySelectorAll('.prop-line')].map(r=>({label:r.querySelector('.pl-label').value.trim(),qty:(v=>{const n=parseFloat(v);return isFinite(n)?n:1;})((r.querySelector('.pl-qty')||{}).value),unit_cents:Math.round(parseFloat(r.querySelector('.pl-price').value||'0')*100)})).filter(i=>i.label);
       // Save writes the record (revise → vN+1 that supersedes the prior); Save &
       // send then immediately emails the review link.
-      const savePropProposal=async()=>{const items=collectItems();if(!items.length){toast('Add at least one line item.',true);return null;}const pr=collectPricing();const body={line_items:items,discount:pr.discount,tax_pct:pr.tax_pct};
-        if(!est){if(PARTS&&partsSum()!==100){toast('The parts add up to '+partsSum()+'%. Make them 100%.',true);return null;}body.schedule=collectSchedule();if(TPL_ID&&!rev)body.template_id=TPL_ID;}   // sales item 106
-        const path=est?('/sales/deals/'+id+'/estimates'):rev?('/sales/proposals/'+rev+'/revise'):('/sales/deals/'+id+'/proposals');const r=await api(path,'POST',body);clearPropDrafts();return r.data&&r.data.id;};
+      const savePropProposal=async()=>{const items=collectItems();if(!items.length){toast('Add at least one line item.',true);return null;}if(items.some(i=>qtyQ(i.qty)===null||i.qty<0)){toast('A quantity can be a whole number, a half or a quarter, like 2, 2.5 or 0.25.',true);return null;}const pr=collectPricing();const body={line_items:items,discount:pr.discount,tax_pct:pr.tax_pct};
+        if(!est){if(PARTS&&partsSum()!==100){toast('The parts add up to '+partsSum()+'%. Make them 100%.',true);return null;}body.schedule=collectSchedule();if(TPL_ID&&!rev&&!edit)body.template_id=TPL_ID;}   // sales item 106
+        // sales item 183: Edit changes the draft in place (PATCH); Revise makes the next version, of an estimate too
+        const path=edit?(est?'/sales/estimates/'+edit:'/sales/proposals/'+edit):rev?(est?'/sales/estimates/'+rev+'/revise':'/sales/proposals/'+rev+'/revise'):est?('/sales/deals/'+id+'/estimates'):('/sales/deals/'+id+'/proposals');const r=await api(path,edit?'PATCH':'POST',body);clearPropDrafts();return r.data&&r.data.id;};
       const busyProp=(x)=>{$('plSave').disabled=x;$('plSaveSend').disabled=x;};
-      $('plSave').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}toast(est?'Estimate saved as a draft — send it when you’re ready.':rev?'Revision saved as a draft — send it when you’re ready.':'Proposal saved as a draft — send it when you’re ready.');openDeal(id);}catch(e){toast(nice(e),true);busyProp(false);}};
+      $('plSave').onclick=async()=>{busyProp(true);try{const pid=await savePropProposal();if(!pid){busyProp(false);return;}toast(edit?'Changes saved. Send it when you’re ready.':est?(rev?'New version saved as a draft — send it when you’re ready.':'Estimate saved as a draft — send it when you’re ready.'):rev?'Revision saved as a draft — send it when you’re ready.':'Proposal saved as a draft — send it when you’re ready.');openDeal(id);}catch(e){toast(nice(e),true);busyProp(false);}};
       // item 95 (B7): when the save worked and only the email failed, the draft is on the deal now with
       // its own Send — open the deal on it. Staying here made the next press save a second copy.
       $('plSaveSend').onclick=async()=>{busyProp(true);let pid=null;try{pid=await savePropProposal();if(!pid){busyProp(false);return;}await (est?sendEstimateById(pid):sendProposalById(pid));}
@@ -4136,6 +4162,12 @@ async function openDeal(id){
     $('detailInner').querySelectorAll('[data-est-prop]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/estimates/'+b.dataset.estProp+'/proposal','POST',{});toast('Proposal drafted from the estimate — check it, then send it the usual way.');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
     $('detailInner').querySelectorAll('[data-est-inv]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/sales/estimates/'+b.dataset.estInv+'/invoice','POST',{});toast('Invoice ready under Invoice & deposit — press Send on it when you’re ready.');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
     $('detailInner').querySelectorAll('[data-del-est]').forEach(b=>b.onclick=async()=>{if(!(await ddsConfirm('Remove this draft estimate? It was never sent, so nothing the client saw changes.',null,'Remove draft',{danger:true})))return;b.disabled=true;try{await api('/sales/estimates/'+b.dataset.delEst,'DELETE');toast('Draft removed');openDeal(id);}catch(e){toast(nice(e),true);b.disabled=false;}});
+    // sales item 183: Edit a draft proposal or estimate, Revise a sent estimate, in the same editor
+    const prefillOf=(x)=>{const S=splitPropLI(x.line_items);return {items:S.items,discount:S.meta.discount||null,tax_pct:(S.meta.tax_pct!=null?S.meta.tax_pct:null),title:x.title,schedule:S.meta.schedule||null};};
+    const openAt=(fid)=>{const f=$(fid);if(f&&f.scrollIntoView)f.scrollIntoView({behavior:'smooth',block:'nearest'});};
+    $('detailInner').querySelectorAll('[data-edit-prop]').forEach(b=>b.onclick=()=>{const p=(data.proposals||[]).find(x=>x.id===b.dataset.editProp);if(!p){toast('That proposal isn’t here.',true);return;}openPropEditor({editOf:p.id,prefill:prefillOf(p)});openAt('propForm');});
+    $('detailInner').querySelectorAll('[data-edit-est]').forEach(b=>b.onclick=()=>{const e=(data.estimates||[]).find(x=>x.id===b.dataset.editEst);if(!e){toast('That estimate isn’t here.',true);return;}openPropEditor({estimate:true,editOf:e.id,prefill:prefillOf(e)});openAt('estForm');});
+    $('detailInner').querySelectorAll('[data-revise-est]').forEach(b=>b.onclick=()=>{const e=(data.estimates||[]).find(x=>x.id===b.dataset.reviseEst);if(!e){toast('That estimate isn’t here.',true);return;}openPropEditor({estimate:true,reviseOf:e.id,versionLabel:'v'+(((+e.version)||1)+1),prefill:prefillOf(e)});openAt('estForm');});
     // Revise → pre-fill the editor from the prior proposal (items + discount/tax),
     // submit to /revise as vN+1. The prior is superseded server-side.
     $('detailInner').querySelectorAll('[data-revise-prop]').forEach(b=>b.onclick=()=>{

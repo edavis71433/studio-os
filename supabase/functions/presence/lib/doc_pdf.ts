@@ -8,7 +8,7 @@
 // loads the row, the brand and the context; same input, same bytes.
 import { PdfDoc, rgb, textWidth, wrapText, type PdfFont, type Rgb } from './pdf.ts';
 import {
-  money, utcStamp, invoiceNo, dayLabel, paidLine, partyLines, invoiceLines, invoiceDocLabel, mixHex, invoiceReturnWords, payOtherLines,
+  money, utcStamp, invoiceNo, dayLabel, paidLine, partyLines, invoiceLines, invoiceDocLabel, mixHex, invoiceReturnWords, payOtherLines, signedFromLines, yesLine,
   type DocBrand, type DocContext, type DocKind,
 } from './documents.ts';
 import { splitLineItems, computeProposalTotals, subtotalOf } from './sales_lifecycle.ts';
@@ -280,12 +280,12 @@ function linesPdf(p: any, brandIn: Partial<DocBrand> | null | undefined, ctx: Do
   return pdf.bytes();
 }
 export function proposalPdf(p: any, brand?: Partial<DocBrand> | null, ctx?: DocContext | null): Uint8Array<ArrayBuffer> {
-  const note = p?.status === 'accepted' ? 'Accepted. Thank you.' : p?.status === 'declined' ? 'This proposal was declined.' : 'This is a proposal. Nothing is final until you accept.';
-  return linesPdf(p, brand, ctx, { label: 'Proposal', note, state: p?.status === 'accepted' ? 'ACCEPTED' : p?.status === 'declined' ? 'DECLINED' : '', stateColor: p?.status === 'accepted' ? GOOD : SOFT });
+  const note = p?.status === 'accepted' ? ['Accepted. Thank you.', yesLine(p, 'Accepted')].filter(Boolean).join(' ') : p?.status === 'declined' ? 'This proposal was declined.' : p?.status === 'withdrawn' ? 'Your studio withdrew this proposal, so it can no longer be accepted.' : 'This is a proposal. Nothing is final until you accept.';
+  return linesPdf(p, brand, ctx, { label: 'Proposal', note, state: p?.status === 'accepted' ? 'ACCEPTED' : p?.status === 'declined' ? 'DECLINED' : p?.status === 'withdrawn' ? 'WITHDRAWN' : '', stateColor: p?.status === 'accepted' ? GOOD : SOFT });
 }
 export function estimatePdf(e: any, brand?: Partial<DocBrand> | null, ctx?: DocContext | null): Uint8Array<ArrayBuffer> {
   const until = dayLabel(/^\d{4}-\d{2}-\d{2}/.test(String(e?.expires_at || '')) ? String(e.expires_at).slice(0, 10) : '');
-  const note = e?.status === 'approved' ? 'Approved. Thank you.' : e?.status === 'declined' ? 'You chose not now on this estimate.'
+  const note = e?.status === 'approved' ? ['Approved. Thank you.', yesLine(e, 'Approved')].filter(Boolean).join(' ') : e?.status === 'declined' ? 'You chose not now on this estimate.' : e?.status === 'withdrawn' ? 'Your studio withdrew this estimate, so it can no longer be approved.'
     : `This is an estimate, not a final price. Nothing is charged until you get an invoice.${until ? ` Good until ${until}.` : ''}`;
   return linesPdf(e, brand, ctx, { label: 'Estimate', note, state: e?.status === 'approved' ? 'APPROVED' : '', stateColor: GOOD });
 }
@@ -334,7 +334,7 @@ export function contractPdf(c: any, brandIn?: Partial<DocBrand> | null, ctx?: Do
     if (c?.countersigned_name) rows.push(`Countersigned by: ${String(c.countersigned_name)}${c?.countersigned_title ? ', ' + String(c.countersigned_title) : ''} for ${brand.name}`);
     rows.push(`Signed at: ${utcStamp(c?.signed_at || ev?.at)}`);
     rows.push(`Document fingerprint (SHA-256): ${String(c?.content_hash || ev?.hash || '')}`);
-    if (ev?.ip_hash) rows.push(`Signing evidence (hashed IP): ${String(ev.ip_hash)}`);
+    for (const [k, v] of signedFromLines(c?.sign_evidence)) rows.push(`${k}: ${v}`);   // sales item 184
     // the certificate: a box in the studio's colour, a title, then its rows
     const cw = rows.flatMap((r) => wrapText(r, 'R', 9.5, W - 32));
     const ch = 40 + cw.length * 14 + 10;
