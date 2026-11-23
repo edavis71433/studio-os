@@ -282,6 +282,8 @@ pp = await publish('release', ['201 {"id":"dep2"}', '200 {"state":"error"}']);
 ok('a deploy Netlify ends in error fails the release, saying the server is live and the pages are the previous ones', pp.code === 1 && pp.log.includes('::error title=Pages::Netlify ended deploy dep2 as "error". The server is live; the pages are still the previous ones.'), pp.log.trim());
 pp = await publish('release', ['422 {"message":"bad"}']);
 ok('a refused upload fails, with Netlify\'s code', pp.code === 1 && pp.log.includes('Netlify refused the upload (HTTP 422)'));
+pp = await publish('release', ['404 {"code":404,"message":"Not Found"}']);
+ok('a token whose Netlify login can\'t see the site (Netlify answers 404): it says to make the token from the login that owns the site', pp.code === 1 && pp.log.includes('Netlify refused the upload (HTTP 404)') && pp.log.includes('login that owns the app\'s site'), pp.log.trim());
 pp = await publish('release', ['200 {}'], { NETLIFY_AUTH_TOKEN: '' });
 ok('switch says "release" but no token: fails before building, naming the secret', pp.code === 1 && pp.calls.length === 0 && pp.log.includes('NETLIFY_AUTH_TOKEN isn\'t set'));
 pp = await publish('release', ['200 {}'], { NETLIFY_SITE_ID: '' });
