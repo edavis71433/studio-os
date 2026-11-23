@@ -96,6 +96,16 @@ world({ presence_contacts: [{ id: CT, site_id: SITE, name: 'Riley Park', email: 
   ok('180: with no email on the deal nothing is sent, and the one reminder isn\'t spent', m.status === 409 && m.body?.error === 'not_sent' && !row('presence_contracts', CON).reminded_at && mail.length === 0);
 }
 
+// ═══ 217: no Remind on a deal closed as Not a fit ═══
+ok('217: Remind is off on a Not a fit deal', DL.canRemind('proposal', { status: 'sent' }, PINNED_NOW, 'lost') === false && DL.canRemind('proposal', { status: 'sent' }, PINNED_NOW, 'proposal') === true);
+world({ presence_deals: [{ id: DEAL, site_id: SITE, title: 'Blue Finch Café website', stage: 'lost', contact_id: CT, expected_value_cents: 250000, revision_rounds: null, created_project_id: PROJ, deleted_at: null }] });
+{
+  const r = await res(await DL.handleDocumentsList(req('GET', `/sales/documents?today=${PINNED_NOW.slice(0, 10)}`), site, cors));
+  ok('217: the list offers no Remind on a Not a fit deal', r.status === 200 && (r.body?.data?.items || []).every((x) => x.can_remind === false));
+  const m = await res(await DL.handleDocumentRemind(req('POST', '/sales/documents/remind', { kind: 'contract', id: CON }), site, owner, cors));
+  ok('217: and the server refuses one, sending nothing', m.status === 409 && m.body?.error === 'closed' && mail.length === 0 && !row('presence_contracts', CON).reminded_at);
+}
+
 // ═══ 179: rounds of changes ═══
 eq('179: rounds as typed: a whole number 0 to 20, or nothing', [RR.cleanRounds(2), RR.cleanRounds('0'), RR.cleanRounds(''), RR.cleanRounds(1.5), RR.cleanRounds(21)], [{ ok: true, value: 2 }, { ok: true, value: 0 }, { ok: true, value: null }, { ok: false }, { ok: false }]);
 eq('179: both sides read it plainly', [RR.roundsLine({ included: 2, used: 1 }), RR.roundsLine({ included: 2, used: 3 }), RR.roundsLine({ included: null, used: 4 }), RR.nextRoundWords({ included: 2, used: 0 }), RR.nextRoundWords({ included: 2, used: 2 })],

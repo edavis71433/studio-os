@@ -52,6 +52,7 @@ test.describe('Download my data (item 69)', () => {
     await page.goto('/settings.html#billing');
     const btn = page.getByRole('button', { name: 'Download my data' });
     await expect(btn).toBeVisible();
+    await expect(page.getByText(/with history\.csv .* and messages\.csv/)).toBeVisible();   // sales item 217: the hint names them
     const [dl] = await Promise.all([page.waitForEvent('download'), btn.click()]);
     expect(dl.suggestedFilename()).toMatch(/^studio-data-\d{4}-\d{2}-\d{2}\.zip$/);
     await expect(page.locator('.dds-toast')).toContainText('Downloaded');

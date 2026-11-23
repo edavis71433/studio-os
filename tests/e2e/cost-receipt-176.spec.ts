@@ -59,6 +59,7 @@ test.describe('Add a cost keeps a receipt (sales item 176)', () => {
     const sent: Array<Record<string, unknown>> = [];
     await openCost(page, sent);
     await expect(page.locator('#co-rc-name')).toHaveText('Receipt (optional): none yet.');
+    await expect(page.getByRole('button', { name: 'Remove the receipt' })).toBeHidden();   // sales item 217: none picked yet
     await page.getByRole('button', { name: 'Pick from Files' }).click();
     const dlg = page.getByRole('dialog', { name: 'Pick the receipt' });
     await expect(dlg.getByRole('button')).toHaveText(['Namecheap receipt', 'Plugin invoice', 'Cancel']);   // the archived banner isn't offered

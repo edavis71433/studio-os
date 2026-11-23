@@ -37,10 +37,11 @@ export function docState(kind: DocKind, d: Record<string, unknown>, nowIsoStr: s
   if (kind !== 'contract' && d?.expires_at && String(d.expires_at) < nowIsoStr) return 'expired';
   return d?.first_viewed_at ? 'opened' : 'out';
 }
-/** May Remind re-send this one? Only while it waits on the client, and only once. Pure. */
-export function canRemind(kind: DocKind, d: Record<string, unknown>, nowIsoStr: string): boolean {
+/** May Remind re-send this one? Only while it waits on the client, only once, and never on a
+ *  deal closed as Not a fit (sales item 217: its links say it's closed). Pure. */
+export function canRemind(kind: DocKind, d: Record<string, unknown>, nowIsoStr: string, dealStage?: unknown): boolean {
   const st = docState(kind, d, nowIsoStr);
-  return (st === 'out' || st === 'opened') && !d?.reminded_at;
+  return (st === 'out' || st === 'opened') && !d?.reminded_at && dealStage !== 'lost';
 }
 
 const COLS: Record<DocKind, string> = {
@@ -78,7 +79,7 @@ export async function handleDocumentsList(req: Request, site: SiteRow, cors: Rec
       business: String(who?.company || ''), person: String(who?.name || ''),
       amount_cents: kind === 'contract' ? priceOf(String(x.deal_id || '')) : proposalTotals(x.line_items).total_cents,
       state: docState(kind, x, now), sent_at: x.sent_at || null, opened_at: x.first_viewed_at || null, expires_at: x.expires_at || null,
-      decided_at: x.decided_at || x.signed_at || null, created_at: x.created_at, reminded_at: x.reminded_at || null, can_remind: canRemind(kind, x, now),
+      decided_at: x.decided_at || x.signed_at || null, created_at: x.created_at, reminded_at: x.reminded_at || null, can_remind: canRemind(kind, x, now, d?.stage),
     };
   };
   const items = [...props.map((x) => one('proposal', x)), ...ests.map((x) => one('estimate', x)), ...cons.map((x) => one('contract', x))]
@@ -96,6 +97,9 @@ export async function handleDocumentRemind(req: Request, site: SiteRow, principa
   const d = rows(await svc(`${TABLE[kind]}?id=eq.${id}&site_id=eq.${site.id}&deleted_at=is.null&select=${COLS[kind]}&limit=1`))[0];
   if (!d) return json({ error: 'not_found', message: 'That document isn’t here.' }, 404, cors);
   const st = docState(kind, d, nowIso());
+  // sales item 217: a deal closed as Not a fit has nothing to remind them of
+  const dealRow = rows(await svc(`presence_deals?id=eq.${d.deal_id}&site_id=eq.${site.id}&select=stage&limit=1`))[0];
+  if (dealRow?.stage === 'lost') return json({ error: 'closed', message: 'This deal is closed as Not a fit, so there’s nothing to remind them of. Reopen the deal first.' }, 409, cors);
   if (d.reminded_at) return json({ error: 'already_reminded', reminded_at: d.reminded_at, message: 'You reminded them already. One reminder per document, so it never nags.' }, 409, cors);
   if (st === 'expired') return json({ error: 'expired', message: 'It has expired. Revise it to send them a fresh one.' }, 409, cors);
   if (st !== 'out' && st !== 'opened') return json({ error: 'not_waiting', message: 'They aren’t waiting on this one any more, so there’s nothing to remind them of.' }, 409, cors);
