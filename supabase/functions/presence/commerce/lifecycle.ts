@@ -522,11 +522,15 @@ export async function runLeadFollowups(limit = 20): Promise<{ nudged: number; fo
   const nowIso = new Date().toISOString();
   const from = new Date(Date.now() - 7 * 86400_000).toISOString();   // still fresh (<1 week)
   const to = new Date(Date.now() - 24 * 3600_000).toISOString();     // aged at least a day
-  const q = await svc(`presence_form_submissions?status=eq.new&spam=is.false&created_at=gte.${encodeURIComponent(from)}&created_at=lte.${encodeURIComponent(to)}&select=id,site_id,form_kind,name,email,created_at&order=created_at.asc&limit=${limit}`);
+  // Sales item 201's follow-up (Nov 23 2026): status and spam are read too. The guard below
+  // (leadFollowupDue) checks both, and without them in the select every row failed it, so this
+  // nudge never fired after it was added (July 2026). tests/presence/sales_three_nov23_test.mjs
+  // runs this sweep on a pretend database that returns only the columns asked for.
+  const q = await svc(`presence_form_submissions?status=eq.new&spam=is.false&created_at=gte.${encodeURIComponent(from)}&created_at=lte.${encodeURIComponent(to)}&select=id,site_id,form_kind,name,email,status,spam,created_at&order=created_at.asc&limit=${limit}`);
   const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
   const base = appBase();
   let nudged = 0;
-  for (const lead of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; form_kind: string; name?: string; email?: string; created_at: string }>) {
+  for (const lead of (Array.isArray(q.json) ? q.json : []) as Array<{ id: string; site_id: string; form_kind: string; name?: string; email?: string; status?: string; spam?: boolean; created_at: string }>) {
     if (!leadFollowupDue(lead, nowIso)) continue;                    // pure guard (defends the SQL window)
     const siteQ = await svc(`presence_sites?id=eq.${lead.site_id}&select=client_id&limit=1`);
     const clientId = siteQ.json?.[0]?.client_id;

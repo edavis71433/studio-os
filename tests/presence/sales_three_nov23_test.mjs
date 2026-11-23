@@ -176,6 +176,30 @@ eq('201: the notice opens the enquiry, as the day-later nudge does', [W.noticeHr
   ok('201 follow-up: an id carrying filter grammar is refused, never widened to other enquiries', week(L4)?.status === 'active');
 }
 
+// ═══ 201's follow-up · the day-later sweep, end to end, on a database that returns only what is asked for ═══
+// Its guard reads status and spam; with them left out of the read it nudged nobody on the real
+// database (since July 2026), while a pretend database that returns whole rows always nudged.
+{
+  const LC = await import('../../supabase/functions/presence/commerce/lifecycle.ts');
+  const N = await import('../../supabase/functions/presence/lib/notice.ts');
+  const QUIET = id('f3f3f3f3', 1), ANSWERED = id('f3f3f3f3', 2), JUNK = id('f3f3f3f3', 3), FRESH = id('f3f3f3f3', 4);
+  const enq = (eid, name, over) => ({ id: eid, site_id: S, form_kind: 'contact', name, email: `${name.split(' ')[0].toLowerCase()}@example.test`, phone: '', message: 'Can you help with our website?', source_page: '/', status: 'new', spam: false, created_at: ago(2), fields: {}, ...over });
+  const w = world();
+  w.presence_form_submissions.push(enq(QUIET, 'Ivo Marsh', {}), enq(ANSWERED, 'Jo Pratt', { status: 'replied' }), enq(JUNK, 'Kim Spam', { spam: true }), enq(FRESH, 'Lu Chen', { created_at: ago(0.25) }));
+  db.reset(w); mail.length = 0;
+  db.honourSelect = true;
+  let ran = null;
+  try { ran = await LC.runLeadFollowups(); } finally { db.honourSelect = undefined; }
+  const raised = (db.tables.presence_plan_notices || []).filter((n) => n.kind === 'lead_followup' && n.status === 'active');
+  ok('201 follow-up: the day-later sweep nudges the enquiry left a day without an answer, and only that one (not one answered, spam, or a few hours old)',
+    ran?.nudged === 1 && raised.length === 1 && raised[0].period === N.leadFollowupPeriod(QUIET, Date.now()), JSON.stringify([ran, raised.map((n) => n.period)]));
+  const replyNow = () => mail.some((m) => [].concat(m.to || []).includes('owner@studio.test') && /Reply now/.test(String(m.html || '')));
+  await settle(replyNow);   // the sweep sends it without waiting (emailOperator(…).catch)
+  ok('201 follow-up: …its "Reply now" email reaches the owner, at the sign-in address when Business details has none', mail.some((m) => [].concat(m.to || []).includes('owner@studio.test') && /Reply now/.test(String(m.html || ''))), JSON.stringify(mail.map((m) => [m.to, m.subject])));
+  const again = await LC.runLeadFollowups();
+  ok('201 follow-up: the next sweep in the same week nudges it no more', again.nudged === 0 && (db.tables.presence_plan_notices || []).filter((n) => n.kind === 'lead_followup').length === 1);
+}
+
 // ═══ 211 · what AI help knows ═══
 eq('211: "How I write" is kept with the goal, cleaned, and cleared by empty', [
   L.applyGoalAi(L.normalizeGoalAi(null), { writing: '  Friendly, first names.\r\n\r\n\r\n50% deposit.  ' }, 'o@s.test', PINNED_NOW).value.writing,

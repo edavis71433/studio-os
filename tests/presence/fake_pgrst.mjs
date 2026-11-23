@@ -91,6 +91,17 @@ export function installFakePostgrest(opts = {}) {
     return null;
   };
 
+  // db.honourSelect (a Set of table names, or true for every table): a read gives back only the
+  // columns its select= names, as PostgREST does. Off by default: most suites seed whole rows and
+  // read them back. Sales item 201's follow-up: the day-later sweep's guard read `status`, which its
+  // select left out, so on the real database it never fired, while here it always did.
+  // A select with anything but plain column names (an embed, an alias, a JSON path, *) is left whole.
+  const picked = (table, sel, r) => {
+    const on = db.honourSelect === true || (db.honourSelect instanceof Set && db.honourSelect.has(table));
+    const cols = on && sel && sel !== '*' ? splitTop(sel).map((c) => c.trim()) : null;
+    if (!cols || !cols.every((c) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(c))) return { ...r };
+    return Object.fromEntries(cols.filter((c) => c in r).map((c) => [c, r[c]]));
+  };
   globalThis.fetch = async (url, init = {}) => {
     const u = new URL(String(url));
     const method = (init.method || 'GET').toUpperCase();
@@ -122,7 +133,7 @@ export function installFakePostgrest(opts = {}) {
       if (keys.length) out = [...out].sort((a, b) => { for (const [col, dir] of keys) { const x = String(a[col] ?? ''), y = String(b[col] ?? ''); if (x !== y) return (x < y ? -1 : 1) * (dir === 'desc' ? -1 : 1); } return 0; });
       const off = Math.max(0, Number(u.searchParams.get('offset') || 0)); if (off) out = out.slice(off);
       const lim = Number(u.searchParams.get('limit') || 0); if (lim) out = out.slice(0, lim);
-      return method === 'HEAD' ? new Response(null, { status: 200, headers: { 'content-range': `*/${out.length}` } }) : reply(out.map((r) => ({ ...r })));
+      return method === 'HEAD' ? new Response(null, { status: 200, headers: { 'content-range': `*/${out.length}` } }) : reply(out.map((r) => picked(table, u.searchParams.get('select'), r)));
     }
     const prefer = h.get('Prefer') || ''; const rep = prefer.includes('return=representation');
     if (method === 'POST') {
