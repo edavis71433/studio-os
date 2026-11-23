@@ -687,6 +687,7 @@ function go(view, early) {
   if (view === "bookings") loadBookings();
   if (view === "reviews") loadReviews();
   if (view === "search") { loadSearch(); hbLoadBoardExtras("search"); mountSearchCard(); }
+  if (view === "styles") paintStylesView();
   if (view === "business" && !TAB_ASKED.monitor) { TAB_ASKED.monitor = true; renderMonitorCard(); }
   if (view === "business") voiceLoad();   // item 328
   // CP-2.5: the live proof warms on entry. Item 85: already on a drawn canvas (a section's
@@ -729,7 +730,7 @@ function contextHint(view) {
   }, 400);
 }
 // ── CP-2.6: hash deep-links — the shell palette + nav route straight to tabs ──
-const HASH_VIEWS = { today: "today", pages: "pages", business: "business", settings: "business", search: "search", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", bookings: "bookings", appointments: "bookings", reviews: "reviews", reputation: "reviews", design: "design", history: "history", versions: "history" };
+const HASH_VIEWS = { today: "today", pages: "pages", business: "business", settings: "business", hours: "business", styles: "styles", search: "search", offerings: "offerings", content: "offerings", services: "offerings", menu: "offerings", faqs: "faqs", testimonials: "testimonials", updates: "updates", media: "media", photos: "media", bookings: "bookings", appointments: "bookings", reviews: "reviews", reputation: "reviews", design: "design", history: "history", versions: "history" };
 // Oct 2026 review: the FIRST paint honours the hash. boot() used to await the
 // whole refreshAll() read wave before routeHash(), so a #settings / #business /
 // #design link sat on the Today view's "Setting the table…" loadline for as
@@ -754,7 +755,9 @@ function routeHash() {
   if (h === "activity") { go("history"); setTimeout(() => hbScrollTo("activitySec"), 200); return; }  // timeline.html retired
   if (h === "preview") { openPreview("draft"); return; }
   if (h === "plan") { if (hasFeature("business_moments")) openCoachDesk(); return; }   // builder list item 184: a coach idea on the client's Do next list
-  if (h === "foundations" || h === "export") { openFoundationsDesk(); return; }   // deep-link the technical desk (approvals + "Download everything I own" live here)
+  if (h === "foundations" || h === "export") { openFoundationsDesk(); return; }
+  // builder item 385: the Do next list's "Thanksgiving is Thursday: are you open?" opens the Hours card
+  if (h === "hours") { go("business"); setTimeout(() => { const c = $("bizHoursH"); if (c) { c.scrollIntoView({ behavior: "smooth", block: "center" }); const f = $("hoursGrid").querySelector("input,button"); if (f) f.focus({ preventScroll: true }); } }, 350); return; }   // deep-link the technical desk (approvals + "Download everything I own" live here)
   // #monitor — the analytics "Add their website address" CTA (routes/analytics.ts
   // record_href). The card lives far down the Business view; without the scroll,
   // the link lands on a screen where the affordance it promised isn't in sight.
@@ -783,13 +786,11 @@ $("dock").addEventListener("click", (e) => {
 // Bookings and Reviews on a phone.
 // One menu, grouped by job, the way Squarespace groups its Website menu. On a
 // desktop it is drawn INTO the shell's sidebar under Website (mountSiteNav); on a
-// phone it is the Sections sheet. Styles opens Edit mode on its Styles panel.
-const SITE_MENU = [
-  [null, [["today", "Overview"], ["pages", "Pages"], ["styles", "Styles"], ["media", "Files"], ["search", "Search"]]],
-  ["Content", [["offerings", "Menu"], ["faqs", "Questions"], ["testimonials", "Testimonials"], ["updates", "Blog"]]],
-  [null, [["bookings", "Bookings"], ["reviews", "Reviews"], ["analytics", "Analytics"]]],
-  ["Site settings", [["business", "Business details"], ["domain", "Domain & email"], ["history", "Versions"], ["connections", "Connections"], ["sharing", "Sharing & access"], ["clientview", "See the client’s view"]]],
-];
+// phone it is the Sections sheet.
+// Builder item 370: the list itself lives in shell-kit.js (window.ddsSiteMenu), loaded before
+// this file, so Analytics and Connections draw the same menu in their sidebar inside a client.
+// Styles is a tab of its own now, with the editor's Styles panel one press away.
+const SITE_MENU = window.ddsSiteMenu.groups;
 const SITE_TABS = SITE_MENU.flatMap((g) => g[1]);
 // builder item 220: the note a Designer's pill opens: their work is saved, and who puts it live
 let WAIT_FROM = null;
@@ -823,8 +824,7 @@ function openSiteTab(view) {
   else if (view === "connections") location.href = withClient("/connections.html");
   else if (view === "sharing") location.href = withClient("/sharing.html");
   else if (view === "clientview") location.href = withClient("/client.html");
-  else if (view === "styles") { go("design"); setTimeout(() => { if (typeof openSettingsPanel === "function") openSettingsPanel("styles"); }, 60); }
-  else go(view);
+  else go(view);   // Styles too (item 370): its own tab, the menu kept, and Change the look opens the editor
 }
 function gateSiteMenu() {
   document.querySelectorAll('.navitem[data-link="connections"]').forEach((n) => { n.hidden = !hasFeature("connected"); });   // Business-OS
@@ -842,7 +842,7 @@ function buildSiteTabs() {
     if (isBusinessTab(view)) b.dataset.needs = "business";
     if (view === "domain") b.title = "Your domain, DNS records, email and the padlock — connect a custom domain here";
     else if (view === "analytics") { b.dataset.link = "analytics"; b.title = "Visitors, where they come from and your busiest pages"; }
-    else if (view === "styles") { b.dataset.link = "styles"; b.title = "Colours, fonts, corners and your template"; }
+    else if (view === "styles") { b.dataset.view = view; b.title = "Colours, fonts, corners and your template"; }
     else if (view === "connections") { b.dataset.link = "connections"; b.title = "The services connected to your site"; }
     else if (view === "sharing") { b.dataset.link = "sharing"; b.dataset.needs = "owner"; b.title = "Who can sign in, and what clients can see"; }
     else if (view === "clientview") { b.dataset.link = "clientview"; b.title = "See what your client sees when they sign in"; }
@@ -1635,6 +1635,26 @@ function blogLook() {
   return { ...base, ...(t.ink ? { ink: t.ink } : {}), ...(t.soft ? { soft: t.soft } : {}), ...(t.accent_dark || t.accent ? { accent: t.accent_dark || t.accent } : {}), ...(t.bg ? { bg: t.bg } : {}),
     ...(t.font_display ? { display: t.font_display } : {}), ...(t.font_body ? { body: t.font_body } : {}), radius: t.radius || "14px" };
 }
+// ── builder item 370: the Styles tab: the look as it is now, and the door to the editor's panel ──
+// The site's own colours and fonts (GET /dev/customization) over its template's; a failed read
+// shows the template's, said so. Nothing here changes the site.
+let STYLES_READ = null;
+async function paintStylesView() {
+  const host = $("stLook"); if (!host) return;
+  // a role that can't change the look (403) reads the template's, and is told who can
+  if (!STYLES_READ) STYLES_READ = api("GET", "/dev/customization").then((r) => (r && r.data && r.data.theme_tokens) || {}).catch((e) => (e && e.status === 403 ? "locked" : null));
+  const got = await STYLES_READ, locked = got === "locked", tokens = locked ? {} : got;
+  if (got === null) STYLES_READ = null;   // asked again next time
+  const btn = $("btnStylesEdit"); if (btn) btn.hidden = locked;
+  const keep = DESIGN_TOKENS; DESIGN_TOKENS = tokens || DESIGN_TOKENS || {};
+  const L = blogLook(); DESIGN_TOKENS = keep;
+  const font = (f) => esc(String(f || "").split(",")[0].replace(/['"]/g, "").trim() || "The system font");
+  const sw = (label, c) => `<div class="st-sw"><svg class="st-dot" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11" fill="${esc(c)}"/></svg><span><b>${esc(label)}</b><span class="st-hex">${esc(String(c).toUpperCase())}</span></span></div>`;
+  host.innerHTML = `<div class="st-row" role="list" aria-label="Colours">${[["Accent", L.accent], ["Text", L.ink], ["Background", L.bg]].map(([l, c]) => `<div role="listitem">${sw(l, c)}</div>`).join("")}</div>
+    <div class="st-row"><div class="st-font"><span class="st-k">Headings</span><b>${font(L.display)}</b></div><div class="st-font"><span class="st-k">Text</span><b>${font(L.body)}</b></div><div class="st-font"><span class="st-k">Corners</span><b>${esc(L.radius === "0" || L.radius === "0px" ? "Square" : "Rounded")}</b></div></div>
+    ${locked ? '<p class="hint">These are your template’s. Your role doesn’t change the site’s colours and fonts; the owner or the studio can.</p>' : tokens === null ? '<p class="hint">Your own colours couldn’t load just now, so these are your template’s.</p>' : ""}`;
+}
+document.addEventListener("click", (e) => { if (e.target && e.target.closest && e.target.closest("#btnStylesEdit")) { go("design"); setTimeout(() => { if (typeof openSettingsPanel === "function") openSettingsPanel("styles"); }, 60); } });
 // The one place a post is removed: the card's Remove, and the writing screen's.
 async function deletePost(p) {
   try { await api("DELETE", `/posts/${p.id}`); S.posts = S.posts.filter((x) => x.id !== p.id); toast("Removed"); scheduleChangesRefresh(); return true; }
@@ -7509,6 +7529,7 @@ function renderSvConsole() {
     host.appendChild(when);
     host.insertAdjacentHTML("beforeend", svTable("What people searched", "Search", (c.top_terms || []).map((t) => ({ name: t.term, clicks: t.clicks, impressions: t.impressions }))));
     host.insertAdjacentHTML("beforeend", svTable("Your pages on Google", "Page", (c.top_pages || []).map((p) => ({ name: p.path, clicks: p.clicks, impressions: p.impressions }))));
+    svSeenLittle(host);   // builder item 384
   } else if (c.unavailable) {
     host.appendChild(el("p", "hint", "Search numbers are catching their breath. Check back shortly."));
   }
@@ -7955,6 +7976,23 @@ function renderSvNear() {
     <tbody>${list.map((x, i) => `<tr><td class="q">${esc(x.term)}</td><td class="pl"><b>#${esc(Math.round(x.place))}</b>${x.prior_place == null ? `<span class="sv-chg">New</span>` : svChg(x.place, x.prior_place, "place")}</td><td class="sn">${svNum(x.seen)}</td><td class="ck">${svNum(x.clicks)}</td><td class="pg"><span class="sv-near-ph">Google shows </span>${esc(x.path)}${x.path === "/" ? " (Home)" : ""}</td><td class="fx">${esc(x.words)}</td><td class="act">${x.fix === "check" && !live ? "" : `<button type="button" class="sv-near-go" data-near="${i}" aria-label="${esc(SV_NEAR_GO[x.fix] || "Open")}: ${esc(x.term)}">${esc(SV_NEAR_GO[x.fix] || "Open")}</button>`}</td></tr>`).join("")}</tbody></table>
     <p class="hint">Place is Google’s average for the month; page one is places 1 to 10. The fix is checked against the page’s own title and description on Google, never guessed.</p>`;
   host.querySelectorAll("[data-near]").forEach((b) => b.addEventListener("click", () => svNearGo(list[Number(b.getAttribute("data-near"))], live)));
+}
+// ── builder item 384: seen a lot on Google, clicked little (GET /visibility seen_little) ──
+// The pages Google showed at least 100 times last month that fewer than 2 in 100 people picked,
+// each with a plain hint. Change its title opens that page's own title and description on
+// Google: the home page's on this tab, any other page's in its settings. A page that isn't
+// one of the site's own (a blog post, an old address) gets the hint alone.
+function svSeenLittle(host) {
+  const d = SV && SV.seen_little, list = (d && d.list) || [];
+  if (!list.length) return;
+  let m = null; try { m = pgModel(); } catch (_) { /* no pages read yet: hints alone */ }
+  const can = (x) => x.path === "/" || !!(m && pgEntry(m, { href: x.path }));
+  const box = el("section", "sv-seen"); box.setAttribute("aria-labelledby", "svSeenH");
+  box.innerHTML = `<h4 id="svSeenH">Seen a lot, clicked little</h4>
+    <p class="hint">Pages Google showed at least 100 times in ${esc(svMonth(d.period))} that fewer than 2 in 100 people picked. Google decides how often a page is shown; its title and description on Google decide whether people pick it.</p>
+    <ul class="sv-seen-l">${list.map((x, i) => `<li><div class="sv-seen-t"><b title="${esc(x.path)}">${esc(x.path)}</b><span class="sv-seen-n">Seen ${svNum(x.seen)} · picked ${svNum(x.clicks)}</span><span class="sv-seen-h">${esc(x.hint)}</span></div>${can(x) ? `<button type="button" class="pillbtn sm" data-seen="${i}">Change its title</button>` : ""}</li>`).join("")}</ul>`;
+  box.querySelectorAll("[data-seen]").forEach((b) => b.addEventListener("click", () => { const x = list[Number(b.getAttribute("data-seen"))]; if (x) svNearGo({ fix: "title", key: x.path === "/" ? "home" : "page", path: x.path }, ""); }));
+  host.appendChild(box);
 }
 function svNearGo(x, live) {
   if (!x) return;
@@ -8756,6 +8794,7 @@ function vocabWords() {
 const vocabCap = (w) => String(w || "").charAt(0).toUpperCase() + String(w || "").slice(1);
 function applyVocab() {
   VOCAB = vocabWords();
+  try { const c = new URLSearchParams(location.search).get("client"); if (c && window.ddsSiteMenu) window.ddsSiteMenu.word(c, VOCAB.label); } catch (_) { /* the other pages fall back to a plain word */ }
   document.querySelectorAll('.navitem[data-view="offerings"]').forEach((n) => { n.textContent = VOCAB.label; });   // main tab + sections sheet stay in sync
   const h = document.querySelector("#view-offerings h1.doc"); if (h) h.textContent = VOCAB.label;
   const sub = document.querySelector("#view-offerings .docsub"); if (sub) sub.textContent = VOCAB.sub;
