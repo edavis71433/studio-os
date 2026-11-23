@@ -129,6 +129,11 @@
             <option value="law">Law</option><option value="accounting">Accounting</option><option value="insurance">Insurance</option><option value="consulting">Consulting</option><option value="marketing">Marketing</option><option value="real_estate">Real estate</option><option value="photography">Photography</option>
             <option value="retail">Retail / shop</option><option value="nonprofit">Nonprofit</option><option value="church">Church</option><option value="professional">Professional services</option>
           </select><div class="hint" id="industryHint">Sets the words your site uses, like Menu or Services, and tells Google what you are. Applies when you next publish.</div></div>
+          <div class="field" id="voiceField"><label for="f-voice">How you sound</label><select id="f-voice" aria-describedby="voiceHint">
+            <option value="">Not chosen yet</option>
+            <option value="Warm and friendly">Warm and friendly</option><option value="Calm and professional">Calm and professional</option><option value="Upbeat and fun">Upbeat and fun</option><option value="Simple and to the point">Simple and to the point</option><option value="Polished and upscale">Polished and upscale</option>
+            <option value="own">In my own words</option>
+          </select><input type="text" id="f-voice-own" maxlength="600" aria-label="How you sound, in your own words" placeholder="e.g. Honest and down to earth, no jargon" hidden><div class="hint" id="voiceHint">The AI writer writes in this voice when it drafts or rewrites your words.</div></div>
           </section>
           <section class="biz-card" aria-labelledby="bizContactH">
           <h5 class="rune" id="bizContactH">Contact</h5>
@@ -386,7 +391,6 @@
               <button type="button" class="dc-dk" data-dcmode="comments" id="btnComments" data-ico="message" aria-pressed="false" title="Notes on this draft, from you and your client, section by section"><span class="dc-dk-l">Notes</span></button>
               <button type="button" class="dc-dk" data-dcmode="timewarp" data-ico="clock" aria-pressed="false" title="See your site as it looked on any past date"><span class="dc-dk-l">Versions</span></button>
             </div>
-            <button type="button" class="dc-dk" id="dkFind" data-ico="search" title="Find a section to add"><span class="dc-dk-l">Find</span></button>
             <button type="button" class="dc-dk dc-dk-phone" id="dkPreview" data-ico="eye" title="See this page the way a visitor will"><span class="dc-dk-l">Preview</span></button>
           </div>
           <button type="button" class="dc-dk dc-dk-phone" id="dkMore" data-ico="more" aria-expanded="false" aria-controls="dcDockMore" title="More tools"><span class="dc-dk-l">More</span></button>
@@ -401,10 +405,11 @@
                  machinery (History's version tools, same fetch shape), rendered into
                  the canvas frame read-only. "Back to today" exits to Edit. -->
             <div id="dcTwBar" class="dc-twbar" hidden>
-              <label for="dcTwDate">Your site as it looked on…</label>
+              <div class="dc-twhead"><span class="dc-twt" id="dcTwTitle">Your saved versions, newest first</span><button type="button" class="dc-actbtn dc-ghost" id="dcTwBack">Back to today</button></div>
+              <div class="dc-twlist" id="dcTwList" role="group" aria-labelledby="dcTwTitle"></div>
+              <div class="dc-twrow"><label for="dcTwDate">Or pick a date</label>
               <input type="date" id="dcTwDate" aria-label="Date to look back to">
-              <span class="dc-twmsg" id="dcTwMsg" role="status"></span>
-              <button type="button" class="dc-actbtn dc-ghost" id="dcTwBack">Back to today</button>
+              <span class="dc-twmsg" id="dcTwMsg" role="status"></span></div>
             </div>
             <div id="designPreviewWrap">
               <div class="dp-stage" id="dpStage">
@@ -499,7 +504,7 @@
             <div class="dc-panel-scroll">
               <!-- The site's overall look (theme) lives here now — off the Design page,
                    since starting a page/layout happens through "＋ Page". -->
-              <div class="hint" id="stylesAsk" hidden data-if-lacks="design" style="padding:16px 18px">Ask the account owner to change your template, colors or fonts.</div>
+              <div class="hint" id="stylesAsk" hidden data-if-lacks="design" style="padding:16px 18px">Ask the account owner to change your template, colours or fonts.</div>
               <div id="designGallery" hidden data-needs="owner"></div>
               <div id="designHost"></div>
               <div id="hfCard"></div>
@@ -631,6 +636,7 @@
   <div class="sheetcard" role="dialog" aria-modal="true" aria-labelledby="deskTitle">
     <h2 id="deskTitle"><span class="aimark">✦</span> Draft it with help</h2>
     <p class="sub" id="deskSub"></p>
+    <p class="desk-voice" id="deskVoice" hidden></p>
     <div class="body">
       <div class="field" style="margin-bottom:16px">
         <label for="deskInstructions">Anything you want it to know?</label>

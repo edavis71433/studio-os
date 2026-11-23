@@ -98,7 +98,7 @@ test.describe('the editor on a phone and with the keyboard (builder item 171)', 
     await expect(dock).not.toHaveClass(/\bmore-open\b/);
     await page.locator('#btnTrayClose').click();
     await more.click(); await expect(dock).toHaveClass(/\bmore-open\b/);
-    await page.locator('#dkFind').click();
+    await page.locator('#dkLayers').click();   // builder item 326: Find is gone; Layers is behind More too
     await expect(dock).not.toHaveClass(/\bmore-open\b/);
   });
 

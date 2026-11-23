@@ -304,7 +304,7 @@ function shell(look: TemplateLook, c: SnapshotContent, site: SiteConfig, cssPath
   const logoH = /^\d{2}$/.test(x.tokens.logo_height || '') ? Number(x.tokens.logo_height) : 0;
   const logoImg = hasLogo && brandMode !== 'name'
     ? `<img src="${attr(logo!.variants!.w400)}" alt="${brandMode === 'logo' ? attr(i.business_name) : ''}" class="brandlogo"${logo!.width && logo!.height ? ` width="${logo!.width}" height="${logo!.height}"` : ''}>` : '';
-  const brand = `<a class="brand${brandMode === 'logo' ? ' brand-logo-only' : ''}" href="/"${logoH ? ` style="--logo-h:${logoH}px"` : ''}>${logoImg}${brandMode === 'logo' ? '' : esc(i.business_name)}</a>`;
+  const brand = `<a class="brand${brandMode === 'logo' ? ' brand-logo-only' : ''}" href="/"${logoH ? ` style="--logo-h:${logoH}px"` : ''}>${logoImg}${brandMode === 'logo' ? '' : `<span class="brand-name">${esc(i.business_name)}</span>`}</a>`;   // item 430: the name has its own box, so a phone can hold it to two lines
 
   return `${seoHead(o, site, c, x, look.critical + SHELL_CRITICAL, cssPath).replace('</head>', `${SHELL_NOSCRIPT}\n</head>`)}
 <body>

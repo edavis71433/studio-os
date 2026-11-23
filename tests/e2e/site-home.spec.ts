@@ -1408,7 +1408,7 @@ test.describe('Styles show on the page at once, and save behind', () => {
 
   test('on Slate the colour choices are left out, and the panel says why', async ({ page }) => {
     await styles(page, { '/site': { data: { site: { id: 's1', edition: 'presence', status: 'ready', template_slug: 'slate', template_version: 1 }, identity: { business_name: 'Marlow’s Kitchen', description: 'Hello' }, location: { city: 'Burbank' } } } });
-    await expect(page.locator('#designCard')).toContainText('keeps its own dark colors');
+    await expect(page.locator('#designCard')).toContainText('keeps its own dark colours');
     await expect(page.locator('#designCard').getByRole('button', { name: 'Evergreen', exact: true })).toHaveCount(0);
     await page.locator('#stylesSeg [data-stab="fonts"]').click();
     await expect(page.locator('#designCard').getByRole('button', { name: 'Understated mono', exact: true })).toBeVisible();

@@ -317,7 +317,7 @@ test.describe('the Edit bar and the panels', () => {
       expect(Math.abs(bar.x + bar.width / 2 - w / 2)).toBeLessThan(2);   // the pill floats at the top centre
       const dock = (await page.locator('#dcDock').boundingBox())!;
       expect(dock.x + dock.width).toBeLessThan(bar.x);               // and never touches the dock
-      for (const sel of ['#btnEditExit', '#btnTrayOpen', '#dkPages', '#btnSettingsOpen', '#dkPhotos', '#btnComments', '#dkFind', '#btnUndo', '#btnRedo']) await expect(page.locator(sel)).toBeInViewport();
+      for (const sel of ['#btnEditExit', '#btnTrayOpen', '#dkPages', '#btnSettingsOpen', '#dkPhotos', '#btnComments', '#btnUndo', '#btnRedo']) await expect(page.locator(sel)).toBeInViewport();
       await openPages(page);
       await expect(page.locator('#pagesBar .page-pill').first()).toBeVisible();
       for (const sel of ['#btnPageAdd', '#btnPagesClose', '#pcFind']) await expect(page.locator(sel)).toBeInViewport();
@@ -434,17 +434,14 @@ test.describe('what a real site showed', () => {
     const search = page.locator('#designTray .tray-search');
     if (isPhone(page)) {
       // a phone's keyboard would cover the tiles: Add starts on Done with the search box in view,
-      // and Find, behind More, is the way straight into the search
+      // one tap away (builder item 326 took the dock's Find, which opened this same card)
       await expect(page.locator('#btnTrayClose')).toBeFocused();
       await expect(search).toBeInViewport();
       expect(await page.locator('#designTray').evaluate((n) => n.scrollTop)).toBe(0);
-      await page.locator('#btnTrayClose').click();
-      await page.locator('#dkMore').click();
-      await page.locator('#dkFind').click();
-      await expect(page.locator('#dcDock')).not.toHaveClass(/more-open/);
+      await search.click();
     }
     await expect(search).toBeFocused();
-    expect(await page.evaluate(() => (window as any).__traySeen)).toEqual([0]);
+    if (!isPhone(page)) expect(await page.evaluate(() => (window as any).__traySeen)).toEqual([0]);
     await page.waitForTimeout(400);
     await expect(search).toBeInViewport();
     expect(await page.locator('#designTray').evaluate((n) => n.scrollTop)).toBe(0);
