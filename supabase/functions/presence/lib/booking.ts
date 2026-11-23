@@ -49,6 +49,52 @@ export interface BookingConfig {
   max_days_ahead: number;       // latest bookable = today + this many days
   timezone: string;             // IANA name (display + the route's local↔UTC bridge)
   auto_confirm: boolean;        // true → new bookings land 'confirmed'; false → 'pending'
+  /** Builder item 291: a date's own hours (a holiday the business keeps shorter hours on),
+   *  over the weekly ones. Only set when the booking hours follow the business hours. */
+  date_hours?: Record<string, TimeRange[]>;
+}
+
+// ═════════ builder item 291: booking hours that follow the business hours ═════════
+// A week with no booking hours in it took no bookings at all, so it now means "the same as
+// my business hours": the owner sets their hours once, on the business details, and sets
+// booking hours only when they differ. Pure.
+const BIZ_DAY: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+type BizDay = { day?: unknown; closed?: unknown; intervals?: Array<{ open?: unknown; close?: unknown }> };
+type BizHoliday = { date?: unknown; closed?: unknown; intervals?: Array<{ open?: unknown; close?: unknown }> };
+/** True when the owner has set no booking hours of their own. */
+export function followsBusinessHours(weekly: WeeklyHours): boolean {
+  return weekly.every((d) => !d.length);
+}
+/** One business-hours day's open times as booking ranges: a time that runs past midnight
+ *  stops at midnight, and a range that doesn't parse is left out. */
+function bizRanges(intervals: unknown): TimeRange[] {
+  const out: TimeRange[] = [];
+  for (const i of (Array.isArray(intervals) ? intervals : []).slice(0, MAX_RANGES_PER_DAY)) {
+    const a = hhmmToMin(s((i as { open?: unknown })?.open, 5)), b0 = hhmmToMin(s((i as { close?: unknown })?.close, 5));
+    if (a == null || b0 == null) continue;
+    const b = b0 <= a ? 1439 : b0;   // open late, closing after midnight
+    if (b > a) out.push({ start: minToHHMM(a), end: minToHHMM(b) });
+  }
+  return out;
+}
+/** The business hours (lib/render_types HoursDay[] and HolidayException[]) as booking hours:
+ *  the week, the days closed for a holiday, and a holiday's own shorter hours. */
+export function bookingHoursFromBusiness(hours: unknown, holidays: unknown): { weekly: WeeklyHours; closed_dates: string[]; date_hours: Record<string, TimeRange[]> } {
+  const weekly: WeeklyHours = [[], [], [], [], [], [], []];
+  for (const d of (Array.isArray(hours) ? hours : []) as BizDay[]) {
+    const idx = BIZ_DAY[String(d?.day || '')];
+    if (idx == null || d.closed === true) continue;
+    weekly[idx] = bizRanges(d.intervals);
+  }
+  const closed_dates: string[] = [];
+  const date_hours: Record<string, TimeRange[]> = {};
+  for (const h of ((Array.isArray(holidays) ? holidays : []) as BizHoliday[]).slice(0, MAX_CLOSED_DATES)) {
+    const date = s(h?.date, 10);
+    if (!DATE_RE.test(date) || dateMin(date, 0) == null) continue;
+    const r = h.closed === true ? [] : bizRanges(h.intervals);
+    if (r.length) date_hours[date] = r; else closed_dates.push(date);
+  }
+  return { weekly, closed_dates, date_hours };
 }
 
 // ── caps (bounded, never unbounded) ──────────────────────────────────────────
@@ -224,7 +270,7 @@ export function generateSlots(input: SlotGenInput): string[] {
     .filter((b): b is { a: number; z: number } => b.a != null && b.z != null);
 
   const out: string[] = [];
-  for (const range of config.weekly[dow] || []) {
+  for (const range of config.date_hours?.[date] || config.weekly[dow] || []) {   // item 291: a holiday's own hours first
     const rs = hhmmToMin(range.start), re = hhmmToMin(range.end);
     if (rs == null || re == null) continue;
     for (let m = rs; m + dur <= re; m += config.slot_interval_min) {
@@ -239,6 +285,31 @@ export function generateSlots(input: SlotGenInput): string[] {
     }
   }
   return out;
+}
+
+// ═════════ builder item 291: the days a visitor can pick ═════════
+/** The days from `from` to `to` (business-local, at most six weeks) that still have an open
+ *  time for an appointment this long, and the first open time from now on, looked for to the
+ *  end of the booking window. Today counts until its last open time has gone, in the
+ *  business's own day. `taken` gives one day's booked and busy times. Pure. */
+export const DAYS_SPAN_MAX = 42;
+export function openDays(input: { from: string; to: string; config: BookingConfig; duration_min: number; now_local: string; taken: (date: string) => Array<{ start: string; end: string }> }): { today: string; last: string; open: string[]; next: string | null } {
+  const today = LOCAL_DT_RE.test(input.now_local) ? input.now_local.split('T')[0] : '';
+  if (!today || !DATE_RE.test(input.from) || !DATE_RE.test(input.to)) return { today, last: today, open: [], next: null };
+  const last = addDays(today, input.config.max_days_ahead);
+  const firstOn = new Map<string, string>();
+  const first = (date: string): string => {
+    if (!firstOn.has(date)) firstOn.set(date, generateSlots({ date, config: input.config, duration_min: input.duration_min, now_local: input.now_local, booked: input.taken(date) })[0] || '');
+    return firstOn.get(date)!;
+  };
+  const start = input.from > today ? input.from : today;
+  const capped = addDays(start, DAYS_SPAN_MAX - 1);
+  const end = [input.to, last, capped].sort()[0];
+  const open: string[] = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) if (first(d)) open.push(d);
+  let next: string | null = null;
+  for (let d = today, n = 0; d <= last && n <= 366; d = addDays(d, 1), n++) { const f = first(d); if (f) { next = f; break; } }
+  return { today, last, open, next };
 }
 
 // ═════════ validateBookingInput — the runtime gate for a public booking ═════════

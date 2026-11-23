@@ -45,6 +45,7 @@ import type { Principal } from '../../_shared/auth.ts';
 import {
   normalizeAppointmentType, normalizeBookingConfig, generateSlots, validateBookingInput,
   slotEndLocal, humanSlot, priceText, type BookingConfig, type AppointmentType,
+  followsBusinessHours, bookingHoursFromBusiness, openDays, addDays, DAYS_SPAN_MAX,
 } from '../lib/booking.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { normEmail, emailMatch } from '../lib/contact_email.ts';
@@ -78,12 +79,21 @@ function localToUtcIso(local: string, tz: string): string {
 }
 
 // ═════════ shared loaders / degradation ═════════
-async function loadSettings(siteId: string): Promise<{ enabled: boolean; config: BookingConfig; intro: string } | null> {
+async function loadSettings(siteId: string): Promise<{ enabled: boolean; config: BookingConfig; intro: string; hoursFrom: 'business' | 'own' } | null> {
   const r = await svc(`presence_booking_settings?site_id=eq.${siteId}&select=*&limit=1`);
   if (!r.ok) return null;                                    // pre-0099 → dormant
   const row = rows(r)[0];
-  const config = normalizeBookingConfig(row || {});
-  return { enabled: !!(row && row.enabled), config, intro: String(row?.intro || '') };
+  const own = normalizeBookingConfig(row || {});
+  const config = followsBusinessHours(own.weekly) ? await withBusinessHours(siteId, own) : own;
+  return { enabled: !!(row && row.enabled), config, intro: String(row?.intro || ''), hoursFrom: followsBusinessHours(own.weekly) ? 'business' : 'own' };
+}
+/** Builder item 291: with no booking hours of their own set, bookings follow the business
+ *  hours (the main location's week, its holidays closed or shorter). Exported for its test. */
+export async function withBusinessHours(siteId: string, config: BookingConfig): Promise<BookingConfig> {
+  const loc = rows(await svc(`presence_locations?site_id=eq.${siteId}&select=hours,holiday_exceptions&order=created_at.asc&limit=1`).catch(() => ({ json: [] })))[0];
+  if (!loc) return config;
+  const biz = bookingHoursFromBusiness(loc.hours, loc.holiday_exceptions);
+  return { ...config, weekly: biz.weekly, closed_dates: [...new Set([...config.closed_dates, ...biz.closed_dates])], date_hours: biz.date_hours };
 }
 async function loadActiveTypes(siteId: string): Promise<AppointmentType[] | null> {
   const r = await svc(`presence_appointment_types?site_id=eq.${siteId}&deleted_at=is.null&active=is.true&select=id,name,duration_min,price_cents,description,sort_order&order=sort_order.asc,name.asc&limit=60`);
@@ -227,6 +237,7 @@ export async function handleBookingTypes(req: Request, siteId: string, cors: Rec
   return json({ data: {
     enabled: true, intro: settings.intro,
     timezone: settings.config.timezone,
+    today: nowLocal(settings.config.timezone).slice(0, 10),   // item 291: the business's own day, not the visitor's
     max_days_ahead: settings.config.max_days_ahead,
     types: types.map((t) => ({ id: t.id, name: t.name, duration_min: t.duration_min, price_text: priceText(t.price_cents), description: t.description || '' })),
   } }, 200, cors);
@@ -253,6 +264,44 @@ export async function handleBookingSlots(req: Request, siteId: string, cors: Rec
     now_local: nowLocal(settings.config.timezone), booked,
   });
   return json({ data: { date, duration_min: tn.type.duration_min, slots } }, 200, cors);
+}
+
+/** Booked times from one local date to another (inclusive), by date. */
+async function bookedBetween(siteId: string, from: string, to: string): Promise<Map<string, Array<{ start: string; end: string }>>> {
+  const r = await svc(`presence_appointments?site_id=eq.${siteId}&status=in.(pending,confirmed)&slot_start_local=gte.${from}T00:00&slot_start_local=lte.${to}T23:59&select=slot_start_local,duration_min&order=slot_start_local.asc&limit=2000`);
+  const out = new Map<string, Array<{ start: string; end: string }>>();
+  for (const a of rows(r)) {
+    const start = String(a.slot_start_local || ''); if (!start) continue;
+    const d = start.slice(0, 10);
+    out.set(d, [...(out.get(d) || []), { start, end: slotEndLocal(start, Number(a.duration_min) || 30) }]);
+  }
+  return out;
+}
+
+/** PUBLIC (builder item 291) — the days of a month a service can still be booked on, in
+ *  the business's own day, and the first open time. GET /book/:siteId/days?type=&from=&to= */
+export async function handleBookingDays(req: Request, siteId: string, cors: Record<string, string>): Promise<Response> {
+  if (!UUID_RE.test(siteId)) return json({ error: 'not_found' }, 404, cors);
+  if (!(await rateAllow(`book:days:ip:${clientIp(req)}`, 30, 60)) || !(await rateAllow(`book:days:site:${siteId}`, 120, 60))) return tooMany(cors);
+  const u = new URL(req.url);
+  const typeId = String(u.searchParams.get('type') || '').trim();
+  const from = String(u.searchParams.get('from') || '').trim(), to = String(u.searchParams.get('to') || '').trim();
+  const none = { open: [] as string[], next: null };
+  if (!UUID_RE.test(typeId) || !DATE_RE.test(from) || !DATE_RE.test(to) || to < from) return json({ data: none }, 200, cors);
+  const settings = await loadSettings(siteId);
+  if (!settings || !settings.enabled) return json({ data: none }, 200, cors);
+  const tRow = rows(await svc(`presence_appointment_types?id=eq.${typeId}&site_id=eq.${siteId}&deleted_at=is.null&active=is.true&select=id,name,duration_min,price_cents,description,sort_order&limit=1`))[0];
+  const tn = tRow ? normalizeAppointmentType(tRow) : null;
+  if (!tn || !tn.ok) return json({ data: none }, 200, cors);
+  const cfg = settings.config;
+  const now = nowLocal(cfg.timezone), today = now.slice(0, 10);
+  const [booked, busy] = await Promise.all([
+    bookedBetween(siteId, today, addDays(today, cfg.max_days_ahead)),
+    bookingOptions(siteId).then((o) => busyFor(siteId, o, cfg)).catch(() => [] as BusyRange[]),
+  ]);
+  const r = openDays({ from, to: to < addDays(from, DAYS_SPAN_MAX - 1) ? to : addDays(from, DAYS_SPAN_MAX - 1), config: cfg, duration_min: tn.type.duration_min, now_local: now,
+    taken: (d) => [...(booked.get(d) || []), ...busyOnDate(busy, d, cfg.timezone)] });
+  return json({ data: { today: r.today, last: r.last, open: r.open, next: r.next } }, 200, cors);
 }
 
 /** PUBLIC — create a booking. Honeypot + rate-limit + validation, mirroring the
@@ -484,8 +533,10 @@ export async function handleBookingSettingsGet(site: SiteRow, cors: Record<strin
   if (!r.ok) return unavailable(cors);
   const row = rows(r)[0];
   const config = normalizeBookingConfig(row || {});
+  // item 291: no booking hours of their own means the business hours, which the desk shows
+  const biz = followsBusinessHours(config.weekly) ? (await withBusinessHours(site.id, config)).weekly : null;
   // item 149: whether customers change or cancel themselves, and how the owner's own calendar stands
-  return json({ data: { enabled: !!(row && row.enabled), intro: String(row?.intro || ''), ...config, self_manage: opts.self_manage, calendar: await calendarStatus(site.id, opts) } }, 200, cors);
+  return json({ data: { enabled: !!(row && row.enabled), intro: String(row?.intro || ''), ...config, hours_from: biz ? 'business' : 'own', ...(biz ? { business_weekly: biz } : {}), self_manage: opts.self_manage, calendar: await calendarStatus(site.id, opts) } }, 200, cors);
 }
 
 export async function handleBookingSettingsPut(req: Request, site: SiteRow, principal: Principal, cors: Record<string, string>): Promise<Response> {

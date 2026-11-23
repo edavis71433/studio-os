@@ -2868,10 +2868,20 @@ function bkField(label, node) {
   w.appendChild(el("span", null, label)); w.appendChild(node); return w;
 }
 // Collect the full config from the availability form into the API shape.
+// Item 291: one line for the business hours the booking hours follow ("Monday to Friday, 9 AM to 5 PM").
+function bkTime(hm) { const [h, m] = String(hm).split(":").map(Number); const ap = h < 12 ? "AM" : "PM"; const h12 = h % 12 || 12; return h12 + (m ? ":" + String(m).padStart(2, "0") : "") + " " + ap; }
+function bkHoursLine(weekly) {
+  const day = (idx) => ((Array.isArray(weekly) && weekly[idx]) || []).map((r) => bkTime(r.start) + " to " + bkTime(r.end)).join(" and ");
+  const runs = [];
+  BK_DAYS.forEach(([idx, name]) => { const t = day(idx); const last = runs[runs.length - 1]; if (last && last.t === t) last.to = name; else runs.push({ from: name, to: name, t }); });
+  const open = runs.filter((r) => r.t).map((r) => (r.from === r.to ? r.from : r.from + " to " + r.to) + ", " + r.t);
+  return open.length ? open.join(". ") + "." : "";
+}
 function bkGatherSettings(root) {
   const g = (sel) => root.querySelector(sel);
   const weekly = [[], [], [], [], [], [], []];
-  BK_DAYS.forEach(([idx]) => {
+  const sameAsBusiness = !!(g(".bk-hours-from[value='business']") || {}).checked;   // item 291: no hours of their own
+  if (!sameAsBusiness) BK_DAYS.forEach(([idx]) => {
     const on = g(`[data-day='${idx}'] .bk-on`).checked;
     const st = g(`[data-day='${idx}'] .bk-start`).value, en = g(`[data-day='${idx}'] .bk-end`).value;
     if (on && st && en) weekly[idx] = [{ start: st, end: en }];
@@ -2900,6 +2910,9 @@ function renderBookings(wrap, appts) {
   const en = el("input"); en.type = "checkbox"; en.className = "bk-enabled"; en.checked = !!s.enabled; en.style.width = "auto";
   enWrap.append(en, el("span", null, "Accept bookings on my website"));
   form.appendChild(enWrap);
+  // item 291: the switch is read by the live site each time someone opens it, so say so plainly
+  const liveNote = el("p", "hint bk-live-note", "This switch works on your live site straight away. You don’t need to publish."); liveNote.style.margin = "-4px 0 12px";
+  form.appendChild(liveNote);
   const introI = el("input"); introI.type = "text"; introI.className = "bk-intro"; introI.value = s.intro || ""; introI.style.cssText = BK_ICSS;
   introI.placeholder = "A short welcome line (optional) — e.g. Pick a service and a time that suits you.";
   form.appendChild(bkField("Intro shown above the widget", introI));
@@ -2907,7 +2920,34 @@ function renderBookings(wrap, appts) {
 
   // ── 2. Availability + window ────────────────────────────────────────────────
   const c2 = bkCard("Your hours", "The days and times you take appointments. Slots are offered inside these hours, minus anything already booked.");
-  const grid = el("div"); grid.style.cssText = "display:grid;gap:8px;margin-bottom:14px";
+  // Item 291: booking hours are the business hours unless the owner sets different ones
+  const ownSet = Array.isArray(s.weekly) && s.weekly.some((d) => Array.isArray(d) && d.length);
+  const bizLine = bkHoursLine(s.business_weekly);
+  const pick = el("div"); pick.className = "bk-hours-pick"; pick.setAttribute("role", "radiogroup"); pick.setAttribute("aria-label", "Booking hours"); pick.style.cssText = "display:grid;gap:2px;margin-bottom:10px";
+  const choice = (val, label) => {
+    const w = el("label"); w.style.cssText = "display:flex;align-items:center;gap:10px;min-height:44px;font-size:14px;font-weight:600;cursor:pointer";
+    const r = el("input"); r.type = "radio"; r.name = "bk-hours-from"; r.value = val; r.className = "bk-hours-from"; r.checked = (val === "own") === ownSet; r.style.width = "auto";
+    w.append(r, el("span", null, label)); return w;
+  };
+  pick.append(choice("business", "The same as my business hours"), choice("own", "Different hours for bookings"));
+  c2.appendChild(pick);
+  const bizNote = el("p", "hint bk-biz-hours", bizLine
+    ? bizLine + " Change these in Business details, and bookings follow."
+    : "Your business hours aren’t set yet. Add them in Business details, or choose different hours for bookings.");
+  bizNote.style.margin = "0 0 12px";
+  c2.appendChild(bizNote);
+  const grid = el("div"); grid.className = "bk-days"; grid.style.cssText = "display:grid;gap:8px;margin-bottom:14px";
+  const showPick = () => {
+    const same = pick.querySelector(".bk-hours-from[value='business']").checked;
+    grid.hidden = same; bizNote.hidden = !same;
+    // choosing different hours starts from the business hours, so only the differences need typing
+    if (!same && !grid.querySelector(".bk-on:checked") && Array.isArray(s.business_weekly)) BK_DAYS.forEach(([idx]) => {
+      const r0 = (s.business_weekly[idx] || [])[0]; const row = grid.querySelector(`[data-day='${idx}']`);
+      if (!r0 || !row) return;
+      row.querySelector(".bk-on").checked = true; row.querySelector(".bk-start").value = r0.start; row.querySelector(".bk-end").value = r0.end;
+    });
+  };
+  pick.addEventListener("change", showPick);
   BK_DAYS.forEach(([idx, name]) => {
     const ranges = (Array.isArray(s.weekly) && Array.isArray(s.weekly[idx])) ? s.weekly[idx] : [];
     const r0 = ranges[0] || {};
@@ -2921,6 +2961,7 @@ function renderBookings(wrap, appts) {
     grid.appendChild(row);
   });
   c2.appendChild(grid);
+  showPick();
   const opts = el("div"); opts.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px";
   const interval = el("select"); interval.className = "bk-interval"; BK_INTERVALS.forEach((m) => { const o = el("option", null, m + " min"); o.value = m; if (+m === +(s.slot_interval_min || 30)) o.selected = true; interval.appendChild(o); }); interval.style.cssText = BK_ICSS;
   const buffer = el("input"); buffer.type = "number"; buffer.className = "bk-buffer"; buffer.min = 0; buffer.max = 240; buffer.value = s.buffer_min || 0; buffer.style.cssText = BK_ICSS;
@@ -3210,7 +3251,7 @@ function renderReviews(wrap, data) {
 
   // ── 3. Showing on your site (approved) ──────────────────────────────────────
   const approved = reviews.filter((r) => r.status === "approved");
-  const c3 = rvCard("Showing on your site" + (agg.count ? " · " + (agg.average % 1 === 0 ? agg.average : agg.average.toFixed(1)) + "★ from " + agg.count : ""), "Approved reviews. Add the “Reviews wall” section to a page (Edit site → add a section) to display them — with honest star ratings for search. Changes appear the next time you publish.");
+  const c3 = rvCard("Showing on your site" + (agg.count ? " · " + (agg.average % 1 === 0 ? agg.average : agg.average.toFixed(1)) + "★ from " + agg.count : ""), "Approved reviews. Add the “Reviews wall” section to a page (Edit site → add a section) to display them with their stars. Google shows no stars in its results for reviews you collect on your own site. Changes appear the next time you publish.");
   if (!approved.length) c3.appendChild(el("p", "hint", "No approved reviews yet. Approve one above and it’ll show here."));
   approved.forEach((r) => c3.appendChild(rvRow(r)));
   wrap.appendChild(c3);
@@ -8794,7 +8835,7 @@ const BLOCK_DEFS = [
   { type: "video", name: "Video", mediaKind: "video", hint: "A poster image that links out to your video — nothing external loads on your site." },
   { type: "partners", name: "Trusted by (logo strip)", mediaKind: "gallery", hint: "Logos of brands you work with — instant credibility. Pick them from your files." },
   { type: "reviews", name: "Review rating badge", reviewsSimple: true, hint: "" },
-  { type: "reviews_wall", name: "Reviews wall", reviewsWallSimple: true, hint: "Show the real reviews customers leave on your site — with honest star ratings that help you show up in search. Collect + approve them in the Reviews tab." },
+  { type: "reviews_wall", name: "Reviews wall", reviewsWallSimple: true, hint: "Show the real reviews customers leave on your site, with their stars. Collect and approve them in the Reviews tab." },
   { type: "appointment", name: "Booking button", apptSimple: true, hint: "" },
   { type: "booking", name: "Online booking", bookingSimple: true, hint: "Take real appointments right on your site. Set up your services + hours in the Bookings tab; this section shows the booking widget." },
   // Growth blocks (r2) — every one links OUT; nothing external ever loads on the site.
