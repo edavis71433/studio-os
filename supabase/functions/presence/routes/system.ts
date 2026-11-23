@@ -19,6 +19,7 @@ import { reapSnapshots } from '../lib/snapshot_gc.ts';
 import { runRecurringInvoices } from './recurring_invoices.ts';   // sales review item 47: a fresh invoice on a schedule
 import { runTrafficSpikes } from '../ops/traffic_spikes.ts';
 import { runEmailOutbox } from '../lib/email_outbox.ts';
+import { runUploadChecks } from '../lib/upload_check.ts';
 import { runMonthlyReports } from '../ops/monthly_report.ts';
 import { runAiChecks } from '../ops/ai_checks.ts';
 import { runRankGridScans } from '../ops/rank_grid_scans.ts';
@@ -485,6 +486,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       if (task === 'reconcile_billing') return json({ data: await runBillingReconcile(limit) }, 200, cors);   // P2-E W7: correct entitlement drift vs Stripe
       if (task === 'stripe_check') return json({ data: await runStripeCheck(limit ? { invoices: limit, retainers: limit, receipts: limit } : {}) }, 200, cors);   // sales item 130
       if (task === 'email_outbox') return json({ data: await runEmailOutbox(limit) }, 200, cors);   // builder item 393: kept emails tried again
+      if (task === 'upload_checks') return json({ data: await runUploadChecks(limit) }, 200, cors);   // builder item 395: new uploads read back
       if (task === 'gsc_sync') {
         // Ledgered like the tick groups: the daily pg_cron job's response is
         // discarded by pg_net, so without a ledger row a persistently failing
@@ -564,6 +566,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
             ['email_auth', () => runEmailAuthNudges(20)],   // DNS #5: escalate persistent SPF/DMARC/DKIM gaps to one owner nudge
             ['apex_drift', () => runApexDriftWatch(10)],    // DNS: verify the apex still points home; surface drift as a finding
             ['retention', () => runRetentionSweep()],
+            ['upload_checks', () => runUploadChecks()],   // builder list item 395: each new upload read back: its real kind and size (before media_gc, which reaps the never-uploaded)
             ['media_gc', () => reapMedia(100)],
             ['snapshot_gc', () => reapSnapshots(200)],
             ['ai_checks', () => runAiChecks(1)],   // builder list item 182: one client's monthly AI check at most (it takes up to a minute), last
@@ -654,6 +657,7 @@ export async function handleSystem(req: Request, route: string, method: string, 
       await step('nurture', () => runProspectNurture(10));                        // CRO: day-7 free-review follow-up (owner-gated NURTURE_DRIP=1)
       await step('broadcasts', () => runScheduledBroadcasts(25));                 // BROADCASTS: dispatch owner-approved scheduled sends at their due time
       const retention = await step('retention', () => runRetentionSweep());        // bounded detail tables (visits/terms/ledgers/evidence)
+      await step('upload_checks', () => runUploadChecks());                        // builder list item 395: each new upload read back: its real kind and size
       const media_gc = await step('media_gc', () => reapMedia(100));               // M6: reap soft-deleted + orphan media
       const snapshot_gc = await step('snapshot_gc', () => reapSnapshots(200));     // M7: prune old unreferenced snapshots
       await step('ai_checks', () => runAiChecks(1));                               // builder list item 182: one client's monthly AI check at most, last (it takes up to a minute)
