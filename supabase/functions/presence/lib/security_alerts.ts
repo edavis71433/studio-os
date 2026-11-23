@@ -57,7 +57,7 @@ export const alertDeps = {
   },
   send: async (to: string, subject: string, html: string, siteId: string): Promise<boolean> => {
     const { sendEmail } = await import('../commerce/account.ts');   // lazy: account pulls in the email shell
-    return await sendEmail(to, subject, html, await loadEmailBrand(siteId), { critical: true });
+    return await sendEmail(to, subject, html, await loadEmailBrand(siteId), { critical: true, keep: 'sign_in' });
   },
 };
 

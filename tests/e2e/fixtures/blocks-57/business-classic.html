@@ -286,7 +286,7 @@ a[href^="tel:"],a[href^="mailto:"],.strip a,.credit a,.post-more a,footer.site .
 if(!window.fetch||!window.FormData||!document.addEventListener)return;
 var EP="https://db.example.supabase.co/functions/v1/presence/forms/5e000000-0000-4000-8000-000000000057/submit",WAIT=15000,B=document.body;
 var TKURL=EP.replace(/\/submit$/,'/ticket'),TK='',TKAT=0,TKP=null;
-function ticket(){if(TK&&Date.now()-TKAT<39600000)return Promise.resolve(TK);if(TKP)return TKP;
+function ticket(){if(TK&&Date.now()-TKAT<1200000)return Promise.resolve(TK);if(TKP)return TKP;
 TKP=fetch(TKURL,{headers:{accept:'application/json'}}).then(function(r){if(!r.ok)throw new Error('ticket '+r.status);return r.json();}).then(function(j){TK=(j&&j.data&&j.data.ticket)||'';TKAT=Date.now();TKP=null;return TK;},function(e){TKP=null;throw e;});return TKP;}
 function settled(){return new Promise(function(res){setTimeout(res,Math.max(0,TKAT+3500-Date.now()));});}
 var SAY={gone:'Your message didn’t send. What you wrote is still here, so you can try again in a minute.',busy:'A lot of messages were sent from here just now. Wait a minute, then send it again.',closed:'This form isn’t taking messages right now.'};

@@ -121,7 +121,7 @@ async function sendOff(to: string, by: 'code' | 'studio', brand: EmailBrand, stu
   const { sendEmail } = await import('../commerce/account.ts');   // lazy: account pulls in the email shell
   const mail = offEmail(by, { at, studio: brand.name !== EMAIL_BRAND_DEFAULT.name ? brand.name : '', signInUrl: signInUrl() });
   const asBusiness = !!studioSiteId && brand.name !== EMAIL_BRAND_DEFAULT.name;
-  return await sendEmail(to, mail.subject, mail.html, brand, { critical: true, asBusiness, ...(asBusiness ? { siteId: studioSiteId! } : {}) }).catch(() => false);
+  return await sendEmail(to, mail.subject, mail.html, brand, { critical: true, asBusiness, keep: 'sign_in', ...(asBusiness ? { siteId: studioSiteId! } : {}) }).catch(() => false);
 }
 
 // ═══ GET /auth/backup-codes ═══════════════════════════════════════════════════
