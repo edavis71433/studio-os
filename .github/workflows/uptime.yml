@@ -18,7 +18,11 @@ name: Uptime (from outside)
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    # Every 15 minutes, off the hour: GitHub delays, and can drop, scheduled runs at the
+    # start of each hour. GitHub runs a schedule for whoever last changed this line, so it
+    # must reach main credited to a GitHub account: the first version came in through a
+    # merge that kept commits GitHub couldn't tie to one, and it never ran (Nov 23 2026).
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
   pull_request:
     paths:
