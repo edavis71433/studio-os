@@ -112,5 +112,22 @@ ok('the kit puts its helpers on the page', !!(ddsKit && ddsMoney && ddsDate && d
   ok('say(): the server\'s words, else the page\'s', ddsApi.say({ status: 400, body: { message: 'Give it a name.' } }, 'x') === 'Give it a name.' && ddsApi.say(bad, 'That didn’t save.') === 'That didn’t save.');
 }
 
+// ═══ builder item 369: the studio's voice ═══
+{
+  const v = globalThis.ddsTheirVoice;
+  ok('369: the kit puts the voice on the page', typeof v === 'function' && ddsKit.theirVoice === v);
+  ok('369: "your" and "you are" become "their" and "they are"', v('Your website is ready when you are.') === 'Their website is ready when they are.');
+  ok('369: "you" doing something is "they"; "you" after a word that takes it is "them"',
+    v('Everything you’ve written is waiting in your draft. One look, one button, and customers can start finding you.') === 'Everything they’ve written is waiting in their draft. One look, one button, and customers can start finding them.');
+  ok('369: "if you", "you uploaded", "you’re", a sentence that opens with "You"', v('If you take them, it’s worth adding.') === 'If they take them, it’s worth adding.'
+    && v('Something you uploaded doesn’t match.') === 'Something they uploaded doesn’t match.' && v('Show customers you’re listening.') === 'Show customers they’re listening.'
+    && v('You now have a few more things.') === 'They now have a few more things.');
+  ok('369: yours and yourself', v('A sentence of your own words makes it yours.') === 'A sentence of their own words makes it theirs.' && v('Do it yourself.') === 'Do it themselves.');
+  ok('369: "thank you" stays, and so does anything quoted (what someone typed)', v('A simple thank-you is enough.') === 'A simple thank-you is enough.' && v('Thank you for waiting.') === 'Thank you for waiting.'
+    && v('New answer to “Can you deliver?” on your FAQ page.') === 'New answer to “Can you deliver?” on their FAQ page.' && v('"You and me" is renamed "Yours truly".') === '"You and me" is renamed "Yours truly".');
+  ok('369: the publish summary’s first line, and words with no "you" in them, as they were', v('Your website goes live for the first time.') === 'Their website goes live for the first time.'
+    && v('Menu sections are reordered.') === 'Menu sections are reordered.' && v('') === '' && v(null) === '' && v('Youth league, layout, bayou') === 'Youth league, layout, bayou');
+}
+
 console.log(`\n════ SHELL KIT: ${pass}/${pass + fail} ${fail ? 'FAILED' : 'PASSED'} ════`);
 if (fail) Deno.exit(1);

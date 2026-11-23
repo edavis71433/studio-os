@@ -1,4 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
+import { expectOneHeader } from './helpers/page-header';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
 import { pinClock } from './helpers/clock';
@@ -115,9 +116,9 @@ test.describe('Usage (builder list item 210)', () => {
     await expect(harbor.locator('.c-pub')).toContainText('Their own host puts it live. No cost to you.');
     await expect(harbor.locator('.c-vis')).toContainText('No counter');
     await expect(page.locator('.unote')).toContainText('Publishes and storage: November 1 to 12. Visits: October, compared with September. A drop is red.');
-    // the tab line, on this page and the three beside it
+    // builder item 425: the one page header the other tabs under Sites wear, with its own title
+    await expectOneHeader(page, { title: 'Usage', icon: 'analytics', line: /^5 sites · What each client uses this month · Updated just now$/, filled: null, tabs: ['Sites', 'Domains', 'Templates', 'Usage', 'Changes'] });
     const tabs = page.getByRole('navigation', { name: 'Sites, domains, templates, usage and changes' });
-    await expect(tabs.getByRole('link')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage', 'Changes']);
     await expect(tabs.getByRole('link', { name: 'Usage' })).toHaveAttribute('aria-current', 'page');
   });
 

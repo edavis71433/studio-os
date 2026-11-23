@@ -1,4 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
+import { expectOneHeader } from './helpers/page-header';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, CLIENT_NAV, ALL_FEATURES } from './helpers/app';
 import { pinClock } from './helpers/clock';
@@ -53,9 +54,9 @@ async function openChanges(page: Page, o: { url?: string; status?: number; site?
 test.describe('Changes (builder list item 215)', () => {
   test('at the studio’s level: the tab, the week by who made the changes, and each change in a sentence', async ({ page }) => {
     const { errors, asked } = await openChanges(page);
-    await expect(page.getByRole('heading', { level: 1, name: 'Sites' })).toBeVisible();
+    // builder item 425: the one page header the other tabs under Sites wear, with its own title
+    await expectOneHeader(page, { title: 'Changes', icon: 'overview', line: /^\d+ sites? · Who changed what on every client’s site, newest first · Updated just now$/, filled: null, tabs: ['Sites', 'Domains', 'Templates', 'Usage', 'Changes'] });
     const tabs = page.getByRole('navigation', { name: 'Sites, domains, templates, usage and changes' });
-    await expect(tabs.getByRole('link')).toHaveText(['Sites', 'Domains', 'Templates', 'Usage', 'Changes']);
     await expect(tabs.getByRole('link', { name: 'Changes' })).toHaveAttribute('aria-current', 'page');
     const band = page.getByRole('region', { name: 'This week in changes' });
     await expect(band.locator('.big')).toHaveText('64 changes');

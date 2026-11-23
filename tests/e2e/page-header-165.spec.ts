@@ -42,7 +42,8 @@ test.describe('One page header (builder item 165)', () => {
       await expect(head.locator('.dds-ph-dots')).toBeHidden();
       await expect(head.getByRole('button', { name: 'Refresh' })).toBeVisible();
     }
-    await expect(page.locator('#lmeta')).toContainText('3 sites');   // the sort and freshness line stays, under the header
+    await expect(page.locator('#lmeta')).toContainText('Pinned first, then the ones you opened last');   // the sort and freshness line stays, under the header
+    await expect(page.locator('#lmeta')).not.toContainText('3 sites');   // builder item 367: the header's line already says how many
   });
 
   test('the header has no serious or critical accessibility findings, light and dark', async ({ page }, testInfo) => {

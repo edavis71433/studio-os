@@ -1021,6 +1021,22 @@ test.describe('one copy for search engines (static pins, list item 139)', () => 
     for (const f of LEGAL_PAGES) expect(rules.find((x) => x.from === `${APP_HOST}/${f.replace(/\.html$/, '')}`), `${f} stays on the app host`).toBeUndefined();
   });
 
+  test('builder item 375: addresses only the main site has forward from the app host to the same address there', () => {
+    const rules = parseRedirects();
+    const want: Array<[string, string]> = [
+      ['/home', '/'], ['/free-tools', '/free-tools'], ['/free-tools-menu', '/free-tools-menu'], ['/services-menu', '/services-menu'],
+      ['/growth-partnership', '/growth-partnership'], ['/los-angeles-web-design', '/los-angeles-web-design'],
+      ['/website-audits', '/website-audits'], ['/work/*', '/work/:splat'],
+    ];
+    for (const [from, to] of want) {
+      expect(rules.find((r) => r.from === `${APP_HOST}${from}`), `${from} on the app host`).toEqual({ from: `${APP_HOST}${from}`, to: `${MAIN_SITE}${to}`, code: '301!' });
+      // never a page of the app's own: nothing here serves that address
+      expect(rules.some((r) => r.from === from && r.code.startsWith('200')), `${from} isn't an app page`).toBe(false);
+    }
+    // the old Burbank page still goes to Los Angeles until the main site has a Burbank page again
+    expect(rules.find((r) => r.from === `${APP_HOST}/burbank-web-design`)?.to).toBe(`${MAIN_SITE}/los-angeles-web-design`);
+  });
+
   test('the bare app address is a door: signed in it opens the app, anyone else gets the main site, and it is never indexed', () => {
     const rules = parseRedirects();
     expect(rules.find((r) => r.from === `${APP_HOST}/`)).toEqual({ from: `${APP_HOST}/`, to: '/app-door.html', code: '200!' });

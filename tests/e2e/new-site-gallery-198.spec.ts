@@ -59,11 +59,12 @@ async function openSites(page: Page, opts: { room?: unknown; kits?: unknown[]; m
 const isPhone = (page: Page) => (page.viewportSize()?.width || 1280) < 761;
 
 test.describe('+ New site: the gallery (builder item 198)', () => {
-  test('Sites says "2 of 25 sites"; the sheet asks the kind and shows the eight designs, the three that suit it first', async ({ page }) => {
+  test('Sites says "You’ve used 2 of your 25 sites"; the sheet asks the kind and shows the eight designs, the three that suit it first', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     const t = await openSites(page);
-    await expect(page.locator('#roomLine')).toHaveText('2 of 25 sites');
+    await expect(page.locator('#roomLine')).toHaveText('You’ve used 2 of your 25 sites');   // builder item 367: the plan line, in the header's line
+    await expect(page.locator('#phLine #roomLine')).toBeVisible();
     await page.getByRole('button', { name: '+ New site' }).click();
     const dlg = page.locator('#newDlg');
     await expect(dlg).toBeVisible();
@@ -175,7 +176,7 @@ test.describe('+ New site: the gallery (builder item 198)', () => {
 test.describe('the plan\'s count (builder item 198)', () => {
   test('a full plan: Sites says so, New site says why and makes nothing', async ({ page }) => {
     const t = await openSites(page, { room: { used: 25, limit: 25, full: true } });
-    await expect(page.locator('#roomLine')).toHaveText('25 of 25 sites · your plan is full');
+    await expect(page.locator('#roomLine')).toHaveText('You’ve used 25 of your 25 sites: 2 here, 23 archived · your plan is full');
     await page.getByRole('button', { name: '+ New site' }).click();
     const dlg = page.locator('#newDlg');
     await expect(dlg.locator('#new-full')).toBeVisible();

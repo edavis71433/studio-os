@@ -106,7 +106,7 @@ test.describe('Sites (builder list items 43 and 45)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Sites' })).toBeVisible();
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('.scard')).toHaveCount(3);
-    await expect(page.locator('.lmeta')).toContainText('3 sites · Pinned first, then the ones you opened last');
+    await expect(page.locator('.lmeta')).toContainText('Pinned first, then the ones you opened last');   // builder item 367: the count is the header's, not said again here
     await expect(page.locator('.dds-ph-tabs a[aria-current="page"]')).toHaveText('Sites');
     await expect(page.locator('.dds-ph-tabs a[href="/domains.html"]')).toHaveText('Domains');
     const isMobile = (page.viewportSize()?.width || 1280) < 761;
@@ -453,10 +453,22 @@ test.describe('Sites (builder list items 43 and 45)', () => {
   const NEEDS_ROW = { key: 'broken:1', kind: 'broken', site_id: 's1', client_id: 'c1', name: 'Bistro Nine', what: 'bistro.example expires in 12 days', when: '', verb: 'Fix', href: '/presence.html?client=s1#domain' };
   const NEXT = { s1: { what: 'bistro.example expires in 12 days', verb: 'Fix', href: '/presence.html?client=s1#domain', kind: 'broken' } };
 
+  test('builder item 367: one count, said in full: the plan line in the header, nothing repeated under it', async ({ page }) => {
+    await openSites(page, [BISTRO, GARAGE, CAFE], { body: { room: { used: 4, limit: 25, full: false } } });
+    await expect(page.locator('#phLine')).toHaveText('You’ve used 4 of your 25 sites: 3 here, 1 archived');
+    await expect(page.locator('#phLine #roomLine')).not.toHaveClass(/full/);
+    await expect(page.locator('#lmeta')).not.toContainText('of 25');
+    await expect(page.locator('#lmeta')).not.toContainText('3 sites');
+    await expect(page.locator('.sband')).not.toContainText('sites you look after');
+  });
+
   test('the band counts what the server already knows across every site, and a number filters the cards', async ({ page }) => {
     await openSites(page, [BISTRO, GARAGE, CAFE], { needs: NEXT, needsRows: [NEEDS_ROW] });
     const band = page.locator('.sband');
-    await expect(band).toContainText('3 sites you look after');
+    // builder item 367: the header's line says how many; the band doesn't say it again
+    await expect(page.locator('#phLine')).toHaveText('3 sites you look after · 1 needs you');
+    await expect(band).not.toContainText('sites you look after');
+    await expect(band.locator('h2')).toHaveCount(0);
     await expect(band).toContainText('1 live · 1 needs you · all answering');
     await expect(band.locator('[data-filter="live"] .v')).toHaveText('1');
     await expect(band.locator('[data-filter="needs"] .v')).toHaveText('1');
