@@ -6634,7 +6634,8 @@ async function siteSetState(path, okMsg) {
 }
 async function siteTakeOffline() {
   const name = (S.identity && S.identity.business_name) || "your site";
-  if (!(await askYes(`Take ${name} OFFLINE now?\n\n• Visitors immediately stop seeing your website.\n• They’ll see a simple, branded “temporarily offline” page instead.\n• Search engines are told not to index it.\n\nNothing is deleted — every version is kept, and publishing (or “Bring back online”) restores everything.`, { ok: "Take it offline", danger: true }))) return;
+  // builder item 310: say what a long break costs on Google
+  if (!(await askYes(`Take ${name} OFFLINE now?\n\n• Visitors immediately stop seeing your website.\n• They’ll see a simple, branded “temporarily offline” page instead.\n• Search engines are told not to index it. Search engines will drop your pages if this lasts more than a few days.\n\nNothing is deleted: every version is kept, and publishing (or “Bring back online”) restores everything.`, { ok: "Take it offline", danger: true }))) return;
   return siteSetState("/site/offline", "Your site is offline. Publish, or use “Bring back online”, to return.");
 }
 async function siteBringOnline() {

@@ -78,7 +78,7 @@ const IDENTITY: Record<string, string> = {
   short_description: 'the short description', social: 'the social links', website_url: 'the website address',
 };
 const LOCATION: Record<string, string> = {
-  hours: 'the opening hours', holiday_exceptions: 'the holiday hours', address_line1: 'the address', address_line2: 'the address',
+  hours: 'the opening hours', holiday_exceptions: 'the special dates', address_line1: 'the address', address_line2: 'the address',
   city: 'the address', region: 'the address', postal_code: 'the address', country: 'the address', phone: 'the phone number',
   temporarily_closed: 'the temporarily closed notice', temporarily_closed_note: 'the temporarily closed notice', lat: 'the map pin', lng: 'the map pin',
 };

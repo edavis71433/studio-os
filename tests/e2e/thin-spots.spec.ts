@@ -79,6 +79,7 @@ test.describe('the Welcome panel’s status', () => {
     expect(question).toContain('Take Marlow’s Kitchen OFFLINE now?');
     expect(question).toContain('Visitors immediately stop seeing your website.');
     expect(question).toContain('Nothing is deleted');
+    expect(question).toContain('Search engines will drop your pages if this lasts more than a few days.');   // builder item 310
     await expect(page.locator('#siteStatusBadge')).toHaveText('Offline');
     await expect(page.locator('#siteStatusCard a')).toHaveCount(0);   // no address to visit while it's offline
     await expect(page.locator('#siteStatusCard')).toContainText('temporarily offline');

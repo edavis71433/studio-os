@@ -52,7 +52,8 @@ const eq = (n, a, b) => ok(n, JSON.stringify(a) === JSON.stringify(b), `got ${JS
   const week = D.composeDoNext(facts, { decided: {} }, '2026-11-20T18:00:00.000Z');
   const hol = week.items.find((i) => i.source === 'holiday');
   eq('385: the line, right after Needs you', week.items.map((i) => i.source), ['needs', 'holiday', 'health']);
-  eq('385: its words and its link to the Hours card', [hol.key, hol.title, hol.verb, hol.href], ['holiday:thanksgiving-2026', 'Thanksgiving is Thursday: are you open?', 'Set hours', `/presence.html?client=${SITE}#hours-thu`]);
+  // item 432: the link opens Special dates with the holiday's date (special_dates_432_test.mjs)
+  eq('385: its words and its link to the Hours card', [hol.key, hol.title, hol.verb, hol.href], ['holiday:thanksgiving-2026', 'Thanksgiving is Thursday: are you open?', 'Set hours', `/presence.html?client=${SITE}#hours-2026-11-26`]);
   eq('431: the link names the holiday’s weekday the way the Hours card names its rows', ['2026-12-20', '2026-12-29', '2027-07-01'].map((d) => H.holidaySoon(d)?.day), ['fri', 'fri', 'sun']);
   ok('385: it says what to do there, without em-dashes', /Hours card/.test(hol.sub) && !/—/.test(hol.sub + hol.title));
   ok('385: a key the decisions accept', !('error' in D.applyDecision({ decided: {} }, hol.key, 'not_relevant', hol.title, null, '2026-11-20T18:00:00.000Z')));

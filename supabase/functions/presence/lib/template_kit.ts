@@ -211,14 +211,17 @@ function hoursTable(c: SnapshotContent, caption: string): string {
   // date and its hours first and the owner's note on its own line; SPECIAL_JS takes one away once it's over
   const special = (loc.holiday_exceptions || []).map((e: HolidayException) => {
     const val = e.closed || !(e.intervals || []).length ? 'Closed' : (e.intervals || []).map((i) => `${fmtTime(i.open)}–${fmtTime(i.close)}`).join(', ');
-    return `<li data-date="${attr(e.date)}"><time datetime="${attr(e.date)}">${esc(dayDate(e.date))}</time>: ${esc(val)}${e.label ? `<br>${esc(e.label)}` : ''}</li>`;
+    return `<li><time datetime="${attr(e.date)}">${esc(dayDate(e.date))}</time>: ${esc(val)}${e.label ? `<br>${esc(e.label)}` : ''}</li>`;
   }).join('');
   return `<table class="hours"${pr('location.hours')}><caption>${esc(caption)}</caption><tbody>${rows}</tbody></table>` +
     (special ? `<div class="holiday" data-tz="${attr(loc.timezone || 'America/Los_Angeles')}"><strong>Special hours</strong><ul>${special}</ul></div>` : '');
 }
-// Item 432: a special date on a page published before it was over goes away when the day is over,
-// in the business's own time zone; the list goes with its last date.
-const SPECIAL_JS = `(function(){try{var bs=document.querySelectorAll('.holiday[data-tz]');for(var i=0;i<bs.length;i++){var b=bs[i],n=new Date(new Date().toLocaleString('en-US',{timeZone:b.getAttribute('data-tz')})),t=n.getFullYear()+'-'+('0'+(n.getMonth()+1)).slice(-2)+'-'+('0'+n.getDate()).slice(-2),li=b.querySelectorAll('li[data-date]'),left=0;for(var j=0;j<li.length;j++){if(li[j].getAttribute('data-date')<t)li[j].hidden=true;else left++}if(!left)b.hidden=true}}catch(e){}})();`;
+// Item 432: a special date on a page published before it was over goes away once the day is over in
+// the business's own time zone, and the list goes with its last date. Kept small, since every page
+// that shows the list carries it (lib/page_weight.ts): 'sv' writes a day as 2026-11-26, the way each
+// date's <time datetime> holds it, and a date still to come counts itself in k. It opens like the
+// renderer's other scripts, "(function(){", which render_test.mjs's hostile-words check knows as ours.
+export const SPECIAL_JS = `(function(){try{document.querySelectorAll('.holiday').forEach(b=>{let t=new Date().toLocaleDateString('sv',{timeZone:b.dataset.tz}),k=0;b.querySelectorAll('time').forEach(e=>e.parentNode.hidden=e.dateTime<t||!++k);b.hidden=!k})}catch(e){}})()`;
 
 function contactBits(c: SnapshotContent): { addr: string; tel: string; mail: string } {
   const l = loc0(c); const i = c.identity;

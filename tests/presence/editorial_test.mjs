@@ -7,6 +7,7 @@
 //   deno run --allow-read --allow-env tests/presence/editorial_test.mjs
 import { getTemplate, renderSnapshot } from '../../supabase/functions/presence/lib/render.ts';
 import { senderTag } from '../../supabase/functions/presence/lib/site_send.ts';
+import { SPECIAL_JS } from '../../supabase/functions/presence/lib/template_kit.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -73,7 +74,8 @@ const cssOf = (f) => f[Object.keys(f).find((k) => k.startsWith('assets/site-') &
   // item 131: the page holding the site's form also carries the page's sender (lib/site_send.ts)
   const noSender = (h) => String(h).replace(senderTag(SITE.formEndpoint), '');
   const noSiteJs = (h) => String(h).replace(/<script src="\/assets\/site-[0-9a-f]+\.js" defer><\/script>\n/, '');   // items 288 and 298: the site's own script file
-  ok('editorial keeps ZERO client JavaScript (except first-party search, tag filter, Open now, the form’s sender and the site’s own script file)', !Object.entries(f).some(([k, v]) => k.endsWith('.html') && k !== 'search/index.html' && k !== 'updates/index.html' && /<script(?![^>]*application\/ld\+json)/.test(noSiteJs(noOpenNow(noSender(v))))));
+  const noSpecial = (h) => String(h).replace(`<script>${SPECIAL_JS}</script>\n`, '');   // item 432: the special dates' small script rides with the list
+  ok('editorial keeps ZERO client JavaScript (except first-party search, tag filter, Open now, the form’s sender, the special dates’ and the site’s own script file)', !Object.entries(f).some(([k, v]) => k.endsWith('.html') && k !== 'search/index.html' && k !== 'updates/index.html' && /<script(?![^>]*application\/ld\+json)/.test(noSiteJs(noOpenNow(noSender(noSpecial(v)))))));
   ok('editorial: the Open now script is on the home page only', Object.entries(f).filter(([k, v]) => k.endsWith('.html') && String(v).includes("getElementById('open-now')")).map(([k]) => k).join() === 'index.html');
   ok('provenance markers preserved (data-pr on the hero identity)', home.includes('data-pr="identity.business_name"'));
 }
