@@ -6,6 +6,7 @@
 // and the page they joined on, signed and good for JOIN_LINK_DAYS. One such email a day
 // goes to an address (lib/auto_reply.ts), so the box can't be used to send a stranger
 // mail over and over.
+import { linkKey, signedWithAny } from '../../_shared/link_keys.ts';   // builder item 394: each kind of link has its own key
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 
 export const JOIN_LINK_DAYS = 7;
@@ -14,7 +15,7 @@ export const JOIN_CHECK_EMAIL = 'Almost there: check your email and press “Yes
 /** What join.html says once they pressed it. */
 export const JOINED = 'You’re on the list. Thank you!';
 
-const signingKey = () => Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || '';
+const signingKey = () => linkKey('join');   // builder item 394: its own key
 // base64url of UTF-8, so an address with accents survives the trip
 const b64u = (s: string) => { let bin = ''; for (const x of new TextEncoder().encode(s)) bin += String.fromCharCode(x); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 const unb64u = (s: string) => { try { const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/')); return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))); } catch { return ''; } };
@@ -29,7 +30,7 @@ export async function joinLinkToken(siteId: string, email: string, page: string,
 /** The site, address and page a token names; 'expired' past its days; null when it isn't one of ours. */
 export async function readJoinLinkToken(token: unknown, nowSec = Math.floor(Date.now() / 1000), key = signingKey()): Promise<{ siteId: string; email: string; page: string } | 'expired' | null> {
   const m = /^([A-Za-z0-9_-]{10,1200})\.([0-9a-f]{40})$/.exec(String(token ?? '').trim());
-  if (!m || !key || !timingSafeEqual(m[2], (await hmacHex(key, `join-link|${m[1]}`)).slice(0, 40))) return null;
+  if (!m || !key || !(await signedWithAny('join', key, async (k) => timingSafeEqual(m[2], (await hmacHex(k, `join-link|${m[1]}`)).slice(0, 40))))) return null;
   let p: { s?: unknown; m?: unknown; p?: unknown; e?: unknown };
   try { p = JSON.parse(unb64u(m[1])); } catch { return null; }
   if (!p || typeof p.s !== 'string' || !/^[0-9a-f-]{36}$/.test(p.s) || typeof p.m !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.m) || typeof p.e !== 'number') return null;

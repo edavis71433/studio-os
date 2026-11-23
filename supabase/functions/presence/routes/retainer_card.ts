@@ -13,6 +13,8 @@
 // changes a retainer: Stripe uses the new card at its next try, and the webhook says
 // so when the charge lands. Stripe's own failed-card and expiring-card emails, when
 // they are switched on in Stripe, link to Stripe's page too.
+import { linkKey, signedWithAny } from '../../_shared/link_keys.ts';   // builder item 394: each kind of link has its own key
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { svc } from '../lib/db.ts';
@@ -26,7 +28,7 @@ import type { Principal } from '../../_shared/auth.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 
 const rows = (r: { json?: unknown }) => (Array.isArray((r as any)?.json) ? (r as any).json : []) as any[];
-const appUrl = () => (Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com').replace(/\/$/, '');
+const appUrl = () => appBase();
 const usd = (c: unknown) => '$' + ((Number(c) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const escH = (t: string) => t.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
 const retainerOf = (deal: any): Partial<RetainerState> | null => (deal && deal.retainer && typeof deal.retainer === 'object' ? deal.retainer : null);
@@ -40,7 +42,7 @@ export const CARD_LINK_DAYS = 30;
 function b64url(s: string): string { return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function unb64url(s: string): string { const pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : ''; return atob(s.replace(/-/g, '+').replace(/_/g, '/') + pad); }
 export function cardLinkSecret(): string | null {
-  return Deno.env.get('APPROVAL_SECRET') || Deno.env.get('STATE_SIGNING_SECRET') || Deno.env.get('SCHEDULER_SECRET') || null;
+  return linkKey('retainer_card') || null;   // builder item 394: its own key
 }
 export async function signCardToken(dealId: string, siteId: string, nowSec: number, secret: string): Promise<string> {
   const body = b64url(JSON.stringify({ t: 'card', id: dealId, site_id: siteId, exp: nowSec + CARD_LINK_DAYS * 86400 }));
@@ -51,7 +53,7 @@ export async function signCardToken(dealId: string, siteId: string, nowSec: numb
 export async function readCardToken(token: string, secret: string, nowSec: number): Promise<{ ok: true; id: string; site_id: string } | { ok: false; expired: true; id: string; site_id: string } | null> {
   const parts = String(token || '').split('.');
   if (parts.length !== 2 || !parts[0] || !parts[1] || parts[0].length > 400) return null;
-  if (!timingSafeEqual(parts[1], await hmacHex(secret, parts[0]))) return null;
+  if (!(await signedWithAny('retainer_card', secret, async (k) => timingSafeEqual(parts[1], await hmacHex(k, parts[0]))))) return null;
   let p: any; try { p = JSON.parse(unb64url(parts[0])); } catch { return null; }
   if (!p || p.t !== 'card' || !UUID_RE.test(p.id || '') || !UUID_RE.test(p.site_id || '') || typeof p.exp !== 'number') return null;
   if (p.exp < nowSec) return { ok: false, expired: true, id: p.id, site_id: p.site_id };

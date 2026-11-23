@@ -152,7 +152,8 @@ function needsYouItems(feed,snaps,billing){
   return items;
 }
 function bellSinceLabel(unread){unread=Math.max(0,unread|0);return unread+' update'+(unread===1?'':'s')+' since you last looked';}
-function momentIcon(t){return({good_news:'🎉',celebration:'🎉',needs_attention:'⚠️',reminder:'⏰',opportunity:'💡',seasonal:'🍂',business_health:'📈',learning:'📚'})[String(t||'')]||'✨';}
+function momentIcon(t){return si(({good_news:'party',celebration:'party',needs_attention:'warn',reminder:'clock',opportunity:'bulb',seasonal:'leaf',business_health:'trend',learning:'book'})[String(t||'')]||'sparkles');}   // items 247/335: drawn icons, never emoji
+const SI_KEYS={party:1,warn:1,clock:1,bulb:1,leaf:1,trend:1,book:1,sparkles:1};const si=(k)=>SI_KEYS[k]?'<svg data-ico="'+k+'"></svg>':'';   // the test's stand-in for the page's icon helper
 
 const results=[];
 const ok=(n,p)=>{results.push({n,p});console.log(`${p?'PASS':'FAIL'}  ${n}`);};
@@ -306,10 +307,10 @@ ok('bell label: pluralized "N updates since you last looked", clamped at zero',
   && bellSinceLabel(0)==='0 updates since you last looked' && bellSinceLabel(-3)==='0 updates since you last looked');
 // ═══ momentIcon — Recent-updates type icons from the feed's moment_type ═══
 ok('moment icon: every schema moment_type maps; unknown/absent stay the neutral sparkle',
-  momentIcon('good_news')==='🎉' && momentIcon('needs_attention')==='⚠️' && momentIcon('reminder')==='⏰'
-  && momentIcon('opportunity')==='💡' && momentIcon('celebration')==='🎉' && momentIcon('seasonal')==='🍂'
-  && momentIcon('business_health')==='📈' && momentIcon('learning')==='📚'
-  && momentIcon('weird')==='✨' && momentIcon(null)==='✨' && momentIcon(undefined)==='✨');
+  /party/.test(momentIcon('good_news')) && /warn/.test(momentIcon('needs_attention')) && /clock/.test(momentIcon('reminder'))
+  && /bulb/.test(momentIcon('opportunity')) && /party/.test(momentIcon('celebration')) && /leaf/.test(momentIcon('seasonal'))
+  && /trend/.test(momentIcon('business_health')) && /book/.test(momentIcon('learning'))
+  && /sparkles/.test(momentIcon('weird')) && /sparkles/.test(momentIcon(null)) && /sparkles/.test(momentIcon(undefined)) && !/[\u{1F300}-\u{1FAFF}]/u.test(momentIcon('good_news')));
 // PS2: the ONE portal money formatter — thousands grouped, whole dollars
 // clean, fractional amounts keep both cent digits (never $1,234.5).
 ok('fmtMoney: $1,200 (grouped) / $750 (clean) / $1,234.50 (cents kept) / $0 (guarded)',

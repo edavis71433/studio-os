@@ -17,7 +17,7 @@
 // shows a blank pixel rather than a broken image.
 import { svc } from './db.ts';
 import { attr, esc, safeHref } from './markdown.ts';
-import { imageToken } from '../../_shared/email_infra.ts';
+import { imageToken, imageTokenOk } from '../../_shared/email_infra.ts';
 import { signThumb, isImageMime } from './media.ts';
 import { missingColumnSignal } from './inbound_email.ts';
 import { OPEN_PIXEL } from './email_engagement.ts';
@@ -129,11 +129,11 @@ export interface ImageRouteDeps { token?: (id: string) => Promise<string>; read?
  *  A good link answers with a short-lived signed link to the photo (sent on, not
  *  streamed); a wrong, old or deleted one answers a blank pixel, never an error page. */
 export async function handleEmailImage(mediaId: string, sig: string, deps: ImageRouteDeps = {}): Promise<Response> {
-  const token = deps.token || imageToken;
   const read = deps.read || ((p: string) => svc(p));
   const sign = deps.sign || signThumb;
   try {
-    if (!UUID_RE.test(mediaId) || sig !== await token(mediaId.toLowerCase())) return BLANK();
+    // builder item 394: its own key, and a photo in an older email still shows (a test hands its own token)
+    if (!UUID_RE.test(mediaId) || !(deps.token ? sig === await deps.token(mediaId.toLowerCase()) : await imageTokenOk(mediaId.toLowerCase(), sig))) return BLANK();
     const r = await read(`presence_media?id=eq.${mediaId.toLowerCase()}&deleted_at=is.null&select=storage_path,mime,asset_status&limit=1`);
     const row = r.ok && Array.isArray(r.json) ? (r.json[0] as any) : null;
     if (!row || !isImageMime(String(row.mime || '')) || row.asset_status === 'archived') return BLANK();

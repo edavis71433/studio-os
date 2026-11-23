@@ -44,13 +44,28 @@ async function count(table: string, siteId: string, extra = ''): Promise<number>
   return (await svcCount(`${table}?site_id=eq.${siteId}${extra}`)) ?? 0;
 }
 
+// The location row, widest read first. 0255 adds goes_to_customers (builder list item 334) and
+// 0182 added second_location (item 127); a database without a pack's column answers 400, so the
+// read steps down one pack at a time and the editor never goes dark ahead of one. `fields` says
+// which of the two the database has, so Business details shows the switch only once it can save.
+// (The second location was never in this read before, so the editor opened without it.)
+const LOCATION_COLS = 'address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note';
+async function locationRead(db: SiteDb, siteId: string): Promise<{ ok: boolean; status: number; json: unknown; fields: string[] }> {
+  let last: { ok: boolean; status: number; json?: unknown } = { ok: false, status: 0 };
+  for (const fields of [['second_location', 'goes_to_customers'], ['second_location'], []]) {
+    last = await db(`presence_locations?site_id=eq.${siteId}&select=${[LOCATION_COLS, ...fields].join(',')}&limit=1`);
+    if (last.ok || last.status !== 400) return { ok: last.ok, status: last.status, json: last.json, fields: last.ok ? fields : [] };
+  }
+  return { ok: last.ok, status: last.status, json: last.json, fields: [] };
+}
+
 export async function handleGetSite(db: SiteDb, site: SiteRow, cors: Record<string, string>) {
   // Everything the home view needs runs in ONE concurrent batch: the three
   // singletons through siteDb (RLS proves an owner's ownership), the five counts,
   // and the two draft-status probes. One round-trip depth, not three.
   const [ident, loc, voice, nOff, nTes, nFaq, nPos, nMed, evR, pubR, draftHash, liveR] = await Promise.all([
     db(`presence_identity?site_id=eq.${site.id}&select=business_name,tagline,description,phone,email,service_area,booking_url,ordering_url,social,seo_title,seo_description&limit=1`),
-    db(`presence_locations?site_id=eq.${site.id}&select=address_line1,address_line2,city,region,postal_code,country,phone,timezone,hours,holiday_exceptions,temporarily_closed,temporarily_closed_note&limit=1`),
+    locationRead(db, site.id),
     // M9.5G: voice now lives in the Brand Profile (one canonical source);
     // the /site payload keeps its frozen shape via the mapping below
     db(`presence_brand_profile?site_id=eq.${site.id}&select=voice_characteristics,preferred_vocabulary,never_claims&limit=1`),
@@ -86,6 +101,8 @@ export async function handleGetSite(db: SiteDb, site: SiteRow, cors: Record<stri
       },
       identity: (Array.isArray(ident.json) && ident.json[0]) || null,
       location: (Array.isArray(loc.json) && loc.json[0]) || null,
+      // builder list item 334: the location columns this database has beyond the first ones
+      location_fields: loc.fields,
       voice: (Array.isArray(voice.json) && voice.json[0])
         ? { tone_notes: voice.json[0].voice_characteristics || '', preferred_vocabulary: voice.json[0].preferred_vocabulary || '', never_claim: voice.json[0].never_claims || '' }
         : null,

@@ -4,6 +4,7 @@
 // per-site engines / read EXISTING rows. Nothing here has a power that a
 // single-site route lacks; nothing bypasses client ownership (drafts and
 // plans still wait on the client; publishing runs the one frozen pipeline).
+import { appBase } from '../../_shared/app_url.ts';   // builder item 388: every link starts at the app's address
 import { json } from '../../_shared/http.ts';
 import { svc, svcPages } from '../lib/db.ts';
 /** Builder item 411: every row, paged, in the shape of one svc() answer ([] when a page failed). */
@@ -200,8 +201,9 @@ export function forgetAgencyReads(agencyId: string): void {
 
 // builder list items 236 and 232: the portal's address (the one the invite email carries), the
 // clients a studio looks after in name order, and when each last got a sign-in link (two minutes apart)
-// builder item 350: the short address when the studio chose a name (lib/portal_slug.ts), else the long one
-const portalAddress = (studioSiteId: string, slug?: string | null) => portalAddressOf(Deno.env.get('SITE_URL') || 'https://davisdigitalstudio.com', studioSiteId, slug);
+// builder item 350: the short address when the studio chose a name (lib/portal_slug.ts), else the long one;
+// on the app's own address (item 388)
+const portalAddress = (studioSiteId: string, slug?: string | null) => portalAddressOf(appBase(), studioSiteId, slug);
 async function portalSlugOf(siteId: string): Promise<string | null> {
   const r = await svc(`presence_sites?id=eq.${siteId}&select=portal_slug&limit=1`).catch(() => ({ ok: false, json: null }));
   return r.ok && Array.isArray(r.json) ? (r.json[0]?.portal_slug ?? null) : null;   // pre-0254: no column, no name
@@ -303,7 +305,7 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
     const ps = normalizePortal(stored);
     const input = await sharedGather(member.agency_id, now);
     const clients = activeClientsOf(input).map((c) => ({ ...c, choices: ps.clients[c.site_id] || {}, reminders: !ps.reminders_off.includes(c.site_id) }));   // item 336: whether we remind them
-    return json({ data: { off: ps.off, welcome: ps.welcome, home_off: ps.home_off, signin: ps.signin, reply: ps.reply, clients,
+    return json({ data: { off: ps.off, welcome: ps.welcome, home_off: ps.home_off, signin: ps.signin, reply: ps.reply, look: ps.look, clients,
       parts: PORTAL_PARTS.map((k) => ({ key: k, label: PART_WORDS[k][0], sub: PART_WORDS[k][1] })),
       cards: HOME_CARDS.map((k) => ({ key: k, label: CARD_WORDS[k][0], sub: CARD_WORDS[k][1] })),
       welcome_max: WELCOME_MAX, can_edit: can(member.role, 'manage_clients') } }, 200, cors);
@@ -325,13 +327,13 @@ async function handleAgencyInner(req: Request, route: string, method: string, me
       return json({ data: { slug, address: portalAddress(own.id, slug) } }, 200, cors);
     }
     const change = pickStudioChange(raw);
-    if (!Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which part or card to show or hide, the welcome note, a way to sign in, or your reply time.' }, 400, cors);
+    if (!Object.keys(change).length) return json({ error: 'bad_request', message: 'Say which part or card to show or hide, the welcome note, a way to sign in, your reply time, or the portal’s look.' }, 400, cors);
     const own = await ownSiteOf(req.headers.get('x-dds-user-jwt') || '', principal);
     if (!own) return json({ error: 'no_studio_site', message: 'Portal choices are kept on your studio’s own site, and this sign-in doesn’t have one.' }, 409, cors);
     const saved = await updateReservedJson(own.id, RESERVED_NAMES.portalSettings, (cur) => applyStudioChange(normalizePortal(cur), change), member.email);
     if (!saved) return json({ error: 'write_failed', message: 'That didn’t save.' }, 502, cors);
     forgetPortalOff();
-    return json({ data: { off: saved.off, welcome: saved.welcome, home_off: saved.home_off, signin: saved.signin, reply: saved.reply } }, 200, cors);
+    return json({ data: { off: saved.off, welcome: saved.welcome, home_off: saved.home_off, signin: saved.signin, reply: saved.reply, look: saved.look } }, 200, cors);
   }
   {
     const pm = route.match(/^\/agency\/portal\/clients\/([^/]+)$/);
@@ -1183,8 +1185,9 @@ async function ownSiteOf(jwt: string, principal: Principal): Promise<SiteRow | n
   try {
     const s = await resolveSite(jwt);
     if (s) return s;
-    if (!principal.userId && !principal.email) return null;
-    const or = `or=(user_id.eq.${encodeURIComponent(principal.userId || '00000000-0000-0000-0000-000000000000')},email.eq.${encodeURIComponent((principal.email || '').toLowerCase())})`;
+    const { seatFilter } = await import('../lib/workspace.ts');   // builder items 389 + 397
+    const or = seatFilter(principal);
+    if (!or) return null;
     const m = await svc(`presence_site_members?status=eq.active&${or}&select=site_id&order=created_at.asc&limit=1`);
     const siteId = Array.isArray(m.json) && (m.json as Array<{ site_id: string }>)[0]?.site_id;
     if (!siteId) return null;

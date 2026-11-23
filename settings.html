@@ -664,6 +664,20 @@
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px"><span class="how" id="portalSlugBase" style="margin:0"></span><input id="portalSlug" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="your-studio" aria-label="Short name" style="flex:1 1 180px;font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;min-height:44px"></div>
         <div class="how" id="portalSlugAddr" style="margin-top:6px"></div></div>
     </div>
+    <!-- builder items 247 and 335 (direction A, Eric's pick): the portal wears the studio's look. The
+         colour and logo come from the website's brand (Files › Set as logo); here the studio picks a
+         cover picture for the sign-in page and the heading font (PUT /agency/portal { look }). -->
+    <div class="swrow pw-note" id="portalLookRow">
+      <div class="t"><b>The look<span id="portalLookSaved"></span></b><div class="how">Your colour and logo come from your website’s brand. Pick a picture for your clients’ sign-in page, and the font for headings.</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:10px">
+          <img id="portalCoverPic" alt="" hidden style="width:120px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line)">
+          <button type="button" class="btn sm" id="portalCoverPick">Choose a picture</button><button type="button" class="btn sm" id="portalCoverClear" hidden>Use the default</button>
+          <select id="portalFont" aria-label="Heading font" style="font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--dds-r,8px);padding:8px 12px;min-height:44px"><option value="fraunces">Fraunces (serif)</option><option value="inter">Inter (plain)</option></select>
+        </div>
+        <div class="how" id="portalCoverHow" style="margin-top:6px">A wide photo works best. It comes from your Files; upload one there first.</div>
+        <dialog id="portalCoverDlg" style="border:1px solid var(--line);border-radius:14px;padding:0;width:min(640px,calc(100vw - 32px));max-height:80vh;background:var(--card);color:var(--ink)"><div style="padding:18px"><h3 style="margin:0 0 4px">Choose a picture</h3><p class="how" style="margin:0 0 12px">One of your own photos, from Files.</p><div id="portalCoverGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;max-height:52vh;overflow:auto"></div><div class="row" style="justify-content:flex-end;margin-top:12px"><button type="button" class="btn sm" id="portalCoverClose">Close</button></div></div></dialog>
+      </div>
+    </div>
     <!-- builder item 353 (Nov 22 review): the reply time and working hours in the studio's own words.
          The portal used to promise "they usually reply within a day" in four places; now it says
          what the studio chose here, or nothing. Saved with the portal's other choices (PUT /agency/portal { reply }). -->
@@ -2274,7 +2288,7 @@ function loadPortalSettings() {
     paintPortalParts(); wirePortal();
     $('portalParts').hidden = false;
     if (SCOPE) loadPortalWho();   // item 232: when they were invited and last in, and their portal
-    if (!SCOPE) { paintPortalHome(); paintReply(); paintSlug(); $('portalHome').hidden = false; paintSignIn(); $('portalSignIn').hidden = false; }   // the note, Home's cards, the reply words and the sign-in ways are every client's: kept at studio level
+    if (!SCOPE) { paintPortalHome(); paintReply(); paintSlug(); paintLook(); $('portalHome').hidden = false; paintSignIn(); $('portalSignIn').hidden = false; }   // the note, Home's cards, the reply words and the sign-in ways are every client's: kept at studio level
   }).catch(() => { PORTAL_ASKED = null; });
   return PORTAL_ASKED;
 }
@@ -2439,6 +2453,39 @@ async function saveSlug() {
   $('portalSlugSaved').innerHTML = '<span class="nsaved" role="status">Saved</span>';
   toast(r.body.data.slug ? 'Your portal’s address is ' + r.body.data.address : 'Back to the long address.');
 }
+// items 247/335: the look
+let LOOK_BRAND = null;
+async function paintLook() {
+  const look = (PORTALSET && PORTALSET.look) || { cover_media_id: null, heading_font: 'fraunces' }, locked = portalLocked();
+  const sel = $('portalFont'); if (!sel) return;
+  if (document.activeElement !== sel) sel.value = look.heading_font || 'fraunces';
+  sel.disabled = locked; $('portalCoverPick').disabled = locked;
+  $('portalCoverClear').hidden = !look.cover_media_id || locked;
+  const pic = $('portalCoverPic');
+  if (!look.cover_media_id) { pic.hidden = true; return; }
+  if (!LOOK_BRAND) { const r = await api('/brand/studio', 'GET').catch(() => null); LOOK_BRAND = r && r.ok && r.body && r.body.data; }
+  const url = LOOK_BRAND && typeof LOOK_BRAND.cover_url === 'string' && /^https:\/\//.test(LOOK_BRAND.cover_url) ? LOOK_BRAND.cover_url : '';
+  pic.hidden = !url; if (url) pic.src = url;
+}
+async function saveLook(change) {
+  if (!PORTALSET || portalLocked()) return;
+  const cur = PORTALSET.look || { cover_media_id: null, heading_font: 'fraunces' };
+  const r = await api('/agency/portal', 'PUT', { look: { ...cur, ...change } });
+  if (!r.ok || !r.body || !r.body.data) { toast(nice(r.body, 'That didn’t save. It’s as it was.'), true); paintLook(); return; }
+  PORTALSET.look = r.body.data.look || cur; LOOK_BRAND = null; paintLook();
+  $('portalLookSaved').innerHTML = '<span class="nsaved" role="status">Saved</span>';
+}
+async function openCoverPicker() {
+  const dlg = $('portalCoverDlg'), grid = $('portalCoverGrid');
+  grid.innerHTML = '<p class="how">Looking in your Files…</p>';
+  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  const r = await api('/media', 'GET').catch(() => null);
+  const list = (r && r.ok && r.body && (r.body.data && r.body.data.media || r.body.data)) || [];
+  const pics = (Array.isArray(list) ? list : []).filter((m) => m && m.id && m.thumb);
+  if (!pics.length) { grid.innerHTML = '<p class="how">No photos in your Files yet. Upload one in <a href="/files.html">Files</a>, then come back.</p>'; return; }
+  grid.innerHTML = pics.map((m) => `<button type="button" class="cover-opt" data-cover="${esc(m.id)}" aria-label="Use ${esc(m.alt_text || 'this picture')}" style="padding:0;border:2px solid var(--line);border-radius:10px;background:var(--bg);min-height:44px;overflow:hidden;cursor:pointer"><img src="${esc(m.thumb)}" alt="" style="width:100%;height:90px;object-fit:cover;display:block"></button>`).join('');
+  grid.querySelectorAll('[data-cover]').forEach((b) => b.addEventListener('click', async () => { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); await saveLook({ cover_media_id: b.getAttribute('data-cover') }); toast('Your sign-in page has its picture.'); }));
+}
 function paintReply() {   // item 353
   const r = (PORTALSET && PORTALSET.reply) || { within: '', hours: '' }, locked = portalLocked();
   const sel = $('portalReplyWithin'), hrs = $('portalReplyHours');
@@ -2460,6 +2507,10 @@ async function saveReply() {
 function wirePortal() {
   const ta = $('portalWelcome');
   if (ta.dataset.wired) return; ta.dataset.wired = '1';
+  $('portalCoverPick').addEventListener('click', openCoverPicker);   // items 247/335
+  $('portalCoverClear').addEventListener('click', () => saveLook({ cover_media_id: null }));
+  $('portalCoverClose').addEventListener('click', () => { const d = $('portalCoverDlg'); if (d.close) d.close(); else d.removeAttribute('open'); });
+  $('portalFont').addEventListener('change', () => saveLook({ heading_font: $('portalFont').value }));
   $('portalSlug').addEventListener('change', saveSlug);   // item 350; item 165: saves when you leave the box, no Save button
   $('portalSlug').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveSlug(); } });
   $('portalReplyWithin').addEventListener('change', saveReply);   // item 353

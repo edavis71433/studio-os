@@ -81,6 +81,7 @@ const { handleBookingTypes, handleBookingSlots, handleBookingCreate, handleManag
 const { handleReviewPage, handleReviewSubmit, handleReviewsList, handleReviewApprove, handleReviewHide, handleReviewReply, handleReviewRequest, handleReviewGoogleLink } = lazyRoutes(() => import('./routes/reviews.ts'));
 const { handleCommentsList, handleCommentCreate, handleCommentResolve, handleCommentDelete, handleTokenSections, handleTokenComment } = lazyRoutes(() => import('./routes/comments.ts'));
 import { resolveSiteRoleCached, seedSiteRole } from './lib/workspace.ts';
+import { heldPowerOf, holdStop } from './lib/studio_holds.ts';   // builder item 387
 import { designerAllowed } from './lib/site_roles.ts';
 const { handleConciergeAsk } = lazyRoutes(() => import('./routes/concierge.ts'));
 const { handleHelpAsk } = lazyRoutes(() => import('./routes/help.ts'));
@@ -209,6 +210,15 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
     if (route === '/join' && method === 'GET') return handleJoinGet(req, cors);
     if (route === '/join' && method === 'POST') return handleJoinPost(req, cors);
   }
+  // ── Builder item 392: two doors that lived on the old server (clever-api) ──
+  //    The three sign-in pages ask whether the signed-in person is on the platform's own
+  //    team (the old whoami), answered for anyone: it only reflects the caller's own seat.
+  //    The project survey a studio sends after launch is public, like a site's form.
+  if (route === '/team/whoami' && method === 'GET') {
+    const team = principal.kind === 'staff';
+    return json(team ? { role: principal.role, isTeam: true, email: principal.email } : { role: null, isTeam: false }, 200, { ...cors, 'Cache-Control': 'no-store' });
+  }
+  if (route === '/survey' && method === 'POST') return (await import('./routes/project_survey.ts')).handleSurveyResponse(req, cors);
   // ── Phase BK: PUBLIC native booking — a website visitor lists services, reads
   //    open slots, and books an appointment. No session; authorized by the site id
   //    itself (like the form submit + analytics collector). Honeypot + rate-limit +
@@ -532,6 +542,19 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (principal.member && isWrite) {
     const refused = await memberWriteGate(req, route, method, principal.member, cors);
     if (refused) return refused;
+  }
+
+  // 4d. Builder item 387: on a site a studio looks after, the studio keeps Publish, Take offline,
+  //     the template, the domain and who works on the site, unless it switched "They can publish
+  //     and run their website" on for this client (lib/studio_holds.ts). Anyone on the client's
+  //     side (the owner and their seats) is held; the studio inside the site, platform staff and a
+  //     business no studio looks after are not. Editing the draft is unchanged.
+  if (principal.kind === 'client' && !principal.scope) {
+    const power = heldPowerOf(route, method);
+    if (power) {
+      const stop = await holdStop(site.id, power, { userId: principal.userId, email: principal.email });
+      if (stop) return json(stop.body, stop.status, cors);
+    }
   }
 
   // ── M11 boundary: Monitor sites observe an EXISTING external website.
