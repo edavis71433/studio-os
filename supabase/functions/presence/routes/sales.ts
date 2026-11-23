@@ -550,7 +550,7 @@ async function samePhone(siteId: string, phone: string): Promise<any[]> {
   const key = phoneKey(phone);
   if (key.length < 7) return [];
   const r = await svc(`presence_contacts?site_id=eq.${siteId}&deleted_at=is.null&phone=like.*${encodeURIComponent(key.slice(-4))}&select=${DUP_COLS}&order=created_at.desc&limit=50`).catch(() => null);
-  return rows(r).filter((c: any) => phoneKey(c.phone) === key);
+  return r ? rows(r).filter((c: any) => phoneKey(c.phone) === key) : [];
 }
 export async function possibleSamePeople(siteId: string, who: { name?: string; phone?: string; email?: string }) {
   const [pool, byEmail, byPhone] = await Promise.all([
@@ -1226,7 +1226,8 @@ export async function handleSalesDeals(req: Request, site: SiteRow, principal: P
     let who = '';
     if (q && u.searchParams.get('people') === '1' && !mine) {
       const like = encodeURIComponent(`*${q}*`);
-      const ids = rows(await svc(`presence_contacts?site_id=eq.${site.id}&or=(name.ilike.${like},email.ilike.${like},company.ilike.${like})&select=id&limit=200`).catch(() => null)).map((c: any) => String(c.id)).filter((x: string) => UUID_RE.test(x));
+      const found = await svc(`presence_contacts?site_id=eq.${site.id}&or=(name.ilike.${like},email.ilike.${like},company.ilike.${like})&select=id&limit=200`).catch(() => null);
+      const ids = (found ? rows(found) : []).map((c: any) => String(c.id)).filter((x: string) => UUID_RE.test(x));
       if (ids.length) who = `&or=(title.ilike.${like},contact_id.in.(${ids.join(',')}))`;
     }
     const filters = `${openOnly ? `&stage=in.(${REPORT_OPEN_STAGES.join(',')})&converted_client_id=is.null` : stage && isStage(stage) ? `&stage=eq.${stage}` : ''}${who || (q ? `&title=ilike.*${encodeURIComponent(q)}*` : '')}${mine}`;
