@@ -38,8 +38,8 @@ const get = async () => { const r = await R.handleSetupStrip(new Request('https:
 const post = async (b) => { const r = await R.handleSetupStrip(new Request('https://fn.test/functions/v1/presence/sales/setup', { method: 'POST', body: JSON.stringify(b) }), site, owner, cors); return { status: r.status, body: await r.json() }; };
 db.reset(world());
 let r = await get();
-eq('route: each step checked against the real thing', r.d.steps.map((s) => [s.key, s.done]), [['business', true], ['logo', false], ['services', true], ['contact', false], ['deal', true], ['goal', false]]);
-ok('route: it shows, with its count', r.d.shows === true && r.d.hidden === false && r.d.done === 3 && r.d.total === 6);
+eq('route: each step checked against the real thing', r.d.steps.map((s) => [s.key, s.done]), [['business', true], ['logo', false], ['services', true], ['contact', false], ['deal', true], ['goal', false], ['ai', false]]);   // sales item 209: AI help is off
+ok('route: it shows, with its count', r.d.shows === true && r.d.hidden === false && r.d.done === 3 && r.d.total === 7);
 ok('route: every read is this studio\'s own', db.log.filter((c) => c.method !== 'POST').every((c) => c.url.includes(`site_id=eq.${SITE}`)));
 let w = await post({ hidden: true });
 const kept = (db.tables.presence_sales_templates || []).filter((t) => t.name === '__setup_strip__' && t.site_id === SITE);
@@ -53,13 +53,13 @@ w = await post({ hidden: 'please' });
 ok('route: a choice that isn\'t one is a 422', w.status === 422);
 db.reset(world()); db.fail.add('presence_contacts');
 r = await get();
-ok('route: a check that couldn\'t be read leaves its step off, never "not done"', !r.d.steps.some((s) => s.key === 'contact') && r.d.total === 5);
+ok('route: a check that couldn\'t be read leaves its step off, never "not done"', !r.d.steps.some((s) => s.key === 'contact') && r.d.total === 6);
 db.reset(world()); db.tables.presence_contacts = [{ id: 'c1', site_id: SITE, deleted_at: null }]; db.tables.presence_settings = [{ site_id: SITE, brand_kit: { logo_media_id: 'm1' }, logo_media_id: null, signs_as_name: 'Pat Example' }];
 r = await get();
-ok('route: the month\'s goal is the one step left (sales item 94)', r.d.done === 5 && r.d.total === 6 && r.d.shows === true && r.d.steps.find((s) => s.key === 'goal')?.href === '/settings.html#goal');
-db.tables.presence_sales_templates.push({ id: 'goal', site_id: SITE, kind: 'proposal', name: '__sales_goal_ai__', body: JSON.stringify({ goal_cents: 800000 }), deleted_at: null, updated_at: '2026-11-02T00:00:00Z' });
+ok('route: the month\'s goal and AI help are the steps left (sales items 94, 209)', r.d.done === 5 && r.d.total === 7 && r.d.shows === true && r.d.steps.find((s) => s.key === 'goal')?.href === '/settings.html#goal');
+db.tables.presence_sales_templates.push({ id: 'goal', site_id: SITE, kind: 'proposal', name: '__sales_goal_ai__', body: JSON.stringify({ goal_cents: 800000, ai_on: true }), deleted_at: null, updated_at: '2026-11-02T00:00:00Z' });
 r = await get();
-ok('route: everything done, the strip goes by itself', r.d.done === 6 && r.d.shows === false);
+ok('route: everything done, the strip goes by itself', r.d.done === 7 && r.d.shows === false);
 db.reset(world()); db.failMethod.set('presence_sales_templates', 'GET');
 r = await get();
 ok('route: a hide that can\'t be read never brings the strip back', r.d.hidden === true && r.d.shows === false);
@@ -79,6 +79,28 @@ db.reset(world()); db.fail.add('presence_settings');
 r = await get();
 ok('195 route: the settings row unread, the step is left off rather than ticked', !r.d.steps.some((s) => s.key === 'business'));
 ok('195 route: the check reads the boxes the step names', db.log.some((c) => c.url.includes('presence_identity') && c.url.includes('select=business_name,email,service_area')));
+
+// ═══ sales item 209: the switches that make it work for you ═══
+{
+  const tok = (claims) => 'h.' + btoa(JSON.stringify(claims)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_') + '.s';
+  const getAs = async (jwt) => { const q = await R.handleSetupStrip(new Request('https://fn.test/functions/v1/presence/sales/setup'), site, { ...owner, jwt }, cors); return (await q.json()).data; };
+  const step = (d, k) => d.steps.find((x) => x.key === k);
+  db.reset(world()); db.tables.presence_settings = [{ site_id: SITE, brand_kit: {}, logo_media_id: null, signs_as_name: 'Pat Example', enquiry_followups: false }];
+  let d = await getAs(tok({ aal: 'aal1' }));
+  ok('209: the follow-ups are a step until switched on, and it opens Settings › Automations', step(d, 'followups')?.done === false && step(d, 'followups')?.href === '/settings.html#automations' && step(d, 'followups')?.title === 'Turn on your follow-ups');
+  ok('209: AI help is a step while off, with what it costs', step(d, 'ai')?.done === false && /1 cent a press/.test(step(d, 'ai')?.why || '') && step(d, 'ai')?.href === '/settings.html#goal');
+  ok('209: a sign-in without two-step is a step, and it opens Sign-in and security', step(d, 'twostep')?.done === false && step(d, 'twostep')?.href === '/settings.html#security' && step(d, 'twostep')?.title === 'Add two-step sign-in');
+  db.tables.presence_settings[0].enquiry_followups = true;
+  db.tables.presence_sales_templates.push({ id: 'goal', site_id: SITE, kind: 'proposal', name: '__sales_goal_ai__', body: JSON.stringify({ ai_on: true }), deleted_at: null, updated_at: '2026-11-02T00:00:00Z' });
+  d = await getAs(tok({ aal: 'aal2' }));
+  ok('209: each is ticked by the real thing (the switch on, AI help on, a two-step sign-in)', step(d, 'followups')?.done === true && step(d, 'ai')?.done === true && step(d, 'twostep')?.done === true);
+  d = await getAs('not-a-token');
+  ok('209: a sign-in that can\'t be read leaves the two-step step off, never "not done"', !step(d, 'twostep'));
+  db.reset(world());
+  d = await getAs(tok({ aal: 'aal1' }));
+  ok('209: a settings row without the switch leaves the follow-ups step off', !step(d, 'followups'));
+  ok('209: the words people read have no dashes standing in for commas', ['followups', 'ai', 'twostep'].every((k) => { const x = L.SETUP_STEPS.find((y) => y.key === k); return x && !/[—–]/.test(x.title + x.why + x.act); }));
+}
 
 // ═══ 3. Home draws it ═══
 const home = Deno.readTextFileSync(new URL('../../agency.html', import.meta.url));

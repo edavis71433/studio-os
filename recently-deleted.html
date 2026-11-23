@@ -119,10 +119,16 @@ function rowsOf(d){
     const who=x.for_name||x.deal_title||'';
     out.push({kind:'todo',id:x.id,title:x.title,sub:['To-do',who?'for '+who:'',x.due_date?'was due '+niceDay(x.due_date):''].filter(Boolean).join(' · '),at:x.deleted_at,home:'To-dos',open:x.deal_id?'/pipeline.html?deal='+encodeURIComponent(x.deal_id):(x.href||'/todos.html')});
   }
+  // sales item 186: a call, email, meeting or note you removed goes back on its timeline
+  for(const x of d.logs||[]){
+    const what=LOG_WORD[x.kind]||'Note',body=String(x.body||'').trim();
+    out.push({kind:'log',id:x.id,title:body?(body.length>80?body.slice(0,80)+'…':body):what,sub:[what,x.for_name?'with '+x.for_name:'',x.at?'from '+niceDay(String(x.at).slice(0,10)):''].filter(Boolean).join(' · '),at:x.deleted_at,home:'its timeline',open:x.href||'/recently-deleted.html'});
+  }
   return out.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
 }
-const KINDS=[['all','All'],['customer','Customers'],['deal','Deals'],['contact','Contacts'],['todo','To-dos']];
-const PARTIAL_WORD={customers:'customers',deals:'deals',contacts:'contacts',todos:'to-dos',names:'some names'};
+const KINDS=[['all','All'],['customer','Customers'],['deal','Deals'],['contact','Contacts'],['todo','To-dos'],['log','Calls and notes']];
+const LOG_WORD={call:'Call',email:'Email',meeting:'Meeting',note:'Note'};
+const PARTIAL_WORD={customers:'customers',deals:'deals',contacts:'contacts',todos:'to-dos',names:'some names',logs:'calls and notes'};
 function render(focusSel){
   const all=rowsOf(DATA),shown=SHOW==='all'?all:all.filter(r=>r.kind===SHOW);
   const count=(k)=>k==='all'?all.length:all.filter(r=>r.kind===k).length;
@@ -133,7 +139,7 @@ function render(focusSel){
     <div class="dds-ph-row"><span class="dds-ph-ic" data-ic="deleted" aria-hidden="true"></span>
       <div class="dds-ph-tt"><div class="dds-ph-tl"><h1 id="pagehead" tabindex="-1">Recently deleted</h1></div><p class="dds-ph-line" id="phLine">${esc(line)}</p></div></div></header>`;
   if(partial.length)h+=`<p class="partial" role="status">We couldn’t read your deleted ${esc([...new Set(partial.map(k=>PARTIAL_WORD[k]))].join(' and '))} just now, so this may not be everything. Refresh to try again.</p>`;
-  if(all.length)h+=`<div class="kchips" role="group" aria-label="Show">${KINDS.filter(([k])=>k!=='customer'||count(k)).map(([k,l])=>`<button type="button" class="kchip" data-show="${k}" aria-pressed="${SHOW===k?'true':'false'}">${l} <span class="n">${count(k)}</span></button>`).join('')}</div>`;
+  if(all.length)h+=`<div class="kchips" role="group" aria-label="Show">${KINDS.filter(([k])=>(k!=='customer'&&k!=='log')||count(k)).map(([k,l])=>`<button type="button" class="kchip" data-show="${k}" aria-pressed="${SHOW===k?'true':'false'}">${l} <span class="n">${count(k)}</span></button>`).join('')}</div>`;
   if(!all.length){
     h+=`<div class="list"><div class="empty"><div class="dic">${svg('todo')}</div><h2>Nothing deleted in the last ${esc(DATA.days||30)} days</h2><p>When you delete a customer, a deal, a contact or a to-do, it waits here for ${esc(DATA.days||30)} days so you can bring it back.</p><p class="small">Websites you moved to the trash are on <a class="link" href="/sites.html">Sites</a>. Files you delete wait in the Trash on <a class="link" href="/files.html">Files</a>.</p></div></div>`;
   }else{
@@ -152,10 +158,11 @@ async function restore(btn){
   const r=kind==='customer'?await api('/sales/customers/'+encodeURIComponent(id)+'/restore','POST',{})
     :kind==='deal'?await api('/sales/deals/'+encodeURIComponent(id)+'/restore','POST',{})
     :kind==='contact'?await api('/sales/contacts/'+encodeURIComponent(id)+'/restore','POST')
+    :kind==='log'?await api('/sales/logs/'+encodeURIComponent(id),'PATCH',{restore:true})
     :await api('/sales/deal-tasks/'+encodeURIComponent(id),'PATCH',{restore:true});
   if(!r.ok&&r.status!==404){btn.disabled=false;btn.textContent='Restore';toast((r.body&&r.body.message)||'That didn’t come back just now. Try again in a moment.',true);return;}
   // gone from the list either way: put back now, or (404) already back
-  const list={customer:'customers',deal:'deals',contact:'contacts',todo:'todos'}[kind];
+  const list={customer:'customers',deal:'deals',contact:'contacts',todo:'todos',log:'logs'}[kind];
   const at=[...document.querySelectorAll('[data-restore]')].indexOf(btn);
   DATA[list]=(DATA[list]||[]).filter(x=>x.id!==id);
   render();

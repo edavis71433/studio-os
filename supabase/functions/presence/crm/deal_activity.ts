@@ -91,6 +91,54 @@ export function usd(cents: unknown): string {
   return (n < 0 ? '−$' : '$') + (Math.abs(n) / 100).toLocaleString('en-US', whole ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// ── sales item 191 (Nov 22 2026 review): what changed on a deal, in its history ──
+// Ticking the next step, or changing the value, close date or owner, left no line.
+// Each is now a `kind='note'` row (allowed since 0074, so no migration) whose detail
+// carries { change, from, to } or { change: 'step_done', step }. It has no
+// activity_kind, so nothing counts it as a call, email, meeting or note.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** "Nov 3" for a date in `year`, else "Nov 3, 2027". Empty for nothing. Pure. */
+export function dayWords(ymd: unknown, year?: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd || ''));
+  if (!m) return '';
+  return `${MONTHS[Number(m[2]) - 1] || ''} ${Number(m[3])}` + (year && year === m[1] ? '' : `, ${m[1]}`);
+}
+export type DealChange = { change: 'value' | 'close' | 'owner'; from: unknown; to: unknown } | { change: 'step_done'; step: string };
+/** The history lines one saved change to a deal writes: `before` is the deal as it was, `patch`
+ *  what was saved, `stepDone` that the next step was ticked (a cleared one alone writes nothing). Pure. */
+export function dealChanges(before: Record<string, unknown>, patch: Record<string, unknown>, stepDone = false): DealChange[] {
+  const out: DealChange[] = [];
+  if ('expected_value_cents' in patch) {
+    const from = Math.trunc(Number(before?.expected_value_cents) || 0), to = Math.trunc(Number(patch.expected_value_cents) || 0);
+    if (from !== to) out.push({ change: 'value', from, to });
+  }
+  if ('expected_close' in patch) {
+    const from = String(before?.expected_close || '').slice(0, 10) || null, to = String(patch.expected_close || '').slice(0, 10) || null;
+    if (from !== to) out.push({ change: 'close', from, to });
+  }
+  if ('assigned_to' in patch) {
+    const from = before?.assigned_to ? String(before.assigned_to) : null, to = patch.assigned_to ? String(patch.assigned_to) : null;
+    if (from !== to) out.push({ change: 'owner', from, to });
+  }
+  const step = String(before?.next_step || '').trim();
+  if (stepDone && step && 'next_step' in patch && !String(patch.next_step || '').trim()) out.push({ change: 'step_done', step: step.slice(0, 200) });
+  return out;
+}
+/** One change line in words. `year` is the line's own year, so a date in it reads "Nov 3". Pure. */
+export function dealChangeLine(d: any, year?: string): string {
+  if (d?.change === 'step_done') return 'Done: ' + String(d.step || 'the next step');
+  if (d?.change === 'value') {
+    const from = usd(d.from), to = usd(d.to);
+    return from && to ? `Value changed from ${from} to ${to}` : to ? `Value set to ${to}` : from ? `Value cleared (it was ${from})` : 'Value changed';
+  }
+  if (d?.change === 'close') {
+    const from = dayWords(d.from, year), to = dayWords(d.to, year);
+    return from && to ? `Close date moved from ${from} to ${to}` : to ? `Close date set to ${to}` : from ? `Close date cleared (it was ${from})` : 'Close date changed';
+  }
+  if (d?.change === 'owner') return 'Owner changed';   // the page names them: only it knows the team's names
+  return 'Deal changed';
+}
+
 /** "$2,916" when a decision filled in the deal's value (value_backfilled_cents), else "". Pure. */
 function valueFilled(d: Record<string, unknown>): string {
   return Number(d.value_backfilled_cents) > 0 ? usd(d.value_backfilled_cents) : '';
@@ -102,6 +150,7 @@ export function describeSystemEvent(row: any): string {
   const d = (row && typeof row.detail === 'object' && row.detail) || {};
   const k = row?.kind;
   if (k === 'stage_change' && row?.to_stage) return 'Moved to ' + (STAGE_LABEL[row.to_stage] || row.to_stage);
+  if (k === 'note' && d.change) return dealChangeLine(d, String(row?.created_at || '').slice(0, 4));   // sales item 191
   // sales item 88: a decline says what would make it a yes; a signature names the studio's countersigner too
   // sales item 136: an accept that filled in the deal's value says so, since the price change is part
   // of the record (value_backfilled_cents rides the event, routes/sales.ts). It said only "Proposal accepted".
@@ -150,6 +199,28 @@ export interface DealTimelineItem {
   who: string;                   // actor (email/name/'system')
   text: string;                  // plain-language line to render (escape at render)
   backdated: boolean;            // an activity logged for an earlier day than entered
+  // sales item 186: a hand-logged line can be corrected or removed (routes/sales_history.ts)
+  log_id?: string;               // the row's own id, for PATCH /sales/logs/:id
+  body?: string;                 // the words as logged ('' for a call logged without any)
+  via?: string;                  // '' by hand · 'app' sent from Studio OS · 'bcc' logged from your BCC
+  edited_at?: string | null;     // when it was last corrected
+  mine?: boolean;                // the reader logged it by hand (set by the route: only it knows who reads)
+  // sales item 191: a change line says what changed, so the page can name a new owner
+  change?: { kind: string; from: unknown; to: unknown };
+}
+
+/** Sales item 186: a removed log keeps its row (Recently deleted brings it back for 30 days) as
+ *  activity_kind 'removed', its words moved under `removed`, so nothing reads it as a call,
+ *  email, meeting or note, and a search of the words never finds it. Pure. */
+export function isRemovedLog(row: any): boolean {
+  const d = row && typeof row.detail === 'object' ? row.detail : null;
+  return row?.kind === 'note' && !!d && d.activity_kind === 'removed';
+}
+/** The timeline as one reader sees it: their own hand-logged lines say so (`mine`), never one
+ *  Studio OS wrote (an email it sent, or one logged from a BCC). `actor` is who reads. Pure. */
+export function markMine<T extends { source?: string; who?: string; via?: string }>(items: T[], actor: string): Array<T & { mine?: boolean }> {
+  const me = String(actor || '').trim().toLowerCase();
+  return items.map((it) => (it.source === 'activity' && me && !it.via && String(it.who || '').trim().toLowerCase() === me ? { ...it, mine: true } : it));
 }
 
 /** Is this raw presence_deal_events row a manual (operator-logged) activity? */
@@ -173,12 +244,15 @@ export function mapDealTimelineItem(row: any, idx = 0): DealTimelineItem {
       at, logged_at: createdAt, source: 'activity', kind: ak, icon: ACTIVITY_ICON[ak],
       who, text: body || ACTIVITY_VERB[ak],
       backdated: !!(at && createdAt && at.slice(0, 10) !== createdAt.slice(0, 10)),
+      ...(row?.id ? { log_id: String(row.id) } : {}), body, via: typeof d.via === 'string' ? d.via : '',
+      edited_at: typeof d.edited_at === 'string' ? d.edited_at : null,
     };
   }
   return {
     id: row?.id ? `evt:${row.id}` : `evt:${idx}`,
     at: createdAt, logged_at: createdAt, source: 'system', kind: String(row?.kind || ''), icon: '',
     who, text: describeSystemEvent(row), backdated: false,
+    ...(row?.kind === 'note' && d.change ? { kind: 'deal_change', change: { kind: String(d.change), from: d.from ?? null, to: d.to ?? null } } : {}),
   };
 }
 
@@ -186,7 +260,7 @@ export function mapDealTimelineItem(row: any, idx = 0): DealTimelineItem {
  *  reverse-chronological timeline by EFFECTIVE time (occurred_at for activities,
  *  created_at for system events). Pure — the caller supplies the rows. */
 export function mergeDealTimeline(rows: any[]): DealTimelineItem[] {
-  const items = (Array.isArray(rows) ? rows : []).map((r, i) => mapDealTimelineItem(r, i)).filter((x) => x.at);
+  const items = (Array.isArray(rows) ? rows : []).filter((r) => !isRemovedLog(r)).map((r, i) => mapDealTimelineItem(r, i)).filter((x) => x.at);
   items.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
   return items;
 }

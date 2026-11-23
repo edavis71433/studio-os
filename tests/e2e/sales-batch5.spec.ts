@@ -71,7 +71,7 @@ test.describe('item 29 — My tasks on Home', () => {
     expect(writes).toEqual([
       ['PATCH', `/sales/deal-tasks/${DT}`, { status: 'done' }],
       ['PATCH', `/projects/${PROJ}/tasks/${PT}`, { status: 'done' }],
-      ['PATCH', `/sales/deals/${DEAL}`, { next_step: '', next_step_at: '' }],
+      ['PATCH', `/sales/deals/${DEAL}`, { next_step: '', next_step_at: '', step_done: true }],
     ]);
   });
 

@@ -139,7 +139,7 @@ test.describe('Home — the list first (item 70)', () => {
     expect(sent.map((s) => [s.method, s.path, s.body, s.scope])).toEqual([
       ['POST', `/forms/inbox/${E1}`, { status: 'read' }, SITE],                 // inside that client's account
       ['PATCH', `/support/${S1}`, { status: 'closed' }, null],
-      ['PATCH', `/sales/deals/${DEAL}`, { next_step: '', next_step_at: '' }, null],
+      ['PATCH', `/sales/deals/${DEAL}`, { next_step: '', next_step_at: '', step_done: true }, null],
       ['POST', '/commerce/notices/dismiss', { id: NOTE }, null],
     ]);
   });

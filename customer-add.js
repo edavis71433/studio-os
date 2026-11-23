@@ -22,6 +22,8 @@
 
   var CSS = [
     '#custDlg .done{text-align:center;padding:var(--dds-s2,8px) 0 var(--dds-s1,4px)}',
+    '#custDlg .same-m{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line,#e3e0d8)}',   // sales item 190
+    '#custDlg .same-m .btn{min-height:44px}',
     '#custDlg .done .tick{width:48px;height:48px;border-radius:50%;background:var(--dds-good-soft,#e7f1ea);color:var(--dds-good,#33664b);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto var(--dds-s3,12px)}',
     '#custDlg .done p{color:var(--dds-soft,#6b6478);font-size:14px;margin:6px 0 0}',
     '#custDlg .cu-lead{font-size:13.5px;color:var(--dds-soft,#6b6478);margin:0 0 var(--dds-s2,8px);line-height:1.5}',
@@ -63,6 +65,7 @@
     + '<input id="cu-phone" type="tel" maxlength="40" placeholder="(555) 123-4567" autocomplete="off">'
     + '<div class="row2"><button type="button" class="btn ghost" id="cu-cancel">Cancel</button><button type="submit" class="btn" id="cu-submit">Save customer</button></div>'
     + '</div>'
+    + '<div id="cust-same" role="group" aria-label="Someone you already have?" style="display:none"></div>'
     + '<div id="cust-done" style="display:none"></div>'
     + '</form>'
     + '</dialog>';
@@ -82,6 +85,7 @@
     ensure();
     $('cu-name').value = ''; $('cu-biz').value = ''; $('cu-email').value = ''; $('cu-phone').value = '';
     $('cust-fields').style.display = ''; $('cust-done').style.display = 'none'; $('cust-done').innerHTML = '';
+    $('cust-same').style.display = 'none'; $('cust-same').innerHTML = ''; SAME_OK = false;
     var sb = $('cu-submit'); if (sb) { sb.disabled = false; sb.textContent = 'Save customer'; }
     // Name is the box's first field, so showModal already focuses it; the late nudge never
     // pulls focus back from a field someone has moved to (item 199's focus race)
@@ -97,6 +101,17 @@
     if (!email && !name) { toastWith(O, 'Enter their name too, so you know who this is.', true); $('cu-name').focus(); return; }
     var btn = $('cu-submit'); btn.disabled = true; btn.textContent = 'Saving…';
     var failed = function (m) { toastWith(O, m || 'We couldn’t save them just now.', true); btn.disabled = false; btn.textContent = 'Save customer'; };
+    // sales item 190: "is this someone you already have?" first, the way Add a contact asks. A server
+    // without the check (or one that can't answer) saves them, as before.
+    if (!SAME_OK) {
+      var q = new URLSearchParams(); if (name || business_name) q.set('name', name || business_name); if (email) q.set('email', email); if (phone) q.set('phone', phone);
+      return Promise.resolve().then(function () { return O.request('GET', '/sales/people/check?' + q.toString()); }).then(function (r) {
+        var m = r && r.ok && r.body && r.body.data && Array.isArray(r.body.data.matches) ? r.body.data.matches : [];
+        if (m.length) { btn.disabled = false; btn.textContent = 'Save customer'; showSame(m); return; }
+        SAME_OK = true; return submit(e);
+      }, function () { SAME_OK = true; return submit(e); });
+    }
+    SAME_OK = false;
     // The pages go live on merge and the server only with the deploy that follows. A server from
     // before item 241 reads every mode but 'connect' as "set up their website and invite them",
     // so the box asks for 'connect' with save: true. This server saves the customer; an older one
@@ -115,6 +130,18 @@
       return Promise.resolve().then(function () { return O.done ? O.done() : null; })
         .catch(function () { toastWith(O, 'We couldn’t refresh the list just now — Refresh will catch it up.', true); });
     }, function () { failed(''); });
+  }
+
+  var SAME_OK = false;
+  function showSame(matches) {
+    var box = $('cust-same');
+    box.innerHTML = '<h3 style="margin:0 0 6px">Is this someone you already have?</h3><p class="opt" style="margin:0 0 10px">It looks like:</p>'
+      + matches.slice(0, 3).map(function (m) { var why = (m.reasons || []).join(', '); return '<div class="same-m"><div><b>' + esc(m.name || m.email || m.phone || 'Someone') + '</b>' + (why ? '<div class="opt">' + esc(why) + '</div>' : '') + '</div><a class="btn ghost" href="/crm.html?contact=' + encodeURIComponent(m.id || '') + '">Open</a></div>'; }).join('')
+      + '<div class="row2"><button type="button" class="btn ghost" id="cu-same-back">Go back</button><button type="button" class="btn" id="cu-same-add">Add as new anyway</button></div>';
+    $('cust-fields').style.display = 'none'; box.style.display = '';
+    $('cu-same-back').onclick = function () { box.style.display = 'none'; box.innerHTML = ''; $('cust-fields').style.display = ''; $('cu-name').focus(); };
+    $('cu-same-add').onclick = function () { box.style.display = 'none'; box.innerHTML = ''; $('cust-fields').style.display = ''; SAME_OK = true; $('custForm').requestSubmit(); };
+    $('cu-same-add').focus();
   }
 
   function showDone(d, name, business_name, email) {

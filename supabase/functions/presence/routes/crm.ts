@@ -441,7 +441,7 @@ async function collectClientConversation(u: URL, rs: RelScope): Promise<{
       if (ev.kind === 'note' && ['call', 'email', 'meeting', 'note'].includes(String(d.activity_kind))) {
         // item 107 (J8): who logged it rides along, so a teammate's call is theirs on the record
         // item 80: an email sent from Studio OS (via 'app') carries its subject
-        items.push({ id: ev.id, kind: 'activity', activity_kind: String(d.activity_kind), from: 'studio', actor: String(ev.actor || ''), body: String(d.body || ''), created_at: String(d.occurred_at || ev.created_at), via: String(d.via || ''), subject: String(d.subject || '') });
+        items.push({ id: ev.id, kind: 'activity', activity_kind: String(d.activity_kind), from: 'studio', actor: String(ev.actor || ''), body: String(d.body || ''), created_at: String(d.occurred_at || ev.created_at), via: String(d.via || ''), subject: String(d.subject || ''), edited_at: String(d.edited_at || '') });
       } else if (SYS.includes(String(ev.kind))) {
         items.push({ id: ev.id, kind: 'activity', activity_kind: String(ev.kind), from: 'studio', body: '', created_at: ev.created_at });
       }
@@ -468,11 +468,13 @@ export async function personActivity(AS: string, contactParam: string | null, cl
   if (!ors.length) return { events: [], tasks: [] };
   const or = `or=(${ors.join(',')})`;
   const [ev, tk] = await Promise.all([
-    svc(`presence_person_events?site_id=eq.${AS}&deleted_at=is.null&${or}&select=id,kind,body,subject,occurred_at,via,actor,created_at&order=occurred_at.desc&limit=200`).then(arr).catch(() => [] as any[]),
+    // sales item 186: edited_at lands with APPLY-0273; before it, the same read without it
+    svc(`presence_person_events?site_id=eq.${AS}&deleted_at=is.null&${or}&select=id,kind,body,subject,occurred_at,via,actor,created_at,edited_at&order=occurred_at.desc&limit=200`)
+      .then((r: any) => r && r.ok ? r : svc(`presence_person_events?site_id=eq.${AS}&deleted_at=is.null&${or}&select=id,kind,body,subject,occurred_at,via,actor,created_at&order=occurred_at.desc&limit=200`)).then(arr).catch(() => [] as any[]),
     svc(`presence_deal_tasks?site_id=eq.${AS}&deleted_at=is.null&deal_id=is.null&${or}&select=id,title,due_date,status,completed_at,created_at&order=due_date.asc.nullslast,created_at.asc&limit=200`).then(arr).catch(() => [] as any[]),
   ]);
   return {
-    events: ev.map((e: any) => ({ id: e.id, kind: 'activity', activity_kind: String(e.kind), from: 'studio', actor: String(e.actor || ''), body: String(e.body || ''), created_at: String(e.occurred_at || e.created_at), via: String(e.via || ''), subject: String(e.subject || '') })),
+    events: ev.map((e: any) => ({ id: e.id, kind: 'activity', activity_kind: String(e.kind), from: 'studio', actor: String(e.actor || ''), body: String(e.body || ''), created_at: String(e.occurred_at || e.created_at), via: String(e.via || ''), subject: String(e.subject || ''), edited_at: String(e.edited_at || '') })),
     tasks: tk,
   };
 }

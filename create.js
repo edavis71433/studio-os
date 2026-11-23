@@ -677,6 +677,22 @@
     S.busy = false; var go = dlg.querySelector('.cr-go'); if (go) go.disabled = false;
   }
 
+  // sales item 190: "Is this someone you already have?" inside the form. Resolves the person's id
+  // (use them) or 'new' (add the person typed in anyway).
+  function askSamePerson(m) {
+    return new Promise(function (resolve) {
+      var e = dlg && dlg.querySelector('.cr-err'); if (!e) { resolve('new'); return; }
+      var who = m.name || m.email || m.phone || 'someone';
+      e.textContent = 'Is this ' + who + (m.reasons && m.reasons.length ? ' (' + m.reasons.join(', ') + ')' : '') + ', someone you already have? ';
+      var use = document.createElement('button'); use.type = 'button'; use.className = 'cr-second'; use.textContent = 'Use ' + who;
+      var add = document.createElement('button'); add.type = 'button'; add.className = 'cr-second'; add.textContent = 'Add someone new';
+      use.addEventListener('click', function () { e.hidden = true; resolve(String(m.id)); });
+      add.addEventListener('click', function () { e.hidden = true; resolve('new'); });
+      e.appendChild(use); e.appendChild(document.createTextNode(' ')); e.appendChild(add);
+      e.hidden = false; use.focus();
+    });
+  }
+
   // ── saving ──
   function msg(r, fallback) { return (r && r.body && (r.body.message || (r.body.error && typeof r.body.error === 'string' && r.body.error.length > 20 ? r.body.error : ''))) || fallback; }
   // the pick becomes that deal, so pressing again never starts a second
@@ -791,9 +807,18 @@
       var title = val('cr-title'), cents = crCents(val('cr-value'));
       var person = S.someoneNew ? { name: val('cr-pname'), email: val('cr-pemail') } : null;
       if (person && !person.name && !person.email) person = null;
+      // sales item 190: someone new is checked first, the way Add a contact checks ("is this someone
+      // you already have?"); the answer picks them, or adds the new person anyway. A server without
+      // the check (or one that can't answer) adds them, as before.
+      var addPerson = function () {
+        return api('/sales/contacts', { method: 'POST', body: { name: person.name || person.email.split('@')[0], email: person.email || undefined } }).then(function (r) {
+          var id = r.ok && r.body && r.body.data && r.body.data.id; if (!id) return Promise.reject(msg(r, 'That person didn’t save — please try again.')); return id; });
+      };
       var contactP = S.someoneNew
-        ? (person ? api('/sales/contacts', { method: 'POST', body: { name: person.name || person.email.split('@')[0], email: person.email || undefined } }).then(function (r) {
-            var id = r.ok && r.body && r.body.data && r.body.data.id; if (!id) return Promise.reject(msg(r, 'That person didn’t save — please try again.')); return id; }) : Promise.resolve(null))
+        ? (person ? api('/sales/people/check?' + new URLSearchParams({ name: person.name || '', email: person.email || '' }).toString()).then(function (r) {
+            var m = r && r.ok && r.body && r.body.data && Array.isArray(r.body.data.matches) ? r.body.data.matches[0] : null;
+            return m && m.id && stillMine() ? askSamePerson(m) : 'new';
+          }, function () { return 'new'; }).then(function (pick) { return pick === 'new' ? addPerson() : pick; }) : Promise.resolve(null))
         : Promise.resolve(c && c.kind === 'contact' ? c.id : null);
       p = contactP.then(function (contactId) {
         return api('/sales/deals', { method: 'POST', body: { title: title, contact_id: contactId || undefined, expected_value_cents: cents || undefined } });
