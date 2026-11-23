@@ -58,9 +58,9 @@ export function reportPdf(d: ReportData, o: { studioName: string; accent?: strin
   const prior = d.priorLabel || 'the month before';
   const boxes: Array<[string, string, string]> = [];
   if (d.visitors !== null && on('visits')) boxes.push(['Visits', n1(d.visitors), changeOn(d.visitors, d.priorVisitors, prior)]);
-  // builder list item 219: clicks to contact ride the Enquiries switch, as in the email
+  // builder list item 219: the phone and email taps ride the Enquiries switch, as in the email (item 381: taps, never "calls")
   const c = d.contacts;
-  if (c && on('enquiries') && (c.calls + c.emails || c.prior)) boxes.push(['Clicks to contact', n1(c.calls + c.emails), c.prior === null ? '' : c.calls + c.emails === c.prior ? 'the same' : `${c.calls + c.emails > c.prior ? 'up' : 'down'} ${n1(Math.abs(c.calls + c.emails - c.prior))} on ${prior}`]);
+  if (c && on('enquiries') && (c.calls + c.emails || c.prior)) boxes.push(['Phone and email taps', n1(c.calls + c.emails), c.prior === null ? '' : c.calls + c.emails === c.prior ? 'the same' : `${c.calls + c.emails > c.prior ? 'up' : 'down'} ${n1(Math.abs(c.calls + c.emails - c.prior))} on ${prior}`]);
   if (d.enquiries !== null && on('enquiries')) boxes.push(['Enquiries', n1(d.enquiries), '']);
   if (d.search && on('google')) boxes.push(['Google clicks', n1(d.search.clicks), changeOn(d.search.clicks, d.search.priorClicks, prior)]);
   if (d.ai && on('ai')) boxes.push(['AI answers', `${d.ai.named} of ${d.ai.asked}`, d.ai.priorNamed === null ? '' : d.ai.named === d.ai.priorNamed ? 'the same as before' : `${d.ai.named > d.ai.priorNamed ? 'up' : 'down'} ${Math.abs(d.ai.named - d.ai.priorNamed)}`]);

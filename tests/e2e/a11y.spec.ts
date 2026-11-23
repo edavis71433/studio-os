@@ -46,10 +46,11 @@ test.describe('Accessibility', () => {
   // Slice 7 surfaces get scanned OPEN — a closed popover is display:none and
   // invisible to axe, so these are the only scans that actually cover them.
   test('no serious/critical axe violations with the Menu panel open (inbox.html)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });   // builder item 428: the Menu is the phone bar's; beside the sidebar there is none
     await installApp(page);
     await page.goto('/inbox.html#enquiries');
     await page.waitForLoadState('networkidle');
-    await page.locator('#dds-waffle').click();
+    await page.locator('#dds-mbar-menu').click();
     await expect(page.locator('#dds-drawer')).toBeVisible();
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     const serious = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
@@ -93,12 +94,14 @@ test.describe('Accessibility', () => {
     await page.goto('/today.html');
     await expect(page.getByRole('button', { name: 'Notifications' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Account' })).toBeVisible();
-    // the sidebar's Menu button (slice 7: the burger's successor) carries its name:
-    // Menu, the word (builder item 165; it was "App Launcher")
+    // the Menu button carries its name: Menu, the word (builder item 165; it was "App Launcher").
+    // Beside the sidebar there is none (builder item 428); on a phone it is the bar's
     await expect(page.locator('#dds-waffle')).toHaveAttribute('aria-label', 'Menu');
-    await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
+    await expect(page.locator('#dds-waffle')).toBeHidden();
     await expect(page.getByRole('button', { name: 'App Launcher' })).toHaveCount(0);
     await expect(page.getByLabel('Search')).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
   });
 
   test('keyboard: the command palette is reachable and Escapable', async ({ page }) => {

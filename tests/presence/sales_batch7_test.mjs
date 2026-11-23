@@ -51,7 +51,7 @@ const out = R.wonAndLost([
   { stage: 'proposal', expected_value_cents: 5 },
 ], NOW);
 eq('won and not a fit in the last year', [out.won, out.lost, out.win_rate_pct], [{ count: 2, value_cents: 290000 }, { count: 4, value_cents: 50000 }, 33]);
-eq('won by where it came from', out.won_by_source, [{ label: 'Website enquiry', count: 1, value_cents: 240000 }, { label: 'Added by hand', count: 1, value_cents: 50000 }]);
+eq('won by where it came from', out.won_by_source, [{ label: 'From your website', count: 1, value_cents: 240000 }, { label: 'Added by you', count: 1, value_cents: 50000 }]);   // sales item 196: Pipeline's words
 eq('not a fit by reason: an offered reason matches whatever the case; no reason says so', out.lost_by_reason.map((g) => [g.label, g.count]), [['Price', 2], ['No reason given', 1], ['They moved away', 1]]);
 eq('more than eight reasons fold the rest into one row', R.wonAndLost(Array.from({ length: 12 }, (_, i) => ({ stage: 'lost', lost_reason: 'Reason ' + i, updated_at: NOW })), NOW).lost_by_reason.slice(-1)[0], { label: 'Other reasons', count: 5, value_cents: 0 });
 eq('an unknown source reads as words', [R.sourceLabel('trade_show'), R.sourceLabel(''), R.sourceLabel('import')], ['Trade show', 'Not recorded', 'Imported']);

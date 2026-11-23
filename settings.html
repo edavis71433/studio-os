@@ -961,30 +961,47 @@ const IC = {
   calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
   portal: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><circle cx="12" cy="13.5" r="2"/><path d="M8.5 19a3.5 3.5 0 0 1 7 0"/>',   // items 229 and 233
   security: '<path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z"/><rect x="9" y="11" width="6" height="5" rx="1"/><path d="M10 11V9.5a2 2 0 0 1 4 0V11"/>',
+  // builder item 427: the parts that borrowed the building or the globe get their own, and On every invoice (it had none)
+  invoiceCard: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',   // On every invoice: an invoice with lines
+  reports: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M9.5 18v-3M12.5 18v-5M15.5 18v-2"/>',   // Monthly report(s): a page with bars
+  menu: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M12.5 9h5M12.5 13h5M12.5 17h3"/>',   // Your menu: the sidebar beside the page
+  replies: '<path d="M4 5h16v11H9l-5 4z"/><path d="M11 8.5 8.5 11l2.5 2.5"/><path d="M9 11h6"/>',   // Enquiry replies: a bubble with a reply arrow
+  domains_all: '<circle cx="9" cy="12" r="6"/><path d="M3 12h12M9 6a9 9 0 0 1 0 12M9 6a9 9 0 0 0 0 12"/><path d="M18 8h3M18 12h3M18 16h3"/>',   // every site's domains: a globe and a list
+  site_access: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',   // who can see your website: an eye
+  ai_crawlers: '<path d="M12 3.5l1.9 5.6 5.6 1.9-5.6 1.9L12 18.5l-1.9-5.6L4.5 11l5.6-1.9z"/>',   // AI assistants: a spark
+  visits: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 5-6"/>',   // the visit counter: a line going up
 };
 const CARDS = [
+  // builder item 427 (Nov 22): the parts on this page first, in the order the page shows them, then
+  // the rows that open another page; each with its own picture (IC)
   // builder item 202: a business owner who isn't a studio reads "Business profile"; a studio keeps "Studio profile"
   { key: 'studio', href: '#studio', title: 'Business profile', agencyTitle: 'Studio profile', desc: 'Name, email, phone, where you work from, and the kind of business — it drives the nudges on Today.', words: 'name email phone address location business industry kind studio profile',
     scopedTitle: (who) => possessive(who) + ' profile', scopedDesc: 'Their name, email, phone, where they work from, and the kind of business — it drives their nudges.' },
-  // builder list item 191: the signed-in person's own sign-in, so never inside a client
-  { key: 'security', href: '#security', title: 'Sign-in and security', desc: 'Two-step sign-in with a code from your phone, and who hears about the big changes.', words: 'two step 2fa mfa authenticator code phone password security login sign in alerts', studioOnly: true },
   // the studio's own switches — never a client's (the invoices and deals are the studio's book)
   // Bold redesign (Nov 2026): the deal stages are a section of their own (the studio's book, like Automations)
   { key: 'stages', href: '#stages', title: 'Deal stages', desc: 'Your names for the four open stages, the chance each one closes, and when a deal counts as stalled.', words: 'pipeline deals stalled chance close', studioOnly: true, needs: 'configure' },
   // sales item 94: the month's goal and the AI help switch (the studio's own, like the stages)
-  { key: 'invoiceCard', href: '#invoiceCard', title: 'On every invoice', desc: 'Other ways to pay, your tax number, the next invoice number, and an optional late fee.', words: 'invoice check zelle tax ein licence number late fee pay', studioOnly: true, needs: 'configure' },
   { key: 'goal', href: '#goal', title: 'Goal and AI help', desc: 'A monthly sales goal for Home and Pipeline, and AI help that drafts a reply or sums a customer up.', words: 'goal target monthly sales number ai help draft reply summary claude assistant cost', studioOnly: true, needs: 'configure' },
+  // builder list item 58 (Nov 2026): the client's monthly report email, set once per client (inside a client only)
+  { key: 'report', icon: 'reports', href: '#report', title: 'Monthly report', desc: 'Once a month, this client gets how their website did, on your brand, with a line from you.', words: 'email client monthly report visitors', scopedOnly: true, feature: 'website', cap: 'configure' },
+  // builder list item 160 (Nov 2026): every client's monthly report on one card, the studio's own Settings
+  { key: 'reports', href: '#reports', title: 'Monthly reports', desc: 'Which clients get a monthly report, who it goes to, and how the last one went.', words: 'email clients monthly report send who copy', agencyOnly: true, feature: 'website' },
+  // builder list item 54 (Nov 2026): a studio hides the menu areas it doesn't use
+  { key: 'menu', href: '#menu', title: 'Your menu', desc: 'Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away.', words: 'hide areas navigation sidebar', agencyOnly: true, cap: 'configure' },
+  // builder item 202: the card holds the real switch (this device); it opened the Inbox, where there is none
+  { key: 'notify', href: '#notify', title: 'Notifications', desc: 'Ring this phone or computer when something needs you. Enquiries, approvals and support requests also land in your Inbox.', words: 'notifications bell digest alerts emails mute quiet push device phone', scoped: true,
+    agencyHref: '#notify', agencyDesc: 'One switch for each client’s site, then the bell and email: what you hear about it, and how.', scopedTitle: () => 'Notifications', scopedDesc: 'What you hear about this client’s site: on Home and in the bell, and by email.' },   // item 126
+  // builder list items 229 and 233: what clients see in the portal, the welcome note, Home's cards
+  { key: 'portal', href: '#portalParts', title: 'Client portal', desc: 'What your clients see in their portal, a welcome note on their Home, and Home’s cards.', words: 'client portal clients see hide invoices messages files reports welcome note home cards pages quick links guide sign in google password code', studioTeam: true, scoped: true,
+    scopedTitle: (who) => possessive(who) + ' portal', scopedDesc: 'What this client sees in their portal: the same as your studio’s choices unless you change it here.' },
   { key: 'auto', href: '#automations', title: 'Automations', desc: 'Ready-made recipes: answer and follow up enquiries, remind unpaid invoices and quotes about to run out, nudge quiet deals, ask for a review. Each shows what it sends.', words: 'automatic reminders emails nudge review request unpaid recipes follow up quote expires auto reply', studioOnly: true, needs: 'configure' },
   // sales item 87: inside a client, the replies THEIR website sends: the acknowledgement and the follow-ups
-  { key: 'replies', icon: 'auto', href: '#automations', title: 'Enquiry replies', desc: 'The reply their website visitors get right away, and two follow-ups if an enquiry goes quiet. In your words or theirs.', words: 'auto reply acknowledgement follow up enquiry automatic email', scopedOnly: true, feature: 'website', needs: 'configure' },
+  { key: 'replies', href: '#automations', title: 'Enquiry replies', desc: 'The reply their website visitors get right away, and two follow-ups if an enquiry goes quiet. In your words or theirs.', words: 'auto reply acknowledgement follow up enquiry automatic email', scopedOnly: true, feature: 'website', needs: 'configure' },
+  { key: 'invoiceCard', href: '#invoiceCard', title: 'On every invoice', desc: 'Other ways to pay, your tax number, the next invoice number, and an optional late fee.', words: 'invoice check zelle tax ein licence number late fee pay', studioOnly: true, needs: 'configure' },
+  // builder list item 191: the signed-in person's own sign-in, so never inside a client
+  { key: 'security', href: '#security', title: 'Sign-in and security', desc: 'Two-step sign-in with a code from your phone, and who hears about the big changes.', words: 'two step 2fa mfa authenticator code phone password security login sign in alerts', studioOnly: true },
   // the agency's own team: seats and roles (agency members at studio level only — never a client's settings)
   { key: 'agency_team', href: '#team', title: 'Team', desc: 'Who is on your studio’s team, their roles, and the seats your plan covers.', words: 'people seats roles members invite staff', agencyOnly: true },
-  // builder list item 58 (Nov 2026): the client's monthly report email, set once per client (inside a client only)
-  { key: 'report', icon: 'studio', href: '#report', title: 'Monthly report', desc: 'Once a month, this client gets how their website did, on your brand, with a line from you.', words: 'email client monthly report visitors', scopedOnly: true, feature: 'website', cap: 'configure' },
-  // builder list item 160 (Nov 2026): every client's monthly report on one card, the studio's own Settings
-  { key: 'reports', icon: 'studio', href: '#reports', title: 'Monthly reports', desc: 'Which clients get a monthly report, who it goes to, and how the last one went.', words: 'email clients monthly report send who copy', agencyOnly: true, feature: 'website' },
-  // builder list item 54 (Nov 2026): a studio hides the menu areas it doesn't use
-  { key: 'menu', icon: 'studio', href: '#menu', title: 'Your menu', desc: 'Hide the areas your studio doesn’t use. A hidden area keeps its page and stays one search away.', words: 'hide areas navigation sidebar', agencyOnly: true, cap: 'configure' },
   { key: 'billing', href: '#billing', title: 'Your plan', desc: 'Your Studio OS plan, how to change it, and closing your account.', words: 'plan billing subscription payment card cancel close delete account export download data', ownerOnly: true, needs: 'owner' },   // item 166: "Plan" alone for the studio's own subscription (billing stays a search word)
   // builder item 202: named for what it opens, Manage services on Pipeline (it read "Invoices & agreements")
   { key: 'money', href: '/pipeline.html?services=1', title: 'Services and prices', desc: 'What you sell and for how much; they fill your proposals. The agreement every deal starts from and deposits are there too.', words: 'services prices proposals deposits contracts agreements invoices tax', feature: 'relationship' },
@@ -997,23 +1014,17 @@ const CARDS = [
   // the operator's card used to go to the platform Health Center instead (sales review B12 was exactly
   // that case); the platform-wide view is now a card of its own, for staff only.
   { key: 'domains', href: '/presence.html#domain', title: 'Domain & email', desc: 'Put your site on your own domain; email records and the padlock.', words: 'domain dns records padlock ssl certificate www email', feature: 'website', scoped: true },
-  { key: 'domains_all', icon: 'domains', href: '/admin-health.html', title: 'Every site’s domains', desc: 'Domains, email records and padlocks across the platform, in the Health Center. Staff only.', operatorOnly: true },
+  { key: 'domains_all', href: '/admin-health.html', title: 'Every site’s domains', desc: 'Domains, email records and padlocks across the platform, in the Health Center. Staff only.', operatorOnly: true },
   { key: 'team', href: '/sharing.html', title: 'Team & access', desc: 'Who can sign in, what clients can see, reviewer links.', words: 'sharing access reviewer client portal invite people', feature: 'client_portal', cap: 'invite', scoped: true,
     agencyTitle: 'Sharing & access', agencyDesc: 'What your clients can see in their portal, and reviewer links.' },
-  // builder item 202: the card holds the real switch (this device); it opened the Inbox, where there is none
-  { key: 'notify', href: '#notify', title: 'Notifications', desc: 'Ring this phone or computer when something needs you. Enquiries, approvals and support requests also land in your Inbox.', words: 'notifications bell digest alerts emails mute quiet push device phone', scoped: true,
-    agencyHref: '#notify', agencyDesc: 'One switch for each client’s site, then the bell and email: what you hear about it, and how.', scopedTitle: () => 'Notifications', scopedDesc: 'What you hear about this client’s site: on Home and in the bell, and by email.' },   // item 126
-  // builder list items 229 and 233: what clients see in the portal, the welcome note, Home's cards
-  { key: 'portal', href: '#portalParts', title: 'Client portal', desc: 'What your clients see in their portal, a welcome note on their Home, and Home’s cards.', words: 'client portal clients see hide invoices messages files reports welcome note home cards pages quick links guide sign in google password code', studioTeam: true, scoped: true,
-    scopedTitle: (who) => possessive(who) + ' portal', scopedDesc: 'What this client sees in their portal: the same as your studio’s choices unless you change it here.' },
   // the developer tools are the STUDIO's, never a client's — the card stays unscoped and says so while drilled in
   // builder item 165: named for what the page holds (it promised API keys, webhooks and a schema dump it doesn't have)
   { key: 'dev', href: '/developer.html', title: 'Developer tools', desc: 'Your site’s colors and type, your own styles and a block of your own HTML. For you, not your clients.', words: 'developer code css html theme colors styles tokens', feature: 'developer', cap: 'use_developer_mode',
     scopedTitle: () => 'Your studio’s developer tools', scopedDesc: 'Your studio’s own colors, styles and HTML, not this client’s. Opening it leaves the client.' },
   // list item 175: website settings that live on the website page, found by searching only
-  { key: 'site_access', icon: 'domains', href: '/presence.html', title: 'Who can see your website', desc: 'Public, a visitor password, or offline. On your website’s Overview.', words: 'password private public offline availability hide lock coming soon', feature: 'website', scoped: true, searchOnly: true },
-  { key: 'ai_crawlers', icon: 'domains', href: '/presence.html#search', title: 'AI assistants', desc: 'Let ChatGPT, Claude and other AI assistants read your website, or ask them not to. In your website’s Search.', words: 'ai crawlers robots chatgpt claude perplexity gemini bots block', feature: 'website', scoped: true, searchOnly: true },
-  { key: 'visits', icon: 'domains', href: '/presence.html#business', title: 'Visit counter & privacy page', desc: 'Count visits to your website without cookies; its privacy page follows the switch. In Business details.', words: 'analytics tracking cookies privacy counter visitors', feature: 'website', scoped: true, searchOnly: true },
+  { key: 'site_access', href: '/presence.html', title: 'Who can see your website', desc: 'Public, a visitor password, or offline. On your website’s Overview.', words: 'password private public offline availability hide lock coming soon', feature: 'website', scoped: true, searchOnly: true },
+  { key: 'ai_crawlers', href: '/presence.html#search', title: 'AI assistants', desc: 'Let ChatGPT, Claude and other AI assistants read your website, or ask them not to. In your website’s Search.', words: 'ai crawlers robots chatgpt claude perplexity gemini bots block', feature: 'website', scoped: true, searchOnly: true },
+  { key: 'visits', href: '/presence.html#business', title: 'Visit counter & privacy page', desc: 'Count visits to your website without cookies; its privacy page follows the switch. In Business details.', words: 'analytics tracking cookies privacy counter visitors', feature: 'website', scoped: true, searchOnly: true },
 ];
 let CTX = null;   // /portal/context — the shell already has it; fall back to our own read
 function hasFeature(f) { const list = CTX && CTX.edition_features; return !Array.isArray(list) || list.includes(f); }
@@ -3038,7 +3049,8 @@ async function saveStaleDays(k) {
 function renderSubline() {
   const bits = [];
   if (IDENT && IDENT.business_name) bits.push(esc(IDENT.business_name));
-  if (CTX && CTX.edition_name) bits.push(esc(CTX.edition_name));
+  const planW = CTX ? ('plan_words' in CTX ? CTX.plan_words : CTX.edition_name) : '';   // item 426: the Sites words, never "Studio OS"
+  if (planW) bits.push(esc(planW));
   // builder item 165: the header's one line — the business and its plan, or one plain sentence
   $('subline').innerHTML = bits.length ? bits.join(' · ') : (studioOwn() ? 'How your studio works, in one place.' : 'How your business works, in one place.');   // builder item 202's words
 }

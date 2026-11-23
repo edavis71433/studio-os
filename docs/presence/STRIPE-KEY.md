@@ -27,6 +27,7 @@ Every other row in Stripe's form stays on **None**. This list is
 | Payment Disputes | Read | read a dispute, its deadline and how it ended |
 | Invoices | Read | read each monthly retainer charge |
 | Balance | Read | Stripe’s fee on each payment, for the bookkeeper file |
+| Balance Transaction Sources | Read | the payment behind each of Stripe’s fees, for the bookkeeper file and the Stripe card on the Invoices page |
 | Payouts | Read | the list of what Stripe sent to your bank, for the bookkeeper file |
 
 What it must not be able to do, and so stays on None or Read: refund a payment
@@ -41,7 +42,7 @@ Destinations) or change the ways to pay (Payment Method Configurations).
 3. Pick **Powering an integration you built** and press **Continue**.
 4. On **Choose a permission template**, press **Choose your own**. Pick no template.
 5. In **Key name**, type `Studio OS restricted`.
-6. Set the twelve rows in the table above. The **Filter resources** box finds each one by
+6. Set the thirteen rows in the table above. The **Filter resources** box finds each one by
    name. Leave the group rows (Core, Billing and the rest) alone, and leave every other row
    on None.
 7. Press **Create key** and finish Stripe's two-step check.
@@ -56,6 +57,13 @@ Destinations) or change the ways to pay (Payment Method Configurations).
 12. Leave the old "Studio OS production" key in Stripe for a week. If its **Last used**
     date in Stripe doesn't move in that week, nothing else uses it, and you can delete it
     from its **⋯** menu.
+
+**Adding a row to the key you already made.** Balance Transaction Sources joined the table
+on Nov 22 2026: without it Stripe refused the bookkeeper file's fees and paid-out days and
+the Stripe card on the Invoices page. Open the same **API keys** page, open the
+`Studio OS restricted` key's **⋯** menu, choose **Edit key**, set the row to Read, and save.
+The key itself stays the same, so nothing goes into Supabase. Then press **Check its
+permissions** on the Health Center's Stripe key card again.
 
 If anything stops working after the swap, the quick undo is a new standard secret key
 from **Create secret key** on the same Stripe page, put into STRIPE_SECRET the same way.

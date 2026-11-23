@@ -448,7 +448,7 @@ const ico=(k,tone)=>`<span class="ico ${tone||''}"><svg viewBox="0 0 24 24" aria
 // or Escape, closes it. One open at a time (the listeners are at the end of this script).
 const EXPLAIN={
   pipeline:'Every open deal added up, at the value you gave it: everything not yet won or marked not a fit.',
-  won:'Deals moved to Won since the 1st of this month, at their expected value. The arrow compares with last month.',
+  won:'Deals moved to Won since the 1st of this month, at their expected value, the same number Home and Pipeline show. Money actually paid is Money in.',
   enquiries:'Messages sent through the website’s forms in these dates, with spam left out. “Not yet answered” counts the ones still marked new.',
   support:'Support requests open or in progress right now, and how long the oldest one has waited.',
   visits:'Our counter’s count for these dates. A person counts once a day: someone who comes back on three days is three visits. Page views count every page opened.',
@@ -460,7 +460,7 @@ const EXPLAIN={
   attention:'Clients with something flagged for a look today. Each one is listed under What stands out.',
   waiting:'Website enquiries, across every client, that nobody has answered yet.',
   live:'Client sites that are published and answering. Hosted elsewhere means the site lives on another platform.',
-  revenue:'Invoices paid and retainer payments this month, by the day they were paid. The chip compares with last month; the line is the last 12 months.',
+  revenue:'Money in: invoices paid and retainer payments this month, by the day they were paid. It is not Won this month, which counts deals on the day they are won, before they are paid, so the two can move in different directions. The chip compares with last month; the line is the last 12 months.',
   winrate:'Of the deals closed in the last 12 months, the share you won. Not a fit counts as not won.',
   days:'The middle number of days from a deal being added to it being won, across your six latest wins. The chip compares with the six before.',
   expected:'Each open deal’s value times its stage’s chance of closing, added up.',
@@ -933,10 +933,11 @@ function glanceNums(rep){
   // 1. revenue this month (paid invoices), against last month, the twelve months in a line
   if(rv&&!rv.unavailable&&Array.isArray(rv.months)&&rv.months.length>=2){
     const ms=rv.months,cur=ms[ms.length-1],prev=ms[ms.length-2],d=(cur.this_year||0)-(prev.this_year||0);
-    out.push(numCard({label:'Revenue · '+mon(cur.label),explain:EXPLAIN.revenue,value:esc(money(cur.this_year)),
+    out.push(numCard({label:'Money in · '+mon(cur.label),explain:EXPLAIN.revenue,   // sales item 215: money paid, named so beside Won this month (deals won)
+     value:esc(money(cur.this_year)),
       chip:(cur.this_year||prev.this_year)?{text:(d>=0?'+':'−')+money(Math.abs(d))+' vs '+mon(prev.label),tone:d>=0?'good':'bad'}:null,
       spark:spark(ms.map(m=>m.this_year)),sub:money(rv.total_this_year)+' in the last 12 months'}));
-  }else out.push(numCard({label:'Revenue',explain:EXPLAIN.revenue,value:'—',none:true,sub:'Couldn’t load just now'}));
+  }else out.push(numCard({label:'Money in',explain:EXPLAIN.revenue,value:'—',none:true,sub:'Couldn’t load just now'}));
   // 2. win rate over the last twelve months
   if(o&&!o.unavailable&&o.won&&o.lost){
     out.push(o.win_rate_pct==null?numCard({label:'Win rate',explain:EXPLAIN.winrate,value:'—',none:true,sub:'No deals closed in the last 12 months'})
@@ -1183,7 +1184,7 @@ function insightCard(i){
     ${(i.number!=null&&i.number!=='')?`<p class="kn">${esc(i.number)}</p>`:''}<p class="isent">${esc(i.sentence)}</p>${i.detail?`<p class="kd">${esc(i.detail)}</p>`:''}${links}</section>`;
 }
 function portfolioRollup(roster,ws,vTrunc){
-  // roster: /agency/portfolio rows (site_id · name · edition · status ·
+  // roster: /agency/portfolio rows (site_id · name · plan_words (item 426: the plan in Sites' words, never edition · status) ·
   // attention · leads_waiting). null = that read FAILED — say so, never a
   // blank or an implied all-clear (failure ≠ empty).
   // SS7 item 3: visitors joined from the ENRICHED /analytics/portfolio
@@ -1208,7 +1209,7 @@ function portfolioRollup(roster,ws,vTrunc){
     const att=Number(c.attention||0),lw=Number(c.leads_waiting||0);
     const v=vs?vs.get(c.site_id):undefined;
     const vcell=vs?`<td class="r">${(vTrunc||v==null)?'<span class="muted">—</span>':num(Number(v)||0)}</td>`:'';
-    return `<tr data-drill="${esc(drill)}"><td><a href="${esc(drill)}">${esc(c.name||'(unnamed)')}</a></td><td>${esc(c.edition||'presence')}${c.status?' · '+esc(c.status):''}</td><td>${att?`<span class="pill wait">${num(att)} waiting</span>`:'<span class="pill ok">all clear</span>'}</td><td class="r">${num(lw)}</td>${vcell}</tr>`;
+    return `<tr data-drill="${esc(drill)}"><td><a href="${esc(drill)}">${esc(c.name||'(unnamed)')}</a></td><td>${c.plan_words?esc(c.plan_words):'<span class="muted">—</span>'}</td><td>${att?`<span class="pill wait">${num(att)} waiting</span>`:'<span class="pill ok">all clear</span>'}</td><td class="r">${num(lw)}</td>${vcell}</tr>`;
   }).join('');
   h+=`<div class="tscroll"><table><caption>Customers — plan, what’s waiting, enquiries${vs?', visits':''}. Open a row for that customer’s Business dashboard.</caption><thead><tr><th scope="col">Customer</th><th scope="col">Plan</th><th scope="col">Waiting</th><th class="r" scope="col">Enquiries waiting</th>${vs?'<th class="r" scope="col" title="'+VISIT_WORDS+'">Visits (7 days)</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>`;
   // the one honest line for the — column: a partial count per client would be

@@ -7478,11 +7478,11 @@ function renderSvListing() {
     const nums = el("div", "sv-nums");
     const tile = (v, k) => { if (v == null) return; const t = el("div"); t.append(el("b", null, v), el("span", null, k)); nums.appendChild(t); };
     tile(d.rating != null ? d.rating + "★" : null, d.review_count != null ? `${svNum(d.review_count)} review${d.review_count === 1 ? "" : "s"}` : "rating");
-    tile(d.calls != null ? svNum(d.calls) : null, "calls");
+    tile(d.calls != null ? svNum(d.calls) : null, "calls from Google");   // item 381: Google's own count, not the taps on the site's number
     tile(d.direction_requests != null ? svNum(d.direction_requests) : null, "direction requests");
     tile(d.website_clicks != null ? svNum(d.website_clicks) : null, "website clicks");
     host.appendChild(nums);
-    if (d.calls != null || d.direction_requests != null) host.appendChild(el("p", "hint", "Calls, directions and website clicks are for the last 30 days."));
+    if (d.calls != null || d.direction_requests != null) host.appendChild(el("p", "hint", "Google counts these calls, direction requests and website clicks from your listing, over the last 30 days."));
     if (d.unreplied_reviews) host.appendChild(el("p", "sv-why", `${svNum(d.unreplied_reviews)} of your latest reviews ${d.unreplied_reviews === 1 ? "has" : "have"} no reply yet.`));
     if (d.hours_set === false) host.appendChild(el("p", "sv-why", "Your listing has no opening hours. People often check those first."));
     if (d.listing_maps_uri) { const a = el("a", null, "Open on Google Maps"); a.href = d.listing_maps_uri; a.target = "_blank"; a.rel = "noopener"; a.style.cssText = "font-size:13px;color:var(--plum)"; host.appendChild(a); }

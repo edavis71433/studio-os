@@ -675,9 +675,9 @@ const PORTFOLIO = { data: {
   ],
 } };
 const AGENCY_ROSTER = { data: [
-  { site_id: 's1', name: 'Marlow’s Kitchen', edition: 'presence', status: 'live', attention: 0, leads_waiting: 3 },
-  { site_id: 's2', name: 'Beacon Plumbing', edition: 'presence', status: 'live', attention: 2, leads_waiting: 1 },
-  { site_id: 's3', name: 'Cedar Studio', edition: 'presence', status: 'draft', attention: 0, leads_waiting: 0 },
+  { site_id: 's1', name: 'Marlow’s Kitchen', edition: 'presence', status: 'live', plan_words: 'Website + tools', attention: 0, leads_waiting: 3 },
+  { site_id: 's2', name: 'Beacon Plumbing', edition: 'monitor', status: 'ready', plan_words: 'Watch', attention: 2, leads_waiting: 1 },
+  { site_id: 's3', name: 'Cedar Studio', edition: 'presence', status: 'draft', attention: 0, leads_waiting: 0 },   // an older server: no plan_words
 ] };
 const AGENCY_API = { '/portal/context': AGENCY_CTX, '/analytics/portfolio': PORTFOLIO, '/agency/portfolio': AGENCY_ROSTER };
 
@@ -781,6 +781,15 @@ test.describe('Analytics (Agency portfolio lens)', () => {
     await expect(page.getByRole('columnheader', { name: /Visit/ })).toHaveCount(0);
     await expect(page.locator('.tscroll thead th')).toHaveCount(4);
     await expect(page.locator('.tscroll tbody tr').nth(0).locator('td')).toHaveCount(4);
+  });
+
+  // builder list item 426: the Plan column said "presence · live" and "monitor · ready", the site's
+  // edition and status codes; it names the plan the way Sites does, and a dash when it isn't known
+  test('the Plan column names each plan as Sites does, never the edition and status codes', async ({ page }) => {
+    await installApp(page, { api: AGENCY_API });
+    await page.goto('/analytics.html');
+    await expect(page.locator('.tscroll tbody tr td:nth-child(2)')).toHaveText(['Website + tools', 'Watch', '—']);
+    await expect(page.locator('.tscroll tbody')).not.toContainText(/presence|monitor|ready|live|draft/);
   });
 
   test('a rollup row click drills into that client’s SCOPED Business dashboard', async ({ page }) => {

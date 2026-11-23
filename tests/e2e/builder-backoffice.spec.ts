@@ -242,6 +242,8 @@ test.describe('Search tab', () => {
     await expect(l).toContainText('128 reviews');
     await expect(l).toContainText('direction requests');
     await expect(l).toContainText('last 30 days');
+    await expect(l).toContainText('calls from Google');   // builder item 381: Google's own count, said as Google's
+    await expect(l).toContainText('Google counts these calls');
     await expect(l).toContainText('3 of your latest reviews have no reply yet');
     await expect(l).toContainText('no opening hours');
     await expect(l.getByRole('link', { name: 'Open on Google Maps' })).toHaveAttribute('href', 'https://maps.google.com/?cid=1');

@@ -90,7 +90,8 @@ const SITE = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', STUDIO = 'bbbbbbbb-2222-422
 let world;
 function reset(over = {}) {
   world = { domain: 'www.bistro.example', rdap: { 'bistro.example': { status: 200, expires: '2026-11-18T00:00:00Z' } }, ssl: { state: 'pending' }, dnsRight: true, pendingSince: null,
-    patches: [], notices: [], dismissed: [], emails: [], reask: 0, rdapAsked: [], clientEmail: 'owner@bistro.example', ...over };
+    patches: [], notices: [], dismissed: [], emails: [], reask: 0, rdapAsked: [], clientEmail: 'owner@bistro.example',
+    list: null, listAsked: '', breakPatch: new Set(), ...over };   // item 365: the round's rows, the question it asked, rows whose first save throws
 }
 const reply = (body, status = 200, headers = {}) => new Response(body === null ? null : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } });
 globalThis.fetch = async (url, init = {}) => {
@@ -107,8 +108,12 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.hostname === 'api.resend.com') { world.emails.push(JSON.parse(init.body)); return reply({ id: 'em' }); }
   if (u.hostname !== 'stub.local') return reply({}, 404);
   const table = u.pathname.replace('/rest/v1/', ''); const q = decodeURIComponent(u.search);
-  if (table === 'presence_sites' && method === 'PATCH') { world.patches.push(JSON.parse(init.body)); return reply([]); }
-  if (table === 'presence_sites' && q.includes('custom_domain=not.is.null')) return reply([{ id: SITE, client_id: CLIENT, custom_domain: world.domain, netlify_site_id: 'nf1', edition: 'presence', cert_pending_since: world.pendingSince }]);
+  if (table === 'presence_sites' && method === 'PATCH') {
+    const id = (q.match(/id=eq\.([^&]+)/) || [])[1];
+    if (world.breakPatch.delete(id)) throw new Error('database timeout');   // item 365: this row's first save breaks
+    world.patches.push({ ...JSON.parse(init.body), _id: id }); return reply([]);
+  }
+  if (table === 'presence_sites' && q.includes('custom_domain=not.is.null')) { world.listAsked = q; return reply(world.list || [{ id: SITE, client_id: CLIENT, custom_domain: world.domain, netlify_site_id: 'nf1', edition: 'presence', cert_pending_since: world.pendingSince }]); }
   if (table === 'presence_sites') return reply([{ id: STUDIO, client_id: 'studio-client' }]);
   if (table === 'presence_plan_notices' && method === 'POST') { const b = JSON.parse(init.body); if (world.notices.some((n) => n.period === b.period)) return reply([]); world.notices.push(b); return reply([{ id: 'n' + world.notices.length }]); }
   if (table === 'presence_plan_notices' && method === 'PATCH') { world.dismissed.push(q); return reply([]); }
@@ -168,6 +173,19 @@ ok('records not right yet: no asking, no clock', world.reask === 0 && world.patc
 reset({ clientEmail: '' });
 await quiet(() => runDomainWatch(10));
 ok('a client without an email: the studio still hears, and is told the client wasn’t', world.emails.length === 1 && world.emails[0].to === 'studio@studio.example' && /no email on their record/.test(world.emails[0].html));
+// ═══ builder list item 365: the round's order, and one failure never holds up the rest ═══
+{
+  const row = (id, domain) => ({ id, client_id: CLIENT, custom_domain: domain, netlify_site_id: null, edition: 'presence', cert_pending_since: null });
+  const A = 'a0000000-0000-4000-8000-000000000001', B = 'b0000000-0000-4000-8000-000000000002', C = 'c0000000-0000-4000-8000-000000000003';
+  reset({ list: [row(A, 'one.example'), row(B, 'two.example'), row(C, 'three.example')], breakPatch: new Set([B]),
+    rdap: { 'one.example': { status: 200, expires: '2027-06-01T00:00:00Z' }, 'two.example': { status: 200, expires: '2027-06-01T00:00:00Z' }, 'three.example': { status: 200, expires: '2027-06-01T00:00:00Z' } } });
+  const r = await quiet(() => runDomainWatch(10));
+  ok('365: the round asks for the never-checked first, then the longest since a check', /order=domain_checked_at\.asc\.nullsfirst,id\.asc/.test(world.listAsked) && /limit=10/.test(world.listAsked), world.listAsked);
+  ok('365: a check that breaks doesn’t stop the round: the one after it is checked too', world.patches.some((x) => x._id === C && x.domain_lookup_status === 'ok') && world.patches.some((x) => x._id === A && x.domain_lookup_status === 'ok'), JSON.stringify(world.patches.map((x) => x._id)));
+  const bp = world.patches.filter((x) => x._id === B);
+  ok('365: …and the broken one is written down on its own row: checked today, its lookup failed', bp.length === 1 && bp[0].domain_lookup_status === 'failed' && bp[0].domain_checked_at === '2026-11-11T12:00:00.000Z' && Object.keys(bp[0]).length === 3, JSON.stringify(bp));
+  ok('365: the run counts it apart', r.checked === 2 && r.failed === 1, JSON.stringify(r));
+}
 globalThis.Date = RealDate; Date.now = realNow;
 
 const passed = results.filter((r) => r.p).length;
