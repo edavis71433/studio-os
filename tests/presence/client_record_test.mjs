@@ -155,7 +155,7 @@ const sameId = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 // ═══ 1. the resolver: any key opens the same record ═══
 {
   db.reset(world());
-  const FULL = { contact_id: C1, deal_id: D1, client_id: CUST, customer_site_id: SITE_CUST, project_id: P1 };
+  const FULL = { contact_id: C1, deal_id: D1, client_id: CUST, customer_site_id: SITE_CUST, project_id: P1, person_id: C1 };   // sales item 211: person_id, whose note it is
   const byKey = {};
   for (const [label, q] of [['a contact', `?contact=${C1}`], ['a deal', `?deal=${D1}`], ['a project', `?project=${P1}`], ['a customer', `?client_id=${CUST}`]]) byKey[label] = await studio(q);
   const wrongKey = Object.entries(byKey).filter(([, r]) => r.status !== 200 || !sameId(r.body?.data?.identity, FULL)).map(([k, r]) => `${k}: ${JSON.stringify(r.body?.data?.identity)}`);
@@ -167,7 +167,7 @@ const sameId = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   ok('…and it lists the customer\'s projects and deals on this studio\'s site only', sameId((r.related_projects || []).map((p) => p.id), [P1]) && sameId((r.related_deals || []).map((d) => d.id), [D1]), JSON.stringify([r.related_projects, r.related_deals]));
 
   const lead = (await studio(`?contact=${C2}`)).body?.data || {};
-  ok('a person with an open deal and no customer yet: the deal and details, no Overview; it opens on the deal and is addressed by it', sameId(lead.identity, { contact_id: C2, deal_id: D2, client_id: null, customer_site_id: null, project_id: null }) && sameId(lead.sections, { overview: false, messages: false, deal: true, delivery: false, details: true }) && lead.default_tab === 'deal' && sameId(lead.canonical, { key: 'deal', value: D2 }), JSON.stringify([lead.identity, lead.sections, lead.default_tab, lead.canonical]));
+  ok('a person with an open deal and no customer yet: the deal and details, no Overview; it opens on the deal and is addressed by it', sameId(lead.identity, { contact_id: C2, deal_id: D2, client_id: null, customer_site_id: null, project_id: null, person_id: C2 }) && sameId(lead.sections, { overview: false, messages: false, deal: true, delivery: false, details: true }) && lead.default_tab === 'deal' && sameId(lead.canonical, { key: 'deal', value: D2 }), JSON.stringify([lead.identity, lead.sections, lead.default_tab, lead.canonical]));
   const solo = (await studio(`?contact=${C3}`)).body?.data || {};
   ok('a person with no deal: details only, addressed by the contact, named in the header', sameId(solo.sections, { overview: false, messages: false, deal: false, delivery: false, details: true }) && solo.default_tab === 'details' && sameId(solo.canonical, { key: 'contact', value: C3 }) && solo.header?.name === 'Casey Doe', JSON.stringify([solo.sections, solo.default_tab, solo.canonical, solo.header?.name]));
   const noSite = (await studio(`?deal=${D3}`)).body?.data || {};

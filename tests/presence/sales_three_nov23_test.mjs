@@ -96,7 +96,7 @@ const search = async (q) => { const r = await C.handleCrmSearch(new Request(`htt
   ok('192: a call logged on a person with no deal is found, says what it was and with whom, and opens their history',
     call?.group === 'notes' && call.sub.startsWith('Logged call with Cara Lin') && call.href === `/crm.html?contact=${CARA}&tab=activity`, JSON.stringify(rs));
   const sent = rs.find((x) => x.sub.startsWith('Email you sent'));
-  ok('192: an email sent from Studio OS to a customer is found by its subject, and opens the customer', sent?.href === `/crm.html?client_id=${HARBOR_CLIENT}&tab=activity` && sent.sub.includes('Harbor Cafe') && sent.label.includes('Spring menu photos'), JSON.stringify(sent));
+  ok('192: an email sent from Studio OS to a customer is found by its subject, and opens the customer', sent?.href === `/crm.html?client_id=${HARBOR_CLIENT}&tab=activity` && sent.sub.startsWith('Email you sent to Harbor Cafe') && sent.label.includes('Spring menu photos'), JSON.stringify(sent));
   ok('192: a removed log is never found', !JSON.stringify(rs).includes('secret'));
 }
 {

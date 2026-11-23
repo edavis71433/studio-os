@@ -246,8 +246,10 @@ export async function handleCrmSearch(req: Request, jwt: string, site: SiteRow, 
     for (const x of [...ppl, ...cus]) nameOf[String(x.id)] = String(x.name || x.email || '');
     for (const e of personLogged) {
       const said = hit(e.body) ? e.body : e.subject, who = nameOf[String(e.contact_id || e.client_id || '')];
-      const word = e.via === 'app' && e.kind === 'email' ? 'Email you sent' : LOGGED_WORD[String(e.kind)] || 'Note';
-      add({ kind: 'note', group: 'notes', label: quoteOf(snippet(said, q, 80)), sub: [who ? `${word} with ${who}` : word, shortDate(e.occurred_at || e.created_at)].filter(Boolean).join(' · '),
+      // "Logged call with Cara", "Note on Cara", "Email you sent to Harbor Cafe"
+      const sent = e.via === 'app' && e.kind === 'email', word = sent ? 'Email you sent' : LOGGED_WORD[String(e.kind)] || 'Note';
+      const said2 = who ? `${word} ${sent ? 'to' : e.kind === 'note' ? 'on' : 'with'} ${who}` : word;
+      add({ kind: 'note', group: 'notes', label: quoteOf(snippet(said, q, 80)), sub: [said2, shortDate(e.occurred_at || e.created_at)].filter(Boolean).join(' · '),
         href: e.contact_id ? `/crm.html?contact=${e.contact_id}&tab=activity` : `/crm.html?client_id=${e.client_id}&tab=activity` });
     }
   }

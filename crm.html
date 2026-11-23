@@ -2506,9 +2506,13 @@ function renderGoodToKnow(inRail){
   if(!pid){host.innerHTML='';GTK=null;return;}
   if(!GTK||GTK.pid!==pid){
     GTK={pid,text:undefined,editing:false,busy:false,draft:null};
-    apiAg('/sales/contacts/'+encodeURIComponent(pid)).then(r=>{
+    // one read of the person, shared with the Details tab (CONTACT_CACHE) when it is the record's own
+    const own=pid===((REC.identity&&REC.identity.contact_id)||'');
+    const pr=(CONTACT_CACHE&&CONTACT_CACHE.cid===pid)?CONTACT_CACHE.promise:apiAg('/sales/contacts/'+encodeURIComponent(pid)).then(r=>r.ok?(r.body.data||{}):null);
+    if(own&&!(CONTACT_CACHE&&CONTACT_CACHE.cid===pid))CONTACT_CACHE={cid:pid,promise:pr};
+    pr.then(d=>{
       if(!GTK||GTK.pid!==pid)return;
-      const c=r.ok&&r.body&&r.body.data&&r.body.data.contact;
+      const c=d&&d.contact;
       GTK.text=c&&typeof c.good_to_know==='string'?c.good_to_know:null;
       drawGoodToKnow();
     }).catch(()=>{if(GTK&&GTK.pid===pid){GTK.text=null;drawGoodToKnow();}});
