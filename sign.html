@@ -417,7 +417,9 @@ function splitProposalLI(raw){const a=Array.isArray(raw)?raw:[];const M='__meta_
 // Nov 10 review (G11): each line's amount by the SAME rule as the total (quantity ×
 // unit price, whole numbers, never below zero). A quantity-0 line used to show its
 // unit price while the total counted nothing for it; it now reads "× 0" and $0.
-const lineCents=(i)=>Math.max(0,Math.trunc(i.qty)||0)*Math.max(0,Math.trunc(i.unit_cents)||0);
+// sales item 185 (mirrors lib/sales_lifecycle.ts readQty and lineCents): halves and quarters, each line rounded to the cent once
+const qtyR=(v)=>{const n=Number(v);return isFinite(n)?Math.max(0,Math.round(n*4)/4):0;};
+const lineCents=(i)=>Math.max(0,Math.round(qtyR(i.qty)*Math.max(0,Math.trunc(i.unit_cents)||0)));
 function proposalTotals(raw){const {items,meta}=splitProposalLI(raw);const sub=items.reduce((n,i)=>n+lineCents(i),0);let disc=0;if(meta.discount){disc=meta.discount.mode==='percent'?Math.round(sub*Math.min(100,Math.max(0,meta.discount.value))/100):Math.trunc(meta.discount.value);}disc=Math.max(0,Math.min(disc,sub));const post=sub-disc;const tp=(meta.tax_pct!=null&&isFinite(+meta.tax_pct))?Math.min(100,Math.max(0,+meta.tax_pct)):0;const tax=Math.round(post*tp/100);return{items,meta,subtotal:sub,discount:disc,tax:tax,total:Math.max(0,post+tax)};}
 
 // ── the pieces every view is built from ──
@@ -436,7 +438,7 @@ const forWhom=(client)=>client?(client.business||client.name||''):'';
 const betweenLine=(client)=>STUDIO&&forWhom(client)?`Between ${STUDIO} and ${forWhom(client)}`:'';
 const proposalMeta=(p)=>[p.sent_at?'Prepared '+dayOf(p.sent_at):'',p.expires_at?'Good until '+dayOf(p.expires_at):'',Number(p.version)>1?'Version '+Number(p.version):''];
 function itemsHtml(T,totalWord){
-  const rows=T.items.map(i=>{const q=Math.max(0,Math.trunc(i.qty)||0);return `<tr><td><span class="lbl">${esc(i.label)}</span>${q!==1?`<span class="q"> × ${q}</span>`:''}</td><td>${money(lineCents(i))}</td></tr>`;}).join('');
+  const rows=T.items.map(i=>{const q=qtyR(i.qty);return `<tr><td><span class="lbl">${esc(i.label)}</span>${q!==1?`<span class="q"> × ${q}</span>`:''}</td><td>${money(lineCents(i))}</td></tr>`;}).join('');
   const dLbl=(T.meta.discount&&T.meta.discount.mode==='percent')?`Discount (${+T.meta.discount.value}%)`:'Discount';
   const tLbl=(T.meta.tax_pct!=null)?`Tax (${+T.meta.tax_pct}%)`:'Tax';
   const bd=(T.discount>0||T.tax>0)?`<tr class="sub first"><td>Subtotal</td><td>${money(T.subtotal)}</td></tr>${T.discount>0?`<tr class="sub"><td>${esc(dLbl)}</td><td>−${money(T.discount)}</td></tr>`:''}${T.tax>0?`<tr class="sub"><td>${esc(tLbl)}</td><td>+${money(T.tax)}</td></tr>`:''}`:'';
@@ -459,10 +461,14 @@ function chooseHtml(p,o){
   let side;
   if(o.state)side=o.state;
   else if(p.status==='declined')side=`<p class="muted">You declined this proposal. Changed your mind? Ask your studio to send a fresh one.</p>`;
+  else if(p.status==='withdrawn')side=`<p class="muted">Your studio withdrew this proposal, so it can’t be accepted. Ask them if you have questions.</p>`;   // sales item 182
   else if(p.expired)side=`<p class="muted">This proposal has expired — ask your studio to send an updated one. Nothing is lost.</p><div class="acts"><button class="ghost" id="askBtn" type="button">Ask for an updated one</button></div>`;
-  else side=`<div class="acts bar" id="chooseRow"><button id="accept" type="button"><span class="lg">Accept this proposal</span><span class="sm">Accept · ${money(T.total)}</span></button><button class="ghost" id="askBtn" type="button"><span class="lg">Ask a question</span><span class="sm">Ask</span></button></div><button class="link" id="decline" type="button">Decline this proposal</button><p class="fine">Nothing is final until you accept.${o.flow?' Accepting opens the agreement to sign, right here.':''}</p>`;
+  else side=`${nameBoxHtml('accept')}<div class="acts bar" id="chooseRow"><button id="accept" type="button"><span class="lg">Accept this proposal</span><span class="sm">Accept · ${money(T.total)}</span></button><button class="ghost" id="askBtn" type="button"><span class="lg">Ask a question</span><span class="sm">Ask</span></button></div><button class="link" id="decline" type="button">Decline this proposal</button><p class="fine">Nothing is final until you accept.${o.flow?' Accepting opens the agreement to sign, right here.':''}</p>`;
   return `<section id="step-choose" class="grid2" aria-label="Your proposal"><article class="card doc"><h2 class="eyebrow sec">What’s included</h2>${itemsHtml(T)}${partsHtml(rows,o.flow)}${termsHtml(p.terms)}</article><aside class="card side"><p class="lbl">Your total</p><p class="big">${money(T.total)}</p>${why&&!o.state&&p.status!=='declined'?`<p class="why">${esc(why)}</p>`:''}${side}</aside></section>`;
 }
+// sales items 183, 184: a yes takes the name they type, kept with it as their answer
+const nameBoxHtml=(verb)=>`<label for="yesName">Type your full name to ${verb}</label><input id="yesName" autocomplete="name" placeholder="Your full name" maxlength="120">`;
+function yesNameOf(rowId){const nm=$('yesName');const v=nm?nm.value.trim():'';if(!v){softFail('Type your full name first. That’s how you say yes.',$(rowId));if(nm)nm.focus();}return v;}
 const acceptedHtml=(p,T,rows)=>`<details class="card done" id="step-choose"><summary>✓ Proposal accepted — ${money(T.total)} total<span class="tog"></span></summary><div class="inner">${itemsHtml(T)}${partsHtml(rows,true)}${termsHtml(p.terms)}</div></details>`;
 // the agreement's words as blocks: numbered headings, paragraphs, lettered items
 function blocksHtml(blocks){
@@ -550,6 +556,8 @@ function signedDocHtml(c){
 
 // ── The one-page flow: choose → sign → pay ──────────────────────────────────
 function renderFlow(d,after){
+  // sales item 182: the studio closed the deal (Not a fit), so there is nothing here to answer
+  if(d.closed){paint(heroHtml({eyebrow:'Proposal',title:(d.deal&&d.deal.title)||'Your proposal'})+pageHtml(`<div class="card notice" id="step-choose"><h2>This is closed</h2><p class="muted">${esc(STUDIO||'Your studio')} closed this, so there’s nothing to accept or sign here. If you’d like to pick it back up, just ask them.</p></div>`)+footHtml());return;}
   const p=d.proposal,c=d.contract,dep=d.deposit;
   const pending=!p&&!!d.proposal_pending;             // between versions: the studio is updating the proposal
   const chosen=p?p.status==='accepted':!pending;     // no proposal ever in play → the agreement is the first step
@@ -576,7 +584,8 @@ function renderFlow(d,after){
   }else if(!c){
     // accepted, and the agreement is on its way
     hero=heroHtml({eyebrow:'Agreement',title,meta:[betweenLine(client)]});
-    body=`<div class="card notice" id="step-sign"><h2>The agreement is on its way</h2><p class="muted">${p?'You’ve accepted — your studio has been told and is preparing the agreement. You’ll get an email when it’s ready to sign; nothing to do now.':'Your studio is preparing the agreement. You’ll get an email when it’s ready to sign.'}</p></div>${p?acceptedHtml(p,T,rows):''}`;
+    // sales item 181: the studio took the agreement back to update it
+    body=d.contract_withdrawn?`<div class="card notice" id="step-sign"><h2>Your studio is updating the agreement</h2><p class="muted">They took back the one they sent so they can update it, so it can’t be signed. You’ll get an email when the new one is ready. Nothing to do now.</p></div>${p?acceptedHtml(p,T,rows):''}`:`<div class="card notice" id="step-sign"><h2>The agreement is on its way</h2><p class="muted">${p?'You’ve accepted — your studio has been told and is preparing the agreement. You’ll get an email when it’s ready to sign; nothing to do now.':'Your studio is preparing the agreement. You’ll get an email when it’s ready to sign.'}</p></div>${p?acceptedHtml(p,T,rows):''}`;
   }else if(!signed){
     // ── 2 · Sign ──
     hero=heroHtml({titleHtml:agreementTitle,meta:[betweenLine(client)]});
@@ -589,7 +598,7 @@ function renderFlow(d,after){
   }
   paint(hero+stripHtml(steps,note)+pageHtml(body)+footHtml());
   // ── actions ──
-  const a=$('accept');if(a)a.onclick=async()=>{a.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'accepted'});
+  const a=$('accept');if(a)a.onclick=async()=>{const name=yesNameOf('chooseRow');if(!name)return;a.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'accepted',name});
     if(r.ok){announce('Accepted — thank you. Next: sign the agreement.');await load({kind:'accepted'});}
     else softFail(r.body&&r.body.message,$('chooseRow'));};
   // Declining is final for this version, so it opens its own sheet: what would make it a yes, then Decline
@@ -699,7 +708,7 @@ function renderProposal(p){
   const state=(T.meta&&T.meta.superseded_by)?`<p class="muted">Your studio sent an updated version of this proposal — please use the latest link they gave you.</p>`
     :p.status==='accepted'?`<div class="ok">✓ You’ve accepted this proposal — your studio has been told.</div>`:null;
   paint(heroHtml({eyebrow:forWhom(client)?`Proposal for ${forWhom(client)}`:'Proposal',title:p.title||'Your proposal',meta:proposalMeta(p),total:T.total,pill:pillHtml(scheduleOf(p))})+pageHtml(chooseHtml(p,{flow:false,dep:null,state}))+footHtml());
-  const a=$('accept');if(a)a.onclick=async()=>{a.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'accepted'});if(r.ok)thanks('Accepted — thank you!','Your studio has been told and will take it from here. Next up: the agreement to sign.');else{softFail(r.body&&r.body.message,$('chooseRow'));}};
+  const a=$('accept');if(a)a.onclick=async()=>{const name=yesNameOf('chooseRow');if(!name)return;a.disabled=true;const r=await api('/sales/proposals/'+p.id+'/decide','POST',{token:TOKEN,decision:'accepted',name});if(r.ok)thanks('Accepted — thank you!','Your studio has been told and will take it from here. Next up: the agreement to sign.');else{softFail(r.body&&r.body.message,$('chooseRow'));}};
   const dd=$('decline');if(dd)dd.onclick=()=>openDecline(p,dd,()=>thanks('No problem.','Your studio has been told. If anything changes, they can send an updated proposal any time.'));
   const ab=$('askBtn');if(ab)ab.onclick=()=>openAsk('proposal',ab);
 }
@@ -711,16 +720,20 @@ function renderEstimate(e){
   const T=proposalTotals(e.line_items);
   const until=e.expires_at?new Date(e.expires_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'';
   let side;
-  if(e.status==='approved')side=`<div class="ok">✓ You approved this estimate — your studio has been told.</div>`;
-  else if(e.status==='declined')side=`<p class="muted">You said not now. Changed your mind? Ask your studio to send a fresh one.</p>`;
+  // sales item 183: a Not now can still become a yes, and a yes takes the name they type
+  if(e.status==='approved')side=`<div class="ok">✓ You approved this estimate${e.decided_name?' as '+esc(e.decided_name):''}. Your studio has been told.</div>`;
+  else if(e.status==='withdrawn')side=`<p class="muted">Your studio withdrew this estimate, so it can’t be answered. Ask them if you have questions.</p>`;
+  else if(e.superseded)side=`<p class="muted">Your studio sent a newer version of this estimate. Use the latest link they sent you.</p>`;
+  else if(e.status==='declined'&&!e.expired)side=`<p class="muted">You said not now. Changed your mind? You can still approve it.</p>${nameBoxHtml('approve')}<div class="acts row" id="approveRow"><button id="approve" type="button">Approve this estimate</button></div>`;
+  else if(e.status==='declined')side=`<p class="muted">You said not now, and this estimate has since expired. Ask your studio for a fresh one if anything changes.</p>`;
   else if(e.expired)side=`<p class="muted">This estimate has expired — ask your studio for an updated one. Nothing is lost.</p>`;
-  else side=`<label for="note">Anything you’d like to add? (optional)</label><textarea id="note" maxlength="500" placeholder="A question, or what you’d change"></textarea>
-    <div class="acts row"><button id="approve" type="button">Approve this estimate</button><button class="ghost" id="notnow" type="button">Not now</button></div>
+  else side=`${nameBoxHtml('approve')}<label for="note">Anything you’d like to add? (optional)</label><textarea id="note" maxlength="500" placeholder="A question, or what you’d change"></textarea>
+    <div class="acts row" id="approveRow"><button id="approve" type="button">Approve this estimate</button><button class="ghost" id="notnow" type="button">Not now</button></div>
     <p class="fine">${until?`Good until ${esc(until)}. `:''}Approving tells your studio to go ahead with the next step — you’ll get the proposal or the invoice before anything is final.</p>`;
-  paint(heroHtml({eyebrow:'Estimate',title:e.title&&e.title!=='Estimate'?e.title:'Your estimate',meta:['This is an estimate — a price before anything is agreed. Nothing is charged.'],total:T.total,totalLabel:'Estimated total'})
+  paint(heroHtml({eyebrow:'Estimate',title:e.title&&e.title!=='Estimate'?e.title:'Your estimate',meta:['This is an estimate — a price before anything is agreed. Nothing is charged.',Number(e.version)>1?'Version '+Number(e.version):''],total:T.total,totalLabel:'Estimated total'})
     +pageHtml(`<section class="grid2" aria-label="Your estimate"><article class="card doc"><h2 class="eyebrow sec">What’s included</h2>${itemsHtml(T,'Estimated total')}${termsHtml(e.terms)}</article><aside class="card side"><p class="lbl">Estimated total</p><p class="big">${money(T.total)}</p>${side}</aside></section>`)+footHtml());
   const note=()=>{const n=$('note');return n?n.value.trim():'';};
-  const a=$('approve');if(a)a.onclick=async()=>{a.disabled=true;const r=await api('/sales/estimates/'+e.id+'/decide','POST',{token:TOKEN,decision:'approved',note:note()});
+  const a=$('approve');if(a)a.onclick=async()=>{const name=yesNameOf('approveRow');if(!name)return;a.disabled=true;const r=await api('/sales/estimates/'+e.id+'/decide','POST',{token:TOKEN,decision:'approved',note:note(),name});
     if(r.ok)thanks('Approved — thank you!','Your studio has been told and will send you the next step.');else softFail(r.body&&r.body.message,a.closest('.acts'));};
   // Not now can't be undone from this link, so it takes two deliberate taps.
   const nn=$('notnow');if(nn)nn.onclick=async()=>{
@@ -734,6 +747,8 @@ function renderContract(c){
   const o={signer:c.studio_signer||null,client:c.client||null};
   const hero=(signedAt)=>heroHtml({eyebrow:'Agreement',title:c.title||'Your agreement',meta:[betweenLine(o.client),signedAt?'Signed '+dayOf(signedAt):'']});
   if(c.status==='signed'){paint(hero(c.signed_at)+pageHtml(signedHtml(c,{client:o.client,payCard:false})+signedDocHtml(c))+footHtml());return;}
+  // sales item 181: taken back by the studio to update it, so it can't be signed
+  if(c.status==='voided'){paint(hero(null)+pageHtml(`<div class="card notice" id="step-sign"><h2>Your studio is updating this agreement</h2><p class="muted">They took it back so they can update it, so it can’t be signed. You’ll get an email when the new one is ready. Nothing to do now.</p></div>`)+footHtml());return;}
   paint(hero(null)+pageHtml(agreementStep(c,{signer:o.signer,client:o.client,dep:null,rows:null,flow:false}))+footHtml());
   watchRail();
   wireSign(c,async(r,name,em)=>{

@@ -50,7 +50,8 @@ export interface BookingConfig {
   timezone: string;             // IANA name (display + the route's local↔UTC bridge)
   auto_confirm: boolean;        // true → new bookings land 'confirmed'; false → 'pending'
   /** Builder item 291: a date's own hours (a holiday the business keeps shorter hours on),
-   *  over the weekly ones. Only set when the booking hours follow the business hours. */
+   *  over the weekly ones. Item 432: with booking hours of their own, the part of that
+   *  weekday's booking hours inside the business's special hours (withSpecialDates). */
   date_hours?: Record<string, TimeRange[]>;
 }
 
@@ -95,6 +96,27 @@ export function bookingHoursFromBusiness(hours: unknown, holidays: unknown): { w
     if (r.length) date_hours[date] = r; else closed_dates.push(date);
   }
   return { weekly, closed_dates, date_hours };
+}
+/** Builder item 432: the business's special dates over booking hours of the owner's own. A
+ *  date the business is closed takes no bookings, and a date with special hours offers only
+ *  the booking hours of its weekday that fall inside them (none left: closed). Pure. */
+export function withSpecialDates(config: BookingConfig, holidays: unknown): BookingConfig {
+  const biz = bookingHoursFromBusiness([], holidays);
+  const closed = new Set([...config.closed_dates, ...biz.closed_dates]);
+  const date_hours: Record<string, TimeRange[]> = { ...(config.date_hours || {}) };
+  for (const [date, open] of Object.entries(biz.date_hours)) {
+    const dow = dayOfWeek(date);
+    const both: TimeRange[] = [];
+    for (const a of dow == null ? [] : config.weekly[dow] || []) {
+      for (const b of open) {
+        const s0 = Math.max(hhmmToMin(a.start) ?? 0, hhmmToMin(b.start) ?? 0), e0 = Math.min(hhmmToMin(a.end) ?? 0, hhmmToMin(b.end) ?? 0);
+        if (e0 > s0) both.push({ start: minToHHMM(s0), end: minToHHMM(e0) });
+      }
+    }
+    if (both.length) date_hours[date] = both.sort((x, y) => (x.start < y.start ? -1 : 1));
+    else { closed.add(date); delete date_hours[date]; }
+  }
+  return { ...config, closed_dates: [...closed], date_hours };
 }
 
 // ── caps (bounded, never unbounded) ──────────────────────────────────────────

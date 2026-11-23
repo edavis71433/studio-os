@@ -193,7 +193,7 @@ async function main() {
 
   // ═══ 1. Accept fills the deal value (once, and only this studio's deal) ═══
   {
-    const decide = async (pid, token, decision = 'accepted', extra = {}) => pub('POST', `/sales/proposals/${pid}/decide`, { token, decision, ...extra });
+    const decide = async (pid, token, decision = 'accepted', extra = {}) => pub('POST', `/sales/proposals/${pid}/decide`, { token, decision, ...(decision === 'accepted' ? { name: 'Riley Park' } : {}), ...extra });   // sales item 184: a yes takes a typed name
     world({ presence_deals: [dealRow(DEAL, SITE_A, { stage: 'proposal' }), dealRow(DEAL_B, SITE_B)], presence_proposals: [propRow(PROP, DEAL, SITE_A, 'sent', LINES_DT)] });
     let r = await decide(PROP, await tok('flow', DEAL));
     ok('accepting on the client’s page answers 200 and the proposal reads accepted', r.status === 200 && r.body?.data?.status === 'accepted' && row('presence_proposals', PROP).status === 'accepted', short(r));
@@ -354,7 +354,7 @@ async function main() {
     r = await pub('POST', `/sales/contracts/${CON}/sign`, { token: await tok('flow', DEAL), signer_name: 'Riley Park', signer_email: 'riley@example.com', presented_hash: HASH });
     ok('signing before accepting is refused: 409 accept_first, "Accept the proposal first", still unsigned', r.status === 409 && r.body?.error === 'accept_first' && /Accept the proposal first/.test(r.body.message) && row('presence_contracts', CON).status === 'sent', short(r));
 
-    r = await pub('POST', `/sales/proposals/${PROP}/decide`, { token: await tok('flow', DEAL), decision: 'accepted' });
+    r = await pub('POST', `/sales/proposals/${PROP}/decide`, { token: await tok('flow', DEAL), decision: 'accepted', name: 'Riley Park' });
     d = (await flowView(DEAL)).body?.data || {};
     ok('once accepted, the agreement’s words and fingerprint come back (the fingerprint the sign route checks)', r.status === 200 && d.contract?.body === BODY_DEPOSIT && d.contract.content_hash === HASH && !d.contract.locked, JSON.stringify(d.contract));
     const unsignedPdf = d.contract && 'pdf_url' in d.contract;

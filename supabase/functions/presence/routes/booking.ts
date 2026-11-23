@@ -45,7 +45,7 @@ import type { Principal } from '../../_shared/auth.ts';
 import {
   normalizeAppointmentType, normalizeBookingConfig, generateSlots, validateBookingInput,
   slotEndLocal, humanSlot, priceText, type BookingConfig, type AppointmentType,
-  followsBusinessHours, bookingHoursFromBusiness, openDays, addDays, DAYS_SPAN_MAX,
+  followsBusinessHours, bookingHoursFromBusiness, withSpecialDates, openDays, addDays, DAYS_SPAN_MAX,
 } from '../lib/booking.ts';
 import { UUID_RE } from '../lib/uuid.ts';
 import { normEmail, emailMatch } from '../lib/contact_email.ts';
@@ -84,14 +84,17 @@ async function loadSettings(siteId: string): Promise<{ enabled: boolean; config:
   if (!r.ok) return null;                                    // pre-0099 → dormant
   const row = rows(r)[0];
   const own = normalizeBookingConfig(row || {});
-  const config = followsBusinessHours(own.weekly) ? await withBusinessHours(siteId, own) : own;
+  const config = await withBusinessHours(siteId, own);   // item 432: own booking hours keep the business's special dates too
   return { enabled: !!(row && row.enabled), config, intro: String(row?.intro || ''), hoursFrom: followsBusinessHours(own.weekly) ? 'business' : 'own' };
 }
 /** Builder item 291: with no booking hours of their own set, bookings follow the business
- *  hours (the main location's week, its holidays closed or shorter). Exported for its test. */
+ *  hours (the main location's week, its holidays closed or shorter). Item 432: with hours of
+ *  their own, the business's special dates still close a date or narrow it (lib/booking.ts
+ *  withSpecialDates). Exported for its test. */
 export async function withBusinessHours(siteId: string, config: BookingConfig): Promise<BookingConfig> {
   const loc = rows(await svc(`presence_locations?site_id=eq.${siteId}&select=hours,holiday_exceptions&order=created_at.asc&limit=1`).catch(() => ({ json: [] })))[0];
   if (!loc) return config;
+  if (!followsBusinessHours(config.weekly)) return withSpecialDates(config, loc.holiday_exceptions);
   const biz = bookingHoursFromBusiness(loc.hours, loc.holiday_exceptions);
   return { ...config, weekly: biz.weekly, closed_dates: [...new Set([...config.closed_dates, ...biz.closed_dates])], date_hours: biz.date_hours };
 }

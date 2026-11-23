@@ -9,6 +9,7 @@
 import { getTemplate, renderSnapshot, listTemplates } from '../../supabase/functions/presence/lib/render.ts';
 import { NOT_SENT_REASONS, notSentReason } from '../../supabase/functions/presence/lib/legal_pages.ts';
 import { senderTag } from '../../supabase/functions/presence/lib/site_send.ts';
+import { SPECIAL_JS } from '../../supabase/functions/presence/lib/template_kit.ts';
 
 const results = [];
 const ok = (n, p, note = '') => { results.push({ n, p }); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note ? ' — ' + note : ''}`); };
@@ -74,7 +75,9 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   const noSender = (h) => String(h).replace(sender, '');
   // items 288 and 298: every page links the site's own script file (the phone menu, the gallery's zoom view)
   const noSiteJs = (h) => String(h).replace(/<script src="\/assets\/site-[0-9a-f]+\.js" defer><\/script>\n/, '');
-  ok('zero JavaScript emitted, except the first-party search, tag filter, Open now, the form’s sender and the site’s own script file', scriptPages.length > 0 && scriptPages.every(([, h]) => !/<script(?! type="application\/ld\+json")/.test(noSiteJs(noOpenNow(noSender(h))))));
+  // item 432: a page that shows special dates carries the small script that takes one away once it's over
+  const noSpecial = (h) => String(h).replace(`<script>${SPECIAL_JS}</script>\n`, '');
+  ok('zero JavaScript emitted, except the first-party search, tag filter, Open now, the form’s sender, the special dates’ and the site’s own script file', scriptPages.length > 0 && scriptPages.every(([, h]) => !/<script(?! type="application\/ld\+json")/.test(noSiteJs(noOpenNow(noSender(noSpecial(h)))))));
   ok('the form’s sender rides only on the pages that hold the form', scriptPages.some(([, h]) => h.includes(sender)) && scriptPages.every(([, h]) => h.includes(sender) === h.includes(`action="${SITE.formEndpoint}"`)));
   ok('the Open now script is on the home page only', pages.filter(([, h]) => String(h).includes("getElementById('open-now')")).map(([k]) => k).join() === 'index.html');
 }
@@ -128,7 +131,7 @@ const render = (industry, extra) => renderSnapshot(snapFor(industry, extra), SIT
   ok('not-sent: the page exists, noindex, out of the sitemap, disallowed for robots', !!ns && ns.includes('name="robots" content="noindex"') && !f['sitemap.xml'].includes('/not-sent/') && f['robots.txt'].includes('Disallow: /not-sent/'));
   ok('not-sent: says it didn’t send, with a line per reason and a general one', ns.includes('Your message didn’t send.') && NOT_SENT_REASONS.every((r) => ns.includes(`id="ns-${r}"`)) && ns.includes('ns-general'));
   ok('not-sent: it sends the visitor Back, where the browser keeps the words, and offers the contact page', ns.includes('Back button to return to the form: what you wrote is still there.') && ns.includes('href="/contact/"'));
-  ok('not-sent: no script beyond the site’s own file, and no click handler (CSS :target picks the reason)', !/<script(?! type="application\/ld\+json")(?! src="\/assets\/site-)/.test(ns) && !/<[a-z][a-z0-9]*\b[^>]*\son\w+\s*=/i.test(ns));
+  ok('not-sent: no script beyond the site’s own file and the special dates’, and no click handler (CSS :target picks the reason)', !/<script(?! type="application\/ld\+json")(?! src="\/assets\/site-)/.test(ns.replace(`<script>${SPECIAL_JS}</script>\n`, '')) && !/<[a-z][a-z0-9]*\b[^>]*\son\w+\s*=/i.test(ns));
   ok('reasons: a known code keeps its line, anything else gets the general one', notSentReason('bad_email') === 'bad_email' && notSentReason('need_contact') === 'need_contact' && notSentReason('weird') === 'check');
   const route = await Deno.readTextFile(new URL('supabase/functions/presence/routes/commercial.ts', ROOT));
   // six: the contact form's two, a custom form's three (item 147: its files couldn't be kept), and item 146's "Join our list" box

@@ -330,13 +330,13 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   world(sent);
   const before = theirs();
   const noTok = await decide(PROP_A, { decision: 'accepted' });
-  const junk = await decide(PROP_A, { decision: 'accepted', token: 'not.a-token' });
-  const old = await decide(PROP_A, { decision: 'accepted', token: await sign({ t: 'proposal', id: PROP_A, site_id: SITE_A, exp: nowSec() - 5 }) });
+  const junk = await decide(PROP_A, { decision: 'accepted', name: 'Riley Park', token: 'not.a-token' });
+  const old = await decide(PROP_A, { decision: 'accepted', name: 'Riley Park', token: await sign({ t: 'proposal', id: PROP_A, site_id: SITE_A, exp: nowSec() - 5 }) });
   ok('deciding a proposal with no link, a made-up one or an expired one is a 403, and the proposal stays sent', [noTok, junk, old].every((r) => r.status === 403 && r.body?.error === 'invalid_link') && row('presence_proposals', PROP_A).status === 'sent', [noTok, junk, old].map((r) => r.status).join(','));
-  const elsewhere = await decide(PROP_A, { decision: 'accepted', token: await sign({ t: 'proposal', id: PROP_A, site_id: SITE_B }) });
+  const elsewhere = await decide(PROP_A, { decision: 'accepted', name: 'Riley Park', token: await sign({ t: 'proposal', id: PROP_A, site_id: SITE_B }) });
   const theirsTok = await decide(PROP_B, { decision: 'declined', token: await sign({ t: 'proposal', id: PROP_B, site_id: SITE_A }) });
   ok('a link is read in its own studio only: Juniper\'s proposal under a Cobalt-signed link, and Cobalt\'s under a Juniper-signed one, are 404s', elsewhere.status === 404 && theirsTok.status === 404 && row('presence_proposals', PROP_A).status === 'sent' && row('presence_proposals', PROP_B).status === 'sent', `${elsewhere.status} ${theirsTok.status}`);
-  const yes = await decide(PROP_A, { decision: 'accepted', token: await sign({ t: 'proposal', id: PROP_A, site_id: SITE_A }) });
+  const yes = await decide(PROP_A, { decision: 'accepted', name: 'Riley Park', token: await sign({ t: 'proposal', id: PROP_A, site_id: SITE_A }) });
   ok('the proposal\'s own link decides it', yes.status === 200 && yes.body?.data?.status === 'accepted' && row('presence_proposals', PROP_A).status === 'accepted' && !!row('presence_proposals', PROP_A).decided_at, yes.text);
   ok('Cobalt\'s rows did not move', theirs() === before);
 
@@ -365,7 +365,7 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   const NOISY = '203.0.113.9';
   const docTok = (await res(await S.handleSalesDocumentLink(siteA, 'proposal', PROP_A, cors))).body?.url?.split('t=')[1] || '';
   const limited = [
-    await decide(PROP_A, { decision: 'accepted', token: await sign({ t: 'proposal', id: PROP_A, site_id: SITE_A }) }, NOISY),
+    await decide(PROP_A, { decision: 'accepted', name: 'Riley Park', token: await sign({ t: 'proposal', id: PROP_A, site_id: SITE_A }) }, NOISY),
     await signIt(CON_A, { ...signer, token: await sign({ t: 'contract', id: CON_A, site_id: SITE_A }) }, NOISY),
     await view(await sign({ t: 'proposal', id: PROP_A, site_id: SITE_A }), NOISY),
     await res(S.handleSalesDocument(req('GET', `/sales/doc/${docTok}`, undefined, { 'x-forwarded-for': NOISY }), decodeURIComponent(docTok), cors)),
@@ -373,7 +373,7 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   ok('an address over the limit gets a 429 from decide, sign, the page and the document, and nothing moves', limited.every((r) => r.status === 429) && row('presence_proposals', PROP_A).status === 'sent' && row('presence_contracts', CON_A).status === 'sent' && !row('presence_proposals', PROP_A).first_viewed_at, limited.map((r) => r.status).join(','));
   const calm = [
     await view(await sign({ t: 'proposal', id: PROP_A, site_id: SITE_A })),
-    await decide(PROP_A, { decision: 'accepted', token: await sign({ t: 'proposal', id: PROP_A, site_id: SITE_A }) }),
+    await decide(PROP_A, { decision: 'accepted', name: 'Riley Park', token: await sign({ t: 'proposal', id: PROP_A, site_id: SITE_A }) }),
     await signIt(CON_A, { ...signer, token: await sign({ t: 'contract', id: CON_A, site_id: SITE_A }) }),
   ];
   ok('the limit is per address: another address is answered as usual at the same moment', calm.every((r) => r.status === 200), calm.map((r) => r.status).join(','));
@@ -423,7 +423,7 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
     t.presence_proposals = [proposal(PROP_A, SITE_A, DEAL_A, 'sent')];
     t.presence_contracts = [agreement(CON_A, SITE_A, DEAL_A, 'sent')];
   };
-  const decideWith = async (tok) => { world(decided); return res(S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP_A}/decide`, { decision: 'accepted', token: tok }), PROP_A, cors)); };
+  const decideWith = async (tok) => { world(decided); return res(S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP_A}/decide`, { decision: 'accepted', name: 'Riley Park', token: tok }), PROP_A, cors)); };
   const okFlow = await decideWith(await sign({ t: 'flow', id: DEAL_A, site_id: SITE_A }));
   ok('a flow link for the proposal\'s deal decides it', okFlow.status === 200 && row('presence_proposals', PROP_A).status === 'accepted', okFlow.text);
   const refusedDecide = [
@@ -490,8 +490,8 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   const out = (t) => { t.presence_deals.find((d) => d.id === DEAL_A).stage = 'proposal'; t.presence_proposals = [proposal(PROP_A, SITE_A, DEAL_A, 'sent')]; t.presence_contracts = [agreement(CON_A, SITE_A, DEAL_A, 'sent')]; };
   world(out);
   const pTok = await sign({ t: 'proposal', id: PROP_A, site_id: SITE_A });
-  const d1 = await res(S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP_A}/decide`, { decision: 'accepted', token: pTok }), PROP_A, cors));
-  const d2 = await res(S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP_A}/decide`, { decision: 'accepted', token: pTok }), PROP_A, cors));
+  const d1 = await res(S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP_A}/decide`, { decision: 'accepted', name: 'Riley Park', token: pTok }), PROP_A, cors));
+  const d2 = await res(S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP_A}/decide`, { decision: 'accepted', name: 'Riley Park', token: pTok }), PROP_A, cors));
   ok('accepting twice: the second answers already, with one decision on the record', d1.status === 200 && d2.status === 200 && d2.body.already === true && db.tables.presence_deal_events.filter((e) => e.kind === 'proposal_decided').length === 1, d2.text);
   const cTok = await sign({ t: 'contract', id: CON_A, site_id: SITE_A });
   const signNow = (extra = {}) => res(S.handleSalesContractSign(req('POST', `/sales/contracts/${CON_A}/sign`, { token: cTok, presented_hash: HASH, signer_name: 'Riley Park', signer_email: 'riley@example.org', ...extra }), CON_A, cors));
@@ -569,7 +569,7 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   const flowTok = await sign({ t: 'flow', id: DEAL_A, site_id: SITE_A });
   await S.handleSalesDealSend(req('POST', `/sales/deals/${DEAL_A}/send`, {}), siteA, studioA, DEAL_A, cors);
   const afterSend = row('presence_deals', DEAL_A).stage;
-  await S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP_A}/decide`, { decision: 'accepted', token: flowTok }), PROP_A, cors);
+  await S.handleSalesProposalDecide(req('POST', `/sales/proposals/${PROP_A}/decide`, { decision: 'accepted', name: 'Riley Park', token: flowTok }), PROP_A, cors);
   const afterAccept = row('presence_deals', DEAL_A).stage;
   await S.handleSalesContractSign(req('POST', `/sales/contracts/${CON_A}/sign`, { token: flowTok, presented_hash: HASH, signer_name: 'Riley Park', signer_email: 'riley@example.org' }), CON_A, cors);
   const afterSign = row('presence_deals', DEAL_A).stage;
@@ -879,7 +879,7 @@ const leaks = (text) => COBALT.filter((s) => String(text).includes(s));
   ok('the client\'s page answers signed out at /sales/view, /sales/p and /sales/c', pages.every((x) => x.status === 200) && pages[0].body.data.kind === 'proposal' && pages[2].body.data.kind === 'contract', pages.map((x) => x.status).join(','));
   const sess = await call('jwt-a', 'POST', `/sales/proposals/${PROP_A}/decide`, { decision: 'accepted' });
   ok('a signed-in session is no substitute for the link: deciding with a session but no link is a 403', sess.status === 403 && sess.body.error === 'invalid_link' && row('presence_proposals', PROP_A).status === 'sent', sess.text);
-  const dec = await call(null, 'POST', `/sales/proposals/${PROP_A}/decide`, { decision: 'accepted', token: p });
+  const dec = await call(null, 'POST', `/sales/proposals/${PROP_A}/decide`, { decision: 'accepted', name: 'Riley Park', token: p });
   const sgn = await call(null, 'POST', `/sales/contracts/${CON_A}/sign`, { token: c, presented_hash: HASH, signer_name: 'Riley Park', signer_email: 'riley@example.org' });
   ok('signed out, the link decides the proposal and signs the agreement', dec.status === 200 && sgn.status === 200 && row('presence_proposals', PROP_A).status === 'accepted' && row('presence_contracts', CON_A).status === 'signed', `${dec.status} ${sgn.status}`);
   const doc = (await res(await S.handleSalesDocumentLink(siteA, 'contract', CON_A, cors))).body.url.split('t=')[1];

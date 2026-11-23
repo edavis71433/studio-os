@@ -42,10 +42,10 @@ const eq = (n, a, b) => ok(n, JSON.stringify(a) === JSON.stringify(b), `got ${JS
 const read = (p) => Deno.readTextFileSync(new URL('../../' + p, import.meta.url));
 
 // ═══ 1. pure ═══
-eq('a studio starts with no goal and AI help off', L.normalizeGoalAi(null), { goal_cents: null, ai_on: false, ai_on_by: null, ai_on_at: null });
-eq('anything odd stored reads as off and no goal', L.normalizeGoalAi({ goal_cents: -5, ai_on: 'yes' }), { goal_cents: null, ai_on: false, ai_on_by: null, ai_on_at: null });
+eq('a studio starts with no goal and AI help off', L.normalizeGoalAi(null), { goal_cents: null, ai_on: false, ai_on_by: null, ai_on_at: null, writing: '' });   // item 211: and nothing on how they write
+eq('anything odd stored reads as off and no goal', L.normalizeGoalAi({ goal_cents: -5, ai_on: 'yes' }), { goal_cents: null, ai_on: false, ai_on_by: null, ai_on_at: null, writing: '' });
 const cur = L.normalizeGoalAi({});
-eq('a goal is set in cents', L.applyGoalAi(cur, { goal_cents: 800000 }, 'a@b.test', '2026-11-12T10:00:00Z'), { value: { goal_cents: 800000, ai_on: false, ai_on_by: null, ai_on_at: null } });
+eq('a goal is set in cents', L.applyGoalAi(cur, { goal_cents: 800000 }, 'a@b.test', '2026-11-12T10:00:00Z'), { value: { goal_cents: 800000, ai_on: false, ai_on_by: null, ai_on_at: null, writing: '' } });
 ok('an empty goal clears it', [null, '', 0].every((g) => L.applyGoalAi({ ...cur, goal_cents: 5000 }, { goal_cents: g }, null, 'x').value?.goal_cents === null));
 ok('a goal under $1 or over $1,000,000 is refused in words', /at least \$1/.test(L.applyGoalAi(cur, { goal_cents: 50 }, null, 'x').error) && /up to \$1,000,000/.test(L.applyGoalAi(cur, { goal_cents: 100_000_001 }, null, 'x').error));
 const on = L.applyGoalAi(cur, { ai_on: true }, 'owner@studio.test', '2026-11-12T10:00:00Z');

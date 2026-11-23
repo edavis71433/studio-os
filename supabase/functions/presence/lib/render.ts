@@ -24,6 +24,7 @@ import { BLOCK_CSS, DESIGN_CSS, sectionStyles, pageClasses } from './site_blocks
 import { applyPageChrome, applyNotFoundPage } from './page_access.ts';
 import { applyHeaderScroll } from './site_header.ts';
 import { applyPhoneBar } from './phone_bar.ts';
+import { specialAsOf } from './special_dates.ts';
 import { applyMotion } from './site_motion.ts';
 import { applySiteIcon } from './site_icon.ts';
 import { applyButtonStyles } from './site_buttons.ts';
@@ -217,7 +218,11 @@ function withoutLookColours(dev: Snapshot['dev_customization']): Snapshot['dev_c
  *  template/version or contract-version mismatch — never on content.
  *  `allSectionStyles` keeps every section style in the stylesheet (the builder's
  *  canvas, renderForBuilder); without it the site ships only the ones it uses. */
-export async function renderSnapshot(snapshot: Snapshot, site: SiteConfig, opts: { allSectionStyles?: boolean } = {}): Promise<FileMap> {
+export async function renderSnapshot(given: Snapshot, site: SiteConfig, opts: { allSectionStyles?: boolean } = {}): Promise<FileMap> {
+  // Builder item 432: a special date already over on the snapshot's own day isn't drawn anywhere
+  // (hours, phone bar, Open now, Google's data); the pages' own scripts take one away once it's over
+  const content0 = specialAsOf(given.content, given.created_at);
+  const snapshot: Snapshot = content0 === given.content ? given : { ...given, content: content0 };
   const t = getTemplate(snapshot.template_slug, snapshot.template_version);
   if (!t) throw new Error(`unknown template ${snapshot.template_slug}@${snapshot.template_version}`);
   if (t.manifest.content_contract_version !== snapshot.content_contract_version) {

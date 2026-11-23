@@ -8,7 +8,9 @@
 // (back if it is still true then); "Not relevant" puts it away for good. Decisions
 // are kept on the client's site (reserved JSON `__do_next__`). Pure.
 // Builder item 385: in the week before a main holiday, "Thanksgiving is Thursday: are you
-// open?" comes right after Needs you, once per holiday (its key carries the year).
+// open?" comes right after Needs you, once per holiday (its key carries the year). Item 432:
+// its link opens Special dates with the holiday's date filled in, so closing for Thanksgiving
+// closes that Thursday, not every one; a holiday the business has set already isn't asked about.
 import { TYPE_TITLES, HEADINGS, headingOf } from './health_score.ts';
 import { holidaySoon, localDay } from './holidays.ts';
 
@@ -55,6 +57,8 @@ export interface DoNextFacts {
   reviews: { googleUnreplied: number; pending: number } | null;
   ai: { results: Array<{ q: string; kind: string; answers: Array<{ named: boolean | null }> }> } | null;
   ideas: Array<{ id: string; opportunity: string; suggested_next_step: string; timing_phrase?: string | null }>;
+  /** item 432: the dates the business has special hours for (lib/special_dates.ts); null or absent: not known */
+  special?: string[] | null;
 }
 
 const qkey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
@@ -67,7 +71,7 @@ export function composeDoNext(f: DoNextFacts, decisions: { decided: Record<strin
   // Needs you writes "changes are sitting unpublished" after the site's name; here it stands alone
   for (const n of f.needs) add({ key: n.key, source: 'needs', title: n.what.charAt(0).toUpperCase() + n.what.slice(1), sub: n.when, verb: n.verb || 'Open', href: n.href });
   const hol = holidaySoon(localDay(nowIso));
-  if (hol) add({ key: `holiday:${hol.key}`, source: 'holiday', title: `${hol.name} is ${hol.when}: are you open?`, sub: 'If you close or keep shorter hours, say so on the website’s Hours card so customers know before they come.', verb: 'Set hours', href: `${ws}#hours-${hol.day}` });   // item 431: the editor puts focus on that day's row
+  if (hol && !(f.special || []).includes(hol.date)) add({ key: `holiday:${hol.key}`, source: 'holiday', title: `${hol.name} is ${hol.when}: are you open?`, sub: 'If you close or keep different hours that day, add it to Special dates on the website’s Hours card, so customers know before they come.', verb: 'Set hours', href: `${ws}#hours-${hol.date}` });   // item 432: the editor opens Special dates with that date
   const healthTypes = new Set<string>();
   for (const h of (f.health || []).slice().sort((a, b) => (a.severity === b.severity ? b.n - a.n : a.severity === 'critical' ? -1 : 1)).slice(0, 3)) {
     healthTypes.add(h.type);
