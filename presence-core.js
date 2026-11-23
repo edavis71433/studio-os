@@ -1121,7 +1121,7 @@ function renderPlace2Hours() {
   PLACE2.hours.forEach((day, idx) => {
     const name = DAYS.find(([k]) => k === day.day)[1];
     const row = el("div", "hrow");
-    row.appendChild(el("span", "day", name));
+    row.appendChild(dayLabel(name));
     const iv = (day.intervals && day.intervals[0]) || { open: "09:00", close: "17:00" };
     const open = el("input"); open.type = "time"; open.value = iv.open || "09:00"; open.disabled = !!day.closed; open.setAttribute("aria-label", name + " opens");
     const close = el("input"); close.type = "time"; close.value = iv.close || "17:00"; close.disabled = !!day.closed; close.setAttribute("aria-label", name + " closes");
@@ -1166,6 +1166,14 @@ async function removePlace2() {
 
 /* ── hours (identical PUT /location) ── */
 let HOURS_BEFORE = null;
+// The phone line (item 432): a day's name, with the short one ("Wed") a narrow card shows in its
+// place (presence.css); a screen reader hears the long one
+function dayLabel(name) {
+  const s = el("span", "day"), short = el("span", "day-short", name.slice(0, 3));
+  short.setAttribute("aria-hidden", "true");
+  s.append(el("span", "day-long", name), short);
+  return s;
+}
 function hoursFromState() {
   const loc = S.location || {};
   const map = new Map((loc.hours || []).map((d) => [d.day, d]));
@@ -1175,7 +1183,7 @@ function renderHours() {
   const grid = $("hoursGrid"); grid.innerHTML = "";
   hoursFromState().forEach((day) => {
     const row = el("div", "hrow");
-    row.appendChild(el("span", "day", DAYS.find(([k]) => k === day.day)[1]));
+    row.appendChild(dayLabel(DAYS.find(([k]) => k === day.day)[1]));
     const iv = day.intervals && day.intervals[0] ? day.intervals[0] : { open: "09:00", close: "17:00" };
     const open = el("input"); open.type = "time"; open.value = iv.open || "09:00"; open.disabled = !!day.closed;
     const close = el("input"); close.type = "time"; close.value = iv.close || "17:00"; close.disabled = !!day.closed;
@@ -1218,6 +1226,129 @@ function renderHours() {
   const sw = $("closedSwitch"), note = $("f-closednote");
   sw.checked = !!(S.location && S.location.temporarily_closed);
   note.hidden = !sw.checked; note.value = (S.location && S.location.temporarily_closed_note) || "";
+}
+
+/* ── builder item 432: special dates, one day closed or open different hours ──
+   The main location's holiday_exceptions, saved whole (PUT /location) like the week. The list
+   shows the dates from today on, today in the site's own time zone, so a date that has gone by
+   leaves by itself, and the server keeps it out of the next save. Nothing is saved until Add
+   is pressed, so the Do next line's link (#hours-2026-11-26) can fill in the date without
+   deciding anything for the owner. Up to a year ahead, forty at most (lib/special_dates.ts). */
+const SD_MAX = 40, SD_DAYS_AHEAD = 366;
+const SD_WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const SD_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const sdIsDay = (v) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || "")); if (!m) return false; const t = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])); return t.getUTCMonth() === +m[2] - 1 && t.getUTCDate() === +m[3]; };
+const sdUtc = (day) => { const [y, m, d] = day.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+const sdPlus = (day, n) => { const t = sdUtc(day); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+// "Thursday, Nov 26": how a date reads here (the site writes "Thu Nov 26")
+const sdWords = (day) => { const t = sdUtc(day); return SD_WEEKDAYS[t.getUTCDay()] + ", " + SD_MONTHS[t.getUTCMonth()] + " " + t.getUTCDate(); };
+const sdTime = (hm) => { const [h, m] = String(hm).split(":").map(Number); return ((h + 11) % 12 + 1) + (m ? ":" + String(m).padStart(2, "0") : "") + (h < 12 ? "am" : "pm"); };
+function sdToday() {
+  try {
+    const p = new Intl.DateTimeFormat("en-US", { timeZone: siteTz(), year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+    const g = (k) => (p.find((x) => x.type === k) || {}).value;
+    return g("year") + "-" + g("month") + "-" + g("day");
+  } catch (_) { return new Date().toISOString().slice(0, 10); }
+}
+function specialFromState() {
+  const today = sdToday(), list = S.location && Array.isArray(S.location.holiday_exceptions) ? S.location.holiday_exceptions : [];
+  return list.filter((e) => e && sdIsDay(e.date) && e.date >= today).sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+const sdHours = (e) => (e.closed || !(e.intervals || []).length ? "Closed" : e.intervals.map((i) => sdTime(i.open) + " to " + sdTime(i.close)).join(", "));
+function renderSpecialDates() {
+  const list = $("sdList"); if (!list) return;
+  const rows = specialFromState(), add = $("btnSdAdd");
+  if (!add.dataset.drawn) { add.innerHTML = uiIcon("plus", 14) + " Add a date"; add.dataset.drawn = "1"; }   // the icons are read once the page has loaded
+  list.innerHTML = "";
+  rows.forEach((e) => {
+    const li = el("li", "sd-row"); li.dataset.date = e.date;
+    const what = el("div", "sd-what");
+    what.append(el("span", "sd-when", sdWords(e.date)), el("span", "sd-hours", sdHours(e)));
+    if (e.label) what.append(el("span", "sd-note", e.label));
+    const ch = el("button", "sd-act", "Change"); ch.type = "button"; ch.setAttribute("aria-label", "Change " + sdWords(e.date));
+    ch.addEventListener("click", () => sdOpenForm(e.date));
+    const rm = el("button", "sd-act sd-rm", "Remove"); rm.type = "button"; rm.setAttribute("aria-label", "Remove " + sdWords(e.date));
+    rm.addEventListener("click", async () => { if (await sdSave(specialFromState().filter((x) => x.date !== e.date))) { toast(sdWords(e.date) + " is off your special dates"); $("btnSdAdd").focus(); } });
+    li.append(what, ch, rm);
+    list.appendChild(li);
+  });
+  list.hidden = !rows.length;
+}
+async function sdSave(list) {
+  whisper("save-hours", "saving"); whisper("topWhisper", "saving");
+  try {
+    const r = await api("PUT", "/location", { holiday_exceptions: list });
+    const kept = r && r.data && Array.isArray(r.data.holiday_exceptions) ? r.data.holiday_exceptions : list;
+    S.location = { ...(S.location || {}), holiday_exceptions: kept };   // after the write: Undo takes the list as it was
+    whisper("save-hours", "saved"); whisper("topWhisper", "saved"); scheduleChangesRefresh();
+    renderSpecialDates();
+    return true;
+  } catch (err) { whisper("save-hours", ""); whisper("topWhisper", "failed"); toast(nice(err), true); return false; }
+}
+// The form, filled for a date (one already on the list comes with its hours and note), or empty
+function sdOpenForm(day) {
+  const f = $("sdForm"), today = sdToday();
+  const have = day ? specialFromState().find((x) => x.date === day) : null;
+  $("sdDate").min = today; $("sdDate").max = sdPlus(today, SD_DAYS_AHEAD);
+  $("sdDate").value = day || "";
+  $("sdClosed").checked = have ? !!(have.closed || !(have.intervals || []).length) : true;
+  const iv = have && have.intervals && have.intervals[0];
+  $("sdOpen").value = (iv && iv.open) || "09:00"; $("sdClose").value = (iv && iv.close) || "17:00";
+  $("sdNote").value = (have && have.label) || "";
+  $("sdMsg").hidden = true;
+  sdFormState();
+  f.hidden = false; $("btnSdAdd").hidden = true;
+  (day ? $("sdClosed") : $("sdDate")).focus({ preventScroll: true });
+  f.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+// The weekday beside the date, the times on when the day isn't closed (that weekday's usual
+// hours the first time), and the button's words: Add, or Save for a date already on the list
+function sdFormState(fromTick) {
+  const day = $("sdDate").value, closed = $("sdClosed").checked, ok = sdIsDay(day);
+  $("sdWd").textContent = ok ? SD_WEEKDAYS[sdUtc(day).getUTCDay()] : "";
+  $("sdOpen").disabled = $("sdClose").disabled = closed;
+  if (fromTick && !closed && ok) {
+    const wk = hoursFromState().find((d) => d.day === ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][sdUtc(day).getUTCDay()]);
+    const iv = wk && !wk.closed && wk.intervals && wk.intervals[0];
+    if (iv && $("sdOpen").value === "09:00" && $("sdClose").value === "17:00") { $("sdOpen").value = iv.open; $("sdClose").value = iv.close; }
+  }
+  const have = ok && specialFromState().some((x) => x.date === day);
+  $("sdFormH").textContent = have ? "Change " + sdWords(day) : "Add a date";
+  $("btnSdSave").textContent = have ? "Save this date" : "Add this date";
+}
+function sdCloseForm() { $("sdForm").hidden = true; $("btnSdAdd").hidden = false; }
+function sdSay(msg, focus) { const m = $("sdMsg"); m.textContent = msg; m.hidden = false; if (focus) focus.focus(); }
+async function sdSubmit(ev) {
+  ev.preventDefault();
+  const day = $("sdDate").value, today = sdToday(), closed = $("sdClosed").checked;
+  if (!sdIsDay(day)) return sdSay("Pick the date first.", $("sdDate"));
+  if (day < today) return sdSay("That day has gone by. Pick today or a day to come.", $("sdDate"));
+  if (day > sdPlus(today, SD_DAYS_AHEAD)) return sdSay("Pick a date within the next year.", $("sdDate"));
+  const open = $("sdOpen").value, close = $("sdClose").value;
+  if (!closed && (!open || !close || open === close)) return sdSay("Set the times you open and close that day, or tick Closed all day.", $("sdOpen"));
+  const rest = specialFromState().filter((x) => x.date !== day);
+  if (rest.length >= SD_MAX) return sdSay("You can keep up to " + SD_MAX + " special dates. Remove one first.");
+  const entry = { date: day, label: $("sdNote").value.replace(/\s+/g, " ").trim().slice(0, 60), closed, intervals: closed ? [] : [{ open, close }] };
+  const had = rest.length !== specialFromState().length;
+  $("btnSdSave").disabled = true;
+  const done = await sdSave([...rest, entry].sort((a, b) => (a.date < b.date ? -1 : 1)));
+  $("btnSdSave").disabled = false;
+  if (!done) return;
+  sdCloseForm();
+  toast(sdWords(day) + (had ? " is changed" : " is on your special dates"));
+  const row = $("sdList").querySelector('[data-date="' + day + '"] .sd-act'); if (row) row.focus();
+}
+$("btnSdAdd").addEventListener("click", () => sdOpenForm(""));
+$("btnSdCancel").addEventListener("click", () => { sdCloseForm(); $("btnSdAdd").focus(); });
+$("sdForm").addEventListener("submit", sdSubmit);
+$("sdDate").addEventListener("input", () => sdFormState());
+$("sdClosed").addEventListener("change", () => sdFormState(true));
+// The Do next line's "Thanksgiving is Thursday: are you open?" (#hours-2026-11-26): the form,
+// that date filled in, focus on Closed all day
+function openSpecialDate(day) {
+  const card = $("specialDates"); if (!card) return;
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  sdOpenForm(sdIsDay(day) && day >= sdToday() ? day : "");
 }
 $("closedSwitch").addEventListener("change", async () => {
   const now = $("closedSwitch").checked;
@@ -6978,6 +7109,7 @@ function fillSingles() {
     .forEach(([id, k]) => { $(id).value = l[k] || ""; });
   renderGoesSwitch();
   renderHours();
+  renderSpecialDates();   // item 432
   PLACE2 = undoClone(l.second_location) || null;
   renderPlace2();
   paintBizShows();
