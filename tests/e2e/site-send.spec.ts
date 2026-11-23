@@ -1,7 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
-import { senderTag, bookingScript, SEND_WAIT_MS, TICKET_SETTLE_MS } from '../../supabase/functions/presence/lib/site_send';
+import { senderTag, bookingScript, BOOKING_MONTH_JS, BOOKING_MONTH_PATH, SEND_WAIT_MS, TICKET_SETTLE_MS } from '../../supabase/functions/presence/lib/site_send';
 import { pinClock } from './helpers/clock';
-import { BLOCK_CSS } from '../../supabase/functions/presence/lib/site_blocks';
 
 // Builder list item 131: a client's site sends its forms and bookings from the page. The page here is
 // a client's contact page on its own address (faked), carrying the very script a publish
@@ -154,12 +153,13 @@ const bookingPage = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 const TYPES = { data: { enabled: true, timezone: 'UTC', max_days_ahead: 60, types: [{ id: '7e000000-0000-4000-8000-000000000001', name: 'Haircut', duration_min: 30, price_text: '$40', description: '' }] } };
 
 test.describe('booking on a client’s site', () => {
-  // Item 291: the month of open days comes from /days; a server without it (or one that fails)
-  // leaves the date box, so these older tests run on that path.
-  async function openBooking(page: Page, days: (route: Route) => unknown = (route) => route.abort('connectionrefused')) {
+  // Item 291: the month of open days comes from /days, drawn by a file the widget loads at that
+  // step; a server without /days (or one that fails) leaves the date box, so the older tests run there.
+  async function openBooking(page: Page, days: (route: Route) => unknown = (route) => route.abort('connectionrefused'), body = bookingPage) {
     await page.route(`${BK}/days?**`, days);
     await page.route(`${BK}/ticket`, (route) => answer(route, 200, TICKET));
-    await page.route(`${SITE}/**`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: bookingPage }));
+    await page.route(`${SITE}/**`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body }));
+    await page.route(`${SITE}${BOOKING_MONTH_PATH}`, (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: BOOKING_MONTH_JS }));
     await page.goto(`${SITE}/book/`);
   }
 
@@ -234,7 +234,7 @@ test.describe('booking on a client’s site', () => {
     await expect(page.getByRole('button', { name: 'Sunday, November 22, today, open' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Monday, November 23, no times' })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Tuesday, November 24, open' })).toBeEnabled();
-    await expect(page.locator('.bk-day.open')).toHaveCount(3);
+    await expect(page.locator('.bk-day.bk-open')).toHaveCount(3);
     await expect(page.getByRole('button', { name: 'Previous month' })).toBeDisabled();
     // the next month asks for its own days
     await page.getByRole('button', { name: 'Next month' }).click();
@@ -254,11 +254,8 @@ test.describe('booking on a client’s site', () => {
   test('item 291: with the site’s own styles every day, both month arrows and the next opening are 44px to tap, and the month fits a phone', async ({ page }) => {
     await pinClock(page, LATE_SUNDAY);
     await page.route(`${BK}/types`, (route) => answer(route, 200, TYPES_LA));
-    await page.route(`${BK}/ticket`, (route) => answer(route, 200, TICKET));
-    await page.route(`${BK}/days?**`, (route) => answer(route, 200, DAYS));
-    const styled = bookingPage.replace('</head>', `<style>:root{--accent:#1b2a4a;--line:#ccc;--soft:#555}body{margin:0;font-family:system-ui,sans-serif}.wrap{padding:0 16px}${BLOCK_CSS}</style></head>`);
-    await page.route(`${SITE}/**`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: styled }));
-    await page.goto(`${SITE}/book/`);
+    // the month brings its own rules; the page has only a site's basics
+    await openBooking(page, (route) => answer(route, 200, DAYS), bookingPage.replace('</head>', '<style>:root{--accent:#1b2a4a;--line:#ccc;--soft:#555}body{margin:0;font-family:system-ui,sans-serif}.wrap{padding:0 16px}</style></head>'));
     await page.getByRole('button', { name: /Haircut/ }).click();
     await expect(page.locator('.bk-day')).toHaveCount(30);
     const boxes = await page.locator('.bk-day, .bk-mon, .bk-next-btn').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { w: r.width, h: r.height, right: r.right }; }));
@@ -274,7 +271,17 @@ test.describe('booking on a client’s site', () => {
     await openBooking(page, (route) => answer(route, 200, { data: { today: '2026-11-22', last: '2027-01-21', open: [], next: null } }));
     await page.getByRole('button', { name: /Haircut/ }).click();
     await expect(page.locator('.bk-next')).toHaveText('No open times right now. To book, call (555) 123-4567 or email hello@shop.example.');
-    await expect(page.locator('.bk-day.open')).toHaveCount(0);
+    await expect(page.locator('.bk-day.bk-open')).toHaveCount(0);
+  });
+
+  test('item 291: when the month’s file can’t be had, the date box still starts on the business’s today', async ({ page }) => {
+    await pinClock(page, LATE_SUNDAY);
+    await page.route(`${BK}/types`, (route) => answer(route, 200, TYPES_LA));
+    await openBooking(page, (route) => answer(route, 200, DAYS));
+    await page.route(`${SITE}${BOOKING_MONTH_PATH}`, (route) => route.abort('connectionrefused'));
+    await page.getByRole('button', { name: /Haircut/ }).click();
+    await expect(page.locator('.bk-date')).toHaveAttribute('min', '2026-11-22');
+    await expect(page.locator('.bk-cal')).toHaveCount(0);
   });
 
   test('item 291: on a server with no list of days, the date box starts on the business’s today, not UTC’s', async ({ page }) => {

@@ -34,6 +34,7 @@ const { HELP_TOPICS } = await import(`${P}/lib/help_assistant.ts`);
 const { COMPONENTS } = await import(`${P}/lib/site_components.ts`);
 const B = await import(`${P}/lib/booking.ts`);
 const R = await import(`${P}/routes/booking.ts`);
+const { BOOKING_MONTH_JS, BOOKING_MONTH_PATH, bookingScript } = await import(`${P}/lib/site_send.ts`);
 
 const SITE = { baseUrl: 'https://shop.example' };
 const draw = async (snap) => { const r = await renderSnapshot(snap, SITE); return r.files || r; };
@@ -244,6 +245,14 @@ const HOLIDAYS = [{ date: '2026-11-26', label: 'Thanksgiving', closed: true }, {
   ok('291: with no hours at all, no day is offered and there is no next opening', !quiet.open.length && quiet.next === null);
   const later = B.openDays({ from: '2026-12-01', to: '2026-12-31', config: cfg, duration_min: 30, now_local: '2026-11-22T12:00', taken: () => [] });
   ok('291: a later month lists its own days, and the next opening is still the first from now', later.open[0] === '2026-12-01' && later.next === '2026-11-22T12:00');
+}
+// the month the widget loads at the "pick a day" step ships only with a site that takes bookings
+{
+  const published = async (snap) => { const r = await renderSnapshot(snap, { ...SITE, bookEndpoint: 'https://db.test/functions/v1/presence/book/5e000000-0000-4000-8000-000000000291' }); return r.files || r; };
+  const withBooking = await published(fullFixture('harbor')), without = await published(sampleOf('harbor'));
+  ok('291: a site with the booking widget ships the month file the widget loads', withBooking[BOOKING_MONTH_PATH.slice(1)] === BOOKING_MONTH_JS && bookingScript().includes(BOOKING_MONTH_PATH));
+  ok('291: a site without it ships no month file, and its pages and stylesheet are as before', !(BOOKING_MONTH_PATH.slice(1) in without));
+  ok('291: the month file is named by what it holds', /^\/assets\/book-month-[0-9a-f]{16}\.js$/.test(BOOKING_MONTH_PATH));
 }
 // the routes, on a fake database: a business in Los Angeles at 5:30 pm on Sunday Nov 22, already Monday in UTC
 {

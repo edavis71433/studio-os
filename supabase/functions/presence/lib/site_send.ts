@@ -120,17 +120,66 @@ document.addEventListener('focusin',function(ev){var f=ev.target&&ev.target.form
 // Item 131: every call gives up after SEND_WAIT_MS, so a sleeping server never leaves the
 // widget spinning, and when booking can't load or a booking didn't go through it says so
 // and offers the business's phone and email (injectSender below puts them on <body>).
+// ── Builder item 291: the month a visitor picks a day from ─────────────────────
+// The widget's second step shows a month with the days that still have an open time marked,
+// "Next opening" and arrows to the months around it, all in the business's own day (the
+// server's /days answer says which). It lives in a small file of its own that the widget
+// loads when a visitor reaches that step, with its own rules, so a page's first load and
+// every site's stylesheet stay as light as before; the date box stays in the page for when
+// the file or the list of days can't be had (an older server, a dropped connection).
+const BAND = (sel: string) => ['.block.block--bg-accent', '.block.block--bg-dark', '.block.block--bg-photo.veil-dark'].map((b) => `${b} ${sel}`).join(',');
+export const BOOKING_MONTH_CSS = '.bk-next{margin:0 0 12px;font-weight:600}'
+  + '.bk-next-btn{min-height:44px;margin-left:4px;padding:8px 14px;border:1px solid var(--accent);border-radius:999px;background:var(--card,#fff);color:inherit;font:inherit;font-weight:700;cursor:pointer}'
+  + '.bk-cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:360px;margin:0 0 6px}.bk-cal-title{margin:0;font-weight:700}'
+  + '.bk-mon{min-width:44px;min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--card,#fff);color:inherit;font-size:1.25rem;cursor:pointer}.bk-mon:disabled{opacity:.35;cursor:default}'
+  + '.bk-cal{display:grid;grid-template-columns:repeat(7,minmax(44px,1fr));gap:4px;max-width:360px}.bk-wd{padding:4px 0;text-align:center;font-size:.8rem;color:var(--soft)}'
+  + '.bk-day{min-height:44px;border:1px solid transparent;border-radius:10px;background:none;color:inherit;font:inherit;opacity:.5}'
+  + '.bk-day.bk-open{border-color:var(--accent);background:var(--card,#fff);font-weight:700;opacity:1;cursor:pointer}.bk-day.bk-open:hover{border-width:2px}'
+  + '.bk-day.bk-today{text-decoration:underline;text-underline-offset:3px}'
+  + '.bk-day:focus-visible,.bk-mon:focus-visible,.bk-next-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}'
+  + '.bk-cal-key{margin:10px 0 0;font-size:.85rem;color:var(--soft)}'
+  + `${BAND(':is(.bk-mon,.bk-next-btn)')}{background:var(--band-box,rgba(0,0,0,.08));border-color:rgba(255,255,255,.22)}`
+  + `${BAND('.bk-day.bk-open')}{background:var(--band-box,rgba(0,0,0,.08));border-color:rgba(255,255,255,.6)}`;
+export const BOOKING_MONTH_JS = `(function(){
+var MON=['January','February','March','April','May','June','July','August','September','October','November','December'],WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],WDL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function wday(t){var p=t.split('-');return new Date(Date.UTC(+p[0],+p[1]-1,+p[2])).getUTCDay();}
+window.ddsBookMonth=function(B){
+var S=B.S,el=B.el,pad=B.pad;
+if(!document.getElementById('bk-month-css')){var st=document.createElement('style');st.id='bk-month-css';st.textContent=${JSON.stringify(BOOKING_MONTH_CSS)};document.head.appendChild(st);}
+function when(t){return WD[wday(t.slice(0,10))]+', '+B.fdate(t.slice(0,10))+' at '+B.ftime(t.split('T')[1]);}
+function month(ym){var v=B.view(),y=+ym.slice(0,4),m=+ym.slice(5,7),n=new Date(Date.UTC(y,m,0)).getUTCDate();
+B.getj(B.EP+'/days?type='+encodeURIComponent(S.type.id)+'&from='+ym+'-01&to='+ym+'-'+pad(n)).then(function(res){if(v!==B.view())return;var d=(res&&res.data)||{};if(!d.today||!d.open)throw 0;S.month=ym;cal(ym,y,m,n,d);}).catch(function(){if(v===B.view())B.dateBox();});}
+function cal(ym,y,m,n,d){B.head();var stage=B.stage,open={};d.open.forEach(function(x){open[x]=1;});
+var nx=el('p','bk-next');if(d.next){nx.appendChild(document.createTextNode('Next opening: '));var nb=el('button','bk-next-btn',when(d.next));nb.type='button';nb.addEventListener('click',function(){S.date=d.next.slice(0,10);S.month=d.next.slice(0,7);B.slots();});nx.appendChild(nb);}else{nx.textContent='No open times right now.';B.reach(nx,'To book,');}stage.appendChild(nx);
+var hd=el('div','bk-cal-head');var pv=el('button','bk-mon','‹');pv.type='button';pv.setAttribute('aria-label','Previous month');pv.disabled=ym<=d.today.slice(0,7);var nm=el('button','bk-mon','›');nm.type='button';nm.setAttribute('aria-label','Next month');nm.disabled=ym>=String(d.last||d.today).slice(0,7);
+pv.addEventListener('click',function(){month(B.plus(ym+'-01',-1).slice(0,7));});nm.addEventListener('click',function(){month(B.plus(ym+'-'+pad(n),1).slice(0,7));});hd.appendChild(pv);hd.appendChild(el('p','bk-cal-title',MON[m-1]+' '+y));hd.appendChild(nm);stage.appendChild(hd);
+var g=el('div','bk-cal');g.setAttribute('role','group');g.setAttribute('aria-label',MON[m-1]+' '+y);WD.forEach(function(w){var h=el('span','bk-wd',w.slice(0,2));h.setAttribute('aria-hidden','true');g.appendChild(h);});
+for(var i=0;i<wday(ym+'-01');i++)g.appendChild(el('span','bk-gap'));
+for(var k=1;k<=n;k++){(function(t){var on=!!open[t],b=el('button','bk-day'+(on?' bk-open':'')+(t===d.today?' bk-today':''),String(k));b.type='button';b.disabled=!on;
+b.setAttribute('aria-label',WDL[wday(t)]+', '+MON[m-1]+' '+(+t.slice(8))+(t===d.today?', today':'')+(on?', open':', no times'));if(on)b.addEventListener('click',function(){S.date=t;B.slots();});g.appendChild(b);})(ym+'-'+pad(k));}
+stage.appendChild(g);stage.appendChild(el('p','bk-cal-key','Days with open times are marked.'));}
+if(!S.cfg.today)return B.dateBox();month(S.month||S.cfg.today.slice(0,7));};
+})();
+`;
+/** Where a published site keeps the month file: named by what it holds, like the site's own. */
+export const BOOKING_MONTH_PATH = `/assets/book-month-${fnv1a(BOOKING_MONTH_JS)}.js`;
+function fnv1a(s: string): string {
+  let h = 0xcbf29ce484222325n;
+  for (const b of new TextEncoder().encode(s)) h = BigInt.asUintN(64, (h ^ BigInt(b)) * 0x100000001b3n);
+  return h.toString(16).padStart(16, '0');
+}
+
 export function bookingScript(): string {
   const js = `(function(){
 var W=document.querySelector('.booking-widget[data-book]');if(!W)return;
 var EP=W.getAttribute('data-book');var stage=W.querySelector('.bk-stage');
 var S={types:[],type:null,date:'',slot:'',cfg:{}},WAIT=${SEND_WAIT_MS};
 var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-var MON=['January','February','March','April','May','June','July','August','September','October','November','December'],WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],WDL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 var NOT_BOOKED='Your booking didn’t go through, so nothing is booked yet. Please try again.';
 var TK='',TKAT=0;
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
-function clr(){while(stage.firstChild)stage.removeChild(stage.firstChild);}
+var V=0;   // which step the stage shows: an answer that lands after the visitor moved on draws nothing
+function clr(){V++;while(stage.firstChild)stage.removeChild(stage.firstChild);}
 function msg(t){clr();var p=el('p','bk-msg',t);stage.appendChild(p);return p;}
 function call(u,o){var ac=window.AbortController?new AbortController():null;if(ac)o.signal=ac.signal;var t=setTimeout(function(){if(ac)ac.abort();},WAIT);
 return fetch(u,o).then(function(r){clearTimeout(t);return r.json().then(function(j){return {s:r.status,j:j};},function(){return {s:r.status,j:null};});},function(e){clearTimeout(t);throw e;});}
@@ -151,23 +200,12 @@ function services(){clr();stage.appendChild(el('p','bk-step','1. Choose a servic
 function pad(n){return (n<10?'0':'')+n;}
 function ymd(y,m,d){var t=new Date(Date.UTC(y,m-1,d));return t.getUTCFullYear()+'-'+pad(t.getUTCMonth()+1)+'-'+pad(t.getUTCDate());}
 function plus(t,n){var p=t.split('-');return ymd(+p[0],+p[1],+p[2]+n);}
-function localToday(){var d=new Date();return ymd(d.getFullYear(),d.getMonth()+1,d.getDate());}
-function wday(t){var p=t.split('-');return new Date(Date.UTC(+p[0],+p[1]-1,+p[2])).getUTCDay();}
 function head(){clr();stage.appendChild(back(services));stage.appendChild(el('p','bk-step','2. Pick a day for '+S.type.name));}
-function pickDate(){head();stage.appendChild(el('p','bk-msg','Finding open days…'));month(S.month||(S.cfg.today||localToday()).slice(0,7));}
-function month(ym){var y=+ym.slice(0,4),m=+ym.slice(5,7),n=new Date(Date.UTC(y,m,0)).getUTCDate();var ty=S.type;
-getj(EP+'/days?type='+encodeURIComponent(ty.id)+'&from='+ym+'-01&to='+ym+'-'+pad(n)).then(function(res){var d=(res&&res.data)||{};if(S.type!==ty)return;if(!d.today||!d.open)throw new Error('days');S.month=ym;cal(ym,n,d);}).catch(function(){if(S.type===ty)dateBox();});}
-function when(t){return WD[wday(t.slice(0,10))]+', '+fdate(t.slice(0,10))+' at '+ftime(t.split('T')[1]);}
-function cal(ym,n,d){head();var y=+ym.slice(0,4),m=+ym.slice(5,7),open={};d.open.forEach(function(x){open[x]=1;});
-var nx=el('p','bk-next');if(d.next){nx.appendChild(document.createTextNode('Next opening: '));var nb=el('button','bk-next-btn',when(d.next));nb.type='button';nb.addEventListener('click',function(){S.date=d.next.slice(0,10);S.month=d.next.slice(0,7);slots();});nx.appendChild(nb);}else{nx.textContent='No open times right now.';reach(nx,'To book,');}stage.appendChild(nx);
-var hd=el('div','bk-cal-head');var pv=el('button','bk-mon','‹');pv.type='button';pv.setAttribute('aria-label','Previous month');pv.disabled=ym<=d.today.slice(0,7);var nm=el('button','bk-mon','›');nm.type='button';nm.setAttribute('aria-label','Next month');nm.disabled=ym>=String(d.last||d.today).slice(0,7);
-var ttl=el('p','bk-cal-title',MON[m-1]+' '+y);pv.addEventListener('click',function(){month(plus(ym+'-01',-1).slice(0,7));});nm.addEventListener('click',function(){month(plus(ym+'-'+pad(n),1).slice(0,7));});hd.appendChild(pv);hd.appendChild(ttl);hd.appendChild(nm);stage.appendChild(hd);
-var g=el('div','bk-cal');g.setAttribute('role','group');g.setAttribute('aria-label',MON[m-1]+' '+y);WD.forEach(function(w){var h=el('span','bk-wd',w.slice(0,2));h.setAttribute('aria-hidden','true');g.appendChild(h);});
-for(var i=0;i<wday(ym+'-01');i++)g.appendChild(el('span','bk-gap'));
-for(var k=1;k<=n;k++){(function(t){var on=!!open[t],b=el('button','bk-day'+(on?' open':'')+(t===d.today?' today':''),String(+t.slice(8)));b.type='button';b.disabled=!on;
-b.setAttribute('aria-label',WDL[wday(t)]+', '+MON[+t.slice(5,7)-1]+' '+(+t.slice(8))+(t===d.today?', today':'')+(on?', open':', no times'));if(on)b.addEventListener('click',function(){S.date=t;slots();});g.appendChild(b);})(ym+'-'+pad(k));}
-stage.appendChild(g);stage.appendChild(el('p','bk-cal-key','Days with open times are marked.'));}
-function dateBox(){head();var inp=el('input','bk-date');inp.type='date';var t=S.cfg.today||localToday();inp.min=t;if(S.cfg.max_days_ahead){inp.max=plus(t,S.cfg.max_days_ahead);}inp.addEventListener('change',function(){S.date=inp.value;if(S.date)slots();});stage.appendChild(inp);}
+var B={S:S,EP:EP,el:el,head:head,slots:slots,getj:getj,ftime:ftime,fdate:fdate,reach:reach,pad:pad,plus:plus,stage:stage,view:function(){return V;},dateBox:dateBox},MP=null;
+function pickDate(){head();stage.appendChild(el('p','bk-msg','Finding open days…'));var v=V;
+MP=MP||new Promise(function(ok,no){var s=document.createElement('script');s.src='${BOOKING_MONTH_PATH}';s.onload=ok;s.onerror=no;document.head.appendChild(s);});
+MP.then(function(){if(v!==V)return;if(!window.ddsBookMonth)throw 0;window.ddsBookMonth(B);}).catch(function(){MP=null;if(v===V)dateBox();});}
+function dateBox(){head();var inp=el('input','bk-date');inp.type='date';var d=new Date(),t=S.cfg.today||ymd(d.getFullYear(),d.getMonth()+1,d.getDate());inp.min=t;if(S.cfg.max_days_ahead){inp.max=plus(t,S.cfg.max_days_ahead);}inp.addEventListener('change',function(){S.date=inp.value;if(S.date)slots();});stage.appendChild(inp);}
 function slots(){clr();stage.appendChild(back(pickDate));stage.appendChild(el('p','bk-step','3. Choose a time'));var load=el('p','bk-msg','Finding open times…');stage.appendChild(load);getj(EP+'/slots?type='+encodeURIComponent(S.type.id)+'&date='+encodeURIComponent(S.date)).then(function(res){var sl=((res&&res.data)||{}).slots||[];if(load.parentNode)stage.removeChild(load);if(!sl.length){stage.appendChild(el('p','bk-msg','No open times that day — try another.'));return;}var grid=el('div','bk-slots');sl.forEach(function(s){var b=el('button','bk-slot',ftime(s.split('T')[1]));b.type='button';b.addEventListener('click',function(){S.slot=s;details();});grid.appendChild(b);});stage.appendChild(grid);}).catch(function(){if(load.parentNode)stage.removeChild(load);stage.appendChild(reach(el('p','bk-msg','We couldn’t load the times for that day. Go back and pick the day again, or try another.'),'You can also'));});}
 function field(lb,nm,ty,req){var w=el('label','bk-field');w.appendChild(el('span',null,lb+(req?' *':'')));var i=el(ty==='textarea'?'textarea':'input');if(ty!=='textarea')i.type=ty;i.name=nm;if(req)i.required=true;w.appendChild(i);return {w:w,i:i};}
 function details(){clr();stage.appendChild(back(slots));stage.appendChild(el('p','bk-step','4. Your details'));var f=el('form','bk-form');var nm=field('Your name','name','text',true),em=field('Email','email','email',false),ph=field('Phone','phone','tel',false),nt=field('Anything we should know?','note','textarea',false);f.appendChild(nm.w);f.appendChild(em.w);f.appendChild(ph.w);f.appendChild(nt.w);var hp=el('div','bk-hp');var hpi=el('input');hpi.name='_hp';hpi.tabIndex=-1;hpi.setAttribute('autocomplete','off');hp.appendChild(hpi);f.appendChild(hp);f.appendChild(el('p','bk-summary',S.type.name+' — '+fdate(S.date)+' at '+ftime(S.slot.split('T')[1])));var btn=el('button','bk-submit btn','Confirm booking');btn.type='submit';f.appendChild(btn);var err=el('p','bk-err');f.appendChild(err);

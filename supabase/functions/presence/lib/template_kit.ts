@@ -27,6 +27,7 @@ import { SHELL_CSS, SHELL_CRITICAL, SHELL_NOSCRIPT, MENU_JS, menuButtonHtml } fr
 import { isNewOpening, openingCss, PANEL_LEFT_CSS, type OpeningKind } from './template_openings.ts';
 import { HERO_CARD_CSS, TODAY_JS } from './hero_cards.ts';
 import { shareCard, CARD_W, CARD_H, SHARE_CARD_VERSION } from './share_card.ts';
+import { BOOKING_MONTH_JS, BOOKING_MONTH_PATH } from './site_send.ts';
 import { normHex } from './brand_kit.ts';
 
 /** The site's script file: the phone menu (lib/site_shell.ts) and the gallery and carousel (lib/site_blocks.ts). */
@@ -986,6 +987,9 @@ export function makeRender(look: TemplateLook): RenderFn {
       path: '/404.html', title: `Page not found — ${i.business_name}`, description: siteDesc, ld: [], active: '',
       body: band(look, `<h1>That page isn’t here</h1><p class="tagline">The page you’re after may have moved.</p><div class="cta-row"><a class="btn" href="/">Back to ${esc(i.business_name)}</a><a class="btn ghost" href="${attr(v.offeringPath)}">${esc(words.seeOfferings(v.offeringLabel))}</a></div>`),
     }, extras);
+
+    // Item 291: a site that takes bookings ships the month its widget loads at the "pick a day" step
+    if (Object.values(files).some((h) => typeof h === 'string' && h.includes('<div class="booking-widget" data-book='))) files[BOOKING_MONTH_PATH.slice(1)] = BOOKING_MONTH_JS;
 
     const initial = classic?.files.initial || 'B';
     const letter = (i.business_name || initial).trim()[0]?.toUpperCase() || initial;
