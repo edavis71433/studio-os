@@ -29,7 +29,9 @@ ok('…and still publishes the allowlisted dist/ that build-public.sh makes', /^
 // ── The rule, in a real repository ──────────────────────────────────────────
 const dir = await Deno.makeTempDir({ prefix: 'netlify-ignore-test-' });
 const rule0 = Deno.readTextFileSync(SCRIPT);
-ok('the switch starts at "merge": Netlify keeps publishing main on every merge until Eric\'s steps are done', read('scripts/pages-go-live.txt').trim() === 'merge');
+// Eric's steps were done on Nov 23 2026 (NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID set), and the
+// switch moved to "release". It can go back to "merge" with one word if a release can't publish.
+ok('the switch holds one of its two words', ['merge', 'release'].includes(read('scripts/pages-go-live.txt').trim()), read('scripts/pages-go-live.txt').trim());
 const git = (...args) => sh(dir, 'git', '-c', 'user.name=t', '-c', 'user.email=t@example.invalid', ...args);
 async function write(path, body) {
   await Deno.mkdir(`${dir}/${path}`.replace(/\/[^/]*$/, ''), { recursive: true });
@@ -42,9 +44,14 @@ await git('add', '.');
 await git('commit', '--quiet', '-m', 'base');
 const BASE = await git('rev-parse', 'HEAD');
 
+// The rule reads the switch beside itself, so these run a copy of it next to the word
+// "merge", whatever the repository's own switch says today; "release" has its own checks below.
+const RULE_DIR = await Deno.makeTempDir({ prefix: 'netlify-ignore-rule-' });
+await Deno.writeTextFile(`${RULE_DIR}/netlify-ignore.sh`, rule0);
+await Deno.writeTextFile(`${RULE_DIR}/pages-go-live.txt`, 'merge\n');
 async function decide(env) {
   const { code, stdout } = await new Deno.Command('bash', {
-    args: [SCRIPT], cwd: dir, stdout: 'piped', stderr: 'null', clearEnv: true,
+    args: [`${RULE_DIR}/netlify-ignore.sh`], cwd: dir, stdout: 'piped', stderr: 'null', clearEnv: true,
     env: { PATH: Deno.env.get('PATH'), HOME: dir, ...env },
   }).output();
   return { code, log: text.decode(stdout).trim() };
@@ -115,6 +122,18 @@ ok('the switch says "release": a production build of a merge is skipped, even a 
 const previewInRelease = await new Deno.Command('bash', { args: [`${dir}/scripts/netlify-ignore.sh`], cwd: dir, stdout: 'piped', stderr: 'null', clearEnv: true,
   env: { PATH: Deno.env.get('PATH'), HOME: dir, CONTEXT: 'deploy-preview', CACHED_COMMIT_REF: MODE_BASE, COMMIT_REF: await git('rev-parse', 'HEAD') } }).output();
 ok('…and a deploy preview still builds', previewInRelease.code === BUILD);
+// The release's own question (scripts/pages-live.sh): did a published file change between two
+// commits, whoever publishes them? With "release" every Netlify build is skipped, so without
+// PAGES_CHANGES_ONLY any older live commit would look like this commit's pages.
+const askChanges = async (cached) => new Deno.Command('bash', { args: [`${dir}/scripts/netlify-ignore.sh`], cwd: dir, stdout: 'piped', stderr: 'null', clearEnv: true,
+  env: { PATH: Deno.env.get('PATH'), HOME: dir, CONTEXT: 'production', PAGES_CHANGES_ONLY: '1', CACHED_COMMIT_REF: cached, COMMIT_REF: await git('rev-parse', 'HEAD') } }).output();
+const pageChanged = await askChanges(MODE_BASE);
+ok('asked only whether a published file changed, the rule answers that while the switch says "release": a page change counts', pageChanged.code === BUILD, new TextDecoder().decode(pageChanged.stdout).trim());
+const pageHead = await git('rev-parse', 'HEAD');
+await write('docs/plan.md', 'release-mode notes\n'); await git('add', '-A'); await git('commit', '--quiet', '-m', 'docs in release mode');
+const docsChanged = await askChanges(pageHead);
+ok('…and a change to docs alone counts as nothing published', docsChanged.code === SKIP, new TextDecoder().decode(docsChanged.stdout).trim());
+ok('the release\'s wait asks the rule that way', /PAGES_CHANGES_ONLY=1 CONTEXT=production CACHED_COMMIT_REF="\$live" COMMIT_REF="\$SHA" bash "\$here\/netlify-ignore\.sh"/.test(read('scripts/pages-live.sh')));
 const head = await git('rev-parse', 'HEAD');
 const same = await decide({ CONTEXT: 'production', CACHED_COMMIT_REF: head, COMMIT_REF: head });
 ok('the commit Netlify built last builds again (a retry, or a first build)', same.code === BUILD, same.log);
@@ -130,6 +149,7 @@ await write('docs/plan.md', 'three\n'); await git('add', '-A'); await git('commi
 const two = await decide({ CONTEXT: 'production', CACHED_COMMIT_REF: BASE, COMMIT_REF: await git('rev-parse', 'HEAD') });
 ok('a page changed two commits back still builds', two.code === BUILD);
 await Deno.remove(dir, { recursive: true });
+await Deno.remove(RULE_DIR, { recursive: true });
 
 // ── The skip list against what build-public.sh copies ───────────────────────
 // build-public.sh copies files at the top of the repository and five asset folders, and
