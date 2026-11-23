@@ -140,5 +140,41 @@ world({ presence_approvals: [approval(AP1)], presence_service_links: [{ id: LINK
   ok('179: a deal that doesn\'t count rounds answers as before, with no round and no estimate', d.status === 200 && !d.body?.data?.round && !T('presence_estimates').some((e) => e.extra_work));
 }
 
+// ═══ Download my data carries the new fields, never where a signature came from ═══
+{
+  const X = await import('../../supabase/functions/presence/routes/sales_export.ts');
+  const Z = await import('../../supabase/functions/presence/lib/zip_csv.ts');
+  // the zip reader the export's own suite uses (sales_extras_2_test.mjs)
+  const unzip = (bytes) => {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let e = bytes.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+    const n = dv.getUint16(e + 10, true), cdOff = dv.getUint32(e + 16, true);
+    const out = {}; let p = cdOff;
+    for (let i = 0; i < n; i++) {
+      const crc = dv.getUint32(p + 16, true), size = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), lo = dv.getUint32(p + 42, true);
+      const name = new TextDecoder().decode(bytes.subarray(p + 46, p + 46 + nl));
+      const lnl = dv.getUint16(lo + 26, true), lel = dv.getUint16(lo + 28, true);
+      const data = bytes.subarray(lo + 30 + lnl + lel, lo + 30 + lnl + lel + size);
+      if (Z.crc32(data) !== crc) throw new Error('crc mismatch ' + name);
+      out[name] = new TextDecoder().decode(data);
+      p += 46 + nl + dv.getUint16(p + 30, true) + dv.getUint16(p + 32, true);
+    }
+    return out;
+  };
+  world({
+    presence_deals: [{ id: DEAL, site_id: SITE, title: 'Blue Finch Café website', stage: 'won', contact_id: CT, expected_value_cents: 250000, revision_rounds: 2, created_project_id: PROJ, deleted_at: null, created_at: ago(30) }],
+    presence_proposals: [{ id: PROP, site_id: SITE, deal_id: DEAL, title: 'Website', line_items: [{ label: 'Website', qty: 1, unit_cents: 240000 }], status: 'accepted', version: 2, sent_at: ago(9), decided_at: ago(7), decided_name: 'Riley Park', reminded_at: ago(8), created_at: ago(10), deleted_at: null }],
+    presence_contracts: [{ id: CON, site_id: SITE, deal_id: DEAL, title: 'Service agreement', status: 'voided', sent_at: ago(2), signed_evidence: { ip_hash: 'scrambled-0123' }, created_at: ago(3), deleted_at: null }],
+    presence_estimates: [{ id: EST, site_id: SITE, deal_id: DEAL, title: 'Extra work: Homepage draft', line_items: [{ label: 'Gallery page', qty: 1, unit_cents: 45000 }], status: 'approved', version: 1, extra_work: true, decided_at: ago(1), decided_name: 'Riley Park', sent_at: ago(2), created_at: ago(3), deleted_at: null }],
+    presence_sign_evidence: [{ id: uuid('9'), site_id: SITE, deal_id: DEAL, doc_kind: 'proposal', doc_id: PROP, signer_name: 'Riley Park', ip: '203.0.113.7', user_agent: 'Mozilla/5.0 (iPhone)', created_at: ago(7) }],
+  });
+  const r = await X.handleSalesExport(site, owner, cors);
+  const files = unzip(new Uint8Array(await r.arrayBuffer()));
+  const first = (name) => (files[name] || '').split('\r\n').slice(0, 2).join('\n');
+  ok('Download my data: the deal\'s rounds, the proposal\'s typed name and Remind day', /Rounds of changes included/.test(first('deals.csv')) && /,2$/m.test(first('deals.csv')) && /Accepted by,Reminded/.test(first('proposals.csv')) && /Riley Park/.test(first('proposals.csv')), first('deals.csv') + ' | ' + first('proposals.csv'));
+  ok('Download my data: an estimate\'s version, Extra work and who approved it; an agreement taken back reads withdrawn', /Version,Extra work,Status/.test(first('estimates.csv')) && /,1,yes,approved,/.test(first('estimates.csv')) && /Approved by/.test(first('estimates.csv')) && /withdrawn/.test(first('agreements.csv')), first('estimates.csv') + ' | ' + first('agreements.csv'));
+  ok('Download my data: where a signature came from stays out of every file', !Object.values(files).some((t) => /203\.0\.113\.7|Mozilla\/5\.0 \(iPhone\)|scrambled-0123/.test(t)));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('Failed:\n  ' + failed.join('\n  ')); Deno.exit(1); }
