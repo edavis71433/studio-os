@@ -1,7 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
+import { expectOneHeader } from './helpers/page-header';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
-import { expectOneHeader } from './helpers/page-header';
 
 // Builder list item 210 (Nov 2026; review file 03, findings 1, 6 and 11): the Usage tab on
 // Sites, as drawn in Figma (page 310:2, option A) and approved. The month in one band: the

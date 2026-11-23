@@ -1,7 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
+import { expectOneHeader } from './helpers/page-header';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, CLIENT_NAV, ALL_FEATURES } from './helpers/app';
-import { expectOneHeader } from './helpers/page-header';
 
 // Builder list item 215 (Nov 2026; review file 03, finding 4): Changes, who changed what and
 // when, as drawn in Figma (page 410:2) and approved. At the studio's level, a tab beside
