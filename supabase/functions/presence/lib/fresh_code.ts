@@ -27,7 +27,9 @@ import { hmacHex, timingSafeEqual } from '../../_shared/hmac.ts';
 import { maskEmail } from '../../_shared/email_infra.ts';
 import { rateAllow } from './ratelimit.ts';
 
-export type FreshAction = 'invite_coowner' | 'transfer' | 'domain_remove' | 'close_account';
+// Item 347 adds a fifth, for a studio owner only:
+//   two_step_off     turning off a client's two-step sign-in for them (a lost phone)
+export type FreshAction = 'invite_coowner' | 'transfer' | 'domain_remove' | 'close_account' | 'two_step_off';
 export const FRESH_MINUTES = 10, FRESH_TRIES = 5, FRESH_SENDS = 3;
 /** How recently an app code must have been typed into a sign-in to count as fresh. */
 export const FRESH_APP_SECONDS = 300;
@@ -38,6 +40,7 @@ export const FRESH_WORDS: Record<FreshAction, { doing: string; go: string }> = {
   transfer: { doing: 'hand a site to someone else', go: 'Confirm and hand it over' },
   domain_remove: { doing: 'remove a domain', go: 'Confirm and remove it' },
   close_account: { doing: 'close the account', go: 'Confirm and close the account' },
+  two_step_off: { doing: 'turn off a client’s two-step sign-in', go: 'Confirm and turn it off' },   // item 347
 };
 
 const signingKey = () => Deno.env.get('APPROVAL_SECRET') || Deno.env.get('SCHEDULER_SECRET') || Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';

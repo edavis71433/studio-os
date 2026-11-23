@@ -161,7 +161,7 @@ test.describe('items 257 and 281 — the password row in Help', () => {
   test('is hidden when the studio turned passwords off for its clients', async ({ page }) => {
     await installApp(page, { api: CLIENT_API({ '/portal/context': CLIENT_CTX({ portal: { off: [], welcome: '', home_off: [], signin: { google: false, password: false } } }) }) });
     await page.goto('/client.html#help');
-    await expect(page.getByRole('heading', { name: 'Your account' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your account', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Change password' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   });

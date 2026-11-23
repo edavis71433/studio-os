@@ -297,7 +297,20 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   {
     const m = route.match(/^\/public\/studio\/([0-9a-f-]{36})\/brand$/);
     if (m && method === 'GET') return (await import('./routes/studio_brand.ts')).handlePublicStudioBrand(m[1], cors);
+    // builder item 348: the logo's lasting address for emails; item 341: the studio a bare /portal belongs to
+    const lg = route.match(/^\/public\/studio\/([0-9a-f-]{36})\/logo$/);
+    if (lg && method === 'GET') return (await import('./routes/studio_brand.ts')).handlePublicStudioLogo(lg[1], cors);
+    if (route === '/public/studio/default/brand' && method === 'GET') return (await import('./routes/studio_brand.ts')).handlePublicDefaultStudio(cors);
+    // builder item 350: the studio behind a short portal address; item 340: the portal as the studio's own app
+    const bs = route.match(/^\/public\/studio\/by-slug\/([a-z0-9-]{1,60})\/brand$/i);
+    if (bs && method === 'GET') return (await import('./routes/studio_brand.ts')).handlePublicStudioBySlug(bs[1], cors);
+    const mf = route.match(/^\/public\/studio\/([0-9a-f-]{36})\/manifest$/);
+    if (mf && method === 'GET') return (await import('./routes/studio_brand.ts')).handlePublicStudioManifest(mf[1], cors);
   }
+  // ── Builder item 349: the thank-you page after paying, PUBLIC, pre-auth, keyed by the
+  //    invoice id Stripe's return already carries (routes/pay_thanks.ts): the studio, the
+  //    amount, a masked receipt address, and whether this payer has a portal sign-in. ──
+  if (route === '/public/pay/thanks' && method === 'GET') return (await import('./routes/pay_thanks.ts')).handlePayThanks(req, cors);
 
   // ── Sales item 129: the link a client gets to put in a new card for their retainer —
   //    PUBLIC, pre-auth, authorized ONLY by the link's own signature (a 'card' token
@@ -335,6 +348,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
       if (mp && method === 'POST') return handleMarketplacePrepare(req, mp[1], principal, cors);
     }
   }
+
+  // ── Builder item 347: the lost-phone door — a backup code turns two-step sign-in off
+  //    for the account its email names. PUBLIC, pre-auth by nature (the person can't get
+  //    past their second step); rate-limited by email and address, one generic answer
+  //    whatever went wrong (routes/backup_codes.ts). ──
+  if (route === '/auth/backup-codes/use' && method === 'POST') return (await import('./routes/backup_codes.ts')).handleBackupCodeUse(req, cors);
 
   // Web Push: the VAPID public key is public by design (the browser needs it to
   // subscribe). Served before the auth gate so the enable-notifications prompt
@@ -404,6 +423,12 @@ async function route_(req: Request, cors: Record<string, string>): Promise<Respo
   if (route === '/push/unsubscribe' && method === 'POST') {
     const { handlePushUnsubscribe } = await import('./routes/push.ts');
     return handlePushUnsubscribe(req, principal, cors);
+  }
+  // ── Builder item 347: the caller's own backup codes for two-step sign-in. About the
+  //    person, not a site, so before the caller-site gate (routes/backup_codes.ts). ──
+  if (route === '/auth/backup-codes' && (method === 'GET' || method === 'POST')) {
+    const { handleBackupCodesGet, handleBackupCodesSave } = await import('./routes/backup_codes.ts');
+    return method === 'GET' ? handleBackupCodesGet(principal, cors) : handleBackupCodesSave(req, principal, cors);
   }
 
   // ── ADMIN routes (M6): staff-only, operate on any site by id, sit BEFORE

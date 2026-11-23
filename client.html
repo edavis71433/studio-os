@@ -127,6 +127,98 @@
   .hpage{display:flex;align-items:center;gap:14px}.hpage .hpin{flex:1;min-width:0}.hpage h3{margin:0 0 3px;font-size:15.5px}.hpage p{margin:0;color:var(--soft);font-size:13.5px}
   @media (max-width:719px){.qtab{display:none}}
   @media (min-width:720px){.moretab{display:none}.morepanel{display:none}}
+  /* ── items 247 + 335, direction A: the website is the hero ──
+     The hero sits inside the band: a kicker, one large line ("Launching in 12 days." or "Live since
+     March 3"), the project's steps as dots, and the site itself in a browser frame with a phone
+     frame over its corner. Needs you is one bold card whose first row is the big one. The studio is
+     a card with its logo, its reply hours and one button. Section titles are real headings. */
+  body{font-size:16px}
+  #main .card p{font-size:15px}#main .muted{font-size:15px}#main .qmain p{font-size:14.5px}header .sub{font-size:16px}#main .fload{font-size:15px}#main .qrow .qmain h3{font-size:17.5px}#main .qcard .qrow:first-child .qmain h3{font-size:24px}
+  h2{font-family:var(--serif);font-size:22px;letter-spacing:-.01em;text-transform:none;color:var(--ink);font-weight:500;margin:0 0 12px;line-height:1.2}
+  h2 .hcount{font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--p);background:var(--p-soft);border-radius:999px;padding:3px 10px;margin-left:8px;vertical-align:middle}
+  .hero{display:grid;gap:22px;margin-top:18px}
+  .hero .hwords{min-width:0}
+  .hero .hkick{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--chrome-accent);margin:0 0 8px;word-break:break-word}
+  .hero .hline{font-family:var(--serif);font-weight:300;font-size:clamp(30px,5.6vw,52px);line-height:1.04;letter-spacing:-.02em;color:var(--on-chrome);margin:0 0 10px}
+  .hero .hsub{color:var(--on-chrome-soft);font-size:16px;margin:0;max-width:520px}
+  .hsteps{display:flex;gap:16px 18px;flex-wrap:wrap;margin:16px 0 0;padding:0;list-style:none}
+  .hsteps li{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:500;color:var(--on-chrome);white-space:nowrap}
+  .hsteps li.next{opacity:.55}
+  .hsteps .hdot{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;background:#2b3650}
+  .hsteps li.done .hdot{background:var(--chrome-accent);color:var(--chrome)}
+  .hsteps li.now .hdot{background:transparent;border:2px solid var(--on-chrome)}
+  .hsteps li.now .hdot::after{content:'';width:7px;height:7px;border-radius:50%;background:var(--on-chrome)}
+  .hsteps li.now{font-weight:700}
+  .hbtns{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+  .hbtns .approve{background:var(--chrome-accent);color:var(--chrome);border-color:var(--chrome-accent);box-shadow:none;padding:12px 22px;font-size:15px}
+  .hbtns .approve:hover{background:#fff;border-color:#fff;color:var(--chrome)}
+  .hbtns a.btn,.hbtns button.ghost{color:var(--on-chrome);border-color:rgba(255,255,255,.3);background:transparent;padding:12px 20px;font-size:15px;display:inline-flex;align-items:center;gap:8px}
+  .hbtns a.btn:hover,.hbtns button.ghost:hover{border-color:#fff;color:#fff}
+  .hart{position:relative;min-width:0}
+  .hbrowser{position:relative;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.35);aspect-ratio:16/10}
+  .hbrowser .hbar{height:26px;background:#f1ede6;display:flex;align-items:center;gap:6px;padding:0 10px}
+  .hbrowser .hbar i{width:9px;height:9px;border-radius:50%;display:block}.hbrowser .hbar i:nth-child(1){background:#ff5f57}.hbrowser .hbar i:nth-child(2){background:#febc2e}.hbrowser .hbar i:nth-child(3){background:#28c840}
+  .hbrowser .hpic{position:absolute;top:26px;left:0;right:0;bottom:0;overflow:hidden;background:var(--p-soft)}
+  .hpic iframe{position:absolute;top:0;left:0;width:1280px;height:800px;border:0;transform-origin:0 0;transform:scale(var(--hk,.4));pointer-events:none;background:#fff;opacity:0;transition:opacity .32s}
+  .hpic iframe.on{opacity:1}
+  .hpic .hini{position:absolute;inset:0;display:grid;place-items:center;color:var(--p);opacity:.6}
+  .hphone{position:absolute;right:-8px;bottom:-14px;width:22%;min-width:84px;max-width:150px;aspect-ratio:9/19;background:var(--chrome);border-radius:16%/8%;padding:4%;box-shadow:0 14px 34px rgba(0,0,0,.4)}
+  .hphone .hpic{position:relative;inset:auto;top:0;height:100%;border-radius:12%/6%;overflow:hidden;background:#fff}
+  .hphone .hpic iframe{width:390px;height:844px;transform:scale(var(--hpk,.3))}
+  .hart.dim .hpic iframe.on{opacity:.5}
+  @media (min-width:860px){.hero{grid-template-columns:minmax(0,1fr) minmax(0,46%);align-items:center;gap:40px}.hphone{right:-10px;bottom:-18px}}
+  /* Needs you as one bold card: the first row is the big one */
+  .qcard .qrow:first-child{padding:16px 0 18px;align-items:center}
+  .qcard .qrow:first-child .qmain h3{font-size:24px;font-weight:500;margin:6px 0 4px}
+  .qcard .qrow:first-child .qico{width:44px;height:44px;border-radius:12px}
+  .qcard .qrow:first-child .qact .approve,.qcard .qrow:first-child .qact a.approve{padding:12px 22px;font-size:15px}
+  #home-needs .qcard{border-color:color-mix(in srgb,var(--p) 35%,var(--line));box-shadow:var(--shadow-lift)}
+  /* the studio's card and the launch card, beside Needs you on a computer */
+  .studcard{display:flex;flex-direction:column;gap:12px}
+  .studcard .srow{display:flex;align-items:center;gap:12px}
+  .studcard .slogo{height:40px;width:auto;max-width:150px;display:block;border-radius:8px}
+  .studcard .smark{width:44px;height:44px;border-radius:12px;background:var(--p);color:var(--on-p);display:grid;place-items:center;font-family:var(--serif);font-size:20px;flex:0 0 auto}
+  .studcard .sname{font-family:var(--serif);font-size:20px;line-height:1.2}
+  .studcard .shours{display:flex;align-items:center;gap:8px;color:var(--soft);font-size:14px;margin:0}
+  .studcard .shours i{width:8px;height:8px;border-radius:50%;background:var(--good);display:inline-block;flex:0 0 auto}
+  .studcard .sbtns{display:flex;flex-direction:column;gap:8px}.studcard .sbtns button{width:100%;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+  .launchcard{background:var(--chrome);color:var(--on-chrome);border-color:transparent}
+  .launchcard .lk{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--chrome-accent);margin:0 0 4px}
+  .launchcard .lv{font-family:var(--serif);font-size:28px;line-height:1.1;margin:0}
+  .launchcard p.ls{color:var(--on-chrome-soft);font-size:14px;margin:6px 0 0}
+  @media (min-width:1000px){body.homeview #main>#home-studio{grid-column:2}}
+  /* the project page as a tracker: dates, what is done, who has the next move */
+  .track{list-style:none;padding:0;margin:0}
+  .track li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:0 14px;align-items:start;padding:14px 0;border-top:1px solid var(--line)}
+  .track li:first-child{border-top:0}
+  .track .tdot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--bg);border:2px solid var(--line);margin-top:2px}
+  .track li.done .tdot{background:var(--good);border-color:var(--good);color:#fff}
+  .track li.now .tdot{border-color:var(--p);background:var(--p-soft)}
+  .track li.now .tdot::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--p)}
+  .track .tt{font-family:var(--serif);font-size:19px;line-height:1.2;color:var(--ink)}
+  .track li.next .tt{color:var(--soft)}
+  .track .tm{color:var(--soft);font-size:14px;margin:2px 0 0}
+  .track .tw{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);white-space:nowrap;padding-top:4px}
+  .track li.now .tw{color:var(--p)}
+  .track li.now.yours .tw{color:var(--warn)}
+  .tracknow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 16px;border-radius:12px;background:var(--p-soft);margin-bottom:12px;font-size:15px}
+  .tracknow b{font-family:var(--serif);font-weight:500;font-size:18px}
+  /* a moment of celebration: a short burst, then still (none when motion is reduced) */
+  .confetti{position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden}
+  .confetti i{position:absolute;top:-12px;width:9px;height:14px;border-radius:2px;opacity:0;animation:cfall 1.4s ease-out forwards}
+  @keyframes cfall{0%{opacity:1;transform:translate3d(0,0,0) rotate(0)}100%{opacity:0;transform:translate3d(var(--cx,0),100vh,0) rotate(var(--cr,720deg))}}
+  @media (prefers-reduced-motion:reduce){.confetti{display:none}}
+  .empty .ei{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:var(--p-soft);color:var(--p);margin:0 auto 10px}
+  .empty .ei .si{width:22px;height:22px}
+  /* item 339: the people on the account */
+  .plist{list-style:none;padding:0;margin:0}.plist li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);min-height:44px}.plist li:first-child{border-top:none}
+  .plist .pwho{flex:1;min-width:0;display:flex;flex-direction:column}.plist .pwho b{font-weight:600;font-size:14px}.plist .pwho .muted{font-size:12.5px}
+  .padd .approve{min-height:44px}
+  .plist button.plain{min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
+  /* item 352: the account menu under the initial (the initial shows at 720px and up) */
+  .acctpanel{position:fixed;right:16px;top:64px;z-index:36;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-lift);padding:6px;min-width:190px}
+  .acctpanel button{display:block;width:100%;text-align:left;min-height:44px;padding:10px 14px;border:0;background:none;font:inherit;font-size:14px;color:var(--ink);border-radius:8px;cursor:pointer}
+  .acctpanel button:hover,.acctpanel button:focus-visible{background:var(--p-soft);color:var(--p)}
   @media (min-width:720px){
     /* the context bar (salesforce-reference §11.5): primary region = the studio
        identity as the "app name", secondary = flat tabs with the active-tab
@@ -497,13 +589,14 @@
   .phero h1{font-family:var(--serif);font-weight:500;font-size:clamp(28px,5vw,38px);margin:12px 0 .15em;letter-spacing:-.02em;line-height:1.08;color:var(--on-chrome)}
   .phero .sub{color:var(--on-chrome-soft);font-size:15px;margin:0}
   .phero .rolebadge{background:rgba(255,255,255,.13);color:var(--on-chrome)}
+  /* items 247 and 335, direction A (Eric's pick, Nov 22): the band stays the studio's colour at
+     EVERY width and runs edge to edge; on a computer it carries the website hero beside the words */
   @media (min-width:720px){
-    .phero{background:transparent;color:var(--ink);margin:0;padding:0;border-radius:0}
+    .phero{margin:0 calc(50% - 50vw) 0;padding:34px calc(50vw - 50% + 24px) 38px;border-radius:0}
     .phero .ph-brand{display:none}
-    .phero h1{color:var(--ink);margin-top:16px}
-    .phero .sub{color:var(--soft)}
-    .phero .rolebadge{background:var(--p-soft);color:var(--p)}
+    .phero h1{margin-top:4px}
   }
+  @media (min-width:1000px){body.homeview .phero{padding-left:calc(50vw - 50% + 24px);padding-right:calc(50vw - 50% + 24px)}}
   /* the ≥720px context bar wears the chrome too (the studio's colours up top) */
   @media (min-width:720px){
     .tabnav{background:var(--chrome);border-bottom:0}
@@ -579,9 +672,11 @@
     body.homeview .wrap{max-width:1100px}
     body.homeview #main{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0 22px;align-items:start;grid-auto-flow:row dense}   /* dense: with no website card the projects move up, never an empty half */
     body.homeview #main>*{grid-column:1/-1;min-width:0}
-    body.homeview #main>#home-website{grid-column:1;grid-row:span 2}
-    body.homeview #main>#home-needs{grid-column:2}
-    body.homeview #main>#home-updates{grid-column:2}
+    /* direction A: Needs you is the big left column; the studio, the launch day and this month's numbers sit beside it */
+    body.homeview #main>#home-needs{grid-column:1}
+    body.homeview #main>#home-studio{grid-column:2}
+    body.homeview #main>#home-website{grid-column:2}
+    body.homeview #main>#home-updates{grid-column:1}
     body.homeview #main>#home-projects{grid-column:1}
   }
   /* ── slice 11, now Ask for a service inside Messages (item 179 part three):
@@ -755,6 +850,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="/fresh-code.js?v=191"></script>
+<script src="/backup-codes.js?v=347"></script>
 <script src="/vendor/supabase-js-2.45.4.js"></script>
 <script>
 // The simplified Client Portal (A7.2). Consumes ONLY /portal/context + /portal/feed
@@ -899,9 +995,9 @@ function bellSinceLabel(unread){unread=Math.max(0,unread|0);return unread+' upda
 // unknown/absent types keep the neutral sparkle. Informational rows stay
 // unactionable — the icon narrates tone, never a to-do.
 // ── one icon set (Oct 2026 experience review): the shell's 2px-stroke SVGs, never an emoji as a control's icon ──
-const SI={chart:'<path d="M3 20h18M7 16v-5M12 16V6M17 16v-8"/>',home:'<path d="M3 11l9-8 9 8v9a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',receipt:'<path d="M5 3h14v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',sparkles:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',thumbsup:'<path d="M7 11v10H3V11z"/><path d="M7 11l4-8a2.5 2.5 0 0 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7"/>',link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',check:'<path d="M5 12l5 5 9-10"/>',clipboard:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V2.5h6V4"/><path d="M9 10h6M9 14h6"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',file:'<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 8"/>',upload:'<path d="M12 16V4"/><path d="M6 10l6-6 6 6"/><path d="M4 20h16"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',paperclip:'<path d="M21 11.5l-9 9a5.5 5.5 0 0 1-7.8-7.8l9-9a3.5 3.5 0 0 1 5 5l-9 9a1.5 1.5 0 0 1-2.1-2.1l8.5-8.5"/>',cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',send:'<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>'};
+const SI={chart:'<path d="M3 20h18M7 16v-5M12 16V6M17 16v-8"/>',home:'<path d="M3 11l9-8 9 8v9a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/>',message:'<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12z"/>',folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',receipt:'<path d="M5 3h14v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',sparkles:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5"/><path d="M12 17h.01"/>',bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',thumbsup:'<path d="M7 11v10H3V11z"/><path d="M7 11l4-8a2.5 2.5 0 0 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7"/>',link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',check:'<path d="M5 12l5 5 9-10"/>',clipboard:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V2.5h6V4"/><path d="M9 10h6M9 14h6"/>',pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',file:'<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 8"/>',upload:'<path d="M12 16V4"/><path d="M6 10l6-6 6 6"/><path d="M4 20h16"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',paperclip:'<path d="M21 11.5l-9 9a5.5 5.5 0 0 1-7.8-7.8l9-9a3.5 3.5 0 0 1 5 5l-9 9a1.5 1.5 0 0 1-2.1-2.1l8.5-8.5"/>',cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',send:'<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',party:'<path d="M5 21l4-13 9 9z"/><path d="M14 5l1-2M18 9l2-1M16 6l3-3"/>',warn:'<path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17h.01"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',bulb:'<path d="M9 18h6M10 21h4M8 13a5 5 0 1 1 8 0c-1 1-1.5 2-1.5 3h-5c0-1-.5-2-1.5-3z"/>',leaf:'<path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19l8-8"/>',trend:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',book:'<path d="M4 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4z"/><path d="M20 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"/>',rocket:'<path d="M12 2c3 3 4 7 3 12l-3 3-3-3C8 9 9 5 12 2z"/><path d="M9 14l-4 2 1-4M15 14l4 2-1-4M12 22v-5"/>',doc:'<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>'};
 const si=(k)=>`<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SI[k]||SI.dot}</svg>`;
-function momentIcon(t){return({good_news:'🎉',celebration:'🎉',needs_attention:'⚠️',reminder:'⏰',opportunity:'💡',seasonal:'🍂',business_health:'📈',learning:'📚'})[String(t||'')]||'✨';}
+function momentIcon(t){return si(({good_news:'party',celebration:'party',needs_attention:'warn',reminder:'clock',opportunity:'bulb',seasonal:'leaf',business_health:'trend',learning:'book'})[String(t||'')]||'sparkles');}   // items 247/335: drawn icons, never emoji
 // Nov 10 walk: the website coach writes its asks for whoever runs the site ("…then
 // publish. It's one button", "Add … in Business details"). The portal has no editor
 // and the studio does that work, so Recent updates keeps only what asks nothing of
@@ -1062,6 +1158,10 @@ const tabOf=(t)=>TAB_ALIAS[t]||t;
 function studioNamed(){const s=PORTAL.ctx&&PORTAL.ctx.studio;return !!(s&&!s.is_default&&s.name&&String(s.name).trim());}
 function studioBrand(){return studioNamed()?String(PORTAL.ctx.studio.name).trim():'Your studio';}
 function studioInitial(){return studioNamed()?studioBrand().charAt(0).toUpperCase():'✦';}
+// item 353: what the studio promised about replying (Settings › Client portal), in words; '' when it never said
+function replyWords(){const r=(PORTAL.ctx&&PORTAL.ctx.portal&&PORTAL.ctx.portal.reply)||{};const w=String(r.within||'').trim(),h=String(r.hours||'').trim();if(!w&&!h)return'';return (w?`${studioBrand()} replies ${w}`:studioBrand())+(h?` · ${h}`:'');}
+// "they usually reply within a day" was a promise no studio set: now the studio's own words, or nothing
+function replyLine(lead){const w=replyWords();return w?`${lead} ${w}.`:`${lead}.`;}
 function studioLogo(){const s=PORTAL.ctx&&PORTAL.ctx.studio;return (s&&typeof s.logo_url==='string'&&/^https:\/\//.test(s.logo_url))?s.logo_url:'';}
 // the sign-in page shows the same name and logo next time (portal.html reads this)
 function rememberStudio(){if(PREVIEW)return;try{const s=PORTAL.ctx&&PORTAL.ctx.studio;if(studioNamed()){const si=PORTAL.ctx.portal&&PORTAL.ctx.portal.signin;localStorage.setItem('dds-studio-brand',JSON.stringify(Object.assign({name:s.name,logo_url:studioLogo()||null,accent:s.accent||''},si?{signin:si}:{})));}}catch(_){}}   // item 230: and how its clients sign in, when the context says
@@ -1071,15 +1171,16 @@ function showNav(){
   const badge=PORTAL.unread?`<span class="badge on" aria-hidden="true">${PORTAL.unread>9?'9+':PORTAL.unread}</span>`:'<span class="badge" aria-hidden="true"></span>';
   nav.innerHTML=`<div class="tabnav-inner">`+
     `<span class="cb-brand">${studioLogo()?`<img class="cb-logo" src="${esc(studioLogo())}" alt="">`:`<span class="cb-mark" aria-hidden="true">${esc(studioInitial())}</span>`}<span class="cb-name">${esc(studioBrand())}</span></span>`+
-    `<div class="cb-tabs">`+TABS.filter(t=>PORTAL.persona!=='client'||tabShown(t[0])).map(t=>`<button class="tab" type="button" data-tab="${t[0]}"><span class="ti" aria-hidden="true">${t[1]}</span><span class="tl">${t[2]}</span></button>`).join('')
+    `<div class="cb-tabs">`+TABS.filter(t=>PORTAL.persona==='client'?tabShown(t[0]):(t[0]==='home'||t[0]==='help')).map(t=>`<button class="tab" type="button" data-tab="${t[0]}"><span class="ti" aria-hidden="true">${t[0]==='help'&&PORTAL.persona!=='client'?si('user'):t[1]}</span><span class="tl">${t[0]==='help'&&PORTAL.persona!=='client'?'Account':t[2]}</span></button>`).join('')   // item 355: a reviewer gets Home and their account, never a door the server keeps shut
       +(PORTAL.persona==='client'?quickLinksShown().map(qlinkTabHtml).join(''):'')   // item 280: the studio's quick links, in the menu
       +(PORTAL.persona==='client'&&(quickLinksShown().length||((PAGES&&PAGES.pages)||[]).length)?`<button class="tab moretab" type="button" id="navmore" aria-expanded="false" aria-controls="navmorep" aria-haspopup="true"><span class="ti" aria-hidden="true">⋯</span><span class="tl">More</span></button>`:'')
       +`</div>`+
     `<span class="cb-right">`+
       `<button id="navbell" class="bell cb-bell" aria-label="What’s new${PORTAL.unread?` — ${PORTAL.unread} new`:''}" aria-expanded="false" aria-haspopup="true">${si('bell')}${badge}</button>`+
-      `<button id="navacct" class="cb-acct" aria-label="Your account — opens Help" title="Your account">${esc(acct)}</button>`+
+      `<button id="navacct" class="cb-acct" aria-label="Your account" title="Your account" aria-expanded="false" aria-haspopup="true" aria-controls="navacctp">${esc(acct)}</button>`+
     `</span>`+
     `<div id="navnp" class="notifpanel navpanel" role="region" aria-label="What’s new" hidden></div>`+
+    `<div id="navacctp" class="acctpanel" role="menu" aria-label="Your account" hidden><button type="button" role="menuitem" id="acctGo">Your account</button><button type="button" role="menuitem" id="acctOut">Sign out</button></div>`+
     `<div id="navmorep" class="morepanel" role="region" aria-label="More from your studio" hidden>${morePanelHtml()}</div>`+
   `</div>`;
   nav.hidden=false;
@@ -1102,7 +1203,14 @@ function showNav(){
     const i=tabs.indexOf(document.activeElement);if(i<0)return;
     e.preventDefault();tabs[(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length].focus();
   });
-  const na=$('navacct');if(na)na.addEventListener('click',()=>showTab('help'));
+  // item 352: the initial opens a small account menu, not Help's bottom
+  {const na=$('navacct'),ap=$('navacctp');
+    const close=()=>{if(ap)ap.hidden=true;if(na)na.setAttribute('aria-expanded','false');};
+    if(na&&ap){na.addEventListener('click',()=>{const open=ap.hidden;ap.hidden=!open;na.setAttribute('aria-expanded',open?'true':'false');});
+      $('acctGo').addEventListener('click',()=>{close();showTab('help');setTimeout(()=>{const s=$('sec-you');if(s)s.scrollIntoView({block:'start'});const h=s&&s.querySelector('h2');if(h){h.setAttribute('tabindex','-1');h.focus();}},0);});
+      $('acctOut').addEventListener('click',()=>{close();if(PREVIEW){PREVIEW_REFUSED=Date.now();toast(PREVIEW_MSG);return;}doSignOut();});
+      document.addEventListener('click',(e)=>{if(!ap.hidden&&!ap.contains(e.target)&&e.target!==na&&!na.contains(e.target))close();});
+      document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&!ap.hidden){close();na.focus();}});}}
   wireBellAt('navbell','navnp');
   setActiveTab(CURRENT_TAB);
 }
@@ -1118,13 +1226,77 @@ function showTab(tab){
   if(tab==='documents')SHELF_CAT=SHELF_FROM_TAB[named]||'all';   // the tab itself opens on All; an old name opens its filter
   VIEW_SEQ++;   // this tab owns #main now — invalidate any in-flight view render
   CURRENT_TAB=tab;setActiveTab(tab);setWide(false);try{window.scrollTo(0,0);}catch(_){}
-  try{document.title=({home:'Home',messages:'Messages',documents:'Documents',help:'Help'}[tab]||'Home')+' — '+studioBrand();}catch(_){}   // the walk found "Your updates" on every tab
-  if(tab==='messages')return renderMessages();
+  try{document.title=({home:'Home',messages:'Messages',documents:'Documents',help:PORTAL.persona==='client'?'Help':'Your account'}[tab]||'Home')+' — '+studioBrand();}catch(_){}   // the walk found "Your updates" on every tab
+  if(tab==='messages'){if(PORTAL.persona!=='client')return renderHelp();return renderMessages();}   // item 355: a reviewer's Messages door opens their account
   if(tab==='documents')return renderDocuments();
   if(tab==='help')return renderHelp();
   return renderHome();
 }
 function goHome(){showTab('home');}
+// ── item 343: the portal refreshes itself ──
+// A client with Messages open sees the reply; the bell's count follows; a paid invoice stops
+// saying Processing. The open view is read again when the tab comes back into view, and the
+// open conversation every minute while it is on screen. Never in a preview, never a write.
+let LIVE_BUSY=false,LIVE_ON=false;
+const LIVE_EVERY_MS=60000;
+function liveStart(){
+  if(LIVE_ON||PREVIEW||PORTAL.persona!=='client')return;LIVE_ON=true;
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)liveRefresh('visible');});
+  setInterval(()=>{if(CURRENT_TAB==='messages'&&MC.sel&&!MC.compose)liveRefresh('tick');},LIVE_EVERY_MS);
+}
+async function liveRefresh(why){
+  if(PREVIEW||!PORTAL.ready||document.hidden||LIVE_BUSY||PORTAL.persona!=='client')return;
+  LIVE_BUSY=true;
+  try{
+    const reads=[liveBell()];
+    if(CURRENT_TAB==='messages'&&MC.sel&&!MC.compose)reads.push(liveConversation());
+    else if(why==='visible'&&CURRENT_TAB==='documents'&&$('shelf'))reads.push(renderDocuments());   // the invoice's state (Processing → Paid) and anything new on the shelf
+    else if(why==='visible'&&CURRENT_TAB==='messages'&&$('mconsole')&&!MC.sel&&!MC.compose)reads.push(renderMessages());   // the list: a new conversation, a newer preview
+    await Promise.allSettled(reads);
+  }catch(_){}finally{LIVE_BUSY=false;}
+}
+async function liveBell(){
+  let r=null;try{r=await api('/client/notifications');}catch(_){r=null;}
+  if(!r||!r.ok)return;   // a failed re-read changes nothing: the last good count stays
+  const nb=r.body||{};const list=(nb.data&&Array.isArray(nb.data)?nb.data:(nb.data&&nb.data.data)||[])||[];
+  const unread=nb.unread_count!=null?nb.unread_count:((nb.data&&nb.data.unread_count)||0);
+  // the panel is open: leave it to its own refetch (wireBellAt) so a list on screen never jumps
+  const panel=$('navnp');if(panel&&!panel.hidden)return;
+  PORTAL.notifs=list;PORTAL.unread=unread;PORTAL.notifsFailed=false;syncBellBadges();
+  if(CURRENT_TAB==='messages'&&$('mrows')){MC.unread=unreadKeysFrom(PORTAL.notifs);renderMRows();}   // the conversation list's dots agree
+}
+// the open conversation, read again: repainted only when something new arrived, so nothing
+// on screen moves under a reader who is scrolled up, and a half-typed reply is kept
+async function liveConversation(){
+  const row=MC.rows.find(r=>r.id===MC.sel);if(!row)return;
+  const seq=MC.seq,sel=MC.sel;
+  if(row.pid){
+    const [b,m]=await Promise.all([api('/client/projects/'+row.pid).catch(()=>null),api('/client/projects/'+row.pid+'/messages').catch(()=>null)]);
+    if(seq!==MC.seq||sel!==MC.sel||!m||!m.ok)return;
+    const bd=(b&&b.ok&&b.body&&b.body.data)||null;const md=m.body&&m.body.data;
+    const c={events:(bd&&Array.isArray(bd.events)?bd.events:((MC.cache[row.pid]||{}).events||[])).slice(),msgs:(Array.isArray(md)?md:[]).slice()};
+    if(liveSame(MC.cache[row.pid],c))return;
+    MC.cache[row.pid]=c;paintProjThread(c);
+    const last=c.msgs[c.msgs.length-1];if(last&&last.created_at){row.when=last.created_at;resortMRows();}
+    return;
+  }
+  if(row.sid){
+    let r=null;try{r=await api('/client/support/'+row.sid);}catch(_){}
+    if(seq!==MC.seq||sel!==MC.sel||!r||!r.ok)return;
+    const d=(r.body&&r.body.data)||{};const rq=d.request||{};const msgs=Array.isArray(d.messages)?d.messages:[];
+    const key=JSON.stringify([rq.status,msgs.map(x=>x&&x.id)]);
+    if(row.liveKey===key)return;
+    row.liveKey=key;row.status=String(rq.status||row.status||'open');
+    const st=$('msupstatus');if(st)st.textContent=supportWord(row.status,row.kind);
+    paintChat(supportChatItems(rq,msgs),replyLine('No replies yet'));
+    if(row.status==='resolved'||row.status==='closed'){const pc=$('mpcomp');if(pc)paintSupportDone(pc);}
+  }
+}
+function liveSame(a,b){
+  if(!a||!b)return false;
+  const ids=(c)=>JSON.stringify([(c.msgs||[]).map(x=>x&&x.id),(c.events||[]).map(x=>x&&x.id)]);
+  return ids(a)===ids(b);
+}
 // a project's "← Back to home": Home redraws #main (synchronously), which drops
 // focus to <body> — hand it to the card the project opened from, or to Home's
 // h1 when that card isn't there (a failed projects read, a project that left)
@@ -1136,7 +1308,8 @@ function backHome(id){
 }
 // small shared building blocks for the tab views
 function portalHeader(title,sub){return `<header><h1>${esc(title)}</h1>${sub?`<p class="sub">${esc(sub)}</p>`:''}</header>`;}
-function emptyCard(msg,icon){return `<div class="empty">${icon?`<span class="ei" aria-hidden="true">${icon}</span>`:''}<p>${esc(msg)}</p></div>`;}
+const EMPTY_ICON={'🚀':'rocket','✨':'sparkles','💬':'message','📁':'folder','❓':'help','🎉':'party'};   // items 247/335: the old emoji names map to drawn icons
+function emptyCard(msg,icon){const k=EMPTY_ICON[icon]||(SI[icon]?icon:'');return `<div class="empty">${k?`<span class="ei" aria-hidden="true">${si(k)}</span>`:''}<p>${esc(msg)}</p></div>`;}
 function spinnerHtml(){return skeleton();}
 // billing (invoices) — a SUCCESSFUL read is cached per full load; a reviewer
 // never fetches (403 server-side — genuinely no invoices of their own). A
@@ -1232,6 +1405,26 @@ function pathChevrons(steps,mini){
   return `<div class="path" role="img" aria-label="${esc(label)}">${spans}</div>`;
 }
 function miniPathHtml(ms){const steps=pathSteps(ms);return steps.length?pathChevrons(steps,true)+`<span class="sr-only">${esc(pathSummary(steps))}</span>`:'';}
+// items 247/335: the tracker. Each milestone with its date (done on, or due), its state, and whose
+// move it is: the current step is the client's when something waits under Needs your OK or Your
+// to-dos, else the studio's. The highlights (progress, waiting, files, target date) sit above it.
+function trackerHtml(ms,p,aps,acts,tiles){
+  const steps=pathSteps(ms);
+  const yours=(aps||[]).length+(acts||[]).filter(t=>t.status!=='done').length;
+  const studio=studioBrand();
+  const cur=steps.find(s=>s.state==='current');
+  let h=`<section id="sec-overview"><h2>Where things stand</h2>`;
+  if(cur)h+=`<div class="tracknow"><span>Now:</span><b>${esc(cur.m.title)}</b><span>· ${yours?`your move (${yours===1?'one thing':yours+' things'} below)`:`${esc(studio)}’s move`}</span>${cur.m.due_date?`<span>· by ${esc(niceDay(cur.m.due_date))}</span>`:''}</div>`;
+  else if(steps.length)h+=`<div class="tracknow"><b>Every step is done.</b>${p&&p.target_date?`<span>· launch ${esc(niceDay(p.target_date))}</span>`:''}</div>`;
+  if(steps.length){
+    h+=`<div class="card"><ol class="track" aria-label="The project’s steps">${steps.map(s=>{const st=s.state==='done'?'done':s.state==='current'?'now':'next';const t=s.state==='done'?Date.parse(s.m.completed_at||''):NaN;
+      const when=s.state==='done'?(isFinite(t)?'Done '+new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'Done'):s.m.due_date?(s.state==='current'?'Due ':'Planned for ')+niceDay(s.m.due_date):s.state==='current'?'In progress':'Up next';
+      const who=s.state==='done'?'':s.state==='current'?(yours?'You':studio):'';
+      return `<li class="${st}${st==='now'&&yours?' yours':''}"><span class="tdot" aria-hidden="true">${st==='done'?si('check'):''}</span><div><div class="tt">${esc(s.m.title)}</div><p class="tm">${esc(when)}</p></div><span class="tw">${esc(who)}</span></li>`;}).join('')}</ol></div>`;
+  }
+  if(tiles&&tiles.length)h+=`<div class="hl-panel" role="group" aria-label="Project highlights" style="margin-top:0">${tiles.map(t=>`<div class="hl"><div class="hl-k">${esc(t[0])}</div><div class="hl-v">${esc(t[1])}</div></div>`).join('')}</div>`;
+  return h+`</section>`;
+}
 function milestonePathHtml(ms){
   const steps=pathSteps(ms);if(!steps.length)return'';
   const cur=steps.find(s=>s.state==='current');
@@ -1240,13 +1433,15 @@ function milestonePathHtml(ms){
     :`✓ All milestones complete`;
   return `<section id="sec-milestones"><h2>Milestones</h2><div class="card pathcard">${pathChevrons(steps,false)}<p class="path-meta">${meta}</p></div></section>`;
 }
-async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api(path,'POST',{decision});if(r.ok){toast(decision==='approve'?'Approved — thank you.':'Noted — your studio has been told. Nothing changed.');return load();}toast('That didn’t go through — please try again.');btn.disabled=false;}
+async function decideFeed(path,decision,btn){btn.disabled=true;const r=await api(path,'POST',{decision});if(r.ok){if(decision==='approve')celebrate('Approved. Thank you.');else toast('Noted — your studio has been told. Nothing changed.');return load();}toast('That didn’t go through — please try again.');btn.disabled=false;}
 
 // ── HOME — aggregates ACROSS all projects (needs-you · projects · updates) ──
+// item 351: a project named after its web address reads as "Your new website" to the client
+function projectTitle(p){const n=String((p&&p.name)||'').trim();return !n||/^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+\/?$/i.test(n)?'Your new website':n;}
 function projectCardsHtml(projects){
   if(!projects.length)return emptyCard('When your studio starts a project, it’ll appear here with your tasks, files, and approvals.','🚀');
   let h='';
-  for(const p of projects){h+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(p.name)}</h3><p>Status: ${esc(projectWord(p.status))}${p.target_date?` · target ${esc(niceDay(p.target_date))}`:''}</p><div id="mp-${esc(p.id)}"></div><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
+  for(const p of projects){h+=`<div class="card" role="button" tabindex="0" data-proj="${esc(p.id)}"><h3>${esc(projectTitle(p))}</h3><p>Status: ${esc(projectWord(p.status))}${p.target_date?` · target ${esc(niceDay(p.target_date))}`:''}</p><div id="mp-${esc(p.id)}"></div><p class="muted" id="glance-${esc(p.id)}" style="margin-top:4px"></p></div>`;}
   return h;
 }
 // Which Home queue rows deserve an unread dot — derived purely from the EXISTING
@@ -1284,9 +1479,10 @@ function renderHome(){
   const logo=studioLogo();
   let html=`<header class="phero" id="home-hero">`+
     `<div class="ph-brand">${logo?`<img class="ph-logo" src="${esc(logo)}" alt="">`:`<span class="ph-mark" aria-hidden="true">${esc(studioInitial())}</span>`}<span class="ph-name">${esc(studioBrand())}</span></div>`+
-    `<div class="rolebadge">● ${P.persona==='client'?'Your workspace':'Client view'}</div>`+   // persona, not projects.length — a failed projects read must not demote a client's badge
+    `<div class="rolebadge">● ${P.persona==='client'?'Your client portal':'Client view'}</div>`+   // persona, not projects.length — a failed projects read must not demote a client's badge
     `<h1>${esc(portalGreeting(new Date().getHours(),clientName()))}</h1>`+
     `<p class="sub">${P.persona==='client'?'Here’s where your website and projects stand.':'Everything your studio shares with you, in one place.'}</p>`+
+    (P.persona==='client'&&cardOn('website')?`<div class="hero" id="hero-site" hidden></div>`:'')+   // items 247/335: the website is the hero, inside the band
   `</header>`;
   html+=connectAskHtml();
   if(PORTAL.welcome&&P.persona==='client')html+=welcomeNoteHtml();   // item 233: the studio's note, signed
@@ -1298,6 +1494,7 @@ function renderHome(){
   // builder item 194: a domain that isn't live yet shows its records, where to add them and Check
   html+=`<section id="home-domain" hidden></section>`;
   html+=`<section id="home-needs"><h2 id="needs-h">Needs you</h2><div id="needs-body"><div class="skel"><div class="l w60"></div><div class="l w40"></div></div></div></section>`;
+  if(P.persona==='client')html+=`<section id="home-studio" aria-label="Your studio">${launchCardHtml()}${studioCardHtml()}</section>`;   // direction A: the studio as a card with real reply hours
   // Oct 2026 audit change 4: what your studio just did sits right under what needs you
   if(cardOn('updates')){   // item 233: the studio can take this card off Home
   html+=`<section id="home-updates"><h2>From your studio</h2>`;
@@ -1327,9 +1524,106 @@ function renderHome(){
   if(location.hash==='#connections'){try{history.replaceState(null,'','/client.html');}catch(_){}const hc=$('home-connect');if(hc)setTimeout(()=>hc.scrollIntoView({block:'start'}),0);}
   // item 228: once what needs them and the website card are in, this Home is the one kept for next time
   const view=VIEW_SEQ;
-  Promise.allSettled([buildNeedsYou(),cardOn('website')?loadWebsiteCard():null]).then(()=>{if(view===VIEW_SEQ)saveHomeCache();});
+  Promise.allSettled([buildNeedsYou(),cardOn('website')?loadWebsiteCard():null,cardOn('website')?loadHeroSite():null]).then(()=>{if(view===VIEW_SEQ)saveHomeCache();});
+  wireStudioCard();
   loadDomainCard();
   loadHomePage();
+}
+// ── items 247 and 335, direction A: the look is the studio's, on every screen ──
+// The server sends the studio's colour (readable on white, lib/brand_kit.ts) and its heading
+// font. The portal's purple, its dark band and its serif follow them, in both themes.
+function mixHex(a,b,t){const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16);const ch=(sh)=>Math.round(((pa>>sh)&255)*t+((pb>>sh)&255)*(1-t));return '#'+((1<<24)+(ch(16)<<16)+(ch(8)<<8)+ch(0)).toString(16).slice(1);}
+function applyStudioLook(){
+  try{
+    const st=PORTAL.ctx&&PORTAL.ctx.studio;if(!st)return;
+    const r=document.documentElement.style;
+    const acc=/^#[0-9a-f]{6}$/i.test(st.accent||'')?st.accent.toLowerCase():'';
+    if(acc&&acc!=='#5b3fa0'){
+      const dark=matchMedia('(prefers-color-scheme:dark)').matches&&document.documentElement.getAttribute('data-theme')!=='light'||document.documentElement.getAttribute('data-theme')==='dark';
+      r.setProperty('--p',dark?mixHex(acc,'#ffffff',0.6):acc);r.setProperty('--p-deep',dark?mixHex(acc,'#ffffff',0.45):mixHex(acc,'#160f22',0.78));
+      r.setProperty('--p-soft',dark?mixHex(acc,'#171320',0.22):mixHex(acc,'#ffffff',0.1));
+      r.setProperty('--chrome',mixHex(acc,'#160f22',0.3));r.setProperty('--chrome-accent',mixHex(acc,'#ffffff',0.45));
+      const m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',mixHex(acc,'#160f22',0.3));
+    }
+    if(st.font==='inter')r.setProperty('--serif',"'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif");
+  }catch(_){}
+}
+// the hero: where the website stands, in one line, with the site itself beside it
+function heroProject(){return (PORTAL.projects||[]).find(p=>p&&p.id&&String(p.status||'')==='active')||(PORTAL.projects||[])[0]||null;}
+function daysUntilYmd(ymd){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd||''));if(!m)return null;const t=new Date(+m[1],+m[2]-1,+m[3]);const now=new Date();now.setHours(0,0,0,0);return Math.round((t-now)/86400000);}
+function heroStepsHtml(ms){
+  const steps=pathSteps(ms);if(!steps.length)return'';
+  return `<ul class="hsteps" aria-label="Your project’s steps">${steps.map(s=>`<li class="${s.state==='done'?'done':s.state==='current'?'now':'next'}"><span class="hdot" aria-hidden="true">${s.state==='done'?si('check'):''}</span>${esc(s.m.title)}<span class="sr-only">, ${esc(pathStepText(s))}</span></li>`).join('')}</ul>`;
+}
+function heroArtHtml(dim){return `<div class="hart${dim?' dim':''}" aria-hidden="true"><div class="hbrowser"><div class="hbar"><i></i><i></i><i></i></div><div class="hpic" id="hpic-b"><span class="hini">${si('sparkles')}</span></div></div><div class="hphone"><div class="hpic" id="hpic-p"></div></div></div>`;}
+async function loadHeroSite(){
+  const host=document.getElementById('hero-site');if(!host||PORTAL.persona!=='client')return;
+  if(PORTAL.wstats===undefined){wsStatsStart();PORTAL.wstats=await PORTAL.wstatsFetch;PORTAL.wstatsFetch=null;if(PORTAL.wstats===false)PORTAL.wstats=undefined;}
+  const d=PORTAL.wstats;const studio=studioBrand();
+  let words='',dim=false,ms=[];
+  if(d&&d.published===true){
+    const site=wsSiteInfo(d);
+    const when=site.published_at?new Date(site.published_at):null;
+    const live=when&&!isNaN(when)?'Live since '+when.toLocaleDateString('en-US',{month:'long',day:'numeric'})+'.':'Your website is live.';
+    const m=d.month,v=m&&m.visitors!=null?Math.max(0,m.visitors|0):null;
+    words=`<p class="hkick">Your website${site.host?' · '+esc(site.host):''}</p><h2 class="hline">${esc(live)}</h2><p class="hsub">${v!=null?`<b>${esc(wsPeople(v))}</b> visited this month. `:''}${d.elsewhere?'It lives on its own host.':`${esc(studio)} keeps it running and watches how it does.`}</p>`+
+      `<div class="hbtns">${site.url?`<a class="approve" href="${esc(site.url)}" target="_blank" rel="noopener">See your site</a>`:''}<button type="button" class="ghost" id="hero-messages">${si('message')}Write to ${esc(studio)}</button></div>`;
+    // the celebration: the first time this device sees the site live within two days of going live
+    try{const key='dds-live-seen:'+(site.host||'site');if(when&&!isNaN(when)&&Date.now()-when.getTime()<2*86400000&&!localStorage.getItem(key)){localStorage.setItem(key,'1');celebrate('Your website is live.');}}catch(_){}
+  }else if(d&&d.published===false){
+    const snaps=await ensureSnaps();const draft=wsDraftOf(snaps);const state=wsBuildState(d,draft);
+    const p=heroProject();const snap=p?snaps.find(x=>x&&x.id===p.id):null;ms=(snap&&snap.milestones)||[];
+    const days=p?daysUntilYmd(p.target_date):null;
+    const line=state==='ready'?'Your draft is ready to look at.':state==='approved'?'You approved your website.':days==null||days<0?'Your website is on its way.':days>1?`Launching in ${days} days.`:days===1?'Launching tomorrow.':'Launching today.';
+    const sub=state==='ready'?`${esc(studio)} sent a draft. Have a look and say yes, or tell them what to change.`:state==='approved'?`${esc(studio)} is getting it ready to go live. You’ll hear here the moment it’s up.`:`${esc(studio)} is building it${days!=null&&days>0?` for ${esc(niceDay(p.target_date))}`:''}. ${(snap&&snapWaiting(snap))?`Next: the ${snapWaiting(snap)===1?'one thing':snapWaiting(snap)+' things'} under Needs you.`:'You’ll get a draft to look at here as soon as it’s ready.'}`;
+    dim=state==='building';
+    const a=(draft&&draft.a)||{};
+    words=`<p class="hkick">Your website${p&&p.target_date&&days!=null&&days>=0?' · launch '+esc(niceDay(p.target_date)):''}</p><h2 class="hline">${esc(line)}</h2><p class="hsub">${sub}</p>${heroStepsHtml(ms)}`+
+      `<div class="hbtns">${draft&&(state==='ready'||state==='approved')?`<button type="button" class="approve" data-ws-apr="${esc(a.id)}" data-ws-proj="${esc(draft.pid)}">${state==='ready'?'See the design':'See the draft again'}</button>`:''}<button type="button" class="ghost" id="hero-messages">${si('message')}Write to ${esc(studio)}</button></div>`;
+  }else{host.hidden=true;return;}
+  host.innerHTML=`<div class="hwords">${words}</div>${heroArtHtml(dim)}`;host.hidden=false;
+  const rv=host.querySelector('[data-ws-apr]');if(rv)rv.addEventListener('click',()=>openApproval(rv.getAttribute('data-ws-proj'),rv.getAttribute('data-ws-apr'),'home'));
+  const hm=$('hero-messages');if(hm)hm.addEventListener('click',openMessagesCompose);
+  loadHeroThumb();
+}
+// the site itself, drawn by the server, in the browser frame and again in the phone frame
+async function loadHeroThumb(){
+  if(PORTAL.wsthumb===undefined){wsThumbStart();PORTAL.wsthumb=await PORTAL.wsthumbFetch;PORTAL.wsthumbFetch=null;}
+  if(!PORTAL.wsthumb)return;
+  for(const [id,w,prop] of [['hpic-b',1280,'--hk'],['hpic-p',390,'--hpk']]){
+    const box=document.getElementById(id);if(!box||box.querySelector('iframe'))continue;
+    const f=document.createElement('iframe');f.setAttribute('sandbox','allow-same-origin');f.setAttribute('tabindex','-1');f.setAttribute('aria-hidden','true');f.setAttribute('referrerpolicy','no-referrer');f.title='Picture of your website';
+    f.addEventListener('load',()=>{f.classList.add('on');const ini=box.querySelector('.hini');if(ini)ini.remove();},{once:true});
+    f.srcdoc=PORTAL.wsthumb;box.appendChild(f);
+    const fit=()=>{if(box.clientWidth)box.style.setProperty(prop,String(box.clientWidth/w));};
+    if('ResizeObserver' in window)new ResizeObserver(fit).observe(box);else window.addEventListener('resize',fit);
+    fit();
+  }
+}
+function studioCardHtml(){
+  const logo=studioLogo();const words=replyWords();
+  return `<div class="card studcard"><div class="srow">${logo?`<img class="slogo" src="${esc(logo)}" alt="">`:`<span class="smark" aria-hidden="true">${esc(studioInitial())}</span>`}<div><div class="sname">${esc(studioBrand())}</div></div></div>`+
+    (words?`<p class="shours"><i aria-hidden="true"></i>${esc(words)}</p>`:'')+
+    `<div class="sbtns">${partOn('messages')?`<button type="button" class="approve" id="stud-write">${si('message')}Message ${esc(studioBrand())}</button>`:''}${partOn('book')?`<button type="button" id="stud-book">${si('calendar')}Book a call</button>`:''}</div></div>`;
+}
+function wireStudioCard(){const w=$('stud-write');if(w)w.addEventListener('click',openMessagesCompose);const b=$('stud-book');if(b)b.addEventListener('click',()=>openBooking());}
+function launchCardHtml(){
+  const p=heroProject();if(!p||!p.target_date)return'';
+  const days=daysUntilYmd(p.target_date);if(days==null||days<0)return'';
+  if(PORTAL.wstats&&PORTAL.wstats.published===true)return'';
+  const d=new Date(p.target_date.slice(0,4),+p.target_date.slice(5,7)-1,+p.target_date.slice(8,10));
+  return `<div class="card launchcard"><p class="lk">Launch day</p><p class="lv">${esc(d.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'}))}</p><p class="ls">${days===0?'Today.':days===1?'Tomorrow.':days+' days to go.'}</p></div>`;
+}
+// a moment of celebration: Approve, Paid, and the day the site goes live
+function celebrate(message){
+  toast(message);
+  try{
+    if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+    const host=document.createElement('div');host.className='confetti';host.setAttribute('aria-hidden','true');
+    const cols=[getComputedStyle(document.documentElement).getPropertyValue('--p').trim()||'#5b3fa0','#c9a56a','#2f6b4f','#e9dcc3'];
+    for(let i=0;i<42;i++){const b=document.createElement('i');b.style.left=Math.random()*100+'%';b.style.background=cols[i%cols.length];b.style.setProperty('--cx',(Math.random()*160-80)+'px');b.style.setProperty('--cr',(Math.random()*900+360)+'deg');b.style.animationDelay=(Math.random()*0.35)+'s';host.appendChild(b);}
+    document.body.appendChild(host);setTimeout(()=>host.remove(),2000);
+  }catch(_){}
 }
 // item 280: the one page the studio pinned to Home — its title and first line, and Open
 function loadHomePage(){
@@ -1538,20 +1832,13 @@ async function loadWebsiteCard(){
     PORTAL.wstatsFetch=null;   // settled — a later call may start a fresh read
     if(PORTAL.wstats===false){PORTAL.wstats=undefined;wsSlotOff();return;}
   }
+  // direction A (items 247/335): the picture and where the site stands live in the band's hero;
+  // this card keeps the numbers (visits, taps, Google) once the site is live
   let h=wsCardHtml(PORTAL.wstats);
-  // not live yet: the card says where the site stands (needs the projects, for the draft)
-  let draft=null;
-  if(!h&&PORTAL.wstats&&PORTAL.wstats.published===false){
-    const snaps=await ensureSnaps();
-    draft=wsDraftOf(snaps);
-    h=wsBuildHtml(wsBuildState(PORTAL.wstats,draft),draft,snaps.reduce((n,x)=>n+snapWaiting(x),0),studioBrand());
-  }
+  if(h)h=h.replace(/<div class="wspic" id="wspic">[\s\S]*?<\/div><\/div>/,'').replace('<span class="tag">Your website</span>','<span class="tag">This month</span>');
   const host=document.getElementById('home-website');if(!host)return;   // the user moved on mid-fetch
-  if(!h){wsSlotOff();return;}   // nothing to show: the slot closes and Home's other column moves up
+  if(!h){wsSlotOff();return;}   // not live yet, or nothing to count: the hero says where it stands
   host.innerHTML=h;host.hidden=false;
-  const rv=host.querySelector('[data-ws-apr]');
-  if(rv)rv.addEventListener('click',()=>openApproval(rv.getAttribute('data-ws-proj'),rv.getAttribute('data-ws-apr'),'home'));
-  loadWebsiteThumb();   // item 179: the card leads with a picture of the site itself
   const btn=document.getElementById('wsmore');
   // the disclosure contract (slice 2): the SAME card grows in place; the button
   // carries aria-expanded/aria-controls and keeps focus across the toggle
@@ -1620,7 +1907,7 @@ function convRows(projects,support,latest,studio){
     if(!p||!p.id)continue;
     const fetched=Object.prototype.hasOwnProperty.call(latest||{},p.id);
     const lm=fetched?(latest||{})[p.id]:null;
-    rows.push({id:'proj:'+p.id,kind:'project',pid:p.id,title:p.name||'Project',when:(lm&&lm.created_at)||'',
+    rows.push({id:'proj:'+p.id,kind:'project',pid:p.id,title:projectTitle(p),when:(lm&&lm.created_at)||'',
       preview:lm?(lm.body||''):(fetched?'No messages yet — say hello any time.':'Open this conversation'),
       unfetched:!fetched,chip:'',chipCls:'',unreadKey:'msgs-'+p.id});
   }
@@ -1686,7 +1973,7 @@ async function renderMessages(focusSup,opts){
   MC.cache={};   // fresh per tab ENTRY — the bundle/message cache lives for one tab visit
   const canMessage=PORTAL.persona==='client';
   if(!canMessage){ // reviewer: /client/* is 403 server-side — the calm empty state, NO list fetches
-    $('main').innerHTML=portalHeader('Messages','Talk to your studio — they usually reply within a day.')+
+    $('main').innerHTML=portalHeader('Messages',replyLine('Talk to your studio'))+
       emptyCard('Your studio will reach you here. Messaging opens up once they’ve set up your account.','💬');
     return;
   }
@@ -1730,7 +2017,7 @@ async function renderMessages(focusSup,opts){
       `<aside class="mlist" aria-label="Conversation list">`+
         // item 179 part three: one door. Write, Book a call and Ask for a service all start here.
         `<div class="mlhead"><div class="mlrow1"><h1>Messages</h1><button type="button" id="mnew" class="mnew approve" aria-label="Write to ${esc(studioBrand())}">Write</button></div>`+
-          `<p class="mlsub">Talk to ${esc(studioBrand())}. They usually reply within a day.</p>`+
+          `<p class="mlsub">${esc(replyLine('Talk to '+studioBrand()))}</p>`+
           ((partOn('book')||partOn('services'))?`<div class="mtiles${partOn('book')&&partOn('services')?'':' solo'}" role="group" aria-label="Book or ask">${partOn('book')?`<button type="button" class="mtile" id="mbook"><span class="mti" aria-hidden="true">${si('calendar')}</span><span class="mtt">Book a call</span><span class="mtd">Pick a time to talk</span></button>`:''}${partOn('services')?`<button type="button" class="mtile" id="msvc"><span class="mti" aria-hidden="true">${si('sparkles')}</span><span class="mtt">Ask for a service</span><span class="mtd">See what they offer</span></button>`:''}</div>`:'')+
           `${supFailed?`<p class="mlmeta fload">We couldn’t check on your requests just now — please try again in a moment.</p>`:''}${MC.projFailed?`<p class="mlmeta fload">We couldn’t check on your project conversations just now — please try again in a moment.</p>`:''}<p class="mlmeta mlcount" id="mlmeta"></p></div>`+
         `<ul id="mrows" role="listbox" aria-label="Conversations" tabindex="0"></ul>`+
@@ -1873,7 +2160,7 @@ function focusMPane(){
 // page and is left alone.
 async function paneProject(host,row){
   const seq=++MC.seq;
-  host.innerHTML=mpaneHead(row.title,`<span>With ${esc(studioBrand())} · they usually reply within a day</span><a class="link" href="#" id="mopenproj">Open the project →</a>`)+
+  host.innerHTML=mpaneHead(row.title,`<span>With ${esc(studioBrand())}${replyWords()?' · '+esc(replyWords()):''}</span><a class="link" href="#" id="mopenproj">Open the project →</a>`)+
     `<div class="mpbody" id="mpbody">${skeleton()}</div><div class="mpcomposer" id="mpcomp"></div>`;
   wireMBack();
   const op=$('mopenproj');if(op)op.addEventListener('click',(e)=>{e.preventDefault();openProject(row.pid);});
@@ -1990,7 +2277,8 @@ async function paneSupport(host,row){
   if(!r||!r.ok){pb.innerHTML=emptyCard('That request isn’t available right now.','💬');pc.innerHTML='';return;}
   const d=(r.body&&r.body.data)||{};const rq=d.request||{};const msgs=d.messages||[];
   const st=$('msupstatus');if(st)st.textContent=supportWord(rq.status||row.status,row.kind);
-  paintChat(supportChatItems(rq,msgs),'No replies yet — your studio usually replies within a day.');
+  paintChat(supportChatItems(rq,msgs),replyLine('No replies yet'));
+  row.liveKey=JSON.stringify([rq.status,msgs.map(x=>x&&x.id)]);   // item 343: what is on screen, for the minute's re-read
   const resolved=rq.status==='resolved'||rq.status==='closed';
   if(resolved){paintSupportDone(pc);return;}
   pc.innerHTML=`<textarea id="smsg" rows="1" aria-label="Write to ${esc(studioBrand())}" placeholder="Write to ${esc(studioBrand())}…"></textarea><button class="msendbtn" id="ssend" aria-label="Send">${si('send')}</button>`;
@@ -2014,7 +2302,7 @@ async function paneSupport(host,row){
       const rq2=fd.request||{};const msgs2=Array.isArray(fd.messages)?fd.messages:[];
       row.status=String(rq2.status||row.status||'open');
       const st2=$('msupstatus');if(st2)st2.textContent=supportWord(row.status,row.kind);
-      paintChat(supportChatItems(rq2,msgs2),'No replies yet — your studio usually replies within a day.');
+      paintChat(supportChatItems(rq2,msgs2),replyLine('No replies yet'));
       if(row.status==='resolved'||row.status==='closed'){const pc2=$('mpcomp');if(pc2)paintSupportDone(pc2);return;}
     }else{
       // the reply DID send — a failed refetch keeps the thread we have (no error card, no lost composer)
@@ -2026,7 +2314,7 @@ async function paneSupport(host,row){
 // a request's state in plain words (the walk read "SUPPORT · CLOSED")
 function supportWord(status,kind){const s=String(status||'open');return s==='resolved'||s==='closed'?'Done':kind==='service'?'Asked':s==='in_progress'?'Being worked on':'Open';}
 // a finished request stays readable; Write starts a new conversation
-function paintSupportDone(pc){pc.innerHTML=`<p class="muted" style="font-size:13px;flex:1 1 auto">This one is done. Write to start a new conversation.</p><button type="button" id="sdonewrite">Write</button>`;const b=$('sdonewrite');if(b)b.addEventListener('click',openComposePane);}
+function paintSupportDone(pc){pc.innerHTML=`<p class="muted" style="font-size:14.5px;flex:1 1 auto">This one is done. Write to start a new conversation.</p><button type="button" id="sdonewrite">Write</button>`;const b=$('sdonewrite');if(b)b.addEventListener('click',openComposePane);}
 // NEW conversation (persona client only): compose in the reading pane — the
 // general composer is CONVERSATIONAL (comms routing F2):
 //   • ≥1 ACTIVE project → the message goes to the NEWEST active project's
@@ -2122,17 +2410,31 @@ function fileRowHtml(f,ap){
 // The client→studio share card (uploads are PER-PROJECT: hidden entirely with
 // zero projects; a reviewer never reaches any of this — renderDocuments' persona
 // gate returns the calm read-only state before any share UI or /client/* read).
-// Type/size honesty up front: the ONE media store accepts JPEG/PNG/WebP images
-// up to 10MB and PDF documents up to 25MB (lib/media.ts MIME_ALLOW / MAX_BYTES /
-// MAX_DOC_BYTES). The input advertises exactly that, the card copy says it, and
-// a pre-flight check catches the rest BEFORE any network call.
-const SHARE_ACCEPT='image/jpeg,image/png,image/webp,application/pdf';
-const SHARE_IMG_CAP=10*1024*1024,SHARE_PDF_CAP=25*1024*1024;
+// Type/size honesty up front. Builder item 337 (Nov 22 review): the studio door takes what a
+// client really has (lib/client_files.ts STUDIO_KINDS): photos including iPhone HEIC, PDFs, Word
+// and text files, SVG, Illustrator and EPS, zips and short videos. Photos and documents up to
+// 25MB, zips and videos up to 100MB. The input advertises exactly that, the words say it, and a
+// pre-flight check catches the rest BEFORE any network call; the server checks the bytes too.
+const SHARE_KINDS={'image/jpeg':['jpg','jpeg'],'image/png':['png'],'image/webp':['webp'],'image/heic':['heic'],'image/heif':['heif'],'application/pdf':['pdf'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':['docx'],'application/msword':['doc'],'text/plain':['txt'],'image/svg+xml':['svg'],
+  'application/postscript':['eps'],'application/illustrator':['ai'],'application/zip':['zip'],'video/mp4':['mp4'],'video/quicktime':['mov']};
+const SHARE_BIG=new Set(['application/zip','video/mp4','video/quicktime']);
+const SHARE_ACCEPT=Object.keys(SHARE_KINDS).concat(Object.values(SHARE_KINDS).flat().map(e=>'.'+e)).join(',');
+const SHARE_CAP=25*1024*1024,SHARE_BIG_CAP=100*1024*1024;
+const SHARE_WORDS='Photos (JPEG, PNG, WebP or iPhone HEIC), PDFs, Word documents, text files, SVG, Illustrator and EPS files, zips, and short videos (MP4 or MOV). Photos and documents up to 25MB; videos and zips up to 100MB.';
+// the kind a file is sent as: its own type when it is one we take, else the one its extension
+// names (a Mac or iPhone hands over .ai and .heic files with no type at all)
+function shareMime(file){
+  const t=String((file&&file.type)||'').toLowerCase();if(SHARE_KINDS[t])return t;
+  const m=/\.([a-z0-9]+)$/i.exec(String((file&&file.name)||''));const e=m?m[1].toLowerCase():'';
+  for(const k in SHARE_KINDS)if(SHARE_KINDS[k].indexOf(e)>=0)return k;
+  return'';
+}
 function sharePreflight(file){
-  const t=String((file&&file.type)||'');
-  if(SHARE_ACCEPT.split(',').indexOf(t)<0)return'That kind of file can’t be sent here — a JPEG, PNG or WebP image, or a PDF, works.';
-  const cap=t==='application/pdf'?SHARE_PDF_CAP:SHARE_IMG_CAP;
-  if(file.size>cap)return t==='application/pdf'?'That PDF is too big — PDFs can be up to 25MB.':'That image is too big — images can be up to 10MB.';
+  const t=shareMime(file);
+  if(!t)return'That kind of file can’t be sent here. '+SHARE_WORDS;
+  const big=SHARE_BIG.has(t);
+  if(file.size>(big?SHARE_BIG_CAP:SHARE_CAP))return big?'That file is too big. Videos and zips can be up to 100MB.':'That file is too big. Photos and documents can be up to 25MB.';
   return'';
 }
 // Known server 422s whose wording reads wrong IN THE PORTAL get a portal voice
@@ -2147,7 +2449,7 @@ function shareServerMsg(m,file){
 }
 function shareCardHtml(){
   return `<div class="fshare"><span class="fshare-i" aria-hidden="true">${si('upload')}</span>`+
-    `<div class="fshare-m"><p class="fshare-t">Share a file with your studio</p><p class="fshare-d">JPEG, PNG or WebP images up to 10MB, or PDFs up to 25MB — it lands in your project’s files right away.</p></div>`+
+    `<div class="fshare-m"><p class="fshare-t">Share a file with your studio</p><p class="fshare-d">${SHARE_WORDS} It lands in your project’s files right away.</p></div>`+
     `<button class="approve fshare-btn" id="fchoose">Choose a file</button>`+
     `<input type="file" id="ffile" class="fshare-file" accept="${SHARE_ACCEPT}" aria-hidden="true" tabindex="-1">`+
     `<form class="fsend" id="fsend" aria-live="polite" hidden></form></div>`;
@@ -2192,7 +2494,7 @@ async function shareCompose(file){
   host.hidden=false;
   host.innerHTML=`<p class="fsel">${esc(file.name)}</p>`+
     // the shelf's send button has no card around it to name the limits, so its form does
-    (host.classList.contains('shelfform')?`<p class="fshare-d">JPEG, PNG or WebP images up to 10MB, or PDFs up to 25MB. It lands in your project’s files right away.</p>`:'')+
+    (host.classList.contains('shelfform')?`<p class="fshare-d">${SHARE_WORDS} It lands in your project’s files right away.</p>`:'')+
     (multi?`<label class="fld" for="fproj">Which project is this for?</label><select id="fproj" class="fin">${list.map(p=>`<option value="${esc(p.id)}"${p.id===SHARE_CTX.pid?' selected':''}>${esc(p.name)}</option>`).join('')}</select>`:'')+
     `<label class="fld" for="ftitle">Title <span class="muted" style="font-weight:400">(optional)</span></label><input id="ftitle" class="fin" type="text" value="${esc(file.name)}">`+
     `<div class="row" style="margin-top:14px"><button type="submit" class="approve" id="fgo">Send to your studio</button><button type="button" id="fno">Cancel</button></div>`;
@@ -2222,10 +2524,10 @@ async function shareSend(file){
   try{
     let mediaId=(SHARE_KEPT.pid===pid&&SHARE_KEPT.mediaId)||'';
     if(!mediaId){   // fresh send — a kept id (a prior step-3 failure on THIS project) skips straight to the record step
-      const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:file.type||'application/octet-stream',bytes:file.size,title});
+      const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:shareMime(file)||file.type||'application/octet-stream',bytes:file.size,title});
       if(!up.ok||!up.body.data)return fail(shareServerMsg(up.body&&up.body.message,file)||'Uploads aren’t available right now.');
       if(!up.body.data.upload_url)return fail((up.body&&up.body.message)||'Uploads aren’t available right now.');   // a 200 with no URL is its own honest failure, never a throw
-      const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file});
+      const put=await fetch(up.body.data.upload_url,{method:'PUT',headers:{'Content-Type':shareMime(file)||file.type||'application/octet-stream','x-upsert':'true'},body:file});
       if(!put.ok)return fail('The upload didn’t finish — please try again.');
       mediaId=up.body.data.media_id;
       SHARE_KEPT={mediaId,pid};   // the bytes are up — a failed record step retries from HERE, orphan-free
@@ -2578,7 +2880,7 @@ async function paidPoll(){
   const b=await ensureBilling();
   if(!PAID_PENDING.length)return;
   const row=((b&&b.invoices)||[]).find(i=>i&&String(i.id)===PAID_PENDING[0]);
-  if(row&&row.status==='paid'){PAID_PENDING=[];PAID_STALE=false;paidForget();toast('Paid — thank you.');paidRepaint();return;}   // the server said so — only now
+  if(row&&row.status==='paid'){PAID_PENDING=[];PAID_STALE=false;paidForget();celebrate('Paid. Thank you.');paidRepaint();return;}   // the server said so — only now
   const waited=Date.now()-PAID_SINCE;
   if(waited>=PAID_PENDING_TTL_MS){PAID_PENDING=[];PAID_STALE=false;paidForget();paidRepaint();return;}   // the memory runs out — the row goes back to the server's own word
   if(waited>=PAID_POLL_LIMIT_MS&&!PAID_STALE){PAID_STALE=true;paidRepaint();}
@@ -2606,12 +2908,12 @@ async function openServices(){
   const services=Array.isArray(d)?d.filter(x=>x&&x.id):null;
   let html=sheetBackHtml(back)+`<header class="sheet"><h1 tabindex="-1">Ask for a service</h1><p class="sub">Nothing is charged until ${esc(studioBrand())} replies with a price.</p></header>`;
   if(!services)html+=`<div class="card" style="margin-top:16px"><p class="muted">We couldn’t load your studio’s services just now — please try again in a moment.</p></div>`;
-  else if(!services.length)html+=`<div style="margin-top:16px">${emptyCard('Your studio hasn’t listed services here yet. You can still ask for anything below.')}</div>`;
+  else if(!services.length)html+=`<div class="card selse one" style="margin-top:16px"><div><strong>Ask for something</strong><span class="muted">Say what you need in your own words, and ${esc(studioBrand())} replies with a price.</span></div><button class="approve" id="svcwrite" aria-label="Ask ${esc(studioBrand())} for something">Write</button></div>`;   // item 354: one box, not the same thing twice
   else html+=`<div class="svcgrid" style="margin-top:16px">`+services.map(svc=>`<div class="card">`+
     `${svc.category?`<span class="kchip svccat">${esc(svc.category)}</span>`:''}`+
     `<h3>${esc(svc.name)}</h3>${svc.description?`<p>${esc(svc.description)}</p>`:''}`+
     `<div class="svcfoot">${svc.price?`<span class="svcprice">${esc(svc.price)}</span>`:'<span></span>'}<button class="approve" data-svc="${esc(svc.id)}" aria-label="Ask for this — ${esc(svc.name)}">Ask for this</button></div></div>`).join('')+`</div>`;
-  html+=`<div class="card selse"><div><strong>Something else?</strong><span class="muted">Say what you need in your own words.</span></div><button class="approve" id="svcwrite" aria-label="Write to ${esc(studioBrand())}">Write</button></div>`;
+  if(!services||services.length)html+=`<div class="card selse"><div><strong>Something else?</strong><span class="muted">Say what you need in your own words.</span></div><button class="approve" id="svcwrite" aria-label="Write to ${esc(studioBrand())}">Write</button></div>`;
   $('main').innerHTML=html;
   wireSheet(back);
   $('svcwrite').addEventListener('click',()=>openSupport(null,'services'));   // its own subject, a NEW request (the Nov 8 walk), never folded into an older one
@@ -2722,6 +3024,7 @@ function bookConfirm(slot){
   $('bk-go').addEventListener('click',submitBooking);
 }
 async function submitBooking(){
+  if(PREVIEW){PREVIEW_REFUSED=Date.now();toast(PREVIEW_MSG);return;}   // item 345: the calendar opens in a preview; a booking never leaves
   const name=($('bk-name').value||'').trim(),email=($('bk-email').value||'').trim();
   if(!name){toast('Please add your name.');return;}
   if(!email){toast('Please add your email.');return;}
@@ -2729,7 +3032,7 @@ async function submitBooking(){
   const view=VIEW_SEQ;   // captured — the success takeover must not paint over a newer view
   let r=null;try{r=await bookApi('/book/'+BOOK.site,'POST',{type_id:BOOK.type.id,slot_start:BOOK.slot,name,email});}catch(_){}
   if(view!==VIEW_SEQ)return;   // the user moved on mid-POST — the confirm UI is gone; never repaint #main
-  if(r&&r.ok&&r.body&&r.body.data&&r.body.data.ok!==false){const day=bookDayLabel(BOOK.slot);$('main').innerHTML=`<header><h1>You’re booked 🎉</h1><p class="sub">${esc(BOOK.type.name)} · ${day?esc(day)+' · ':''}${esc(bookLabel(BOOK.slot))}. Your studio will confirm by email.</p></header><p><a class="link" href="#" id="bk-done">‹ Messages</a></p>`;const d=$('bk-done');if(d)d.addEventListener('click',(e)=>{e.preventDefault();showTab('messages');});bookFocusH1();}
+  if(r&&r.ok&&r.body&&r.body.data&&r.body.data.ok!==false){const day=bookDayLabel(BOOK.slot);$('main').innerHTML=`<header><h1>You’re booked.</h1><p class="sub">${esc(BOOK.type.name)} · ${day?esc(day)+' · ':''}${esc(bookLabel(BOOK.slot))}. Your studio will confirm by email.</p></header><p><a class="link" href="#" id="bk-done">‹ Messages</a></p>`;const d=$('bk-done');if(d)d.addEventListener('click',(e)=>{e.preventDefault();showTab('messages');});bookFocusH1();}
   else{toast((r&&r.body&&r.body.message)||'Couldn’t book that time — try another.');btn.disabled=false;}
 }
 // Client file upload — signed-URL flow (mirrors the studio deliverable upload):
@@ -2769,6 +3072,79 @@ async function openServiceRequest(svc){
 // account card is a proper profile section whose "message your studio" pointers
 // only render for a persona that CAN message.
 function passwordWayOn(){const si=PORTAL.ctx&&PORTAL.ctx.portal&&PORTAL.ctx.portal.signin;return !(si&&si.password===false);}
+// ── item 339: a second person on the client's side ──
+// The account's owner adds a partner or office manager as a Co-owner of their own site
+// (POST /portal/members, the same seat the studio could add from Sites; it asks for a fresh
+// code first). They sign in at the portal door, see everything the owner sees, and every
+// "needs you" email goes to them too (lib/service_bridge.ts accountPeople).
+function peopleSectionHtml(){
+  const role=PORTAL.ctx&&PORTAL.ctx.site_role;
+  if(PORTAL.persona!=='client'||(role&&role!=='business_owner'))return'';
+  return `<section id="sec-people"><h2>People on your account</h2><div class="card"><p class="muted" style="margin-top:0">Add a partner or someone at your business. They sign in like you, see the same things, and get the same emails when something needs you.</p><ul class="plist" id="plist" aria-live="polite"><li class="muted">Checking…</li></ul>`+
+    `<form class="row padd" id="padd" style="margin-top:10px;gap:8px;flex-wrap:wrap"><label for="pemail" class="sr-only">Their email</label><input id="pemail" type="email" autocomplete="off" placeholder="their@email.com" style="flex:1 1 220px;min-height:44px;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);color:var(--ink)"><button class="approve" id="pinvite" type="submit">Add them</button></form><p class="muted" id="pnote" style="font-size:12.5px;margin:8px 0 0"></p></div></section>`;
+}
+async function wirePeopleSection(){
+  const list=$('plist'),form=$('padd');if(!list||!form)return;
+  const paint=(rows)=>{
+    const me=((USER&&USER.email)||'').toLowerCase();
+    const people=(rows||[]).filter(m=>m&&m.status!=='revoked'&&m.role==='business_owner');
+    list.innerHTML=`<li><span class="pwho"><b>${esc(clientName()||'You')}</b><span class="muted">${esc(me)} · the account’s owner</span></span></li>`+
+      people.map(m=>`<li><span class="pwho"><b>${esc(m.email)}</b><span class="muted">${esc(m.status==='invited'?'Invited, hasn’t signed in yet':'Can see and approve everything')}</span></span>${PREVIEW?'':`<button type="button" class="plain" data-premove="${esc(m.id)}" aria-label="Remove ${esc(m.email)}">Remove</button>`}</li>`).join('');
+    list.querySelectorAll('[data-premove]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Remove them from this account? They can be added again any time.'))return;b.disabled=true;const r=await api('/portal/members/'+b.getAttribute('data-premove')+'/revoke','POST',{});if(!r.ok){b.disabled=false;toast((r.body&&r.body.message)||'That didn’t work just now.');return;}toast('Removed.');load();}));
+  };
+  const load=async()=>{let r=null;try{r=await api('/portal/members');}catch(_){}if(!r||!r.ok){list.innerHTML='<li class="muted">We couldn’t check who is on your account just now.</li>';return;}const d=r.body&&r.body.data;paint(Array.isArray(d)?d:(d&&d.members)||[]);};
+  load();
+  form.addEventListener('submit',async(e)=>{
+    e.preventDefault();if(PREVIEW){PREVIEW_REFUSED=Date.now();toast(PREVIEW_MSG);return;}
+    const em=($('pemail').value||'').trim().toLowerCase();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){toast('Type their email first.');return;}
+    const btn=$('pinvite');btn.disabled=true;
+    const send=(extra)=>api('/portal/members','POST',Object.assign({email:em,role:'business_owner'},extra||{})).catch(()=>null);
+    const r=window.ddsFresh?await window.ddsFresh.run(send,{sb}):await send({});
+    btn.disabled=false;
+    if(!r||r.cancelled)return;
+    if(!r.ok){$('pnote').textContent=(r.body&&r.body.message)||'That didn’t work just now.';return;}
+    $('pemail').value='';$('pnote').textContent=`We emailed ${em} a way in.`;toast('Added. They have an email with a way in.');load();
+  });
+}
+// ── item 340: the portal as an app on their phone, and a tap when something needs them ──
+function phoneCardHtml(){
+  if(PORTAL.persona!=='client')return'';
+  const ios=/iPhone|iPad|iPod/.test(navigator.userAgent||'');
+  const how=ios?'In Safari, press Share, then “Add to Home Screen”.':'In your browser’s menu, choose “Install” or “Add to Home screen”.';
+  return `<section id="sec-phone"><h2>On your phone</h2><div class="card"><div class="acctrow"><div class="acctlab"><strong>Add this portal to your phone</strong><span class="muted">It opens as ${esc(studioBrand())}, with its own icon. ${esc(how)}</span></div></div>`+
+    `<div class="acctrow" id="alertsRow"><div class="acctlab"><strong>Alerts on this phone</strong><span class="muted" id="alertsLine">A tap when something needs you, or ${esc(studioBrand())} writes. Off until you say yes.</span></div><button id="alertsBtn" hidden>Turn on</button></div></div></section>`;
+}
+function urlB64ToU8(s){const pad='='.repeat((4-s.length%4)%4);const b=atob((s+pad).replace(/-/g,'+').replace(/_/g,'/'));const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
+async function alertsSub(){try{const reg=await navigator.serviceWorker.ready;return await reg.pushManager.getSubscription();}catch(_){return null;}}
+async function wirePhoneCard(){
+  const btn=$('alertsBtn'),line=$('alertsLine');if(!btn||!line)return;
+  const can=('serviceWorker' in navigator)&&('PushManager' in window)&&('Notification' in window)&&!PREVIEW;
+  if(!can){line.textContent=PREVIEW?'Theirs to turn on: not shown in a preview.':'Alerts need this portal added to your phone first (see above), then come back here.';return;}
+  const paint=async()=>{const sub=await alertsSub();const on=!!sub&&Notification.permission==='granted';btn.textContent=on?'Turn off':'Turn on';btn.hidden=false;line.textContent=on?'On. A tap when something needs you, or when your studio writes.':Notification.permission==='denied'?'Your phone has alerts for this site switched off. Allow them in its settings, then come back here.':`A tap when something needs you, or ${studioBrand()} writes. Off until you say yes.`;if(Notification.permission==='denied')btn.hidden=true;};
+  await paint();
+  btn.onclick=async()=>{btn.disabled=true;try{
+    const sub=await alertsSub();
+    if(sub){await api('/push/unsubscribe','POST',{endpoint:sub.endpoint}).catch(()=>{});try{await sub.unsubscribe();}catch(_){}toast('Alerts are off on this phone.');}
+    else{
+      const perm=await Notification.requestPermission();if(perm!=='granted'){toast('No alerts, then. You can turn them on here any time.');await paint();return;}
+      const kr=await fetch(FN+'/push/key',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(r=>r.json()).catch(()=>null);
+      const key=kr&&kr.data&&kr.data.enabled&&kr.data.key;if(!key){toast('Alerts aren’t switched on for this portal yet.');return;}
+      const reg=await navigator.serviceWorker.ready;const s=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToU8(key)});
+      const r=await api('/push/subscribe','POST',s.toJSON());if(!r||!r.ok){try{await s.unsubscribe();}catch(_){}toast('Couldn’t turn alerts on just now.');return;}
+      toast('Alerts are on. You’ll get a tap when something needs you.');
+    }
+  }finally{btn.disabled=false;await paint();}};
+}
+// item 340: once the studio is known, this page carries its app details (name, colour, the
+// portal as the page it opens) and a worker for alerts; never in a preview
+function portalAppStart(){
+  if(PREVIEW||PORTAL.persona!=='client')return;
+  try{const s=PORTAL.ctx&&PORTAL.ctx.studio;const id=s&&s.site_id;
+    if(id&&/^[0-9a-f-]{36}$/i.test(id)&&!document.querySelector('link[rel="manifest"]')){const l=document.createElement('link');l.rel='manifest';l.href=FN+'/public/studio/'+id+'/manifest';l.crossOrigin='anonymous';document.head.appendChild(l);}
+    const meta=document.querySelector('meta[name="theme-color"]');if(meta&&s&&/^#[0-9a-f]{6}$/i.test(s.accent||''))meta.setAttribute('content',s.accent);
+    if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  }catch(_){}
+}
 function accountSectionHtml(canMessage){
   const name=clientName();
   const email=PREVIEW?String((PORTAL.ctx&&PORTAL.ctx.preview&&PORTAL.ctx.preview.email)||''):(USER&&USER.email)?USER.email:'';
@@ -2780,7 +3156,7 @@ function accountSectionHtml(canMessage){
     // turned passwords off for its clients (Settings › How clients sign in) hides this row too
     (email&&passwordWayOn()?`<div class="acctrow"><div class="acctlab"><strong>Password</strong><span class="muted">We’ll email you a code to set a new one.</span></div><button id="chgpw">Change password</button></div>`:'')+
     // builder item 191: two-step sign-in, the client's own (the set-up sheet is fresh-code.js, Figma B)
-    `<div class="acctrow" id="acctTwo"><div class="acctlab"><strong>Two-step sign-in</strong><span class="muted" id="acctTwoLine">Checking…</span></div><button id="twoStep" hidden>Turn on</button></div>`+
+    `<div class="acctrow" id="acctTwo"><div class="acctlab"><strong>Two-step sign-in</strong><span class="muted" id="acctTwoLine">Checking…</span></div><span class="row" style="gap:8px"><button id="bkCodes" hidden>Backup codes</button><button id="twoStep" hidden>Turn on</button></span></div>`+
     `<div class="acctrow"><div class="acctlab"><strong>Session</strong><span class="muted">Signed in on this device.</span></div><button id="signout2">Sign out</button></div>`+
     businessesHtml()+
     (canMessage?`<p class="muted" style="font-size:12.5px;margin-top:10px">Need to change your name or email? Message your studio and they’ll update it.</p>`:'')+
@@ -2823,9 +3199,15 @@ async function paintTwoStep(){
   const since=st.since?new Date(st.since):null,day=since&&!isNaN(since)?since.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
   line.textContent=st.on?`On${day?' since '+day:''}. Signing in on a new device asks for a code from your app.`:'Off. Turned on, signing in also asks for a 6-digit code from an app on your phone.';
   b.textContent=st.on?'Turn off':'Turn on';b.hidden=false;
+  // item 347: ten one-use backup codes, made on this page and shown once; the line says how many are left
+  const bk=$('bkCodes');if(bk&&window.ddsBackup){bk.hidden=!st.on;
+    if(st.on)window.ddsBackup.remaining(api).then(d=>{if(d&&typeof d.remaining==='number'){line.textContent+=d.total?` ${d.remaining} of ${d.total} backup codes left.`:' No backup codes yet: make some in case you lose your phone.';}});
+    bk.onclick=async()=>{bk.disabled=true;try{const {r,codes}=await window.ddsBackup.save(api);
+      if(!r||!r.ok){toast((r&&r.body&&r.body.message)||'Couldn’t make backup codes just now.',true);return;}
+      await window.ddsBackup.show(codes,{studio:studioBrand()});paintTwoStep().catch(()=>{});}finally{bk.disabled=false;}};}
   b.onclick=async()=>{
     const who=studioBrand();
-    const r=st.on?await window.ddsFresh.turnOff(sb,st.factor,{lost:`Lost your phone? Ask ${who==='Your studio'?'your studio':who}. They check it’s you, then have it turned off.`})
+    const r=st.on?await window.ddsFresh.turnOff(sb,st.factor,{lost:`Lost your phone? Use one of your backup codes on the sign-in page, or ask ${who==='Your studio'?'your studio':who} to turn it off for you.`})
       :await window.ddsFresh.turnOn(sb,{issuer:who==='Your studio'?'Studio OS':who});
     if(r.on||r.off){toast(r.on?'Two-step sign-in is on. Next time you sign in, have your phone ready.':'Two-step sign-in is off.');paintTwoStep().catch(()=>{});}
   };
@@ -2833,7 +3215,7 @@ async function paintTwoStep(){
 // The starter answers: how this portal works, true for every studio. Same markup as
 // the studio's own articles (lib/faq.ts renderFaq), so the search covers them too.
 const STARTER_FAQ=[
-  ['How do I send my studio a file?','Open Documents and press Send a file. Photos (JPEG, PNG or WebP) up to 10MB and PDFs up to 25MB go straight to your studio.'],
+  ['How do I send my studio a file?','Open Documents and press Send a file. Photos (including iPhone HEIC), PDFs, Word and text files, your logo as SVG, AI or EPS, zips and short videos go straight to your studio. Photos and documents up to 25MB, videos and zips up to 100MB.'],
   ['How do I approve something?','Anything waiting for your OK is at the top of Home, under Needs you, and in your project. Press Approve, or Request changes to say what you’d like different. Nothing changes until you approve.'],
   ['How do I pay an invoice?','Open Documents: what you owe is at the top, with Pay. You pay on Stripe’s secure page and come straight back here, where the invoice shows Processing and then Paid.'],
   ['How do I ask for something new?','Open Messages to book a call, ask for one of your studio’s services, or press Write and say what you need. Nothing is charged until your studio replies.'],
@@ -2933,7 +3315,8 @@ function loadWhatsNew(){
   if(!WN_LOAD)WN_LOAD=new Promise((res,rej)=>{const s=document.createElement('script');s.src='/whats-new.js?v=1';s.onload=()=>res(window.DDSWhatsNew);s.onerror=()=>{WN_LOAD=null;rej(new Error('whats-new'));};document.head.appendChild(s);});
   return WN_LOAD;
 }
-function whatsNewDoorHtml(){return `<button type="button" class="wn-door" id="helpWhatsNew"><span class="wn-ic" aria-hidden="true">✦</span><span><b>New in your portal</b><span class="muted">What changed lately, a picture and a sentence each</span></span></button>`;}
+function whatsNewDoorHtml(){return '';}   // item 352: product news is the studio's to read, not a client's
+function whatsNewDoorHtmlOld(){return `<button type="button" class="wn-door" id="helpWhatsNew"><span class="wn-ic" aria-hidden="true">✦</span><span><b>New in your portal</b><span class="muted">What changed lately, a picture and a sentence each</span></span></button>`;}
 function wireWhatsNewDoor(){
   const b=$('helpWhatsNew');if(!b)return;
   const mark=(on)=>{const m=b.querySelector('.wn-new');if(on&&!m)b.insertAdjacentHTML('beforeend','<span class="wn-new">New</span>');if(!on&&m)m.remove();};
@@ -2944,9 +3327,7 @@ async function renderHelp(){
   const view=++VIEW_SEQ;   // this render owns #main until something newer bumps the token (renderMessages' contract)
   const canMessage=PORTAL.persona==='client';
   if(!canMessage){ // reviewer: /client/faq is 403 server-side — the calm read-only state, ZERO fetches, never an error line (renderMessages' contract)
-    $('main').innerHTML=portalHeader('Help','Quick answers from your studio.')+
-      emptyCard('Help articles will appear here once your studio has set up your account.','❓')+
-      accountSectionHtml(false);
+    $('main').innerHTML=portalHeader('Your account','Your sign-in, and how this portal looks.')+accountSectionHtml(false);   // item 355: honest, no promise of articles
     wireAccountSection();
     return;
   }
@@ -2959,7 +3340,7 @@ async function renderHelp(){
   if(pg&&pg.ok&&pg.body&&pg.body.data)PAGES=pg.body.data;   // item 280: a failed re-read keeps the load's copy
   const faqFailed=!(r&&r.ok);
   const faqHtml=(!faqFailed&&r.body&&r.body.data&&r.body.data.html)||'';
-  let html=portalHeader('Help',answers?'Quick answers from your studio.':'Your account, and what’s new in your portal.')+whatsNewDoorHtml()+portalPagesHtml()+(answers?kitHtml(kr):'');
+  let html=portalHeader('Help',answers?'Quick answers from your studio.':'Your account.')+whatsNewDoorHtml()+portalPagesHtml()+(answers?kitHtml(kr):'');
   // failed ≠ empty: a failed read says so calmly (nothing was cached, so coming
   // back to the tab retries) — only a genuine ok-empty earns the no-articles copy
   if(answers&&faqFailed)html+=`<div class="card"><p class="muted">We couldn’t load help articles just now — please try again in a moment.</p></div>`;
@@ -2968,13 +3349,16 @@ async function renderHelp(){
     html+=`<div class="card" style="padding:12px 14px"><input id="faqSearch" type="search" placeholder="Search help…" aria-label="Search help" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)"></div>`;
     // Nov 10 walk: no articles used to mean an empty box with a red question mark.
     // Until the studio writes its own, the basics of this portal answer instead.
-    html+=`<div id="faqBody">${faqHtml||`<p class="faq-intro" id="faqStarter">Your studio hasn’t added its own help articles yet, so here are the basics.</p>${starterFaqHtml()}`}</div>`;
+    html+=`<div id="faqBody">${faqHtml||starterFaqHtml()}</div>`;
     html+=`<p id="faqNone" class="muted" hidden style="padding:4px 2px">No answers match that. Try fewer words, or message your studio below.</p>`;
   }
   if(partOn('messages'))html+=`<div class="card"><h3>Still need help?</h3><p class="muted">Can’t find what you’re looking for? Send your studio a message and they’ll get back to you.</p><div class="row"><button class="approve" id="helpMsg">Write to your studio</button></div></div>`;
+  html+=peopleSectionHtml();   // item 339: the people on this account
+  html+=phoneCardHtml();   // item 340: the portal on your phone, and alerts
   html+=packCardHtml();   // sales item 93: everything, to keep
   html+=accountSectionHtml(true);
   $('main').innerHTML=html;
+  wirePeopleSection();wirePhoneCard();
   wirePackCard();
   wireKitFiles();   // item 200
   const hm=$('helpMsg');if(hm)hm.addEventListener('click',openMessagesCompose);   // item 179 part three: one door
@@ -3054,11 +3438,11 @@ function welcomeCardHtml(){
   WELCOME_THIS_VISIT=true;
   try{localStorage.setItem(WELCOME_KEY,'1');}catch(_){}
   const n=clientName();
-  const step=(tab,icon,label,desc)=>`<button class="wl-step" data-wtab="${tab}" style="display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;border:none;background:none;padding:9px 0;cursor:pointer;border-top:1px solid var(--line)"><span aria-hidden="true" style="font-size:18px;line-height:1.3">${icon}</span><span><span style="font-weight:600;display:block">${label}</span><span class="muted" style="font-size:13px">${desc}</span></span></button>`;
+  const step=(tab,icon,label,desc)=>`<button class="wl-step" data-wtab="${tab}" style="display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;border:none;background:none;padding:9px 0;cursor:pointer;border-top:1px solid var(--line)"><span aria-hidden="true" style="font-size:18px;line-height:1.3">${icon}</span><span><span style="font-weight:600;display:block">${label}</span><span class="muted" style="font-size:14.5px">${desc}</span></span></button>`;
   // First-run orientation — names every destination, not just approve/download/message.
   return `<div class="card welcome" id="welcome" role="note"><button class="x" id="welcomeX" aria-label="Dismiss welcome">×</button>`+
     `<h3>Welcome${n?`, ${esc(n)}`:''}</h3>`+
-    `<p>This is your workspace with your studio — here's where everything lives:</p>`+
+    `<p>This is your client portal with your studio. Here's where everything lives:</p>`+
     (tabShown('messages')?step('messages',si('message'),'Messages','Talk to your studio, book a call or ask for a service.'):'')+
     (tabShown('documents')?step('documents',si('folder'),'Documents','Monthly reports, invoices, proposals and files, in one place. Pay what you owe there.'):'')+
     `</div>`;
@@ -3390,9 +3774,10 @@ function paintApprovalDone(back,decision,draft){
     `<h1 tabindex="-1">${ok?'Approved — thank you.':'Sent — your studio will take a look.'}</h1>`+
     `<p class="muted">${ok?(draft?`${esc(studioBrand())} has been told. They’ll put it live and let you know here.`:`${esc(studioBrand())} has been told and will take it from here.`):'Nothing changes until you approve the next version.'}</p>`+
     `<div class="row"><button class="approve" id="thxback">Back to ${esc(back.label==='Home'?'Home':'the project')}</button></div></div>`+
-    (ok?`<p class="muted" style="text-align:center;font-size:13px;margin-top:12px">Changed your mind? Message your studio and they’ll hold off.</p>`:'');
+    (ok?`<p class="muted" style="text-align:center;font-size:14.5px;margin-top:12px">Changed your mind? Message your studio and they’ll hold off.</p>`:'');
   wireSheet(back);
   $('thxback').addEventListener('click',back.go);
+  if(ok)celebrate('Approved. Thank you.');   // items 247/335: a moment of celebration
 }
 
 // ── a to-do, opened ──
@@ -3417,7 +3802,7 @@ async function openTodo(pid,tid,from){
   if(k==='content'||k==='questionnaire'){
     const mine=(data.deliverables||[]).filter(isClientUpload);
     const sent=`<section style="margin-top:22px"><h2>Sent so far · ${mine.length}</h2>${mine.length?`<div class="flv">${mine.map(fx=>fileRowHtml(fx)).join('')}</div>`:emptyCard('Nothing yet. What you send shows up here.')}</section>`;
-    const drop=`<div class="dropbox" id="dropbox"><span class="di" aria-hidden="true">${si('upload')}</span><p class="dt">${k==='content'?'Choose photos or a PDF':'Choose your filled-in questionnaire'}</p><p class="dd">JPEG, PNG or WebP images up to 10MB, or PDFs up to 25MB. Pick several at once.</p><p class="dprog" id="dprog" aria-live="polite"></p><button class="approve" id="dchoose">Choose files</button><input type="file" id="dfiles" class="fshare-file" accept="${SHARE_ACCEPT}" multiple aria-hidden="true" tabindex="-1"></div>`;
+    const drop=`<div class="dropbox" id="dropbox"><span class="di" aria-hidden="true">${si('upload')}</span><p class="dt">${k==='content'?'Choose photos, your logo or any file':'Choose your filled-in questionnaire'}</p><p class="dd">${SHARE_WORDS} Pick several at once.</p><p class="dprog" id="dprog" aria-live="polite"></p><button class="approve" id="dchoose">Choose files</button><input type="file" id="dfiles" class="fshare-file" accept="${SHARE_ACCEPT}" multiple aria-hidden="true" tabindex="-1"></div>`;
     const helps=k==='content'?`<section style="margin-top:22px"><h2>What helps most</h2><div class="card helps">${HELPS.map(h=>`<div class="hrow"><span class="hck" aria-hidden="true">✓</span><span><strong>${esc(h[0])}</strong><span class="hsub">${esc(h[1])}</span></span></div>`).join('')}</div></section>`:'';
     const tell=done?`<p class="histline"><span aria-hidden="true">✓</span>Done — your studio has ticked this off.</p>`:`<button class="donebtn" id="tdone">I’ve sent everything — tell my studio</button><p class="muted" style="font-size:12.5px;margin-top:8px">This writes to ${esc(studioBrand())} in your project’s conversation, so they can check and tick it off.</p>`;
     $('main').innerHTML=sheetBackHtml(back)+`<div class="sheetcols headtop"><div class="s-ask">${sheetHead(chips,t.title||'Send your files',subs[k])}</div><div class="s-thing">${drop}${sent}</div><div class="s-answer">${helps}${tell}</div></div>`;
@@ -3482,10 +3867,10 @@ async function sendFilesTo(pid,files,onStep){
     const file=files[i];if(onStep)onStep(i+1,files.length,file);
     const bad=sharePreflight(file);if(bad){failed.push({name:file.name,msg:bad});continue;}
     try{
-      const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:file.type||'application/octet-stream',bytes:file.size,title:file.name});
+      const up=await api('/client/projects/'+pid+'/upload-url','POST',{mime:shareMime(file)||file.type||'application/octet-stream',bytes:file.size,title:file.name});
       const d=up.ok&&up.body&&up.body.data;
       if(!d||!d.upload_url){failed.push({name:file.name,msg:shareServerMsg(up.body&&up.body.message,file)||'Uploads aren’t available right now.'});continue;}
-      const put=await fetch(d.upload_url,{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file});
+      const put=await fetch(d.upload_url,{method:'PUT',headers:{'Content-Type':shareMime(file)||file.type||'application/octet-stream','x-upsert':'true'},body:file});
       if(!put.ok){failed.push({name:file.name,msg:'The upload didn’t finish.'});continue;}
       let rec=await api('/client/projects/'+pid+'/uploads','POST',{media_id:d.media_id,title:file.name});
       if(!rec.ok&&rec.status!==422)rec=await api('/client/projects/'+pid+'/uploads','POST',{media_id:d.media_id,title:file.name});
@@ -3552,9 +3937,8 @@ async function openProject(id,focusSection){
   if(msTotals.total>0)tiles.push(['Milestones',`${msTotals.complete} of ${msTotals.total}`]);
   if(files>0)tiles.push(['Files shared',String(files)]);
   if(p.target_date)tiles.push(['Target date',niceDay(p.target_date)]);
-  html+=`<div class="hl-panel" id="sec-overview" role="group" aria-label="Project highlights">${tiles.map(t=>`<div class="hl"><div class="hl-k">${esc(t[0])}</div><div class="hl-v">${esc(t[1])}</div></div>`).join('')}</div>`;
-  // milestone Path — read-only chevrons (replaces the old vertical list)
-  html+=milestonePathHtml(data.milestones);
+  // items 247/335: the page is a tracker: each step with its date, what is done, and who has the next move
+  html+=trackerHtml(data.milestones,p,aps,acts,tiles);
   // two-region body: the client's actions first (left), the timeline as the rail
   html+=`<div class="pbody"><div class="pleft">`;
   // approvals that need the client — per-kind tag, per-card id (notification
@@ -3579,13 +3963,13 @@ async function openProject(id,focusSection){
   if(dels.length)html+=`<div class="flv">${dels.map(f=>fileRowHtml(f,approvalForFile(data.approvals,f.id))).join('')}</div>`;
   html+=shareCardHtml()+`</section>`;
   }
-  // surveys
-  if((data.surveys||[]).length){html+=`<section id="sec-surveys"><h2>A quick survey</h2>`;for(const sv of data.surveys){html+=`<div class="card"><h3>${esc(sv.title)}</h3><div class="row"><a class="link" href="#" data-survey="${esc(sv.id)}">Open survey →</a></div></div>`;}html+=`</section>`;}
+  // items 247/335: the questionnaire sits with the to-dos as one row, not a card of its own
+  if((data.surveys||[]).length){html+=`<section id="sec-questions"><h2>Questions from ${esc(studioBrand())}</h2>`;for(const sv of data.surveys){html+=`<div class="card"><h3>${esc(sv.title)}</h3><div class="row"><a class="link" href="#" data-survey="${esc(sv.id)}">Open survey →</a></div></div>`;}html+=`</section>`;}
   // item 179 part three: no Support box here any more — this project's conversation is
   // the rail beside, and every question, request and service ask lives in Messages
   html+=`</div>`;   // /pleft
   // the activity rail — the project's client-visible timeline, composer below it
-  html+=partOn('messages')?`<aside class="prail"><section id="sec-messages"><h2>Messages &amp; activity</h2><p class="muted" style="margin:-6px 0 12px;font-size:13px">Your studio usually replies within a day. <a class="link" href="#" id="toMessages">All your conversations →</a></p><div class="card acard"><div id="ptl" class="tlhost"></div><div class="pcompose"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></div></section></aside></div>`
+  html+=partOn('messages')?`<aside class="prail"><section id="sec-messages"><h2>Activity</h2><p class="muted" style="margin:-6px 0 12px;font-size:14px">${replyWords()?esc(replyWords())+'. ':''}<a class="link" href="#" id="toMessages">All your conversations →</a></p><div class="card acard"><div id="ptl" class="tlhost"></div><div class="pcompose"><textarea id="msg" rows="2" aria-label="Message your studio" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--card);color:var(--ink)" placeholder="Message your studio…"></textarea><div class="row"><button class="approve" id="send">Send</button></div></div></div></section></aside></div>`
     :`<aside class="prail"><section id="sec-messages"><h2>Activity</h2><div class="card acard"><div id="ptl" class="tlhost"></div></div></section></aside></div>`;   // item 229: Messages off
   $('main').innerHTML=html;
   // Oct 2026 audit change 4: one filled button on the record — the first Approve,
@@ -3614,7 +3998,7 @@ async function openProject(id,focusSection){
   // a retry loop on the same stale hash. Clearing PORTAL.snaps keeps Home's
   // "Needs you" honest (it renders from that cache).
   const adec=async(aid,ah,decision,note,btn)=>{if(btn)btn.disabled=true;const r=await api('/client/approvals/'+aid+'/decide','POST',{decision,presented_hash:ah,note:note||''});
-    if(r.ok){PORTAL.snaps=null;toast(decision==='approved'?'Approved — thank you.':'Sent — your studio will take a look.');openProject(id,'sec-approvals');return;}   // re-focus the acted-on section
+    if(r.ok){PORTAL.snaps=null;if(decision==='approved')celebrate('Approved. Thank you.');else toast('Sent — your studio will take a look.');openProject(id,'sec-approvals');return;}   // re-focus the acted-on section
     toast((r.body&&r.body.message)||'That didn’t go through — please try again.');
     if(r.status===409){PORTAL.snaps=null;openProject(id,'sec-approvals');return;}
     if(btn)btn.disabled=false;};
@@ -3781,7 +4165,7 @@ async function openSupportThread(rid,pid){
 function paintSThread(rq,msgs){
   const host=$('sthread');if(!host)return;
   const items=supportThreadItems(rq,msgs);
-  host.innerHTML=items.length?`<div class="tlhost">${tlItemsHtml(items)}</div>`:emptyCard('No replies yet — your studio usually replies within a day.','💬');
+  host.innerHTML=items.length?`<div class="tlhost">${tlItemsHtml(items)}</div>`:emptyCard(replyLine('No replies yet'),'💬');
 }
 async function openSurvey(sid,pid,ctrl,from){
   const view=++VIEW_SEQ;   // this drill-in paints #main on success — a late tab render must not clobber it
@@ -3993,6 +4377,7 @@ async function load(){
   // with or without a project yet) OR an invited reviewer (feed only). Both get the
   // persistent tab nav + the cross-project Home; tabs degrade to calm empty states.
   PORTAL.ctx=c;
+  applyStudioLook();   // items 247/335: the studio's colour and heading font, before anything paints
   if(PREVIEW)showPreviewBar(c.preview||{});   // item 232
   {const pc=c.portal||{};PORTAL.off=new Set(Array.isArray(pc.off)?pc.off:[]);PORTAL.welcome=typeof pc.welcome==='string'?pc.welcome:'';PORTAL.homeOff=new Set(Array.isArray(pc.home_off)?pc.home_off:[]);PORTAL.papers=null;}
   rememberStudio();
@@ -4028,6 +4413,8 @@ async function load(){
   if(PORTAL.persona==='client')await decidePapers(toHome,paidId?'documents':tabOf(wantTab));   // item 238
   if(PORTAL.persona==='client')await pagesStart();   // item 280: the menu carries the studio's quick links (read beside the papers decision, not after it)
   PORTAL.ready=true;
+  liveStart();   // item 343: the open view reads again when the tab comes back, and a conversation every minute
+  portalAppStart();   // item 340: the portal as the studio's own app on a phone
   // item 228: with the last Home on screen, swap only once Home's own reads have answered,
   // so the fresh Home replaces it whole instead of passing through grey placeholders
   // (at most 4 s: a slow read gets the fresh Home's own placeholders, not a frozen old one)
@@ -4066,7 +4453,10 @@ if(PREVIEW)document.addEventListener('click',(e)=>{
   const a=e.target&&e.target.closest?e.target.closest('a[href]'):null;if(!a||a.classList.contains('pvback'))return;
   const href=a.getAttribute('href')||'';
   const pays=((PORTAL.billing&&PORTAL.billing.invoices)||[]).map(i=>i&&i.pay_url).filter(Boolean);
-  if(a.hasAttribute('data-pay')||pays.includes(href)||/\/doc\.html\?t=/.test(href)){e.preventDefault();e.stopPropagation();PREVIEW_REFUSED=Date.now();toast(PREVIEW_MSG);}
+  // item 345: View and Receipt open the paper as the client sees it, read-only (doc.html?view=1
+  // takes its accept, sign and pay buttons away); Pay still says it is a preview
+  if(/\/doc\.html\?t=/.test(href)&&!a.hasAttribute('data-pay')){if(!/[?&]view=1/.test(href)){a.setAttribute('href',href+'&view=1');}return;}
+  if(a.hasAttribute('data-pay')||pays.includes(href)){e.preventDefault();e.stopPropagation();PREVIEW_REFUSED=Date.now();toast(PREVIEW_MSG);}
 },true);
 // Builder list item 238: Documents shows once the client has something there (an invoice, a
 // proposal, an estimate or an agreement, a file or a monthly report) and stays from then on:

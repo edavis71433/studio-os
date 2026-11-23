@@ -44,7 +44,7 @@ ok('hostile words are escaped in every state', (()=>{const x='"><img src=x onerr
 ok('hidden draws nothing', wsBuildHtml('hidden',null,0,'S')==='');
 
 // ═══ the page: wiring ═══
-ok('page: an unpublished site gets the card, built from the projects', /if\(!h&&PORTAL\.wstats&&PORTAL\.wstats\.published===false\)\{\s*const snaps=await ensureSnaps\(\);/.test(page));
+ok('page: an unpublished site gets the card, built from the projects', /else if\(d&&d\.published===false\)\{\s*const snaps=await ensureSnaps\(\);const draft=wsDraftOf\(snaps\);const state=wsBuildState\(d,draft\);/.test(page));   /* item 247: the hero band, built from the same projects */
 ok('page: a client’s slot holds its place while loading; nothing to show closes it', page.includes('P.persona===\'client\'?`<section id="home-website"><div class="card wscard" aria-hidden="true">') && page.includes('if(!h){wsSlotOff();return;}'));
 ok('page: Home packs densely, so an empty slot never leaves an empty half', /body\.homeview #main\{[^}]*grid-auto-flow:row dense/.test(page));
 ok('page: the tour comes after the website and what needs them', page.indexOf('html+=welcomeCardHtml();')>page.indexOf('<section id="home-projects">'));
@@ -59,7 +59,7 @@ ok('page: a phone keeps a Needs you row on one line', page.includes('@media (max
 // ═══ speed: the server beside the database, and the last Home at once (items 226 to 228) ═══
 ok('page: every server read asks to run beside the database (x-region, Oregon)', page.includes("const FN_REGION='us-west-2';") && /const H=\(\)=>Object\.assign\(\{[^}]*'x-region':FN_REGION\}/.test(page));
 ok('page: the last Home is kept per person, for a week, without the site picture or the tour', page.includes("const HOME_CACHE_PREFIX='dds-portal-home:';") && page.includes('const HOME_CACHE_DAYS=7;') && page.includes("return(USER&&USER.id)?HOME_CACHE_PREFIX+USER.id:'';") && page.includes("m.querySelectorAll('iframe,#welcome').forEach(e=>e.remove());"));
-ok('page: kept only once Needs you and the website card are in, and only while Home is still showing', page.includes("Promise.allSettled([buildNeedsYou(),cardOn('website')?loadWebsiteCard():null]).then(()=>{if(view===VIEW_SEQ)saveHomeCache();});") && page.includes("main.querySelector('#needs-body .skel')"));
+ok('page: kept only once Needs you and the website card are in, and only while Home is still showing', page.includes("Promise.allSettled([buildNeedsYou(),cardOn('website')?loadWebsiteCard():null,cardOn('website')?loadHeroSite():null]).then(()=>{if(view===VIEW_SEQ)saveHomeCache();});")   /* item 247: the hero loads with them */ && page.includes("main.querySelector('#needs-body .skel')"));
 ok('page: the kept Home cannot be pressed and says it is busy', page.includes("for(const el of[main,nav]){el.setAttribute('inert','');el.setAttribute('aria-busy','true');}"));
 ok('page: shown only when the visit lands on Home', page.includes('if(landsOnHome()&&!PREVIEW)paintHomeCache();') && /function landsOnHome\(\)\{[^\n]*q\.get\('support'\)\|\|q\.get\('project'\)\|\|q\.get\('approval'\)\|\|q\.get\('paid'\)\|\|q\.get\('connect'\)[^\n]*!localStorage\.getItem\(RETURN_KEY\)/.test(page));
 ok('page: wiped on sign-out, when nobody is signed in, and for a studio owner', page.includes('clearHomeCaches();try{await sb.auth.signOut();}') && /function signedOut\(\)\{if\(PREVIEW\)\{[^\n]*return;\}[^\n]*\n\s*dropHomeCacheView\(\);clearHomeCaches\(\);/.test(page) && page.includes("function ownerNote(){dropHomeCacheView();clearHomeCaches();"));
