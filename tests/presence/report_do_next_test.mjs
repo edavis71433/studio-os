@@ -5,6 +5,11 @@
 // download. The Do next list joins Needs you, health, Search, reviews, AI answers and
 // the coach's ideas for one client, with Done (away 30 days) and Not relevant (away
 // for good). No Supabase, Google or email leaves the test.
+import { pinClock, PINNED_NOW } from './clock.mjs';
+// Builder item 433: "last month's PDF" is counted from today, and these fixtures hold fixed dates, so "today" is pinned
+// (it starts at PINNED_NOW and ticks). Found by running the suites with the clock moved ahead.
+const restoreClock = pinClock(PINNED_NOW, { ticking: true });
+
 for (const [k, v] of Object.entries({ SUPABASE_URL: 'http://stub.local', SERVICE_ROLE_KEY: 'SERVICE-KEY', SUPABASE_ANON_KEY: 'ANON-KEY', SITE_URL: 'https://app.example', RESEND_KEY: 're_test_unused', RESEND_INBOUND_DOMAIN: 'reply.example.com' })) Deno.env.set(k, v);
 
 const results = [];
@@ -144,6 +149,7 @@ const extras = R.foldExtras({
   ok('wired: the studio’s routes and the report’s PDF', /handleDoNext\(req, route, method, member, principal, cors, \{ needs: \(\) => computeStudioNeeds\(member, principal, jwt, now\) \}\)/.test(src.routes) && /route === '\/report\/monthly\/pdf' && method === 'GET'\)/.test(src.idx));
 }
 
+restoreClock();
 const failed = results.filter((r) => !r.p).length;
 console.log(`report_do_next: ${results.length - failed} passed, ${failed} failed`);
 if (failed) Deno.exit(1);

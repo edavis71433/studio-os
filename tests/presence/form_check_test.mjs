@@ -8,6 +8,10 @@
 // unteaches it; the Inbox's Spam list says why; the email link asks, marks and undoes;
 // booking refuses a robot outright. Part C reads the page scripts.
 import { installFakePostgrest } from './fake_pgrst.mjs';
+import { pinClock, PINNED_NOW } from './clock.mjs';
+// Builder item 433: the Spam list keeps 30 days from today, and the pretend database dates its rows from Nov 8, and these fixtures hold fixed dates, so "today" is pinned
+// (it starts at PINNED_NOW and ticks). Found by running the suites with the clock moved ahead.
+const restoreClock = pinClock(PINNED_NOW, { ticking: true });
 
 const results = [];
 const ok = (n, p, note = '') => { results.push(!!p); console.log(`${p ? 'PASS' : 'FAIL'}  ${n}${note && !p ? ' — ' + note : ''}`); };
@@ -221,6 +225,7 @@ const hoursAgo = (h) => new Date(Date.now() - h * 3600_000).toISOString();
   ok('inbox.html: a Spam chip beside Open, New and All, with the reason and Not spam', inbox.includes("${chip('spam','Spam')}") && inbox.includes("api('/forms/inbox?spam=1')") && inbox.includes('<button id="notSpam" class="primary">Not spam</button>') && inbox.includes('l.spam_reason'));
 }
 
+restoreClock();
 const passed = results.filter(Boolean).length;
 console.log(`\n════ FORM CHECKS (item 140): ${passed}/${results.length} ${passed === results.length ? 'PASSED' : 'FAILED'} ════`);
 if (passed !== results.length) Deno.exit(1);

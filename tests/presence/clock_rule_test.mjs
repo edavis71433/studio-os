@@ -12,7 +12,8 @@
 //   1. no file under tests/e2e/ but the helper calls page.clock.setFixedTime( or
 //      page.clock.install({ time }) itself (install() with no time, runFor, fastForward,
 //      pauseAt, resume and setSystemTime drive timers or move a clock already set: they stay);
-//   2. no file under tests/presence/ but clock.mjs swaps Date or Date.now by hand;
+//   2. no file under tests/presence/ but clock.mjs (and time_travel.mjs, which moves the clock
+//      ahead for the time-travel run) swaps Date or Date.now by hand;
 //   3. a browser spec that holds a calendar date (2026-11-15) and never calls pinClock is on
 //      the "specs" list in real_clock_allowed.json, and the list only shrinks: a spec not on
 //      it fails until it pins, and a listed one that pins now (or holds no date) fails until
@@ -24,6 +25,7 @@
 // (their number is in text_checks_allowed.json). --update writes today's lists down; a name
 // added to a list belongs in the review of the change that adds it.
 import { pinClock, withClock, PINNED_NOW, clockPinned } from './clock.mjs';
+import { travel } from './time_travel.mjs';
 
 const HERE = new URL('./', import.meta.url);
 const E2E = new URL('../e2e/', import.meta.url);
@@ -89,7 +91,7 @@ if (Deno.args.includes('--update')) {
 
 // ═══ 2. a pure suite swaps the clock only through clock.mjs ═══
 {
-  const byHand = scripts(HERE).filter(([f, s]) => f !== 'clock.mjs' && SWAPS_DATE.test(s));
+  const byHand = scripts(HERE).filter(([f, s]) => !['clock.mjs', 'time_travel.mjs'].includes(f) && SWAPS_DATE.test(s));
   for (const [f, s] of byHand) ok(`tests/presence/${f} pins the clock through clock.mjs`, false, `line ${linesOf(s, SWAPS_DATE)}: use pinClock(at) or withClock(at, fn) from ./clock.mjs`);
   ok('no pure suite swaps Date or Date.now by hand', byHand.length === 0);
 }
@@ -135,6 +137,32 @@ if (Deno.args.includes('--update')) {
   try { await withClock('2026-11-15T18:00:00Z', () => { inside = Date.now(); throw new Error('stop'); }); } catch (e) { threw = e.message; }
   ok('withClock runs on the moment it is given', inside === Date.parse('2026-11-15T18:00:00Z'));
   ok('withClock puts the real clock back when the function throws, and the throw goes on', threw === 'stop' && globalThis.Date === Real && !clockPinned());
+}
+
+// ═══ 6. the time-travel run (builder item 433) ═══
+// The rule above reads the suites; it can't see fixed dates meeting code that reads the real
+// clock (tick_calls_402, Nov 23 2026). time-travel.yml runs every pure suite 32 and 400 days ahead.
+{
+  const WF = read(new URL('../../.github/workflows/time-travel.yml', HERE));
+  const SWEEP = read(new URL('../../scripts/ci-pure-tests.sh', HERE));
+  ok('time-travel.yml runs every pure suite 32 and 400 days ahead, on every pull request and on main',
+    /^ {2}pull_request:$/m.test(WF) && /^ {2}push:\n {4}branches: \[main\]$/m.test(WF) && /^ {8}days: \[32, 400\]$/m.test(WF)
+    && /TIME_TRAVEL_DAYS: \$\{\{ matrix\.days \}\}\n {8}run: bash scripts\/ci-pure-tests\.sh$/m.test(WF) && !/secrets\./.test(WF));
+  ok('…and the sweep preloads time_travel.mjs when TIME_TRAVEL_DAYS is set',
+    SWEEP.includes('pre="--preload=tests/presence/time_travel.mjs"') && SWEEP.includes('"$DENO" run $pre '));
+  const outer = globalThis.Date, before = Date.now(), given = new Date('2026-01-01T00:00:00Z').getTime();
+  const back = travel(400);
+  const moved = Date.now() - before, made = new Date().getTime() - before, said = Date.parse(Date()) - before;
+  ok('travel(400): now, new Date() and Date() are 400 days ahead', [moved, made, said].every((d) => Math.abs(d - 400 * 86_400_000) < 60_000), `${moved}`);
+  ok('…a date made from a given moment stays put, and is still a Date', new Date('2026-01-01T00:00:00Z').getTime() === given && new Date() instanceof Date);
+  const restore = pinClock(PINNED_NOW);
+  ok('…and a pinned suite still sees its pinned moment', Date.now() === Date.parse(PINNED_NOW));
+  restore(); back();
+  ok('…and the clock comes back', globalThis.Date === outer && Math.abs(Date.now() - before) < 60_000);
+  const tick = pinClock(PINNED_NOW, { ticking: true });
+  const a = Date.now(); await new Promise((r) => setTimeout(r, 30)); const b = Date.now();
+  tick();
+  ok('pinClock(at, { ticking: true }) starts at its moment and moves on with real time', a - Date.parse(PINNED_NOW) < 1000 && a >= Date.parse(PINNED_NOW) && b - a >= 20 && b - a < 5000, `${a - Date.parse(PINNED_NOW)} then +${b - a}`);
 }
 
 console.log(`\n════ CLOCK RULE: ${pass}/${pass + fail} ${fail ? 'FAILED' : 'PASSED'} ════`);
