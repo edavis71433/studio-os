@@ -34,8 +34,10 @@ case "$context" in
 esac
 # Once the release publishes the pages itself (scripts/pages-go-live.txt says "release",
 # scripts/publish-pages.sh), Netlify's own production build of a merge is never needed.
+# scripts/pages-live.sh sets PAGES_CHANGES_ONLY=1: it asks only whether a published file
+# changed between two commits, whoever publishes them, so this doesn't apply to it.
 mode="$(tr -d '[:space:]' < "$(dirname "$0")/pages-go-live.txt" 2>/dev/null || echo merge)"
-if [ "$context" = production ] && [ "$mode" = release ]; then
+if [ "$context" = production ] && [ "$mode" = release ] && [ -z "${PAGES_CHANGES_ONLY:-}" ]; then
   skip "The pages go live with the release (scripts/pages-go-live.txt), not on a merge."
 fi
 [ -n "$new" ] && [ -n "$old" ] || build "Netlify didn't say what it built last."
