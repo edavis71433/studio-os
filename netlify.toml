@@ -7,3 +7,7 @@
 [build]
   command = "bash scripts/build-public.sh"
   publish = "dist"
+  # Builder item 400: a merge that changes no published file builds nothing (exit 0 stops
+  # the build). Each production deploy is 15 credits; 22% of November's merges changed no
+  # published file. scripts/netlify-ignore.sh says which files can reach the site.
+  ignore = "bash scripts/netlify-ignore.sh"

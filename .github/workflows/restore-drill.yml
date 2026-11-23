@@ -1,0 +1,96 @@
+name: Restore drill (into a throwaway project)
+
+# Builder item 415: nobody had ever brought the data back. This brings production's
+# database and the newest weekly copy of its uploaded files into a NEW, EMPTY Supabase
+# project made for the drill, opens one client there, and writes what came back to the
+# run's summary (counts only). scripts/restore-drill.sh says each step, and refuses to
+# touch production.
+#
+# By hand only, and only with Eric's yes: the throwaway project costs money while it
+# exists (Supabase's smallest size is about 1.4 cents an hour). docs/RUN-SHEET.md,
+# "Restore", has the steps around it: make the project, add its database address as the
+# repository secret DRILL_DB_URL, run this, read the summary, then delete the project and
+# the secret.
+#
+# This repository is public, so the run's log and summary carry counts and table names,
+# never a row or a file name, and nothing is uploaded from it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      drill_ref:
+        description: "The throwaway project's ref (Project Settings, General). Never production's."
+        required: true
+      copy_run:
+        description: "The run id of the 'Copy of uploaded files' run to restore from (blank: the newest green one)"
+        required: false
+      confirm:
+        description: "Type restore-drill to bring production's data into the throwaway project"
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: restore-drill
+  cancel-in-progress: false
+
+env:
+  SUPABASE_CLI_VERSION: "2.122.0"
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Refuse without the phrase, the drill database or the passphrase
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+          DRILL_DB_URL: ${{ secrets.DRILL_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          [ "$CONFIRM" = restore-drill ] || { echo "::error title=Restore drill::Type restore-drill to run the drill. Nothing was done."; exit 1; }
+          [ -n "$DRILL_DB_URL" ] || { echo "::error title=Restore drill::The repository secret DRILL_DB_URL (the throwaway project's database address) isn't set. Nothing was done. docs/RUN-SHEET.md, \"Restore\"."; exit 1; }
+          [ "${#BACKUP_PASSPHRASE}" -ge 32 ] || { echo "::error title=Restore drill::The repository secret BACKUP_PASSPHRASE isn't set, so the copy of the files can't be opened. Nothing was done."; exit 1; }
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Which copy of the files to restore
+        id: copy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ASKED: ${{ github.event.inputs.copy_run }}
+        run: |
+          run="$ASKED"
+          if [ -z "$run" ]; then
+            run=$(gh api "repos/$REPO/actions/workflows/storage-copy.yml/runs?status=success&per_page=1" --jq '.workflow_runs[0].id // empty')
+          fi
+          printf '%s' "$run" | grep -qE '^[0-9]+$' || { echo "::error title=Restore drill::No green 'Copy of uploaded files' run was found to restore from."; exit 1; }
+          echo "Restoring the files from run $run."
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: uploaded-files-encrypted
+          run-id: ${{ steps.copy.outputs.run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/copy
+
+      - name: The tools the drill uses
+        run: command -v psql > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client > /dev/null; }
+
+      - name: Bring production back into the throwaway project, and open one client
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PROD_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+          DRILL_DB_URL: ${{ secrets.DRILL_DB_URL }}
+          DRILL_REF: ${{ github.event.inputs.drill_ref }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          COPY_DIR: ${{ runner.temp }}/copy
+        run: |
+          ARCHIVE=$(ls "$COPY_DIR"/uploaded-files-*.tar.gz.enc | head -1)
+          [ -f "$ARCHIVE" ] || { echo "::error title=Restore drill::The run's artifact holds no encrypted copy."; exit 1; }
+          ARCHIVE="$ARCHIVE" bash scripts/restore-drill.sh

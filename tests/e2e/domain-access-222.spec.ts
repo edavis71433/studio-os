@@ -1,6 +1,7 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_LEVEL_NAV, ALL_FEATURES } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Builder list item 222 (Nov 12 review, file 04, finding 2), drawn in Figma ("Files Trash and
 // Ask for access", section B) and approved: a domain's panel has a card for the studio's access.
@@ -70,7 +71,7 @@ const openPanel = async (page: Page, domain: string) => {
 
 test.describe('Domains: Ask for access (item 222)', () => {
   test('the list: a pill under each name that has an ask, a chip while one waits, and the count in the line', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 101)
+    await pinClock(page, '2026-11-15T18:00:00Z');   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 101)
     const t = await openDomains(page);
     await expect(page.locator('tr[data-domain="harbordental.com"] .acc')).toHaveText('Access: yes');
     await expect(page.locator('tr[data-domain="harbordental.com"] .acc')).toHaveClass(/\byes\b/);
@@ -85,7 +86,7 @@ test.describe('Domains: Ask for access (item 222)', () => {
   });
 
   test('the panel: the card says where the records are kept; the sheet shows the email the client gets, then sends it', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 101)
+    await pinClock(page, '2026-11-15T18:00:00Z');   // the fixtures' dates are fixed in 2026; from January a page adds the year (builder item 101)
     const t = await openDomains(page);
     await openPanel(page, 'brightbakery.com');
     const card = page.locator('#dpanel .dp-acc');
@@ -244,7 +245,7 @@ test.describe('Domains: Ask for access (item 222)', () => {
 // ── Builder item 396: Check now can email the client, so it is a manager's ──
 test.describe('Domains: Check now asks for the manager role (item 396)', () => {
   test('a view-only seat: Check now is greyed with the reason, and nothing is sent', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));
+    await pinClock(page, '2026-11-15T18:00:00Z');
     const t = await openDomains(page, { detailOver: { can_manage: false } });
     await openPanel(page, 'brightbakery.com');
     await expect(page.locator('#dpCheck')).toBeDisabled();
@@ -253,7 +254,7 @@ test.describe('Domains: Check now asks for the manager role (item 396)', () => {
   });
 
   test('a manager: Check now is there as before (and an older server, which says nothing, keeps it too)', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));
+    await pinClock(page, '2026-11-15T18:00:00Z');
     await openDomains(page, { detailOver: { can_manage: true } });
     await openPanel(page, 'brightbakery.com');
     await expect(page.locator('#dpCheck')).toBeEnabled();

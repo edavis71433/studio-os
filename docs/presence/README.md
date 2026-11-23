@@ -19,8 +19,8 @@ The two architectural spines, frozen, are the whole system in miniature — see 
 | I need to… | Read |
 |---|---|
 | Understand the system in a day | [V1 System Reference](V1-SYSTEM-REFERENCE.md) → [Constitution](constitution/03-final-constitution.md) |
-| Deploy it | [Deployment & Operations](DEPLOYMENT-AND-OPERATIONS.md) |
-| Recover production | [Deployment & Operations § Rollback/DR](DEPLOYMENT-AND-OPERATIONS.md#rollback--disaster-recovery) + [runbooks/](../runbooks/) |
+| Deploy it | [Run sheet § Release](../RUN-SHEET.md#release) |
+| Recover production | [Run sheet § Undo a release, Backups, Restore](../RUN-SHEET.md#restore) |
 | Debug a failing request | [API Reference](API-REFERENCE.md) (boundary order + error codes) + [V1 System Reference § Request Flow](V1-SYSTEM-REFERENCE.md#request-flow) |
 | Add a feature (safely) | [V1 System Reference § Extension rules](V1-SYSTEM-REFERENCE.md#extension--what-can-and-cannot-change) + [PLATFORM-CONTRACTS](PLATFORM-CONTRACTS.md) |
 | Add an Industry Pack | [THIRD-PARTY-PACK-GUIDE](THIRD-PARTY-PACK-GUIDE.md) |
@@ -50,7 +50,7 @@ The two architectural spines, frozen, are the whole system in miniature — see 
 
 ### Operations
 - **[Operations & Production Readiness](OPERATIONS-PRODUCTION-READINESS.md)** — the SRE/DevOps audit: monitoring, alerting, backups/DR, reliability, security ops, the Infrastructure Risk Register, and the production/launch checklists.
-- **[Deployment & Operations](DEPLOYMENT-AND-OPERATIONS.md)** — deploy technique (function + migration hold-back), monitoring, logging, backups, rollback, disaster recovery, maintenance, production checklist.
+- **[Run sheet](../RUN-SHEET.md)** (the current page; the older Deployment & Operations page is in `docs/archive/`) — deploy technique (function + migration hold-back), monitoring, logging, backups, rollback, disaster recovery, maintenance, production checklist.
 - **[RUNBOOKS](RUNBOOKS.md)** + **[runbooks/](../runbooks/)** — step-by-step operator procedures (new customer, domain, DNS, promotion, byte-check).
 - **[OPERATIONS](OPERATIONS.md)** — the L2 operational model (capacity, metering, the unattended cycle).
 

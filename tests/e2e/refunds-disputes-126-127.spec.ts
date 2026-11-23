@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installApp, ALL_FEATURES, STUDIO_NAV, STUDIO_LEVEL_NAV, settled } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Sales items 126, 127 (Stripe review, Nov 15 2026): a refund made in Stripe, full or part,
 // and a dispute a client opens, show wherever the invoice does. On the deal and the record
@@ -11,7 +12,7 @@ import { installApp, ALL_FEATURES, STUDIO_NAV, STUDIO_LEVEL_NAV, settled } from 
 // No test here writes anything: installApp's pretend server refuses any save. Names are made up.
 
 const PINNED = Date.parse('2026-11-16T18:00:00Z');
-test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date(PINNED)); });
+test.beforeEach(async ({ page }) => { await pinClock(page, PINNED); });
 
 const CLIENT = 'cccccccc-3333-4333-8333-cccccccccccc';
 const DEAL = 'dddddddd-4444-4444-8444-dddddddddddd';

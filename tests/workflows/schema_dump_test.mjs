@@ -44,7 +44,7 @@ const FLAGS = WORKFLOW.match(/openssl enc (-aes\S+ .*?) -salt/)?.[1] ?? '';
 const DUMP_FILE = '00-schema-foundation.sql';
 const FAKE = {
   SUPABASE_DB_URL: 'postgresql://postgres.fakeref:fake-db-password@pooler.example.invalid:6543/postgres',
-  SCHEMA_DUMP_PASSPHRASE: 'fake-passphrase-'.repeat(4),
+  BACKUP_PASSPHRASE: 'fake-passphrase-'.repeat(4),
 };
 
 const STUB_NPX = `#!/bin/bash
@@ -102,16 +102,18 @@ for (const f of ['deploy', 'rollback', 'schema-dump']) {
 const named = (word) => steps.find((s) => s.name?.includes(word));
 ok('the passphrase check is the first step', steps[0].name?.includes('passphrase'));
 ok('only the dump step sees the production URL', steps.filter((s) => s.env.DB_URL).length === 1 && named('Dump schema').env.DB_URL.includes('SUPABASE_DB_URL'));
-ok('the dump and guard steps do not see the passphrase', !named('Dump schema').env.SCHEMA_DUMP_PASSPHRASE && !named('guard').env.SCHEMA_DUMP_PASSPHRASE);
+ok('the dump and guard steps do not see the passphrase', !named('Dump schema').env.BACKUP_PASSPHRASE && !named('guard').env.BACKUP_PASSPHRASE);
 ok('the guard step sees no secrets', Object.keys(named('guard').env).length === 0);
 ok('no checkout, so no repo code runs beside the production URL', !steps.some((s) => s.uses?.startsWith('actions/checkout')));
 ok('the job has no GitHub token permissions', /^permissions: \{\}$/m.test(WORKFLOW));
 const upload = steps.find((s) => s.uses?.startsWith('actions/upload-artifact'));
 ok('only the encrypted file is uploaded, and a missing file fails', upload.with.path === `${DUMP_FILE}.enc` && upload.with['if-no-files-found'] === 'error');
 ok('no step prints the dump', !steps.some((s) => s.run && new RegExp(`\\b(head|tail|cat)\\b[^\\n]*${DUMP_FILE}`).test(s.run)));
-const runbook = read('docs/runbooks/ENVIRONMENTS.md');
+const runbook = read('docs/RUN-SHEET.md');   // builder item 422: the one run sheet says how to open a copy
 ok('the runbook decrypts with the same flags', FLAGS && runbook.includes(`openssl enc -d ${FLAGS} -pass env:`) && WORKFLOW.includes(`openssl enc -d ${FLAGS} -pass env:`), FLAGS);
-ok('the secrets inventory lists the passphrase', read('docs/SECRETS-INVENTORY.md').includes('`SCHEMA_DUMP_PASSPHRASE`'));
+ok('the run sheet names the passphrase and how to set it', runbook.includes('`BACKUP_PASSPHRASE`'));
+ok('it runs every week, and by hand', /^ {2}schedule:\n {4}- cron: "\d+ \d+ \* \* \d"/m.test(WORKFLOW) && /^ {2}workflow_dispatch:$/m.test(WORKFLOW));
+ok('each copy is kept 35 days, so five weekly copies are always there', /retention-days: 35$/m.test(WORKFLOW));
 
 // ── A clean dump: 0000_baseline.sql is what this workflow produced in July ───
 const BASE = read('supabase/migrations/0000_baseline.sql');
@@ -126,11 +128,11 @@ const decrypt = (passphrase) => new Deno.Command('openssl', {
   args: ['enc', '-d', ...FLAGS.split(' '), '-pass', 'env:P', '-in', cipherPath],
   env: { P: passphrase }, stdout: 'piped', stderr: 'null',
 }).output();
-const opened = await decrypt(FAKE.SCHEMA_DUMP_PASSPHRASE);
+const opened = await decrypt(FAKE.BACKUP_PASSPHRASE);
 ok('the runbook flags decrypt it to the exact dump', opened.code === 0 && new TextDecoder().decode(opened.stdout) === BASE);
 ok('a wrong passphrase does not open it', (await decrypt('wrong-'.repeat(8))).code !== 0);
 ok('the log has no line of the dump', !BASE.split('\n').some((l) => l.length >= 12 && clean.log.includes(l)));
-ok('the log has neither secret', !clean.log.includes(FAKE.SCHEMA_DUMP_PASSPHRASE) && !clean.log.includes(FAKE.SUPABASE_DB_URL));
+ok('the log has neither secret', !clean.log.includes(FAKE.BACKUP_PASSPHRASE) && !clean.log.includes(FAKE.SUPABASE_DB_URL));
 
 // ── Unsafe dumps: blocked before encryption, and the log never shows the text ─
 // Tokens are split so the fake keys don't set off secret scanning on this file.
@@ -162,7 +164,7 @@ ok('an empty dump is blocked', stoppedByGuard(await runWorkflow({ dump: '' })));
 ok('a dump with only the header is blocked', stoppedByGuard(await runWorkflow({ dump: BASE.split('CREATE')[0] })));
 const cliDown = await runWorkflow({ dump: BASE, cliExit: 1 });
 ok('a CLI failure stops the run at the dump step', cliDown.failedAt?.includes('Dump schema') && cliDown.uploaded === null);
-for (const [label, secrets] of [['missing', { SUPABASE_DB_URL: FAKE.SUPABASE_DB_URL }], ['short', { ...FAKE, SCHEMA_DUMP_PASSPHRASE: 'too-short' }]]) {
+for (const [label, secrets] of [['missing', { SUPABASE_DB_URL: FAKE.SUPABASE_DB_URL }], ['short', { ...FAKE, BACKUP_PASSPHRASE: 'too-short' }]]) {
   const r = await runWorkflow({ dump: BASE, secrets });
   ok(`a ${label} passphrase stops the run before production is read`, r.failedAt === steps[0].name && r.calls.length === 0 && r.files.length === 0);
 }

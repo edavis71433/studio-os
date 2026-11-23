@@ -1,9 +1,10 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // The fixtures' dates are fixed in 2026, so the clock is too: from January a page adds the
 // year to them, and the checks below say "Nov 9" (builder item 108).
-test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z')); });
+test.beforeEach(async ({ page }) => { await pinClock(page, '2026-11-15T18:00:00Z'); });
 
 // Builder list item 129 (Nov 9 2026): like Squarespace, a site opens into its own
 // home. A client's Overview now leads with their website: the picture of the home

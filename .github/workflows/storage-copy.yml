@@ -1,0 +1,52 @@
+name: Copy of uploaded files (weekly, encrypted)
+
+# Builder item 415: Supabase's daily backups hold the database but not the files people
+# upload (photos, PDFs, deliverables, form uploads). Every Sunday this copies every file in
+# every bucket of production into one encrypted archive and keeps it on the run for 35
+# days, so five weekly copies are always there. scripts/storage-copy.sh says how, and
+# scripts/restore-drill.sh puts a copy back into a throwaway project.
+#
+# This repository is public: anyone signed in to GitHub can download a run's artifacts and
+# read its logs. So the archive is encrypted before it is uploaded and the log carries
+# counts and sizes, never a file name. Without the repository secret BACKUP_PASSPHRASE (32
+# characters or more) it refuses before reading anything. Setting it, and opening a copy:
+# docs/RUN-SHEET.md, "Backups".
+#
+# It reads production with the deploy token already among the repository's secrets and
+# writes nothing there. tests/workflows/storage_copy_test.mjs runs the real script against
+# a stand-in Supabase.
+
+on:
+  schedule:
+    - cron: "41 9 * * 0"   # Sundays, 1:41 am Pacific
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storage-copy
+  cancel-in-progress: false
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Copy every uploaded file into one encrypted archive
+        id: copy
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          OUT_DIR: ${{ runner.temp }}
+        run: bash scripts/storage-copy.sh
+      - name: Keep the encrypted archive for 35 days (download it from this run's page)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: uploaded-files-encrypted
+          path: ${{ runner.temp }}/${{ steps.copy.outputs.file }}
+          if-no-files-found: error
+          retention-days: 35
+          compression-level: 0

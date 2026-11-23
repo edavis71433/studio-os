@@ -77,7 +77,7 @@ async function businessKnown(){if(!new URLSearchParams(location.search).get('cli
 // (build() then offers to set it up by hand instead of leaving "Drafting your website…" up)
 const api=(path,method,body)=>ddsApi(path,{method,body,scope:ownBusiness()});
 
-// ── the intake industries + smart default services (mirror of lib/onboarding.ts) ──
+// ── the intake industries + smart default services (the one copy: lib/onboarding.ts, a spec never wired in, went with builder item 423) ──
 const INDUSTRIES=[
   {key:'restaurant',label:'Restaurant',services:['Dinner','Lunch','Catering']},
   {key:'coffee_shop',label:'Café / Coffee Shop',services:['Coffee & espresso','Pastries','Breakfast']},

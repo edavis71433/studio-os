@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // ── connections.html + connections-callback.html ─────────────────────────────
 // The "Search Console circle": Eric pressed Connect Search Console and came
@@ -506,7 +507,7 @@ test.describe('Connections — ask the client to connect their Google', () => {
 // Item 95: the date ran into the last number ("4 from searchas of 2026-11-08"), as a raw date.
 // Builder item 101: the date is the shell's one date format, so a day in another year says its year.
 test('a connection’s numbers end with a separated, plain-words date', async ({ page }) => {
-  await page.clock.setFixedTime(new Date('2026-11-16T12:00:00Z'));   // "Mar 2" is this year's
+  await pinClock(page, '2026-11-16T12:00:00Z');   // "Mar 2" is this year's
   await installApp(page);
   await page.goto('/connections.html');
   const words = await page.evaluate(() => {

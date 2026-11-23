@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp, STUDIO_NAV, ALL_FEATURES } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // ── Settings: team and account safety (sales list items 101 and 109, bug hunt I1 to I7) ──
 // 101: the Monthly report switch greys while it saves, like Your menu. I1: an invite never
@@ -182,7 +183,7 @@ test.describe('Settings — the team (I1, I5)', () => {
 test.describe('Settings — closing the account (I2)', () => {
   test('a closing already asked for shows on every visit, with its real date and Cancel', async ({ page }) => {
     const posts: string[] = [];
-    await page.clock.setFixedTime(new Date('2026-11-16T12:00:00Z'));   // "Dec 11" is this year's (builder item 101: a day in another year says its year)
+    await pinClock(page, '2026-11-16T12:00:00Z');   // "Dec 11" is this year's (builder item 101: a day in another year says its year)
     await installApp(page, { api: { ...API, '/commerce/subscription': { data: { ...SUB, deletion: { scheduled_for: '2026-12-11T12:00:00Z', status: 'pending' } } } } });
     await page.route('**/functions/v1/presence/commerce/delete-*', (route) => {
       const what = new URL(route.request().url()).pathname.split('/').pop()!;

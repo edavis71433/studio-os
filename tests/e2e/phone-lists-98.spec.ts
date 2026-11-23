@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp, settled } from './helpers/app';
+import { pinClock } from './helpers/clock';
 import { CONTACTS_API, AGENCY_API, BROADCASTS_API, CUSTOMERS_API } from './tap-targets-98.fixtures';
 
 // ── Builder item 98: the lists on a phone and a touch tablet ─────────────────────────
@@ -12,7 +13,7 @@ const phone = () => test.info().project.name === 'mobile';
 const touch = () => !!test.info().project.use.hasTouch;
 
 test.describe('lists on a phone and a touch tablet (builder item 98)', () => {
-  test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z')); });
+  test.beforeEach(async ({ page }) => { await pinClock(page, '2026-11-16T18:00:00Z'); });
 
   test('a row of chips that runs off a phone fades out and has an arrow that moves it along; at its end both go', async ({ page }) => {
     test.skip(!phone(), 'the chips only run off a phone');

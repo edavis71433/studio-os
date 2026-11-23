@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { installApp } from './helpers/app';
+import { pinClock } from './helpers/clock';
 import { headerAction } from './helpers/page-header';
 
 // Visual Studio — the approved "make images" board over the EXISTING backend:
@@ -102,7 +103,7 @@ test.describe('Visual Studio (the approved board)', () => {
 
   test('Approved before lists saved plans with Use again, unapproved ones with Reopen — both reopen the plan', async ({ page }) => {
     let opened = '';
-    await page.clock.setFixedTime(new Date('2026-11-16T12:00:00Z'));   // the plans' dates are this year's: no year shown (builder item 101: the shell's one date format)
+    await pinClock(page, '2026-11-16T12:00:00Z');   // the plans' dates are this year's: no year shown (builder item 101: the shell's one date format)
     await installApp(page, { api: { '/visual/kinds': KINDS, '/visual/plans': PLANS } });
     await page.route('**/functions/v1/presence/visual/plans/p1', (route) => { opened = 'p1'; return route.fulfill(ok({ data: { ...PLANS.data[0], summary: 'The autumn banner.', variations: [{ id: 'v1', preview_url: IMG }] } })); });
     await page.goto('/visual-studio.html');

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { installApp } from './helpers/app';
+import { pinClock } from './helpers/clock';
 
 // Item 65 (Nov 2026): the record and the pipeline judge "today" on the studio's
 // LOCAL day. They used the UTC date, so from 4pm in Los Angeles a to-do due today
@@ -49,7 +50,7 @@ test.describe('Los Angeles, 11:30pm: the local day is still Nov 9', () => {
   test.use({ timezoneId: 'America/Los_Angeles' });
 
   test('List, Table and Board: a step due today says "Due today", never overdue; yesterday’s says Overdue', async ({ page }) => {
-    await page.clock.setFixedTime(LA_LATE);
+    await pinClock(page, LA_LATE);
     await display(page, 'list');
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');
@@ -76,7 +77,7 @@ test.describe('Los Angeles, 11:30pm: the local day is still Nov 9', () => {
   });
 
   test('the deal’s to-dos, the quick log and the server reads all use Nov 9', async ({ page }) => {
-    await page.clock.setFixedTime(LA_LATE);
+    await pinClock(page, LA_LATE);
     await display(page, 'list');
     await installApp(page, { api: API });
     const days: string[] = [];
@@ -101,7 +102,7 @@ test.describe('Los Angeles, 11:30pm: the local day is still Nov 9', () => {
   });
 
   test('the record’s Upcoming & overdue band: due today is "due today" even when the server (UTC) said overdue', async ({ page }) => {
-    await page.clock.setFixedTime(LA_LATE);
+    await pinClock(page, LA_LATE);
     const CLIENT = 'cccccccc-3333-4333-8333-cccccccccccc';
     const PROJECT = 'eeeeeeee-5555-4555-8555-eeeeeeeeeeee';
     let activityDay: string | null = null;
@@ -132,7 +133,7 @@ test.describe('Los Angeles, 11:30pm: the local day is still Nov 9', () => {
   });
 
   test('the record’s log offers today and sends it as local noon', async ({ page }) => {
-    await page.clock.setFixedTime(LA_LATE);
+    await pinClock(page, LA_LATE);
     const CLIENT = 'cccccccc-3333-4333-8333-cccccccccccc';
     const PROJECT = 'eeeeeeee-5555-4555-8555-eeeeeeeeeeee';
     await installApp(page, { api: {
@@ -160,7 +161,7 @@ test.describe('Los Angeles, 11:30pm: the local day is still Nov 9', () => {
 test.describe('Los Angeles, ten past midnight: Nov 9 has passed', () => {
   test.use({ timezoneId: 'America/Los_Angeles' });
   test('the step and the to-do due Nov 9 are overdue now', async ({ page }) => {
-    await page.clock.setFixedTime(LA_AFTER_MIDNIGHT);
+    await pinClock(page, LA_AFTER_MIDNIGHT);
     await display(page, 'list');
     await installApp(page, { api: API });
     await page.goto(`/pipeline.html?deal=${DEAL}`);
@@ -172,7 +173,7 @@ test.describe('Los Angeles, ten past midnight: Nov 9 has passed', () => {
 test.describe('Auckland, 12:30am: a day ahead of UTC', () => {
   test.use({ timezoneId: 'Pacific/Auckland' });
   test('a step due Nov 9 is overdue (the UTC day would still call it today); Nov 10’s is due today', async ({ page }) => {
-    await page.clock.setFixedTime(AKL_EARLY);
+    await pinClock(page, AKL_EARLY);
     await display(page, 'list');
     await installApp(page, { api: API });
     await page.goto('/pipeline.html');

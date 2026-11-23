@@ -38,6 +38,7 @@
  "client_portal_bugs_test.mjs": 9,
  "client_record_test.mjs": 3,
  "client_website_test.mjs": 2,
+ "clock_rule_test.mjs": 1,
  "colour_literals_test.mjs": 4,
  "comments_159_test.mjs": 5,
  "contact_fields_89_test.mjs": 2,

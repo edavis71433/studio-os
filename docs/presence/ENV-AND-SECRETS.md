@@ -2,7 +2,7 @@
 
 The source of truth for **which** configuration exists is the `Deno.env.get(...)` calls in the deployed function; this doc enumerates them for V1. **Values live only in the Supabase / Netlify / Stripe dashboards — never in this repo.** Staging and production run **identical code**; only these values differ.
 
-Supersedes `docs/SECRETS-INVENTORY.md` (which predates the Connected Platform and Visual Studio).
+This is the one list of the server's secrets (builder item 422, Nov 22 2026); the older `docs/SECRETS-INVENTORY.md` is in `docs/archive/`. How to change one: `docs/RUN-SHEET.md`, "Change a secret".
 
 ## Presence function secrets (Supabase → Edge Functions → Secrets)
 
@@ -24,6 +24,9 @@ Supersedes `docs/SECRETS-INVENTORY.md` (which predates the Connected Platform an
 | `VISUAL_MODEL_NAME` | image model name override | optional | default `gpt-image-1` |
 | `REPLICATE_API_TOKEN` | the photo editor's **Cut out the subject** (Replicate, open model pinned in `lib/cutout.ts`) | optional | absent → the button doesn't show; the free plain-background tool still works. About $0.0004 a photo; Replicate deletes inputs and outputs after an hour |
 | `STRIPE_SECRET` | checkout + subscriptions | **activation** (billing) | **TEST key on staging, always** |
+| `STRIPE_WEBHOOK_SECRET` | verifying Stripe's webhooks (the stripe-webhook function; provisioning on payment) | activation (billing) | from the webhook's page at Stripe |
+| `PLACES_KEY` | the Prospects page's business search and the Search tab's map rank grid (Google Places) | optional | absent → finding businesses and scanning say they aren't switched on |
+| `PSI_KEY` | Google PageSpeed Insights for the free site review (`PSI_API_KEY` accepted too) | optional | absent → the review has no PageSpeed scores |
 | `SITE_URL` | the app's address for every emailed link and every Stripe return (builder item 388: one helper, `_shared/app_url.ts`) | optional | Production sets it to `https://app.davisdigitalstudio.com`. Without it: `APP_URL`, then the app's address. Never the main site: its pages are on Squarespace and answer "not found". Staging: the staging/preview URL. |
 | `BILLING_SYNC_SECRET` | gates the Stripe webhook sync tier | recommended | |
 | `NETLIFY_AUTH_TOKEN` | site publish/deploy | yes (publish) | rotation runbook exists |
