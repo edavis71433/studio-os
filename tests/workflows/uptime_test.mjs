@@ -13,7 +13,7 @@ const ok = (n, p, note = '') => { results.push({ n, p: !!p }); console.log(`${p 
 
 // ── The workflow's shape ─────────────────────────────────────────────────────
 const WF = read('.github/workflows/uptime.yml');
-ok('runs every 15 minutes', /^ {2}schedule:\n {4}- cron: "\*\/15 \* \* \* \*"$/m.test(WF));
+ok('runs every 15 minutes, off the top of the hour', /^ {2}schedule:\n(?: {4}#.*\n)* {4}- cron: "7,22,37,52 \* \* \* \*"$/m.test(WF));
 ok('…and by hand', /^ {2}workflow_dispatch:$/m.test(WF));
 ok('reads no repository secret: nothing here needs more than a visitor has', !/secrets\./.test(WF));
 ok('may read the repository and nothing else', /^permissions:\n {2}contents: read\n(?! {2})/m.test(WF));
