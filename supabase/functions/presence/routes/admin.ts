@@ -738,7 +738,7 @@ async function handleAgencyProvision(req: Request, cors: Record<string, string>)
   const nameHtml = name.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
   const invited = await sendEmail(ownerEmail, `Your agency workspace is ready — ${name}`,
     `<p>Welcome! <strong>${nameHtml}</strong> is set up on Studio OS.</p><p>${cta}</p>`,
-    undefined, { critical: true }).catch(() => false);   // login access = transactional
+    undefined, { critical: true, keep: 'sign_in' }).catch(() => false);   // login access = transactional; kept until it goes (item 393)
 
   return json({ data: { id: agency.id, agency_id: agency.id, client_id: clientId, site_id: prov.siteId, invited: !!invited, already_existed: alreadyExisted } }, 200, cors);
 }

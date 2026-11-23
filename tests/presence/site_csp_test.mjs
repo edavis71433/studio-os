@@ -113,7 +113,7 @@ ok('homes: a site not hosted yet has none', siteHomes({ id: SITE_ID }).length ==
   const pub = read('supabase/functions/presence/routes/publish.ts');
   const at = (s) => pub.indexOf(s);
   ok('publish: the rule is worked out from the drawn pages and the sealed ones', /const drawn = fileMap;[^\n]*\n\s*fileMap = await lockPages\(fileMap[^\n]*\n\s*csp = await publishedCspFor\(\[drawn, fileMap\], fnBase \? new URL\(fnBase\)\.origin : '', siteHomes\(site\)\);/.test(pub));
-  ok('publish: and goes into _headers before anything deploys', at('csp = await publishedCspFor(') > 0 && at(", csp);") > at('csp = await publishedCspFor(') && at(", csp);") < at('deployFileMap('));
+  ok('publish: and goes into _headers before anything deploys', at('csp = await publishedCspFor(') > 0 && at(", csp, {") > at('csp = await publishedCspFor(') && at(", csp, {") < at('deployFileMap('));   // builder item 390: with the site's HSTS form
   ok('the pages\' own <meta> rule is unchanged (the canvas and the goldens draw as before)', read('supabase/functions/presence/lib/render.ts').includes(`export const PUBLISHED_CSP = "default-src 'self' https: data: 'unsafe-inline'; object-src 'none'; base-uri 'self'";`));
 }
 

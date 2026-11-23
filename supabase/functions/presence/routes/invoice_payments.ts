@@ -226,5 +226,5 @@ async function emailReceipt(siteId: string, paidRow: any, inv: any, leftCents: n
     + (leftCents > 0 ? `<p>${usd(leftCents)} is still due on it.</p>` + (payUrl && /^https:\/\//.test(payUrl) ? `<p class="cta"><a href="${escH(payUrl)}" style="display:inline-block;margin-top:6px;background:${brand.accent};color:#fff;padding:9px 16px;border-radius:999px;text-decoration:none">Pay ${usd(leftCents)} securely →</a></p>` : '') : `<p>${inv.purpose === 'deposit' ? 'Your deposit is in.' : 'The invoice is paid in full.'} Nothing else is needed from you.</p>`)
     + `<p style="margin-top:6px">Your receipt is attached as a PDF.${link ? ` <a href="${link}" style="color:${brand.accentDark}">View it online →</a>` : ''}</p>`;
   return await sendEmail(String(contact.email), `Receipt${no ? ' for ' + no : ''} — ${usd(row.amount_cents)} received, thank you`, html, brand,
-    { critical: true, asBusiness: true, siteId, ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // their own payment = transactional; an answer lands in the Inbox
+    { critical: true, asBusiness: true, siteId, keep: 'money', ...(pdf ? { attachments: [{ filename: pdfFileName('invoice', row), content: pdf }] } : {}) });   // their own payment = transactional; an answer lands in the Inbox
 }

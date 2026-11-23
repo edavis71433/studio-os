@@ -254,7 +254,7 @@ export async function runLifecycleSweep(limit = 50): Promise<{ expired_trials: n
         notices++;
         // payment_trouble + winddown_reminder are TRANSACTIONAL (payment failure /
         // "your site comes down") — they must survive a marketing opt-out.
-        const critical = kind === 'payment_trouble' || kind === 'winddown_reminder' ? { critical: true } : undefined;
+        const critical = kind === 'payment_trouble' || kind === 'winddown_reminder' ? { critical: true, keep: 'money' as const } : undefined;   // builder item 393: kept until it goes
         if (email && (await sendEmail(email, copy.subject, copy.html, undefined, critical))) emails++;
       }
     }
@@ -1257,7 +1257,7 @@ export async function runInvoiceReminders(limit = 20, nowMs = Date.now()): Promi
         const doc = await docLinkFor('invoice', inv.id, inv.site_id).catch(() => null);
         const more = invoiceReminderMore(doc, brand.accentDark);
         // Sales item 74: money they owe always reaches them (critical, so no unsubscribe on it); their answer lands in the Inbox
-        sent = await sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>${more}`, brand, { critical: true, asBusiness: true, siteId: inv.site_id }).catch(() => false);
+        sent = await sendEmail(email, copy.subject, `<p>${copy.line}</p><p class="cta">${btn}</p>${more}`, brand, { critical: true, asBusiness: true, siteId: inv.site_id, keep: 'money' }).catch(() => false);
       } catch { sent = false; }
       const failedPeriod = invoiceReminderFailedPeriod(inv.id, slot);
       if (sent) {

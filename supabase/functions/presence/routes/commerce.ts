@@ -462,7 +462,7 @@ export async function invoicePaidEcho(invoiceId: string): Promise<Record<string,
           emailFacts([[isDeposit ? 'Deposit' : 'Invoice', `${what}${no ? ` ${no}` : ''}`], ['Amount paid', amount]], { big: true, tone: 'good' }) +
           `<p>${isDeposit ? 'The deposit is in and the work can begin.' : 'The invoice is settled — nothing else is needed from you.'} ${told}, and everything updates on its own.</p>` +
           `<p style="color:#666;font-size:.9rem">${attachments ? 'Your receipt is attached as a PDF. ' : ''}Keep this email for your records.</p>`,
-          brand, { critical: true, asBusiness: true, siteId: String(inv.site_id), ...(attachments ? { attachments } : {}) });
+          brand, { critical: true, asBusiness: true, siteId: String(inv.site_id), keep: 'money', ...(attachments ? { attachments } : {}) });
       } else if (!payerEmail) {
         console.warn(`[invoice-paid] no client email resolvable for invoice ${inv.id} (deal ${inv.deal_id || 'none'}) — the payer gets no receipt; add an email to the deal's contact`);
       }

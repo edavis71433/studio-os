@@ -316,7 +316,7 @@ async function emailRefund(m: Match, p: People, refund: { amount: number; full: 
       + `<p>${studio} ${has} ${said}</p>` + facts
       + `<p>${where}</p>`
       + `<p style="color:#6b6478;font-size:14px;margin-top:14px">Questions about it? Just reply to this email.</p>`;
-    return await sendEmail(p.email, `Your refund of ${money} is on its way`, html, brand, { critical: true, asBusiness: true, siteId: m.siteId });   // their own money = transactional; an answer lands in the Inbox
+    return await sendEmail(p.email, `Your refund of ${money} is on its way`, html, brand, { critical: true, asBusiness: true, siteId: m.siteId, keep: 'money' });   // their own money = transactional; an answer lands in the Inbox
   } catch (e) { console.warn(`[charge-returns] refund email failed: ${String((e as Error)?.message || e)} (non-fatal)`); return false; }
 }
 

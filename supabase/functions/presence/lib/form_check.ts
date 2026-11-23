@@ -22,8 +22,16 @@ import { readReservedJson, updateReservedJson, RESERVED_NAMES } from './reserved
 
 /** A ticket younger than this came from something faster than a person. */
 export const TICKET_MIN_AGE_S = 3;
-/** And one older than this is stale: the page asks again after 11 hours. */
-export const TICKET_MAX_AGE_S = 24 * 3600;
+/** And one older than this is stale (builder item 391): a ticket used to be good for 24 hours,
+ *  again and again, so one fetch let a script send all day. Pages published since ask for a
+ *  new one after 20 minutes (lib/site_send.ts TICKET_FRESH_MS), so 30 minutes is plenty. */
+export const TICKET_MAX_AGE_S = 30 * 60;
+/** What a site's pages published before item 391 can still send: they ask again only after
+ *  11 hours, so their tickets are good for 24 until the site is published again. */
+export const OLD_PAGES_TICKET_MAX_AGE_S = 24 * 3600;
+/** After the first publish with the short tickets, pages already open in a browser keep the
+ *  old sender until reloaded: the old limit holds this long more. */
+export const SHORT_TICKETS_GRACE_MS = 12 * 3600_000;
 // builder item 394: a ticket and a "This was spam" link each have their own key
 const signingKey = () => linkKey('form_ticket');
 const spamKey = () => linkKey('spam_link');
@@ -37,7 +45,7 @@ export async function issueTicket(siteId: string, nowSec: number, key = signingK
 }
 
 export type TicketState = 'ok' | 'missing' | 'bad' | 'too_fast' | 'stale';
-export async function readTicket(ticket: unknown, siteId: string, nowSec: number, key = signingKey()): Promise<TicketState> {
+export async function readTicket(ticket: unknown, siteId: string, nowSec: number, key = signingKey(), maxAgeS = TICKET_MAX_AGE_S): Promise<TicketState> {
   const t = String(ticket ?? '').trim();
   if (!t) return 'missing';
   const m = /^(\d{9,11})\.([0-9a-f]{32})$/.exec(t);
@@ -46,7 +54,7 @@ export async function readTicket(ticket: unknown, siteId: string, nowSec: number
   if (!(await signedWithAny('form_ticket', key, async (k) => timingSafeEqual(m[2], (await hmacHex(k, `form-ticket|${siteId}|${issued}`)).slice(0, 32))))) return 'bad';
   const age = nowSec - issued;
   if (age < TICKET_MIN_AGE_S) return 'too_fast';
-  return age > TICKET_MAX_AGE_S ? 'stale' : 'ok';
+  return age > maxAgeS ? 'stale' : 'ok';
 }
 
 /** A link in the name box, or three or more in the message: a robot's or a pitch's mark. */
@@ -77,16 +85,37 @@ export function spamReason(i: { trap: boolean; ticket: TicketState; checking: bo
 /** True an hour after the site first published pages that ask for tickets (set by
  *  routes/publish.ts): the hour lets a visitor who opened an older page finish sending. */
 export const CHECK_GRACE_MS = 3600_000;
-export async function siteChecksSends(siteId: string, nowMs = Date.now()): Promise<boolean> {
-  const v = await readReservedJson(siteId, RESERVED_NAMES.formCheck);
-  const since = v && typeof v === 'object' ? Date.parse(String((v as { since?: string }).since || '')) : NaN;
-  return Number.isFinite(since) && nowMs - since >= CHECK_GRACE_MS;
+/** What a site's sends are held to: whether they must carry a ticket, and how old it may be. */
+export interface SendCheck { checking: boolean; maxAgeS: number }
+const NO_CHECK: SendCheck = { checking: false, maxAgeS: OLD_PAGES_TICKET_MAX_AGE_S };
+/** From the site's reserved row { since, short_since } (both set by startCheckingSends). Pure. */
+export function sendCheckOf(v: unknown, nowMs: number): SendCheck {
+  const o = (v && typeof v === 'object' ? v : {}) as { since?: string; short_since?: string };
+  const since = Date.parse(String(o.since || '')), short = Date.parse(String(o.short_since || ''));
+  return {
+    checking: Number.isFinite(since) && nowMs - since >= CHECK_GRACE_MS,
+    // item 391: 30 minutes once the site's pages carry the 20-minute sender and the old ones had time to go
+    maxAgeS: Number.isFinite(short) && nowMs - short >= SHORT_TICKETS_GRACE_MS ? TICKET_MAX_AGE_S : OLD_PAGES_TICKET_MAX_AGE_S,
+  };
 }
-/** Called after a successful publish: from now on this site's sends must carry a ticket. */
+export async function sendCheck(siteId: string, nowMs = Date.now()): Promise<SendCheck> {
+  return sendCheckOf(await readReservedJson(siteId, RESERVED_NAMES.formCheck), nowMs);
+}
+export async function siteChecksSends(siteId: string, nowMs = Date.now()): Promise<boolean> {
+  return (await sendCheck(siteId, nowMs)).checking;
+}
+/** Called after a successful publish: from now on this site's sends must carry a ticket, and
+ *  (item 391) its pages ask for a fresh one after 20 minutes, so once the old pages had time
+ *  to go a ticket is good for 30. Each moment is written once and kept. */
 export async function startCheckingSends(siteId: string): Promise<void> {
   const v = await readReservedJson(siteId, RESERVED_NAMES.formCheck);
-  if (v && typeof v === 'object' && (v as { since?: string }).since) return;
-  await updateReservedJson(siteId, RESERVED_NAMES.formCheck, (cur) => (cur && typeof cur === 'object' && (cur as { since?: string }).since ? cur : { since: new Date().toISOString() }), 'system');
+  const has = (x: unknown, k: 'since' | 'short_since') => !!(x && typeof x === 'object' && (x as Record<string, unknown>)[k]);
+  if (has(v, 'since') && has(v, 'short_since')) return;
+  const now = new Date().toISOString();
+  await updateReservedJson(siteId, RESERVED_NAMES.formCheck, (cur) => {
+    const c = (cur && typeof cur === 'object' ? cur : {}) as Record<string, unknown>;
+    return { ...c, since: c.since || now, short_since: c.short_since || now };
+  }, 'system');
 }
 
 // ── the addresses an owner marked as spam, per site, as hashes ──
@@ -114,12 +143,12 @@ export async function markSender(siteId: string, email: unknown, on: boolean): P
 
 /** One read of everything a form send is judged on. Never throws: a failed read checks nothing. */
 export async function judgeSend(siteId: string, s: { trap: boolean; ticket: unknown; email: unknown; name: unknown; message: unknown }, nowSec = Math.floor(Date.now() / 1000)): Promise<string | null> {
-  const [checking, known, ticket] = await Promise.all([
-    ticketsOn() ? siteChecksSends(siteId).catch(() => false) : false,
+  const [check, known] = await Promise.all([
+    ticketsOn() ? sendCheck(siteId, nowSec * 1000).catch(() => NO_CHECK) : NO_CHECK,
     isMarkedSender(siteId, s.email).catch(() => false),
-    readTicket(s.ticket, siteId, nowSec),
   ]);
-  return spamReason({ trap: s.trap, ticket, checking, known, words: wordsLookLikeSpam(s.name, s.message) });
+  const ticket = await readTicket(s.ticket, siteId, nowSec, undefined, check.maxAgeS);
+  return spamReason({ trap: s.trap, ticket, checking: check.checking, known, words: wordsLookLikeSpam(s.name, s.message) });
 }
 
 // ── the "This was spam" link in the owner's alert email ──

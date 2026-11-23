@@ -27,7 +27,7 @@ ok('invite: helper exists and takes the studio siteId', inviteStart > 0 && /send
 ok('invite: loads the STUDIO email brand (loadEmailBrand on the caller’s site)', /loadEmailBrand\(siteId\)/.test(invite));
 // item 71: the invite also carries the studio's site, so "message me directly" answers land in the Inbox
 // sales item 92: and comes from the studio (asBusiness)
-ok('invite: the send carries that brand (not the platform default shell)', /\n  brand, \{ critical: true, (asBusiness: true, )?siteId \}/.test(invite) && !/\n  undefined, \{ critical: true/.test(invite));
+ok('invite: the send carries that brand (not the platform default shell)', /\n  brand, \{ critical: true, (asBusiness: true, )?siteId(, keep: 'sign_in')? \}/.test(invite) && !/\n  undefined, \{ critical: true/.test(invite));
 ok('invite: subject is studio-voiced — "Your client portal is ready — <studio>"', /`Your client portal is ready\$\{studioName \? ` — \$\{studioName\}` : ''\}`/.test(invite));
 // comments may still NAME the platform (the secrecy-rule explanation does); the
 // sent subject/body must not — so strip comments, then look for the string.

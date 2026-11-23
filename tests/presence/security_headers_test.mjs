@@ -25,7 +25,7 @@ const merged = mergeSecurityHeaders(typeof templateHeaders === 'string' ? templa
 // ═══ 1. every required directive is present in the published `_headers` ═══
 {
   const required = [
-    ['HSTS (>=1yr, includeSubDomains, preload)', /Strict-Transport-Security:\s*max-age=(\d+); includeSubDomains; preload/],
+    ['HSTS, one year, the site\'s own name only (builder item 390)', /Strict-Transport-Security:\s*max-age=31536000\n/],
     ['X-Frame-Options DENY', /X-Frame-Options:\s*DENY/],
     ['X-Content-Type-Options nosniff', /X-Content-Type-Options:\s*nosniff/],
     ['Referrer-Policy', /Referrer-Policy:\s*strict-origin-when-cross-origin/],
@@ -77,6 +77,20 @@ const merged = mergeSecurityHeaders(typeof templateHeaders === 'string' ? templa
     }
   }
   ok('all directives well-formed (valid name, non-empty value, no stray newline)', bad.length === 0, bad.slice(0, 3).join(' | '));
+}
+
+// ═══ 4b. builder item 390: "HTTPS only" per domain ═══
+{
+  const { mergeSecurityHeaders: merge, isStudioOwnDomain, HSTS_ONE_YEAR, HSTS_STRONG } = await import('../../supabase/functions/presence/lib/security_headers.ts');
+  const { offlineFileMap } = await import('../../supabase/functions/presence/lib/offline_page.ts');
+  const { comingSoonFileMap } = await import('../../supabase/functions/presence/lib/coming_soon.ts');
+  const hsts = (text) => (text.match(/Strict-Transport-Security:\s*(.+)/) || [])[1];
+  ok('390: a customer\'s site says one year, for its own name, and never asks to join the browsers\' built-in list', hsts(merge(templateHeaders)) === 'max-age=31536000' && HSTS_ONE_YEAR === 'max-age=31536000' && !/includeSubDomains|preload/.test(merge(templateHeaders)));
+  ok('390: a site on the studio\'s own domain keeps the strong form', hsts(merge(templateHeaders, undefined, { strongHsts: true })) === 'max-age=63072000; includeSubDomains; preload' && HSTS_STRONG === 'max-age=63072000; includeSubDomains; preload');
+  ok('390: the studio\'s own domains are its own and the names under them', ['davisdigitalstudio.com', 'tools.davisdigitalstudio.com', 'DavisDigitalStudio.com.', ' www.davisdigitalstudio.com '].every(isStudioOwnDomain));
+  ok('390: every other domain is a customer\'s, look-alikes included, and no domain at all gets the year too', !['kismetbakery.com', 'www.kismetbakery.com', 'davisdigitalstudio.com.evil.example', 'notdavisdigitalstudio.com', 'davisdigitalstudio.co', '', null, undefined].some(isStudioOwnDomain));
+  ok('390: the offline and Coming soon pages say what the site says', hsts(offlineFileMap('<p>x</p>')['_headers']) === 'max-age=31536000' && hsts(comingSoonFileMap('<p>x</p>')['_headers']) === 'max-age=31536000' && hsts(offlineFileMap('<p>x</p>', { strongHsts: true })['_headers']) === HSTS_STRONG && hsts(comingSoonFileMap('<p>x</p>', { strongHsts: true })['_headers']) === HSTS_STRONG);
+  ok('390: one HSTS line however it is merged, and the other headers unchanged', (merge(merge(templateHeaders, undefined, { strongHsts: true })).match(/Strict-Transport-Security:/g) || []).length === 1 && merge(templateHeaders, undefined, { strongHsts: true }).replace(HSTS_STRONG, HSTS_ONE_YEAR) === merged);
 }
 
 // ═══ 5. determinism + reproducibility ═══

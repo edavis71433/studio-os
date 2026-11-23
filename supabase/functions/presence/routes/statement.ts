@@ -105,7 +105,7 @@ export async function handleStatementEmail(req: Request, site: SiteRow, _princip
   const sent = await sendEmail(built.email, `Your statement from ${studio}: ${usDate(built.p.from)} to ${usDate(built.p.to)}`,
     emailBand('Statement', `${usDate(built.p.from)} to ${usDate(built.p.to)}`) + `<p>Here is your statement from ${esc(studio)}: every invoice and payment in those days, with the balance as it went.</p>` +
     emailFacts([['Owed now', money(Math.max(0, built.sum.owed_now))]], { big: true }) + `<p>It is attached as a PDF. Have a question about it? Just reply to this email.</p>`,
-    brand, { critical: true, asBusiness: true, siteId: site.id, attachments: [{ filename: built.name, content: built.pdf }] }).catch(() => false);
+    brand, { critical: true, asBusiness: true, siteId: site.id, keep: 'money', attachments: [{ filename: built.name, content: built.pdf }] }).catch(() => false);
   if (!sent) return json({ error: 'send_failed', message: 'The statement didn’t send. Try again, or download it.' }, 502, cors);
   return json({ data: { sent: true, to_first: built.who } }, 200, cors);
 }

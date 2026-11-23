@@ -43,6 +43,9 @@ import { wordsHtml, quoteBlock, followupPlan } from '../lib/follow_ups.ts';   //
 import { readVisitStats } from '../lib/visit_stats.ts';
 import { guardedFetch } from '../../_shared/tools/url_guard.ts';   // builder item 204
 
+/** Builder item 391: what one site's forms take, whatever the address (lib/auto_reply.ts caps the emails). */
+export const FORM_POSTS_PER_MINUTE = 20, FORM_POSTS_PER_HOUR = 300;
+
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 // builder item 394: one-tap approval links have their own key (never the scheduler's secret)
 const approvalKey = () => linkKey('approval');
@@ -126,7 +129,9 @@ export async function handleFormSubmit(req: Request, siteId: string, cors: Recor
   // Item 131: a plain post over the limit lands on the site's "didn't send" page, not
   // on the server's raw answer at its own address.
   const rlIp = clientIp(req);
-  if (!(await rateAllow(`forms:ip:${rlIp}`, 10, 60)) || !(await rateAllow(`forms:site:${siteId}`, 60, 60))) {
+  // Builder item 391: a site took 60 posts a minute, each able to set off an email; now 20 a
+  // minute and 300 an hour (a busy launch day of a small business is a fraction of that).
+  if (!(await rateAllow(`forms:ip:${rlIp}`, 10, 60)) || !(await rateAllow(`forms:site:${siteId}`, FORM_POSTS_PER_MINUTE, 60)) || !(await rateAllow(`forms:site-hour:${siteId}`, FORM_POSTS_PER_HOUR, 3600))) {
     if (toPage) {
       const s = await svc(`presence_sites?id=eq.${siteId}&select=id,client_id,custom_domain,netlify_site_id&limit=1`);
       const origin = s.json?.[0] ? siteAddress(s.json[0]) : '';
